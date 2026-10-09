@@ -130,3 +130,62 @@ fn an_index_orders_the_requested_scopes_and_evicts_the_least_recently_used() {
     let loads_after = world.trace().iter().filter(|line| line.contains("out Load")).count();
     assert_eq!(loads_after, loads_before + 1, "least recently used scope was reloaded");
 }
+
+#[test]
+fn a_notes_last_write_time_survives_restart_and_a_refused_correction() {
+    let mut world = World::default();
+    world.set_wall(skein_lib::Wall::from_nanos(100));
+    assert_eq!(
+        world.call(Event::Write {
+            owner: Token::new(1),
+            entry: task_entry(20, PROJECT, b"warmup", b"old", 9),
+            recalled: None,
+        }),
+        Answer::Written { name: 20, revision: 1 }
+    );
+    assert_eq!(world.stored_entry(20).expect("written entry").changed, skein_lib::Wall::from_nanos(100));
+    world.set_wall(skein_lib::Wall::from_nanos(200));
+    assert_eq!(
+        world.call(Event::Write {
+            owner: Token::new(2),
+            entry: task_entry(20, PROJECT, b"warmup revised", b"revised", 9),
+            recalled: Some(1),
+        }),
+        Answer::Written { name: 20, revision: 2 }
+    );
+    assert_eq!(world.stored_entry(20).expect("written entry").changed, skein_lib::Wall::from_nanos(200));
+    world.set_wall(skein_lib::Wall::from_nanos(300));
+    assert_eq!(
+        world.call(Event::Edit {
+            owner: Token::new(3),
+            party: 5,
+            name: 20,
+            scope: PROJECT,
+            change: correction(2, b"warmup corrected", b"new"),
+        }),
+        Answer::Written { name: 20, revision: 3 }
+    );
+    world.set_wall(skein_lib::Wall::from_nanos(400));
+    assert_eq!(
+        world.call(Event::Edit {
+            owner: Token::new(4),
+            party: 5,
+            name: 20,
+            scope: PROJECT,
+            change: correction(2, b"stale", b"stale"),
+        }),
+        Answer::Refused { why: Refusal::Moved { revision: 3 } }
+    );
+    world.restart();
+    let Answer::Recalled { entries, more: false } =
+        world.call(Event::Recall { owner: Token::new(5), by: Recall::Name { name: 20 }, page: 0 })
+    else {
+        panic!("entry recalled after restart")
+    };
+    let entry = entries.get(0).expect("recalled entry");
+    assert_eq!(entry.changed, skein_lib::Wall::from_nanos(300));
+    assert_eq!(entry.revision, 3);
+    assert_eq!(entry.author, Author::Party { party: 5 });
+    assert_eq!(&*entry.body, b"new");
+    assert_eq!(world.commits(), 3);
+}

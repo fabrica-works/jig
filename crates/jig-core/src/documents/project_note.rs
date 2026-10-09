@@ -448,7 +448,7 @@ pub fn note_from_entry(core: &Core, limits: &Limits, party: u64, value: &notes::
         body: super::small::text(&value.body, limits.documents.text_bytes),
         writer: value.author,
         tasks,
-        changed: None,
+        changed: Some(value.changed),
         revision: value.revision,
         cut: usize::try_from(value.references.len()).expect("references fit") > bound(limits),
     })

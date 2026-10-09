@@ -94,6 +94,7 @@ fn entry(project: u32, name: u64, description: &[u8]) -> Entry {
         references: List::with_capacity(2),
         author: Author::Task { task: 9, attempt: 1 },
         revision: 1,
+        changed: Wall::from_nanos(100),
     }
 }
 
@@ -109,9 +110,10 @@ fn a_new_entry_is_saved_with_its_scope_line_in_one_decision() {
     let [Request::Load { owner, range: Range::Lines { .. } }] = &*asked else {
         panic!("scope lookup: {asked:?}");
     };
+    h.env.wall = Wall::from_nanos(900);
     let got = h.step(Event::Loaded { owner: *owner, rows: rows(&[]), more: false });
     let [
-        Request::Save { record: Record::Entry(_) },
+        Request::Save { record: Record::Entry(saved) },
         Request::Save { record: Record::Line(_) },
         Request::Written { owner, name: 20, revision: 1 },
     ] = &*got
@@ -119,6 +121,7 @@ fn a_new_entry_is_saved_with_its_scope_line_in_one_decision() {
         panic!("new entry writes: {got:?}");
     };
     assert_eq!(*owner, Token::new(4));
+    assert_eq!(saved.changed, Wall::from_nanos(900), "time belongs to the writing decision after store loads");
     assert!(!h.domain.busy());
 }
 
@@ -137,6 +140,7 @@ fn a_revision_must_name_the_entry_the_writer_recalled() {
         references: List::with_capacity(2),
         author: Author::Party { party: 2 },
         revision: 2,
+        changed: Wall::from_nanos(100),
     };
     let got = h.step(Event::Loaded { owner: *owner, rows: rows(&[Record::Entry(old)]), more: false });
     assert_eq!(&*got, &[Request::Refused { owner: Token::new(5), why: Refusal::Moved { revision: 2 } }]);
@@ -163,6 +167,7 @@ fn a_party_deletes_only_the_revision_it_saw() {
         references: List::with_capacity(2),
         author: Author::Task { task: 1, attempt: 1 },
         revision: 2,
+        changed: Wall::from_nanos(100),
     };
     let got = h.step(Event::Loaded { owner: *owner, rows: rows(&[Record::Entry(old)]), more: false });
     let [Request::Erase { .. }, Request::Erase { .. }, Request::Deleted { owner, name: 20 }] = &*got else {

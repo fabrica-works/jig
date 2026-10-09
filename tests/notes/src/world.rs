@@ -46,6 +46,7 @@ pub struct World {
     loads: Ledger<Token, Range>,
     referee: Referee,
     limits: Limits,
+    wall: Wall,
     commits: u64,
     trace: Trace,
 }
@@ -66,9 +67,15 @@ impl World {
             loads: Ledger::new("notes store load"),
             referee: Referee,
             limits,
+            wall: Wall::EPOCH,
             commits: 0,
             trace: Trace::default(),
         }
+    }
+
+    /// Supply the wall time for subsequent decisions and store replies.
+    pub fn set_wall(&mut self, wall: Wall) {
+        self.wall = wall;
     }
 
     /// Drive one caller event through store loads and one committed answer.
@@ -180,7 +187,7 @@ impl World {
 
     fn step_once(&mut self, event: Event) -> Vec<Request> {
         self.trace.log(Time::ZERO, format!("in {event:?}"));
-        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: self.limits };
+        let env = Env { now: Time::ZERO, wall: self.wall, limits: self.limits };
         let mut out = Queue::with_capacity(notes::max_out(&self.limits));
         notes::step(&mut self.domain, &env, event, &mut out);
         let mut requests = Vec::new();

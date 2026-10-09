@@ -3,7 +3,7 @@
 
 use alloc::boxed::Box;
 
-use skein_lib::{List, Token};
+use skein_lib::{List, Token, Wall};
 
 /// A connector's bounded resource pattern, preserving literal segment boundaries.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -51,6 +51,8 @@ pub struct Entry {
     pub references: List<u64>,
     pub author: Author,
     pub revision: u32,
+    /// Wall time of the decision that last saved this entry.
+    pub changed: Wall,
 }
 
 /// The fields supplied for a new entry or correction.

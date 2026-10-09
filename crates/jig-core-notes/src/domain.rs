@@ -11,7 +11,7 @@
 //! | idle | index or recall | waiting for store or idle | load or answer |
 //! | waiting for read | loaded | waiting or idle | load or answer |
 
-use skein_lib::{Env, Map, Queue, Token};
+use skein_lib::{Env, Map, Queue, Token, Wall};
 
 use crate::boundary::{Author, Change, Entry, Event, Key, Line, New, Range, Record, Refusal, Request, Rows, Scope};
 use crate::limits::Limits;
@@ -167,7 +167,7 @@ fn loaded(domain: &mut Domain, env: &Env<Limits>, owner: Token, rows: Rows, more
                     Record::Line(_) => unreachable!("entry lookup returns entries"),
                 }
             }
-            entry_loaded(domain, pending, found, out);
+            entry_loaded(domain, pending, found, env.wall, out);
         }
         Phase::Count { scope, mut count, mut after } => {
             assert!(!rows.records.is_empty() || !more, "a continued page advances");
@@ -196,7 +196,7 @@ fn loaded(domain: &mut Domain, env: &Env<Limits>, owner: Token, rows: Rows, more
                 match pending.action {
                     Action::Write { entry, recalled: None } => {
                         domain.invalidate(&entry.scope);
-                        save_new(pending.owner, entry, 1, out);
+                        save_new(pending.owner, entry, 1, env.wall, out);
                     }
                     Action::Write { entry: _, recalled: Some(_) } | Action::Edit { .. } => {
                         unreachable!("only a new entry counts a scope")
@@ -207,7 +207,7 @@ fn loaded(domain: &mut Domain, env: &Env<Limits>, owner: Token, rows: Rows, more
     }
 }
 
-fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>, out: &mut Queue<Request>) {
+fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>, wall: Wall, out: &mut Queue<Request>) {
     match pending.action {
         Action::Write { entry, recalled } => match found {
             None => match recalled {
@@ -232,7 +232,7 @@ fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>,
                         );
                     } else if let Some(revision) = old.revision.checked_add(1) {
                         domain.invalidate(&entry.scope);
-                        save_new(pending.owner, entry, revision, out);
+                        save_new(pending.owner, entry, revision, wall, out);
                     } else {
                         push(out, Request::Refused { owner: pending.owner, why: Refusal::RevisionExhausted });
                     }
@@ -255,6 +255,7 @@ fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>,
                         old.references = references;
                         old.author = Author::Party { party };
                         old.revision = revision;
+                        old.changed = wall;
                         domain.invalidate(&old.scope);
                         save_entry(pending.owner, old, out);
                     } else {
@@ -280,7 +281,7 @@ fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>,
     }
 }
 
-fn save_new(owner: Token, new: New, revision: u32, out: &mut Queue<Request>) {
+fn save_new(owner: Token, new: New, revision: u32, changed: Wall, out: &mut Queue<Request>) {
     save_entry(
         owner,
         Entry {
@@ -291,6 +292,7 @@ fn save_new(owner: Token, new: New, revision: u32, out: &mut Queue<Request>) {
             references: new.references,
             author: new.author,
             revision,
+            changed,
         },
         out,
     );

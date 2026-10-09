@@ -991,6 +991,7 @@ fn documents_notes_carry_the_child_revision_and_cut_display_text_only() {
         references,
         author: notes::Author::Task { task: 2, attempt: 1 },
         revision: 7,
+        changed: Wall::from_nanos(100),
     };
     let note = note_from_entry(&core, &limits, 1, &entry).unwrap();
     assert_eq!(note.revision, 7);
@@ -998,7 +999,7 @@ fn documents_notes_carry_the_child_revision_and_cut_display_text_only() {
     assert_eq!(note.tasks.get(0), Some(&2));
     assert!(note.description.cut);
     assert!(note.body.cut);
-    assert_eq!(note.changed, None);
+    assert_eq!(note.changed, Some(entry.changed));
     assert_eq!(make(&core, &limits, 1, &Subject::Note { note: 8 }, &window()), Err(Missing::Ended));
 }
 

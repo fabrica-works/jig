@@ -11,7 +11,7 @@
 //! enter its text. Application subjects belong to their connectors.
 //!
 //! Store-only notes, ended rows and proposal routing trails use the public row
-//! constructors. Notes lack changed wall times; history and milestones lack
+//! constructors. Notes retain their last write wall time; history and milestones lack
 //! wall times and amendment before snapshots until that work owns their records.
 //! Person stall timing and result followup identities are not retained today;
 //! their optional fields say so. Dependency results missing from live memory are

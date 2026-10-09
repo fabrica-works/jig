@@ -161,5 +161,6 @@ pub fn saved_entry(name: u64, scope: Scope, revision: u32) -> Entry {
         references: skein_lib::List::with_capacity(0),
         author: Author::Task { task: 1, attempt: 1 },
         revision,
+        changed: skein_lib::Wall::EPOCH,
     }
 }
