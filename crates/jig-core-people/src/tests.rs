@@ -1126,3 +1126,102 @@ fn retry_and_signed_out_answers_cannot_restore_as_completed_keys() {
         assert!(!test.d.ready());
     }
 }
+
+fn application(digest: u8) -> Ask {
+    Ask::Application { project: 1, connector: 2, digest: [digest; 32] }
+}
+
+#[test]
+fn application_keys_join_flights_and_replay_opaque_tokens_across_sign_ins_and_restore() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    test.signin(99, 11, identity(0, 1));
+    let request = route(&test.request(10, 7, application(1)));
+    assert!(test.request(11, 7, application(1)).is_empty());
+    assert_eq!(reply(&test.request(10, 7, application(2))), Reply::Refused(Refusal::KeyConflict));
+    assert_eq!(reply(&test.request(10, 7, ask(1))), Reply::Refused(Refusal::KeyConflict));
+    let outcome = Outcome::Applied { connector: 2, token: Token::new(42) };
+    let rows = test.send(Event::Decided { request, outcome });
+    assert_eq!(
+        rows.iter()
+            .filter(|row| match row {
+                Request::Reply { .. } => true,
+                Request::Route { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
+                | Request::ServiceMade { .. }
+                | Request::RolesApplied { .. }
+                | Request::RolesRefused { .. }
+                | Request::RestoreRefused { .. } => false,
+            })
+            .count(),
+        2
+    );
+    let saved = saved_answer(&rows);
+    assert_eq!(reply(&test.request(11, 7, application(1))), Reply::Outcome(outcome));
+    test.send(Event::Roles { project: 1, holdings: Box::new([]) });
+    assert_eq!(reply(&test.request(10, 7, application(1))), Reply::Outcome(outcome));
+    let mut d = Domain::new(&LIMITS, Box::new([]), 2);
+    for record in [
+        Stored::Person { number: 1, identity: identity(0, 1) },
+        Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) },
+        saved,
+    ] {
+        let mut out = Queue::with_capacity(max_out(&LIMITS));
+        step(&mut d, &test.env, Event::Restore { record }, &mut out);
+        assert!(out.is_empty());
+    }
+    test.d = d;
+    assert!(test.send(Event::Restored).is_empty());
+    assert_eq!(reply(&test.request(10, 7, application(1))), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.request(10, 7, application(2))), Reply::Refused(Refusal::KeyConflict));
+}
+
+#[test]
+fn application_admission_shares_capacity_and_retention_and_requires_a_live_sign_in_and_role() {
+    let mut test = Test::new(Limits { requests: 1, ..LIMITS });
+    assert_eq!(reply(&test.request(10, 1, application(1))), Reply::SignedOut);
+    test.member();
+    test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
+    let request = route(&test.request(10, 1, application(1)));
+    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+    let outcome = Outcome::Applied { connector: 2, token: Token::new(42) };
+    test.send(Event::Decided { request, outcome });
+    assert_eq!(reply(&test.request(10, 2, application(1))), Reply::Again(Again::Busy));
+    test.env.now = test.env.now.saturating_add(LIMITS.request_retention);
+    test.env.wall = Wall::from_nanos(LIMITS.request_retention.as_nanos());
+    test.signin(1, 11, identity(0, 1));
+    assert_ne!(route(&test.request(11, 1, application(2))), Token::new(0));
+    let mut no_role = Test::new(LIMITS);
+    no_role.signin(1, 10, identity(0, 1));
+    assert_eq!(
+        reply(&no_role.request(10, 1, application(1))),
+        Reply::Outcome(Outcome::Refused(Refusal::Role { held: None }))
+    );
+}
+
+#[test]
+fn restored_application_tokens_must_name_their_connector_and_a_positive_outcome() {
+    for outcome in [
+        Outcome::Applied { connector: 3, token: Token::new(42) },
+        Outcome::Applied { connector: 2, token: Token::new(0) },
+        Outcome::Started { task: 42 },
+    ] {
+        let mut test = Test::new(LIMITS);
+        test.d = Domain::new(&LIMITS, Box::new([]), 2);
+        let rows = test.send(Event::Restore {
+            record: Stored::Answer {
+                key: RequestKey { person: 1, key: [1; 16] },
+                ask: Box::new(application(1)),
+                outcome,
+                at: Wall::EPOCH,
+            },
+        });
+        match rows.as_slice() {
+            [Request::RestoreRefused { .. }] => {}
+            _ => panic!("invalid restored application outcome is refused"),
+        }
+        test.send(Event::Restored);
+        assert!(!test.d.ready());
+    }
+}

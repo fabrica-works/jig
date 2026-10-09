@@ -97,6 +97,12 @@ pub(super) fn tag_people(
             }
             people::Request::Route { request, person, project, role, ask } => {
                 match *ask {
+                    people::Ask::Application { .. } => {
+                        work.push(Event::People(people::Event::Decided {
+                            request,
+                            outcome: people::Outcome::Refused(people::Refusal::NotOffered),
+                        }));
+                    }
                     ask @ (people::Ask::TakePerson { .. }
                     | people::Ask::HandBackPerson { .. }
                     | people::Ask::AnswerPerson { .. }) => {

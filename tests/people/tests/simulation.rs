@@ -366,3 +366,41 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
     assert_eq!(world.stats().routes, routes);
     world.assert_settled();
 }
+
+fn application(words: &[u8]) -> Ask {
+    use sha2::{Digest, Sha256};
+    Ask::Application { project: 1, connector: 2, digest: Sha256::digest(words).into() }
+}
+
+#[test]
+fn an_application_request_sent_twice_is_routed_once() {
+    let mut world = World::new(Settings::calm(92));
+    member(&mut world);
+    let ask = application(b"extend object 7 at revision 3");
+    let first = world.request(10, [9; 16], ask.clone());
+    let duplicate = world.request(10, [9; 16], ask.clone());
+    assert!(world.reply(first).is_none() && world.reply(duplicate).is_none());
+    assert_eq!(world.stats().routes, 1);
+    world.commit_all();
+    assert_eq!(world.reply(first), world.reply(duplicate));
+    assert!(matches!(world.reply(first), Some(Reply::Outcome(Outcome::Applied { connector: 2, .. }))));
+    world.restart();
+    let replay = world.request(10, [9; 16], ask);
+    assert_eq!(world.reply(first), world.reply(replay));
+    assert_eq!(world.stats().routes, 1);
+    world.assert_settled();
+}
+
+#[test]
+fn an_application_request_under_a_used_key_with_another_digest_is_a_conflict() {
+    let mut world = World::new(Settings::calm(93));
+    member(&mut world);
+    world.request(10, [9; 16], application(b"extend object 7"));
+    let conflict = world.request(10, [9; 16], application(b"extend object 8"));
+    world.commit_all();
+    assert_eq!(world.reply(conflict), Some(Reply::Refused(Refusal::KeyConflict)));
+    let jig_conflict = world.ask(10, [9; 16], b"hello");
+    assert_eq!(world.reply(jig_conflict), Some(Reply::Refused(Refusal::KeyConflict)));
+    assert_eq!(world.stats().routes, 1);
+    world.assert_settled();
+}

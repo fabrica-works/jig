@@ -199,6 +199,8 @@ pub enum NoteChange {
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ask {
+    /// Application-owned request metadata; the root carries the value, and the protocol supplies its digest.
+    Application { project: u32, connector: u16, digest: [u8; 32] },
     /// Correct or delete a note whose scope the party's project role permits.
     EditNote { project: u32, name: u64, scope: Box<NoteScope>, change: Box<NoteChange> },
     /// Make a deployment service in a project with a role and display name.
@@ -325,6 +327,8 @@ pub enum EscalationChoice {
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// Connector-owned durable outcome named by token; the root asks its owner for the value.
+    Applied { connector: u16, token: Token },
     /// Unsaved retry answer; the request may be sent again.
     Again(crate::Again),
     /// Unsaved expired-sign-in answer.
@@ -474,7 +478,7 @@ pub enum Stored {
     },
     /// Root-owned full mutable project policy; the people page carries it to authority.
     Policy { project: u32, value: crate::PolicyValue },
-    /// Persistent request and outcome; same-key same-ask replay returns it without checking current
+    /// Persistent jig request and outcome, or application metadata and outcome token; replay never checks current
     /// roles anew.
     Answer {
         /** Person-scoped completed key; restoration validates its person reference. */

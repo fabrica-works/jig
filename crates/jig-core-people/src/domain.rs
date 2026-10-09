@@ -618,7 +618,8 @@ fn outcome_reply(outcome: Outcome) -> Reply {
     match outcome {
         Outcome::Again(why) => Reply::Again(why),
         Outcome::SignedOut => Reply::SignedOut,
-        Outcome::NoteEdited { .. }
+        Outcome::Applied { .. }
+        | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
         | Outcome::GoalStarted { .. }
@@ -673,7 +674,8 @@ fn apply_roles(
     let flight = domain.pending.get(Id::from_token(request)).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let project = match &flight.ask {
         Ask::SetRoles { project, .. } => *project,
-        Ask::MakeService { .. }
+        Ask::Application { .. }
+        | Ask::MakeService { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
@@ -715,7 +717,8 @@ fn apply_roles(
             }
             holdings.clone()
         }
-        Ask::MakeService { .. }
+        Ask::Application { .. }
+        | Ask::MakeService { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
@@ -817,7 +820,8 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
     let flight = domain.pending.get(Id::from_token(request)).expect("service creation names a live keyed flight");
     let (project, name, service_role) = match &flight.ask {
         Ask::MakeService { project, name, role } => (*project, name.clone(), *role),
-        Ask::EditNote { .. }
+        Ask::Application { .. }
+        | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::SetGoal { .. }
         | Ask::Stop { .. }
@@ -1007,7 +1011,8 @@ fn end_signin(domain: &mut Domain, number: u64, out: &mut Queue<Request>) {
 
 fn project(ask: &Ask) -> u32 {
     match ask {
-        Ask::EditNote { project, .. }
+        Ask::Application { project, .. }
+        | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
         | Ask::SetRoles { project, .. }
@@ -1103,6 +1108,7 @@ fn valid_note(limits: &Limits, name: u64, scope: &crate::NoteScope, change: &cra
 
 fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
     match ask {
+        Ask::Application { .. } => true,
         Ask::EditNote { name, scope, change, .. } => valid_note(limits, *name, scope, change),
         Ask::MakeService { name, .. } => {
             let Some(bytes) = name.len().checked_add(size_of::<u64>()) else {
@@ -1214,7 +1220,8 @@ fn invalid_ask(ask: &Ask) -> Refusal {
             }
             LimitKind::Words
         }
-        Ask::TakePerson { .. }
+        Ask::Application { .. }
+        | Ask::TakePerson { .. }
         | Ask::HandBackPerson { .. }
         | Ask::Stop { .. }
         | Ask::Release { .. }
@@ -1273,6 +1280,7 @@ fn invalid_ask(ask: &Ask) -> Refusal {
 fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     #[derive(PartialEq, Eq)]
     enum Expected {
+        Application(u16),
         Note(u64),
         Service,
         Goal,
@@ -1297,6 +1305,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     }
 
     let expected = match ask {
+        Ask::Application { connector, .. } => Expected::Application(*connector),
         Ask::EditNote { name, .. } => Expected::Note(*name),
         Ask::MakeService { .. } => Expected::Service,
         Ask::Adopt { project, .. } => Expected::Adoption(*project),
@@ -1334,6 +1343,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     };
 
     match outcome {
+        Outcome::Applied { connector, token } => expected == Expected::Application(connector) && token.raw() != 0,
         Outcome::NoteEdited { name } => expected == Expected::Note(name),
         Outcome::ServiceMade { person } => expected == Expected::Service && person != 0,
         Outcome::Adopted { project } => expected == Expected::Adoption(project),
@@ -1429,6 +1439,13 @@ fn admit_ask(
     let project = project(&ask);
     let role = role(domain, key.person, project);
     let refusal = match &ask {
+        Ask::Application { .. } => {
+            if role.is_some() {
+                None
+            } else {
+                Some(Refusal::Role { held: None })
+            }
+        }
         Ask::EditNote { .. } => match role {
             Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
             Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
@@ -1534,7 +1551,8 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
         // A refused admission is retryable with the same key, including
         // pressure reported by tasks or another child through the root.
         Outcome::Again(_) | Outcome::SignedOut => {}
-        Outcome::NoteEdited { .. }
+        Outcome::Applied { .. }
+        | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
         | Outcome::RolesSet { .. }
@@ -1685,7 +1703,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                         }
                     }
                 }
-                Ask::EditNote { .. }
+                Ask::Application { .. }
+                | Ask::EditNote { .. }
                 | Ask::MakeService { .. }
                 | Ask::StartChat { .. }
                 | Ask::Adopt { .. }
@@ -1708,7 +1727,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     unreachable!("restored role success has a matching roster ask");
                 }
             },
-            Outcome::NoteEdited { .. }
+            Outcome::Applied { .. }
+            | Outcome::NoteEdited { .. }
             | Outcome::Adopted { .. }
             | Outcome::Started { .. }
             | Outcome::PolicyChanged { .. }

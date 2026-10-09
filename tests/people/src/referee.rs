@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RouteKind {
+    Application,
     Chat,
     Goal,
     Service,
@@ -69,7 +70,8 @@ impl Expectations for People {
                 | RouteKind::Service
                 | RouteKind::Proposal
                 | RouteKind::TakePerson
-                | RouteKind::Control => {}
+                | RouteKind::Control
+                | RouteKind::Application => {}
             },
             Seen::RoleWaitingOpened { task, both_present } => {
                 if !both_present || !self.role_waiting.insert(task) {

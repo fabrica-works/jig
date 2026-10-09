@@ -380,6 +380,7 @@ impl World {
                     assert_eq!(person, key.person);
                     self.stats.routes += 1;
                     let kind = match ask.as_ref() {
+                        Ask::Application { .. } => RouteKind::Application,
                         Ask::StartChat { .. } => RouteKind::Chat,
                         Ask::SetGoal { .. } => RouteKind::Goal,
                         Ask::MakeService { .. } => RouteKind::Service,
@@ -417,6 +418,15 @@ impl World {
                         self.deferred.push((request, key));
                     } else {
                         match *ask {
+                            Ask::Application { connector, .. } => {
+                                let token = Token::new(self.name());
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome: Outcome::Applied { connector, token } },
+                                    &mut self.out,
+                                );
+                            }
                             Ask::MakeService { .. } => {
                                 let candidate = self.name();
                                 people::step(
