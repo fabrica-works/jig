@@ -65,7 +65,9 @@ fn send(engine: &mut Engine, now: u64, sign_in: u64, key: u8, token: u64, ask: A
 fn final_answer(up: &Up) -> &Answer {
     match up {
         Up::Answer { envelope: Envelope::Final, answer: Some(answer), .. } => answer,
-        Up::Answer { .. } => panic!("expected a final answer: {up:?}"),
+        Up::Read { .. } | Up::Watch { .. } | Up::Ended { .. } | Up::Answer { .. } => {
+            panic!("expected a final answer: {up:?}")
+        }
     }
 }
 fn proposal() -> Proposal {

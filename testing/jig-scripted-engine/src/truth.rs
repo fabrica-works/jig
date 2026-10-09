@@ -1,7 +1,7 @@
 //! The story's starting documents and atomic changes; contract.md, 5.
 //! Documents carry offers, revisions, terminal facts and parts in the client's vocabulary.
-use crate::{Bounds, Invalid, payload};
-use jig_client::contract::{Answer, Ask, Deployment, Frame, Note, ObjectKey, Project, ReadValue};
+use crate::{Bounds, Invalid, Source, payload};
+use jig_client::contract::{Answer, Ask, Deployment, Frame, Note, ObjectKey, Project, ReadValue, Tree};
 use std::collections::BTreeMap;
 
 /// Client documents indexed by their identities, with parties and sign-ins.
@@ -15,6 +15,10 @@ pub struct Truth {
     pub projects: BTreeMap<u32, Project>,
     pub deployment: Option<Deployment>,
     pub notes: BTreeMap<u64, Note>,
+    pub sources: Vec<Source>,
+    pub results_seen: BTreeMap<u64, u64>,
+    pub replies_seen: BTreeMap<u64, Vec<jig_client::contract::ReplyPosition>>,
+    pub trees: BTreeMap<u64, Tree>,
 }
 
 /// One whole-document replacement made atomically with its story's decision.
@@ -38,10 +42,18 @@ pub enum Change {
     DeleteNote { note: u64 },
     /// Replace deployment hosts, accounts and capacities.
     Deployment(Deployment),
+    /// Replace the retained rows of one scoped read; rows may span many protocol pages.
+    Source(Source),
+    /// Replace the authoritative subtree, including folded counts.
+    Tree(Tree),
 }
 impl Change {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
         let fits = match self {
+            Self::Source(value) => {
+                return value.validate(bounds);
+            }
+            Self::Tree(value) => payload::fits(value, bounds),
             Self::Frame(value) => payload::fits(value, bounds),
             Self::Object { project, key, value } => {
                 if identity(value) != Some(*key) || document_project(value).is_some_and(|number| number != *project) {
@@ -90,10 +102,33 @@ impl Truth {
         if let Some(deployment) = &self.deployment {
             Change::Deployment(deployment.clone()).validate(bounds)?;
         }
+        for source in &self.sources {
+            source.validate(bounds)?;
+        }
+        for (task, tree) in &self.trees {
+            if *task != tree.task {
+                return Err(Invalid::Identity);
+            }
+            Change::Tree(tree.clone()).validate(bounds)?;
+        }
         Ok(())
     }
     pub(crate) fn apply(&mut self, change: &Change) -> core::result::Result<(), Invalid> {
         match change {
+            Change::Source(source) => {
+                self.sources.retain(|old| old.party != source.party || old.read != source.read);
+                self.sources.push(source.clone());
+                if let (jig_client::contract::Read::Activity { task, .. }, crate::Rows::Activity(rows)) =
+                    (&source.read, &source.rows)
+                {
+                    if let Some(ReadValue::Task(doc)) = self.objects.get_mut(&ObjectKey::Task(*task)) {
+                        doc.activity = rows.last().map_or(0, |line| line.position);
+                    }
+                }
+            }
+            Change::Tree(tree) => {
+                self.trees.insert(tree.task, tree.clone());
+            }
             Change::Frame(frame) => {
                 self.frames.insert(frame.party.number, frame.clone());
             }

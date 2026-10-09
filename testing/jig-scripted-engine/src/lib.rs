@@ -12,11 +12,14 @@
 //! The story supplies wall times separately from the scheduling clock.
 #![forbid(unsafe_code)]
 mod payload;
+mod reads;
 mod requests;
 mod truth;
-use jig_client::contract::{Answer, Ask};
+mod watches;
+use jig_client::contract::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
+pub use reads::{Rows, Source};
 use skein_lib::{Duration, Time, Token, Wall};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 pub use truth::{Change, Rule, Script, Truth};
 
 /// Payload and scheduling bounds of the scripted contract.
@@ -72,7 +75,23 @@ pub enum Envelope {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
     /// One keyed attempt ended, with a final answer only for a final envelope.
-    Answer { attempt: Token, envelope: Envelope, answer: Option<Answer> },
+    Answer {
+        attempt: Token,
+        envelope: Envelope,
+        answer: Option<Answer>,
+    },
+    Read {
+        token: Token,
+        terminal: ReadResult,
+    },
+    Watch {
+        token: Token,
+        event: WatchEvent,
+    },
+    Ended {
+        token: Token,
+        why: WatchEnd,
+    },
 }
 
 /// One numbered decision, including its payload and durability time for a referee.
@@ -121,6 +140,12 @@ pub struct Engine {
     next_commit: u64,
     due: Vec<Due>,
     seed: u64,
+    read_tokens: BTreeSet<Token>,
+    positions: BTreeMap<u64, reads::Position>,
+    next_position: u64,
+    watches: BTreeMap<Token, watches::Watch>,
+    watch_tokens: BTreeSet<Token>,
+    runs: BTreeMap<u64, jig_client::contract::RunText>,
 }
 impl Engine {
     /// Checks every decoded/program-supplied document before retaining the script.
@@ -137,6 +162,12 @@ impl Engine {
             next_commit: 1,
             due: Vec::new(),
             seed,
+            read_tokens: BTreeSet::new(),
+            positions: BTreeMap::new(),
+            next_position: 1,
+            watches: BTreeMap::new(),
+            watch_tokens: BTreeSet::new(),
+            runs: BTreeMap::new(),
         })
     }
     /// The scheduling bounds used at every typed entrance.
@@ -178,6 +209,9 @@ impl Engine {
         answer: Option<Answer>,
         changes: Vec<Change>,
     ) -> u64 {
+        for watch in self.watches.values_mut() {
+            watch.dirty = true;
+        }
         let number = self.next_commit;
         self.next_commit = number.checked_add(1).expect("a scenario fits the commit number space");
         let mut due = now.saturating_add(self.bounds.commit_delay);
@@ -203,6 +237,7 @@ impl Engine {
             }
             self.commits.push(pending.commit);
         }
+        self.prepare_watches(now);
         let durable = self.commits.last().map_or(0, |commit| commit.number);
         let mut out = Vec::new();
         let mut held = Vec::new();
@@ -230,6 +265,7 @@ impl Engine {
                     .map_or(Time::ZERO, |pending| pending.due);
                 due.at.max(barrier)
             }))
+            .chain(self.watch_due())
             .min()
     }
     fn queue(&mut self, now: Time, commit: u64, up: Up) {
