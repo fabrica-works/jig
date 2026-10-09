@@ -59,6 +59,8 @@ pub struct World {
     pub stopped: bool,
     /// Independent scripted hosts and clients, when this scenario uses them.
     pub peers: Option<crate::peers::Peers>,
+    /// Client-facing outputs; their protocol adapter runs in the joint world.
+    pub client_peer: Option<crate::client_peer::ClientPeer>,
     /// Independent document consumers, enabled only in watch stories.
     pub watches: Option<crate::peers::WatchParties>,
     /// Independent offer observer, enabled for immediately acting scripted parties.
@@ -254,6 +256,7 @@ impl World {
             store_delay: 0,
             stopped: false,
             peers: None,
+            client_peer: None,
             watches: None,
             offers: None,
             reads: None,
@@ -465,6 +468,12 @@ impl World {
                         }));
                     }
                     root::Request::Now(now) => {
+                        if let Some(peer) = &mut self.client_peer
+                            && crate::client_peer::ClientPeer::immediate(&now)
+                        {
+                            peer.now.push(now);
+                            continue;
+                        }
                         if let Some(watches) = &mut self.watches {
                             watches.now(&now);
                         }
@@ -523,6 +532,12 @@ impl World {
         if let Some(watches) = &mut self.watches {
             watches.released(&delivery, self.store.applied);
         }
+        if let Some(peer) = &mut self.client_peer
+            && crate::client_peer::ClientPeer::accepts(&delivery)
+        {
+            peer.delivered.push((self.store.applied, delivery));
+            return;
+        }
         if let Some(peers) = &mut self.peers {
             peers.delivered(&delivery);
             if let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery {
@@ -545,6 +560,9 @@ impl World {
             root::Delivery::Core(core::Held::ReadLoad { load, range }) => {
                 if let Some(reads) = &mut self.reads {
                     self.events.extend(reads.load(load, *range, &self.store));
+                } else if self.client_peer.is_some() {
+                    let result = crate::reads::page(&self.store, &range);
+                    self.events.push_back(root::Event::Core(core::Event::ReadLoaded { load, result }));
                 }
             }
             root::Delivery::Core(
