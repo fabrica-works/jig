@@ -73,11 +73,12 @@ pub(crate) fn request(
             people::Seen::Results { .. } => (Act::MarkSeen, documents::Subject::Inbox { party: person }),
             people::Seen::Chat { task, .. } => (Act::MarkSeen, documents::Subject::Task { task: *task }),
         },
-        people::Ask::EditNote { change, .. } => {
-            return standing::role(
+        people::Ask::EditNote { scope, change, .. } => {
+            return super::note(
                 core,
+                person,
                 project,
-                role,
+                scope,
                 match &**change {
                     people::NoteChange::Correct { .. } => Act::EditNote,
                     people::NoteChange::Delete { .. } => Act::DeleteNote,
@@ -91,6 +92,9 @@ pub(crate) fn request(
         people::Ask::SetPool { .. } => (Act::SetPool, documents::Subject::Project { project }),
     };
     match ask {
+        // The person-task entrance compares the named revision before phase
+        // eligibility, and preserves the historical ended-task lookup.
+        people::Ask::AnswerPerson { .. } => return Ok(()),
         people::Ask::DecideProposal { proposer, proposal, .. } => {
             if core.tasks.person_proposal(*proposer, *proposal).is_none()
                 && core.tasks.proposal(*proposer, *proposal).is_none()
@@ -116,7 +120,6 @@ pub(crate) fn request(
         | people::Ask::AnswerQuestion { .. }
         | people::Ask::TakePerson { .. }
         | people::Ask::HandBackPerson { .. }
-        | people::Ask::AnswerPerson { .. }
         | people::Ask::Release { .. }
         | people::Ask::Amend { .. }
         | people::Ask::Stop { .. }

@@ -173,23 +173,21 @@ pub(super) fn edit_note_request(
     request: Token,
     person: u64,
     project: u32,
-    role: Option<people::Role>,
+    _role: Option<people::Role>,
     name: u64,
     scope: Box<people::NoteScope>,
     change: people::NoteChange,
 ) {
-    if core.note_authorized(project, role, &scope) {
+    let act = match &change {
+        people::NoteChange::Correct { .. } => crate::acts::Act::EditNote,
+        people::NoteChange::Delete { .. } => crate::acts::Act::DeleteNote,
+    };
+    if let Err(why) = crate::acts::note(core, person, project, &scope, act) {
+        work.push(Event::People(people::Event::Decided { request, outcome: people::Outcome::Refused(why) }));
+    } else {
         let owner = core.begin_note_route(NoteRoute::Person { request });
         let scope = person_note_scope(project, *scope);
         let change = person_note_change(change);
         work.push(Event::Notes(notes::Event::Edit { owner, party: person, name, scope, change }));
-    } else {
-        work.push(Event::People(people::Event::Decided {
-            request,
-            outcome: people::Outcome::Refused(people::Refusal::Authority {
-                proposable: None,
-                lacking: people::Lack::Shape,
-            }),
-        }));
     }
 }

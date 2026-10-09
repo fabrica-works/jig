@@ -10,12 +10,13 @@ use skein_lib::{List, Queue, Wall};
 
 fn recipient(core: &Core, project: u32, kind: authority::ProposalKind) -> Option<Recipient> {
     let policy = core.authority.policy(project)?;
+    let mut roles = List::with_capacity(core.authority.limits().roles);
     for role in &policy.roles {
         if role.decides.allows(kind) {
-            return Some(Recipient::Role { project, role: role.number });
+            roles.push(role.number).expect("policy roles fit the admitted authority bound");
         }
     }
-    None
+    if roles.is_empty() { None } else { Some(Recipient::Roles { project, roles }) }
 }
 
 pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held: Option<people::Role>) -> Admission {

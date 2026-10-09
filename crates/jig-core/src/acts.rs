@@ -115,7 +115,7 @@ pub enum Beyond {
 }
 
 /// A holder named by current routing policy.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Recipient {
     /// A task above.
     Task(u64),
@@ -123,6 +123,8 @@ pub enum Recipient {
     Party(u64),
     /// A role in a project.
     Role { project: u32, role: u32 },
+    /// Every policy role eligible for this collective decision.
+    Roles { project: u32, roles: List<u32> },
 }
 
 /// One act and its current engine judgment.
@@ -147,5 +149,24 @@ fn allowed(value: Result<(), people::Refusal>) -> Admission {
 
 /// Transient judgment facts and their authority translations; no result is retained.
 pub(crate) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
-    documents::document_worst_case(&limits.documents)?.checked_mul(4)
+    documents::document_worst_case(&limits.documents)?
+        .checked_mul(4)?
+        .checked_add(List::<u32>::worst_case(limits.authority.roles)?)
+}
+
+/// Judge a note edit with the scope supplied by its owner-loaded entry.
+pub(crate) fn note(
+    core: &Core,
+    party: u64,
+    project: u32,
+    scope: &people::NoteScope,
+    act: Act,
+) -> Result<(), people::Refusal> {
+    let held = core.people.role(party, project);
+    role(core, project, held, act)?;
+    if core.note_authorized(project, held, scope) {
+        Ok(())
+    } else {
+        Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape })
+    }
 }

@@ -409,6 +409,7 @@ impl World {
             | Event::RoutedEscalation { .. }
             | Event::DecideEscalation { .. }
             | Event::Message { .. }
+            | Event::AuthorizedMessage { .. }
             | Event::Introduce { .. }
             | Event::DelegateResult { .. }
             | Event::RememberStub { .. }
@@ -422,7 +423,10 @@ impl World {
             Event::Amend { message, .. } => {
                 self.message = self.message.max(*message);
             }
-            Event::Message { word, .. } | Event::DelegateResult { word, .. } | Event::Notice { word, .. } => {
+            Event::Message { word, .. }
+            | Event::AuthorizedMessage { word, .. }
+            | Event::DelegateResult { word, .. }
+            | Event::Notice { word, .. } => {
                 self.message = self.message.max(word.number);
             }
             Event::ResourceAccess { .. }

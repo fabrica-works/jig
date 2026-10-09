@@ -490,7 +490,6 @@ impl World {
                     assert!(project == 1 || matches!(ask.as_ref(), Ask::MarkSeen { .. }));
                     let key = self.context.expect("a routed call carries the client's key");
                     assert_eq!(person, key.person);
-                    self.stats.routes += 1;
                     let kind = match ask.as_ref() {
                         Ask::Application { .. } => RouteKind::Application,
                         Ask::StartChat { .. } => RouteKind::Chat,
@@ -522,6 +521,25 @@ impl World {
                         Some(Stored::Person { identity, .. }) => identity.key.provider == 1,
                         Some(_) | None => false,
                     };
+                    // The parent now owns role admission; the people child
+                    // routes authenticated requests with their current role.
+                    let allowed = match kind {
+                        RouteKind::Service => role == Some(Role::Owner),
+                        RouteKind::Chat | RouteKind::Goal | RouteKind::Proposal | RouteKind::TakePerson => {
+                            role.is_some() && role != Some(Role::Observer)
+                        }
+                        RouteKind::Control | RouteKind::Application => true,
+                    };
+                    if !allowed {
+                        people::step(
+                            &mut self.domain,
+                            &self.env,
+                            Event::Decided { request, outcome: Outcome::Refused(Refusal::Role { held: role }) },
+                            &mut self.out,
+                        );
+                        continue;
+                    }
+                    self.stats.routes += 1;
                     self.observe(Seen::Routed { role: role.unwrap_or(Role::Observer), kind, service });
                     if self.defer_route {
                         assert_eq!(kind, RouteKind::Chat, "only chats use the deferred script");

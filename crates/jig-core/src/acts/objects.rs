@@ -12,7 +12,7 @@ pub(crate) use task::{close, person, question, write};
 pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: &documents::Subject) -> Admission {
     match object {
         documents::Subject::Task { task: number } => task::admit(core, limits, party, act, *number),
-        documents::Subject::PersonTask { task: number } => allowed(person(core, party, act, *number)),
+        documents::Subject::PersonTask { task: number } => allowed(person(core, party, act, *number, None)),
         documents::Subject::Question { task: number, message } => {
             allowed(question(core, limits, party, act, *number, *message))
         }

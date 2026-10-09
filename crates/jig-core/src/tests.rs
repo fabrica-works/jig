@@ -2654,7 +2654,7 @@ fn deployment_capacity_carries_direct_batch_refusals_and_task_history_cut() {
 }
 mod application_documents;
 
+mod acts;
 mod chip_phase;
 mod hold_origin;
 mod live_delegates;
-mod acts;

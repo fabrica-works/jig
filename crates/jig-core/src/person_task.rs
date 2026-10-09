@@ -129,7 +129,8 @@ impl Core {
             | people::Ask::Release { .. }
             | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
         };
-        match crate::acts::person(self, person, act, task) {
+        let revision = if let people::Ask::AnswerPerson { revision, .. } = &ask { Some(*revision) } else { None };
+        match crate::acts::person(self, person, act, task, revision) {
             Ok(()) => {}
             // The task owner supplies its exact capacity observation.
             Err(people::Refusal::Limit { which: people::LimitKind::LiveDelegates })

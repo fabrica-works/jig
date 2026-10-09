@@ -7,7 +7,6 @@ use jig_core_authority as authority;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 
-#[expect(clippy::too_many_lines, reason = "one exhaustive object judgment covers the closed act vocabulary")]
 pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: u64) -> Admission {
     let Some(row) = core.tasks.task(number) else { return Admission::Refused(people::Refusal::Unknown) };
     let held = core.people.role(party, row.project);
@@ -22,12 +21,6 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
             }
             if act == Act::AmendRelease {
                 match row.phase {
-                    tasks::Phase::Held { why: tasks::Hold::Uncertain { .. }, .. } => {
-                        return Admission::Refused(people::Refusal::Authority {
-                            proposable: None,
-                            lacking: people::Lack::Again { required: true },
-                        });
-                    }
                     tasks::Phase::Held { .. } => {}
                     tasks::Phase::Waiting
                     | tasks::Phase::Active(_)
@@ -38,9 +31,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
             bounds::amend(core, limits, party, number, held)
         }
         Act::Stop | Act::Cancel | Act::Release => {
-            if act == Act::Stop
-                && let Err(why) = mutable(row)
-            {
+            if let Err(why) = mutable(row) {
                 return Admission::Refused(why);
             }
             if act == Act::Release {
@@ -163,9 +154,16 @@ pub(crate) fn close(core: &Core, party: u64, row: &tasks::TaskRecord) -> Result<
     Ok(())
 }
 
-pub(crate) fn person(core: &Core, party: u64, act: Act, number: u64) -> Result<(), people::Refusal> {
+pub(crate) fn person(
+    core: &Core,
+    party: u64,
+    act: Act,
+    number: u64,
+    revision: Option<u64>,
+) -> Result<(), people::Refusal> {
     let row = core.tasks.task(number).ok_or(people::Refusal::Unknown)?;
     let held = core.people.role(party, row.project);
+    standing::role(core, row.project, held, act)?;
     let addressed = match row.executor {
         tasks::Executor::Person(tasks::PersonAddress::Person(person)) => person == party && act == Act::Answer,
         tasks::Executor::Person(tasks::PersonAddress::Role(role)) => {
@@ -187,6 +185,9 @@ pub(crate) fn person(core: &Core, party: u64, act: Act, number: u64) -> Result<(
         && by != party
     {
         return Err(people::Refusal::Taken { by });
+    }
+    if let Some(revision) = revision {
+        core.person_revision(number, revision)?;
     }
     mutable(row)?;
     match row.phase {

@@ -6,7 +6,8 @@
 //! durable (domain/engine.md, 5.6).
 //!
 //! The boundary admits adoption and other owner requests by key, checks their
-//! project role and retains committed answers for replay after a restart
+//! shape, routes its current project role to the parent, and retains committed
+//! answers for replay after a restart
 //! (domain/people.md, section 5.1). This child never sees provider
 //! credentials, protocol bytes, task internals or authority policy state.
 //! The root supplies authenticated identities and authoritative role changes.

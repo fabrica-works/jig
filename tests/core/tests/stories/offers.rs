@@ -4,15 +4,15 @@ use super::*;
 fn no_acceptor_fixture(seed: u64) -> (root::Config, root::Limits) {
     let (mut configuration, mut limits) = fixture(seed, false);
     limits.core.authority.roles = 2;
-    let mut policy = configuration.core.authority.policy(1).unwrap().clone();
+    let mut policy = configuration.core.authority.policy(1).expect("configured policy").clone();
     let mut member = policy.roles[0].clone();
     member.number = people::Role::Member.number();
     member.authority.budget.spend = 100;
     member.decides = authority::Proposals(0);
     policy.roles[0].decides = authority::Proposals(16);
     policy.roles = Box::new([policy.roles[0].clone(), member]);
-    let mut domain =
-        authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority).unwrap();
+    let mut domain = authority::Domain::new(configuration.core.authority.rules().clone(), limits.core.authority)
+        .expect("valid roles");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
@@ -28,7 +28,7 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
         .people_answers
         .iter()
         .find_map(|reply| if let people::Reply::SignedIn { person, .. } = reply { Some(*person) } else { None })
-        .unwrap();
+        .expect("signed-in person");
     ask(
         &mut world,
         90,
