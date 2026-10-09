@@ -13,12 +13,13 @@ pub const MAX_OUT: u32 = 40;
 /// Infrastructure's bounded working set and durable records.
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) application: crate::application::State,
     restart: Option<crate::RestartStage>,
     closing: Map<u64, bool>,
     refresh: Map<Resource, bool>,
     backend: Backend,
     services: Map<Service, ServiceFact>,
-    environments: Map<Environment, Option<EnvironmentFact>>,
+    pub(crate) environments: Map<Environment, Option<EnvironmentFact>>,
     pools: Map<Pool, (u32, u32)>,
     reliance: Map<u64, (u32, Box<[Named]>)>,
     procedures: Map<u64, ProcedureState>,
@@ -38,6 +39,7 @@ impl Domain {
             "MAX_OUT covers one step"
         );
         Self {
+            application: crate::application::State::new(limits),
             restart: None,
             closing: Map::with_capacity(
                 limits
@@ -77,7 +79,7 @@ fn bytes_valid(bytes: &[u8], limits: &Limits) -> bool {
     !bytes.is_empty() && u32::try_from(bytes.len()).unwrap_or(u32::MAX) <= limits.name_bytes
 }
 
-fn resource_valid(resource: &Resource, limits: &Limits) -> bool {
+pub(crate) fn resource_valid(resource: &Resource, limits: &Limits) -> bool {
     match resource {
         Resource::Service(service) => bytes_valid(&service.environment, limits) && bytes_valid(&service.name, limits),
         Resource::Environment(environment) => {
@@ -289,6 +291,8 @@ fn fresh_pool(domain: &mut Domain, env: &Env<Limits>, pool: Pool, quota: u32, us
 
 fn restore(domain: &mut Domain, record: Record) {
     match record {
+        Record::EnvironmentEnd { environment, now } => domain.application.restore_end(environment, now),
+        Record::ApplicationAnswer { token, until, outcome } => domain.application.restore_answer(token, until, outcome),
         Record::Rely { task, project, resources } => {
             domain.reliance.insert(task, (project, resources)).expect("restored task fits");
         }
@@ -678,6 +682,11 @@ fn stage(domain: &mut Domain, env: &Env<Limits>, token: Token, effect: Effect, o
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "the root reserves MAX_OUT slots");
     match event {
+        Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value, &env.limits),
+        Event::ApplicationDrop { owner } => domain.application.drop(owner),
+        Event::Application { request, token, owner, person, project, role, retention } => {
+            crate::application::decide(domain, env, request, token, owner, person, project, role, retention, out);
+        }
         Event::Close { task } => {
             domain.closing.insert(task, true).expect("live owner capacity");
         }

@@ -432,6 +432,9 @@ fn restored_records_rebuild_adoptions_names_topics_and_pool_slots() {
                 | Request::DriftResource { .. }
                 | Request::Changed { .. }
                 | Request::RestartDone
+                | Request::ApplicationDone { .. }
+                | Request::ApplicationAgain { .. }
+                | Request::ApplicationRelease { .. }
                 | Request::Closed { .. } => {}
             }
         }

@@ -56,6 +56,7 @@ pub struct Peers {
     pub entries: Vec<(u64, u16)>,
     pub accepted: Vec<u64>,
     pub replies: u64,
+    pub application_answers: Vec<infra::ApplicationOutcome>,
     llm: scripts::Llm,
     asked_accept: std::collections::BTreeSet<(u64, u64)>,
 }
@@ -109,6 +110,7 @@ impl Application for Ops {
             entries: Vec::new(),
             accepted: Vec::new(),
             replies: 0,
+            application_answers: Vec::new(),
             llm: scripts::Llm::new(config.seed),
             asked_accept: std::collections::BTreeSet::new(),
         }
@@ -192,7 +194,8 @@ impl Application for Ops {
                     }
                 }
                 root::Output::Stop => outputs.push(Output::Stop),
-                other @ (root::Output::Load { .. }
+                other @ (root::Output::Application { .. }
+                | root::Output::Load { .. }
                 | root::Output::CoreLoad(_)
                 | root::Output::Core(_)
                 | root::Output::Now(_)
@@ -226,6 +229,10 @@ impl Application for Ops {
             }
         };
         match delivery {
+            root::Output::Application { outcome, .. } => {
+                peers.application_answers.push(outcome);
+                Vec::new()
+            }
             root::Output::ToChild(child) => {
                 if let root::Released::Host(jig_host::Event::Assign { assignment, .. }) = &child {
                     let task = assignment.assignment.run.raw();

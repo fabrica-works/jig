@@ -151,6 +151,8 @@ impl InfrastructureWorld {
                 | infra::Request::Refused { .. }
                 | infra::Request::Make { .. }
                 | infra::Request::Outcome { .. }
+                | infra::Request::ApplicationDone { .. }
+                | infra::Request::ApplicationBusy { .. }
                 | infra::Request::Step { .. }
                 | infra::Request::System(..) => {}
             }
@@ -188,6 +190,8 @@ impl InfrastructureWorld {
                 | infra::Request::Described { .. }
                 | infra::Request::Refused { .. }
                 | infra::Request::Outcome { .. }
+                | infra::Request::ApplicationDone { .. }
+                | infra::Request::ApplicationBusy { .. }
                 | infra::Request::Step { .. } => Vec::new(),
             };
             pending.extend(generated.iter().cloned());
@@ -335,6 +339,7 @@ impl InfrastructureWorld {
         let mut live = BTreeSet::new();
         for record in records {
             match record {
+                infra::Record::ApplicationAnswer { .. } => {}
                 infra::Record::Rely { resources, .. } => {
                     live.extend(resources.into_iter().map(|named| named.resource));
                 }
@@ -360,7 +365,7 @@ impl InfrastructureWorld {
                         }
                     }
                 }
-                infra::Record::Made { environment, .. } => {
+                infra::Record::EnvironmentEnd { environment, .. } | infra::Record::Made { environment, .. } => {
                     live.insert(infra::Resource::Environment(environment));
                 }
             }

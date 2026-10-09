@@ -211,6 +211,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)
@@ -243,6 +244,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                 | Output::Now(_)
                 | Output::Observability(_)
                 | Output::Infrastructure(_)
+                | Output::Application { .. }
                 | Output::Read { .. }
                 | Output::Llm { .. }
                 | Output::Busy
@@ -296,6 +298,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
                 | Output::Now(_)
                 | Output::Observability(_)
                 | Output::Infrastructure(_)
+                | Output::Application { .. }
                 | Output::Read { .. }
                 | Output::Llm { .. }
                 | Output::Busy
@@ -346,6 +349,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)
@@ -376,6 +380,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::Application { .. }
             | Output::Read { .. }
             | Output::ToChild(_)
             | Output::Busy
@@ -444,6 +449,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)
@@ -469,6 +475,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)

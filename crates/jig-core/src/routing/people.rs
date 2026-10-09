@@ -25,6 +25,28 @@ pub(super) fn route_people(
     work: &mut Queue<Event>,
     event: people::Event,
 ) -> Requests {
+    let event = match event {
+        people::Event::Decided { request, outcome } => {
+            if let Some(flight) = core.applications.get_mut(&request)
+                && flight.part
+            {
+                flight.part = false;
+                people::application_part_done(&mut core.people, request);
+                return super::application_routes::answer(flight.connector, request, outcome);
+            }
+            people::Event::Decided { request, outcome }
+        }
+        other @ (people::Event::MakeService { .. }
+        | people::Event::Seed { .. }
+        | people::Event::Waiting { .. }
+        | people::Event::ApplyRoles { .. }
+        | people::Event::SignedIn { .. }
+        | people::Event::SignOut { .. }
+        | people::Event::Roles { .. }
+        | people::Event::Ask { .. }
+        | people::Event::Restore { .. }
+        | people::Event::Restored) => other,
+    };
     super::view_routes::touch_people_event(core, &env.limits, &event);
     let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
     people::step(&mut core.people, &Env { now: env.now, wall: env.wall, limits: env.limits.people }, event, &mut child);
@@ -71,16 +93,7 @@ pub(super) fn tag_people(
         let Some(next) = pending.pop() else { break };
         let request = match next {
             people::Request::ServiceMade { request, outcome } => {
-                let mut follow = Queue::with_capacity(people::max_out(&env.limits.people));
-                people::step(
-                    &mut core.people,
-                    &Env { now: env.now, wall: env.wall, limits: env.limits.people },
-                    people::Event::Decided { request, outcome },
-                    &mut follow,
-                );
-                for _ in 0..follow.len() {
-                    pending.push(follow.pop().expect("service output count"));
-                }
+                work.push(Event::People(people::Event::Decided { request, outcome }));
                 continue;
             }
             people::Request::Save { record } => {
@@ -88,20 +101,61 @@ pub(super) fn tag_people(
                 Request::Write(Write::Save(Record::People(record)))
             }
             people::Request::Erase { key } => Request::Write(Write::Erase(Key::People(key))),
-            people::Request::Reply { to, reply } => {
-                Request::Held(Box::new(Held::PeopleReply { to, sign_in: core.signing_in, reply }))
-            }
+            people::Request::Reply { to, reply } => match reply {
+                people::Reply::Outcome(people::Outcome::Applied { connector, token }) => {
+                    Request::Held(Box::new(Held::Applied { to, connector, token }))
+                }
+                reply @ (people::Reply::SignedIn { .. }
+                | people::Reply::SignedOut
+                | people::Reply::Again(..)
+                | people::Reply::Refused(..)
+                | people::Reply::Outcome(
+                    people::Outcome::Again(..)
+                    | people::Outcome::SignedOut
+                    | people::Outcome::NoteEdited { .. }
+                    | people::Outcome::ServiceMade { .. }
+                    | people::Outcome::Adopted { .. }
+                    | people::Outcome::GoalStarted { .. }
+                    | people::Outcome::GoalProposed { .. }
+                    | people::Outcome::Stopped { .. }
+                    | people::Outcome::Cancelled { .. }
+                    | people::Outcome::Released { .. }
+                    | people::Outcome::PersonTaken { .. }
+                    | people::Outcome::PersonHandedBack { .. }
+                    | people::Outcome::PersonAnswered { .. }
+                    | people::Outcome::Moved { .. }
+                    | people::Outcome::ProposalDecided { .. }
+                    | people::Outcome::Said { .. }
+                    | people::Outcome::QuestionAnswered { .. }
+                    | people::Outcome::Prioritised { .. }
+                    | people::Outcome::Amended { .. }
+                    | people::Outcome::AmendProposed { .. }
+                    | people::Outcome::RolesSet { .. }
+                    | people::Outcome::PolicyChanged { .. }
+                    | people::Outcome::PoolSet { .. }
+                    | people::Outcome::EscalationDecided { .. }
+                    | people::Outcome::Started { .. }
+                    | people::Outcome::Refused(..),
+                )) => Request::Held(Box::new(Held::PeopleReply { to, sign_in: core.signing_in, reply })),
+            },
             people::Request::RolesApplied { .. } => continue,
             people::Request::RolesRefused { .. } | people::Request::RestoreRefused { .. } => {
                 Request::Now(Box::new(Now::RestoreRefused))
             }
             people::Request::Route { request, person, project, role, ask } => {
                 match *ask {
-                    people::Ask::Application { .. } => {
-                        work.push(Event::People(people::Event::Decided {
+                    people::Ask::Application { connector, .. } => {
+                        super::application_routes::admitted(
+                            core,
+                            env,
+                            work,
+                            &mut out,
                             request,
-                            outcome: people::Outcome::Refused(people::Refusal::NotOffered),
-                        }));
+                            connector,
+                            person,
+                            project,
+                            role.expect("application membership admitted"),
+                        );
                     }
                     ask @ (people::Ask::TakePerson { .. }
                     | people::Ask::HandBackPerson { .. }

@@ -139,6 +139,7 @@ impl Parties {
                 }
             }
             root::Event::Core(_)
+            | root::Event::Application { .. }
             | root::Event::Turn { .. }
             | root::Event::Text { .. }
             | root::Event::Answer { .. }
@@ -198,6 +199,7 @@ impl Parties {
                 self.endings.push((watcher.raw(), *why));
             }
             root::Delivery::Core(_)
+            | root::Delivery::Application { .. }
             | root::Delivery::Restart(_)
             | root::Delivery::Fleet(_)
             | root::Delivery::Projection { .. }

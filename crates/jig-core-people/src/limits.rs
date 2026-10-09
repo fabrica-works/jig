@@ -98,7 +98,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Slab::<Pending>::worst_case(limits.pending)?)?
         .checked_add(Map::<RequestKey, Id<Pending>>::worst_case(limits.pending)?)?
         .checked_add(u64::from(limits.pending).checked_mul(List::<skein_lib::ReplyTo>::worst_case(limits.waiters)?)?)?
-        .checked_add(u64::from(limits.pending).checked_mul(ask_bytes)?)?
+        .checked_add(u64::from(limits.pending).checked_mul(ask_bytes.checked_mul(2)?)?)?
         .checked_add(u64::from(limits.initial_owners).checked_mul(
             u64::try_from(size_of::<InitialOwner>()).ok()?.checked_add(u64::from(limits.identity_bytes))?,
         )?)?

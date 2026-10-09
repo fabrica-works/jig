@@ -27,6 +27,7 @@ pub(crate) struct Answered {
 
 #[derive(Debug)]
 pub(crate) struct Pending {
+    part: Option<Ask>,
     key: RequestKey,
     ask: Ask,
     replies: List<ReplyTo>,
@@ -672,7 +673,7 @@ fn apply_roles(
         return Err(Outcome::Again(Again::NotReady));
     }
     let flight = domain.pending.get(Id::from_token(request)).ok_or(Outcome::Refused(Refusal::Unknown))?;
-    let project = match &flight.ask {
+    let project = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::SetRoles { project, .. } => *project,
         Ask::Application { .. }
         | Ask::MakeService { .. }
@@ -704,7 +705,7 @@ fn apply_roles(
     if role(domain, flight.key.person, project) != Some(Role::Owner) {
         return Err(Outcome::Refused(Refusal::Role { held: role(domain, flight.key.person, project) }));
     }
-    let holdings = match &flight.ask {
+    let holdings = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::SetRoles { holdings, .. } => {
             valid_roles(domain, &env.limits, project, holdings)?;
             for holding in holdings {
@@ -818,7 +819,7 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         return;
     }
     let flight = domain.pending.get(Id::from_token(request)).expect("service creation names a live keyed flight");
-    let (project, name, service_role) = match &flight.ask {
+    let (project, name, service_role) = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::MakeService { project, name, role } => (*project, name.clone(), *role),
         Ask::Application { .. }
         | Ask::EditNote { .. }
@@ -1386,7 +1387,6 @@ fn role(domain: &Domain, person: u64, project: u32) -> Option<Role> {
     None
 }
 
-#[expect(clippy::too_many_lines, reason = "each keyed request is admitted with its role and replay check")]
 fn admit_ask(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -1441,71 +1441,7 @@ fn admit_ask(
     }
     let project = project(&ask);
     let role = role(domain, key.person, project);
-    let refusal = match &ask {
-        Ask::Application { .. } => {
-            if role.is_some() {
-                None
-            } else {
-                Some(Refusal::Role { held: None })
-            }
-        }
-        Ask::EditNote { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::MakeService { .. }
-        | Ask::Adopt { .. }
-        | Ask::SetRoles { .. }
-        | Ask::ChangePolicy { .. }
-        | Ask::SetPool { .. } => {
-            if !domain.roles.contains_key(&project) {
-                Some(Refusal::Unknown)
-            } else if role == Some(Role::Owner) {
-                None
-            } else {
-                Some(Refusal::Role { held: role })
-            }
-        }
-        Ask::StartChat { .. } => {
-            let service = match domain.people.get(&key.person) {
-                Some(party) => party.key.provider == domain.deployment_provider,
-                None => false,
-            };
-            if service {
-                Some(Refusal::Role { held: role })
-            } else {
-                match role {
-                    Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-                    Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-                }
-            }
-        }
-        Ask::SetGoal { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::Say { .. } | Ask::AnswerQuestion { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::Prioritise { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Policy { .. }) => None,
-            Some(Role::Member | Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::Amend { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::DecideEscalation { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::Move { .. }
-        | Ask::TakePerson { .. }
-        | Ask::HandBackPerson { .. }
-        | Ask::AnswerPerson { .. }
-        | Ask::Stop { .. }
-        | Ask::Cancel { .. }
-        | Ask::Release { .. } => None,
-    };
+    let refusal = admission(domain, key.person, project, role, &ask);
     if let Some(refusal) = refusal {
         let outcome = Outcome::Refused(refusal);
         save_answer(domain, env, key, ask, outcome, out);
@@ -1516,7 +1452,7 @@ fn admit_ask(
     }
     let mut replies = List::with_capacity(env.limits.waiters);
     replies.push(to).expect("bounded list room checked");
-    let flight = Pending { key, ask: ask.clone(), replies };
+    let flight = Pending { key, ask: ask.clone(), replies, part: None };
     let id = domain.pending.insert(flight).expect("pending request admitted");
     let indexed = domain.flights.insert(key, id);
     assert!(indexed == Ok(None), "one key per flight within pending capacity");
@@ -1778,5 +1714,150 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             assert!(saved.is_ok(), "restored sign-in already exists");
             arm(domain, env, number, signin.expires);
         }
+    }
+}
+
+/// Judge a connector's core part as its admitted party, without allocating another key.
+/// The caller completes this part before the application flight (domain/people.md, 5.1).
+pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, ask: Ask) -> Result<Request, Outcome> {
+    let id = Id::from_token(request);
+    let flight = domain.pending.get(id).ok_or(Outcome::Refused(Refusal::Unknown))?;
+    let application_project = match &flight.ask {
+        Ask::Application { project, .. } => *project,
+        Ask::MakeService { .. }
+        | Ask::Adopt { .. }
+        | Ask::SetRoles { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetPool { .. }
+        | Ask::StartChat { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Say { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::Prioritise { .. }
+        | Ask::Amend { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::Move { .. }
+        | Ask::TakePerson { .. }
+        | Ask::HandBackPerson { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Release { .. }
+        | Ask::EditNote { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
+    };
+    match &ask {
+        Ask::Application { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
+        Ask::MakeService { .. }
+        | Ask::Adopt { .. }
+        | Ask::SetRoles { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetPool { .. }
+        | Ask::StartChat { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Say { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::Prioritise { .. }
+        | Ask::Amend { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::Move { .. }
+        | Ask::TakePerson { .. }
+        | Ask::HandBackPerson { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Release { .. }
+        | Ask::EditNote { .. } => {}
+    }
+    if project(&ask) != application_project {
+        return Err(Outcome::Refused(Refusal::Unknown));
+    }
+    if !valid_ask(&env.limits, &ask) {
+        return Err(Outcome::Refused(invalid_ask(&ask)));
+    }
+    let person = flight.key.person;
+    let role = role(domain, person, application_project);
+    if let Some(why) = admission(domain, person, application_project, role, &ask) {
+        return Err(Outcome::Refused(why));
+    }
+    let flight = domain.pending.get_mut(id).expect("admitted application flight");
+    assert!(flight.part.is_none(), "one core part at a time");
+    flight.part = Some(ask.clone());
+    Ok(Request::Route { request, person, project: application_project, role, ask: Box::new(ask) })
+}
+
+fn admission(domain: &Domain, person: u64, project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
+    match ask {
+        Ask::Application { .. } => {
+            if role.is_some() {
+                None
+            } else {
+                Some(Refusal::Role { held: None })
+            }
+        }
+        Ask::EditNote { .. } => match role {
+            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
+            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
+        },
+        Ask::MakeService { .. }
+        | Ask::Adopt { .. }
+        | Ask::SetRoles { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetPool { .. } => {
+            if !domain.roles.contains_key(&project) {
+                Some(Refusal::Unknown)
+            } else if role == Some(Role::Owner) {
+                None
+            } else {
+                Some(Refusal::Role { held: role })
+            }
+        }
+        Ask::StartChat { .. } => {
+            let service = match domain.people.get(&person) {
+                Some(party) => party.key.provider == domain.deployment_provider,
+                None => false,
+            };
+            if service {
+                Some(Refusal::Role { held: role })
+            } else {
+                match role {
+                    Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
+                    Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
+                }
+            }
+        }
+        Ask::SetGoal { .. } => match role {
+            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
+            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
+        },
+        Ask::Say { .. } | Ask::AnswerQuestion { .. } => match role {
+            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
+            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
+        },
+        Ask::Prioritise { .. } => match role {
+            Some(Role::Owner | Role::Maintainer | Role::Policy { .. }) => None,
+            Some(Role::Member | Role::Observer) | None => Some(Refusal::Role { held: role }),
+        },
+        Ask::Amend { .. } => match role {
+            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
+            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
+        },
+        Ask::DecideEscalation { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::Move { .. }
+        | Ask::TakePerson { .. }
+        | Ask::HandBackPerson { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Release { .. } => None,
+    }
+}
+
+/// Forget the synchronous part while preserving its application key and digest.
+pub fn application_part_done(domain: &mut Domain, request: Token) {
+    if let Some(flight) = domain.pending.get_mut(Id::from_token(request)) {
+        flight.part = None;
     }
 }

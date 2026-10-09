@@ -26,6 +26,8 @@ pub struct Deployment {
     pub calls: u64,
     /// Last allocated stable store identity for a connector row.
     pub connector_rows: u64,
+    /// Last durable token allocated for a connector-owned party outcome.
+    pub applications: u64,
     /// Last issued ordered commit. A restored header is already durable; a live journal may await
     /// this number's store terminal.
     pub commits: u64,
@@ -50,6 +52,8 @@ pub enum Family {
     Call,
     /// Stable connector row identity, allocated once per live connector key.
     ConnectorRow,
+    /// Connector-owned application request outcomes.
+    Application,
 }
 
 /// Deployment numbers retained by the core.
@@ -74,6 +78,7 @@ impl Counters {
             runs: 0,
             calls: 0,
             connector_rows: 0,
+            applications: 0,
             commits: 0,
         };
         Counters { deployment, dirty: true }
@@ -127,6 +132,7 @@ pub fn fresh(counters: &mut Counters, family: Family) -> Option<u64> {
         Family::Run => &mut counters.deployment.runs,
         Family::Call => &mut counters.deployment.calls,
         Family::ConnectorRow => &mut counters.deployment.connector_rows,
+        Family::Application => &mut counters.deployment.applications,
     };
     let next = counter.checked_add(1)?;
     *counter = next;

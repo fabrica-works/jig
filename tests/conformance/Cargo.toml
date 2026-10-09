@@ -25,6 +25,7 @@ jig-core-accounts.workspace = true
 jig-core-notes.workspace = true
 skein-lib.workspace = true
 skein-world.workspace = true
+sha2.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"

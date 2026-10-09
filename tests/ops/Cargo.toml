@@ -30,6 +30,7 @@ smith-charter.workspace = true
 smith-transcript.workspace = true
 skein-fake-llm-domain.workspace = true
 skein-world.workspace = true
+sha2.workspace = true
 jig-ops-domain-observability.workspace = true
 jig-ops-domain-infrastructure.workspace = true
 jig-ops-fake-production.workspace = true

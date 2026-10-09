@@ -3,6 +3,29 @@
 use crate::documents::*;
 use crate::*;
 use skein_lib::{Duration, Env, ReplyTo, Time, Token, Wall};
+
+#[test]
+fn restored_application_tokens_cannot_exceed_the_deployments_allocations() {
+    let (mut core, _) = make_tree();
+    let connector = core.connectors[0];
+    let token = fresh(&mut core.counters, Family::Application).expect("application token");
+    let mut record = people::Stored::Answer {
+        key: people::RequestKey { person: 1, key: [1; 16] },
+        ask: Box::new(people::Ask::Application { project: 1, connector, digest: [1; 32] }),
+        outcome: people::Outcome::Applied { connector, token: Token::new(token.checked_add(1).expect("next token")) },
+        at: Wall::EPOCH,
+    };
+    assert!(!core.restore_people_row(&record));
+    if let people::Stored::Answer { outcome, .. } = &mut record {
+        *outcome = people::Outcome::Applied { connector, token: Token::new(token) };
+    }
+    assert!(core.restore_people_row(&record));
+    if let people::Stored::Answer { outcome, .. } = &mut record {
+        *outcome = people::Outcome::Applied { connector: u16::MAX, token: Token::new(token) };
+    }
+    assert!(!core.restore_people_row(&record));
+}
+
 fn limits() -> Limits {
     let retry = tasks::Retry { retries: 1, base: Duration::from_millis(10), max: Duration::from_secs(1) };
     let tasks = tasks::Limits {

@@ -379,7 +379,8 @@ impl Observer {
                     self.observe(now, r::Observed::Uncertain { connector: *number, key: key.into() });
                 }
             }
-            root::Event::RestartBegin
+            root::Event::Application { .. }
+            | root::Event::RestartBegin
             | root::Event::RestartDone(_)
             | root::Event::Timer(_)
             | root::Event::Core(_)
@@ -836,7 +837,8 @@ impl Observer {
             root::Delivery::LostRead { task, attempt, .. } => {
                 requires.push(r::Receipt::Terminal(*task, *attempt));
             }
-            root::Delivery::Restart(_)
+            root::Delivery::Application { .. }
+            | root::Delivery::Restart(_)
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)
             | root::Delivery::Projection { .. }

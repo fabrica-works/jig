@@ -27,6 +27,11 @@
 
 extern crate alloc;
 
+mod application;
+pub mod application_core;
+pub use application::{
+    ApplicationCoreAnswer, ApplicationObject, ApplicationOutcome, ApplicationRelease, ApplicationRequest,
+};
 mod boundary;
 mod domain;
 mod limits;

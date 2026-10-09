@@ -117,6 +117,19 @@ fn event_in(
     work: &mut Queue<Work>,
 ) {
     match event {
+        Event::Application { reply_to, sign_in, key, project, digest, value } => {
+            let owner = domain.token();
+            work.push(Work::Infrastructure(infrastructure::Event::ApplicationPrepare { owner, value }));
+            work.push(Work::Core(core::Event::Application {
+                reply_to,
+                sign_in,
+                key,
+                project,
+                connector: domain.numbers.infrastructure,
+                digest,
+                owner,
+            }));
+        }
         Event::Core(event) => work.push(Work::Core(event)),
         Event::Infrastructure(event) => work.push(Work::Infrastructure(event)),
         Event::Observability(event) => work.push(Work::Observability(event)),
@@ -216,8 +229,17 @@ pub(crate) fn core_out(
         }
     }
 }
+#[expect(clippy::too_many_lines, reason = "one dispatcher preserves the full held output vocabulary")]
 fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value: core::Held, work: &mut Queue<Work>) {
     match value {
+        core::Held::Applied { to, connector, token } => {
+            assert!(connector == domain.numbers.infrastructure, "application request owner");
+            let outcome = domain
+                .infrastructure
+                .application_outcome(token)
+                .expect("kept people token has its retained connector outcome");
+            held(decision, Output::Application { to, outcome });
+        }
         core::Held::MakeEffect { connector, entry } => {
             if connector == domain.numbers.infrastructure {
                 child(decision, Released::Infrastructure(infrastructure::Event::MakeEntry { entry }));
@@ -342,6 +364,24 @@ fn core_ask(
     work: &mut Queue<Work>,
 ) {
     match ask {
+        core::Ask::Application { request, token, owner, person, project, role, retention } => {
+            assert!(number == domain.numbers.infrastructure, "application owner");
+            work.push(Work::Infrastructure(infrastructure::Event::Application {
+                request,
+                token,
+                owner,
+                person,
+                project,
+                role: role.number(),
+                retention,
+            }));
+        }
+        core::Ask::DropApplication { owner } => {
+            if number == domain.numbers.infrastructure {
+                work.push(Work::Infrastructure(infrastructure::Event::ApplicationDrop { owner }));
+            }
+        }
+        core::Ask::ApplicationPartAnswered { .. } => unreachable!("infrastructure requests ask for no core part"),
         core::Ask::Effect(ask) => effect_ask(domain, env, number, ask, work),
         core::Ask::TaskHoldings { request, executor, spec, .. } => work.push(Work::Core(core::Event::Holdings {
             request,
@@ -693,6 +733,15 @@ fn infrastructure_out(
 ) {
     for _ in 0..out.len() {
         match out.pop().expect("infrastructure requests") {
+            infrastructure::Request::ApplicationDone { request, token } => {
+                work.push(Work::Core(core::Event::ApplicationFinished { request, outcome: Ok(token) }));
+            }
+            infrastructure::Request::ApplicationBusy { request } => {
+                work.push(Work::Core(core::Event::ApplicationFinished {
+                    request,
+                    outcome: Err(jig_core_people::Again::Busy),
+                }));
+            }
             infrastructure::Request::Closed { task } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Closed {
                     task,

@@ -214,6 +214,8 @@ pub(crate) struct WatchedSubject {
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
+    pub(crate) application_input: Option<(u16, Token)>,
+    pub(crate) applications: Map<Token, routing::application_routes::Flight>,
     pub(crate) restart: restart::Restart,
     pub(crate) restart_attempts: u32,
     /// Application connectors addressed only by number.
@@ -481,6 +483,8 @@ impl Core {
             );
         }
         Core {
+            application_input: None,
+            applications: Map::with_capacity(limits.people.pending),
             restart: restart::Restart::Cold,
             restart_attempts: limits.fleet.attempts,
             counters: Counters::bootstrap(config.deployment),

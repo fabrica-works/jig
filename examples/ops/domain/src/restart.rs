@@ -125,14 +125,18 @@ pub(crate) fn store(
                     domain.core.restore_policy(&env.limits.core, project, value)
                 }
                 Record::Core(core::Record::People(row)) => {
-                    let mut out = Queue::with_capacity(people::max_out(&env.limits.core.people));
-                    people::step(
-                        &mut domain.core.people,
-                        &Env { now: env.now, wall: env.wall, limits: env.limits.core.people },
-                        people::Event::Restore { record: row },
-                        &mut out,
-                    );
-                    out.is_empty()
+                    if domain.core.restore_people_row(&row) {
+                        let mut out = Queue::with_capacity(people::max_out(&env.limits.core.people));
+                        people::step(
+                            &mut domain.core.people,
+                            &Env { now: env.now, wall: env.wall, limits: env.limits.core.people },
+                            people::Event::Restore { record: row },
+                            &mut out,
+                        );
+                        out.is_empty()
+                    } else {
+                        false
+                    }
                 }
                 Record::Core(core::Record::Notes(row)) => {
                     work.push(Work::Core(core::Event::Notes(notes::Event::Restore { record: row })));
@@ -174,6 +178,8 @@ fn restore_roles(domain: &mut Domain, env: &Env<Limits>, record: &infrastructure
         infrastructure::Record::Procedure(_)
         | infrastructure::Record::Proposal { .. }
         | infrastructure::Record::Outbox(_)
+        | infrastructure::Record::EnvironmentEnd { .. }
+        | infrastructure::Record::ApplicationAnswer { .. }
         | infrastructure::Record::Made { .. } => {}
     }
     valid

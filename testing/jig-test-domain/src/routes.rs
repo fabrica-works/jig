@@ -28,6 +28,12 @@ pub(super) fn route_core(
             }
             core::Request::Write(core::Write::Erase(key)) => write(domain, decision, Write::Erase(Key::Core(key))),
             core::Request::Held(held) => match *held {
+                core::Held::Applied { to, connector: number, token } => {
+                    let outcome = crate::numbered(domain, number)
+                        .application_outcome(token)
+                        .expect("the connector retains every kept people token");
+                    hold(decision, Delivery::Application { to, number, outcome });
+                }
                 core::Held::Assign { channel, run, attempt, .. } => {
                     let assignment = domain.assignments.remove(&run.raw()).expect("prepared claim has assignment");
                     assert!(assignment.attempt == attempt.raw(), "current assignment fence");
@@ -98,6 +104,27 @@ fn route_ask(
     work: &mut Queue<Work>,
 ) {
     match ask {
+        core::Ask::Application { request, token, owner, person, project, role, retention } => {
+            work.push(Work::Connector {
+                number,
+                event: connector::Event::Application {
+                    request,
+                    token,
+                    owner,
+                    person,
+                    project,
+                    role: role.number(),
+                    retention,
+                },
+            });
+        }
+        core::Ask::DropApplication { owner } => {
+            work.push(Work::Connector { number, event: connector::Event::ApplicationDrop { owner } });
+        }
+        core::Ask::ApplicationPartAnswered { request, outcome } => work.push(Work::Connector {
+            number,
+            event: connector::Event::ApplicationCore { request, answer: application_answer(outcome) },
+        }),
         core::Ask::Effect(ask) => route_effect_ask(domain, number, ask, work),
         core::Ask::TaskHoldings { request, project, spec, .. } => {
             let holdings = specification_holdings(domain, env, number, project, &spec, work);
@@ -491,6 +518,27 @@ pub(super) fn route_connector(
 ) {
     for _ in 0..requests.len() {
         match requests.pop().expect("connector request count") {
+            connector::Request::ApplicationDone { request, token } => {
+                work.push(Work::Core(core::Event::ApplicationFinished { request, outcome: Ok(token) }));
+            }
+            connector::Request::ApplicationAgain { request, why } => {
+                let why = match why {
+                    connector::application_core::Again::Busy => people::Again::Busy,
+                    connector::application_core::Again::NotReady => people::Again::NotReady,
+                };
+                work.push(Work::Core(core::Event::ApplicationFinished { request, outcome: Err(why) }));
+            }
+            connector::Request::ApplicationRelease { request, project, release } => {
+                work.push(Work::Core(core::Event::ApplicationPart {
+                    request,
+                    ask: Box::new(people::Ask::Release {
+                        project,
+                        task: release.task,
+                        revision: release.revision,
+                        again: release.again,
+                    }),
+                }));
+            }
             connector::Request::Closed { task } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Closed {
                     task,
@@ -517,7 +565,9 @@ pub(super) fn route_connector(
                     connector::Record::Outbox(row) => {
                         assert!(domain.outbox_tasks.insert(row.number, row.task).is_ok(), "bounded outbox task routes");
                     }
-                    connector::Record::Proposal { .. }
+                    connector::Record::ApplicationObject { .. }
+                    | connector::Record::ApplicationAnswer { .. }
+                    | connector::Record::Proposal { .. }
                     | connector::Record::Task { .. }
                     | connector::Record::Adoption { .. }
                     | connector::Record::Subscription { .. }
@@ -870,5 +920,39 @@ fn resource_reports(
             role,
             hold,
         })));
+    }
+}
+
+fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAnswer {
+    match outcome {
+        people::Outcome::Released { .. } => connector::ApplicationCoreAnswer::Released,
+        people::Outcome::Refused(why) => {
+            connector::ApplicationCoreAnswer::Refused(crate::application_facts::refusal(why))
+        }
+        people::Outcome::Again(why) => connector::ApplicationCoreAnswer::Again(crate::application_facts::again(why)),
+        people::Outcome::Applied { .. }
+        | people::Outcome::SignedOut
+        | people::Outcome::NoteEdited { .. }
+        | people::Outcome::ServiceMade { .. }
+        | people::Outcome::Adopted { .. }
+        | people::Outcome::GoalStarted { .. }
+        | people::Outcome::GoalProposed { .. }
+        | people::Outcome::Stopped { .. }
+        | people::Outcome::Cancelled { .. }
+        | people::Outcome::PersonTaken { .. }
+        | people::Outcome::PersonHandedBack { .. }
+        | people::Outcome::PersonAnswered { .. }
+        | people::Outcome::Moved { .. }
+        | people::Outcome::ProposalDecided { .. }
+        | people::Outcome::Said { .. }
+        | people::Outcome::QuestionAnswered { .. }
+        | people::Outcome::Prioritised { .. }
+        | people::Outcome::Amended { .. }
+        | people::Outcome::AmendProposed { .. }
+        | people::Outcome::RolesSet { .. }
+        | people::Outcome::PolicyChanged { .. }
+        | people::Outcome::PoolSet { .. }
+        | people::Outcome::EscalationDecided { .. }
+        | people::Outcome::Started { .. } => unreachable!("release core part returns a release terminal"),
     }
 }

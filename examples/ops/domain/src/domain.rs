@@ -227,7 +227,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
     match event {
         Event::Store(Store::Committed { number }) => domain.journal.committed(number),
         Event::Store(Store::Failed { number }) => domain.journal.failed(number),
-        other @ (Event::Core(_)
+        other @ (Event::Application { .. }
+        | Event::Core(_)
         | Event::Infrastructure(_)
         | Event::Observability(_)
         | Event::Host(_)

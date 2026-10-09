@@ -602,6 +602,11 @@ pub(super) fn tag_tasks(
                         out.push(Request::Ask {
                             connector,
                             ask: match &ask {
+                                Ask::Application { .. }
+                                | Ask::DropApplication { .. }
+                                | Ask::ApplicationPartAnswered { .. } => {
+                                    unreachable!("application handoffs do not arise from task closes")
+                                }
                                 Ask::SubscriptionDone { request, key, subscription } => {
                                     Ask::SubscriptionDone { request: *request, key: *key, subscription: *subscription }
                                 }

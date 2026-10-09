@@ -29,11 +29,11 @@ pub struct Limits {
     pub facts: u32,
     /// Outstanding verdicts awaiting a fact change (at most four).
     pub judges: u32,
-    /// Staged sections or workspace item sets.
+    /// Staged sections or workspace item sets; separately, retained application outcomes.
     pub values: u32,
     /// Maximum bytes in one read answer or staged section.
     pub value_bytes: u32,
-    /// Maximum effects awaiting an authority decision.
+    /// Maximum effects awaiting authority; separately, prepared application values and core parts.
     pub staged: u32,
     /// Maximum unsettled outbox entries.
     pub entries: u32,
@@ -68,7 +68,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let path_bytes = u64::from(limits.path_segments).checked_mul(u64::from(limits.segment_bytes).checked_add(16)?)?;
     let task_paths =
         u64::from(limits.tasks).checked_mul(u64::from(limits.resources_per_task))?.checked_mul(path_bytes)?;
-    Map::<u64, Record>::worst_case(limits.tasks)?
+    crate::application::worst_case(limits)?
+        .checked_add(Map::<u64, Record>::worst_case(limits.tasks)?)?
         .checked_add(Map::<u64, ()>::worst_case(limits.tasks)?)?
         .checked_add(Map::<(u32, Path), ResourceRole>::worst_case(limits.adoptions)?)?
         .checked_add(Map::<(u16, u64), (u16, u16)>::worst_case(limits.subscriptions)?)?

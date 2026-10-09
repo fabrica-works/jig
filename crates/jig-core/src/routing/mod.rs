@@ -4,6 +4,8 @@
 
 #![expect(clippy::mod_module_files, reason = "the route split keeps dispatch in routing/mod.rs")]
 
+pub(crate) mod application_routes;
+
 use crate::{CallKey, CallPart, Core, RoutedCall};
 use alloc::boxed::Box;
 use children::{route_account, route_brief, route_fleet, route_projection_settled, tag_account, tag_brief, tag_fleet};
@@ -308,7 +310,10 @@ pub fn room_max(limits: &Limits) -> Option<JournalRoom> {
 pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
-        Event::EffectStart { .. }
+        Event::Application { .. }
+        | Event::ApplicationPart { .. }
+        | Event::ApplicationFinished { .. }
+        | Event::EffectStart { .. }
         | Event::EffectConnector(_)
         | Event::EffectDeadline
         | Event::SignIn { .. }
@@ -395,6 +400,13 @@ pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
 
 fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<Event>) -> Requests {
     match event {
+        Event::Application { reply_to, sign_in, key, project, connector, digest, owner } => {
+            application_routes::start(core, env, work, reply_to, sign_in, key, project, connector, digest, owner)
+        }
+        Event::ApplicationPart { request, ask } => application_routes::part(core, env, work, request, *ask),
+        Event::ApplicationFinished { request, outcome } => {
+            application_routes::finished(core, env, work, request, outcome)
+        }
         Event::ProjectionSettled { goal, connector } => route_projection_settled(core, env, goal, connector),
         Event::SettledCall { to, key, call } => crate::conversation::settle(core, &env.limits, to, key, call),
         Event::EffectStart { owner, connector, origin } => crate::effects::start(core, env, owner, connector, origin),

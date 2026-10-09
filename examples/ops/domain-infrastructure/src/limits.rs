@@ -18,9 +18,9 @@ pub struct Limits {
     pub tasks: u32,
     /// Live procedure states.
     pub procedures: u32,
-    /// Staged effects.
+    /// Staged effects and, separately, prepared application values.
     pub staged: u32,
-    /// Durable proposed effects.
+    /// Durable proposed effects and, separately, retained application outcomes.
     pub proposals: u32,
     /// Unsettled outbox entries.
     pub effects: u32,
@@ -44,7 +44,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     }
     let name = u64::from(limits.name_bytes);
     let refresh = limits.tasks.checked_mul(limits.resources_per_task)?.checked_add(limits.procedures)?;
-    Map::<Service, ServiceFact>::worst_case(limits.services)?
+    crate::application::worst_case(limits)?
+        .checked_add(Map::<Service, ServiceFact>::worst_case(limits.services)?)?
         .checked_add(Map::<u64, bool>::worst_case(
             limits.tasks.checked_add(limits.procedures)?.checked_add(limits.effects)?,
         )?)?

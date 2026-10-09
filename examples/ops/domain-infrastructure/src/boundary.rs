@@ -382,6 +382,10 @@ pub enum StepDecision {
 /// Stable key for a connector record.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum RecordKey {
+    /// Connector-owned end and revision.
+    EnvironmentEnd(Environment),
+    /// Retained keyed outcome.
+    ApplicationAnswer(Token),
     /// Resources named by a task.
     Rely(u64),
     /// A procedure task's state.
@@ -397,6 +401,10 @@ pub enum RecordKey {
 /// State committed by the root with a decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Record {
+    /// Current desired end and revision.
+    EnvironmentEnd { environment: Environment, now: crate::EnvironmentEnd },
+    /// Own outcome retained for the people child's token.
+    ApplicationAnswer { token: Token, until: skein_lib::Wall, outcome: crate::ApplicationOutcome },
     /// Resources a task relies on.
     Rely { task: u64, project: u32, resources: Box<[Named]> },
     /// One procedure's state.
@@ -414,6 +422,8 @@ impl Record {
     #[must_use]
     pub fn key(&self) -> RecordKey {
         match self {
+            Record::EnvironmentEnd { environment, .. } => RecordKey::EnvironmentEnd(environment.clone()),
+            Record::ApplicationAnswer { token, .. } => RecordKey::ApplicationAnswer(*token),
             Record::Rely { task, .. } => RecordKey::Rely(*task),
             Record::Procedure(state) => RecordKey::Procedure(state.task),
             Record::Proposal { number, .. } => RecordKey::Proposal(*number),
@@ -426,6 +436,20 @@ impl Record {
 /// Root-to-connector events.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// Decoded request retained by its owner before keyed admission.
+    ApplicationPrepare { owner: Token, value: crate::ApplicationRequest },
+    /// Admission consumed or rejected the prepared value.
+    ApplicationDrop { owner: Token },
+    /// Decide the admitted party request within this decision.
+    Application {
+        request: Token,
+        token: Token,
+        owner: Token,
+        person: u64,
+        project: u32,
+        role: u32,
+        retention: skein_lib::Duration,
+    },
     /// Settle this task before acknowledging its closing barrier.
     Close { task: u64 },
     /// Release this task's connector-owned live state.
@@ -499,6 +523,10 @@ pub enum SystemEvent {
 /// Requests to the root and its journal.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// The outcome was saved in this decision.
+    ApplicationDone { request: Token, token: Token },
+    /// No application decision was made; retry the key.
+    ApplicationBusy { request: Token },
     /// This task has no unsettled entries.
     Closed { task: u64 },
     /// This task's live state was released.

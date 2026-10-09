@@ -31,6 +31,20 @@ pub enum Request {
 /// A question or retained-section command for a numbered connector.
 #[derive(Debug)]
 pub enum Ask {
+    /// Decide the admitted connector-owned value in this decision and retain its outcome.
+    Application {
+        request: Token,
+        token: Token,
+        owner: Token,
+        person: u64,
+        project: u32,
+        role: people::Role,
+        retention: skein_lib::Duration,
+    },
+    /// Discard a prepared value after admission; deciding consumes it first.
+    DropApplication { owner: Token },
+    /// The party's core part completed, with the same facts as a direct ask.
+    ApplicationPartAnswered { request: Token, outcome: people::Outcome },
     /// A core-selected effect handoff completed inside this decision.
     Effect(crate::connector::Ask),
     /// Tell the owning connector that this task took a write hold.
@@ -91,6 +105,8 @@ pub enum Write {
 pub enum Held {
     /// One authenticated read answer after every preceding commit is durable.
     Read { reply: ReplyTo, answer: crate::reads::Answer },
+    /// The root assembles the outcome retained by its numbered connector.
+    Applied { to: ReplyTo, connector: u16, token: Token },
     /// Current subject document, held until every preceding commit is durable.
     Delivery { watcher: Token, document: Box<crate::documents::Document> },
     /// A watch has ended after every outstanding terminal.
@@ -303,6 +319,20 @@ pub struct CoreBriefBudgets {
 pub enum Event {
     /// An unkeyed one-shot read on the supplied live sign-in.
     Read { reply: ReplyTo, sign_in: u64, read: crate::reads::Read },
+    /// Admit an application request by metadata; its owner retains the value.
+    Application {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        project: u32,
+        connector: u16,
+        digest: [u8; 32],
+        owner: Token,
+    },
+    /// A connector asks the core within the admitted party decision.
+    ApplicationPart { request: Token, ask: Box<people::Ask> },
+    /// The connector durably kept its outcome, or could not decide this time.
+    ApplicationFinished { request: Token, outcome: Result<Token, people::Again> },
     /// A connector's final projection write has settled, or its project has no home there.
     ProjectionSettled { goal: u64, connector: u16 },
     /// A protocol-rendered answer, with opaque workspace evidence preserved verbatim.

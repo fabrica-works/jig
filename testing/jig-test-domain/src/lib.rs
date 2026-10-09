@@ -86,6 +86,8 @@ pub enum Write {
 /// What the journal releases after its commit, or through its read door.
 #[derive(Debug)]
 pub enum Delivery {
+    /// The connector's own terminal, released by the journal after durability.
+    Application { to: ReplyTo, number: u16, outcome: connector::ApplicationOutcome },
     /// One committed whole-tree projection handoff.
     Projection { connector: u16, feed: Box<core::ProjectionFeed> },
     /// One committed inbox word for its current host.
@@ -152,6 +154,16 @@ pub enum Request {
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "the testing root moves admitted core events by value")]
 pub enum Event {
+    /// A protocol-decoded application value with its independently computed digest.
+    Application {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        project: u32,
+        number: u16,
+        digest: [u8; 32],
+        value: connector::ApplicationRequest,
+    },
     /// A correlated reply to the connector's fresh read after a lost writer.
     WriterRead {
         connector: u16,
@@ -368,6 +380,15 @@ impl Domain {
 
 #[expect(clippy::large_enum_variant, reason = "the bounded route queue owns complete core events")]
 enum Work {
+    Application {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        project: u32,
+        number: u16,
+        digest: [u8; 32],
+        value: connector::ApplicationRequest,
+    },
     ProjectionEffect {
         goal: u64,
         number: u16,
@@ -435,6 +456,9 @@ enum Payload {
 /// Admit one input and route all synchronous continuations inside one decision.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
     match event {
+        Event::Application { reply_to, sign_in, key, project, number, digest, value } => {
+            decide(domain, env, Work::Application { reply_to, sign_in, key, project, number, digest, value });
+        }
         Event::ConnectorTimer { number } => decide(domain, env, Work::ConnectorFire { number }),
         Event::WriterRead { connector, resource, event } => {
             decide(domain, env, Work::WriterRead { connector, resource, event });
@@ -504,7 +528,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
 fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
     let core_room = match &first {
         Work::Core(event) => core::room(&env.limits.core, event),
-        Work::Restart(_)
+        Work::Application { .. }
+        | Work::Restart(_)
         | Work::AdoptRestored
         | Work::AdoptDone
         | Work::Timer(_)
@@ -542,6 +567,22 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
             continue;
         };
         match next {
+            Work::Application { reply_to, sign_in, key, project, number, digest, value } => {
+                let owner = Token::new(domain.next_payload);
+                domain.next_payload = domain.next_payload.checked_add(1).expect("root token room");
+                if number == 1 || number == 2 {
+                    work.push(Work::Connector { number, event: connector::Event::ApplicationPrepare { owner, value } });
+                }
+                work.push(Work::Core(core::Event::Application {
+                    reply_to,
+                    sign_in,
+                    key,
+                    project,
+                    connector: number,
+                    digest,
+                    owner,
+                }));
+            }
             Work::ConnectorFire { number } => {
                 let mut out = Queue::with_capacity(connector::MAX_OUT);
                 connector::fire(
@@ -769,7 +810,8 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
                 let event = relay_message(domain, task, attempt, previous, word);
                 step(domain, env, event);
             }
-            other @ (Delivery::Projection { .. }
+            other @ (Delivery::Application { .. }
+            | Delivery::Projection { .. }
             | Delivery::Message { .. }
             | Delivery::Restart(_)
             | Delivery::CallAnswer { .. }
@@ -846,6 +888,7 @@ fn hold(decision: &mut Decision<Write, Delivery>, value: Delivery) {
 
 // The translations below are deliberately exhaustive: a new boundary variant
 // must make the testing application say how it crosses its root.
+mod application_facts;
 mod routes;
 use routes::{route_connector, route_core};
 
@@ -879,6 +922,9 @@ pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) ->
             domain.core.restore_policy(&env.limits.core, project, value)
         }
         Record::Core(core::Record::People(row)) => {
+            if !domain.core.restore_people_row(&row) {
+                return false;
+            }
             let mut out = Queue::with_capacity(jig_core_people::max_out(&env.limits.core.people));
             jig_core_people::step(
                 &mut domain.core.people,
@@ -919,7 +965,9 @@ fn restore_connector(domain: &mut Domain, env: &Env<Limits>, number: u16, record
                 return false;
             }
         }
-        connector::Record::Proposal { .. }
+        connector::Record::ApplicationObject { .. }
+        | connector::Record::ApplicationAnswer { .. }
+        | connector::Record::Proposal { .. }
         | connector::Record::Procedure(_)
         | connector::Record::Result { .. }
         | connector::Record::Task { .. }
@@ -977,6 +1025,9 @@ fn restore_connector(domain: &mut Domain, env: &Env<Limits>, number: u16, record
             | connector::Request::Save { .. }
             | connector::Request::Erase { .. }
             | connector::Request::RestartDone
+            | connector::Request::ApplicationDone { .. }
+            | connector::Request::ApplicationAgain { .. }
+            | connector::Request::ApplicationRelease { .. }
             | connector::Request::System(_) => return false,
         }
     }

@@ -27,6 +27,55 @@ const LIMITS: Limits = Limits {
 };
 
 #[test]
+fn application_parts_use_party_admission_and_preserve_the_original_key() {
+    let mut test = Test::new(LIMITS);
+    test.signin(1, 10, identity(0, 1));
+    test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
+    let ask = Ask::Application { project: 1, connector: 7, digest: [8; 32] };
+    let request = route(&test.request(10, 1, ask.clone()));
+    assert_eq!(
+        application_part(&mut test.d, &test.env, request, Ask::SetPool { project: 1, person: 1, budget: 20 }),
+        Err(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
+    );
+    assert_eq!(
+        application_part(&mut test.d, &test.env, request, Ask::SetPool { project: 2, person: 1, budget: 20 }),
+        Err(Outcome::Refused(Refusal::Unknown))
+    );
+    assert_eq!(
+        application_part(&mut test.d, &test.env, request, ask.clone()),
+        Err(Outcome::Refused(Refusal::NotOffered))
+    );
+    test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Owner }]) });
+    let part = Ask::SetRoles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Owner }]) };
+    assert_eq!(
+        application_part(&mut test.d, &test.env, request, part.clone()),
+        Ok(Request::Route { request, person: 1, project: 1, role: Some(Role::Owner), ask: Box::new(part) })
+    );
+    let to = test.to();
+    let applied = test.send(Event::ApplyRoles { reply_to: to, request });
+    assert!(applied.iter().any(|row| if let Request::RolesApplied { result, .. } = row {
+        result.is_ok()
+    } else {
+        false
+    }));
+    application_part_done(&mut test.d, request);
+    assert!(test.request(10, 1, ask.clone()).is_empty(), "same digest still joins the original flight");
+    let outcome = Outcome::Applied { connector: 7, token: Token::new(40) };
+    let completed = test.send(Event::Decided { request, outcome });
+    assert_eq!(reply(&completed), Reply::Outcome(outcome));
+    assert_eq!(
+        saved_answer(&completed),
+        Stored::Answer {
+            key: RequestKey { person: 1, key: [1; 16] },
+            ask: Box::new(ask.clone()),
+            outcome,
+            at: Wall::EPOCH
+        }
+    );
+    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+}
+
+#[test]
 fn result_cache_is_bounded_and_read_position_restores() {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
     let mut out = Queue::with_capacity(max_out(&LIMITS));

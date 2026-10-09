@@ -73,7 +73,7 @@ pub use boundary::{
     ProposalDecision, Reply, Request, RequestKey, ResourceName, ResourceRole, ResultRef, Role, Seed, Stored, Whom,
 };
 pub use decisions::{FailureClass, HoldReason, Moved};
-pub use domain::{Domain, fire, max_out, step};
+pub use domain::{Domain, application_part, application_part_done, fire, max_out, step};
 pub use facts::Fact;
 pub use limits::{Limits, worst_case};
 pub use policy_value::{

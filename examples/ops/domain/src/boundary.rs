@@ -53,6 +53,15 @@ pub enum Released {
 /// Inputs to the reference root; protocol adapters supply typed child values.
 #[derive(Debug)]
 pub enum Event {
+    /// A decoded infrastructure request with its protocol encoding's digest.
+    Application {
+        reply_to: ReplyTo,
+        sign_in: u64,
+        key: [u8; 16],
+        project: u32,
+        digest: [u8; 32],
+        value: infrastructure::ApplicationRequest,
+    },
     /// A typed core input, including authenticated parties and accounts.
     Core(core::Event),
     /// Observability's typed protocol input.
@@ -104,6 +113,8 @@ pub enum Timer {
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "the journal owns complete concrete outputs")]
 pub enum Output {
+    /// Infrastructure's own outcome, released only by the commit barrier.
+    Application { to: ReplyTo, outcome: infrastructure::ApplicationOutcome },
     /// One atomic transaction, numbered by the journal.
     Commit { number: u64, writes: Queue<Write> },
     /// Load this child's rows for the core-selected restart step.

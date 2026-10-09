@@ -40,6 +40,7 @@ pub struct World {
     pub hold_projection_settlements: bool,
     pub sign_in: Option<u64>,
     pub people_answers: Vec<people::Reply>,
+    pub application_answers: Vec<(Token, u16, connector::ApplicationOutcome)>,
     pub procedure: Option<u64>,
     pub pending_reads: Vec<(u16, connector::SystemRequest)>,
     pub lost_answers: u32,
@@ -213,6 +214,7 @@ impl World {
             hold_projection_settlements: false,
             sign_in: None,
             people_answers: Vec::new(),
+            application_answers: Vec::new(),
             procedure: None,
             pending_reads: Vec::new(),
             lost_answers: 0,
@@ -445,6 +447,12 @@ impl World {
             }
         }
         match delivery {
+            root::Delivery::Core(core::Held::Applied { .. }) => {
+                panic!("root assembles connector outcomes before journaling")
+            }
+            root::Delivery::Application { to, number, outcome } => {
+                self.application_answers.push((to.into_token(), number, outcome));
+            }
             root::Delivery::Projection { connector, feed } => {
                 if feed.closing && !self.hold_projection_settlements {
                     self.events.push_back(root::Event::Core(core::Event::ProjectionSettled {

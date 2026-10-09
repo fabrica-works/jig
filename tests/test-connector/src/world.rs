@@ -168,6 +168,9 @@ impl World {
                 | Request::Slots { .. }
                 | Request::Drift { .. }
                 | Request::News { .. }
+                | Request::ApplicationDone { .. }
+                | Request::ApplicationAgain { .. }
+                | Request::ApplicationRelease { .. }
                 | Request::Closed { .. } => {}
             }
         }
@@ -245,6 +248,9 @@ impl World {
                 | Request::News { .. }
                 | Request::Save { .. }
                 | Request::Erase { .. }
+                | Request::ApplicationDone { .. }
+                | Request::ApplicationAgain { .. }
+                | Request::ApplicationRelease { .. }
                 | Request::Closed { .. } => Vec::new(),
             };
             pending.extend(generated.iter().cloned());
@@ -271,7 +277,11 @@ impl World {
                 Record::Procedure(state) => {
                     live.insert(state.resource.clone());
                 }
-                Record::Proposal { .. } | Record::Subscription { .. } | Record::Result { .. } => {}
+                Record::ApplicationObject { .. }
+                | Record::ApplicationAnswer { .. }
+                | Record::Proposal { .. }
+                | Record::Subscription { .. }
+                | Record::Result { .. } => {}
             }
         }
         self.domain = Domain::new(config(self.seed), &LIMITS);

@@ -489,6 +489,22 @@ pub enum SystemEvent {
 /// What the root tells the connector for this part of its contract.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// The root leaves a decoded application value with this owner before admission.
+    ApplicationPrepare { owner: Token, value: crate::ApplicationRequest },
+    /// Drop an unconsumed prepared value after keyed admission.
+    ApplicationDrop { owner: Token },
+    /// Decide a newly admitted request within the current decision.
+    Application {
+        request: Token,
+        token: Token,
+        owner: Token,
+        person: u64,
+        project: u32,
+        role: u32,
+        retention: Duration,
+    },
+    /// The party's requested core part has settled.
+    ApplicationCore { request: Token, answer: crate::ApplicationCoreAnswer },
     /// Settle sent effects and withdraw unsent entries before acknowledging closure.
     Close { task: u64 },
     /// The core refused this step's effect, or its outbox settled.
@@ -570,6 +586,10 @@ pub enum Adoption {
 /// Stable identity of one connector record.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum RecordKey {
+    /// Connector-owned object revision and value.
+    ApplicationObject(u64),
+    /// Retained terminal of one keyed request.
+    ApplicationAnswer(Token),
     /// One procedure task's progress.
     Procedure(u64),
     /// Connector-owned result retained for a dependent's brief.
@@ -593,6 +613,10 @@ pub enum RecordKey {
 /// Data owned by this connector and committed by its root.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Record {
+    /// Current revision of a configured object.
+    ApplicationObject { object: u64, now: crate::ApplicationObject },
+    /// Retained answer for the people child's durable token.
+    ApplicationAnswer { token: Token, until: Wall, outcome: crate::ApplicationOutcome },
     /// A proposed payload is durable, and cannot be made before acceptance.
     Proposal { number: u64, task: u64, effect: Effect },
     /// Parameters and state of one procedure task.
@@ -618,6 +642,8 @@ impl Record {
     #[must_use]
     pub fn key(&self) -> RecordKey {
         match self {
+            Record::ApplicationObject { object, .. } => RecordKey::ApplicationObject(*object),
+            Record::ApplicationAnswer { token, .. } => RecordKey::ApplicationAnswer(*token),
             Record::Procedure(state) => RecordKey::Procedure(state.task),
             Record::Result { task, .. } => RecordKey::Result(*task),
             Record::Task { task, .. } => RecordKey::Task(*task),
@@ -634,6 +660,12 @@ impl Record {
 /// What the connector asks its root to route or commit.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// Outcome has been saved in this decision.
+    ApplicationDone { request: Token, token: Token },
+    /// Nothing changed; retry the same party key.
+    ApplicationAgain { request: Token, why: crate::application_core::Again },
+    /// Release through the core as the admitted party.
+    ApplicationRelease { request: Token, project: u32, release: crate::ApplicationRelease },
     /// Current adoption changed for a resource, including waiting tasks.
     Resource { project: u32, resource: Named },
     /// All of this task's outbox entries have settled.

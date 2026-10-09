@@ -13,6 +13,7 @@ pub const MAX_OUT: u32 = 8;
 /// A connector's live working set and records.
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) application: crate::application::State,
     pub(crate) config: Config,
     pub(crate) tasks: Map<u64, Record>,
     pub(crate) adoptions: Map<(u32, Path), ResourceRole>,
@@ -105,6 +106,7 @@ impl Domain {
             assert!(pools.insert(pool.path.clone(), pool.slots) == Ok(None), "pool paths are unique");
         }
         Domain {
+            application: crate::application::State::new(limits),
             config,
             closing: Map::with_capacity(limits.tasks),
             tasks: Map::with_capacity(limits.tasks),
@@ -152,6 +154,14 @@ impl Domain {
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "parent reserved the connector's maximum output");
     match event {
+        Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value),
+        Event::ApplicationDrop { owner } => domain.application.drop(owner),
+        Event::Application { request, token, owner, person, project, role, retention } => {
+            crate::application::decide(domain, env, request, token, owner, person, project, role, retention, out);
+        }
+        Event::ApplicationCore { request, answer } => {
+            crate::application::core_answer(domain, env, request, answer, out);
+        }
         Event::Close { task } => {
             domain.closing.insert(task, ()).expect("one closing slot per task");
         }
@@ -426,6 +436,8 @@ fn unsubscribe(domain: &mut Domain, task: u64, topic: u16, out: &mut Queue<Reque
 
 fn restore(domain: &mut Domain, record: Record, out: &mut Queue<Request>) {
     match record {
+        Record::ApplicationObject { object, now } => domain.application.restore_object(object, now),
+        Record::ApplicationAnswer { token, until, outcome } => domain.application.restore_answer(token, until, outcome),
         Record::Procedure(state) => {
             domain.procedures.insert(state.task, state).expect("restored procedure fits");
         }

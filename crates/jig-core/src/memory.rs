@@ -126,6 +126,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let largest = size_of::<Event>();
     for value in [
         size_of::<crate::GoalRoute>(),
+        size_of::<crate::routing::application_routes::Flight>(),
         size_of::<crate::PersonTaskRoute>(),
         size_of::<crate::PersonProposalRoute>(),
         size_of::<crate::RoutedCall>(),
@@ -145,6 +146,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         limits.load_slots,         // reads
         limits.tasks.tasks,        // dependency results
         limits.people.pending,     // made
+        limits.people.pending,     // application continuations
         limits.people.pending,     // goal routes
         limits.fleet.calls,        // delegation
         limits.people.pending,     // proposal routes

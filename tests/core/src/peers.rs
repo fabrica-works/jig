@@ -261,7 +261,8 @@ impl Peers {
                     );
                 }
             }
-            root::Delivery::LostRead { .. }
+            root::Delivery::Application { .. }
+            | root::Delivery::LostRead { .. }
             | root::Delivery::Restart(_)
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)
