@@ -209,6 +209,8 @@ pub struct Task {
     pub requester: tasks::Party,
     pub lineage: List<Chip>,
     pub spec_revision: u64,
+    /// Last committed immutable activity position.
+    pub activity: u64,
     pub words: Text,
     pub parameters: List<Parameter>,
     pub instructions: Option<Text>,
@@ -650,6 +652,7 @@ pub(super) fn task(core: &Core, limits: &Limits, party: u64, number: u64) -> Res
         requester: row.requester,
         lineage: ordered,
         spec_revision: row.revisions.spec,
+        activity: row.activity,
         words: super::small::text(&row.spec.words, limits.documents.text_bytes),
         parameters,
         instructions: match row.executor {

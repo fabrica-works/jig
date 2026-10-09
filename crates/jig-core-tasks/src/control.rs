@@ -436,6 +436,7 @@ pub(crate) fn apply(
             };
             let task = task_mut(domain, number).expect("entrance found live task");
             task.record.phase = next;
+            task.record.due_reason = crate::Why::Released;
             if task.record.phase == Phase::Waiting {
                 task.record.hold_wait_since = None;
             }

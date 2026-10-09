@@ -404,10 +404,20 @@ pub(super) fn route_claim_prepared(
     writes: Box<[tasks::Name]>,
 ) -> Requests {
     if core.claiming.get(&task) == Some(&attempt) {
+        let earlier_transcript = match core.proofs.get(&task) {
+            Some(proof) => proof.transcript_from != attempt,
+            None => false,
+        };
+        let turned = match core.tasks.task(task) {
+            Some(row) => row.ever_turned,
+            None => false,
+        };
+        let resumed = earlier_transcript && turned;
         work.push(Event::Tasks(tasks::Event::Claim {
             reply_to: ReplyTo::new(Token::new(task)),
             task,
             attempt,
+            resumed,
             budget,
             writes,
         }));

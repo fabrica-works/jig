@@ -158,7 +158,9 @@ pub(crate) fn after_message(
     let phase = record(domain, number).expect("batch task live").phase.clone();
     match phase {
         Phase::Active(Active::Idle) => {
-            task_mut(domain, number).expect("idle task live").record.phase = Phase::Active(Active::Due);
+            let row = &mut task_mut(domain, number).expect("idle task live").record;
+            row.due_reason = crate::Why::Message { message: word.number };
+            row.phase = Phase::Active(Active::Due);
             publish(domain, env, number, out);
             activate(domain, number, out);
         }

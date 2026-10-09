@@ -836,7 +836,7 @@ impl World {
         self.send(Event::Prepare { reply_to, task });
         let reply_to = self.to();
         let call = self.call;
-        self.send(Event::Claim { reply_to, task, attempt, budget, writes });
+        self.send(Event::Claim { reply_to, task, attempt, resumed: false, budget, writes });
         let reply = self.replies[&call].clone();
         if reply == Reply::Done {
             assert!(self.runs.insert(task, attempt).is_none());

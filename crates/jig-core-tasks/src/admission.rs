@@ -83,6 +83,7 @@ pub(crate) fn turn(
     task.turn = turn;
     crate::inbox::take(task, read);
     task.ever_turned = true;
+    crate::activity::append(task, environment.wall, crate::Line::Turn { attempt, turn, read }, out);
     post(domain, environment, number, cumulative, spent, out);
     out.push(Request::TurnAcknowledged { reply_to: to, task: number, attempt, turn, accepted: Accepted::New });
 }

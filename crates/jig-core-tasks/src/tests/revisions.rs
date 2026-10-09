@@ -291,7 +291,14 @@ fn priority_spend_delegate_phase_and_run_turn_do_not_move_decision_revisions() {
     test.send(Event::Hold { task: 2, why: Hold::Budget });
     assert_eq!(test.revisions(1), before);
     test.send(Event::Prepare { reply_to: to(), task: 1 });
-    let out = test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, budget: 10, writes: Box::new([]) });
+    let out = test.send(Event::Claim {
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        resumed: false,
+        budget: 10,
+        writes: Box::new([]),
+    });
     assert!(
         out.iter().any(|request| match request {
             Request::Done { .. } => true,
@@ -424,7 +431,7 @@ fn activity_keeps_whole_words_after_a_committed_turn_takes_them() {
     test.make(vec![task(1, &[])]);
     write(&mut test, 1, 1);
     test.send(Event::Prepare { reply_to: to(), task: 1 });
-    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, budget: 10, writes: Box::new([]) });
+    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
     test.send(Event::Started { task: 1, attempt: 1 });
     test.send(Event::Turn {
         reply_to: to(),

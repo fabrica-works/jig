@@ -29,12 +29,54 @@ pub enum Line {
         recipient: Party,
         word: Word,
     },
+    RunBegan {
+        attempt: u64,
+        why: Why,
+        resumed: bool,
+    },
+    RunEnded {
+        attempt: u64,
+        end: EndKind,
+        spent: u64,
+    },
+    Turn {
+        attempt: u64,
+        turn: u32,
+        read: Option<u64>,
+    },
     Decided {
         revision: u64,
     },
     Milestone {
         position: u64,
     },
+}
+
+/// The durable cause carried through preparation to the committed claim.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Why {
+    Made,
+    Ready,
+    Message {
+        message: u64,
+    },
+    Released,
+    Retry {
+        tries: crate::Tries,
+    },
+    Narrowed,
+    /// A procedure's connector or writer inputs changed.
+    Changed,
+}
+
+/// The accepted terminal outcome; result bytes remain in their existing rows.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum EndKind {
+    Parked,
+    Finished,
+    Cancelled,
+    Failed { class: crate::Class },
+    Refused,
 }
 
 pub(crate) fn append(task: &mut TaskRecord, at: Wall, line: Line, out: &mut Queue<Request>) {

@@ -90,7 +90,7 @@ mod tests;
 mod value;
 mod wake;
 mod writers;
-pub use activity::{ActivityLine, Line, line_bytes_limit, lines_per_decision};
+pub use activity::{ActivityLine, EndKind, Line, Why, line_bytes_limit, lines_per_decision};
 pub use batch::{bounded_batch, valid_authority, valid_contract, valid_spec};
 pub use boundary::{
     Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor, Hold,

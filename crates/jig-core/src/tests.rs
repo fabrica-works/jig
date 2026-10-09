@@ -1802,3 +1802,5 @@ fn taking_a_changed_delivery_after_signin_expiry_ends_instead_of_making_a_docume
     assert_eq!(*why, views::End::SignedOut);
     assert!(core.view_subjects.is_empty());
 }
+
+mod activity;

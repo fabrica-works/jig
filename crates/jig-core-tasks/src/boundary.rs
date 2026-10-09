@@ -756,6 +756,8 @@ pub struct TaskRecord {
     pub milestone: u64,
     /// Last immutable activity position; restored with live state, never reused.
     pub activity: u64,
+    /// Actual activation cause, retained through preparation and restart.
+    pub due_reason: crate::Why,
     /// An admitted authority narrowing stopped the current run; its terminal starts the task anew.
     pub narrowing: bool,
     /// Root-issued commit order for an ended result; zero while live and until the root saves an ending.
@@ -1286,6 +1288,8 @@ pub enum Event {
         /// Root-issued nonzero identity strictly greater than the latest claim; success resets
         /// attempt turn/expense baselines.
         attempt: u64,
+        /// Whether the prepared run includes an earlier committed transcript.
+        resumed: bool,
         /// Root-checked allowance reserved from the task at this claim.
         budget: u64,
         /// Complete set of held resources this run will write, in one atomic claim.

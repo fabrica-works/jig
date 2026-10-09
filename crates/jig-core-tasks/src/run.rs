@@ -67,6 +67,7 @@ pub(crate) fn claim(
     to: ReplyTo,
     number: u64,
     attempt: u64,
+    resumed: bool,
     budget: u64,
     writes: &[crate::Name],
     out: &mut Queue<Request>,
@@ -102,6 +103,8 @@ pub(crate) fn claim(
     task.record.invalid_result = None;
     task.record.turn = 0;
     task.record.phase = Phase::Active(Active::Claimed { attempt });
+    let why = task.record.due_reason;
+    crate::activity::append(&mut task.record, env.wall, crate::Line::RunBegan { attempt, why, resumed }, out);
     publish(domain, env, number, out);
     fact(domain, Fact::Claimed { task: number, attempt });
     out.push(Request::Done { reply_to: to });
@@ -338,6 +341,17 @@ pub(crate) fn activation(
         return out
             .push(Request::Refused { reply_to: to, problem: crate::Problem::live_delegates(number, &old.delegates) });
     }
+    let end_kind = if narrowed || closing.is_some() {
+        crate::EndKind::Cancelled
+    } else {
+        match &end {
+            End::Parked => crate::EndKind::Parked,
+            End::Finished { .. } => crate::EndKind::Finished,
+            End::Failed(class) => crate::EndKind::Failed { class: *class },
+            End::Refused => crate::EndKind::Refused,
+            End::FinishedWithFollowups { .. } => unreachable!("follow-ups normalized"),
+        }
+    };
     let next = if let Some(mut closing) = closing {
         closing.stage = Stage::Delegates;
         match &mut closing.ending {
@@ -375,6 +389,11 @@ pub(crate) fn activation(
     task.record.run_reserved = 0;
     task.record.last_answer = Some(attempt);
     task.record.narrowing = false;
+    if narrowed {
+        task.record.due_reason = crate::Why::Narrowed;
+    }
+    let spent = task.record.run_spent;
+    crate::activity::append(&mut task.record, env.wall, crate::Line::RunEnded { attempt, end: end_kind, spent }, out);
     if let Some(tags) = saved {
         task.record.saved = tags;
     }

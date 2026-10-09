@@ -18,7 +18,11 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         Stored::Activity(row) => match &row.line {
             crate::Line::Words { words, .. } => bytes(words.len()),
             crate::Line::Heard(word) | crate::Line::Notified { word, .. } => bytes(word.words.len()),
-            crate::Line::Decided { .. } | crate::Line::Milestone { .. } => Some(0),
+            crate::Line::Decided { .. }
+            | crate::Line::Milestone { .. }
+            | crate::Line::RunBegan { .. }
+            | crate::Line::RunEnded { .. }
+            | crate::Line::Turn { .. } => Some(0),
         },
         Stored::Milestone(row) => phase_bytes(&row.phase),
         Stored::PersonProposal(row) => {

@@ -537,8 +537,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::recurring::after_delegate(domain, env, task, out);
         }
         Event::Prepare { reply_to, task } => crate::run::prepare(domain, env, reply_to, task, out),
-        Event::Claim { reply_to, task, attempt, budget, writes } => {
-            crate::run::claim(domain, env, reply_to, task, attempt, budget, &writes, out);
+        Event::Claim { reply_to, task, attempt, resumed, budget, writes } => {
+            crate::run::claim(domain, env, reply_to, task, attempt, resumed, budget, &writes, out);
         }
         Event::ReadAfresh { resource } => crate::writers::read_afresh(domain, env, &resource, out),
         Event::ChargeEffect { funder, maximum } => crate::funders::charge_effect(domain, env, funder, maximum, out),
@@ -632,7 +632,9 @@ pub(crate) fn wake_procedure(domain: &mut Domain, env: &Env<Limits>, task: u64, 
         None => false,
     };
     if wake {
-        task_mut(domain, task).expect("live procedure").record.phase = Phase::Active(Active::Due);
+        let row = &mut task_mut(domain, task).expect("live procedure").record;
+        row.due_reason = crate::Why::Changed;
+        row.phase = Phase::Active(Active::Due);
         publish(domain, env, task, out);
         activate(domain, task, out);
     }
@@ -760,10 +762,45 @@ fn milestone(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queu
     if task.observed_phase.as_ref() == Some(&task.record.phase) {
         return;
     }
+    let initial = task.observed_phase.is_none();
+    let previous_held = match &task.observed_phase {
+        Some(Phase::Held { .. }) => true,
+        Some(Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_)) | None => false,
+    };
+    if !initial && task.record.phase == Phase::Waiting && !previous_held {
+        task.record.due_reason = crate::Why::Ready;
+    }
+    if task.record.phase == Phase::Active(Active::Due) {
+        task.record.due_reason = match task.observed_phase.as_ref() {
+            Some(Phase::Waiting)
+                if task.record.due_reason == crate::Why::Made && task.record.dependencies.is_empty() =>
+            {
+                crate::Why::Made
+            }
+            Some(Phase::Waiting) if task.record.due_reason != crate::Why::Released => crate::Why::Ready,
+            Some(Phase::Held { .. }) => crate::Why::Released,
+            Some(Phase::Active(Active::BackingOff { .. })) => crate::Why::Retry { tries: task.record.tries },
+            Some(
+                Phase::Waiting
+                | Phase::Closing(_)
+                | Phase::Ended(_)
+                | Phase::Active(
+                    Active::Idle | Active::Due | Active::Preparing | Active::Claimed { .. } | Active::Running { .. },
+                ),
+            )
+            | None => task.record.due_reason,
+        };
+    }
     task.record.milestone = task.record.milestone.checked_add(1).expect("task history position fits");
     task.observed_phase = Some(task.record.phase.clone());
     let position = task.record.milestone;
-    crate::activity::append(&mut task.record, env.wall, crate::Line::Milestone { position }, out);
+    let held = match task.record.phase {
+        Phase::Held { .. } => true,
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,
+    };
+    if initial || held {
+        crate::activity::append(&mut task.record, env.wall, crate::Line::Milestone { position }, out);
+    }
     out.push(Request::Save {
         record: Stored::Milestone(crate::Milestone {
             task: number,
@@ -1019,6 +1056,7 @@ pub(crate) fn make_admitted(
                 revisions: crate::Revisions { hold: 0, spec: 0, person: 0 },
                 milestone: 0,
                 activity: 0,
+                due_reason: crate::Why::Made,
                 narrowing: false,
                 result_position: 0,
                 escalation: crate::Escalation::Unheld { revision: 0 },

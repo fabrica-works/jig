@@ -81,7 +81,14 @@ impl Measured {
         let reply_to = self.to();
         self.event(Event::Prepare { reply_to, task: number });
         let reply_to = self.to();
-        self.event(Event::Claim { reply_to, task: number, attempt: number, budget: 100, writes: Box::new([]) });
+        self.event(Event::Claim {
+            reply_to,
+            task: number,
+            attempt: number,
+            resumed: false,
+            budget: 100,
+            writes: Box::new([]),
+        });
         self.event(Event::Started { task: number, attempt: number });
     }
 }
@@ -140,7 +147,14 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
             let reply_to = m.to();
             m.event(Event::Prepare { reply_to, task: number });
             let reply_to = m.to();
-            m.event(Event::Claim { reply_to, task: number, attempt: number + 10, budget: 100, writes: Box::new([]) });
+            m.event(Event::Claim {
+                reply_to,
+                task: number,
+                attempt: number + 10,
+                resumed: false,
+                budget: 100,
+                writes: Box::new([]),
+            });
             let reply_to = m.to();
             m.event(Event::Turn {
                 reply_to,
