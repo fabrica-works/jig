@@ -1,27 +1,50 @@
-use jig_core_views::Event;
-use jig_views_world::World;
-use skein_lib::Token;
-#[test]
-fn random_changes_keep_one_delivery_per_watcher() {
-    for seed in 1..=64_u64 {
-        let mut world = World::default();
-        for watcher in 0..4 {
-            world.watch(watcher, 7);
+use jig_core_views::{Call, Event, Follow, TurnName};
+use jig_views_world::{LIMITS, World};
+use skein_lib::{Rng, Token};
+fn run(seed: u64) -> Vec<String> {
+    let mut world = World::seeded(LIMITS, seed);
+    for watcher in 1..=4 {
+        world.watch_from(watcher, 6 + watcher, Some(Follow { run: Token::new(7), turn: None, offset: 0 }));
+    }
+    let mut rng = Rng::new(seed);
+    let mut turn = 1;
+    for tick in 0..80 {
+        let state = rng.next_u64();
+        if tick % 17 == 0 {
+            turn += 1;
         }
-        let mut state = seed;
-        for _ in 0..80 {
-            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
-            world.changed(7);
-            for watcher in 0..4 {
-                if state.rotate_left(u32::try_from(watcher).expect("small")).is_multiple_of(3) {
-                    world.delivered(watcher);
-                }
+        world.changed(7 + state % 4);
+        let call = if state.is_multiple_of(7) {
+            Some(Call {
+                number: tick,
+                tool: b"tool".as_slice().into(),
+                input: vec![u8::try_from(state % 256).expect("byte"); 8].into_boxed_slice(),
+                cut: false,
+            })
+        } else {
+            None
+        };
+        world.text(7, TurnName { attempt: 1, turn }, &[u8::try_from(state % 256).expect("byte"); 7], call);
+        for watcher in 1..=4 {
+            if state.rotate_left(u32::try_from(watcher).expect("small")).is_multiple_of(3) {
+                world.delivered(watcher);
+            }
+            if state.rotate_right(u32::try_from(watcher).expect("small")).is_multiple_of(5) {
+                world.stream_delivered(watcher);
             }
         }
-        for watcher in 0..4 {
-            world.step(Event::Unwatch { watcher: Token::new(watcher) });
-            world.delivered(watcher);
-        }
-        assert_eq!(world.referee.live(), 0, "seed {seed}");
+    }
+    world.settle();
+    for watcher in 1..=4 {
+        world.step(Event::Unwatch { watcher: Token::new(watcher) });
+    }
+    world.settle();
+    assert_eq!(world.referee.live(), 0, "seed {seed}");
+    world.log().to_vec()
+}
+#[test]
+fn random_subjects_and_slow_streams_replay_and_settle_after_the_last_change() {
+    for seed in 1..=64 {
+        assert_eq!(run(seed), run(seed), "seed {seed}");
     }
 }
