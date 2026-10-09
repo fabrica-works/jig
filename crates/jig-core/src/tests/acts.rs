@@ -561,3 +561,40 @@ fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() 
         people::Outcome::Closing { chat: 1, cancelled: 0, kept: 0 }
     );
 }
+
+#[test]
+fn a_takeover_offer_uses_the_childs_current_requester_and_changes_after_adoption() {
+    let (mut core, limits) = make_tree();
+    sign_in(&mut core, &limits);
+    let mut row = new_row(&core, 5, tasks::Funder::Task(1), None);
+    row.authority.delegation.tasks = 1;
+    row.authority.delegation.depth = 1;
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(120)),
+            creator: tasks::Party::Task(1),
+            batch: Box::new([row]),
+        },
+    );
+    let object = Subject::Task { task: 5 };
+    assert_eq!(offers::admit(&core, &limits, 1, Act::TakeOver, &object), Admission::Allowed);
+    assert_eq!(
+        ask_now(
+            &mut core,
+            &limits,
+            1,
+            people::Ask::Move { project: 1, task: 5, reason: b"take responsibility".as_slice().into() }
+        ),
+        people::Outcome::Moved { task: 5 }
+    );
+    assert_eq!(core.tasks.task(5).unwrap().requester, tasks::Party::Person(1));
+    assert!(!core.tasks.takeover_state(5, 1));
+    let why = people::Refusal::NotWaiting;
+    assert_eq!(offers::admit(&core, &limits, 1, Act::TakeOver, &object), Admission::Refused(why));
+    assert_eq!(
+        core.move_admit(1, Some(people::Role::Owner), 1, 5, limits.tasks.tree_tasks, limits.tasks.depth),
+        Err(why)
+    );
+}

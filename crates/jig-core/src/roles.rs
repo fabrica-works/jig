@@ -63,7 +63,18 @@ impl Core {
             request: authority::PersonRequest::Move(giving),
         };
         let checked = authority::check_request_with_standing(&self.authority, &ask, true, &mut findings);
-        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
+        if checked.answer != authority::Answer::Allow {
+            return Err(self.request_refusal(&ask, &mut findings));
+        }
+        if !self.tasks.takeover_state(task, person) {
+            let people::Outcome::Refused(why) =
+                crate::routing::refusals::person_task_refusal(self, Some(task), tasks::Refusal::State)
+            else {
+                unreachable!("a state refusal is permanent")
+            };
+            return Err(why);
+        }
+        Ok(())
     }
 
     /// Admit a directly requested chat under current person and project policy.

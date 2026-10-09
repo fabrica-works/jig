@@ -30,6 +30,12 @@ fn mutable(phase: &Phase) -> bool {
     }
 }
 
+/// Current task ownership and phase, shared with the core's offer judgment.
+pub(crate) fn state(domain: &Domain, number: u64, person: u64) -> bool {
+    let Some(row) = record(domain, number) else { return false };
+    person != 0 && row.requester != Party::Person(person) && mutable(&row.phase)
+}
+
 #[derive(Debug)]
 pub(crate) struct Plan {
     number: u64,
@@ -98,10 +104,7 @@ pub(crate) fn check(
         return Err(crate::Problem::new(Some(number), why));
     }
     let old = record(domain, number).expect("entrance named live task");
-    if person == 0 || old.requester == Party::Person(person) {
-        return Err(crate::Problem::new(Some(number), Refusal::State));
-    }
-    if !mutable(&old.phase) {
+    if !state(domain, number, person) {
         return Err(crate::Problem::new(Some(number), Refusal::State));
     }
     if reason.len() > usize::try_from(env.limits.message_bytes).expect("bounded reason size") {

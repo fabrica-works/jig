@@ -394,6 +394,13 @@ impl Domain {
         self.startup == Startup::Ready
     }
 
+    /// Whether an existing task has a different requester and a mutable phase;
+    /// authority and funding remain the parent's and move preflight's checks.
+    #[must_use]
+    pub fn takeover_state(&self, number: u64, person: u64) -> bool {
+        crate::moving::state(self, number, person)
+    }
+
     /// Reclaim retired live task slots at the parent's iteration reclaim point after outputs have
     /// been routed; emits no persistence or lifecycle output.
     pub fn reclaim(&mut self) {
