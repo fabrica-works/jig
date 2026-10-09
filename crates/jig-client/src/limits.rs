@@ -21,6 +21,12 @@ pub struct Backoff {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Limits {
     pub watches: u32,
+    pub objects: u32,
+    pub sources: u32,
+    pub reads: u32,
+    pub parts: u32,
+    /// Total owned heap within any one decoded document, including its containers.
+    pub document_bytes: u64,
     pub records: u32,
     pub projects: u32,
     pub roles: u32,
@@ -41,8 +47,22 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     {
         return None;
     }
-    limits.watches.checked_mul(2)?.checked_add(8)?;
+    limits
+        .watches
+        .checked_mul(2)?
+        .checked_add(limits.objects)?
+        .checked_add(limits.parts.checked_mul(2)?)?
+        .checked_add(12)?;
+    limits.objects.checked_mul(2)?;
+    if limits.sources == 0 {
+        return None;
+    }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;
+    total = total.checked_add(crate::objects::worst_case(limits)?)?;
+    total = total.checked_add(Slab::<crate::reads::Reading>::worst_case(limits.reads)?)?;
+    total = total.checked_add(Map::<Id<crate::reads::Reading>, ()>::worst_case(limits.reads)?)?;
+    total = total.checked_add(u64::from(limits.reads).checked_mul(limits.document_bytes)?)?;
+    total = total.checked_add(crate::windows::worst_case(limits)?)?;
     total = total.checked_add(Map::<Id<Watch>, ()>::worst_case(limits.watches)?)?;
     total = total.checked_add(Deadlines::<Timer>::worst_case(limits.watches)?)?;
     total = total.checked_add(List::<Record>::worst_case(limits.records)?)?;

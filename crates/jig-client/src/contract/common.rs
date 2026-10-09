@@ -34,14 +34,14 @@ pub struct Revision {
 }
 
 /// A proposal named by its proposer and local number.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProposalKey {
     pub proposer: u64,
     pub number: u64,
 }
 
 /// One object in the working set.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ObjectKey {
     /// A task.
     Task(u64),

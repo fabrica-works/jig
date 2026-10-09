@@ -12,6 +12,11 @@ use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 
 pub(super) const LIMITS: Limits = Limits {
     watches: 4,
+    objects: 2,
+    sources: 8,
+    reads: 4,
+    parts: 8,
+    document_bytes: 65536,
     records: 2,
     projects: 2,
     roles: 2,
@@ -21,17 +26,17 @@ pub(super) const LIMITS: Limits = Limits {
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     heartbeat: Duration::from_nanos(100),
 };
-fn env(now: Time) -> Env<Limits> {
+pub(super) fn env(now: Time) -> Env<Limits> {
     Env { now, wall: Wall::EPOCH, limits: LIMITS }
 }
-fn drain(mut out: Queue<Request>) -> Box<[Request]> {
+pub(super) fn drain(mut out: Queue<Request>) -> Box<[Request]> {
     let mut rows = List::with_capacity(max_out(&LIMITS));
     while let Some(request) = out.pop() {
         rows.push(request).expect("output fits declared bound");
     }
     rows.into_boxed()
 }
-fn drive(domain: &mut Domain, now: Time, event: Event) -> Box<[Request]> {
+pub(super) fn drive(domain: &mut Domain, now: Time, event: Event) -> Box<[Request]> {
     let mut out = Queue::with_capacity(max_out(&LIMITS));
     step(domain, &env(now), event, &mut out);
     drain(out)
@@ -41,7 +46,7 @@ fn tick(domain: &mut Domain, now: Time) -> Box<[Request]> {
     fire(domain, &env(now), &mut out);
     drain(out)
 }
-fn open_token(requests: &[Request]) -> Token {
+pub(super) fn open_token(requests: &[Request]) -> Token {
     for request in requests {
         if let Request::Open { watch, .. } = request {
             return *watch;
@@ -52,7 +57,7 @@ fn open_token(requests: &[Request]) -> Token {
 fn needs() -> Needs {
     Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 }
 }
-fn frame(party: u64) -> Frame {
+pub(super) fn frame(party: u64) -> Frame {
     Frame {
         party: Party {
             number: party,
@@ -67,14 +72,14 @@ fn frame(party: u64) -> Frame {
         deployment_role: None,
     }
 }
-fn start(domain: &mut Domain, kept: List<Record>) -> Token {
+pub(super) fn start(domain: &mut Domain, kept: List<Record>) -> Token {
     open_token(&drive(
         domain,
         Time::ZERO,
         Event::Start { address: Address::Inbox { project: None }, kept, offset: Offset { minutes: 60 } },
     ))
 }
-fn delivered(domain: &mut Domain, now: Time, watch: Token, frame: Frame) -> Box<[Request]> {
+pub(super) fn delivered(domain: &mut Domain, now: Time, watch: Token, frame: Frame) -> Box<[Request]> {
     drive(domain, now, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) })
 }
 fn inbox() -> Inbox {
@@ -164,18 +169,45 @@ fn a_reopened_page_is_behind_until_its_first_delivery_and_never_changes_the_link
     let page = open_token(&delivered(&mut domain, Time::ZERO, watch, frame(7)));
     assert!(drive(&mut domain, Time::ZERO, Event::Ended { watch: page, end: WatchEnd::Dropped }).is_empty());
     assert_eq!(domain.link(), Link::Live);
-    assert_eq!(domain.page(), &Page::Work { address: Address::Inbox { project: None }, generation: 0, behind: true });
+    assert_eq!(
+        domain.page(),
+        &Page::Work {
+            address: Address::Inbox { project: None },
+            generation: 0,
+            behind: true,
+            excess: 0,
+            refused: None
+        }
+    );
     let retry = domain.next_deadline().unwrap();
     let reopened = tick(&mut domain, retry);
     assert_eq!(open_token(&reopened), page);
     assert!(drive(&mut domain, retry, Event::Watch { watch: page, event: WatchEvent::Opened }).is_empty());
-    assert_eq!(domain.page(), &Page::Work { address: Address::Inbox { project: None }, generation: 0, behind: true });
+    assert_eq!(
+        domain.page(),
+        &Page::Work {
+            address: Address::Inbox { project: None },
+            generation: 0,
+            behind: true,
+            excess: 0,
+            refused: None
+        }
+    );
     drive(
         &mut domain,
         retry,
         Event::Watch { watch: page, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox()))) },
     );
-    assert_eq!(domain.page(), &Page::Work { address: Address::Inbox { project: None }, generation: 0, behind: false });
+    assert_eq!(
+        domain.page(),
+        &Page::Work {
+            address: Address::Inbox { project: None },
+            generation: 0,
+            behind: false,
+            excess: 0,
+            refused: None
+        }
+    );
 }
 
 #[test]
@@ -191,7 +223,16 @@ fn a_different_party_keeps_the_previous_partys_work_hidden_until_they_return() {
     let returned = delivered(&mut domain, Time::ZERO, watch, frame(7));
     assert_eq!(returned[0], Request::Confirmed { party: Some(7) });
     assert_eq!(domain.frame().party(), Some(7));
-    assert_eq!(domain.page(), &Page::Work { address: Address::Inbox { project: None }, generation: 0, behind: false });
+    assert_eq!(
+        domain.page(),
+        &Page::Work {
+            address: Address::Inbox { project: None },
+            generation: 0,
+            behind: false,
+            excess: 0,
+            refused: None
+        }
+    );
 }
 
 #[test]
@@ -256,7 +297,7 @@ fn a_watch_closed_during_backoff_needs_no_second_terminal_and_reclaims_its_slot(
     let page = open_token(&delivered(&mut domain, Time::ZERO, watch, frame(7)));
     drive(&mut domain, Time::ZERO, Event::Ended { watch: page, end: WatchEnd::Dropped });
     let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
-    assert!(left.is_empty());
+    assert_eq!(left.as_ref(), &[Request::PartsLeft { generation: 0 }]);
     domain.reclaim();
     let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
     assert_ne!(open_token(&opened), page);

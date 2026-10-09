@@ -54,6 +54,12 @@ pub struct Domain {
     pub(crate) frame_watch: Option<Id<Watch>>,
     pub(crate) timers: Deadlines<Timer>,
     pub(crate) rng: Rng,
+    pub(crate) objects: crate::objects::Objects,
+    pub(crate) reads: crate::reads::Reads,
+    pub(crate) object_rows: crate::windows::ObjectWindow,
+    pub(crate) conversation_rows: crate::windows::ConversationWindow,
+    pub(crate) turn_rows: crate::windows::TurnWindow,
+    pub(crate) history_rows: crate::windows::HistoryWindow,
 }
 impl Domain {
     /// Allocates bounded state from limits; the seed is the only randomness.
@@ -77,6 +83,12 @@ impl Domain {
             frame_watch: None,
             timers: Deadlines::with_capacity(limits.watches),
             rng: Rng::new(seed),
+            objects: crate::objects::Objects::new(limits.objects, limits.sources),
+            reads: crate::reads::Reads::new(limits.reads),
+            object_rows: crate::windows::ObjectWindow::new(limits.rows),
+            conversation_rows: crate::windows::ConversationWindow::new(limits.rows),
+            turn_rows: crate::windows::TurnWindow::new(limits.rows),
+            history_rows: crate::windows::HistoryWindow::new(limits.rows),
         }
     }
     /// What the frame most recently said, without interpreting authority.
@@ -103,6 +115,31 @@ impl Domain {
     #[must_use]
     pub const fn wall(&self) -> Wall {
         self.wall
+    }
+    /// The page's objects held once by key.
+    #[must_use]
+    pub fn objects(&self) -> &crate::objects::Objects {
+        &self.objects
+    }
+    /// Object names in the page's current bounded window.
+    #[must_use]
+    pub const fn object_rows(&self) -> &crate::windows::ObjectWindow {
+        &self.object_rows
+    }
+    /// Activity including turns in the current window.
+    #[must_use]
+    pub const fn turn_rows(&self) -> &crate::windows::TurnWindow {
+        &self.turn_rows
+    }
+    /// Conversations in the current bounded window.
+    #[must_use]
+    pub const fn conversation_rows(&self) -> &crate::windows::ConversationWindow {
+        &self.conversation_rows
+    }
+    /// History in the current bounded window.
+    #[must_use]
+    pub const fn history_rows(&self) -> &crate::windows::HistoryWindow {
+        &self.history_rows
     }
     /// The person's configured display time offset.
     #[must_use]
@@ -134,11 +171,19 @@ impl Domain {
                     let removed = self.watch_ids.remove(&id);
                     assert!(removed.is_some(), "closed watch was registered");
                     self.watches.retire(id);
+                    let count = self.objects.len();
+                    let excess = self.objects.replace(crate::objects::Source::Watch(id), &[]);
+                    assert!(excess == 0, "empty source replacement never refuses");
+                    if self.objects.len() != count {
+                        self.changed();
+                    }
                 }
                 None => break,
             }
         }
         self.watches.reclaim();
+        self.objects.reclaim();
+        self.reads.reclaim();
     }
     pub(crate) fn changed(&mut self) {
         self.shown = self.shown.saturating_add(1);
@@ -192,6 +237,12 @@ impl Domain {
         let removed = self.watch_ids.remove(&id);
         assert!(removed.is_some(), "retired watch was registered");
         self.watches.retire(id);
+        let count = self.objects.len();
+        let excess = self.objects.replace(crate::objects::Source::Watch(id), &[]);
+        assert!(excess == 0, "empty source replacement never refuses");
+        if self.objects.len() != count {
+            self.changed();
+        }
         if self.frame_watch == Some(id) {
             self.frame_watch = None;
         }
@@ -239,23 +290,8 @@ impl Domain {
             | Page::SomeoneElse => {}
         }
     }
-    fn show_work(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) {
-        self.page = Page::Work { address: self.address, generation: self.generation, behind: false };
-        self.changed();
-        let subject = match self.address {
-            Address::Inbox { .. } => Subject::Inbox { window: env.limits.rows },
-            Address::Conversations { .. } => Subject::Conversations,
-            Address::Task { task, .. } => Subject::Task { task },
-            Address::Project { project, .. } => Subject::Goals { project },
-            Address::Deployment => Subject::Deployment,
-        };
-        match self.open(env, subject, Owner::Page { generation: self.generation }, out) {
-            Some(_) => {}
-            None => {
-                self.page = Page::Missing;
-                self.changed();
-            }
-        }
+    pub(crate) fn show_work(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) {
+        crate::pages::routing::enter(self, env, out);
     }
 }
 
@@ -275,7 +311,12 @@ fn close_watch(watch: &mut Watch, id: Id<Watch>, timers: &mut Deadlines<Timer>, 
 /// The maximum effects emitted by any one entry, with all watches closing.
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
-    limits.watches.saturating_mul(2).saturating_add(8)
+    limits
+        .watches
+        .saturating_mul(2)
+        .saturating_add(limits.objects)
+        .saturating_add(limits.parts.saturating_mul(2))
+        .saturating_add(12)
 }
 
 /// Routes one event, accepting no input until Start.
@@ -301,9 +342,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Frame { asked } => frame_answer(domain, asked, out),
         Event::Watch { watch, event } => watch_event(domain, env, Id::from_token(watch), event, out),
         Event::Ended { watch, end } => watch_end(domain, env, Id::from_token(watch), end, out),
-        Event::Went { place } => went(domain, env, place, out),
+        Event::Went { place } => crate::pages::routing::navigate(domain, env, place, true, out),
         Event::Act { act } => match act {
-            Act::Go { address } => went(domain, env, Place::Jig(address), out),
+            Act::Go { address } => crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out),
             Act::Edit { .. }
             | Act::Submit { .. }
             | Act::Intend { .. }
@@ -319,8 +360,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         | Event::Ask { .. }
         | Event::Progress { .. }
         | Event::Answered { .. }
-        | Event::Read { .. }
         | Event::SignedOut => {}
+        Event::Read { read, result } => crate::pages::routing::read_result(domain, env, read, result, out),
     }
 }
 fn start(
@@ -354,33 +395,7 @@ fn frame_answer(domain: &Domain, asked: Token, out: &mut Queue<Request>) {
     };
     out.push(Request::FrameIs { asked, frame: FrameShown { party, address, link: domain.link } });
 }
-fn went(domain: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Request>) {
-    if domain.blocked {
-        return;
-    }
-    domain.close_page(out);
-    domain.generation = domain.generation.checked_add(1).expect("page generations do not wrap");
-    match place {
-        Place::Jig(address) => {
-            domain.address = address;
-            match domain.frame.document {
-                Some(_) => domain.show_work(env, out),
-                None => {
-                    domain.page = Page::Starting;
-                    domain.changed();
-                }
-            }
-        }
-        Place::Elsewhere => {
-            domain.page = Page::Elsewhere;
-            domain.changed();
-        }
-        Place::Missing => {
-            domain.page = Page::Missing;
-            domain.changed();
-        }
-    }
-}
+
 fn accepts(state: Following) -> bool {
     match state {
         Following::Opening { .. } | Following::Live => true,
@@ -414,7 +429,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 },
                 Owner::Page { generation } => {
                     if generation == domain.generation {
-                        domain.changed();
+                        crate::pages::routing::delivery(domain, env, id, delivery, out);
                     }
                 }
             }
@@ -541,13 +556,16 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
         }
         WatchEnd::SignedOut => {
             domain.retire(id);
-            domain.close_all(out);
-            domain.page = Page::SigningIn;
-            domain.set_link(Link::Offline, out);
-            out.push(Request::Confirmed { party: None });
-            domain.changed();
+            signed_out(domain, out);
         }
     }
+}
+pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
+    domain.close_all(out);
+    domain.page = Page::SigningIn;
+    domain.set_link(Link::Offline, out);
+    out.push(Request::Confirmed { party: None });
+    domain.changed();
 }
 /// Fires at most one expired deadline, respecting watch terminal obligations.
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
