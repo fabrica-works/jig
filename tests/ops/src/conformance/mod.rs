@@ -1,6 +1,7 @@
 //! Ops's two proof-of-concept stories on jig's independent conformance loop.
 mod application;
 mod config;
+mod documents;
 mod observations;
 mod scripts;
 mod systems;
@@ -32,13 +33,14 @@ pub struct Config {
     pub seed: u64,
     pub story: Story,
     limits: root::Limits,
+    documents: bool,
 }
 
 impl Config {
     /// Fix the finite limits once; cold starts still rebuild the same root.
     #[must_use]
     pub fn new(seed: u64, story: Story) -> Self {
-        Self { seed, story, limits: config::root(seed).1 }
+        Self { seed, story, limits: config::root(seed).1, documents: false }
     }
 
     /// Bound the retained connector answers for an application-request story.
@@ -50,6 +52,10 @@ impl Config {
 }
 
 /// Outside party state and evidence survive domain crashes.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent account, sign-in, application-request and document peers progress separately"
+)]
 pub struct Peers {
     policy: r::Policy,
     applied: u64,
@@ -67,6 +73,12 @@ pub struct Peers {
     pub accepted: Vec<u64>,
     pub replies: u64,
     pub application_answers: Vec<infra::ApplicationOutcome>,
+    pub documents: Vec<(u64, root::ClientDocument)>,
+    pub ended_documents: Vec<u64>,
+    document_story: bool,
+    watched_documents: std::collections::BTreeSet<u64>,
+    document_rows: Vec<(u64, root::Record)>,
+    pending_document_effects: Vec<infra::SystemRequest>,
     llm: scripts::Llm,
     asked_accept: std::collections::BTreeSet<(u64, u64)>,
 }
@@ -123,6 +135,12 @@ impl Application for Ops {
             accepted: Vec::new(),
             replies: 0,
             application_answers: Vec::new(),
+            documents: Vec::new(),
+            ended_documents: Vec::new(),
+            document_story: config.documents,
+            watched_documents: std::collections::BTreeSet::new(),
+            document_rows: Vec::new(),
+            pending_document_effects: Vec::new(),
             llm: scripts::Llm::new(config.seed),
             asked_accept: std::collections::BTreeSet::new(),
         }
@@ -322,6 +340,15 @@ impl Application for Ops {
                 events
             }
             root::Output::Infrastructure(call) => {
+                if peers.document_story
+                    && let infra::SystemRequest::Apply { key, .. } = &call
+                    && !documents::restarting(peers, key.task)
+                {
+                    // The external system may answer slowly. Let the client
+                    // acknowledge the committed restarting panel first.
+                    peers.pending_document_effects.push(call);
+                    return Vec::new();
+                }
                 if let infra::SystemRequest::Apply { key, attempt, effect } = &call {
                     let attempt = *attempt;
                     let stable = observations::key(*key);
@@ -458,8 +485,17 @@ impl Application for Ops {
                     done: true,
                 }))]
             }
-            root::Output::ApplicationDocument { .. }
-            | root::Output::ApplicationRead { .. }
+            root::Output::ApplicationDocument { watcher, document } => {
+                documents::delivered(peers, store, document);
+                vec![Input::Event(root::Event::Core(core::Event::Delivered { watcher }))]
+            }
+            root::Output::Core(
+                core::Held::ApplicationWatchEnded { watcher, .. } | core::Held::WatchEnded { watcher, .. },
+            ) => {
+                peers.ended_documents.push(watcher.raw());
+                Vec::new()
+            }
+            root::Output::ApplicationRead { .. }
             | root::Output::Read { .. }
             | root::Output::Core(_)
             | root::Output::Now(_)
@@ -530,9 +566,25 @@ impl Application for Ops {
                 }
             }
         }
+        if ready && peers.document_story {
+            events.extend(documents::poll(peers, store));
+            let pending = std::mem::take(&mut peers.pending_document_effects);
+            for call in pending {
+                events.extend(Self::deliver(
+                    peers,
+                    systems,
+                    store,
+                    clock,
+                    Delivery::Root(Box::new(root::Output::Infrastructure(call))),
+                ));
+            }
+        }
         events
     }
     fn submitted(peers: &mut Peers, store: &Store, _: Clock) {
+        if peers.document_story {
+            documents::submitted(peers, store);
+        }
         if peers.application_requests {
             peers.application_observed.extend(application::submitted(store));
         }
@@ -682,7 +734,19 @@ pub fn night(seed: u64, cut: jig_conformance::Cut) -> jig_conformance::Harness<O
 /// The alert storm and incident, including the person's authenticated decision.
 #[must_use]
 pub fn alert(seed: u64, cut: jig_conformance::Cut) -> jig_conformance::Harness<Ops> {
-    let mut world = jig_conformance::Harness::<Ops>::new(Config::new(seed, Story::Alert), seed);
+    alert_documents(seed, cut, false)
+}
+
+/// Observe paced whole application documents during the real alert story.
+#[must_use]
+pub fn documents(seed: u64) -> jig_conformance::Harness<Ops> {
+    alert_documents(seed, jig_conformance::Cut::None, true)
+}
+
+fn alert_documents(seed: u64, cut: jig_conformance::Cut, documents: bool) -> jig_conformance::Harness<Ops> {
+    let mut configuration = Config::new(seed, Story::Alert);
+    configuration.documents = documents;
+    let mut world = jig_conformance::Harness::<Ops>::new(configuration, seed);
     world.cut(cut);
     world.drain().expect("cold ops root");
     world.send(root::Event::Infrastructure(infra::Event::Names {
@@ -743,6 +807,13 @@ pub fn alert(seed: u64, cut: jig_conformance::Cut) -> jig_conformance::Harness<O
     world.drain().unwrap_or_else(|error| panic!("result: {error:?}\n{}", world.trace.join("\n")));
     world.advance(1_000_000_000);
     world.drain().expect("read the result");
+    if documents {
+        let refreshed = world.systems.observability(obs::SystemRequest::Facts {
+            service: obs::Service::new(b"production".as_slice().into(), b"checkout".as_slice().into()),
+        });
+        world.send(root::Event::Observability(obs::Event::System(refreshed)));
+        world.drain().expect("incident health after remediation");
+    }
     read_report(&mut world, cut);
     world
 }

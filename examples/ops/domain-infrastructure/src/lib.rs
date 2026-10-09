@@ -30,8 +30,14 @@ extern crate alloc;
 
 mod application;
 pub use application::{ApplicationOutcome, ApplicationRequest, EnvironmentEnd};
+mod drift_accounts;
+pub use drift_accounts::{DriftAccount, DriftKind};
 mod client_documents;
-pub use client_documents::{ClientDocument, ClientScope, ClientSubject, DocumentMissing, document_worst_case};
+mod client_marks;
+pub use client_documents::{
+    ClientDocument, ClientEnvironment, ClientPool, ClientResource, ClientScope, ClientSubject, DocumentMissing,
+    ResourceFact, document_worst_case,
+};
 mod boundary;
 mod domain;
 mod limits;

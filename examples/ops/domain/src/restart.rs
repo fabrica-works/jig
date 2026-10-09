@@ -184,7 +184,8 @@ fn restore_roles(domain: &mut Domain, env: &Env<Limits>, record: &infrastructure
                 );
             }
         }
-        infrastructure::Record::Procedure(_)
+        infrastructure::Record::Drift(_)
+        | infrastructure::Record::Procedure(_)
         | infrastructure::Record::Proposal { .. }
         | infrastructure::Record::Outbox(_)
         | infrastructure::Record::EnvironmentEnd { .. }

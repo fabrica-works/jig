@@ -350,7 +350,7 @@ impl InfrastructureWorld {
         let mut live = BTreeSet::new();
         for record in records {
             match record {
-                infra::Record::ApplicationAnswer { .. } => {}
+                infra::Record::ApplicationAnswer { .. } | infra::Record::Drift(_) => {}
                 infra::Record::Rely { resources, .. } => {
                     live.extend(resources.into_iter().map(|named| named.resource));
                 }

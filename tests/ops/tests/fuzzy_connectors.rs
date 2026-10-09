@@ -13,7 +13,7 @@ fn observability(seed: u64) -> (Vec<obs::Request>, Vec<production::ObservedEffec
         effect: obs::Effect { rule: Box::from(*b"checkout-errors"), until: 100 },
     });
     let key = obs::Key::procedure([1; 16], seed, 3);
-    let kept = world.event(obs::Event::Keep { entry: 3, token: Token::new(1), key });
+    let kept = world.event(obs::Event::Keep { project: Some(1), entry: 3, token: Token::new(1), key });
     match seed % 4 {
         0 => {
             world.restart();
@@ -60,7 +60,7 @@ fn infrastructure(seed: u64) -> (Vec<infra::Request>, Vec<production::ObservedEf
     };
     world.event(infra::Event::Describe { token: Token::new(1), effect });
     let key = infra::Key::procedure([1; 16], seed, 3);
-    let kept = world.event(infra::Event::Keep { entry: 3, token: Token::new(1), key });
+    let kept = world.event(infra::Event::Keep { project: Some(1), entry: 3, token: Token::new(1), key });
     match seed % 5 {
         0 => {
             world.restart();

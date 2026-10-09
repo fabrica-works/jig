@@ -140,7 +140,7 @@ fn an_uncertain_restart_without_ids_is_held_and_not_resent() {
     let mut domain = Domain::new(Backend::NoOperationIds, &limits());
     let token = Token::new(1);
     event(&mut domain, 1, Event::Describe { token, effect: Effect::Restart { service: service(), operation: 9 } });
-    event(&mut domain, 1, Event::Keep { entry: 3, token, key: key() });
+    event(&mut domain, 1, Event::Keep { project: Some(1), entry: 3, token, key: key() });
     event(&mut domain, 1, Event::Make { key: key() });
     let mut uncertain = event(
         &mut domain,
@@ -151,6 +151,7 @@ fn an_uncertain_restart_without_ids_is_held_and_not_resent() {
         uncertain.pop(),
         Some(Request::Save {
             record: Record::Outbox(Entry {
+                project: Some(1),
                 number: 3,
                 key: key(),
                 effect: Effect::Restart { service: service(), operation: 9 },
@@ -170,7 +171,7 @@ fn an_uncertain_restart_without_ids_is_held_and_not_resent() {
 fn a_procedure_waits_for_current_facts_and_never_asks_for_two_effects() {
     let mut domain = Domain::new(Backend::OperationIds, &limits());
     let procedure = Procedure::Remediate { service: service(), operation: 9, deadline: 100 };
-    event(&mut domain, 1, Event::StartProcedure { task: 7, procedure });
+    event(&mut domain, 1, Event::StartProcedure { task: 7, project: 1, procedure });
     let mut first = event(&mut domain, 1, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
     assert_eq!(first.pop(), Some(Request::System(SystemRequest::Service { service: service() })));
     let fact = ServiceFact { version: Box::from(*b"v1"), replicas: 2, healthy: false, revision: 1, observed: 1 };
@@ -187,6 +188,7 @@ fn a_procedure_waits_for_current_facts_and_never_asks_for_two_effects() {
 fn a_committed_person_retry_opens_restart_but_waits_for_the_old_deadline() {
     let mut domain = Domain::new(Backend::NoOperationIds, &limits());
     let row = Entry {
+        project: Some(1),
         number: 1,
         key: key(),
         effect: Effect::Restart { service: service(), operation: 9 },

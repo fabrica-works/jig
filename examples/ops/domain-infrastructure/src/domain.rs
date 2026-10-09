@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// One fact may wake sixteen scale readers and report drift to sixteen tasks.
-pub const MAX_OUT: u32 = 40;
+pub const MAX_OUT: u32 = 64;
 
 /// Infrastructure's bounded working set and durable records.
 #[derive(Debug)]
@@ -18,16 +18,17 @@ pub struct Domain {
     restart: Option<crate::RestartStage>,
     closing: Map<u64, bool>,
     refresh: Map<Resource, bool>,
-    backend: Backend,
-    services: Map<Service, ServiceFact>,
+    pub(crate) backend: Backend,
+    pub(crate) services: Map<Service, ServiceFact>,
     pub(crate) environments: Map<Environment, Option<EnvironmentFact>>,
-    pools: Map<Pool, (u32, u32)>,
+    pub(crate) pools: Map<Pool, (u32, u32)>,
     pub(crate) reliance: Map<u64, (u32, Box<[Named]>)>,
-    procedures: Map<u64, ProcedureState>,
+    pub(crate) procedures: Map<u64, ProcedureState>,
     staged: Map<Token, Effect>,
-    proposals: Map<u64, (u64, Effect)>,
-    effects: Map<Key, Entry>,
-    made: Map<Environment, Key>,
+    pub(crate) proposals: Map<u64, (u64, Effect)>,
+    pub(crate) effects: Map<Key, Entry>,
+    pub(crate) made: Map<Environment, (Key, Option<u32>)>,
+    pub(crate) drifts: Map<Resource, crate::DriftAccount>,
 }
 
 impl Domain {
@@ -59,7 +60,9 @@ impl Domain {
                     .checked_add(limits.procedures)
                     .expect("procedure resources")
                     .checked_add(limits.environments)
-                    .expect("saved environment ends"),
+                    .expect("saved environment ends")
+                    .checked_add(limits.made)
+                    .expect("retained creation resources"),
             ),
             backend,
             services: Map::with_capacity(limits.services),
@@ -71,6 +74,7 @@ impl Domain {
             proposals: Map::with_capacity(limits.proposals),
             effects: Map::with_capacity(limits.effects),
             made: Map::with_capacity(limits.made),
+            drifts: Map::with_capacity(crate::drift_accounts::capacity(limits).expect("drift bound")),
         }
     }
 }
@@ -117,7 +121,7 @@ fn effect_valid(effect: &Effect, limits: &Limits) -> bool {
     }
 }
 
-fn describe(effect: &Effect, backend: Backend) -> Description {
+pub(crate) fn describe(effect: &Effect, backend: Backend) -> Description {
     match effect {
         Effect::Restart { service, operation } => Description {
             kind: 1,
@@ -251,7 +255,14 @@ fn fresh_service(
         None => false,
     };
     if other_hand && revised {
-        drift(domain, Resource::Service(service), out);
+        let resource = Resource::Service(service);
+        crate::drift_accounts::observed(
+            domain,
+            env,
+            crate::DriftAccount { resource: resource.clone(), kind: crate::DriftKind::Changed, at: env.wall, by: None },
+            out,
+        );
+        drift(domain, resource, out);
     }
 }
 
@@ -273,10 +284,23 @@ fn fresh_environment(
     let old = domain.environments.insert(environment.clone(), fact).expect("environment capacity checked");
     if old != Some(fact) {
         out.push(Request::Changed { resource: Resource::Environment(environment.clone()) });
-        crate::client_documents::changed(domain, env, &environment, out);
     }
     if other_hand && fact.is_none() && domain.made.contains_key(&environment) {
-        drift(domain, Resource::Environment(environment), out);
+        let resource = Resource::Environment(environment);
+        if old != Some(fact) {
+            crate::drift_accounts::observed(
+                domain,
+                env,
+                crate::DriftAccount {
+                    resource: resource.clone(),
+                    kind: crate::DriftKind::Deleted,
+                    at: env.wall,
+                    by: None,
+                },
+                out,
+            );
+        }
+        drift(domain, resource, out);
     }
 }
 
@@ -313,8 +337,11 @@ fn restore(domain: &mut Domain, record: Record) {
         Record::Outbox(entry) => {
             domain.effects.insert(entry.key, entry).expect("restored effect fits");
         }
-        Record::Made { environment, key } => {
-            domain.made.insert(environment, key).expect("restored owner fits");
+        Record::Drift(account) => {
+            domain.drifts.insert(account.resource.clone(), account).expect("restored drift fits");
+        }
+        Record::Made { environment, key, project } => {
+            domain.made.insert(environment, (key, project)).expect("restored owner fits");
         }
     }
 }
@@ -332,6 +359,7 @@ fn make(domain: &mut Domain, env: &Env<Limits>, key: Key, out: &mut Queue<Reques
     }
 }
 
+#[expect(clippy::manual_map, reason = "step code uses no closure-taking methods")]
 fn settled(domain: &mut Domain, key: Key, outcome: Outcome, out: &mut Queue<Request>) {
     let Some(entry) = domain.effects.remove(&key) else {
         return;
@@ -340,8 +368,15 @@ fn settled(domain: &mut Domain, key: Key, outcome: Outcome, out: &mut Queue<Requ
     if outcome == Outcome::Made {
         match entry.effect {
             Effect::CreateEnvironment { environment, .. } => {
-                domain.made.insert(environment.clone(), key).expect("made capacity reserved");
-                out.push(Request::Save { record: Record::Made { environment, key } });
+                let project = match entry.project {
+                    Some(project) => Some(project),
+                    None => match domain.reliance.get(&key.task) {
+                        Some((project, _)) => Some(*project),
+                        None => None,
+                    },
+                };
+                domain.made.insert(environment.clone(), (key, project)).expect("made capacity reserved");
+                out.push(Request::Save { record: Record::Made { environment, key, project } });
             }
             Effect::TearDown { environment, .. } => {
                 domain.made.remove(&environment);
@@ -417,9 +452,33 @@ fn looked(domain: &mut Domain, env: &Env<Limits>, key: Key, result: Looked, out:
     }
 }
 
-fn start_procedure(domain: &mut Domain, env: &Env<Limits>, task: u64, procedure: Procedure, out: &mut Queue<Request>) {
+fn start_procedure(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    task: u64,
+    project: u32,
+    procedure: Procedure,
+    out: &mut Queue<Request>,
+) {
     if domain.procedures.contains_key(&task) || domain.procedures.len() >= env.limits.procedures {
         return;
+    }
+    // Retain the admitted scope and this owner's procedure resource before its
+    // panel or outbox can be constructed. Existing names remain authoritative.
+    if !domain.reliance.contains_key(&task) {
+        let resource = match &procedure {
+            Procedure::Remediate { service, .. } | Procedure::Scale { service, .. } => {
+                Resource::Service(service.clone())
+            }
+            Procedure::Provision { environment, .. } | Procedure::TearDown { environment, .. } => {
+                Resource::Environment(environment.clone())
+            }
+        };
+        names(domain, env, task, project, Box::from([resource]), out);
+    }
+    match domain.reliance.get(&task) {
+        Some((owner, _)) if *owner == project => {}
+        Some(_) | None => return,
     }
     let state = ProcedureState { task, procedure, phase: ProcedurePhase::Active };
     domain.procedures.insert(task, state.clone()).expect("procedure capacity checked");
@@ -454,7 +513,7 @@ fn procedure(domain: &mut Domain, env: &Env<Limits>, task: u64, signal: Procedur
                 };
                 state.procedure = Procedure::TearDown {
                     environment: environment.clone(),
-                    created_by: *key,
+                    created_by: key.0,
                     deadline: now.saturating_add(30),
                 };
                 state.phase = ProcedurePhase::Active;
@@ -697,9 +756,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.client_subjects.remove(&subject);
         }
         Event::Document { watcher, scope, subject, party } => {
-            crate::client_documents::document(domain, watcher, scope, subject, party, out);
+            crate::client_documents::document(domain, &env.limits, watcher, scope, subject, party, out);
         }
-        Event::ReadDocument { scope, read, party } => crate::client_documents::read(domain, scope, read, party, out),
+        Event::ReadDocument { scope, read, party } => {
+            crate::client_documents::read(domain, &env.limits, scope, read, party, out);
+        }
         Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value, &env.limits),
         Event::ApplicationDrop { owner } => domain.application.drop(owner),
         Event::Application { request, token, owner, person, project, role, retention } => {
@@ -725,7 +786,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 out.push(Request::Erase { key: RecordKey::Rely(task) });
             }
         }
-        Event::StartProcedure { task, procedure } => start_procedure(domain, env, task, procedure, out),
+        Event::StartProcedure { task, project, procedure } => {
+            start_procedure(domain, env, task, project, procedure, out);
+        }
         Event::Procedure { task, signal } => procedure(domain, env, task, signal, out),
         Event::Describe { token, effect } => stage(domain, env, token, effect, out),
         Event::DescribeProposal { token, number } => match domain.proposals.get(&number) {
@@ -745,7 +808,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 out.push(Request::Erase { key: RecordKey::Proposal(number) });
             }
         }
-        Event::Keep { token, entry: number, key } => {
+        Event::Keep { token, entry: number, key, project } => {
             if let Some(effect) = domain.staged.remove(&token) {
                 let owner_room = match &effect {
                     Effect::CreateEnvironment { environment, .. } => {
@@ -757,7 +820,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                     | Effect::TearDown { .. } => true,
                 };
                 if domain.effects.len() < env.limits.effects && !domain.effects.contains_key(&key) && owner_room {
-                    let entry = Entry { number, key, effect, attempt: 0, deadline: 0, phase: Phase::Kept };
+                    let entry = Entry { number, key, effect, project, attempt: 0, deadline: 0, phase: Phase::Kept };
                     domain.effects.insert(key, entry.clone()).expect("outbox capacity checked");
                     out.push(Request::Save { record: Record::Outbox(entry) });
                     out.push(Request::Make { key });
@@ -815,6 +878,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
         }
         Event::System(system) => match system {
+            SystemEvent::Drift { account } => crate::drift_accounts::observed(domain, env, account, out),
             SystemEvent::Service { service, fact, other_hand } => {
                 fresh_service(domain, env, service, fact, other_hand, out);
             }
@@ -828,6 +892,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     }
     closing_complete(domain, out);
     restart_complete(domain, out);
+    crate::client_marks::collect(domain, env, out);
 }
 
 /// Rechecks uncertain entries once their absolute retry deadline passes.
@@ -851,6 +916,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             None => break,
         }
     }
+    crate::client_marks::collect(domain, env, out);
 }
 
 /// Earliest absolute retry deadline in the world's clock domain.
@@ -876,6 +942,12 @@ pub fn next_deadline(domain: &Domain) -> Option<Time> {
 fn read_afresh(domain: &mut Domain) {
     domain.restart = Some(crate::RestartStage::ReadAfresh);
     domain.application.read_afresh(&mut domain.refresh);
+    for (environment, _) in &domain.made {
+        domain
+            .refresh
+            .insert(Resource::Environment(environment.clone()), false)
+            .expect("retained creation resources fit");
+    }
     for (_, (_, resources)) in &domain.reliance {
         for named in resources {
             domain.refresh.insert(named.resource.clone(), false).expect("restored live resources fit");

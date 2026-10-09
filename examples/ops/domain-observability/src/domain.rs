@@ -6,8 +6,8 @@ use crate::{
     Requirement, Service, SystemEvent, SystemRequest, Topic, Verdict, Watch,
 };
 
-/// One fact refresh can answer sixteen waiting judges and announce a change.
-pub const MAX_OUT: u32 = 32;
+/// One fact refresh can save thirty-two incident updates and answer sixteen judges.
+pub const MAX_OUT: u32 = 80;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 struct Question {
@@ -27,8 +27,9 @@ pub struct Domain {
     pub(crate) facts: Map<Service, Fact>,
     subscriptions: Map<(Topic, u64), (u64, u8, u8)>,
     pub(crate) watches: Map<u64, Watch>,
+    pub(crate) incidents: Map<(u32, u64), crate::Incident>,
     staged: Map<Token, Effect>,
-    effects: Map<Key, Entry>,
+    pub(crate) effects: Map<Key, Entry>,
     judges: Map<Token, Question>,
     reads: Map<Token, u32>,
 }
@@ -42,7 +43,12 @@ impl Domain {
             limits.judges <= 16 && limits.effects <= 16 && limits.services_per_watch <= 16,
             "one step's outputs fit MAX_OUT"
         );
+        assert!(
+            limits.watches <= 16 && crate::incidents::capacity(limits).expect("incident bound") <= 32,
+            "incident and watch saves fit MAX_OUT"
+        );
         Self {
+            incidents: Map::with_capacity(crate::incidents::capacity(limits).expect("incident bound")),
             client_subjects: Map::with_capacity(limits.reads),
             templates: Map::with_capacity(limits.watches),
             restart: None,
@@ -58,7 +64,9 @@ impl Domain {
                 limits
                     .subscriptions
                     .checked_add(limits.watches.checked_mul(limits.services_per_watch).expect("watched services"))
-                    .expect("live services"),
+                    .expect("live services")
+                    .checked_add(crate::incidents::capacity(limits).expect("incident bound"))
+                    .expect("retained incident services"),
             ),
             facts: Map::with_capacity(limits.services),
             subscriptions: Map::with_capacity(limits.subscriptions),
@@ -195,6 +203,7 @@ fn fresh_fact(domain: &mut Domain, env: &Env<Limits>, service: Service, fact: Fa
         out.push(Request::Changed { service: service.clone() });
         crate::client_documents::changed(domain, env, &service, out);
     }
+    crate::incidents::observed(domain, env, &service, &fact, out);
     let health_changed = match &old {
         Some(prior) => prior.healthy_replicas != fact.healthy_replicas,
         None => false,
@@ -245,6 +254,7 @@ fn news(domain: &mut Domain, env: &Env<Limits>, alert: Alert, own: bool, out: &m
         }
     }
     for task in &watches {
+        crate::incidents::raised(domain, env, *task, &alert, out);
         let watch = domain.watches.get_mut(task).expect("live watch");
         let mut pending = List::with_capacity(env.limits.alerts_per_batch);
         for number in &watch.pending {
@@ -256,6 +266,7 @@ fn news(domain: &mut Domain, env: &Env<Limits>, alert: Alert, own: bool, out: &m
         watch.pending = pending.into_boxed();
         out.push(Request::Save { record: Record::Watch(watch.clone()) });
     }
+    crate::client_documents::changed(domain, env, &alert.service, out);
     if !subscribers.is_empty() {
         out.push(Request::News { alert, subscribers: subscribers.into_boxed() });
     }
@@ -393,6 +404,9 @@ fn restore(domain: &mut Domain, record: Record) {
         Record::Watch(watch) => {
             domain.watches.insert(watch.task, watch).expect("restored watch fits");
         }
+        Record::Incident(incident) => {
+            domain.incidents.insert((incident.project, incident.number), incident).expect("restored incident fits");
+        }
         Record::Outbox(entry) => {
             domain.effects.insert(entry.key, entry).expect("restored outbox fits");
         }
@@ -484,9 +498,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.client_subjects.remove(&subject);
         }
         Event::Document { watcher, scope, subject, party } => {
-            crate::client_documents::document(domain, watcher, scope, subject, party, out);
+            crate::client_documents::document(domain, &env.limits, watcher, scope, subject, party, out);
         }
-        Event::ReadDocument { scope, read, party } => crate::client_documents::read(domain, scope, read, party, out),
+        Event::ReadDocument { scope, read, party } => {
+            crate::client_documents::read(domain, &env.limits, scope, read, party, out);
+        }
         Event::Close { task } => {
             domain.closing.insert(task, true).expect("live owner capacity");
         }
@@ -558,10 +574,10 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 out.push(Request::Refused { token });
             }
         }
-        Event::Keep { token, entry: number, key } => {
+        Event::Keep { token, entry: number, key, project } => {
             if let Some(effect) = domain.staged.remove(&token) {
                 if domain.effects.len() < env.limits.effects {
-                    let entry = Entry { number, key, effect, attempt: 0, deadline: 0, phase: Phase::Kept };
+                    let entry = Entry { number, key, effect, project, attempt: 0, deadline: 0, phase: Phase::Kept };
                     domain.effects.insert(key, entry.clone()).expect("effect fits");
                     out.push(Request::Save { record: Record::Outbox(entry) });
                     out.push(Request::Make { key });
@@ -617,6 +633,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     }
     closing_complete(domain, out);
     restart_complete(domain, out);
+    crate::client_documents::records_changed(domain, env, out);
 }
 
 /// Rechecks uncertain keyed effects when their absolute retry deadline passes.
@@ -661,6 +678,9 @@ fn read_afresh(domain: &mut Domain) {
         for service in &watch.services {
             domain.refresh.insert(service.clone(), false).expect("restored watched services fit");
         }
+    }
+    for (_, incident) in &domain.incidents {
+        domain.refresh.insert(incident.service.clone(), false).expect("retained incident services fit");
     }
 }
 

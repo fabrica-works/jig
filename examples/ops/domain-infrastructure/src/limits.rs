@@ -47,8 +47,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .tasks
         .checked_mul(limits.resources_per_task)?
         .checked_add(limits.procedures)?
-        .checked_add(limits.environments)?;
+        .checked_add(limits.environments)?
+        .checked_add(limits.made)?;
     crate::application::worst_case(limits)?
+        .checked_add(crate::drift_accounts::worst_case(limits)?)?
         .checked_add(Map::<skein_lib::Token, crate::ClientSubject>::worst_case(limits.proposals)?)?
         .checked_add(List::<skein_lib::Token>::worst_case(limits.proposals)?)?
         .checked_add(u64::from(limits.proposals).checked_mul(name.checked_mul(2)?)?)?
@@ -67,7 +69,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<skein_lib::Token, Effect>::worst_case(limits.staged)?)?
         .checked_add(Map::<u64, (u64, Effect)>::worst_case(limits.proposals)?)?
         .checked_add(Map::<Key, Entry>::worst_case(limits.effects)?)?
-        .checked_add(Map::<Environment, Key>::worst_case(limits.made)?)?
+        .checked_add(Map::<Environment, (Key, Option<u32>)>::worst_case(limits.made)?)?
         .checked_add(u64::from(limits.services).checked_mul(name.checked_mul(3)?)?)?
         .checked_add(u64::from(limits.environments).checked_mul(name.checked_mul(2)?)?)?
         .checked_add(u64::from(limits.pools).checked_mul(name)?)?

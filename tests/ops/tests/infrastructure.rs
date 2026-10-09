@@ -10,7 +10,7 @@ fn key() -> infra::Key {
 fn make(world: &mut InfrastructureWorld, effect: infra::Effect) -> Vec<infra::Request> {
     let described = world.event(infra::Event::Describe { token: Token::new(1), effect });
     assert!(matches!(described[0], infra::Request::Described { .. }));
-    let kept = world.event(infra::Event::Keep { entry: 3, token: Token::new(1), key: key() });
+    let kept = world.event(infra::Event::Keep { project: Some(1), entry: 3, token: Token::new(1), key: key() });
     world.release(&kept)
 }
 
@@ -86,6 +86,7 @@ fn provision_waits_for_readiness_and_tears_down_on_release() {
     let mut world = InfrastructureWorld::new(0, infra::Backend::OperationIds);
     let environment = infra_environment();
     world.event(infra::Event::StartProcedure {
+        project: 1,
         task: 7,
         procedure: infra::Procedure::Provision {
             environment: environment.clone(),
@@ -147,7 +148,7 @@ fn a_proposed_restart_survives_restart_and_is_made_after_acceptance() {
     assert!(world.production.observed().is_empty(), "a proposal grants no permission to make it");
     let accepted = world.event(infra::Event::DescribeProposal { token, number: 9 });
     assert!(accepted.iter().any(|request| matches!(request, infra::Request::Described { .. })));
-    let kept = world.event(infra::Event::Keep { entry: 3, token, key: key() });
+    let kept = world.event(infra::Event::Keep { project: Some(1), entry: 3, token, key: key() });
     world.event(infra::Event::DropProposal { number: 9 });
     assert!(world.production.observed().is_empty(), "the outbox waits for its commit's release");
     world.production.queue_fault(production::Fault::LostAnswer);
@@ -180,6 +181,7 @@ fn scale_reads_replicas_afresh_and_finishes_at_the_requested_count() {
         replicas: 4,
     });
     world.event(infra::Event::StartProcedure {
+        project: 1,
         task: 7,
         procedure: infra::Procedure::Scale { service: service.clone(), replicas: 1, deadline: 100 },
     });
@@ -215,6 +217,7 @@ fn scale_waiting_for_authority_rereads_before_asking_again() {
     let service = infra::Service::new(Box::from(*b"staging"), Box::from(*b"checkout"));
     world.production.add_service(production::ServiceName::new("staging", "checkout"), "v2", 3);
     world.event(infra::Event::StartProcedure {
+        project: 1,
         task: 7,
         procedure: infra::Procedure::Scale { service: service.clone(), replicas: 1, deadline: 100 },
     });

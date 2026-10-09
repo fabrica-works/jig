@@ -241,6 +241,8 @@ pub enum Phase {
 /// One durable outbox entry.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Entry {
+    /// Admitted owner scope, retained with the outbox when known.
+    pub project: Option<u32>,
     /// Core-owned outbox number, separate from the stable effect key.
     pub number: u64,
     /// Stable effect key.
@@ -258,6 +260,8 @@ pub struct Entry {
 /// Key of a record committed by the root.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum RecordKey {
+    /// One scoped incident retained by this owner.
+    Incident { project: u32, number: u64 },
     /// One subscriber to a topic.
     Subscription(Topic, u64),
     /// One standing watch.
@@ -269,6 +273,8 @@ pub enum RecordKey {
 /// A record owned by this connector and committed by the root.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Record {
+    /// Scoped incident state and its bounded observed timeline.
+    Incident(crate::Incident),
     /// A subscriber's thresholds.
     Subscription { topic: Topic, task: u64, subscription: u64, wake_at: u8, keep_at: u8 },
     /// A standing watch's progress.
@@ -284,6 +290,7 @@ impl Record {
         match self {
             Record::Subscription { topic, task, .. } => RecordKey::Subscription(topic.clone(), *task),
             Record::Watch(watch) => RecordKey::Watch(watch.task),
+            Record::Incident(incident) => RecordKey::Incident { project: incident.project, number: incident.number },
             Record::Outbox(entry) => RecordKey::Outbox(entry.key),
         }
     }
@@ -323,7 +330,7 @@ pub enum Event {
     /// Describe and stage a silence pending the core's authority check.
     Describe { token: Token, effect: Effect },
     /// Keep an approved silence in the outbox.
-    Keep { token: Token, entry: u64, key: Key },
+    Keep { token: Token, entry: u64, key: Key, project: Option<u32> },
     /// Discard a refused staged silence.
     Drop { token: Token },
     /// The journal released the kept entry.

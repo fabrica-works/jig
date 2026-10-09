@@ -264,6 +264,8 @@ pub enum Phase {
 /// One durable entry in the connector's outbox.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Entry {
+    /// Admitted owner scope, retained when known.
+    pub project: Option<u32>,
     /// Core-owned outbox number, separate from the stable effect key.
     pub number: u64,
     /// Deployment-scoped key.
@@ -382,6 +384,8 @@ pub enum StepDecision {
 /// Stable key for a connector record.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum RecordKey {
+    /// Retained observed drift for one resource.
+    Drift(Resource),
     /// Connector-owned end and revision.
     EnvironmentEnd(Environment),
     /// Retained keyed outcome.
@@ -401,6 +405,8 @@ pub enum RecordKey {
 /// State committed by the root with a decision.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Record {
+    /// The owner's observed drift, including known or unknown actor.
+    Drift(crate::DriftAccount),
     /// Current desired end and revision.
     EnvironmentEnd { environment: Environment, created_by: Key, now: crate::EnvironmentEnd },
     /// Own outcome retained for the people child's token.
@@ -414,7 +420,7 @@ pub enum Record {
     /// One unsettled effect.
     Outbox(Entry),
     /// An environment made under a key.
-    Made { environment: Environment, key: Key },
+    Made { environment: Environment, key: Key, project: Option<u32> },
 }
 
 impl Record {
@@ -428,6 +434,7 @@ impl Record {
             Record::Procedure(state) => RecordKey::Procedure(state.task),
             Record::Proposal { number, .. } => RecordKey::Proposal(*number),
             Record::Outbox(entry) => RecordKey::Outbox(entry.key),
+            Record::Drift(account) => RecordKey::Drift(account.resource.clone()),
             Record::Made { environment, .. } => RecordKey::Made(environment.clone()),
         }
     }
@@ -467,7 +474,7 @@ pub enum Event {
     /// A task no longer relies on its named resources.
     Unnamed { task: u64 },
     /// Start a procedure with parameters.
-    StartProcedure { task: u64, procedure: Procedure },
+    StartProcedure { task: u64, project: u32, procedure: Procedure },
     /// Step a procedure on current facts.
     Procedure { task: u64, signal: ProcedureSignal },
     /// Stage an effect for the core's authority check.
@@ -479,7 +486,7 @@ pub enum Event {
     /// Drop a terminal proposal payload.
     DropProposal { number: u64 },
     /// Keep an approved effect under its key.
-    Keep { token: Token, entry: u64, key: Key },
+    Keep { token: Token, entry: u64, key: Key, project: Option<u32> },
     /// Drop a staged effect after refusal.
     Drop { token: Token },
     /// The journal released this kept entry.
@@ -518,6 +525,8 @@ pub enum SystemRequest {
 /// Answers and hints from infrastructure's system.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum SystemEvent {
+    /// An attributed observation supplements the account without re-deciding a core hold.
+    Drift { account: crate::DriftAccount },
     /// Fresh service fact and whether another hand made this change.
     Service { service: Service, fact: ServiceFact, other_hand: bool },
     /// Fresh environment fact, or absence, and whether another hand removed it.

@@ -20,8 +20,12 @@
 
 extern crate alloc;
 
+mod incidents;
+pub use incidents::{Incident, IncidentHealth, IncidentPoint, IncidentState};
 mod client_documents;
-pub use client_documents::{ClientDocument, ClientScope, ClientSubject, DocumentMissing, document_worst_case};
+pub use client_documents::{
+    ClientDocument, ClientScope, ClientService, ClientSubject, DocumentMissing, document_worst_case,
+};
 mod boundary;
 mod domain;
 mod limits;

@@ -50,8 +50,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let name = u64::from(limits.name_bytes).checked_mul(2)?;
-    let refresh = limits.subscriptions.checked_add(limits.watches.checked_mul(limits.services_per_watch)?)?;
-    Map::<Service, Fact>::worst_case(limits.services)?
+    let refresh = limits
+        .subscriptions
+        .checked_add(limits.watches.checked_mul(limits.services_per_watch)?)?
+        .checked_add(crate::incidents::capacity(limits)?)?;
+    crate::incidents::worst_case(limits)?
+        .checked_add(Map::<Service, Fact>::worst_case(limits.services)?)?
         .checked_add(Map::<skein_lib::Token, crate::ClientSubject>::worst_case(limits.reads)?)?
         .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.reads)?)?
         .checked_add(u64::from(limits.reads).checked_mul(name.checked_mul(2)?)?)?

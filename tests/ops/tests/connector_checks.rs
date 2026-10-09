@@ -40,7 +40,7 @@ fn observability_keyed_silence_survives_each_commit_cut() {
             token,
             effect: obs::Effect { rule: Box::from(*b"checkout-errors"), until: 90 },
         });
-        let kept = world.event(obs::Event::Keep { entry: 3, token, key: obs_key() });
+        let kept = world.event(obs::Event::Keep { project: Some(1), entry: 3, token, key: obs_key() });
         match cut {
             0 => {
                 world.restart();
@@ -89,7 +89,7 @@ fn infrastructure_retries_only_after_the_saved_deadline_and_ignores_late_copies(
         token,
         effect: infra::Effect::CreateEnvironment { environment: infra_environment(), until: 100, price: 30 },
     });
-    world.event(infra::Event::Keep { entry: 3, token, key: infra_key() });
+    world.event(infra::Event::Keep { project: Some(1), entry: 3, token, key: infra_key() });
     let prepared = world.event(infra::Event::Make { key: infra_key() });
     assert!(
         prepared
@@ -140,7 +140,7 @@ fn a_hand_reaching_a_conditional_target_is_ambiguous() {
         token,
         effect: infra::Effect::Scale { service: infra_service(), from: 3, to: 4 },
     });
-    world.event(infra::Event::Keep { entry: 3, token, key: infra_key() });
+    world.event(infra::Event::Keep { project: Some(1), entry: 3, token, key: infra_key() });
     world.event(infra::Event::Make { key: infra_key() });
     world.production.other_hand(production::Fault::HandScale { service: service_name, replicas: 4 });
     let uncertain = world.event(infra::Event::System(infra::SystemEvent::Applied {
@@ -164,6 +164,7 @@ fn a_hand_reaching_a_conditional_target_is_ambiguous() {
 fn infrastructure_procedure_repeats_a_wait_but_never_repeats_an_effect_decision() {
     let mut world = InfrastructureWorld::new(0, infra::Backend::OperationIds);
     world.event(infra::Event::StartProcedure {
+        project: 1,
         task: 7,
         procedure: infra::Procedure::Remediate { service: infra_service(), operation: 17, deadline: 90 },
     });
@@ -228,7 +229,7 @@ fn a_conditional_effect_fails_when_facts_change_after_decision() {
         token,
         effect: infra::Effect::Scale { service: infra_service(), from: 3, to: 4 },
     });
-    let kept = world.event(infra::Event::Keep { entry: 3, token, key: infra_key() });
+    let kept = world.event(infra::Event::Keep { project: Some(1), entry: 3, token, key: infra_key() });
     world.production.other_hand(production::Fault::HandScale {
         service: production::ServiceName::new("production", "checkout"),
         replicas: 5,
@@ -259,7 +260,7 @@ fn a_hand_deleting_an_owned_environment_reports_drift() {
         token: Token::new(1),
         effect: infra::Effect::CreateEnvironment { environment: environment.clone(), until: 100, price: 20 },
     });
-    let kept = world.event(infra::Event::Keep { entry: 3, token: Token::new(1), key: infra_key() });
+    let kept = world.event(infra::Event::Keep { project: Some(1), entry: 3, token: Token::new(1), key: infra_key() });
     world.release(&kept);
     world.release(&[infra::Request::System(infra::SystemRequest::Environment { environment: environment.clone() })]);
     world.production.other_hand(production::Fault::HandDelete {
@@ -278,7 +279,8 @@ fn infrastructure_creation_is_made_once_across_each_restart_cut() {
             token: Token::new(1),
             effect: infra::Effect::CreateEnvironment { environment: infra_environment(), until: 100, price: 20 },
         });
-        let kept = world.event(infra::Event::Keep { entry: 3, token: Token::new(1), key: infra_key() });
+        let kept =
+            world.event(infra::Event::Keep { project: Some(1), entry: 3, token: Token::new(1), key: infra_key() });
         match cut {
             0 => {
                 world.restart();
@@ -319,7 +321,7 @@ fn dropping_a_staged_silence_discards_its_value() {
         effect: obs::Effect { rule: Box::from(*b"checkout-errors"), until: 100 },
     });
     world.event(obs::Event::Drop { token });
-    assert!(world.event(obs::Event::Keep { entry: 3, token, key: obs_key() }).is_empty());
+    assert!(world.event(obs::Event::Keep { project: Some(1), entry: 3, token, key: obs_key() }).is_empty());
     world.restart();
     assert!(world.production.observed().is_empty());
 }
@@ -372,7 +374,8 @@ fn conditional_scale_and_rollback_find_their_own_lost_answers() {
         let mut world = InfrastructureWorld::new(0, infra::Backend::OperationIds);
         world.event(infra::Event::Describe { token: Token::new(1), effect });
         world.production.queue_fault(production::Fault::LostAnswer);
-        let kept = world.event(infra::Event::Keep { entry: 3, token: Token::new(1), key: infra_key() });
+        let kept =
+            world.event(infra::Event::Keep { project: Some(1), entry: 3, token: Token::new(1), key: infra_key() });
         let settled = world.release(&kept);
         assert!(settled.contains(&infra::Request::Outcome {
             entry: 3,

@@ -253,6 +253,9 @@ impl World {
                 obs::Record::Watch(watch) => {
                     live.extend(watch.services.iter().cloned());
                 }
+                obs::Record::Incident(incident) => {
+                    live.insert(incident.service.clone());
+                }
                 obs::Record::Outbox(..) => {}
             }
         }

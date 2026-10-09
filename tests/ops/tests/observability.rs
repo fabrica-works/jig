@@ -115,7 +115,7 @@ fn a_lost_silence_answer_is_found_once_after_restart() {
     let mut world = World::new(0);
     let effect = obs::Effect { rule: Box::from(*b"checkout-errors"), until: 100 };
     world.event(obs::Event::Describe { token: World::token(1), effect });
-    let kept = world.event(obs::Event::Keep { entry: 3, token: World::token(1), key: key() });
+    let kept = world.event(obs::Event::Keep { project: Some(1), entry: 3, token: World::token(1), key: key() });
     assert_eq!(world.commits, 1);
     world.production.queue_fault(production::Fault::LostAnswer);
     let made = world.release(&kept);

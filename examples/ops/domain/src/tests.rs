@@ -648,6 +648,6 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
 
 fn assert_service_document(document: crate::ClientDocument) {
     let crate::ClientDocument::Observability(value) = document else { panic!("observability owns the document") };
-    let observability::ClientDocument::Service { fact, .. } = *value;
+    let observability::ClientDocument::Service { fact, .. } = *value else { panic!("service document") };
     assert_eq!(fact.healthy_replicas, 2);
 }

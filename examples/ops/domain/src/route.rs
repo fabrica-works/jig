@@ -464,7 +464,11 @@ fn core_ask(
             if number == domain.numbers.infrastructure {
                 match translate::procedure(code, &context.spec) {
                     Some(procedure) => {
-                        work.push(Work::Infrastructure(infrastructure::Event::StartProcedure { task, procedure }));
+                        work.push(Work::Infrastructure(infrastructure::Event::StartProcedure {
+                            task,
+                            project: context.project,
+                            procedure,
+                        }));
                     }
                     None => work.push(Work::Core(core::Event::ProcedureStep {
                         task,
@@ -625,6 +629,7 @@ fn core_ask(
     }
 }
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates this child boundary")]
+#[expect(clippy::manual_map, reason = "step code copies owner scope without closure-taking methods")]
 fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::connector::Ask, work: &mut Queue<Work>) {
     match ask {
         core::connector::Ask::Describe { owner } => match domain.effects.remove(&owner) {
@@ -648,12 +653,20 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
                     token: owner,
                     entry,
                     key: translate::infrastructure_key(key),
+                    project: match domain.core.tasks.task(key.task) {
+                        Some(task) => Some(task.project),
+                        None => None,
+                    },
                 }));
             } else if number == domain.numbers.observability {
                 work.push(Work::Observability(observability::Event::Keep {
                     token: owner,
                     entry,
                     key: translate::observability_key(key),
+                    project: match domain.core.tasks.task(key.task) {
+                        Some(task) => Some(task.project),
+                        None => None,
+                    },
                 }));
             }
         }

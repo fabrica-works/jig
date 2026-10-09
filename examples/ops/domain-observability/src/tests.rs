@@ -139,11 +139,12 @@ fn a_silence_is_saved_before_its_system_call_and_found_after_uncertainty() {
     let effect = Effect { rule: Box::from(*b"checkout-errors"), until: 100 };
     let mut described = event(&mut domain, 1, Event::Describe { token, effect: effect.clone() });
     assert_eq!(described.pop(), Some(Request::Described { token, effect: effect.clone() }));
-    let mut kept = event(&mut domain, 1, Event::Keep { entry: 3, token, key });
+    let mut kept = event(&mut domain, 1, Event::Keep { project: Some(1), entry: 3, token, key });
     assert_eq!(
         kept.pop(),
         Some(Request::Save {
             record: Record::Outbox(Entry {
+                project: Some(1),
                 number: 3,
                 key,
                 effect: effect.clone(),
@@ -159,6 +160,7 @@ fn a_silence_is_saved_before_its_system_call_and_found_after_uncertainty() {
         made.pop(),
         Some(Request::Save {
             record: Record::Outbox(Entry {
+                project: Some(1),
                 number: 3,
                 key,
                 effect: effect.clone(),
@@ -175,6 +177,7 @@ fn a_silence_is_saved_before_its_system_call_and_found_after_uncertainty() {
         uncertain.pop(),
         Some(Request::Save {
             record: Record::Outbox(Entry {
+                project: Some(1),
                 number: 3,
                 key,
                 effect: effect.clone(),
@@ -197,7 +200,7 @@ fn an_uncertain_silence_waits_for_its_durable_deadline_before_retry() {
     let key = Key::procedure([1; 16], 7, 3);
     let effect = Effect { rule: Box::from(*b"checkout-errors"), until: 100 };
     event(&mut domain, 1, Event::Describe { token, effect: effect.clone() });
-    event(&mut domain, 1, Event::Keep { entry: 3, token, key });
+    event(&mut domain, 1, Event::Keep { project: Some(1), entry: 3, token, key });
     event(&mut domain, 1, Event::Make { key });
     event(&mut domain, 1, Event::System(SystemEvent::Applied { key, attempt: 1, outcome: Outcome::Uncertain }));
     assert_eq!(next_deadline(&domain), Some(Time::from_nanos(31_000_000_000)));
@@ -206,6 +209,7 @@ fn an_uncertain_silence_waits_for_its_durable_deadline_before_retry() {
         early.pop(),
         Some(Request::Save {
             record: Record::Outbox(Entry {
+                project: Some(1),
                 number: 3,
                 key,
                 effect: effect.clone(),
@@ -225,6 +229,7 @@ fn an_uncertain_silence_waits_for_its_durable_deadline_before_retry() {
         after.pop(),
         Some(Request::Save {
             record: Record::Outbox(Entry {
+                project: Some(1),
                 number: 3,
                 key,
                 effect: effect.clone(),
