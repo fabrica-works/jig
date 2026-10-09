@@ -3,6 +3,7 @@
 //! routed flight ends with `Decided`; the root commits before releasing replies.
 //! These values contain no credential secrets, task internals or protocol bytes.
 
+use crate::Refusal;
 use alloc::boxed::Box;
 use skein_lib::{ReplyTo, Token, Wall};
 
@@ -335,49 +336,14 @@ pub enum EscalationChoice {
     Passed,
 }
 
-/// Admission or root-decision reason; `Busy`/`NotReady` decisions release the flight without saving a
-/// completed key, while other decided refusals are retained. (domain/people.md, section 5.1).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Refusal {
-    /// A connector reports a required resource unavailable.
-    ResourceUnavailable,
-    /// The requested operation has no offered core route.
-    NotOffered,
-    /// Final policy role cannot pass further; no state mutation.
-    NoFurther,
-    /// Caller is not the current waiting recipient.
-    Standing,
-    /// Restoration is unfinished/failed, or the root reports transient admission unavailability.
-    NotReady,
-    /// Sign-in is missing, expired or incompatible with the supplied identity.
-    SignIn,
-    /// Project membership does not permit the supported request.
-    Role,
-    /// Root reports authority insufficient for the action.
-    Authority,
-    /// Root names an unknown target, bootstrap lacks its initialized project, or restore references
-    /// an unknown person.
-    Unknown,
-    /// The thing decided changed; its current revision and reason are given.
-    Moved { now: crate::Moved },
-    /// The proposal or escalation waits for another recipient now.
-    NotWaiting,
-    /// Root reports the requested target has ended.
-    Ended,
-    /// Configured capacity is unavailable or the root reports transient admission pressure; a newly
-    /// refused admission may retry.
-    Busy,
-    /// Payload, configuration-derived arithmetic or restored record validity exceeds the supported
-    /// bound.
-    Limit,
-    /// Same person-scoped key names a different request.
-    KeyConflict,
-}
-
-/// Root's terminal result for one routed flight; people replies to each bounded waiter and saves
-/// nontransient outcomes with the parent's task decision. (domain/people.md, section 5.1).
+/// Root's answer for one routed flight; people replies to each bounded waiter and saves
+/// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// Unsaved retry answer; the request may be sent again.
+    Again(crate::Again),
+    /// Unsaved expired-sign-in answer.
+    SignedOut,
     /// One live watch was opened; it writes no durable answer record.
     Watching { watcher: Token },
     /// A note correction or deletion was committed with its keyed answer.
@@ -405,7 +371,7 @@ pub enum Outcome {
     /// The task now belongs to the requesting person, with its remaining funding transferred.
     Moved { task: u64 },
     /// Keyed answer to one current or historical proposal decision.
-    ProposalDecided { proposer: u64, proposal: u64, by: u64, choice: ProposalChoice },
+    ProposalDecided { proposer: u64, proposal: u64, by: u64, at: Wall, choice: ProposalChoice },
     /// Words were durably admitted under the root-issued message number.
     Said { task: u64, message: u64 },
     /// A named question was answered with a durable message.
@@ -434,6 +400,7 @@ pub enum Outcome {
         revision: u64,
         /// Authenticated winning person, including historical races.
         by: u64,
+        at: Wall,
         choice: EscalationChoice,
     },
     /// Root created the chat task; save the keyed answer with the task in one decision.
@@ -441,9 +408,8 @@ pub enum Outcome {
         /** Chat task number returned by the root; the parent withholds the reply until durability and people holds no task state. */
         task: u64,
     },
-    /// Request ended with a reason; permanent decisions are keyed, `Busy`/`NotReady` remain
-    /// retryable.
-    Refused(/** Root or role refusal; transient `Busy`/`NotReady` is not retained as a completed key. */ Refusal),
+    /// Final refusal, retained under the request key.
+    Refused(/** Final refusal facts, retained under the request key. */ Refusal),
 }
 
 /// Child-to-client answer routed by the parent; state-changing answers are withheld externally
@@ -461,6 +427,8 @@ pub enum Reply {
     SignedOut,
     /// One terminal response for a keyed call or its duplicate waiter.
     Outcome(/** Terminal keyed result, or retryable root admission pressure for the current call. */ Outcome),
+    /// Unsaved retry answer; no completed key is retained.
+    Again(crate::Again),
     /// Entrance refused before making a new answered-key record.
     Refused(/** Direct entrance refusal with no newly saved answered-key record. */ Refusal),
 }
@@ -556,7 +524,6 @@ impl Stored {
 /// Root-to-child inputs; authenticated identity, authoritative roles and restored records
 /// cross this boundary without protocol secrets. (domain/people.md, sections 3–5).
 #[derive(PartialEq, Eq, Debug)]
-#[expect(clippy::large_enum_variant, reason = "bounded owned asks remain inline; queues count the complete event size")]
 pub enum Event {
     /// Forget a volatile watch key when its stream closes.
     WatchClosed { watcher: Token },
@@ -658,7 +625,7 @@ pub enum Request {
         request: Token,
         /// Success, or readiness/identity/roster/project/standing refusal before mutation; bounds
         /// use `Limits::holdings`.
-        result: Result<(), Refusal>,
+        result: Result<(), Outcome>,
     },
     /// New eligible keyed flight for the root's authority/task decision; duplicate callers share
     /// this route.
@@ -697,7 +664,7 @@ pub enum Request {
         /** Project whose role update was refused without replacing holdings. */
         project: u32,
         /** Bound or capacity reason for the refused role update. */
-        refusal: Refusal,
+        outcome: Outcome,
     },
     /// Terminal restoration failure; a failed instance cannot become ready through more rows or
     /// `Restored`.

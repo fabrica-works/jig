@@ -40,7 +40,7 @@ pub(super) fn pool_route(
         return;
     }
     if core.person_tasks.len() >= env.limits.tasks.tasks || work.room() < 2 {
-        pool_refused(work, request, people::Refusal::Busy);
+        super::refusals::pool_again(work, request, people::Again::Busy);
         return;
     }
     let Some(role) = core.people.role(person, project) else {
@@ -52,7 +52,11 @@ pub(super) fn pool_route(
         return;
     };
     if budget > allowed.period_spend {
-        pool_refused(work, request, people::Refusal::Authority);
+        pool_refused(
+            work,
+            request,
+            people::Refusal::Authority { lacking: people::Lack::Budget { needs: budget, left: allowed.period_spend } },
+        );
         return;
     }
     let Some(policy) = core.authority.policy(project) else {
@@ -60,7 +64,13 @@ pub(super) fn pool_route(
         return;
     };
     if core.settings.period_budget > policy.period_spend {
-        pool_refused(work, request, people::Refusal::Authority);
+        pool_refused(
+            work,
+            request,
+            people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: core.settings.period_budget, left: policy.period_spend },
+            },
+        );
         return;
     }
     let period = tasks::Funder::Period { project, period: core.settings.period };
@@ -68,11 +78,17 @@ pub(super) fn pool_route(
     let needed =
         u32::from(core.tasks.funding(period).is_none()).saturating_add(u32::from(core.tasks.funding(funder).is_none()));
     if core.tasks.funding_room() < needed {
-        pool_refused(work, request, people::Refusal::Busy);
+        super::refusals::pool_again(work, request, people::Again::Busy);
         return;
     }
     if core.tasks.funding(period).is_none() && budget > core.settings.period_budget {
-        pool_refused(work, request, people::Refusal::Authority);
+        pool_refused(
+            work,
+            request,
+            people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: budget, left: core.settings.period_budget },
+            },
+        );
         return;
     }
     if core.tasks.funding(period).is_none() {
@@ -125,7 +141,7 @@ pub(super) fn begin_goal_creation(
     priority: u32,
 ) {
     if core.projections.len() >= env.limits.tasks.tasks {
-        pool_refused(work, request, people::Refusal::Limit);
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::LiveTasks });
         return;
     }
     let admitted = match core.goal_start(project, person, role, charter, budget, env.limits.tasks.tree_tasks) {
@@ -136,7 +152,7 @@ pub(super) fn begin_goal_creation(
         }
     };
     let Some(number) = crate::fresh(&mut core.counters, crate::Family::Task) else {
-        pool_refused(work, request, people::Refusal::Limit);
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         return;
     };
     let new = tasks::New {
@@ -155,7 +171,7 @@ pub(super) fn begin_goal_creation(
         tracked: Some(priority),
     };
     if !tasks::valid_spec(&env.limits.tasks, &new.spec) || !tasks::valid_authority(&env.limits.tasks, &new.authority) {
-        pool_refused(work, request, people::Refusal::Limit);
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     }
     begin_creation(core, env, out, work, request, CreationKind::Goal { person, direct: admitted.direct }, new);
@@ -185,7 +201,7 @@ pub(super) fn begin_chat_creation(
         work.push(Event::Tasks(event));
     }
     let Some(number) = crate::fresh(&mut core.counters, crate::Family::Task) else {
-        pool_refused(work, request, people::Refusal::Limit);
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         return;
     };
     let new = tasks::New {
@@ -221,7 +237,7 @@ pub(super) fn begin_creation(
     new: tasks::New,
 ) {
     if core.creating.len() == core.creating.capacity() {
-        pool_refused(work, request, people::Refusal::Busy);
+        super::refusals::pool_again(work, request, people::Again::Busy);
         return;
     }
     let remaining = u32::try_from(core.connectors.len()).expect("configured connector count fits u32");
@@ -287,7 +303,7 @@ pub(super) fn created_holdings(
     }
     let creating = core.creating.remove(&request).expect("completed creation flight");
     if creating.failed {
-        pool_refused(work, request, people::Refusal::Limit);
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         return;
     }
     let mut new = creating.new;
@@ -310,7 +326,7 @@ pub(super) fn created_holdings(
         }
         CreationKind::Goal { person, direct: false } => {
             let Some(proposal) = crate::fresh(&mut core.counters, crate::Family::Message) else {
-                pool_refused(work, request, people::Refusal::Limit);
+                pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
                 return;
             };
             assert!(
@@ -369,7 +385,7 @@ pub(super) fn roles_route(
         Ok(contexts) => contexts,
         Err(refusal) => {
             assert!(refusal == tasks::Refusal::NotReady, "project inspection refusal is readiness");
-            pool_refused(work, request, people::Refusal::NotReady);
+            super::refusals::pool_again(work, request, people::Again::NotReady);
             return;
         }
     };
@@ -386,7 +402,7 @@ pub(super) fn roles_route(
     if work.room() < handoffs.checked_add(env.limits.tasks.tasks).expect("validated recheck bound")
         || out.room() < changed.checked_add(2).expect("validated role cohort bound")
     {
-        pool_refused(work, request, people::Refusal::Busy);
+        super::refusals::pool_again(work, request, people::Again::Busy);
         return;
     }
     if let Err(why) = core.role_allowed(person, project, env.limits.tasks.tree_tasks) {
@@ -420,7 +436,7 @@ pub(super) fn roles_route(
         }
     }
     if let Err(why) = terminal.expect("role application terminal") {
-        pool_refused(work, request, why);
+        work.push(Event::People(people::Event::Decided { request, outcome: why }));
         return;
     }
     work.push(Event::Tasks(tasks::Event::RecheckEscalations { reply_to: ReplyTo::new(request), project }));
@@ -456,7 +472,7 @@ pub(super) fn make_service_request(
                     }
                     None
                 }
-                None => Some(people::Outcome::Refused(people::Refusal::Limit)),
+                None => Some(people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Arithmetic })),
             }
         }
         Ok(()) => Some(people::Outcome::Refused(people::Refusal::Unknown)),
@@ -512,7 +528,7 @@ pub(super) fn change_policy_request(
     change: people::PolicyChange,
 ) {
     if work.room() < env.limits.tasks.tasks.checked_add(1).expect("task recheck bound") || out.room() < 2 {
-        pool_refused(work, request, people::Refusal::Busy);
+        super::refusals::pool_again(work, request, people::Again::Busy);
         return;
     }
     match core.change_policy(&env.limits, person, project, change) {

@@ -37,7 +37,8 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
             people::Reply::SignedIn { .. }
             | people::Reply::SignedOut
             | people::Reply::Outcome(_)
-            | people::Reply::Refused(_) => None,
+            | people::Reply::Refused(_)
+            | people::Reply::Again(_) => None,
         })
         .expect("tracked goal admitted");
     let record = world

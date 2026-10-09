@@ -48,7 +48,7 @@ pub(super) fn tag_tasks(
                 continue;
             }
             tasks::Request::PersonProposalDecided { reply_to, proposer, number, outcome } => {
-                let event = core.person_proposal_decided(reply_to.into_token(), proposer, number, outcome);
+                let event = core.person_proposal_decided(reply_to.into_token(), proposer, number, outcome, env.wall);
                 append_people(core, env, event, &mut out);
                 continue;
             }
@@ -78,7 +78,9 @@ pub(super) fn tag_tasks(
                             env,
                             people::Event::Decided {
                                 request: flight.request,
-                                outcome: people::Outcome::Refused(people::Refusal::Limit),
+                                outcome: people::Outcome::Refused(people::Refusal::Limit {
+                                    which: people::LimitKind::Words,
+                                }),
                             },
                             &mut out,
                         );
@@ -104,6 +106,7 @@ pub(super) fn tag_tasks(
                         task,
                         revision,
                         by: flight.person,
+                        at: env.wall,
                         decision: flight.decision,
                     },
                 )))));
@@ -112,7 +115,13 @@ pub(super) fn tag_tasks(
                     env,
                     people::Event::Decided {
                         request: flight.request,
-                        outcome: people::Outcome::EscalationDecided { task, revision, by: flight.person, choice },
+                        outcome: people::Outcome::EscalationDecided {
+                            task,
+                            revision,
+                            by: flight.person,
+                            at: env.wall,
+                            choice,
+                        },
                     },
                     &mut out,
                 );
@@ -354,6 +363,7 @@ pub(super) fn tag_tasks(
                                     proposal: *proposal,
                                     kind: tasks::ProposalKind::Batch,
                                     by: *person,
+                                    at: env.wall,
                                     choice: people::ProposalChoice::Accepted,
                                     created: Some((first, last)),
                                 },
@@ -398,7 +408,7 @@ pub(super) fn tag_tasks(
             tasks::Request::ProposalDecided { reply_to, proposer, number, outcome } => {
                 let token = reply_to.into_token();
                 if let Some(event) =
-                    core.task_proposal_decided_for_person(token, proposer, number, outcome, person_proposal)
+                    core.task_proposal_decided_for_person(token, proposer, number, outcome, env.wall, person_proposal)
                 {
                     append_people(core, env, event, &mut out);
                     continue;
@@ -623,7 +633,7 @@ pub(super) fn tag_tasks(
                 continue;
             }
             tasks::Request::Save { record } => {
-                if let Some(archive) = crate::proposals::decision_record(&record) {
+                if let Some(archive) = crate::proposals::decision_record(&record, env.wall) {
                     // Accepted task batches already saved their member numbers
                     // with Made; the history row must not replace that evidence.
                     let by_task = match archive.proposer {
@@ -873,7 +883,7 @@ pub(super) fn tag_tasks(
                         env,
                         people::Event::Decided {
                             request: token,
-                            outcome: people::Outcome::Refused(person_task_refusal(problem.why)),
+                            outcome: person_task_refusal(core, problem.task, problem.why),
                         },
                         &mut out,
                     );
@@ -885,7 +895,7 @@ pub(super) fn tag_tasks(
                         env,
                         people::Event::Decided {
                             request: token,
-                            outcome: people::Outcome::Refused(person_move_refusal(problem.why)),
+                            outcome: person_move_refusal(core, problem.task, problem.why),
                         },
                         &mut out,
                     );
@@ -902,7 +912,7 @@ pub(super) fn tag_tasks(
                         env,
                         people::Event::Decided {
                             request,
-                            outcome: people::Outcome::Refused(person_move_refusal(problem.why)),
+                            outcome: person_move_refusal(core, problem.task, problem.why),
                         },
                         &mut out,
                     );
@@ -950,7 +960,7 @@ pub(super) fn tag_tasks(
                         env,
                         people::Event::Decided {
                             request: token,
-                            outcome: people::Outcome::Refused(people::Refusal::Limit),
+                            outcome: person_task_refusal(core, problem.task, problem.why),
                         },
                         &mut out,
                     );
@@ -962,7 +972,7 @@ pub(super) fn tag_tasks(
                         env,
                         people::Event::Decided {
                             request: token,
-                            outcome: people::Outcome::Refused(person_message_refusal(problem.why)),
+                            outcome: person_message_refusal(core, problem.task, problem.why),
                         },
                         &mut out,
                     );
@@ -1207,7 +1217,7 @@ pub(super) fn ending_words(ending: tasks::Ending) -> Box<[u8]> {
     match ending {
         tasks::Ending::Done(result) => result_words(result),
         tasks::Ending::Failed { reason } => reason,
-        tasks::Ending::Cancelled { reason, result } => match result {
+        tasks::Ending::Cancelled { reason, result, .. } => match result {
             Some(result) => result_words(result),
             None => reason,
         },

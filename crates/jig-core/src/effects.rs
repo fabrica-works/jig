@@ -405,7 +405,9 @@ fn describe_busy(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, ou
                 core.pending_calls.remove(&key);
                 out.push(Request::Now(Box::new(Now::EffectAnswer { to, key, part: CallPart::Unavailable })));
             }
-            EffectOrigin::Accept { to, key, .. } => accept_refused(core, work, out, to, key, authority::Answer::Wait),
+            EffectOrigin::Accept { to, key, .. } => {
+                accept_refused(core, work, out, to, key, authority::Answer::Wait, None);
+            }
             EffectOrigin::Projection { goal, .. } => projection_refused(core, env, work, goal),
             EffectOrigin::Procedure { task, step, .. } => procedure_wait(core, work, task, step),
         }
@@ -433,7 +435,9 @@ fn describe_refused(
                 key,
                 CallPart::EffectDenied { answer: authority::Answer::Refuse, findings: Box::new([]) },
             ),
-            EffectOrigin::Accept { to, key, .. } => accept_refused(core, work, out, to, key, authority::Answer::Refuse),
+            EffectOrigin::Accept { to, key, .. } => {
+                accept_refused(core, work, out, to, key, authority::Answer::Refuse, None);
+            }
             EffectOrigin::Projection { goal, .. } => projection_refused(core, env, work, goal),
             EffectOrigin::Procedure { task, step, entry: _ } => procedure_wait(core, work, task, step),
         }
@@ -570,7 +574,26 @@ fn complete(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, out: &m
                     answer(core, out, to, key, part);
                 }
             }
-            EffectOrigin::Accept { to, key, .. } => accept_refused(core, work, out, to, key, checked),
+            EffectOrigin::Accept { to, key, proposal, by } => {
+                let refusal = match by {
+                    tasks::Party::Person(person) if !findings.is_empty() => {
+                        let role = core.people.role(person, proposal.project).expect("accepted party's role");
+                        let (_, pool) = core.goal_pool(proposal.project, person);
+                        let ask = authority::PersonAsk {
+                            project: proposal.project,
+                            role: role.number(),
+                            pool: crate::translate::authority_numbers(pool),
+                            tasks_left: env.limits.tasks.tree_tasks,
+                            request: authority::PersonRequest::Accept(authority::Action::Effect(
+                                description.effect.clone(),
+                            )),
+                        };
+                        Some(core.request_refusal(&ask, &mut findings))
+                    }
+                    tasks::Party::Person(_) | tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
+                };
+                accept_refused(core, work, out, to, key, checked, refusal);
+            }
             EffectOrigin::Propose { .. } => unreachable!("proposals completed separately"),
             EffectOrigin::Projection { goal, .. } => projection_refused(core, env, work, goal),
             EffectOrigin::Procedure { task, step, entry: _ } => procedure_wait(core, work, task, step),
@@ -592,7 +615,9 @@ fn complete(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, out: &m
                 core.pending_calls.remove(&key);
                 out.push(Request::Now(Box::new(Now::EffectAnswer { to, key, part: CallPart::Unavailable })));
             }
-            EffectOrigin::Accept { to, key, .. } => accept_refused(core, work, out, to, key, authority::Answer::Refuse),
+            EffectOrigin::Accept { to, key, .. } => {
+                accept_refused(core, work, out, to, key, authority::Answer::Refuse, None);
+            }
             EffectOrigin::Propose { .. } => unreachable!("proposal has no entry"),
             EffectOrigin::Projection { goal, .. } => projection_refused(core, env, work, goal),
             EffectOrigin::Procedure { task, step, .. } => procedure_wait(core, work, task, step),
@@ -1065,6 +1090,7 @@ fn accept_refused(
     to: ReplyTo,
     key: Option<CallKey>,
     why: authority::Answer,
+    refusal: Option<jig_core_people::Refusal>,
 ) {
     match key {
         Some(key) => {
@@ -1091,11 +1117,13 @@ fn accept_refused(
         }
         None => work.push(Event::People(jig_core_people::Event::Decided {
             request: to.into_token(),
-            outcome: jig_core_people::Outcome::Refused(if why == authority::Answer::Wait {
-                jig_core_people::Refusal::Busy
+            outcome: if why == authority::Answer::Wait {
+                jig_core_people::Outcome::Again(jig_core_people::Again::Busy)
             } else {
-                jig_core_people::Refusal::Authority
-            }),
+                jig_core_people::Outcome::Refused(
+                    refusal.unwrap_or(jig_core_people::Refusal::Authority { lacking: jig_core_people::Lack::Shape }),
+                )
+            },
         })),
     }
 }

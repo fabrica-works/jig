@@ -173,15 +173,14 @@ impl Core {
 
     /// Recheck a person's current funding and authority before releasing a
     /// held task's escalation.
-    #[must_use]
     pub fn escalation_release_allowed(
         &self,
         context: &tasks::EscalationContext,
         person: u64,
         role: Option<people::Role>,
         tasks_left: u32,
-    ) -> bool {
-        let Some(role) = role else { return false };
+    ) -> Result<(), people::Refusal> {
+        let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
         let pool = tasks::Funder::Pool { project: context.project, person, period: self.settings.period };
         let numbers = match self.tasks.funding(pool) {
             Some(record) => record.numbers,
@@ -189,19 +188,15 @@ impl Core {
         };
         let mut findings =
             Queue::with_capacity(authority::max_out(self.authority.limits()).expect("checked authority output"));
-        authority::check_request(
-            &self.authority,
-            &authority::PersonAsk {
-                project: context.project,
-                role: role.number(),
-                pool: translate::authority_numbers(numbers),
-                tasks_left,
-                request: authority::PersonRequest::Accept(authority::Action::Escalate { release: None }),
-            },
-            &mut findings,
-        )
-        .answer
-            == authority::Answer::Allow
+        let ask = authority::PersonAsk {
+            project: context.project,
+            role: role.number(),
+            pool: translate::authority_numbers(numbers),
+            tasks_left,
+            request: authority::PersonRequest::Accept(authority::Action::Escalate { release: None }),
+        };
+        let checked = authority::check_request(&self.authority, &ask, &mut findings);
+        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
     }
 
     /// Select the project's configured fallback role for a held decision.

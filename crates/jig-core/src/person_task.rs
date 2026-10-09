@@ -50,7 +50,7 @@ impl Core {
             | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
         };
         let Some(context) = self.tasks.delegation(task) else {
-            return Err(people::Refusal::Ended);
+            return Err(people::Refusal::Unknown);
         };
         let allowed = context.project == project
             && match self.tasks.executor(task).expect("live task has executor") {
@@ -113,7 +113,7 @@ impl Core {
                 tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => false,
             };
         if !allowed {
-            return Err(people::Refusal::Standing);
+            return Err(people::Refusal::Unknown);
         }
         let (route, event) = match ask {
             people::Ask::TakePerson { .. } => (

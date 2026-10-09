@@ -314,7 +314,7 @@ fn end_within(ending: &Ending, cap: usize) -> bool {
     match ending {
         Ending::Done(result) => bytes(result) <= cap,
         Ending::Failed { reason } => reason.len() <= cap,
-        Ending::Cancelled { reason, result } => {
+        Ending::Cancelled { reason, result, .. } => {
             reason.len() <= cap && result.as_ref().is_none_or(|result| bytes(result) <= cap)
         }
     }

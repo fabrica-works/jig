@@ -80,8 +80,8 @@ impl Core {
         depth: u32,
         limits: &tasks::Limits,
     ) -> Result<(bool, bool), people::Refusal> {
-        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Ended) };
-        let Some(role) = role else { return Err(people::Refusal::Role) };
+        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
+        let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
         let any_task = match role {
             people::Role::Owner | people::Role::Maintainer => true,
             people::Role::Member | people::Role::Observer => false,
@@ -92,17 +92,17 @@ impl Core {
         };
         let standing = self.person_tree(person, task, depth);
         if context.project != project || !any_task && !standing {
-            return Err(people::Refusal::Standing);
+            return Err(people::Refusal::Unknown);
         }
         let Some(role_policy) = self.authority.role(project, role.number()) else {
-            return Err(people::Refusal::Authority);
+            return Err(people::Refusal::Role { held: Some(role) });
         };
         if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
-            return Err(people::Refusal::Authority);
+            return Err(people::Refusal::Role { held: Some(role) });
         }
         let Some(after) = &amendment.authority else { return Ok((false, false)) };
         if !tasks::valid_authority(limits, after) {
-            return Err(people::Refusal::Limit);
+            return Err(people::Refusal::Limit { which: people::LimitKind::Authority });
         }
         let before = translate::authority_value(&context.authority);
         let after = translate::authority_value(after);
@@ -117,20 +117,16 @@ impl Core {
             None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
         };
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority bound"));
-        let checked = authority::check_request_with_standing(
-            &self.authority,
-            &authority::PersonAsk {
-                project,
-                role: role.number(),
-                pool: translate::authority_numbers(numbers),
-                tasks_left: context.tasks_left,
-                request: authority::PersonRequest::Amend(after),
-            },
-            standing,
-            &mut findings,
-        );
+        let ask = authority::PersonAsk {
+            project,
+            role: role.number(),
+            pool: translate::authority_numbers(numbers),
+            tasks_left: context.tasks_left,
+            request: authority::PersonRequest::Amend(after),
+        };
+        let checked = authority::check_request_with_standing(&self.authority, &ask, standing, &mut findings);
         let role_shortage = if findings.len() == 1 {
-            match findings.pop() {
+            match findings.iter().next() {
                 Some(authority::Finding::Authority { source: authority::Source::Role, .. }) => true,
                 Some(_) | None => false,
             }
@@ -145,7 +141,7 @@ impl Core {
         match answer {
             authority::Answer::Allow => Ok((stop_run, false)),
             authority::Answer::Propose => Ok((stop_run, true)),
-            authority::Answer::Wait | authority::Answer::Refuse => Err(people::Refusal::Authority),
+            authority::Answer::Wait | authority::Answer::Refuse => Err(self.request_refusal(&ask, &mut findings)),
         }
     }
 }

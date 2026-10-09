@@ -9,7 +9,7 @@ use jig_core_tasks as tasks;
 impl Core {
     /// Refuse an old hold revision with the current reason before release.
     pub(crate) fn hold_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
-        let row = self.tasks.task(task).ok_or(people::Refusal::Ended)?;
+        let row = self.tasks.task(task).ok_or(people::Refusal::Unknown)?;
         match row.phase {
             tasks::Phase::Held { why, .. } if row.revisions.hold != revision => {
                 Err(moved_hold(row.revisions.hold, why))
@@ -24,7 +24,7 @@ impl Core {
 
     /// Compare only the task spec, independent of progress or history.
     pub(crate) fn spec_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
-        let row = self.tasks.task(task).ok_or(people::Refusal::Ended)?;
+        let row = self.tasks.task(task).ok_or(people::Refusal::Unknown)?;
         if row.revisions.spec == revision {
             Ok(())
         } else {
@@ -34,7 +34,7 @@ impl Core {
 
     /// Compare the question and displayed results before accepting an answer.
     pub(crate) fn person_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
-        let row = self.tasks.task(task).ok_or(people::Refusal::Ended)?;
+        let row = self.tasks.task(task).ok_or(people::Refusal::Unknown)?;
         if row.revisions.person == revision {
             Ok(())
         } else {

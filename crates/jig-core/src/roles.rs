@@ -20,9 +20,12 @@ impl Core {
         tasks_left: u32,
         depth: u32,
     ) -> Result<(), people::Refusal> {
-        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Ended) };
-        if context.project != project || role.is_none() {
-            return Err(people::Refusal::Standing);
+        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
+        if context.project != project {
+            return Err(people::Refusal::Unknown);
+        }
+        if role.is_none() {
+            return Err(people::Refusal::Role { held: None });
         }
         let holding = role.expect("checked member");
         let Some(role_policy) = self.authority.role(project, holding.number()) else {
@@ -30,35 +33,38 @@ impl Core {
         };
         let standing = self.person_tree(person, task, depth);
         if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
-            return Err(people::Refusal::Authority);
+            return Err(people::Refusal::Role { held: Some(holding) });
         }
         let Some(policy) = self.authority.policy(project) else { unreachable!("configured policy") };
-        if self.settings.period_budget > policy.period_spend || self.settings.person_budget > role_policy.period_spend {
-            return Err(people::Refusal::Authority);
+        if self.settings.period_budget > policy.period_spend {
+            return Err(people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: self.settings.period_budget, left: policy.period_spend },
+            });
+        }
+        if self.settings.person_budget > role_policy.period_spend {
+            return Err(people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: self.settings.person_budget, left: role_policy.period_spend },
+            });
         }
         let Some(spent) = context.numbers.spent.checked_add(context.numbers.spent_below) else {
-            return Err(people::Refusal::Limit);
+            return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
         let Some(left) = context.numbers.budget.checked_sub(spent) else {
-            return Err(people::Refusal::Limit);
+            return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
         let (_, pool_numbers) = self.goal_pool(project, person);
         let mut giving = translate::authority_value(&context.authority);
         giving.budget.spend = left;
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority output"));
-        let checked = authority::check_request_with_standing(
-            &self.authority,
-            &authority::PersonAsk {
-                project,
-                role: holding.number(),
-                pool: translate::authority_numbers(pool_numbers),
-                tasks_left,
-                request: authority::PersonRequest::Move(giving),
-            },
-            true,
-            &mut findings,
-        );
-        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(people::Refusal::Authority) }
+        let ask = authority::PersonAsk {
+            project,
+            role: holding.number(),
+            pool: translate::authority_numbers(pool_numbers),
+            tasks_left,
+            request: authority::PersonRequest::Move(giving),
+        };
+        let checked = authority::check_request_with_standing(&self.authority, &ask, true, &mut findings);
+        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
     }
 
     /// Admit a directly requested chat under current person and project policy.
@@ -72,23 +78,20 @@ impl Core {
         let (_, pool_numbers) = self.goal_pool(project, person);
         let mut findings =
             Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority check bound"));
-        let checked = authority::check_request(
-            &self.authority,
-            &authority::PersonAsk {
-                project,
-                role: role.number(),
-                pool: translate::authority_numbers(pool_numbers),
-                tasks_left,
-                request: authority::PersonRequest::Create(Box::new([authority::Delegate {
-                    executor: authority::Executor::Charter(self.settings.charter),
-                    authority: self.settings.chat_authority.clone(),
-                    symbolic: Box::new([]),
-                }])),
-            },
-            &mut findings,
-        );
+        let ask = authority::PersonAsk {
+            project,
+            role: role.number(),
+            pool: translate::authority_numbers(pool_numbers),
+            tasks_left,
+            request: authority::PersonRequest::Create(Box::new([authority::Delegate {
+                executor: authority::Executor::Charter(self.settings.charter),
+                authority: self.settings.chat_authority.clone(),
+                symbolic: Box::new([]),
+            }])),
+        };
+        let checked = authority::check_request(&self.authority, &ask, &mut findings);
         if checked.answer != authority::Answer::Allow {
-            return Err(people::Refusal::Authority);
+            return Err(self.request_refusal(&ask, &mut findings));
         }
         let Some(policy) = self.authority.policy(project) else { unreachable!("checked project policy") };
         let Some(role_policy) = self.authority.role(project, role.number()) else {
@@ -97,10 +100,18 @@ impl Core {
         if match policy.escalation_role {
             Some(role) => role > 3,
             None => true,
-        } || self.settings.period_budget > policy.period_spend
-            || self.settings.person_budget > role_policy.period_spend
-        {
-            return Err(people::Refusal::Authority);
+        } {
+            return Err(people::Refusal::NotOffered);
+        }
+        if self.settings.period_budget > policy.period_spend {
+            return Err(people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: self.settings.period_budget, left: policy.period_spend },
+            });
+        }
+        if self.settings.person_budget > role_policy.period_spend {
+            return Err(people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: self.settings.person_budget, left: role_policy.period_spend },
+            });
         }
         Ok(())
     }
@@ -139,8 +150,8 @@ impl Core {
             | people::Ask::StartChat { .. }
             | people::Ask::SetGoal { .. } => unreachable!("control route owns its ask"),
         };
-        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Ended) };
-        let Some(holding) = role else { return Err(people::Refusal::Role) };
+        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
+        let Some(holding) = role else { return Err(people::Refusal::Role { held: None }) };
         let any_task = match holding {
             people::Role::Owner | people::Role::Maintainer => true,
             people::Role::Member | people::Role::Observer => false,
@@ -151,7 +162,7 @@ impl Core {
         };
         let standing = self.person_tree(person, task, depth);
         if context.project != project || !any_task && !standing {
-            return Err(people::Refusal::Standing);
+            return Err(people::Refusal::Unknown);
         }
         let pool = tasks::Funder::Pool { project, person, period: self.settings.period };
         let numbers = match self.tasks.funding(pool) {
@@ -164,23 +175,19 @@ impl Core {
             authority::PersonRequest::Release
         };
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("bounded findings"));
-        let checked = authority::check_request_with_standing(
-            &self.authority,
-            &authority::PersonAsk {
-                project,
-                role: holding.number(),
-                pool: translate::authority_numbers(numbers),
-                tasks_left: context.tasks_left,
-                request: action,
-            },
-            standing,
-            &mut findings,
-        );
+        let ask = authority::PersonAsk {
+            project,
+            role: holding.number(),
+            pool: translate::authority_numbers(numbers),
+            tasks_left: context.tasks_left,
+            request: action,
+        };
+        let checked = authority::check_request_with_standing(&self.authority, &ask, standing, &mut findings);
         if checked.answer != authority::Answer::Allow {
-            return Err(people::Refusal::Authority);
+            return Err(self.request_refusal(&ask, &mut findings));
         }
         if reason_len > usize::try_from(result_bytes).expect("u32 fits usize") {
-            Err(people::Refusal::Limit)
+            Err(people::Refusal::Limit { which: people::LimitKind::Words })
         } else {
             Ok(task)
         }
@@ -236,10 +243,10 @@ impl Core {
             Some(people::Role::Member | people::Role::Observer) | None => false,
         };
         if !allowed {
-            return Err(people::Refusal::Authority);
+            return Err(people::Refusal::Role { held: role });
         }
         if goals > usize::try_from(task_capacity).expect("u32 fits usize") {
-            return Err(people::Refusal::Limit);
+            return Err(people::Refusal::Limit { which: people::LimitKind::Priority });
         }
         Ok(())
     }
@@ -316,14 +323,11 @@ impl Core {
                 }
             }
             let Some(holder) = self.escalation_recipient(limits, context, role) else {
-                return Err(people::Refusal::Authority);
+                return Err(people::Refusal::Authority { lacking: people::Lack::Shape });
             };
             match context.escalation {
-                tasks::Escalation::Waiting { revision, holder: old, .. } => {
+                tasks::Escalation::Waiting { holder: old, .. } => {
                     if old != holder {
-                        if revision.checked_add(1).is_none() {
-                            return Err(people::Refusal::Limit);
-                        }
                         changed = changed.checked_add(1).expect("bounded task count");
                     }
                 }
@@ -338,7 +342,7 @@ impl Core {
     /// Admit an owner asking to change current role policy.
     pub fn role_allowed(&self, person: u64, project: u32, tasks_left: u32) -> Result<(), people::Refusal> {
         if self.people.role(person, project) != Some(people::Role::Owner) {
-            return Err(people::Refusal::Role);
+            return Err(people::Refusal::Role { held: self.people.role(person, project) });
         }
         if self.authority.policy(project).is_none() {
             return Err(people::Refusal::Unknown);
@@ -350,22 +354,19 @@ impl Core {
         };
         let mut findings =
             Queue::with_capacity(authority::max_out(self.authority.limits()).expect("validated authority bound"));
-        let checked = authority::check_request(
-            &self.authority,
-            &authority::PersonAsk {
-                project,
-                role: people::Role::Owner.number(),
-                pool: authority::Numbers {
-                    budget: numbers.budget,
-                    spent: numbers.spent,
-                    spent_below: numbers.spent_below,
-                    reserved: numbers.reserved,
-                },
-                tasks_left,
-                request: authority::PersonRequest::Policy,
+        let ask = authority::PersonAsk {
+            project,
+            role: people::Role::Owner.number(),
+            pool: authority::Numbers {
+                budget: numbers.budget,
+                spent: numbers.spent,
+                spent_below: numbers.spent_below,
+                reserved: numbers.reserved,
             },
-            &mut findings,
-        );
-        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(people::Refusal::Authority) }
+            tasks_left,
+            request: authority::PersonRequest::Policy,
+        };
+        let checked = authority::check_request(&self.authority, &ask, &mut findings);
+        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
     }
 }

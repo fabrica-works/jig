@@ -11,6 +11,7 @@
 extern crate alloc;
 
 mod amendments;
+mod authority_facts;
 mod brief_text;
 pub use brief_text::{BriefPart, BriefTextLimits, note_index_text, read_brief_part};
 pub mod connector;

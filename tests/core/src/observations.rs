@@ -798,9 +798,7 @@ impl Observer {
                         requires.push(r::Receipt::SignIn(*sign_in));
                     }
                 }
-                people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Busy | people::Refusal::NotReady))
-                | people::Reply::SignedOut
-                | people::Reply::Refused(_) => {}
+                people::Reply::Again(_) | people::Reply::SignedOut | people::Reply::Refused(_) => {}
                 people::Reply::Outcome(_) => {
                     if let Some((person, key)) = self.requests.remove(&destination(to)) {
                         requires.push(r::Receipt::Party(person, key));

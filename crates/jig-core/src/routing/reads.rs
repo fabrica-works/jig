@@ -21,7 +21,7 @@ pub(super) fn route_escalation_read(
             if context.task == task && core.escalation_visible(&context, person, role) {
                 Now::EscalationReply { to, person, context }
             } else {
-                Now::EscalationRefused { to, why: people::Refusal::Standing }
+                Now::EscalationRefused { to, why: people::Refusal::Unknown }
             }
         }
         None => Now::EscalationRefused { to, why: people::Refusal::Unknown },
@@ -46,7 +46,7 @@ pub(super) fn route_historical_escalation(
     busy: bool,
 ) -> Requests {
     let outcome = if busy {
-        people::Outcome::Refused(people::Refusal::Busy)
+        people::Outcome::Again(people::Again::Busy)
     } else if let Some(row) = row {
         let named = row.task == task
             && row.revision == revision
@@ -75,14 +75,14 @@ pub(super) fn route_historical_escalation(
                         Some(tasks::EscalationHolder::Task(_) | tasks::EscalationHolder::Person(_)) | None => false,
                     });
             if !private {
-                people::Outcome::Refused(people::Refusal::Standing)
+                people::Outcome::Refused(people::Refusal::Unknown)
             } else if bounded {
                 let choice = match row.decision {
                     people::EscalationDecision::Release => people::EscalationChoice::Released,
                     people::EscalationDecision::Reject { .. } => people::EscalationChoice::Rejected,
                     people::EscalationDecision::Pass => people::EscalationChoice::Passed,
                 };
-                people::Outcome::EscalationDecided { task, revision, by: row.by, choice }
+                people::Outcome::EscalationDecided { task, revision, by: row.by, at: row.at, choice }
             } else {
                 people::Outcome::Refused(people::Refusal::Unknown)
             }
@@ -111,7 +111,7 @@ pub(super) fn route_historical_proposal(
     busy: bool,
 ) -> Requests {
     let outcome = if busy {
-        people::Outcome::Refused(people::Refusal::Busy)
+        people::Outcome::Again(people::Again::Busy)
     } else if let Some(row) = row {
         let named = row.proposal == proposal
             && row.project == project
@@ -136,9 +136,9 @@ pub(super) fn route_historical_proposal(
                     },
                 );
             if allowed {
-                people::Outcome::ProposalDecided { proposer, proposal, by: row.by, choice: row.choice }
+                people::Outcome::ProposalDecided { proposer, proposal, by: row.by, at: row.at, choice: row.choice }
             } else {
-                people::Outcome::Refused(people::Refusal::Standing)
+                people::Outcome::Refused(people::Refusal::Unknown)
             }
         } else {
             people::Outcome::Refused(people::Refusal::Unknown)

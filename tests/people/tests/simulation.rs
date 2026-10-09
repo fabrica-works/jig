@@ -1,6 +1,6 @@
 use jig_core_people::{
-    Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice, ProposalDecision, Refusal,
-    Reply, Role, Seed, Whom,
+    Again, Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice, ProposalDecision,
+    Refusal, Reply, Role, Seed, Whom,
 };
 use jig_people_world::{Settings, World};
 use skein_lib::Duration;
@@ -92,7 +92,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
     );
     assert!(world.reply(call).is_none(), "refusal waits for its answer commit");
     world.commit_all();
-    assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::Refused(Refusal::Role))));
+    assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))));
     assert_eq!(world.stats().routes, before);
     world.assert_settled();
 }
@@ -129,14 +129,14 @@ fn a_service_sets_a_goal_its_role_allows_and_is_refused_a_chat() {
     let routes = world.stats().routes;
     let chat = world.ask(11, [3; 16], b"hello");
     world.commit_all();
-    assert_eq!(world.reply(chat), Some(Reply::Outcome(Outcome::Refused(Refusal::Role))));
+    assert_eq!(world.reply(chat), Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Member) }))));
     assert_eq!(world.stats().routes, routes);
     assert_eq!(world.tasks(), 1);
     world.assert_settled();
 }
 
 #[test]
-fn two_maintainers_decide_one_proposal_and_the_second_is_told() {
+fn two_maintainers_decide_one_proposal_and_the_second_is_told_who_how_and_when() {
     let mut world = World::new(Settings::calm(15));
     let first = world.signin(10, 1);
     let second = world.signin(11, 2);
@@ -161,9 +161,11 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told() {
         proposer: 7,
         proposal: 8,
         by: first_person,
+        at: skein_lib::Wall::EPOCH,
         choice: ProposalChoice::Accepted,
     }));
     assert_eq!(world.reply(first), expected);
+    world.advance(Duration::from_secs(1));
     let second = world.request(
         11,
         [2; 16],
@@ -238,7 +240,7 @@ fn transient_root_wait_keeps_one_route_and_each_waiter_receives_one_reply() {
     let calls = (0..3).map(|_| world.ask(10, [1; 16], b"hello")).collect::<Vec<_>>();
     let extra = world.ask(10, [1; 16], b"hello");
     world.commit_all();
-    assert_eq!(world.reply(extra), Some(Reply::Refused(Refusal::Busy)));
+    assert_eq!(world.reply(extra), Some(Reply::Again(Again::Busy)));
     assert_eq!(world.stats().routes, 1);
     world.decide_deferred();
     world.commit_all();
@@ -286,7 +288,7 @@ fn an_expired_sign_in_is_refused() {
     world.restart();
     let call = world.ask(10, [2; 16], b"expired");
     world.commit_all();
-    assert_eq!(world.reply(call), Some(Reply::Refused(Refusal::SignIn)));
+    assert_eq!(world.reply(call), Some(Reply::SignedOut));
     world.assert_settled();
 }
 

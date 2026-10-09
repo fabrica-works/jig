@@ -14,8 +14,12 @@ fn valid_ending(limits: &Limits, ending: &Ending) -> bool {
     match ending {
         Ending::Done(result) => crate::run::result_bytes(result) <= cap,
         Ending::Failed { reason } => reason.len() <= cap,
-        Ending::Cancelled { reason, result } => {
-            if reason.len() > cap {
+        Ending::Cancelled { reason, result, by, .. } => {
+            let valid_party = match by {
+                Party::Person(number) | Party::Task(number) => *number != 0,
+                Party::Deployment { project } => *project != 0,
+            };
+            if !valid_party || reason.len() > cap {
                 return false;
             }
             match result {

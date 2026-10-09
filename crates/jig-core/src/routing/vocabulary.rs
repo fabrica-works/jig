@@ -157,7 +157,7 @@ pub enum Now {
     /// A sign-in whose core-owned person or session counter is exhausted.
     SignInRefused { to: ReplyTo },
     /// A volatile watch refused before any durable decision.
-    WatchRefused { watcher: Token, refusal: people::Refusal },
+    WatchRefused { watcher: Token, reply: people::Reply },
     /// Secret-free account protocol output with no store decision.
     Account(accounts::Request),
     /// A live view observation or terminal with no durable mutation.

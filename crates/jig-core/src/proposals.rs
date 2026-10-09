@@ -166,6 +166,28 @@ fn holder(
 }
 
 impl Core {
+    /// Check the accepting party's request and return the authority finding as facts.
+    pub(crate) fn proposal_person_admit(
+        &self,
+        person: u64,
+        project: u32,
+        role: people::Role,
+        action: authority::Action,
+        tasks_left: u32,
+    ) -> Result<(), people::Refusal> {
+        let (_, pool) = self.goal_pool(project, person);
+        let ask = authority::PersonAsk {
+            project,
+            role: role.number(),
+            pool: translate::authority_numbers(pool),
+            tasks_left,
+            request: authority::PersonRequest::Accept(action),
+        };
+        let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority bound"));
+        let checked = authority::check_request(&self.authority, &ask, &mut findings);
+        if checked.answer == authority::Answer::Allow { Ok(()) } else { Err(self.request_refusal(&ask, &mut findings)) }
+    }
+
     /// Check a task's proposed action against both project and deployment ceilings.
     pub fn proposal_admit_action(
         &self,
@@ -294,7 +316,7 @@ impl Core {
 }
 
 /// Extract one immutable person-facing final decision from the child's durable row.
-pub(crate) fn decision_record(row: &tasks::Stored) -> Option<ProposalDecisionRecord> {
+pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Option<ProposalDecisionRecord> {
     match row {
         tasks::Stored::PersonProposal(row) => {
             let (by, choice) = match &row.state {
@@ -319,6 +341,7 @@ pub(crate) fn decision_record(row: &tasks::Stored) -> Option<ProposalDecisionRec
                 proposal: row.number,
                 kind: tasks::ProposalKind::Batch,
                 by,
+                at,
                 choice,
                 created: None,
             })
@@ -345,6 +368,7 @@ pub(crate) fn decision_record(row: &tasks::Stored) -> Option<ProposalDecisionRec
                 proposal: proposal.number,
                 kind: kind(&proposal.action).0,
                 by,
+                at,
                 choice,
                 created: None,
             })

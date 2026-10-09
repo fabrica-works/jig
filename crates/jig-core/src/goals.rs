@@ -79,14 +79,14 @@ impl Core {
         role: Option<people::Role>,
     ) -> Result<(), people::Refusal> {
         if proposal.project != project || role.is_none() {
-            return Err(people::Refusal::Standing);
+            return Err(people::Refusal::Unknown);
         }
         let named = role.expect("checked role");
         let Some(policy) = self.authority.role(project, named.number()) else {
-            return Err(people::Refusal::Standing);
+            return Err(people::Refusal::Unknown);
         };
         if !policy.decides.allows(authority::ProposalKind::Batch) {
-            return Err(people::Refusal::Standing);
+            return Err(people::Refusal::Unknown);
         }
         Ok(())
     }
@@ -106,22 +106,23 @@ impl Core {
             tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => unreachable!("goal is agent"),
         };
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority room"));
-        let checked = authority::check_request(
-            &self.authority,
-            &authority::PersonAsk {
-                project,
-                role: role.number(),
-                pool: translate::authority_numbers(numbers),
-                tasks_left,
-                request: authority::PersonRequest::Accept(authority::Action::Batch(Box::new([authority::Delegate {
-                    executor: authority::Executor::Charter(charter),
-                    authority: translate::authority_value(&proposal.goal.authority),
-                    symbolic: Box::new([]),
-                }]))),
-            },
-            &mut findings,
-        );
-        if checked.answer == authority::Answer::Allow { Ok(source) } else { Err(people::Refusal::Authority) }
+        let ask = authority::PersonAsk {
+            project,
+            role: role.number(),
+            pool: translate::authority_numbers(numbers),
+            tasks_left,
+            request: authority::PersonRequest::Accept(authority::Action::Batch(Box::new([authority::Delegate {
+                executor: authority::Executor::Charter(charter),
+                authority: translate::authority_value(&proposal.goal.authority),
+                symbolic: Box::new([]),
+            }]))),
+        };
+        let checked = authority::check_request(&self.authority, &ask, &mut findings);
+        if checked.answer == authority::Answer::Allow {
+            Ok(source)
+        } else {
+            Err(self.request_refusal(&ask, &mut findings))
+        }
     }
 
     /// Read the person's current pool, including its configured unopened size.
@@ -147,43 +148,45 @@ impl Core {
         tasks_left: u32,
     ) -> Result<GoalStart, people::Refusal> {
         let Some(policy) = self.authority.policy(project) else { return Err(people::Refusal::Unknown) };
-        let Some(role_policy) = self.authority.role(project, role.number()) else { return Err(people::Refusal::Role) };
+        let Some(role_policy) = self.authority.role(project, role.number()) else {
+            return Err(people::Refusal::Role { held: Some(role) });
+        };
         if !role_policy.requests.allows(authority::RequestKind::Create) {
-            return Err(people::Refusal::Authority);
+            return Err(people::Refusal::Role { held: Some(role) });
         }
         let mut given = self.settings.chat_authority.clone();
         given.budget.spend = budget;
-        if charter != self.settings.charter
-            || budget > policy.period_spend
-            || budget > self.authority.rules().period_spend
-            || !authority::at_most(&given, &policy.ceiling, &self.authority.rules().implies)
-        {
-            return Err(people::Refusal::Authority);
+        if charter != self.settings.charter {
+            return Err(people::Refusal::NotOffered);
         }
+        let period_cap = policy.period_spend.min(self.authority.rules().period_spend);
+        if budget > period_cap {
+            return Err(people::Refusal::Authority {
+                lacking: people::Lack::Budget { needs: budget, left: period_cap },
+            });
+        }
+        let hard = !authority::at_most(&given, &policy.ceiling, &self.authority.rules().implies);
         let (source, numbers) = self.goal_pool(project, person);
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority room"));
-        let checked = authority::check_request(
-            &self.authority,
-            &authority::PersonAsk {
-                project,
-                role: role.number(),
-                pool: translate::authority_numbers(numbers),
-                tasks_left,
-                request: authority::PersonRequest::Create(Box::new([authority::Delegate {
-                    executor: authority::Executor::Charter(charter),
-                    authority: given.clone(),
-                    symbolic: Box::new([]),
-                }])),
-            },
-            &mut findings,
-        );
+        let ask = authority::PersonAsk {
+            project,
+            role: role.number(),
+            pool: translate::authority_numbers(numbers),
+            tasks_left,
+            request: authority::PersonRequest::Create(Box::new([authority::Delegate {
+                executor: authority::Executor::Charter(charter),
+                authority: given.clone(),
+                symbolic: Box::new([]),
+            }])),
+        };
+        let checked = authority::check_request(&self.authority, &ask, &mut findings);
         let beyond = budget > role_policy.authority.budget.spend
             || budget
                 > numbers
                     .budget
                     .saturating_sub(numbers.spent.saturating_add(numbers.spent_below).saturating_add(numbers.reserved));
-        if checked.answer != authority::Answer::Allow && !beyond {
-            return Err(people::Refusal::Authority);
+        if hard || checked.answer != authority::Answer::Allow && !beyond {
+            return Err(self.request_refusal(&ask, &mut findings));
         }
         Ok(GoalStart { source, authority: given, direct: checked.answer == authority::Answer::Allow })
     }

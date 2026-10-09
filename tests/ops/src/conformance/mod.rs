@@ -373,7 +373,7 @@ impl Application for Ops {
                         peers.observed.push(r::Observed::Released { requires: vec![r::Receipt::SignIn(number)] });
                     }
                     people::Reply::Outcome(_) => {}
-                    other @ (people::Reply::SignedOut | people::Reply::Refused(_)) => {
+                    other @ (people::Reply::SignedOut | people::Reply::Refused(_) | people::Reply::Again(_)) => {
                         panic!("unexpected party reply: {other:?}, {sign_in:?}")
                     }
                 }

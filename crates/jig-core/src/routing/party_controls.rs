@@ -22,7 +22,7 @@ pub(super) fn amend_route(
     amendment: people::Amendment,
 ) {
     let Some(amendment) = crate::amendments::translate(amendment, &env.limits.tasks) else {
-        pool_refused(work, request, people::Refusal::Limit);
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     };
     let (stop_run, propose) =
@@ -39,7 +39,7 @@ pub(super) fn amend_route(
     }
     if propose {
         let Some(proposal) = crate::fresh(&mut core.counters, crate::Family::Message) else {
-            pool_refused(work, request, people::Refusal::Limit);
+            pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
             return;
         };
         assert!(
@@ -64,7 +64,7 @@ pub(super) fn amend_route(
         return;
     }
     let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
-        pool_refused(work, request, people::Refusal::Limit);
+        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         return;
     };
     assert!(core.person_tasks.insert(request, PersonTaskRoute::Amended(task)) == Ok(None), "one person amendment");

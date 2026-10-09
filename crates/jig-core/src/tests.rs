@@ -584,7 +584,12 @@ fn documents_goal_progress_counts_every_phase_including_ended_plan_rows() {
         tasks::Phase::Held { was: tasks::Was::Waiting, why: tasks::Hold::Budget },
         tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: Box::new([]) })),
         tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::new([]) }),
-        tasks::Phase::Ended(tasks::Ending::Cancelled { reason: Box::new([]), result: None }),
+        tasks::Phase::Ended(tasks::Ending::Cancelled {
+            reason: Box::new([]),
+            result: None,
+            by: tasks::Party::Person(1),
+            at: Wall::EPOCH,
+        }),
     ];
     let mut prototype = core.tasks.task(2).unwrap().clone();
     let mut out = Queue::with_capacity(room_max(&limits).unwrap().writes);

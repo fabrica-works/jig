@@ -380,6 +380,10 @@ pub enum Ending {
     /// Cancellation of descendant work, optionally preserving an already-completed result; no
     /// arbitrary public cancel route is exposed.
     Cancelled {
+        /// Party whose decision cancelled this work.
+        by: Party,
+        /// Wall time when cancellation was decided.
+        at: Wall,
         /** Owned cancellation reason bounded by `Limits::result_bytes`. */
         reason: Box<[u8]>,
         /** Optional already-completed result retained with cancellation, separately bounded and checked against the contract. */

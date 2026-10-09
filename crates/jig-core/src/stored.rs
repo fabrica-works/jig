@@ -546,6 +546,8 @@ pub struct EscalationDecisionRecord {
     pub revision: u64,
     /// Positive authenticated winning person.
     pub by: u64,
+    /// Wall time of the first committed decision.
+    pub at: Wall,
     /// Accepted bounded choice; rejection reason fits journal `result_bytes`/`transcript_bytes`
     /// and both child bounds before mutation.
     pub decision: jig_core_people::EscalationDecision,
@@ -559,6 +561,8 @@ pub struct ProposalDecisionRecord {
     pub proposal: u64,
     pub kind: jig_core_tasks::ProposalKind,
     pub by: u64,
+    /// Wall time of the first committed decision.
+    pub at: Wall,
     pub choice: jig_core_people::ProposalChoice,
     /// Inclusive task-number range created by this accepted batch, in the same commit.
     pub created: Option<(u64, u64)>,

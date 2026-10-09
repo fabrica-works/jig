@@ -437,7 +437,7 @@ pub(super) fn ending(limits: &Limits, value: &tasks::Ending) -> Ending {
     match value {
         tasks::Ending::Done(result) => Ending::Done(result_value(limits, result)),
         tasks::Ending::Failed { reason } => Ending::Failed(super::small::text(reason, limits.documents.text_bytes)),
-        tasks::Ending::Cancelled { reason, result } => Ending::Cancelled {
+        tasks::Ending::Cancelled { reason, result, .. } => Ending::Cancelled {
             reason: super::small::text(reason, limits.documents.text_bytes),
             result: match result {
                 Some(result) => Some(result_value(limits, result)),

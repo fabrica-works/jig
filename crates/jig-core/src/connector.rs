@@ -398,8 +398,10 @@ impl Core {
         project: u32,
         provider: u16,
         parties: Box<[AdoptedParty]>,
-    ) -> Result<Box<[people::Seed]>, people::Refusal> {
-        let Ok(capacity) = u32::try_from(parties.len()) else { return Err(people::Refusal::Limit) };
+    ) -> Result<Box<[people::Seed]>, people::Outcome> {
+        let Ok(capacity) = u32::try_from(parties.len()) else {
+            return Err(people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Roles }));
+        };
         let mut seeds = List::with_capacity(capacity);
         let mut exhausted = false;
         for party in parties {
@@ -417,7 +419,7 @@ impl Core {
             }
         }
         if exhausted || !self.people.can_seed(limits, project, seeds.as_slice()) {
-            Err(people::Refusal::Busy)
+            Err(people::Outcome::Again(people::Again::Busy))
         } else {
             Ok(seeds.into_boxed())
         }

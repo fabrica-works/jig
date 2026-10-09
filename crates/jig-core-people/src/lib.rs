@@ -43,6 +43,7 @@ mod domain;
 mod facts;
 mod limits;
 mod policy_value;
+mod refusals;
 #[cfg(test)]
 mod tests;
 pub use amendment::{
@@ -52,7 +53,7 @@ pub use amendment::{
 pub use boundary::{
     Adoption, Ask, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity, IdentityKey,
     InitialOwner, Key, Kind, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole, ProposalChoice,
-    ProposalDecision, Refusal, Reply, Request, RequestKey, ResourceName, ResourceRole, ResultRef, Role, Seed, Stored,
+    ProposalDecision, Reply, Request, RequestKey, ResourceName, ResourceRole, ResultRef, Role, Seed, Stored,
     WatchSubject, Whom,
 };
 pub use decisions::{FailureClass, HoldReason, Moved};
@@ -63,3 +64,4 @@ pub use policy_value::{
     Guard, Judge, PermissionRole, PolicyChange, PolicyRole, PolicyValue, Requirement, policy_bytes,
     policy_change_bytes, requirements_bytes,
 };
+pub use refusals::{Again, Ending, Lack, LimitKind, Party, Refusal};

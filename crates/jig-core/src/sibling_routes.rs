@@ -54,7 +54,7 @@ impl Core {
     pub fn person_message(&mut self, message: PersonMessage) -> Result<tasks::Event, people::Refusal> {
         let PersonMessage { request, person, project, task, question, words, at } = message;
         let Some(message) = fresh(&mut self.counters, Family::Message) else {
-            return Err(people::Refusal::Limit);
+            return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
         let kind = match question {
             Some(number) => tasks::MessageKind::Answer { question: number },
@@ -179,37 +179,8 @@ impl Core {
     /// structural reasons are translated at the core's sibling boundary.
     pub fn goal_refused(&mut self, request: Token, why: tasks::Refusal) -> Option<people::Event> {
         self.goal_routes.remove(&request)?;
-        let refusal = match why {
-            tasks::Refusal::Busy | tasks::Refusal::NotReady => people::Refusal::Busy,
-            tasks::Refusal::Funding | tasks::Refusal::AuthorityShape => people::Refusal::Authority,
-            tasks::Refusal::Unknown | tasks::Refusal::State => people::Refusal::Ended,
-            tasks::Refusal::ResourceUnavailable => people::Refusal::ResourceUnavailable,
-            tasks::Refusal::Duplicate
-            | tasks::Refusal::Empty
-            | tasks::Refusal::Batch
-            | tasks::Refusal::Live
-            | tasks::Refusal::Project
-            | tasks::Refusal::Tree
-            | tasks::Refusal::Depth
-            | tasks::Refusal::Delegates
-            | tasks::Refusal::Subscription
-            | tasks::Refusal::Dependencies
-            | tasks::Refusal::Cycle
-            | tasks::Refusal::Executor
-            | tasks::Refusal::Spec
-            | tasks::Refusal::Contract
-            | tasks::Refusal::Inputs
-            | tasks::Refusal::Attempt
-            | tasks::Refusal::LiveDelegates
-            | tasks::Refusal::Restore
-            | tasks::Refusal::Read
-            | tasks::Refusal::Turn
-            | tasks::Refusal::Reference
-            | tasks::Refusal::HoldKind
-            | tasks::Refusal::HoldTaken
-            | tasks::Refusal::Holds => people::Refusal::Limit,
-        };
-        Some(people::Event::Decided { request, outcome: people::Outcome::Refused(refusal) })
+        let outcome = crate::routing::refusals::person_task_refusal(self, None, why);
+        Some(people::Event::Decided { request, outcome })
     }
 
     /// Advance a successful batch to the child or caller that owns its
@@ -292,6 +263,7 @@ impl Core {
         proposer: u64,
         number: u64,
         outcome: tasks::ProposalOutcome,
+        at: Wall,
     ) -> people::Event {
         let route = self.goal_routes.remove(&request).expect("goal decision route");
         let (named, proposal, by) = match route {
@@ -308,7 +280,7 @@ impl Core {
         };
         people::Event::Decided {
             request,
-            outcome: people::Outcome::ProposalDecided { proposer, proposal: number, by, choice },
+            outcome: people::Outcome::ProposalDecided { proposer, proposal: number, by, at, choice },
         }
     }
 
@@ -320,6 +292,7 @@ impl Core {
         proposer: u64,
         number: u64,
         outcome: tasks::ProposalOutcome,
+        at: Wall,
         person_proposal: bool,
     ) -> Option<people::Event> {
         let route = if person_proposal { self.routing_people_proposals.remove(&request) } else { None };
@@ -336,7 +309,7 @@ impl Core {
                 };
                 Some(people::Event::Decided {
                     request: named,
-                    outcome: people::Outcome::ProposalDecided { proposer, proposal: number, by, choice },
+                    outcome: people::Outcome::ProposalDecided { proposer, proposal: number, by, at, choice },
                 })
             }
             Some(PersonProposalRoute::Deciding { .. } | PersonProposalRoute::Accepting { .. }) => {

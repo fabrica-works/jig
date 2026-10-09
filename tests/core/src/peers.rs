@@ -338,7 +338,9 @@ fn party_reply(reply: people::Reply, sign_in: Option<u64>) -> parties::Reply {
         people::Reply::Outcome(people::Outcome::Stopped { task } | people::Outcome::Released { task }) => {
             parties::Reply::Changed { task }
         }
-        people::Reply::Refused(_) | people::Reply::Outcome(people::Outcome::Refused(_)) => parties::Reply::Refused,
+        people::Reply::Again(_) | people::Reply::Refused(_) | people::Reply::Outcome(people::Outcome::Refused(_)) => {
+            parties::Reply::Refused
+        }
         people::Reply::SignedOut | people::Reply::Outcome(_) => parties::Reply::Done,
     }
 }

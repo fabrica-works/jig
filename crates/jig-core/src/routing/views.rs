@@ -161,7 +161,7 @@ fn view_snapshot(core: &Core, limits: &Limits, subject: views::Subject) -> Optio
 }
 
 fn watch_refusal(out: &mut Queue<Request>, watcher: Token, refusal: people::Refusal) {
-    out.push(Request::Now(Box::new(Now::WatchRefused { watcher, refusal })));
+    out.push(Request::Now(Box::new(Now::WatchRefused { watcher, reply: people::Reply::Refused(refusal) })));
 }
 
 fn people_reply(out: &mut Queue<Request>, to: ReplyTo, reply: people::Reply) {
@@ -172,7 +172,10 @@ fn people_reply(out: &mut Queue<Request>, to: ReplyTo, reply: people::Reply) {
         people::Reply::Outcome(people::Outcome::Refused(refusal)) | people::Reply::Refused(refusal) => {
             watch_refusal(out, to.into_token(), refusal);
         }
-        people::Reply::Outcome(_) | people::Reply::SignedIn { .. } | people::Reply::SignedOut => {
+        reply @ (people::Reply::Again(_) | people::Reply::SignedOut) => {
+            out.push(Request::Now(Box::new(Now::WatchRefused { watcher: to.into_token(), reply })));
+        }
+        people::Reply::Outcome(_) | people::Reply::SignedIn { .. } => {
             unreachable!("watch replies only with open or refusal")
         }
     }
@@ -195,7 +198,10 @@ pub(super) fn open(
     let room = room.checked_add(1).expect("bounded watch outputs");
     let mut out = Queue::with_capacity(room);
     if !ready {
-        watch_refusal(&mut out, watcher, people::Refusal::Busy);
+        out.push(Request::Now(Box::new(Now::WatchRefused {
+            watcher,
+            reply: people::Reply::Again(people::Again::Busy),
+        })));
         out.push(Request::Decided);
         return Requests::Out(out);
     }
@@ -223,9 +229,9 @@ pub(super) fn open(
                 let outcome = if actual != project || (project == 0 && !inbox) {
                     people::Outcome::Refused(people::Refusal::Unknown)
                 } else if project != 0 && !core.watch_authorized(project, role) {
-                    people::Outcome::Refused(people::Refusal::Authority)
+                    people::Outcome::Refused(people::Refusal::Authority { lacking: people::Lack::Shape })
                 } else if core.watching.contains_key(&watcher) || core.watching.len() >= env.limits.views.watchers {
-                    people::Outcome::Refused(people::Refusal::Busy)
+                    people::Outcome::Again(people::Again::Busy)
                 } else {
                     match view_snapshot(core, &env.limits, subject) {
                         Some(snapshot) => {
@@ -251,20 +257,24 @@ pub(super) fn open(
                                         out.push(Request::Now(Box::new(Now::View(request))));
                                     }
                                     views::Request::Refused { refusal, .. } => {
-                                        result = people::Outcome::Refused(match refusal {
-                                            views::Refusal::Busy => people::Refusal::Busy,
-                                            views::Refusal::Oversized => people::Refusal::Limit,
-                                            views::Refusal::Unknown | views::Refusal::Unfollowed => {
-                                                people::Refusal::Unknown
+                                        result = match refusal {
+                                            views::Refusal::Busy => people::Outcome::Again(people::Again::Busy),
+                                            views::Refusal::Oversized => {
+                                                people::Outcome::Refused(people::Refusal::Limit {
+                                                    which: people::LimitKind::Words,
+                                                })
                                             }
-                                        });
+                                            views::Refusal::Unknown | views::Refusal::Unfollowed => {
+                                                people::Outcome::Refused(people::Refusal::Unknown)
+                                            }
+                                        };
                                     }
                                     views::Request::Ended { .. } => unreachable!("new watch cannot end before opening"),
                                 }
                             }
                             result
                         }
-                        None => people::Outcome::Refused(people::Refusal::Limit),
+                        None => people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Words }),
                     }
                 };
                 if opened {
@@ -285,6 +295,7 @@ pub(super) fn open(
                                     people::Reply::Outcome(people::Outcome::Watching { .. }) => {}
                                     other @ (people::Reply::SignedIn { .. }
                                     | people::Reply::SignedOut
+                                    | people::Reply::Again(_)
                                     | people::Reply::Outcome(_)
                                     | people::Reply::Refused(_)) => people_reply(&mut out, to, other),
                                 }

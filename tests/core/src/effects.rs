@@ -880,7 +880,8 @@ impl World {
                 people::Reply::SignedIn { .. }
                 | people::Reply::SignedOut
                 | people::Reply::Outcome(_)
-                | people::Reply::Refused(_) => None,
+                | people::Reply::Refused(_)
+                | people::Reply::Again(_) => None,
             })
             .expect("durable words")
     }

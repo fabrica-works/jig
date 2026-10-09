@@ -305,6 +305,8 @@ fn borrowed_stored_bytes_matches_allocator_for_every_retained_row() {
     record.waiting_on = Box::new([2, 3]);
     record.delegates = Box::new([4, 5]);
     let ending = tasks::Ending::Cancelled {
+        by: tasks::Party::Person(1),
+        at: skein_lib::Wall::from_nanos(0),
         reason: Box::new([1, 2]),
         result: Some(TaskResult::Report { words: Box::new([3, 4, 5]) }),
     };

@@ -149,7 +149,7 @@ fn owner_makes_a_service_which_can_request_work_but_cannot_start_a_chat() {
         identity: identity(2, 3),
         kind: Kind::Service,
     });
-    assert_eq!(reply(&unknown), Reply::Refused(Refusal::SignIn));
+    assert_eq!(reply(&unknown), Reply::SignedOut);
     let service_to = test.to();
     let service = test.send(Event::SignedIn {
         reply_to: service_to,
@@ -161,7 +161,7 @@ fn owner_makes_a_service_which_can_request_work_but_cannot_start_a_chat() {
     assert_eq!(reply(&service), Reply::SignedIn { person: 2, expires: Wall::from_nanos(60_000_000_000) });
     assert_eq!(
         reply(&test.request(21, 2, Ask::StartChat { project: 1, words: Box::new([]) })),
-        Reply::Outcome(Outcome::Refused(Refusal::Role))
+        Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Member) }))
     );
     let routed = test.request(
         21,
@@ -317,7 +317,7 @@ fn provider_and_subject_identify_a_party_independent_of_display_fields() {
     renamed.login = b"new".as_slice().into();
     assert_eq!(signed_person(reply(&test.signin(2, 11, renamed))), Some(1));
     assert_eq!(signed_person(reply(&test.signin(3, 12, identity(1, 1)))), Some(3));
-    assert_eq!(reply(&test.signin(4, 10, identity(0, 4))), Reply::Refused(Refusal::SignIn));
+    assert_eq!(reply(&test.signin(4, 10, identity(0, 4))), Reply::SignedOut);
     let directory = Identity {
         key: IdentityKey { provider: 1, subject: b"alice".as_slice().into() },
         login: b"a".as_slice().into(),
@@ -334,7 +334,7 @@ fn all_roles_are_checked_and_refusals_are_saved() {
         test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role }]) });
         let rows = test.request(10, 1, ask(1));
         if role == Role::Observer {
-            assert_eq!(reply(&rows), Reply::Outcome(Outcome::Refused(Refusal::Role)));
+            assert_eq!(reply(&rows), Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) })));
             assert!(rows.iter().any(is_answer));
         } else {
             route(&rows);
@@ -342,7 +342,7 @@ fn all_roles_are_checked_and_refusals_are_saved() {
     }
     let mut test = Test::new(LIMITS);
     test.member();
-    assert_eq!(reply(&test.request(10, 1, ask(2))), Reply::Outcome(Outcome::Refused(Refusal::Role)));
+    assert_eq!(reply(&test.request(10, 1, ask(2))), Reply::Outcome(Outcome::Refused(Refusal::Role { held: None })));
 }
 
 #[test]
@@ -418,7 +418,10 @@ fn a_note_edit_checks_membership_then_retains_the_refusal() {
     let mut observer = Test::new(LIMITS);
     observer.member();
     observer.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
-    assert_eq!(reply(&observer.request(10, 14, ask)), Reply::Outcome(Outcome::Refused(Refusal::Role)));
+    assert_eq!(
+        reply(&observer.request(10, 14, ask)),
+        Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
+    );
 }
 
 #[test]
@@ -451,8 +454,8 @@ fn pending_duplicates_share_one_route_and_reserve_answer_room() {
     let routed = test.request(10, 1, ask(1));
     let token = route(&routed);
     assert!(test.request(10, 1, ask(1)).is_empty());
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Refused(Refusal::Busy));
-    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Refused(Refusal::Busy));
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::Busy));
+    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
     assert_eq!(reply(&test.request(10, 1, ask(2))), Reply::Refused(Refusal::KeyConflict));
     let completed = test.send(Event::Decided { request: token, outcome: Outcome::Started { task: 90 } });
     assert_eq!(completed.iter().filter(|r| is_reply(r)).count(), 2);
@@ -523,20 +526,23 @@ fn expired_completed_key_is_erased_from_a_restore_page_and_frees_its_slot() {
 fn every_admission_point_refuses_without_partial_state() {
     let mut test = Test::new(Limits { people: 1, sign_ins: 1, projects: 1, holdings: 1, words: 1, ..LIMITS });
     test.member();
-    assert_eq!(reply(&test.signin(2, 11, identity(0, 2))), Reply::Refused(Refusal::Busy));
+    assert_eq!(reply(&test.signin(2, 11, identity(0, 2))), Reply::Again(Again::Busy));
     let reply_to = test.to();
     test.send(Event::SignOut { reply_to, sign_in: 10 });
-    assert_eq!(reply(&test.signin(2, 11, identity(0, 2))), Reply::Refused(Refusal::Busy));
+    assert_eq!(reply(&test.signin(2, 11, identity(0, 2))), Reply::Again(Again::Busy));
     assert_eq!(signed_person(reply(&test.signin(3, 11, identity(0, 1)))), Some(1));
     let big = Ask::StartChat { project: 1, words: Box::new([1, 2]) };
-    assert_eq!(reply(&test.request(11, 1, big)), Reply::Refused(Refusal::Limit));
+    assert_eq!(reply(&test.request(11, 1, big)), Reply::Refused(Refusal::Limit { which: LimitKind::Words }));
     let roles = test.send(Event::Roles { project: 2, holdings: Box::new([]) });
-    assert_eq!(roles, [Request::RolesRefused { project: 2, refusal: Refusal::Busy }]);
+    assert_eq!(roles, [Request::RolesRefused { project: 2, outcome: Outcome::Again(Again::Busy) }]);
     let roles = test.send(Event::Roles {
         project: 1,
         holdings: Box::new([Holding { person: 1, role: Role::Owner }, Holding { person: 2, role: Role::Member }]),
     });
-    assert_eq!(roles, [Request::RolesRefused { project: 1, refusal: Refusal::Limit }]);
+    assert_eq!(
+        roles,
+        [Request::RolesRefused { project: 1, outcome: Outcome::Refused(Refusal::Limit { which: LimitKind::Roles }) }]
+    );
 }
 
 #[test]
@@ -545,7 +551,7 @@ fn expiry_is_monotonic_even_when_wall_clock_moves_back() {
     test.member();
     test.env.now = Time::from_nanos(Duration::from_secs(60).as_nanos());
     test.env.wall = Wall::EPOCH;
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Refused(Refusal::SignIn));
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::SignedOut);
     let mut out = Queue::with_capacity(max_out(&LIMITS));
     fire(&mut test.d, &test.env, &mut out);
     assert_eq!(out.pop(), Some(Request::Erase { key: Key::SignIn(10) }));
@@ -560,7 +566,7 @@ fn result_query_checks_monotonic_expiry_before_fire_after_backward_wall_jump() {
     test.env.now = Time::from_nanos(Duration::from_secs(60).as_nanos());
     test.env.wall = Wall::EPOCH;
     assert_eq!(test.d.person(10, test.env.now, test.env.wall), None);
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Refused(Refusal::SignIn));
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::SignedOut);
 }
 
 #[test]
@@ -584,7 +590,7 @@ fn restore_order_is_independent_and_bad_or_oversized_records_refuse_start() {
     test.d = Domain::new(&test.env.limits, Box::new([]), 2);
     assert_eq!(
         test.send(Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } }),
-        [Request::RestoreRefused { key: Key::Person(1), refusal: Refusal::Limit }]
+        [Request::RestoreRefused { key: Key::Person(1), refusal: Refusal::Limit { which: LimitKind::Restore } }]
     );
 }
 
@@ -635,7 +641,10 @@ fn role_success_restores_before_identities_and_replays_after_roster_changes() {
     assert_eq!(reply(replayed.as_slice()), Reply::Outcome(outcome));
     assert_eq!(cold.d.role(1, 1), Some(Role::Observer));
     assert_eq!(cold.d.role(2, 1), None);
-    assert_eq!(reply(cold.request_bounded(30, 8, ask).as_slice()), Reply::Outcome(Outcome::Refused(Refusal::Role)));
+    assert_eq!(
+        reply(cold.request_bounded(30, 8, ask).as_slice()),
+        Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
+    );
 }
 
 #[test]
@@ -651,7 +660,13 @@ fn restored_role_success_requires_matching_ask_kind_and_project() {
         (Ask::SetRoles { project: 1, holdings: Box::new([]) }, Outcome::Started { task: 9 }),
         (
             Ask::SetRoles { project: 1, holdings: Box::new([]) },
-            Outcome::EscalationDecided { task: 9, revision: 2, by: 1, choice: EscalationChoice::Passed },
+            Outcome::EscalationDecided {
+                task: 9,
+                revision: 2,
+                by: 1,
+                at: Wall::from_nanos(0),
+                choice: EscalationChoice::Passed,
+            },
         ),
     ] {
         let mut test = Test::new(LIMITS);
@@ -661,7 +676,7 @@ fn restored_role_success_requires_matching_ask_kind_and_project() {
                 record: Stored::Answer { key, ask: Box::new(ask), outcome, at: Wall::EPOCH }
             })
             .as_slice(),
-            [Request::RestoreRefused { key: Key::Answer(key), refusal: Refusal::Limit }]
+            [Request::RestoreRefused { key: Key::Answer(key), refusal: Refusal::Limit { which: LimitKind::Restore } }]
         );
         assert!(test.send_bounded(Event::Restored).is_empty());
         assert!(!test.d.ready());
@@ -687,7 +702,7 @@ fn restored_successful_role_rosters_require_positive_unique_people() {
                 }
             })
             .as_slice(),
-            [Request::RestoreRefused { key: Key::Answer(key), refusal: Refusal::Limit }]
+            [Request::RestoreRefused { key: Key::Answer(key), refusal: Refusal::Limit { which: LimitKind::Restore } }]
         );
         assert!(test.send_bounded(Event::Restored).is_empty());
         assert!(!test.d.ready());
@@ -731,15 +746,20 @@ fn refused_role_requests_restore_invalid_rosters_and_unknown_targets_for_replay(
             Role::Observer,
             1,
             Box::from([Holding { person: 0, role: Role::Owner }, Holding { person: 0, role: Role::Member }]),
-            Refusal::Role,
+            Refusal::Role { held: Some(Role::Observer) },
         ),
         (Role::Owner, 2, Box::from([Holding { person: 99, role: Role::Member }]), Refusal::Unknown),
-        (Role::Owner, 1, Box::from([Holding { person: 0, role: Role::Member }]), Refusal::Limit),
+        (
+            Role::Owner,
+            1,
+            Box::from([Holding { person: 0, role: Role::Member }]),
+            Refusal::Limit { which: LimitKind::Roles },
+        ),
         (
             Role::Owner,
             1,
             Box::from([Holding { person: 1, role: Role::Owner }, Holding { person: 1, role: Role::Member }]),
-            Refusal::Limit,
+            Refusal::Limit { which: LimitKind::Roles },
         ),
         (Role::Owner, 1, Box::from([Holding { person: 99, role: Role::Member }]), Refusal::Unknown),
     ] {
@@ -753,7 +773,11 @@ fn refused_role_requests_restore_invalid_rosters_and_unknown_targets_for_replay(
             let reply_token = live.to().into_token();
             assert_eq!(
                 live.send_bounded(Event::ApplyRoles { reply_to: ReplyTo::new(reply_token), request }).as_slice(),
-                [Request::RolesApplied { reply_to: ReplyTo::new(reply_token), request, result: Err(refusal) }]
+                [Request::RolesApplied {
+                    reply_to: ReplyTo::new(reply_token),
+                    request,
+                    result: Err(Outcome::Refused(refusal))
+                }]
             );
             rows = live.send_bounded(Event::Decided { request, outcome: Outcome::Refused(refusal) });
         }
@@ -785,7 +809,7 @@ fn initial_owners_bootstrap_all_projects_atomically_and_never_regrant() {
     test.send(Event::Restore { record: Stored::Person { number: 9, identity: identity(0, 9) } });
     test.send(Event::Restored);
     let refused = test.signin(1, 10, identity(0, 1));
-    assert_eq!(reply(&refused), Reply::Refused(Refusal::Busy));
+    assert_eq!(reply(&refused), Reply::Again(Again::Busy));
     assert_eq!(refused.len(), 1, "bootstrap refusal makes no record");
     test.send(Event::Roles { project: 2, holdings: Box::new([]) });
     let made = test.signin(2, 10, identity(0, 1));
@@ -793,13 +817,16 @@ fn initial_owners_bootstrap_all_projects_atomically_and_never_regrant() {
     test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 2, role: Role::Observer }]) });
     let again = test.signin(3, 11, identity(0, 1));
     assert!(!again.iter().any(is_roles));
-    assert_eq!(reply(&test.request(11, 1, ask(1))), Reply::Outcome(Outcome::Refused(Refusal::Role)));
+    assert_eq!(
+        reply(&test.request(11, 1, ask(1))),
+        Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
+    );
 }
 
 fn signed_person(reply: Reply) -> Option<u64> {
     match reply {
         Reply::SignedIn { person, .. } => Some(person),
-        Reply::SignedOut | Reply::Outcome(_) | Reply::Refused(_) => None,
+        Reply::SignedOut | Reply::Again(_) | Reply::Outcome(_) | Reply::Refused(_) => None,
     }
 }
 
@@ -879,22 +906,25 @@ fn pending_capacity_refuses_before_routing_and_the_key_can_retry() {
     let mut test = Test::new(Limits { pending: 1, ..LIMITS });
     test.member();
     let first = route(&test.request(10, 1, ask(1)));
-    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Refused(Refusal::Busy));
-    test.send(Event::Decided { request: first, outcome: Outcome::Refused(Refusal::Authority) });
+    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+    test.send(Event::Decided {
+        request: first,
+        outcome: Outcome::Refused(Refusal::Authority { lacking: Lack::Shape }),
+    });
     route(&test.request(10, 2, ask(1)));
 }
 
 #[test]
 fn root_pressure_answers_every_waiter_and_releases_the_key_for_retry() {
-    for refusal in [Refusal::Busy, Refusal::NotReady] {
+    for again in [Again::Busy, Again::NotReady] {
         let mut test = Test::new(Limits { requests: 1, ..LIMITS });
         test.member();
         let first = route(&test.request(10, 1, ask(1)));
         assert!(test.request(10, 1, ask(1)).is_empty());
-        let rows = test.send(Event::Decided { request: first, outcome: Outcome::Refused(refusal) });
+        let rows = test.send(Event::Decided { request: first, outcome: Outcome::Again(again) });
         assert_eq!(rows.len(), 2);
         assert!(rows.iter().all(is_reply), "retryable pressure saves no completed answer");
-        assert_eq!(reply(&rows), Reply::Outcome(Outcome::Refused(refusal)));
+        assert_eq!(reply(&rows), Reply::Again(again));
         let retry = route(&test.request(10, 1, ask(1)));
         assert_ne!(first, retry, "retired route tokens fence earlier completions");
         test.send(Event::Decided { request: retry, outcome: Outcome::Started { task: 90 } });
@@ -905,19 +935,28 @@ fn root_pressure_answers_every_waiter_and_releases_the_key_for_retry() {
 #[test]
 fn identity_limits_clock_overflow_and_duplicate_holdings_leave_no_records() {
     let mut test = Test::new(Limits { identity_bytes: 1, ..LIMITS });
-    assert_eq!(test.signin(1, 10, identity(0, 1)).len(), 1);
+    assert_eq!(
+        reply(&test.signin(1, 10, identity(0, 1))),
+        Reply::Refused(Refusal::Limit { which: LimitKind::Identity })
+    );
     test.env.limits = LIMITS;
     test.d = Domain::new(&LIMITS, Box::new([]), 2);
     test.send(Event::Restored);
     test.env.wall = Wall::from_nanos(u64::MAX);
-    assert_eq!(reply(&test.signin(1, 10, identity(0, 1))), Reply::Refused(Refusal::Limit));
+    assert_eq!(
+        reply(&test.signin(1, 10, identity(0, 1))),
+        Reply::Refused(Refusal::Limit { which: LimitKind::Arithmetic })
+    );
     test.env.wall = Wall::EPOCH;
     test.member();
     let rows = test.send(Event::Roles {
         project: 1,
         holdings: Box::new([Holding { person: 1, role: Role::Owner }, Holding { person: 1, role: Role::Member }]),
     });
-    assert_eq!(rows, [Request::RolesRefused { project: 1, refusal: Refusal::Limit }]);
+    assert_eq!(
+        rows,
+        [Request::RolesRefused { project: 1, outcome: Outcome::Refused(Refusal::Limit { which: LimitKind::Roles }) }]
+    );
     route(&test.request(10, 1, ask(1)));
 }
 
@@ -925,8 +964,8 @@ fn identity_limits_clock_overflow_and_duplicate_holdings_leave_no_records() {
 fn calls_before_restore_and_after_failed_restore_are_answered_not_ready() {
     let mut test = Test::new(LIMITS);
     test.d = Domain::new(&LIMITS, Box::new([]), 2);
-    assert_eq!(reply(&test.signin(1, 10, identity(0, 1))), Reply::Refused(Refusal::NotReady));
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Refused(Refusal::NotReady));
+    assert_eq!(reply(&test.signin(1, 10, identity(0, 1))), Reply::Again(Again::NotReady));
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::NotReady));
     test.send(Event::Restore {
         record: Stored::Answer {
             key: RequestKey { person: 99, key: [1; 16] },
@@ -937,7 +976,7 @@ fn calls_before_restore_and_after_failed_restore_are_answered_not_ready() {
     });
     test.send(Event::Restored);
     assert!(!test.d.ready());
-    assert_eq!(reply(&test.signin(1, 10, identity(0, 1))), Reply::Refused(Refusal::NotReady));
+    assert_eq!(reply(&test.signin(1, 10, identity(0, 1))), Reply::Again(Again::NotReady));
 }
 
 #[test]
@@ -953,7 +992,7 @@ fn expiry_projection_uses_the_environment_when_restore_finishes() {
     test.send(Event::Restored);
     test.env.now = Time::from_nanos(Duration::from_secs(45).as_nanos());
     test.env.wall = Wall::from_nanos(Duration::from_secs(55).as_nanos());
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Refused(Refusal::SignIn));
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::SignedOut);
 }
 
 #[test]
@@ -974,12 +1013,18 @@ fn authenticated_escalation_decisions_route_without_membership_and_io_pressure_i
     }));
     let request = route(&routed);
     assert_eq!(
-        reply(&test.send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Busy) })),
-        Reply::Outcome(Outcome::Refused(Refusal::Busy))
+        reply(&test.send(Event::Decided { request, outcome: Outcome::Again(Again::Busy) })),
+        Reply::Again(Again::Busy)
     );
     let retried = test.request(10, 2, ask.clone());
     let request = route(&retried);
-    let outcome = Outcome::EscalationDecided { task: 9, revision: 2, by: 7, choice: EscalationChoice::Passed };
+    let outcome = Outcome::EscalationDecided {
+        task: 9,
+        revision: 2,
+        by: 7,
+        at: Wall::from_nanos(0),
+        choice: EscalationChoice::Passed,
+    };
     test.send(Event::Decided { request, outcome });
     assert_eq!(reply(&test.request(10, 2, ask)), Reply::Outcome(outcome));
     assert_eq!(
@@ -997,7 +1042,7 @@ fn authenticated_escalation_decisions_route_without_membership_and_io_pressure_i
             3,
             Ask::DecideEscalation { project: 1, task: 9, revision: 2, decision: EscalationDecision::Pass }
         )),
-        Reply::Refused(Refusal::SignIn)
+        Reply::SignedOut
     );
 }
 
@@ -1034,5 +1079,64 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
             _ => panic!("only revision-bearing asks scripted"),
         };
         assert_eq!(reply(&test.request(10, 14, changed)), Reply::Refused(Refusal::KeyConflict));
+    }
+}
+
+#[test]
+fn every_final_refusal_keeps_its_facts_under_the_key_when_roles_and_time_change() {
+    for refusal in [
+        Refusal::Role { held: Some(Role::Member) },
+        Refusal::Authority { lacking: Lack::Budget { needs: 30, left: 11 } },
+        Refusal::Authority { lacking: Lack::Grant { kind: 5 } },
+        Refusal::Authority { lacking: Lack::TaskKind },
+        Refusal::Authority { lacking: Lack::Depth { most: 2 } },
+        Refusal::Authority { lacking: Lack::Deadline },
+        Refusal::Authority { lacking: Lack::Tasks { left: 3 } },
+        Refusal::Limit { which: LimitKind::ProjectLiveTasks },
+        Refusal::Limit { which: LimitKind::InboxFull },
+        Refusal::Limit { which: LimitKind::Words },
+        Refusal::Moved { now: Moved::Hold { revision: 8, reason: HoldReason::StoppedBy { party: 2 } } },
+        Refusal::Moved { now: Moved::Spec { revision: 4 } },
+        Refusal::Moved { now: Moved::Person { revision: 3 } },
+        Refusal::Moved { now: Moved::Note { revision: 2 } },
+        Refusal::Ended { how: Ending::Done },
+        Refusal::Ended { how: Ending::Failed },
+        Refusal::Ended { how: Ending::Cancelled { by: Party::Person(2), at: Wall::from_nanos(10) } },
+        Refusal::Ended { how: Ending::Decided { by: 2, at: Wall::from_nanos(10) } },
+        Refusal::Ended { how: Ending::Deleted },
+        Refusal::NotWaiting,
+        Refusal::NoFurther,
+        Refusal::Unknown,
+        Refusal::NotOffered,
+        Refusal::KeyConflict,
+    ] {
+        let mut test = Test::new(LIMITS);
+        test.member();
+        let request = route(&test.request(10, 1, ask(1)));
+        let outcome = Outcome::Refused(refusal);
+        let decided = test.send(Event::Decided { request, outcome });
+        assert_eq!(reply(&decided), Reply::Outcome(outcome));
+        assert!(decided.iter().any(is_answer));
+        test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
+        test.env.wall = Wall::from_nanos(20);
+        let replay = test.request(10, 1, ask(1));
+        assert_eq!(replay.len(), 1);
+        assert_eq!(reply(&replay), Reply::Outcome(outcome));
+    }
+}
+
+#[test]
+fn retry_and_signed_out_answers_cannot_restore_as_completed_keys() {
+    for outcome in [Outcome::Again(Again::Busy), Outcome::Again(Again::NotReady), Outcome::SignedOut] {
+        let mut test = Test::new(LIMITS);
+        test.d = Domain::new(&LIMITS, Box::new([]), 2);
+        let key = RequestKey { person: 1, key: [1; 16] };
+        assert_eq!(
+            test.send(Event::Restore {
+                record: Stored::Answer { key, ask: Box::new(ask(1)), outcome, at: Wall::EPOCH }
+            }),
+            [Request::RestoreRefused { key: Key::Answer(key), refusal: Refusal::Limit { which: LimitKind::Restore } }],
+        );
+        assert!(!test.d.ready());
     }
 }

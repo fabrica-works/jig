@@ -327,13 +327,13 @@ impl Core {
             return Err(people::Refusal::Unknown);
         }
         let Some(snapshot) = snapshot(&policy, &permissions) else {
-            return Err(people::Refusal::Limit);
+            return Err(people::Refusal::Limit { which: people::LimitKind::Policy });
         };
         if match people::policy_bytes(&snapshot) {
             Some(bytes) => bytes > limits.policy_bytes,
             None => true,
         } {
-            return Err(people::Refusal::Limit);
+            return Err(people::Refusal::Limit { which: people::LimitKind::Policy });
         }
         let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
         authority::step(&mut self.authority, authority::Event::Policy { project, policy }, &mut facts);
@@ -342,7 +342,7 @@ impl Core {
                 assert!(self.permission_roles.insert(project, permissions).is_ok(), "admitted permission policy");
                 Ok(snapshot)
             }
-            authority::PolicyFact::Refused { .. } => Err(people::Refusal::Authority),
+            authority::PolicyFact::Refused { .. } => Err(people::Refusal::Authority { lacking: people::Lack::Shape }),
             authority::PolicyFact::Added { .. } | authority::PolicyFact::Dropped { .. } => {
                 unreachable!("existing project policy replacement")
             }

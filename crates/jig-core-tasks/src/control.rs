@@ -356,7 +356,7 @@ pub(crate) fn apply(
             for child in selected.into_boxed() {
                 history(domain, child, by, Change::Cancelled, &reason, out);
             }
-            crate::closing::cancel_tree(domain, env, number, &reason, out);
+            crate::closing::cancel_tree(domain, env, number, by, &reason, out);
             out.push(Request::Done { reply_to: to });
         }
         Control::Release => {

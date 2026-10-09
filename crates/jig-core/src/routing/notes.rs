@@ -124,10 +124,9 @@ pub(super) fn tag_notes(
                         call_decision(core, &mut out, to, key, CallPart::NoteRefused(why));
                     }
                 },
-                Some(NoteRoute::Person { request }) => work.push(Event::People(people::Event::Decided {
-                    request,
-                    outcome: people::Outcome::Refused(note_person_refusal(why)),
-                })),
+                Some(NoteRoute::Person { request }) => {
+                    work.push(Event::People(people::Event::Decided { request, outcome: note_person_refusal(why) }));
+                }
                 Some(NoteRoute::Brief { task }) => match why {
                     notes::Refusal::Busy => {
                         core.pending_note_briefs.insert(task, true).expect("brief count bounds waiting notes");
@@ -187,7 +186,7 @@ pub(super) fn edit_note_request(
     } else {
         work.push(Event::People(people::Event::Decided {
             request,
-            outcome: people::Outcome::Refused(people::Refusal::Authority),
+            outcome: people::Outcome::Refused(people::Refusal::Authority { lacking: people::Lack::Shape }),
         }));
     }
 }

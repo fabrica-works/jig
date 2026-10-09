@@ -1,11 +1,18 @@
 use crate::referee::{People, RouteKind, Seen, Stimulus};
 use jig_core_people::{
-    self as people, Ask, Domain, Entry, Event, Holding, Identity, IdentityKey, InitialOwner, Key, Limits, Outcome,
-    ProposalChoice, ProposalDecision, Refusal, Reply, Request, RequestKey, Role, Seed, Stored,
+    self as people, Again, Ask, Domain, Entry, Event, Holding, Identity, IdentityKey, InitialOwner, Key, Lack, Limits,
+    Outcome, ProposalChoice, ProposalDecision, Refusal, Reply, Request, RequestKey, Role, Seed, Stored,
 };
 use skein_lib::{Duration, Env, Queue, ReplyTo, Rng, Time, Token, Wall};
 use skein_world::domain::{Referee, Trace};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
+#[derive(Clone, Copy, Debug)]
+struct Winner {
+    by: u64,
+    choice: ProposalChoice,
+    at: Wall,
+}
 
 pub const LIMITS: Limits = Limits {
     people: 8,
@@ -86,7 +93,7 @@ struct Commit {
     number: u64,
     changes: Vec<Change>,
     tasks: Vec<(RequestKey, u64)>,
-    proposals: Vec<((u64, u64), (u64, ProposalChoice))>,
+    proposals: Vec<((u64, u64), Winner)>,
     cleared_waiting: Vec<u64>,
 }
 
@@ -112,7 +119,7 @@ pub struct World {
     owners: Box<[InitialOwner]>,
     records: BTreeMap<Key, Stored>,
     durable_tasks: BTreeMap<RequestKey, u64>,
-    proposals: BTreeMap<(u64, u64), (u64, ProposalChoice)>,
+    proposals: BTreeMap<(u64, u64), Winner>,
     commits: VecDeque<Commit>,
     held: VecDeque<Held>,
     calls: BTreeSet<u64>,
@@ -324,7 +331,7 @@ impl World {
 
     fn send_decision(&mut self, request: Token, key: RequestKey, task: u64) {
         let outcome = if self.settings.authority_refuses {
-            Outcome::Refused(Refusal::Authority)
+            Outcome::Refused(Refusal::Authority { lacking: Lack::Shape })
         } else {
             Outcome::Started { task }
         };
@@ -410,7 +417,7 @@ impl World {
                             Ask::StartChat { .. } | Ask::SetGoal { .. } => {
                                 let goal = kind == RouteKind::Goal;
                                 let outcome = if self.settings.authority_refuses {
-                                    Outcome::Refused(Refusal::Authority)
+                                    Outcome::Refused(Refusal::Authority { lacking: Lack::Shape })
                                 } else {
                                     let number = self.name();
                                     tasks.push((key, number));
@@ -429,7 +436,7 @@ impl World {
                             }
                             Ask::DecideProposal { proposer, proposal, decision, .. } => {
                                 let name = (proposer, proposal);
-                                let (by, choice) = if let Some(&winner) = self.proposals.get(&name) {
+                                let Winner { by, choice, at } = if let Some(&winner) = self.proposals.get(&name) {
                                     winner
                                 } else {
                                     let choice = match decision {
@@ -437,10 +444,11 @@ impl World {
                                         ProposalDecision::Reject { .. } => ProposalChoice::Rejected,
                                         ProposalDecision::Pass => ProposalChoice::Passed,
                                     };
-                                    proposals.push((name, (person, choice)));
-                                    (person, choice)
+                                    let winner = Winner { by: person, choice, at: self.env.wall };
+                                    proposals.push((name, winner));
+                                    winner
                                 };
-                                let outcome = Outcome::ProposalDecided { proposer, proposal, by, choice };
+                                let outcome = Outcome::ProposalDecided { proposer, proposal, by, at, choice };
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
@@ -655,7 +663,7 @@ impl World {
         }
         let overflow = self.ask(10, [7; 16], b"pending");
         self.commit_all();
-        assert_eq!(self.reply(overflow), Some(Reply::Refused(Refusal::Busy)));
+        assert_eq!(self.reply(overflow), Some(Reply::Again(Again::Busy)));
         self.ending("waiter busy");
         self.decide_deferred();
         self.commit_all();
@@ -667,14 +675,17 @@ impl World {
         self.commit_all();
         let denied = self.ask(10, [2; 16], b"hello");
         self.commit_all();
-        assert_eq!(self.reply(denied), Some(Reply::Outcome(Outcome::Refused(Refusal::Role))));
+        assert_eq!(
+            self.reply(denied),
+            Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) })))
+        );
         self.ending("observer");
         for byte in
             20..u8::try_from(self.settings.limits.requests).expect("scenario request limit fits u8").saturating_add(20)
         {
             let call = self.ask(10, [byte; 16], b"fill");
             self.commit_all();
-            if self.reply(call) == Some(Reply::Refused(Refusal::Busy)) {
+            if self.reply(call) == Some(Reply::Again(Again::Busy)) {
                 self.ending("busy");
             }
         }
@@ -682,7 +693,7 @@ impl World {
         self.advance(Duration::from_secs(61));
         let expired = self.ask(10, [3; 16], b"hello");
         self.commit_all();
-        assert_eq!(self.reply(expired), Some(Reply::Refused(Refusal::SignIn)));
+        assert_eq!(self.reply(expired), Some(Reply::SignedOut));
         self.ending("expired");
         let signin = self.signin(11, 1);
         self.commit_all();

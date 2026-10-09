@@ -961,3 +961,47 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
     );
     assert_eq!(live_row(&world, task).spec.words.as_ref(), b"first change");
 }
+
+#[test]
+fn a_party_short_of_budget_hears_what_the_request_needs_and_what_is_left() {
+    let mut world = World::new(153, false);
+    ask(&mut world, 57, people::Ask::StartChat { project: 1, words: b"next".as_slice().into() });
+    let expected = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
+        lacking: people::Lack::Budget { needs: 300, left: 200 },
+    }));
+    assert_eq!(world.people_answers.last(), Some(&expected));
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        1,
+    );
+    ask(&mut world, 57, people::Ask::StartChat { project: 1, words: b"next".as_slice().into() });
+    assert_eq!(world.people_answers.last(), Some(&expected), "the freed budget does not change a saved refusal");
+}
+
+#[test]
+fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
+    let mut world = World::new(154, false);
+    let task = world.call_key(1).task;
+    let person = match live_row(&world, task).requester {
+        tasks::Party::Person(person) => person,
+        tasks::Party::Task(_) | tasks::Party::Deployment { .. } => panic!("person's chat"),
+    };
+    ask(&mut world, 58, people::Ask::Cancel { project: 1, task, reason: b"finished".as_slice().into() });
+    let tasks::Phase::Closing(tasks::Closing { ending: tasks::Ending::Cancelled { at, .. }, .. }) =
+        &live_row(&world, task).phase
+    else {
+        panic!("durable cancellation is closing")
+    };
+    let at = *at;
+    assert!(at > skein_lib::Wall::EPOCH, "cancellation uses the advanced world clock");
+    ask(&mut world, 59, people::Ask::Release { project: 1, task, revision: 0 });
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Ended {
+            how: people::Ending::Cancelled { by: people::Party::Person(person), at },
+        })))
+    );
+}

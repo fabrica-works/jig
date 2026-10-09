@@ -163,7 +163,7 @@ fn ending_bytes(ending: &Ending) -> Option<u64> {
     match ending {
         Ending::Done(result) => result_bytes(result),
         Ending::Failed { reason } => bytes(reason.len()),
-        Ending::Cancelled { reason, result } => {
+        Ending::Cancelled { reason, result, .. } => {
             let reason = bytes(reason.len())?;
             match result {
                 Some(result) => reason.checked_add(result_bytes(result)?),

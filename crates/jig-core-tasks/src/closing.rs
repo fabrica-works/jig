@@ -86,7 +86,7 @@ pub(crate) fn cancel_delegates(
         delegates.push(*delegate).expect("live delegates bounded");
     }
     for delegate in delegates.into_boxed() {
-        cancel_tree(domain, env, delegate, reason, out);
+        cancel_tree(domain, env, delegate, Party::Task(number), reason, out);
     }
 }
 
@@ -106,6 +106,7 @@ pub(crate) fn cancel_tree(
     domain: &mut Domain,
     env: &Env<Limits>,
     ancestor: u64,
+    by: Party,
     reason: &[u8],
     out: &mut Queue<Request>,
 ) {
@@ -145,8 +146,10 @@ pub(crate) fn cancel_tree(
                 Stage::Settled => Stage::Delegates,
                 Stage::Run { .. } | Stage::Delegates | Stage::Effects | Stage::Releases => stage,
             };
-            task_mut(domain, *number).expect("selected task live").record.phase =
-                Phase::Closing(Closing { stage, ending: Ending::Cancelled { reason: reason.into(), result: partial } });
+            task_mut(domain, *number).expect("selected task live").record.phase = Phase::Closing(Closing {
+                stage,
+                ending: Ending::Cancelled { by, at: env.wall, reason: reason.into(), result: partial },
+            });
             publish(domain, env, *number, out);
             if let Some(attempt) = attempt {
                 out.push(Request::Stop { task: *number, attempt });
