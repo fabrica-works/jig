@@ -191,6 +191,20 @@ pub struct Rule {
     pub answer: Answer,
     pub changes: Vec<Change>,
 }
+impl Rule {
+    pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
+        if matches!(self.answer, Answer::Refused(_)) && !self.changes.is_empty() {
+            return Err(Invalid::Script);
+        }
+        if !payload::fits(&self.ask, bounds) || !payload::fits(&self.answer, bounds) {
+            return Err(Invalid::Payload);
+        }
+        for change in &self.changes {
+            change.validate(bounds)?;
+        }
+        Ok(())
+    }
+}
 /// The starting truth, payload limits and request outcomes for a scenario.
 #[derive(Clone, Debug, Default)]
 pub struct Script {
@@ -205,15 +219,7 @@ impl Script {
         }
         self.truth.validate(&self.bounds)?;
         for rule in &self.rules {
-            if matches!(rule.answer, Answer::Refused(_)) && !rule.changes.is_empty() {
-                return Err(Invalid::Script);
-            }
-            if !payload::fits(&rule.ask, &self.bounds) || !payload::fits(&rule.answer, &self.bounds) {
-                return Err(Invalid::Payload);
-            }
-            for change in &rule.changes {
-                change.validate(&self.bounds)?;
-            }
+            rule.validate(&self.bounds)?;
         }
         Ok(())
     }

@@ -11,7 +11,14 @@
 //! | retained key | different ask | unchanged | key conflict |
 //! The story supplies wall times separately from the scheduling clock.
 #![forbid(unsafe_code)]
+mod application;
+mod faults;
 mod payload;
+pub use application::{
+    Application, ApplicationCommit, ApplicationDecision, ApplicationEvent, ApplicationScope, ApplicationValue, Context,
+    Never, NoApplication,
+};
+pub use faults::Fault;
 mod reads;
 mod requests;
 mod truth;
@@ -56,6 +63,8 @@ pub enum Invalid {
     Identity,
     /// A scripted outcome contradicts its offered admission or changes truth on a refusal.
     Script,
+    /// Story work was attempted while the restarted engine is offline.
+    Offline,
 }
 
 /// The envelope a world's root passes to its request table.
@@ -73,7 +82,7 @@ pub enum Envelope {
 
 /// One event delivered to the world's client root.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Up {
+pub enum Up<A: Application = NoApplication> {
     /// One keyed attempt ended, with a final answer only for a final envelope.
     Answer {
         attempt: Token,
@@ -88,6 +97,19 @@ pub enum Up {
         token: Token,
         event: WatchEvent,
     },
+    ApplicationAnswer {
+        attempt: Token,
+        envelope: Envelope,
+        answer: Option<Result<A::Answer, jig_client::contract::Refusal>>,
+    },
+    ApplicationRead {
+        token: Token,
+        terminal: Result<A::Delivery, jig_client::contract::ReadNone>,
+    },
+    ApplicationWatch {
+        token: Token,
+        event: ApplicationEvent<A::Delivery>,
+    },
     Ended {
         token: Token,
         why: WatchEnd,
@@ -96,7 +118,7 @@ pub enum Up {
 
 /// One numbered decision, including its payload and durability time for a referee.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Committed {
+pub struct Committed<A: Application = NoApplication> {
     pub number: u64,
     pub made: Time,
     pub at: Wall,
@@ -106,39 +128,51 @@ pub struct Committed {
     pub ask: Option<Ask>,
     pub answer: Option<Answer>,
     pub changes: Vec<Change>,
+    pub application: Option<ApplicationCommit<A>>,
 }
 #[derive(Debug)]
-struct Pending {
-    commit: Committed,
+struct Pending<A: Application> {
+    commit: Committed<A>,
     due: Time,
     truth: Truth,
+    application: A,
 }
 #[derive(Debug)]
-struct Keyed {
-    ask: Ask,
-    answer: Answer,
+struct Keyed<A: Application> {
+    ask: RequestIdentity,
+    answer: Retained<A>,
     commit: u64,
     retained_until: Option<Time>,
 }
+#[derive(Debug, PartialEq, Eq)]
+enum RequestIdentity {
+    Jig(Box<Ask>),
+    Application { owner: u16, project: u32, digest: [u8; 32] },
+}
+#[derive(Debug, Clone)]
+enum Retained<A: Application> {
+    Jig(Answer),
+    Application(Result<A::Answer, jig_client::contract::Refusal>),
+}
 #[derive(Debug)]
-struct Due {
+struct Due<A: Application> {
     at: Time,
     commit: u64,
-    up: Up,
+    up: Up<A>,
 }
 
 /// A deterministic scripted engine; seed is retained for reproducible extensions.
 #[derive(Debug)]
-pub struct Engine {
+pub struct Engine<A: Application = NoApplication> {
     bounds: Bounds,
     truth: Truth,
     durable_truth: Truth,
     rules: Vec<Rule>,
-    keys: BTreeMap<(u64, [u8; 16]), Keyed>,
-    pending: Vec<Pending>,
-    commits: Vec<Committed>,
+    keys: BTreeMap<(u64, [u8; 16]), Keyed<A>>,
+    pending: Vec<Pending<A>>,
+    commits: Vec<Committed<A>>,
     next_commit: u64,
-    due: Vec<Due>,
+    due: Vec<Due<A>>,
     seed: u64,
     read_tokens: BTreeSet<Token>,
     positions: BTreeMap<u64, reads::Position>,
@@ -146,12 +180,36 @@ pub struct Engine {
     watches: BTreeMap<Token, watches::Watch>,
     watch_tokens: BTreeSet<Token>,
     runs: BTreeMap<u64, jig_client::contract::RunText>,
+    application: A,
+    durable_application: A,
+    application_watches: BTreeMap<Token, application::Open<A>>,
+    attempts: BTreeMap<Token, u64>,
+    reads: BTreeMap<Token, u64>,
+    offline: Option<Time>,
+    slow: Duration,
+    request_fault: Option<Envelope>,
+    clock: Time,
 }
-impl Engine {
-    /// Checks every decoded/program-supplied document before retaining the script.
+impl Engine<NoApplication> {
+    /// Constructs the jig-only engine.
     pub fn new(script: Script, seed: u64) -> Result<Self, Invalid> {
+        Self::with_application(script, seed, NoApplication)
+    }
+}
+impl<A: Application> Engine<A> {
+    /// Checks every decoded/program-supplied document before retaining the script.
+    pub fn with_application(script: Script, seed: u64, application: A) -> Result<Self, Invalid> {
         script.validate()?;
         Ok(Self {
+            durable_application: application.clone(),
+            application,
+            application_watches: BTreeMap::new(),
+            attempts: BTreeMap::new(),
+            reads: BTreeMap::new(),
+            offline: None,
+            slow: Duration::ZERO,
+            request_fault: None,
+            clock: Time::ZERO,
             bounds: script.bounds,
             durable_truth: script.truth.clone(),
             truth: script.truth,
@@ -187,11 +245,26 @@ impl Engine {
     }
     /// Only durable commits, in their commit order.
     #[must_use]
-    pub fn commits(&self) -> &[Committed] {
+    pub fn commits(&self) -> &[Committed<A>] {
         &self.commits
+    }
+    /// Decisions made but not yet durable; restart removes this staged prefix.
+    pub fn pending_commits(&self) -> impl Iterator<Item = &Committed<A>> {
+        self.pending.iter().map(|pending| &pending.commit)
+    }
+    /// Replaces a scenario's outcome for future new keys. Retained keys stay alike.
+    /// The world can script an ask after its person generates the actual words.
+    pub fn script(&mut self, rule: Rule) -> Result<(), Invalid> {
+        rule.validate(&self.bounds)?;
+        self.rules.retain(|old| old.party != rule.party || old.ask != rule.ask);
+        self.rules.push(rule);
+        Ok(())
     }
     /// Moves the story's truth through a numbered, delayed commit.
     pub fn act(&mut self, now: Time, wall: Wall, change: Change) -> Result<u64, Invalid> {
+        if !self.online(now) {
+            return Err(Invalid::Offline);
+        }
         change.validate(&self.bounds)?;
         let mut truth = self.truth.clone();
         truth.apply(&change)?;
@@ -209,7 +282,17 @@ impl Engine {
         answer: Option<Answer>,
         changes: Vec<Change>,
     ) -> u64 {
+        self.clock = self.clock.max(now);
         for watch in self.watches.values_mut() {
+            if !watch.dirty {
+                watch.ready = now.saturating_add(self.slow);
+            }
+            watch.dirty = true;
+        }
+        for watch in self.application_watches.values_mut() {
+            if !watch.dirty {
+                watch.ready = now.saturating_add(self.slow);
+            }
             watch.dirty = true;
         }
         let number = self.next_commit;
@@ -218,17 +301,27 @@ impl Engine {
         if let Some(last) = self.pending.last() {
             due = due.max(last.due);
         }
-        let commit = Committed { number, made: now, at: wall, durable: None, party, key, ask, answer, changes };
-        self.pending.push(Pending { commit, due, truth: self.truth.clone() });
+        let commit = Committed {
+            number,
+            made: now,
+            at: wall,
+            durable: None,
+            party,
+            key,
+            ask,
+            answer,
+            changes,
+            application: None,
+        };
+        self.pending.push(Pending { commit, due, truth: self.truth.clone(), application: self.application.clone() });
         number
     }
-    /// Releases due commits before any answer, preserving commit order.
-    #[must_use]
-    pub fn poll(&mut self, now: Time) -> Vec<Up> {
+    fn advance_commits(&mut self, now: Time) {
         let count = self.pending.iter().take_while(|pending| pending.due <= now).count();
         for mut pending in self.pending.drain(..count) {
             pending.commit.durable = Some(pending.due);
             self.durable_truth = pending.truth;
+            self.durable_application = pending.application;
             for change in &pending.commit.changes {
                 if let Change::Source(Source {
                     read: jig_client::contract::Read::Activity { task, .. },
@@ -238,19 +331,37 @@ impl Engine {
                     && self.runs.get(task).is_some_and(|run| rows.iter().any(|line| matches!(line.event, jig_client::contract::Activity::Turn { name, .. } if name == run.turn))) { self.runs.remove(task); }
             }
             if let (Some(party), Some(key)) = (pending.commit.party, pending.commit.key) {
-                let retention = self.truth.frames.get(&party).expect("keyed party has a frame").retention;
+                let retention = self.durable_truth.frames.get(&party).expect("keyed party has a frame").retention;
                 if let Some(keyed) = self.keys.get_mut(&(party, key)) {
                     keyed.retained_until = Some(pending.due.saturating_add(retention));
                 }
             }
             self.commits.push(pending.commit);
         }
-        self.prepare_watches(now);
+    }
+    /// Releases due commits before answers and current watch values.
+    #[must_use]
+    pub fn poll(&mut self, now: Time) -> Vec<Up<A>> {
+        if self.online(now) {
+            self.offline = None;
+            self.advance_commits(now);
+            self.prepare_watches(now);
+            self.prepare_application_watches(now);
+        }
         let durable = self.commits.last().map_or(0, |commit| commit.number);
         let mut out = Vec::new();
         let mut held = Vec::new();
         for due in self.due.drain(..) {
             if due.at <= now && due.commit <= durable {
+                match &due.up {
+                    Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => {
+                        self.attempts.remove(attempt);
+                    }
+                    Up::Read { token, .. } | Up::ApplicationRead { token, .. } => {
+                        self.reads.remove(token);
+                    }
+                    Up::Watch { .. } | Up::ApplicationWatch { .. } | Up::Ended { .. } => {}
+                }
                 out.push(due.up);
             } else {
                 held.push(due);
@@ -274,10 +385,28 @@ impl Engine {
                 due.at.max(barrier)
             }))
             .chain(self.watch_due())
+            .chain(self.application_watch_due())
+            .chain(self.offline)
             .min()
+            .map(|due| due.max(self.clock))
     }
-    fn queue(&mut self, now: Time, commit: u64, up: Up) {
-        self.due.push(Due { at: now, commit, up });
+    fn online(&mut self, now: Time) -> bool {
+        self.clock = self.clock.max(now);
+        if self.offline.is_some_and(|until| now < until) {
+            false
+        } else {
+            self.offline = None;
+            true
+        }
+    }
+    fn queue(&mut self, now: Time, commit: u64, up: Up<A>) {
+        let direct = matches!(
+            up,
+            Up::Watch { event: WatchEvent::Delivered(_), .. }
+                | Up::ApplicationWatch { event: ApplicationEvent::Delivered(_), .. }
+        );
+        self.clock = self.clock.max(now);
+        self.due.push(Due { at: if direct { now } else { now.saturating_add(self.slow) }, commit, up });
     }
 }
 #[cfg(test)]

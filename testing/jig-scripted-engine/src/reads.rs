@@ -163,7 +163,7 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
     };
     (read, position)
 }
-impl Engine {
+impl<A: crate::Application> Engine<A> {
     /// Captures one read at the latest numbered commit. A token receives one terminal.
     pub fn read(&mut self, now: Time, sign_in: u64, token: Token, read: Read) -> core::result::Result<(), Invalid> {
         if !payload::fits(&read, &self.bounds) {
@@ -172,7 +172,10 @@ impl Engine {
         if !self.read_tokens.insert(token) {
             return Err(Invalid::Identity);
         }
-        let terminal = if let Some(party) = self.truth.sign_ins.get(&sign_in).copied() {
+        self.reads.insert(token, sign_in);
+        let terminal = if !self.online(now) {
+            ReadResult::None(ReadNone::Unreachable)
+        } else if let Some(party) = self.truth.sign_ins.get(&sign_in).copied() {
             self.read_value(party, read).map_or_else(ReadResult::None, ReadResult::Value)
         } else {
             ReadResult::None(ReadNone::SignedOut)

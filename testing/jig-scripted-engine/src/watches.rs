@@ -8,14 +8,15 @@ use skein_lib::{Time, Token, Wall};
 
 #[derive(Debug)]
 pub(crate) struct Watch {
-    sign_in: u64,
-    party: u64,
+    pub(crate) sign_in: u64,
+    pub(crate) party: u64,
     subject: Subject,
     pub(crate) dirty: bool,
-    in_flight: bool,
-    heard: Time,
+    pub(crate) in_flight: bool,
+    pub(crate) heard: Time,
+    pub(crate) ready: Time,
 }
-impl Engine {
+impl<A: crate::Application> Engine<A> {
     /// Admits one subject, then emits whole current values until one terminal.
     pub fn open(&mut self, now: Time, sign_in: u64, token: Token, subject: Subject) -> Result<(), Invalid> {
         if !payload::fits(&subject, &self.bounds) {
@@ -24,12 +25,17 @@ impl Engine {
         if !self.watch_tokens.insert(token) {
             return Err(Invalid::Identity);
         }
+        if !self.online(now) {
+            self.queue(now, 0, Up::Ended { token, why: WatchEnd::Dropped });
+            return Ok(());
+        }
         let Some(party) = self.truth.sign_ins.get(&sign_in).copied() else {
             self.queue(now, 0, Up::Ended { token, why: WatchEnd::SignedOut });
             return Ok(());
         };
-        let party_count = self.watches.values().filter(|watch| watch.party == party).count();
-        let why = if self.watches.len() >= self.bounds.watches as usize
+        let party_count = self.watches.values().filter(|watch| watch.party == party).count()
+            + self.application_watches.values().filter(|watch| watch.party == party).count();
+        let why = if (self.watches.len() + self.application_watches.len()) >= self.bounds.watches as usize
             || party_count >= self.bounds.watches_per_party as usize
         {
             Some(WatchEnd::Busy)
@@ -40,16 +46,31 @@ impl Engine {
             self.queue(now, self.next_commit - 1, Up::Ended { token, why });
             return Ok(());
         }
-        self.watches.insert(token, Watch { sign_in, party, subject, dirty: true, in_flight: false, heard: now });
+        self.watches.insert(
+            token,
+            Watch {
+                sign_in,
+                party,
+                subject,
+                dirty: true,
+                in_flight: false,
+                heard: now,
+                ready: now.saturating_add(self.slow),
+            },
+        );
         self.queue(now, 0, Up::Watch { token, event: WatchEvent::Opened });
         Ok(())
     }
     /// Closes a live watch once; queued deliveries are replaced by its terminal.
     pub fn close(&mut self, now: Time, token: Token) {
         self.end_watch(now, token, WatchEnd::Closed, 0);
+        self.end_application_watch(now, token, WatchEnd::Closed, 0);
     }
     /// The root took the previous delivery; a dirty current value may now be made.
     pub fn taken(&mut self, token: Token) {
+        if let Some(watch) = self.application_watches.get_mut(&token) {
+            watch.in_flight = false;
+        }
         if let Some(watch) = self.watches.get_mut(&token) {
             watch.in_flight = false;
         }
@@ -90,7 +111,8 @@ impl Engine {
                 continue;
             }
             let provisional = matches!(watch.subject, Subject::Run { .. });
-            if !watch.in_flight && watch.dirty && (provisional || durable == self.next_commit - 1) {
+            if !watch.in_flight && watch.dirty && now >= watch.ready && (provisional || durable == self.next_commit - 1)
+            {
                 match self.delivery(watch.party, &watch.subject) {
                     Ok(Some(value)) => {
                         watch.in_flight = true;
@@ -114,7 +136,13 @@ impl Engine {
             }
             if now >= watch.heard.saturating_add(self.bounds.heartbeat) {
                 watch.heard = now;
-                self.queue(now, 0, Up::Watch { token, event: WatchEvent::Alive });
+                if !self
+                    .due
+                    .iter()
+                    .any(|due| matches!(due.up,Up::Watch { token:id,event:WatchEvent::Alive } if id==token))
+                {
+                    self.queue(now, 0, Up::Watch { token, event: WatchEvent::Alive });
+                }
             }
             self.watches.insert(token, watch);
         }
@@ -124,11 +152,11 @@ impl Engine {
             let heartbeat = watch.heard.saturating_add(self.bounds.heartbeat);
             if watch.dirty && !watch.in_flight {
                 let barrier = if matches!(watch.subject, Subject::Run { .. }) {
-                    watch.heard
+                    watch.ready
                 } else {
-                    self.pending.last().map_or(watch.heard, |pending| pending.due)
+                    self.pending.last().map_or(watch.ready, |pending| pending.due)
                 };
-                heartbeat.min(barrier)
+                heartbeat.min(barrier.max(watch.ready))
             } else {
                 heartbeat
             }
@@ -345,6 +373,9 @@ impl Engine {
         bytes: &Text,
         call: Option<Call>,
     ) -> Result<(), Invalid> {
+        if !self.online(now) {
+            return Err(Invalid::Offline);
+        }
         if !payload::fits(bytes, &self.bounds) || !payload::fits(&call, &self.bounds) {
             return Err(Invalid::Payload);
         }
@@ -377,8 +408,10 @@ impl Engine {
         self.runs.insert(task, run);
         for watch in self.watches.values_mut() {
             if matches!(watch.subject, Subject::Run { task:id, .. } if id == task) {
+                if !watch.dirty {
+                    watch.ready = now.saturating_add(self.slow);
+                }
                 watch.dirty = true;
-                watch.heard = now;
             }
         }
         Ok(())

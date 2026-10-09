@@ -1,13 +1,13 @@
 //! Requests are decided once in the party's key space and released after durability.
 //! Revision and decided-first checks precede scripted outcomes; contract.md, 3–4.
-use crate::{Engine, Envelope, Invalid, Keyed, Up, payload};
+use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
 use jig_client::contract::{
-    ActKind, Actor, Admission, Answer, Ask, Decision, Ending, Moved, ObjectKey, Offered, Outcome, Phase, ReadValue,
-    Recipient, Refusal, Revision,
+    ActKind, Actor, Admission, Answer, Ask, ChipPhase, Decision, Ending, Moved, ObjectKey, Offered, Outcome, Phase,
+    ReadValue, Recipient, Refusal, Revision, Runtime,
 };
 use skein_lib::{List, Time, Token, Wall};
 
-impl Engine {
+impl<A: crate::Application> Engine<A> {
     /// Runs one attempt; the world's root supplies the table's attempt token.
     /// Invalid typed payloads are rejected before anything is decided or retained.
     pub fn send(
@@ -22,22 +22,54 @@ impl Engine {
         if !payload::fits(&ask, &self.bounds) {
             return Err(Invalid::Payload);
         }
+        self.attempts.insert(attempt, sign_in);
+        if !self.online(now) || self.request_fault == Some(Envelope::Again) {
+            self.request_fault = None;
+            self.queue(now, 0, Up::Answer { attempt, envelope: Envelope::Again, answer: None });
+            return Ok(());
+        }
         let Some(party) = self.truth.sign_ins.get(&sign_in).copied() else {
             self.queue(now, 0, Up::Answer { attempt, envelope: Envelope::SignedOut, answer: None });
             return Ok(());
         };
         self.keys.retain(|_, keyed| keyed.retained_until.is_none_or(|until| now <= until));
         if let Some(old) = self.keys.get(&(party, key)) {
-            let answer = if old.ask == ask { old.answer.clone() } else { Answer::Refused(Refusal::KeyConflict) };
+            let answer = if let (RequestIdentity::Jig(previous), Retained::Jig(answer)) = (&old.ask, &old.answer) {
+                if **previous == ask { answer.clone() } else { Answer::Refused(Refusal::KeyConflict) }
+            } else {
+                Answer::Refused(Refusal::KeyConflict)
+            };
             let commit = old.commit;
-            self.queue(now, commit, Up::Answer { attempt, envelope: Envelope::Final, answer: Some(answer) });
+            self.answer(now, commit, attempt, answer);
             return Ok(());
         }
-        let (answer, changes) = self.decide(party, &ask, wall)?;
+        let (answer, changes) = match self.decide(party, &ask, wall) {
+            Ok(decision) => decision,
+            Err(error) => {
+                self.attempts.remove(&attempt);
+                return Err(error);
+            }
+        };
         let commit = self.commit(now, wall, Some(party), Some(key), Some(ask.clone()), Some(answer.clone()), changes);
-        self.keys.insert((party, key), Keyed { ask, answer: answer.clone(), commit, retained_until: None });
-        self.queue(now, commit, Up::Answer { attempt, envelope: Envelope::Final, answer: Some(answer) });
+        self.keys.insert(
+            (party, key),
+            Keyed {
+                ask: RequestIdentity::Jig(Box::new(ask)),
+                answer: Retained::Jig(answer.clone()),
+                commit,
+                retained_until: None,
+            },
+        );
+        self.answer(now, commit, attempt, answer);
         Ok(())
+    }
+    fn answer(&mut self, now: Time, commit: u64, attempt: Token, answer: Answer) {
+        let envelope = self.request_fault.take().unwrap_or(Envelope::Final);
+        self.queue(
+            now,
+            commit,
+            Up::Answer { attempt, envelope, answer: if envelope == Envelope::Final { Some(answer) } else { None } },
+        );
     }
     #[expect(
         clippy::too_many_lines,
@@ -183,8 +215,12 @@ impl Engine {
         {
             return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
         }
-        if let Some(rule) =
-            self.rules.iter().find(|rule| rule.ask == *ask && rule.party.is_none_or(|number| number == party)).cloned()
+        if let Some(rule) = self
+            .rules
+            .iter()
+            .find(|rule| rule.ask == *ask && rule.party == Some(party))
+            .or_else(|| self.rules.iter().find(|rule| rule.ask == *ask && rule.party.is_none()))
+            .cloned()
         {
             if matches!(rule.answer, Answer::Done(_)) {
                 if matches!(admission, Some(Admission::Proposed { .. }))
@@ -248,6 +284,8 @@ impl Engine {
                     v.hold = None;
                     v.escalation = None;
                     v.chip.phase = Phase::Due;
+                    *v.chip.details = ChipPhase::Starting;
+                    v.runtime = Runtime::Starting;
                 }
                 ReadValue::Frame(_)
                 | ReadValue::Question(_)
