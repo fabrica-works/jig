@@ -118,6 +118,7 @@ fn refused_subject(watcher: Token, subject: &Subject, why: WatchRefusal) -> Requ
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -164,6 +165,7 @@ pub(super) fn open(
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -184,6 +186,7 @@ pub(super) fn open(
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
@@ -249,6 +252,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -275,6 +279,7 @@ fn watch_subject(subject: &Subject) -> bool {
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -300,6 +305,7 @@ fn application_subject(core: &Core, watcher: Token) -> Option<(u16, Token, docum
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -327,6 +333,7 @@ pub(super) fn marked(core: &mut Core, connector: u16, subjects: List<Token>) -> 
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
             | Subject::Goals { .. }
+            | Subject::Tasks { .. }
             | Subject::Conversations { .. }
             | Subject::Run { .. }
             | Subject::Deployment
@@ -389,6 +396,7 @@ fn watch_document(
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment

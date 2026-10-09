@@ -30,6 +30,8 @@ pub use inbox_deployment::{
 mod objects;
 mod offers;
 mod project_note;
+mod project_tasks;
+pub use project_tasks::{TaskFilter, TaskLine, TaskPhase, Tasks};
 mod small;
 pub use objects::{
     AmendmentChange, AmendmentState, EndedDelegate, Escalation, FundingOffer, HistoryLine, MilestoneLine,
@@ -122,6 +124,8 @@ pub enum Subject {
     Inbox { party: u64 },
     /// A project's live goals.
     Goals { project: u32 },
+    /// Filtered live tasks in one project, newest change first.
+    Tasks { project: u32, filter: TaskFilter },
     /// The party's live chats.
     Conversations { party: u64 },
     /// A task's current attempt.
@@ -275,6 +279,8 @@ pub enum Document {
     Tree(Tree),
     /// Live goals in priority order.
     Goals(Goals),
+    /// A filtered live project task list.
+    Tasks(Tasks),
     /// A pending immutable proposal.
     Proposal(Box<Proposal>),
     /// A held task and its preserved story.
@@ -338,6 +344,9 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             let goals = task_tree::goals(core, limits, party, *project, window)?;
             Ok(Document::Goals(goals))
         }
+        Subject::Tasks { project, filter } => {
+            Ok(Document::Tasks(project_tasks::make(core, limits, party, *project, filter, window)?))
+        }
         Subject::Inbox { party: owner } => {
             if *owner != party {
                 return Err(Missing::NotAllowed);
@@ -395,6 +404,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
             .max(frame)
             .max(u64::from(limits.text_bytes).checked_mul(2)?)
             .max(task_tree::worst_case(limits)?)
+            .max(project_tasks::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
             .max(project_note::worst_case(limits)?)
             .max(inbox_deployment::worst_case(limits)?),
@@ -404,7 +414,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
 /// Peak scratch allocated while constructing party/deployment pages. Child
 /// accessors copy bounded shallow facts only; documents themselves are separate.
 pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
-    inbox_deployment::scratch_worst_case(limits)
+    Some(inbox_deployment::scratch_worst_case(limits)?.max(project_tasks::scratch_worst_case(limits)?))
 }
 
 /// Join volatile live observations to a loaded owner row. The reader checks

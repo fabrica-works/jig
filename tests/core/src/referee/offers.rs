@@ -81,6 +81,7 @@ impl Referee {
             | Document::Run(_)
             | Document::Tree(_)
             | Document::Goals(_)
+            | Document::Tasks(_)
             | Document::Proposal(_)
             | Document::Question(_)
             | Document::PersonTask(_)
@@ -175,6 +176,7 @@ fn offers(value: &Document) -> Option<&List<Offered>> {
         | Document::Run(_)
         | Document::Tree(_)
         | Document::Goals(_)
+        | Document::Tasks(_)
         | Document::Inbox(_)
         | Document::Conversations(_)
         | Document::Deployment(_) => return None,

@@ -751,6 +751,7 @@ pub fn make_with_clock(
         | super::Subject::Chips { .. }
         | super::Subject::Inbox { .. }
         | super::Subject::Goals { .. }
+        | super::Subject::Tasks { .. }
         | super::Subject::Conversations { .. }
         | super::Subject::Run { .. }
         | super::Subject::Proposal { .. }

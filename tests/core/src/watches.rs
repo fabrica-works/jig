@@ -208,7 +208,7 @@ impl Parties {
             let touched = writes.iter().any(|write| match write {
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => {
                     task_subject(&consumer.subject, row.number)
-                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project }) if *project == row.project)
+                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project } | Subject::Tasks { project, .. }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
@@ -216,7 +216,7 @@ impl Parties {
                 }
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => {
                     task_subject(&consumer.subject, row.number)
-                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project }) if *project == row.project)
+                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project } | Subject::Tasks { project, .. }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
@@ -305,6 +305,11 @@ impl Parties {
                     }
                     Document::Escalation(row) => {
                         self.task_projects.insert(row.task.chip.number, row.task.project);
+                    }
+                    Document::Tasks(value) => {
+                        for line in &value.rows {
+                            self.task_projects.insert(line.chip.number, value.project);
+                        }
                     }
                     Document::Frame(_)
                     | Document::Tree(_)
@@ -411,6 +416,7 @@ fn task_subject(watched: &Watched, task: u64) -> bool {
         Subject::Frame { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Deployment
         | Subject::Proposal { proposer: core::documents::Proposer::Party(_), .. }
@@ -430,7 +436,9 @@ fn project_subject(
         return false;
     };
     match subject {
-        Subject::Project { project: owned } | Subject::Goals { project: owned } => *owned == project,
+        Subject::Project { project: owned }
+        | Subject::Goals { project: owned }
+        | Subject::Tasks { project: owned, .. } => *owned == project,
         Subject::Note { .. } => true,
         Subject::Task { task }
         | Subject::Tree { task }
@@ -478,6 +486,7 @@ fn party_subject(watched: &Watched, party: u64) -> bool {
         | Subject::Run { .. }
         | Subject::Chips { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }

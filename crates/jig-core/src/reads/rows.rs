@@ -121,6 +121,7 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
         | Document::Result(_)
         | Document::Conversations(_)
         | Document::Goals(_)
+        | Document::Tasks(_)
         | Document::Project(_)
         | Document::Note(_)
         | Document::Deployment(_) => false,
@@ -271,6 +272,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
         | Document::PersonTask(_)
         | Document::Result(_)
         | Document::Project(_)
+        | Document::Tasks(_)
         | Document::Note(_)
         | Document::Deployment(_)) => return Answer::Document(Box::new(document)),
     };

@@ -781,6 +781,8 @@ pub struct TaskRecord {
     pub revisions: Revisions,
     /// Injected creation time used to order active person tasks in derived inboxes.
     pub created_at: Wall,
+    /// Wall time of the last decision that changed this retained row.
+    pub changed: Wall,
     /// Injected wall time at which the current lifecycle phase began.
     pub phase_since: Wall,
     /// First matching task start report: root reports placement or adoption, not agent or tool start.

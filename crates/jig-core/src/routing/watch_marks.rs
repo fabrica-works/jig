@@ -29,6 +29,7 @@ impl Core {
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Goals { .. }
+                | Subject::Tasks { .. }
                 | Subject::Run { .. }
                 | Subject::Deployment
                 | Subject::Proposal { .. }
@@ -58,6 +59,7 @@ impl Core {
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
                 | Subject::Goals { .. }
+                | Subject::Tasks { .. }
                 | Subject::Conversations { .. }
                 | Subject::Run { .. }
                 | Subject::Proposal { .. }
@@ -93,7 +95,9 @@ impl Core {
         for (_, binding) in &self.view_subjects {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
-                Subject::Project { project: owned } | Subject::Goals { project: owned } => *owned == project,
+                Subject::Project { project: owned }
+                | Subject::Goals { project: owned }
+                | Subject::Tasks { project: owned, .. } => *owned == project,
                 // Store-only note names do not retain their scope in this core.
                 Subject::Note { .. } => true,
                 Subject::Task { task }
@@ -189,7 +193,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             | Subject::PersonTask { task }
             | Subject::Result { task }
             | Subject::Proposal { proposer: Proposer::Task(task), .. } => *task == row.number,
-            Subject::Project { project } => *project == row.project,
+            Subject::Project { project } | Subject::Tasks { project, .. } => *project == row.project,
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
             Subject::Goals { project } => *project == row.project && goal,
             Subject::Conversations { party } => owner == Some(*party),
@@ -312,6 +316,7 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
             | Subject::Goals { .. }
+            | Subject::Tasks { .. }
             | Subject::Conversations { .. }
             | Subject::Deployment
             | Subject::Proposal { .. }
@@ -427,12 +432,8 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
             }
             None
         }
-        Subject::Goals { project } => {
-            if core.people.role(binding.party, *project).is_some() {
-                None
-            } else {
-                Some(views::End::NotAllowed)
-            }
+        Subject::Goals { project } | Subject::Tasks { project, .. } => {
+            if core.people.role(binding.party, *project).is_some() { None } else { Some(views::End::NotAllowed) }
         }
         Subject::Deployment => {
             if core.people.role(binding.party, 0).is_some() {

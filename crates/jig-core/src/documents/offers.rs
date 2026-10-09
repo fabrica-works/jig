@@ -160,6 +160,7 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
+        | Subject::Tasks { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment

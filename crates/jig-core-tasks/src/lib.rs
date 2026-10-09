@@ -65,6 +65,7 @@ mod admission;
 mod batch;
 mod boundary;
 mod capacity;
+mod changed;
 mod chat;
 mod closing;
 mod control;

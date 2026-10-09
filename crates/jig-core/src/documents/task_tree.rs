@@ -216,6 +216,7 @@ pub struct Task {
     pub lineage: List<Chip>,
     /// Every live direct delegate; identities are never omitted from a close decision.
     pub delegates: List<super::LiveDelegate>,
+    pub changed: Wall,
     pub spec_revision: u64,
     /// Last committed immutable activity position.
     pub activity: u64,
@@ -701,6 +702,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         requester: row.requester,
         lineage: ordered,
         delegates: super::live_delegates::from_row(core, limits, party, row)?,
+        changed: row.changed,
         spec_revision: row.revisions.spec,
         activity: row.activity,
         words: super::small::text(&row.spec.words, limits.documents.text_bytes),

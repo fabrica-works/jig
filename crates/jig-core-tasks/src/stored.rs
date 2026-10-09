@@ -716,6 +716,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
             let id = domain
                 .tasks
                 .insert(Task {
+                    published: Some(task.clone()),
                     procedure_offered: None,
                     observed_phase: Some(task.phase.clone()),
                     record: *task,

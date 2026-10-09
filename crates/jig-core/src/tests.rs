@@ -1621,7 +1621,7 @@ fn watch_outputs(core: &mut Core, limits: &Limits, event: Event) -> Box<[Request
     }
 }
 
-fn watch_subjects() -> [Subject; 9] {
+fn watch_subjects() -> [Subject; 10] {
     let mut chips = List::with_capacity(1);
     chips.push(1).unwrap();
     [
@@ -1631,6 +1631,10 @@ fn watch_subjects() -> [Subject; 9] {
         Subject::Chips { tasks: chips },
         Subject::Inbox { party: 1 },
         Subject::Goals { project: 1 },
+        Subject::Tasks {
+            project: 1,
+            filter: TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
+        },
         Subject::Conversations { party: 1 },
         Subject::Run { task: 1 },
         Subject::Deployment,
@@ -1668,6 +1672,7 @@ fn watch_admission_checks_each_subjects_project_or_owner() {
             | Subject::Tree { .. }
             | Subject::Chips { .. }
             | Subject::Goals { .. }
+            | Subject::Tasks { .. }
             | Subject::Run { .. }
             | Subject::Deployment
             | Subject::Proposal { .. }
@@ -2662,3 +2667,5 @@ mod live_delegates;
 mod document_offers;
 mod last_batch;
 mod periods;
+
+mod project_tasks;

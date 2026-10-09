@@ -16,6 +16,7 @@ pub(crate) struct Alarm {
 
 #[derive(Debug)]
 pub(crate) struct Task {
+    pub published: Option<Box<TaskRecord>>,
     pub record: TaskRecord,
     pub alarm: Option<Alarm>,
     pub chat_alarm: Option<Alarm>,
@@ -908,6 +909,7 @@ pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
         None => None,
     };
     task.alarm = alarm;
+    crate::changed::observe(task, env.wall);
     out.push(Request::Save { record: Stored::Live(Box::new(task.record.clone())) });
     crate::chat::schedule(domain, env, number);
     crate::escalation::schedule(domain, env, number);
@@ -1112,10 +1114,12 @@ pub(crate) fn make_admitted(
     for new in batch {
         let number = new.number;
         let task = Task {
+            published: None,
             procedure_offered: None,
             record: TaskRecord {
                 chat_close: None,
                 created_at: env.wall,
+                changed: env.wall,
                 phase_since: env.wall,
                 run_since: None,
                 retry_notice: None,
