@@ -4,17 +4,17 @@ use crate::Bounds;
 use core::mem::size_of;
 use jig_client::contract::{
     Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, Amendment, Answer, Ask, AttemptFailure,
-    Authority, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing, ConversationLine, ConversationPage,
-    Conversations, Count, Cursor, Decider, Decision, Delivery, Deployment, Disposal, Ending, Escalation, Executor,
-    FailureClass, Frame, GoalLine, GoalPage, Goals, Grant, HistoryChange, HistoryLine, HistoryPage, Hold, HoldReason,
-    Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message,
-    Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Part, Party,
-    PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
-    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult, ReadValue,
-    Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultValue, Revision, RolePolicy,
-    RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod, Steering, Subject,
-    Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage,
-    VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing, ConversationLine,
+    ConversationPage, Conversations, Count, Cursor, Decider, Decision, Delivery, Deployment, Disposal, Ending,
+    Escalation, Executor, FailureClass, Frame, GoalLine, GoalPage, Goals, Grant, HistoryChange, HistoryLine,
+    HistoryPage, Hold, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit,
+    LiveDelegate, Made, Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine,
+    Outcome, Part, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy,
+    Pool, Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read,
+    ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultValue,
+    Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod,
+    Steering, Subject, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName,
+    Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
@@ -422,6 +422,32 @@ impl Payload for Admission {
             Self::Allowed => Some(0),
             Self::Proposed { to } => sum(&[to.heap(bounds)]),
             Self::Refused(value0) => sum(&[value0.heap(bounds)]),
+            Self::Bounded { within, beyond } => sum(&[within.heap(bounds), beyond.heap(bounds)]),
+        }
+    }
+}
+impl Payload for jig_client::contract::Bounds {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Goal { pool_left, charters, latest, budget, maximum_budget, maximum_deadline } => sum(&[
+                pool_left.heap(bounds),
+                charters.heap(bounds),
+                latest.heap(bounds),
+                budget.heap(bounds),
+                maximum_budget.heap(bounds),
+                maximum_deadline.heap(bounds),
+            ]),
+            Self::Amend { budget_left, grants, authority, ceiling } => {
+                sum(&[budget_left.heap(bounds), grants.heap(bounds), authority.heap(bounds), ceiling.heap(bounds)])
+            }
+        }
+    }
+}
+impl Payload for Beyond {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Proposed { to } => to.heap(bounds),
+            Self::Refused(why) => why.heap(bounds),
         }
     }
 }

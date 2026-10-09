@@ -205,6 +205,50 @@ impl<A: crate::Application> Engine<A> {
         });
         let admission =
             offer.and_then(|acts| acts.iter().find(|offered| offered.act == kind).map(|offered| &offered.admission));
+        let bounded = matches!(admission, Some(Admission::Bounded { .. }));
+        let prediction = admission.map(|offer| match offer {
+            Admission::Bounded { .. } => match ask {
+                Ask::SetGoal {
+                    executor: jig_client::contract::Executor::Agent { charter }, budget, deadline, ..
+                } => jig_client::contract::admission::goal(offer, *charter, *budget, *deadline),
+                Ask::Amend { task, change, .. } => match self.truth.objects.get(&ObjectKey::Task(*task)) {
+                    Some(ReadValue::Task(before)) => {
+                        jig_client::contract::admission::amendment(offer, change, &before.authority)
+                    }
+                    _ => match self.truth.objects.get(&ObjectKey::Escalation(*task)) {
+                        Some(ReadValue::Escalation(before)) => {
+                            jig_client::contract::admission::amendment(offer, change, &before.steering.authority)
+                        }
+                        _ => Admission::Refused(Refusal::Unknown),
+                    },
+                },
+                Ask::StartChat { .. }
+                | Ask::Write { .. }
+                | Ask::AnswerQuestion { .. }
+                | Ask::AnswerPerson { .. }
+                | Ask::Take { .. }
+                | Ask::HandBack { .. }
+                | Ask::DecideProposal { .. }
+                | Ask::DecideEscalation { .. }
+                | Ask::Release { .. }
+                | Ask::Stop { .. }
+                | Ask::Cancel { .. }
+                | Ask::Close { .. }
+                | Ask::TakeOver { .. }
+                | Ask::SetGoal { .. }
+                | Ask::Prioritise { .. }
+                | Ask::MarkSeen { .. }
+                | Ask::EditNote { .. }
+                | Ask::DeleteNote { .. }
+                | Ask::Adopt { .. }
+                | Ask::ChangePolicy { .. }
+                | Ask::SetRoles { .. }
+                | Ask::MakeService { .. }
+                | Ask::SetPool { .. } => Admission::Refused(Refusal::NotOffered),
+            },
+            Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => offer.clone(),
+        });
+        let admission = prediction.as_ref();
         if let Some(Admission::Refused(refusal)) = admission {
             return Ok((Answer::Refused(refusal.clone()), Vec::new()));
         }
@@ -222,9 +266,18 @@ impl<A: crate::Application> Engine<A> {
             .or_else(|| self.rules.iter().find(|rule| rule.ask == *ask && rule.party.is_none()))
             .cloned()
         {
+            if bounded && matches!(rule.answer, Answer::Refused(_)) {
+                return Err(Invalid::Script);
+            }
             if matches!(rule.answer, Answer::Done(_)) {
                 if matches!(admission, Some(Admission::Proposed { .. }))
                     && !matches!(rule.answer, Answer::Done(Outcome::Proposed { .. }))
+                {
+                    return Err(Invalid::Script);
+                }
+                if bounded
+                    && matches!(admission, Some(Admission::Allowed))
+                    && matches!(rule.answer, Answer::Done(Outcome::Proposed { .. }))
                 {
                     return Err(Invalid::Script);
                 }

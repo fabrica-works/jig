@@ -204,7 +204,43 @@ pub enum Admission {
     Allowed,
     /// It would be proposed to a holder.
     Proposed { to: Recipient },
+    /// Concrete drafts compare with engine-supplied facts before sending.
+    Bounded { within: Bounds, beyond: Beyond },
     /// It is not admitted and says why.
+    Refused(Refusal),
+}
+
+/// Numbers and lists supplied by the engine, never policy inferred by the client.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Bounds {
+    /// Goal choices within the party's offered authority.
+    Goal {
+        pool_left: u64,
+        charters: List<u32>,
+        latest: Option<Wall>,
+        /// Largest directly made budget; pool balance alone is not role authority.
+        budget: u64,
+        /// Hard limits of the supported form, supplied by the engine.
+        maximum_budget: u64,
+        maximum_deadline: Option<Wall>,
+    },
+    /// Additional budget and complete held grants for an amendment.
+    Amend {
+        budget_left: u64,
+        grants: List<super::Grant>,
+        /// Complete numbers and lists for directly made widening.
+        authority: Box<Authority>,
+        /// Hard envelope of supported form choices.
+        ceiling: Box<Authority>,
+    },
+}
+
+/// The engine's outcome when a concrete draft exceeds its supplied facts.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Beyond {
+    /// It would be proposed to this holder.
+    Proposed { to: Recipient },
+    /// It would be refused with these facts.
     Refused(Refusal),
 }
 

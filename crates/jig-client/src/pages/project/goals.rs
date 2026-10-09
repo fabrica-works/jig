@@ -12,7 +12,9 @@
 use crate::{
     Domain, Request,
     address::{Address, Place},
-    contract::{ActKind, Admission, Answer, Ask, Executor, GoalLine, Made, Outcome, Phase, Recipient, Refusal, Text},
+    contract::{
+        ActKind, Admission, Answer, Ask, Bounds, Executor, GoalLine, Made, Outcome, Phase, Recipient, Refusal, Text,
+    },
     fields::Purpose,
     intents::Origin,
     pages::IntentPurpose,
@@ -95,6 +97,31 @@ pub(crate) fn open(domain: &mut Domain) {
         return;
     }
     let words = field.text.clone();
+    let Some((prediction, pool_left)) = prediction(domain, form, scope) else {
+        return;
+    };
+    let to = match prediction {
+        Admission::Allowed => None,
+        Admission::Proposed { to } => Some(to),
+        Admission::Bounded { .. } => return,
+        Admission::Refused(why) => {
+            domain.project_page.form.refusal = Some(why);
+            domain.changed();
+            return;
+        }
+    };
+    domain.project_page.form.confirmation = Some(GoalConfirmation {
+        form,
+        words,
+        pool_left,
+        proposed: to.is_some(),
+        to,
+        scope,
+        generation: domain.generation,
+    });
+    domain.changed();
+}
+fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission, u64)> {
     let mut offered = false;
     let mut pool = None;
     if let Some(frame) = &domain.frame.document {
@@ -122,36 +149,51 @@ pub(crate) fn open(domain: &mut Domain) {
             }
         }
     }
-    if !offered {
-        domain.project_page.form.refusal = Some(Refusal::NotOffered);
-        domain.changed();
-        return;
+    // Bounded offers own these facts; frame facts remain for fixed admissions.
+    match &admission {
+        Admission::Bounded { within, .. } => match within {
+            Bounds::Goal { pool_left, .. } => pool = Some(*pool_left),
+            Bounds::Amend { .. } => {}
+        },
+        Admission::Refused(why) => return Some((Admission::Refused(why.clone()), pool.unwrap_or(0))),
+        Admission::Allowed | Admission::Proposed { .. } => {
+            if !offered {
+                return Some((Admission::Refused(Refusal::NotOffered), pool.unwrap_or(0)));
+            }
+        }
     }
-    let to = match admission {
+    Some((crate::contract::admission::goal(&admission, form.charter, form.budget, form.deadline), pool?))
+}
+/// Refresh an unsent draft when the supplied project facts move.
+pub(crate) fn sync(domain: &mut Domain) {
+    let Some(open) = &domain.project_page.form.confirmation else {
+        return;
+    };
+    let Some((prediction, pool_left)) = prediction(domain, open.form, open.scope) else {
+        return;
+    };
+    let to = match prediction {
         Admission::Allowed => None,
         Admission::Proposed { to } => Some(to),
+        Admission::Bounded { .. } => return,
         Admission::Refused(why) => {
+            domain.project_page.form.confirmation = None;
             domain.project_page.form.refusal = Some(why);
             domain.changed();
             return;
         }
     };
-    let Some(pool_left) = pool else {
-        return;
-    };
-    domain.project_page.form.confirmation = Some(GoalConfirmation {
-        form,
-        words,
-        pool_left,
-        proposed: form.budget > pool_left || to.is_some(),
-        to,
-        scope,
-        generation: domain.generation,
-    });
-    domain.changed();
+    let open = domain.project_page.form.confirmation.as_mut().expect("open above");
+    if open.to != to || open.pool_left != pool_left {
+        open.to = to;
+        open.pool_left = pool_left;
+        open.proposed = to.is_some();
+        domain.changed();
+    }
 }
 /// Sending consumes the confirmation, so a second press can only join pending.
 pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
+    sync(domain);
     if domain.blocked || domain.project_page.form.pending.is_some() {
         return;
     }

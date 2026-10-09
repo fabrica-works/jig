@@ -1,6 +1,7 @@
 //! Independent client vocabulary for the complete domain contract.
 //! See client/domain/contract.md, 2–8. List capacities and text lengths
 //! are the decoding owner's limits; no engine or application type is shared.
+pub mod admission;
 pub mod asks;
 pub mod common;
 pub mod documents;

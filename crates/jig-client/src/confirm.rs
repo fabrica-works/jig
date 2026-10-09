@@ -131,7 +131,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
     }
     let proposed = match acts::offered(object, act) {
-        Admission::Allowed => None,
+        Admission::Allowed | Admission::Bounded { .. } => None,
         Admission::Proposed { to } => Some(to),
         Admission::Refused(refusal) => {
             domain.objects.get_mut(id).expect("named object exists").card = Card::Refused { refusal };
@@ -208,9 +208,9 @@ pub(crate) fn sync(domain: &mut Domain) {
     };
     let now = acts::revision(object, open.act);
     let changed = open.changed || now != open.revision;
-    let proposed = match acts::offered(object, open.act) {
+    let proposed = match draft_admission(object, open) {
         Admission::Proposed { to } => Some(to),
-        Admission::Allowed | Admission::Refused(_) => None,
+        Admission::Allowed | Admission::Bounded { .. } | Admission::Refused(_) => None,
     };
     let missing = if changed { Some(Missing::Changed { now }) } else { missing(domain, open, object) };
     let open = domain.confirming.as_mut().expect("confirmation exists");
@@ -336,12 +336,60 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
     None
 }
 
+fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
+    let offer = acts::offered(object, open.act);
+    let Some(change) = &open.choices.change else {
+        return offer;
+    };
+    match open.act {
+        ActKind::Amend | ActKind::AmendRelease => {
+            let before = match &object.body {
+                Some(Body::Task(document)) => &document.authority,
+                Some(Body::Escalation(document)) => &document.steering.authority,
+                Some(
+                    Body::Chip(_)
+                    | Body::Proposal(_)
+                    | Body::Question(_)
+                    | Body::PersonTask(_)
+                    | Body::Result(_)
+                    | Body::Note { .. },
+                )
+                | None => return Admission::Refused(Refusal::NotOffered),
+            };
+            crate::contract::admission::amendment(&offer, change, before)
+        }
+        ActKind::Write
+        | ActKind::Answer
+        | ActKind::Take
+        | ActKind::HandBack
+        | ActKind::Accept
+        | ActKind::Reject
+        | ActKind::PassUp
+        | ActKind::Release
+        | ActKind::LeaveHeld
+        | ActKind::Stop
+        | ActKind::Cancel
+        | ActKind::Close
+        | ActKind::TakeOver
+        | ActKind::SetGoal
+        | ActKind::Prioritise
+        | ActKind::MarkSeen
+        | ActKind::EditNote
+        | ActKind::DeleteNote
+        | ActKind::Adopt
+        | ActKind::ChangePolicy
+        | ActKind::SetRoles
+        | ActKind::MakeService
+        | ActKind::SetPool => offer,
+    }
+}
+
 fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Missing> {
     if object.project.is_none() {
         return Some(Missing::Context);
     }
-    match acts::offered(object, open.act) {
-        Admission::Allowed | Admission::Proposed { .. } => {}
+    match draft_admission(object, open) {
+        Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => {}
         Admission::Refused(why) => return Some(Missing::Refused { why }),
     }
     let field = match open.act {

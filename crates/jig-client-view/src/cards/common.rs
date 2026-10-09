@@ -58,7 +58,7 @@ pub fn acts(
     }
     for offered in rows {
         match &offered.admission {
-            Admission::Allowed | Admission::Proposed { .. } => crate::frame::control(
+            Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => crate::frame::control(
                 b,
                 words,
                 bindings,

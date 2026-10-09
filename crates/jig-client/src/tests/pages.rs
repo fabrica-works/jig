@@ -634,7 +634,23 @@ fn empty_phase_counts() -> PhaseCounts {
 
 fn project_document() -> Project {
     let mut acts = List::with_capacity(1);
-    acts.push(Offered { act: ActKind::SetGoal, admission: Admission::Allowed }).unwrap();
+    let mut charters = List::with_capacity(1);
+    charters.push(1).unwrap();
+    acts.push(Offered {
+        act: ActKind::SetGoal,
+        admission: Admission::Bounded {
+            within: Bounds::Goal {
+                pool_left: 20,
+                charters,
+                latest: None,
+                budget: 20,
+                maximum_budget: 100,
+                maximum_deadline: None,
+            },
+            beyond: Beyond::Proposed { to: Recipient::Party(9) },
+        },
+    })
+    .unwrap();
     Project {
         number: 1,
         period: 1,
@@ -839,6 +855,84 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
     assert_eq!(domain.address, Address::task(42));
     assert_eq!(domain.fields().get(Purpose::NewGoal).unwrap().text, text(b"later words"));
 }
+#[test]
+fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_inference() {
+    use crate::{action::Act, fields::Purpose, pages::project::goals::GoalForm};
+    use skein_lib::Wall;
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    let mut doc = project_document();
+    let latest = Wall::from_nanos(100);
+    doc.acts.get_mut(0).unwrap().admission = Admission::Bounded {
+        within: Bounds::Goal {
+            pool_left: 20,
+            charters: {
+                let mut rows = List::with_capacity(1);
+                rows.push(99).unwrap();
+                rows
+            },
+            latest: Some(latest),
+            budget: 3,
+            maximum_budget: 100,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Refused(Refusal::Role { project: 1, role: 2 }),
+    };
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"bounded") } });
+    for (charter, budget, deadline, allowed) in [
+        (99, 3, Some(latest), true),
+        (99, 4, Some(latest), false),
+        (99, 101, Some(latest), false),
+        (1, 3, Some(latest), false),
+        (99, 3, Some(Wall::from_nanos(101)), false),
+        (99, 3, None, false),
+    ] {
+        let form = GoalForm { project: 1, charter, budget, deadline, priority: 1 };
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+        assert_eq!(domain.project_page().form.confirmation.is_some(), allowed);
+        if allowed {
+            let open = domain.project_page().form.confirmation.as_ref().unwrap();
+            assert_eq!(open.pool_left, 20);
+            assert!(!open.proposed);
+        } else {
+            assert_eq!(
+                domain.project_page().form.refusal,
+                Some(if charter == 1 || budget > 100 {
+                    Refusal::NotOffered
+                } else {
+                    Refusal::Role { project: 1, role: 2 }
+                })
+            );
+            assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+        }
+    }
+    let form = GoalForm { project: 1, charter: 99, budget: 3, deadline: Some(latest), priority: 1 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(domain.project_page().form.confirmation.is_some());
+    let mut moved = domain.project_page().document.as_ref().unwrap().clone();
+    match &mut moved.acts.get_mut(0).unwrap().admission {
+        Admission::Bounded { within: Bounds::Goal { maximum_deadline, .. }, .. } => {
+            *maximum_deadline = Some(Wall::from_nanos(99));
+        }
+        Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } | Admission::Refused(_) => {
+            panic!("bounded goal")
+        }
+    }
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), moved, &mut out);
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    let mut refused = domain.project_page().document.as_ref().unwrap().clone();
+    refused.acts.get_mut(0).unwrap().admission = Admission::Refused(Refusal::Role { project: 1, role: 2 });
+    crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), refused, &mut out);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::Role { project: 1, role: 2 }));
+}
+
 fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
     use crate::{action::Act, objects::Body};
     let (mut domain, opened) = project_open(ProjectSection::Notes);

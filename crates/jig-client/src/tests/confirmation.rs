@@ -294,3 +294,150 @@ fn only_engine_offers_open_and_new_confirmations_or_dismissals_clear_the_old_fie
     assert!(domain.fields().get(Purpose::Reason).unwrap().text.bytes().is_empty());
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, 2);
 }
+
+#[test]
+fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_offer() {
+    bounded_amendment_dimensions();
+    for act in [ActKind::Amend, ActKind::AmendRelease] {
+        let (mut domain, _) = live();
+        let mut row = task();
+        let grant = Grant { connector: 1, kind: 2, pattern: text(b"listed") };
+        let mut grants = List::with_capacity(1);
+        grants.push(grant.clone()).unwrap();
+        row.acts = offered(
+            act,
+            Admission::Bounded {
+                within: Bounds::Amend {
+                    budget_left: 5,
+                    grants: grants.clone(),
+                    authority: Box::new({
+                        let mut allowed = row.authority.clone();
+                        allowed.budget = 15;
+                        allowed.grants = grants.clone();
+                        allowed
+                    }),
+                    ceiling: Box::new({
+                        let mut maximum = row.authority.clone();
+                        maximum.budget = 100;
+                        maximum.grants = grants;
+                        maximum
+                    }),
+                },
+                beyond: Beyond::Proposed { to: Recipient::Party(9) },
+            },
+        );
+        let id = install(&mut domain, Body::Task(Box::new(row.clone())));
+        intend(&mut domain, id, act);
+        assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Change));
+        let mut draft = change();
+        let mut after = row.authority.clone();
+        after.budget = 15;
+        after.grants = List::with_capacity(1);
+        after.grants.push(grant).unwrap();
+        draft.authority = Some(after);
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+        assert!(domain.confirmation().unwrap().missing.is_none());
+        assert_eq!(domain.confirmation().unwrap().proposed, None);
+        draft.authority.as_mut().unwrap().budget = 16;
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+        assert_eq!(domain.confirmation().unwrap().proposed, Some(Recipient::Party(9)));
+        row.acts = offered(
+            act,
+            Admission::Bounded {
+                within: Bounds::Amend {
+                    budget_left: 5,
+                    grants: List::with_capacity(0),
+                    authority: Box::new(row.authority.clone()),
+                    ceiling: Box::new({
+                        let mut maximum = row.authority.clone();
+                        maximum.budget = 100;
+                        maximum.grants = draft.authority.as_ref().unwrap().grants.clone();
+                        maximum
+                    }),
+                },
+                beyond: Beyond::Refused(Refusal::Role { project: 1, role: 2 }),
+            },
+        );
+        reread(&mut domain, Body::Task(Box::new(row.clone())), Read::Task { task: 8 });
+        assert_eq!(
+            domain.confirmation().unwrap().missing,
+            Some(Missing::Refused { why: Refusal::Role { project: 1, role: 2 } })
+        );
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+        draft.authority = None;
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+        assert_eq!(domain.confirmation().unwrap().proposed, None);
+        assert_eq!(
+            sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
+            &Ask::Amend {
+                project: 1,
+                task: 8,
+                revision: row.spec_revision,
+                change: draft,
+                release: act == ActKind::AmendRelease
+            }
+        );
+    }
+}
+
+fn bounded_amendment_dimensions() {
+    let before = authority();
+    let mut facts = before.clone();
+    facts.budget = 20;
+    facts.depth = 3;
+    facts.tasks = 5;
+    facts.deadline = Some(Wall::from_nanos(100));
+    facts.tools = List::with_capacity(1);
+    facts.tools.push(7).unwrap();
+    facts.task_kinds = List::with_capacity(1);
+    facts.task_kinds.push(Executor::Party { party: 4 }).unwrap();
+    facts.note_scopes = List::with_capacity(1);
+    facts.note_scopes.push(NoteScope::Project(1)).unwrap();
+    let mut maximum = facts.clone();
+    maximum.tasks = 6;
+    maximum.depth = 4;
+    maximum.budget = 100;
+    maximum.deadline = None;
+    let offer = Admission::Bounded {
+        within: Bounds::Amend {
+            budget_left: 10,
+            grants: List::with_capacity(0),
+            authority: Box::new(facts.clone()),
+            ceiling: Box::new(maximum),
+        },
+        beyond: Beyond::Proposed { to: Recipient::Party(9) },
+    };
+    let mut draft = change();
+    draft.authority = Some(facts.clone());
+    assert_eq!(admission::amendment(&offer, &draft, &before), Admission::Allowed);
+    for dimension in 0_u8..7 {
+        let mut outside = facts.clone();
+        match dimension {
+            0 => outside.budget = 21,
+            1 => outside.depth = 4,
+            2 => outside.tasks = 6,
+            3 => outside.deadline = Some(Wall::from_nanos(101)),
+            4 => *outside.tools.get_mut(0).unwrap() = 8,
+            5 => *outside.task_kinds.get_mut(0).unwrap() = Executor::Party { party: 5 },
+            6 => *outside.note_scopes.get_mut(0).unwrap() = NoteScope::Project(2),
+            _ => unreachable!(),
+        }
+        draft.authority = Some(outside);
+        let prediction = admission::amendment(&offer, &draft, &before);
+        assert_eq!(
+            prediction,
+            if dimension < 4 {
+                Admission::Proposed { to: Recipient::Party(9) }
+            } else {
+                Admission::Refused(Refusal::NotOffered)
+            }
+        );
+    }
+    // Current task facts may already be wider than the role; narrowing remains direct.
+    let mut existing = facts;
+    existing.depth = 9;
+    let mut narrower = existing.clone();
+    narrower.budget = 19;
+    draft.authority = Some(narrower);
+    assert_eq!(admission::amendment(&offer, &draft, &existing), Admission::Allowed);
+}

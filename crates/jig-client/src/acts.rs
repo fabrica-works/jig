@@ -305,7 +305,7 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
 pub fn note_ask(project: u32, note: &Note, act: ActKind, description: Text, body: Text) -> Option<Ask> {
     match admission(&note.acts, act) {
         Admission::Allowed | Admission::Proposed { .. } => {}
-        Admission::Refused(_) => return None,
+        Admission::Bounded { .. } | Admission::Refused(_) => return None,
     }
     match act {
         ActKind::EditNote => {

@@ -1,4 +1,5 @@
 use super::*;
+use crate::Bounds;
 use crate::Decision as ApplicationDecision;
 use jig_client::contract::Decision;
 use jig_client::contract::*;
@@ -170,6 +171,7 @@ fn nested_chip_payload_bounds(chip: &Chip) {
 
 #[test]
 fn revision_refusals_scripts_retention_and_whole_payload_admission() {
+    bounded_offer_payloads_and_predictions();
     let mut setup = script();
     let chip = Chip {
         task: 8,
@@ -776,4 +778,97 @@ mod faults;
 fn restart_faults_and_application_hooks_keep_one_durable_truth() {
     faults::run();
     application::run();
+}
+
+fn bounded_offer_payloads_and_predictions() {
+    use jig_client::contract::Bounds as DraftBounds;
+    let mut direct = authority();
+    direct.budget = 110;
+    let mut ceiling = direct.clone();
+    ceiling.budget = 200;
+    let within = DraftBounds::Amend {
+        budget_left: 10,
+        grants: list(vec![]),
+        authority: Box::new(direct),
+        ceiling: Box::new(ceiling),
+    };
+    let offer = Admission::Bounded { within, beyond: Beyond::Proposed { to: Recipient::Party(2) } };
+    for (budget, answer, valid) in [
+        (110, Answer::Done(Outcome::Changed), true),
+        (111, Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: 8, number: 1 } }), true),
+        (110, Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: 8, number: 1 } }), false),
+        (111, Answer::Done(Outcome::Changed), false),
+    ] {
+        let mut setup = live_script();
+        let mut row = task();
+        row.acts = list(vec![Offered { act: ActKind::Amend, admission: offer.clone() }]);
+        setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+        let mut after = authority();
+        after.budget = budget;
+        let ask = Ask::Amend {
+            project: 1,
+            task: 8,
+            revision: Revision { value: 1 },
+            release: false,
+            change: Amendment {
+                addressed: None,
+                words: None,
+                wake: None,
+                dependencies: None,
+                authority: Some(after),
+                instructions: None,
+            },
+        };
+        setup.rules.push(Rule { party: Some(1), ask: ask.clone(), answer: answer.clone(), changes: vec![] });
+        let mut engine = Engine::new(setup, 1).unwrap();
+        let result = engine.send(Time::ZERO, Wall::EPOCH, 11, [1; 16], Token::new(1), ask);
+        if valid {
+            result.unwrap();
+            assert_eq!(final_answer(&engine.poll(at(10_000_000))[0]), &answer);
+        } else {
+            assert_eq!(result, Err(Invalid::Script));
+            assert!(engine.commits().is_empty());
+        }
+    }
+    for variant in 0..5 {
+        let mut setup = live_script();
+        let mut row = task();
+        let within = if variant == 0 {
+            DraftBounds::Goal {
+                pool_left: 1,
+                charters: List::with_capacity(33),
+                latest: None,
+                budget: 1,
+                maximum_budget: 2,
+                maximum_deadline: None,
+            }
+        } else {
+            let mut direct = authority();
+            let mut ceiling = authority();
+            let mut grants = list(vec![]);
+            if variant == 1 {
+                grants = List::with_capacity(33);
+            }
+            if variant == 2 {
+                direct.tools = List::with_capacity(33);
+            }
+            if variant == 3 {
+                ceiling.grants = list(vec![Grant {
+                    connector: 1,
+                    kind: 1,
+                    pattern: Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap(),
+                }]);
+            }
+            if variant == 4 {
+                ceiling.note_scopes = List::with_capacity(33);
+            }
+            DraftBounds::Amend { budget_left: 1, grants, authority: Box::new(direct), ceiling: Box::new(ceiling) }
+        };
+        row.acts = list(vec![Offered {
+            act: ActKind::Amend,
+            admission: Admission::Bounded { within, beyond: Beyond::Proposed { to: Recipient::Party(2) } },
+        }]);
+        setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+        assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload), "all nested bounded facts are priced");
+    }
 }

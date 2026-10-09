@@ -161,6 +161,7 @@ pub(crate) fn document(
     }
     order_spend(&mut document.spend_lines);
     domain.project_page.document = Some(document);
+    goals::sync(domain);
     let section = match domain.address {
         Address::Project { section, .. } => section,
         Address::Inbox { .. } | Address::Conversations { .. } | Address::Task { .. } | Address::Deployment => return,
