@@ -149,7 +149,18 @@ impl Domain {
             return false;
         };
         let until = self.now.saturating_add(self.linger);
-        object.card = crate::objects::Card::Leaving { ending, until };
+        object.card = crate::objects::Card::Leaving { how: crate::objects::Left::Ended { how: ending }, until };
+        self.timers.arm(Timer::Linger(id), until).expect("one linger deadline per object fits");
+        self.changed();
+        true
+    }
+    /// Keeps the durable outcome on a card until its configured linger ends.
+    pub fn leave_answer(&mut self, id: Id<crate::objects::Object>, outcome: crate::contract::Outcome) -> bool {
+        let Some(object) = self.objects.get_mut(id) else {
+            return false;
+        };
+        let until = self.now.saturating_add(self.linger);
+        object.card = crate::objects::Card::Leaving { how: crate::objects::Left::Answered { outcome }, until };
         self.timers.arm(Timer::Linger(id), until).expect("one linger deadline per object fits");
         self.changed();
         true
@@ -468,7 +479,13 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Progress { request, progress } => crate::intents::progress(domain, request, progress),
         Event::Answered { request, answer } => crate::intents::answered(domain, request, answer, out),
         Event::SignedOut => signed_out(domain, out),
-        Event::Read { read, result } => crate::pages::routing::read_result(domain, env, read, result, out),
+        Event::Read { read, result } => {
+            if crate::objects::is_card_read(domain, read) {
+                crate::objects::read_card(domain, read, result, out);
+            } else {
+                crate::pages::routing::read_result(domain, env, read, result, out);
+            }
+        }
     }
     crate::signin::returned(domain, env, out);
     crate::clock::sync(domain);
@@ -534,7 +551,9 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 },
                 Owner::Page { generation } => {
                     if generation == domain.generation {
+                        crate::objects::dropping(domain, id, &delivery);
                         crate::pages::routing::delivery(domain, env, id, delivery, out);
+                        crate::objects::read_dropped(domain, out);
                     }
                 }
             }

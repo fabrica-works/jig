@@ -262,6 +262,8 @@ pub enum FailureClass {
 /// A held task escalation and the hold it names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Escalation {
+    /// Its committed terminal decision when read after leaving the inbox.
+    pub ending: Option<Ending>,
     pub task: Chip,
     pub hold: Hold,
     pub waiting: Recipient,

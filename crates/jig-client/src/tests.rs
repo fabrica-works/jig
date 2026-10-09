@@ -31,3 +31,5 @@ mod storage;
 mod lifecycle;
 
 mod time;
+
+mod objects;

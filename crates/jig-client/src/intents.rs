@@ -192,16 +192,25 @@ pub(crate) fn answered(domain: &mut crate::Domain, request: Token, answer: Answe
         Origin::Program { asked } => out.push(Request::Answered { asked, answer: receipt.answer }),
         Origin::Card { object, .. } => {
             if let Some(id) = domain.objects.find(object) {
-                if domain.objects.get(id).expect("named card exists").sources.is_empty() {
+                if !domain.objects.get(id).expect("named card exists").shown {
                     crate::notices::show(
                         domain,
                         crate::notices::Kind::Answer { object, answer: receipt.answer.clone() },
                     );
                 }
-                let card = &mut domain.objects.get_mut(id).expect("named card exists").card;
                 match receipt.answer {
-                    Answer::Refused(refusal) => *card = crate::objects::Card::Refused { refusal },
-                    Answer::Done(_) => *card = crate::objects::Card::Open,
+                    Answer::Refused(refusal) => {
+                        domain.objects.get_mut(id).expect("named card exists").card =
+                            crate::objects::Card::Refused { refusal };
+                    }
+                    Answer::Done(outcome) => {
+                        if crate::objects::stops_waiting(object, &outcome) {
+                            let left = domain.leave_answer(id, outcome);
+                            assert!(left, "answered card exists");
+                        } else {
+                            domain.objects.get_mut(id).expect("named card exists").card = crate::objects::Card::Open;
+                        }
+                    }
                 }
                 domain.objects.prune();
                 domain.changed();

@@ -1,9 +1,20 @@
 //! The page's objects, held once by key and named by explicit source sets.
 //! A source replacement first preserves objects it still names, then prunes and
 //! admits new names in order. Pending and leaving cards survive without sources.
-//! Jig 21 owns card transitions and each object's acts; client/domain/client.md, 5.
+//! Documents carry facts, never authority judgments or phrases computed here.
+//! Entry points name, put, reply and replace preserve one card per object;
+//! `dropping` and `read_card` obtain terminal facts without ending a pending request.
+//! See client/domain/client.md, 5, and client/domain/objects.md, 2–8.
+//!
+//! | Card | Event | Next | Emits |
+//! |---|---|---|---|
+//! | open/refused | last source drops it | leaving/looking | terminal read |
+//! | deciding | last source drops it | deciding | nothing |
+//! | deciding | durable answer | refused or leaving | notice only if hidden |
+//! | leaving/looking | terminal document | leaving/ended | linger armed |
+//! | leaving | linger expires | gone | nothing |
 use crate::{
-    contract::{Chip, Ending, Escalation, ObjectKey, PersonTask, Proposal, Question, Refusal, Result, Task},
+    contract::{Chip, Ending, Escalation, ObjectKey, Outcome, PersonTask, Proposal, Question, Refusal, Result, Task},
     intents::Progress,
     watches::Watch,
 };
@@ -22,6 +33,8 @@ pub enum Source {
     Watch(Id<Watch>),
     /// A concrete window of one page generation.
     Window { generation: u32, number: u16 },
+    /// A disappearing card reads its terminal facts without naming itself.
+    Card(Id<Object>),
 }
 /// The facts held for an object, with independently moving revisions inside.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -41,7 +54,22 @@ pub enum Body {
     /// A result.
     Result(Box<Result>),
 }
-/// A card's state; jig 21 completes transitions driven by an intent.
+/// Why a card leaves, with durable facts preserved for its view.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Left {
+    /// Its source dropped it; the terminal document has not arrived.
+    Looking,
+    /// Its request received a durable outcome.
+    Answered { outcome: Outcome },
+    /// Its terminal document says how it ended.
+    Ended { how: Ending },
+    /// Its terminal facts are no longer available.
+    Unknown,
+}
+/// A card follows its request until its durable answer.
+/// Open/refused + source drop -> leaving/looking + terminal read;
+/// deciding + source drop -> deciding; answer -> refused or leaving;
+/// leaving + terminal document -> leaving/ended; linger -> removed.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Card {
     /// Available for an offered act.
@@ -51,7 +79,7 @@ pub enum Card {
     /// Refused, with facts kept on its card.
     Refused { refusal: Refusal },
     /// Ended and still shown until its linger expires.
-    Leaving { ending: Ending, until: Time },
+    Leaving { how: Left, until: Time },
 }
 /// One object and the sources that still name it.
 #[derive(Debug)]
@@ -60,6 +88,10 @@ pub struct Object {
     pub body: Option<Body>,
     pub sources: Set<Source>,
     pub card: Card,
+    /// Whether this card belongs to the current page, even after a source drops it.
+    pub shown: bool,
+    /// Navigation facts for an unread reply on this chat.
+    pub reply: Option<result::Reply>,
 }
 /// A bounded working set, with spare slab slots for retired objects in a step.
 #[derive(Debug)]
@@ -95,6 +127,11 @@ impl Objects {
     pub fn find(&self, key: ObjectKey) -> Option<Id<Object>> {
         self.index.get(&key).copied()
     }
+    /// Current card handles, including cards waiting for terminal facts or lingering.
+    #[must_use]
+    pub const fn ids(&self) -> &Map<ObjectKey, Id<Object>> {
+        &self.index
+    }
     /// Whether a specific source successfully names this object.
     #[must_use]
     pub fn named(&self, key: ObjectKey, source: Source) -> bool {
@@ -118,7 +155,17 @@ impl Objects {
         if let Some(id) = self.find(key) {
             let object = self.slab.get_mut(id).expect("indexed object exists");
             match object.sources.insert(source) {
-                Ok(_) => return Some(id),
+                Ok(_) => {
+                    object.shown = true;
+                    match &object.card {
+                        Card::Leaving { how: Left::Looking, .. } => object.card = Card::Open,
+                        Card::Open
+                        | Card::Deciding { .. }
+                        | Card::Refused { .. }
+                        | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => {}
+                    }
+                    return Some(id);
+                }
                 Err(_) => return None,
             }
         }
@@ -130,7 +177,7 @@ impl Objects {
             Ok(_) => {}
             Err(_) => return None,
         }
-        let object = Object { key, body: None, sources, card: Card::Open };
+        let object = Object { key, body: None, sources, card: Card::Open, shown: true, reply: None };
         let Ok(id) = self.slab.insert(object) else {
             return None;
         };
@@ -140,6 +187,9 @@ impl Objects {
     }
     /// Replaces only the facts, preserving one card and its source set.
     pub fn put(&mut self, key: ObjectKey, body: Body) -> bool {
+        if body.key() != key {
+            return false;
+        }
         let Some(id) = self.find(key) else {
             return false;
         };
@@ -212,8 +262,19 @@ impl Objects {
         }
         excess
     }
-    /// Clears page sources while pending and leaving objects remain held.
+    /// Clears page sources while pending and completed leaving objects remain held.
     pub fn clear(&mut self) {
+        for (_, id) in &self.index {
+            let object = self.slab.get_mut(*id).expect("indexed object exists");
+            object.shown = false;
+            match &object.card {
+                Card::Leaving { how: Left::Looking, .. } => object.card = Card::Open,
+                Card::Open
+                | Card::Deciding { .. }
+                | Card::Refused { .. }
+                | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => {}
+            }
+        }
         for (_, id) in &self.index {
             let sources = &mut self.slab.get_mut(*id).expect("indexed object exists").sources;
             for _ in 0..sources.len() {
@@ -250,6 +311,13 @@ impl Objects {
             }
         }
     }
+    /// Attaches a chat's reply navigation without replacing its task facts or card.
+    pub fn reply(&mut self, source: Source, line: crate::contract::ConversationLine) -> Option<Id<Object>> {
+        let reply = result::Reply::from_line(line)?;
+        let id = self.name(ObjectKey::Task(reply.chat), source)?;
+        self.slab.get_mut(id).expect("named chat exists").reply = Some(reply);
+        Some(id)
+    }
     /// Frees retired slots at the application's reclaim point.
     pub fn reclaim(&mut self) {
         self.slab.reclaim();
@@ -270,9 +338,275 @@ fn retained(object: &Object) -> bool {
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let slots = limits.objects.checked_mul(2)?;
-    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes.checked_mul(2)?)?;
+    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes.checked_mul(3)?)?;
     Slab::<Object>::worst_case(slots)?
         .checked_add(Map::<ObjectKey, Id<Object>>::worst_case(limits.objects)?)?
         .checked_add(List::<ObjectKey>::worst_case(limits.objects)?)?
         .checked_add(u64::from(slots).checked_mul(payload)?)
+}
+
+/// Whether this answer ends the waiting object rather than steering a live task.
+#[must_use]
+pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
+    match outcome {
+        Outcome::Proposed { .. } => false,
+        Outcome::Made { .. } | Outcome::Decided { .. } | Outcome::DecidedFirst { .. } | Outcome::Changed => match key {
+            ObjectKey::Proposal(_)
+            | ObjectKey::Escalation(_)
+            | ObjectKey::Question { .. }
+            | ObjectKey::PersonTask(_) => true,
+            ObjectKey::Task(_) | ObjectKey::Result(_) => false,
+        },
+    }
+}
+
+fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<bool> {
+    use crate::contract::Delivery;
+    match value {
+        Delivery::Frame(_) | Delivery::Run(_) | Delivery::Deployment(_) | Delivery::Conversations(_) => None,
+        Delivery::Task(task) => Some(key == ObjectKey::Task(task.chip.task)),
+        Delivery::Inbox(inbox) => {
+            for entry in &inbox.entries {
+                if entry.object == key {
+                    return Some(true);
+                }
+            }
+            Some(false)
+        }
+        Delivery::Tree(tree) => {
+            for node in &tree.nodes {
+                if key == ObjectKey::Task(node.chip.task) {
+                    return Some(true);
+                }
+            }
+            Some(false)
+        }
+        Delivery::Chips(chips) => {
+            for chip in chips {
+                if key == ObjectKey::Task(chip.task) {
+                    return Some(true);
+                }
+            }
+            Some(false)
+        }
+        Delivery::Goals(goals) => {
+            for row in &goals.rows {
+                if key == ObjectKey::Task(row.chip.task) {
+                    return Some(true);
+                }
+            }
+            Some(false)
+        }
+    }
+}
+/// Protects disappearing cards before the source replacement prunes its names.
+pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &crate::contract::Delivery) {
+    let source = Source::Watch(watch);
+    for (key, id) in &domain.objects.index {
+        let object = domain.objects.slab.get_mut(*id).expect("indexed object exists");
+        if object.sources.len() == 1 && object.sources.contains(&source) && delivered_name(value, *key) == Some(false) {
+            match object.card {
+                Card::Open | Card::Refused { .. } => {
+                    object.card = Card::Leaving { how: Left::Looking, until: domain.now.saturating_add(domain.linger) };
+                }
+                Card::Deciding { .. } | Card::Leaving { .. } => {}
+            }
+        }
+    }
+}
+fn document_read(key: ObjectKey) -> crate::contract::Read {
+    use crate::contract::Read;
+    match key {
+        ObjectKey::Task(task) => Read::Task { task },
+        ObjectKey::Proposal(proposal) => Read::Proposal { proposal },
+        ObjectKey::Escalation(task) => Read::Escalation { task },
+        ObjectKey::Question { task, message } => Read::Question { task, message },
+        ObjectKey::PersonTask(task) => Read::PersonTask { task },
+        ObjectKey::Result(task) => Read::Result { task },
+    }
+}
+/// Requests terminal facts for leaving cards, without inventing an ending.
+pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queue<crate::Request>) {
+    for (_, id) in &domain.objects.index {
+        let object = domain.objects.slab.get(*id).expect("indexed object exists");
+        let looking = match &object.card {
+            Card::Leaving { how, .. } => match how {
+                Left::Looking => true,
+                Left::Answered { .. } | Left::Ended { .. } | Left::Unknown => false,
+            },
+            Card::Open | Card::Deciding { .. } | Card::Refused { .. } => false,
+        };
+        if looking {
+            let what = document_read(object.key);
+            if !domain.reads.pending(&what) {
+                let read = domain.reads.ask(domain.generation, Source::Card(*id), what, out);
+                if read.is_none() {
+                    domain.objects.slab.get_mut(*id).expect("indexed object exists").card =
+                        Card::Refused { refusal: Refusal::Limit { which: crate::contract::Limit::Reads } };
+                }
+            }
+        }
+    }
+    domain.changed();
+}
+/// Recognises a terminal read owned by a lingering card.
+fn read_key(what: &crate::contract::Read) -> Option<ObjectKey> {
+    use crate::contract::Read;
+    match what {
+        Read::Task { task } => Some(ObjectKey::Task(*task)),
+        Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
+        Read::Escalation { task } => Some(ObjectKey::Escalation(*task)),
+        Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
+        Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
+        Read::Result { task } => Some(ObjectKey::Result(*task)),
+        Read::Frame
+        | Read::Ended { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::InboxGroup { .. }
+        | Read::Conversations { .. }
+        | Read::Goals { .. }
+        | Read::Project { .. }
+        | Read::Notes { .. }
+        | Read::Deployment => None,
+    }
+}
+pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
+    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+        return false;
+    };
+    match read.source {
+        Source::Card(_) => true,
+        Source::Watch(_) | Source::Window { .. } => {
+            let Some(key) = read_key(&read.what) else {
+                return false;
+            };
+            let Some(id) = domain.objects.find(key) else {
+                return false;
+            };
+            match &domain.objects.get(id).expect("indexed object exists").card {
+                Card::Leaving { how: Left::Looking, .. } => true,
+                Card::Open
+                | Card::Deciding { .. }
+                | Card::Refused { .. }
+                | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => false,
+            }
+        }
+    }
+}
+/// Applies a card's terminal read without replacing the whole page on failure.
+pub(crate) fn read_card(
+    domain: &mut crate::Domain,
+    token: Token,
+    result: crate::contract::ReadResult,
+    out: &mut skein_lib::Queue<crate::Request>,
+) {
+    use crate::contract::{ReadNone, ReadResult, ReadValue};
+    let Some(receipt) = domain.reads.terminal(token) else {
+        return;
+    };
+    if receipt.abandoned || receipt.generation != domain.generation {
+        return;
+    }
+    let id = match receipt.source {
+        Source::Card(id) => id,
+        Source::Watch(_) | Source::Window { .. } => {
+            let Some(key) = read_key(&receipt.what) else {
+                return;
+            };
+            let Some(id) = domain.objects.find(key) else {
+                return;
+            };
+            id
+        }
+    };
+    let Some(object) = domain.objects.get(id) else {
+        return;
+    };
+    let key = object.key;
+    let leaving = match &object.card {
+        Card::Leaving { how: Left::Looking, .. } => true,
+        Card::Open | Card::Refused { .. } => false,
+        Card::Deciding { .. }
+        | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => return,
+    };
+    let body = match result {
+        ReadResult::Value(value) => match value {
+            ReadValue::Task(task) => Some(Body::Task(task)),
+            ReadValue::Proposal(proposal) => Some(Body::Proposal(proposal)),
+            ReadValue::Escalation(escalation) => Some(Body::Escalation(escalation)),
+            ReadValue::Question(question) => Some(Body::Question(question)),
+            ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
+            ReadValue::Result(result) => Some(Body::Result(result)),
+            ReadValue::Frame(_)
+            | ReadValue::Inbox(_)
+            | ReadValue::Activity(_)
+            | ReadValue::History(_)
+            | ReadValue::Conversations(_)
+            | ReadValue::Ended(_)
+            | ReadValue::Goals(_)
+            | ReadValue::Project(_)
+            | ReadValue::Notes(_)
+            | ReadValue::Deployment(_) => None,
+        },
+        ReadResult::None(why) => {
+            match why {
+                ReadNone::SignedOut => crate::domain::signed_out(domain, out),
+                ReadNone::Unknown | ReadNone::Gone | ReadNone::Refused | ReadNone::Busy | ReadNone::Unreachable => {}
+            }
+            None
+        }
+    };
+    if let Some(body) = body {
+        let stored = domain.objects.put(key, body);
+        if !stored {
+            return;
+        }
+    }
+    if !leaving {
+        domain.changed();
+        return;
+    }
+    let how = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
+        Some(body) => match body.ending() {
+            Some(ending) => Left::Ended { how: ending.clone() },
+            None => Left::Unknown,
+        },
+        None => Left::Unknown,
+    };
+    let until = domain.now.saturating_add(domain.linger);
+    domain.objects.get_mut(id).expect("terminal card exists").card = Card::Leaving { how, until };
+    domain.timers.arm(crate::domain::Timer::Linger(id), until).expect("one linger timer per object fits");
+    domain.changed();
+}
+impl Body {
+    /// The object named by these facts, validated before replacing a body.
+    #[must_use]
+    pub fn key(&self) -> ObjectKey {
+        match self {
+            Self::Chip(chip) => ObjectKey::Task(chip.task),
+            Self::Task(task) => ObjectKey::Task(task.chip.task),
+            Self::Proposal(proposal) => ObjectKey::Proposal(proposal.key),
+            Self::Escalation(escalation) => ObjectKey::Escalation(escalation.task.task),
+            Self::Question(question) => ObjectKey::Question { task: question.task.task, message: question.message },
+            Self::PersonTask(task) => ObjectKey::PersonTask(task.task.task),
+            Self::Result(result) => ObjectKey::Result(result.task.task),
+        }
+    }
+    /// The ending a terminal document supplies, never inferred from its phase.
+    #[must_use]
+    pub fn ending(&self) -> Option<&Ending> {
+        match self {
+            Self::Task(task) => match &task.result {
+                Some(result) => Some(&result.ending),
+                None => None,
+            },
+            Self::Proposal(proposal) => proposal.ending.as_ref(),
+            Self::Question(question) => question.ending.as_ref(),
+            Self::PersonTask(task) => task.ending.as_ref(),
+            Self::Result(result) => Some(&result.ending),
+            Self::Escalation(escalation) => escalation.ending.as_ref(),
+            Self::Chip(_) => None,
+        }
+    }
 }
