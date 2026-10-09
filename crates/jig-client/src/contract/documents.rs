@@ -37,6 +37,8 @@ pub struct ProjectRole {
     pub chats: List<Charter>,
     pub goals: List<Charter>,
     pub pool: Budget,
+    /// The role default used by the project chat charter.
+    pub chat_budget: u64,
 }
 
 /// An offered charter for a chat or goal.
@@ -464,6 +466,10 @@ pub enum InboxGroup {
 /// An entry names an object, project and read position.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InboxEntry {
+    pub lineage: List<Chip>,
+    pub goal: Option<u64>,
+    pub recipient: Option<Recipient>,
+    pub stall: Option<Wall>,
     pub object: ObjectKey,
     pub project: u32,
     pub group: InboxGroup,
@@ -492,6 +498,9 @@ pub struct ReplyPosition {
 /// A chat in the party conversations list.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ConversationLine {
+    pub runtime: Runtime,
+    pub delegates: u32,
+    pub budget: Budget,
     pub chip: Chip,
     pub project: u32,
     pub first_words: Text,
@@ -704,6 +713,8 @@ pub enum Runtime {
     Starting,
     /// A run is writing or calling a tool.
     Running { attempt: u32, since: Wall, tool: Option<Text> },
+    /// A live run keeps its slot while waiting for the person.
+    WaitingForWords { attempt: u32, since: Wall },
     /// A failed attempt waits until its retry time.
     BackingOff { at: Wall, attempt: u32, tries: u32, class: FailureClass, reason: Text },
     /// A connector procedure is active, shown in its panel.

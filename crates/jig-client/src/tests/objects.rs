@@ -94,7 +94,17 @@ fn inbox(keys: &[ObjectKey]) -> Delivery {
     let mut entries = List::with_capacity(2);
     for key in keys {
         entries
-            .push(InboxEntry { object: *key, project: 1, group: InboxGroup::Proposals, position: 1, at: Wall::EPOCH })
+            .push(InboxEntry {
+                lineage: List::with_capacity(0),
+                goal: None,
+                recipient: None,
+                stall: None,
+                object: *key,
+                project: 1,
+                group: InboxGroup::Proposals,
+                position: 1,
+                at: Wall::EPOCH,
+            })
             .unwrap();
     }
     Delivery::Inbox(Box::new(Inbox {
@@ -172,6 +182,9 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
         }
     }
     let line = ConversationLine {
+        runtime: Runtime::Idle,
+        delegates: 0,
+        budget: Budget { total: 0, own: 0, ended: 0, reserved: 0, left: 0, funder: Actor::Party(7) },
         chip: chip(9),
         project: 1,
         first_words: text(b"first words"),

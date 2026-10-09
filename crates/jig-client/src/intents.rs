@@ -36,6 +36,8 @@ use skein_lib::{Id, Map, Queue, Slab};
 pub enum Origin {
     /// An object's act; a second press joins by object and act.
     Card { object: ObjectKey, act: ActKind },
+    /// A page's request, with the generation that originated it.
+    Page { generation: u32, purpose: crate::pages::IntentPurpose },
     /// A caller's by-value ask; its token receives the one answer.
     Program { asked: Token },
 }
@@ -182,14 +184,24 @@ pub(crate) fn progress(domain: &mut crate::Domain, request: Token, progress: Pro
             }
         }
         Origin::Program { .. } => {}
+        Origin::Page { .. } => domain.changed(),
     }
 }
-pub(crate) fn answered(domain: &mut crate::Domain, request: Token, answer: Answer, out: &mut Queue<Request>) {
+pub(crate) fn answered(
+    domain: &mut crate::Domain,
+    env: &skein_lib::Env<crate::Limits>,
+    request: Token,
+    answer: Answer,
+    out: &mut Queue<Request>,
+) {
     let Some(receipt) = domain.intents.terminal(request, answer) else {
         return;
     };
     match receipt.origin {
         Origin::Program { asked } => out.push(Request::Answered { asked, answer: receipt.answer }),
+        Origin::Page { generation, purpose } => {
+            crate::pages::conversations::answered(domain, env, request, generation, purpose, receipt.answer, out);
+        }
         Origin::Card { object, .. } => {
             if let Some(id) = domain.objects.find(object) {
                 if !domain.objects.get(id).expect("named card exists").shown {

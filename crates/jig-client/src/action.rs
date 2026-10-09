@@ -29,6 +29,14 @@ pub enum Act {
     Filter { group: InboxGroup, project: Option<u32> },
     /// Read more at a window end.
     More { window: Token, end: End },
+    /// Set the inbox's project, kind and goal filters.
+    FilterInbox { filter: crate::pages::inbox::Filter },
+    /// Open updates and mark the newest result shown as seen.
+    OpenUpdates,
+    /// Start a chat in the selected project from its first-words field.
+    StartChat { project: u32 },
+    /// Open a listed chat and mark its replies through what was displayed.
+    OpenChat { task: u64 },
     /// Choose a sign in provider.
     SignIn { provider: u16 },
 }

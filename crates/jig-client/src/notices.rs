@@ -15,6 +15,8 @@ pub enum Kind {
     Link(Link),
     /// A durable answer for a card no longer shown.
     Answer { object: ObjectKey, answer: Answer },
+    /// A durable page request answer whose page no longer shows it.
+    PageAnswer { answer: Answer },
     /// A refusal with no page or card to show it on.
     Refused(Limit),
 }

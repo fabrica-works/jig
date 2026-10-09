@@ -61,6 +61,8 @@ pub struct Domain {
     pub(crate) frame: FrameState,
     pub(crate) link: Link,
     pub(crate) page: Page,
+    pub(crate) inbox: crate::pages::inbox::Inbox,
+    pub(crate) chats: crate::pages::conversations::State,
     pub(crate) navigation: crate::pages::navigation::Navigation,
     pub(crate) updates_count: u32,
     pub(crate) address: Address,
@@ -102,6 +104,8 @@ impl Domain {
             frame: FrameState { document: None },
             link: Link::Starting,
             page: Page::Starting,
+            inbox: crate::pages::inbox::Inbox::new(limits.rows),
+            chats: crate::pages::conversations::State::new(),
             navigation: crate::pages::navigation::Navigation::new(limits.navigation_entries),
             updates_count: limits.updates_count,
             address: Address::Inbox { project: None },
@@ -133,6 +137,16 @@ impl Domain {
         }
         self.navigation = navigation;
         Ok(())
+    }
+    /// Inbox context, filters and historical cursors for its shared cards.
+    #[must_use]
+    pub const fn inbox(&self) -> &crate::pages::inbox::Inbox {
+        &self.inbox
+    }
+    /// The new-chat form's request and factual refusal.
+    #[must_use]
+    pub const fn chats(&self) -> &crate::pages::conversations::State {
+        &self.chats
     }
     /// Configured destinations, in the application's order.
     #[must_use]
@@ -524,18 +538,32 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             },
             Act::Dismiss => crate::notices::dismiss_first(domain),
             Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
-            Act::Submit { .. }
-            | Act::Intend { .. }
-            | Act::Choose { .. }
-            | Act::Confirm
-            | Act::Fold { .. }
-            | Act::Filter { .. }
-            | Act::More { .. } => {}
+            Act::StartChat { project } => crate::pages::conversations::start(domain, env, project, out),
+            Act::OpenChat { task } => crate::pages::conversations::open_chat(domain, env, task, out),
+            Act::OpenUpdates => crate::pages::conversations::open_updates(domain, out),
+            Act::FilterInbox { filter } => crate::pages::conversations::filter_inbox(domain, filter, out),
+            Act::Filter { group, project } => crate::pages::conversations::filter_inbox(
+                domain,
+                crate::pages::inbox::Filter { project, kind: Some(group), goal: None },
+                out,
+            ),
+            Act::More { window, end } => crate::pages::conversations::more(domain, window, end, out),
+            Act::Submit { field: crate::fields::Purpose::NewChat } => {
+                let project = match domain.address {
+                    Address::Conversations { project } | Address::Inbox { project } => project,
+                    Address::Project { project, .. } => Some(project),
+                    Address::Task { .. } | Address::Deployment => None,
+                };
+                if let Some(project) = project {
+                    crate::pages::conversations::start(domain, env, project, out);
+                }
+            }
+            Act::Submit { .. } | Act::Intend { .. } | Act::Choose { .. } | Act::Confirm | Act::Fold { .. } => {}
         },
         Event::Start { .. } => {}
         Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
         Event::Progress { request, progress } => crate::intents::progress(domain, request, progress),
-        Event::Answered { request, answer } => crate::intents::answered(domain, request, answer, out),
+        Event::Answered { request, answer } => crate::intents::answered(domain, env, request, answer, out),
         Event::SignedOut => signed_out(domain, out),
         Event::Read { read, result } => {
             if crate::objects::is_card_read(domain, read) {

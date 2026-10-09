@@ -27,3 +27,12 @@ pub enum Page {
     /// Kept work belongs to another party and stays hidden.
     SomeoneElse,
 }
+
+/// The page policy awaiting a durable keyed answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum IntentPurpose {
+    /// A new chat whose task page opens once made.
+    StartChat,
+    /// One explicitly opened read position.
+    Seen(crate::contract::Seen),
+}

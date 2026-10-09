@@ -81,6 +81,12 @@ pub(crate) fn navigate(
     out.push(Request::PartsLeft { generation: domain.generation });
     domain.objects.clear();
     domain.clock.page_times = false;
+    domain.inbox.rows.clear();
+    domain.inbox.reading = None;
+    domain.inbox.before = None;
+    domain.inbox.after = None;
+    domain.inbox.more = false;
+    domain.inbox.opening_updates = false;
     domain.object_rows.rows.clear();
     domain.object_rows.edges = blank_edges();
     domain.conversation_rows.rows.clear();
@@ -146,8 +152,14 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         Page::Work { address: domain.address, generation: domain.generation, behind: false, excess: 0, refused: None };
     domain.changed();
     match domain.address {
-        Address::Inbox { .. } => open(domain, env, Subject::Inbox { window: env.limits.rows }, out),
-        Address::Conversations { .. } => open(domain, env, Subject::Conversations, out),
+        Address::Inbox { project } => {
+            domain.inbox.filter = crate::pages::inbox::Filter { project, kind: None, goal: None };
+            open(domain, env, Subject::Inbox { window: env.limits.rows }, out);
+        }
+        Address::Conversations { project } => {
+            open(domain, env, Subject::Conversations, out);
+            read(domain, 11, Read::Conversations { project, after: None }, out);
+        }
         Address::Task { task, section } => {
             open(domain, env, Subject::Task { task }, out);
             match section {
@@ -306,14 +318,23 @@ pub(crate) fn delivery(
             }
         }
         Delivery::Inbox(inbox) => {
-            let mut keys = List::with_capacity(env.limits.rows);
-            for entry in &inbox.entries {
-                match keys.push(entry.object) {
-                    Ok(()) => {}
-                    Err(_) => break,
+            domain.inbox.needs = inbox.needs;
+            domain.inbox.updates = inbox.updates;
+            domain.inbox.marked_results = domain.inbox.marked_results.max(inbox.results_seen);
+            domain.inbox.more = inbox.more;
+            if domain.inbox.before.is_none() {
+                domain.inbox.replace(inbox.entries);
+                let mut keys = List::with_capacity(env.limits.rows);
+                for entry in &domain.inbox.rows {
+                    if keys.push(entry.object).is_err() {
+                        break;
+                    }
                 }
+                names(domain, env, source, keys, out);
+                crate::pages::conversations::mark_results(domain, out);
             }
-            names(domain, env, source, keys, out);
+            domain.timed_page(!domain.inbox.rows.is_empty());
+            domain.changed();
         }
         Delivery::Goals(goals) => {
             let mut keys = List::with_capacity(env.limits.rows);
@@ -333,11 +354,13 @@ pub(crate) fn delivery(
             }
         }
         Delivery::Conversations(conversations) => {
-            // A watch replaces its bounded live rows. Historical cursors come
-            // from a read page, which the conversations owner requests.
+            domain.chats.more = conversations.more;
             if domain.conversation_rows.edges.reaches(End::Before) {
                 domain.conversation_rows.rows.clear();
-                let dropped = domain.conversation_rows.slide(conversations.rows, blank_edges(), End::Before);
+                let mut rows = conversations.rows;
+                filter_chats(domain.address, &mut rows);
+                crate::pages::conversations::order(&mut rows);
+                let dropped = domain.conversation_rows.slide(rows, blank_edges(), End::Before);
                 if dropped > 0 {
                     refuse(domain, Limit::Objects);
                 }
@@ -367,6 +390,15 @@ pub(crate) fn read_result(
     };
     if receipt.abandoned || receipt.generation != domain.generation {
         return;
+    }
+    match receipt.source {
+        Source::Window { number: 10, .. } => {
+            if domain.inbox.reading != Some(token) {
+                return;
+            }
+            domain.inbox.reading = None;
+        }
+        Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
     }
     match result {
         ReadResult::None(why) => match why {
@@ -434,21 +466,30 @@ fn read_value(
         }
         ReadValue::Conversations(page) => {
             let edges = page_edges(page.before, page.after);
-            let dropped = domain.conversation_rows.slide(page.rows, edges, End::After);
+            let mut rows = page.rows;
+            filter_chats(domain.address, &mut rows);
+            crate::pages::conversations::order(&mut rows);
+            let dropped = domain.conversation_rows.slide(rows, edges, End::After);
             if dropped > 0 {
                 domain.changed();
             }
+            crate::pages::conversations::order(&mut domain.conversation_rows.rows);
             domain.changed();
         }
         ReadValue::Inbox(page) => {
+            domain.inbox.before = page.before;
+            domain.inbox.after = page.after;
+            domain.inbox.more = domain.inbox.after.is_some();
+            domain.inbox.replace(page.rows);
             let mut keys = List::with_capacity(env.limits.rows);
-            for entry in &page.rows {
-                match keys.push(entry.object) {
-                    Ok(()) => {}
-                    Err(_) => break,
+            for entry in &domain.inbox.rows {
+                if keys.push(entry.object).is_err() {
+                    break;
                 }
             }
             names(domain, env, source, keys, out);
+            crate::pages::conversations::mark_results(domain, out);
+            domain.changed();
         }
         ReadValue::Ended(page) => {
             let mut keys = List::with_capacity(env.limits.rows);
@@ -480,4 +521,19 @@ fn read_value(
         ReadValue::Project(project) => parts(domain, env, project.parts.as_slice(), out),
         ReadValue::Deployment(deployment) => parts(domain, env, deployment.parts.as_slice(), out),
     }
+}
+
+fn filter_chats(address: Address, rows: &mut List<contract::ConversationLine>) {
+    let project = match address {
+        Address::Conversations { project } => project,
+        Address::Inbox { .. } | Address::Task { .. } | Address::Project { .. } | Address::Deployment => None,
+    };
+    let mut filtered = List::with_capacity(rows.capacity());
+    let incoming = core::mem::replace(rows, List::with_capacity(0));
+    for row in incoming.into_boxed() {
+        if project.is_none() || project == Some(row.project) {
+            filtered.push(row).expect("filter does not add rows");
+        }
+    }
+    *rows = filtered;
 }

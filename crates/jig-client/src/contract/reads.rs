@@ -37,6 +37,8 @@ pub enum Read {
     Activity { task: u64, before: Option<Cursor> },
     /// A filtered inbox group.
     InboxGroup { group: InboxGroup, project: Option<u32>, after: Option<Cursor> },
+    /// A filtered inbox window, including a goal subtree filter.
+    Inbox { project: Option<u32>, kind: Option<InboxGroup>, goal: Option<u64>, after: Option<Cursor> },
     /// Party conversations.
     Conversations { project: Option<u32>, after: Option<Cursor> },
     /// Live or ended goals.

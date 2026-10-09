@@ -75,6 +75,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;
     total = total.checked_add(List::<crate::pages::navigation::Destination>::worst_case(limits.navigation_entries)?)?;
+    total = total.checked_add(crate::pages::conversations::worst_case(limits)?)?;
     total = total.checked_add(crate::intents::worst_case(limits)?)?;
     total = total.checked_add(crate::notices::worst_case(limits)?)?;
     total = total.checked_add(crate::fields::worst_case(limits)?)?;

@@ -28,6 +28,9 @@ fn chip(task: u64) -> Chip {
 }
 fn conversation(task: u64) -> ConversationLine {
     ConversationLine {
+        runtime: Runtime::Idle,
+        delegates: 0,
+        budget: Budget { total: 0, own: 0, ended: 0, reserved: 0, left: 0, funder: Actor::Party(7) },
         chip: chip(task),
         project: 1,
         first_words: text(b"words"),

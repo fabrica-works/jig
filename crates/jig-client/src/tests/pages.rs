@@ -24,6 +24,7 @@ fn project(number: u32, chats: bool) -> ProjectRole {
         name: text(b"shop"),
         roles: List::with_capacity(0),
         chats: charters,
+        chat_budget: 10,
         goals: List::with_capacity(0),
         pool: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(7) },
     }
@@ -139,5 +140,251 @@ fn deployment_without_a_role_is_missing_and_never_watched() {
         if let Request::Open { subject, .. } = request {
             assert_ne!(*subject, Subject::Deployment);
         }
+    }
+}
+
+fn entry(task: u64, group: InboxGroup, at: u64) -> InboxEntry {
+    InboxEntry {
+        object: ObjectKey::Task(task),
+        project: 1,
+        group,
+        position: task,
+        at: skein_lib::Wall::from_nanos(at),
+        lineage: List::with_capacity(0),
+        goal: Some(9),
+        recipient: Some(Recipient::Role { project: 1, role: 2 }),
+        stall: Some(skein_lib::Wall::from_nanos(100)),
+    }
+}
+fn inbox(entries: List<InboxEntry>) -> Inbox {
+    Inbox {
+        entries,
+        needs: Needs { questions: 0, proposals: 2, escalations: 0, person_tasks: 0 },
+        updates: Count { value: 100, limited: true },
+        results_seen: 0,
+        replies_seen: List::with_capacity(0),
+        more: false,
+    }
+}
+fn live_inbox(seed: u64) -> (Domain, skein_lib::Token) {
+    let mut domain = Domain::new(&LIMITS, seed);
+    let f = start(&mut domain, List::with_capacity(0));
+    let page = open_token(&delivered(&mut domain, Time::ZERO, f, frame(7)));
+    (domain, page)
+}
+fn inbox_delivery(domain: &mut Domain, page: skein_lib::Token, entries: List<InboxEntry>) -> Box<[Request]> {
+    drive(
+        domain,
+        Time::ZERO,
+        Event::Watch { watch: page, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(entries)))) },
+    )
+}
+fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
+    ConversationLine {
+        chip: Chip { task, title: text(b"held checkout"), executor: Executor::Agent { charter: 1 }, phase },
+        project: 1,
+        first_words: text(b"help checkout"),
+        unread: Count { value: 1, limited: false },
+        seen: 2,
+        last_reply: 3,
+        changed: skein_lib::Wall::from_nanos(changed),
+        runtime: Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH },
+        delegates: 2,
+        budget: Budget { total: 20, own: 5, ended: 1, reserved: 2, left: 12, funder: Actor::Party(7) },
+    }
+}
+#[test]
+fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder() {
+    for group in [InboxGroup::Proposals, InboxGroup::Results] {
+        let (mut domain, page) = live_inbox(20);
+        let mut rows = List::with_capacity(2);
+        rows.push(entry(8, group, 20)).unwrap();
+        rows.push(entry(7, group, 10)).unwrap();
+        inbox_delivery(&mut domain, page, rows);
+        let first = if crate::pages::inbox::needs(group) { 7 } else { 8 };
+        assert_eq!(domain.inbox().rows.get(0).unwrap().object, ObjectKey::Task(first));
+        assert_eq!(domain.inbox().rows.get(0).unwrap().recipient, Some(Recipient::Role { project: 1, role: 2 }));
+        assert_eq!(domain.inbox().updates, Count { value: 100, limited: true });
+        assert_eq!(crate::pages::inbox::address(ObjectKey::Task(first)), Address::task(first));
+        for filter in [
+            crate::pages::inbox::Filter { project: Some(2), kind: None, goal: None },
+            crate::pages::inbox::Filter { project: None, kind: Some(InboxGroup::Questions), goal: None },
+            crate::pages::inbox::Filter { project: None, kind: None, goal: Some(10) },
+        ] {
+            let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter } });
+            assert!(domain.inbox().rows.is_empty());
+            for request in &out {
+                if let Request::Read { what, .. } = request {
+                    assert_eq!(
+                        *what,
+                        Read::Inbox { project: filter.project, kind: filter.kind, goal: filter.goal, after: None }
+                    );
+                }
+            }
+        }
+    }
+    for party in [7, 8] {
+        let mut domain = Domain::new(&LIMITS, party);
+        let f = start(&mut domain, List::with_capacity(0));
+        let page = open_token(&delivered(&mut domain, Time::ZERO, f, frame(party)));
+        let mut rows = List::with_capacity(1);
+        rows.push(entry(7, InboxGroup::Proposals, 10)).unwrap();
+        inbox_delivery(&mut domain, page, rows);
+        inbox_delivery(&mut domain, page, List::with_capacity(0));
+        assert!(domain.inbox().rows.is_empty());
+    }
+}
+#[test]
+fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
+    let (mut domain, page) = live_inbox(21);
+    drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates });
+    let mut rows = List::with_capacity(2);
+    rows.push(entry(7, InboxGroup::Results, 10)).unwrap();
+    rows.push(entry(8, InboxGroup::Results, 20)).unwrap();
+    let out = inbox_delivery(&mut domain, page, rows.clone());
+    let mut count = 0_u32;
+    for request in &out {
+        if let Request::Send { ask, .. } = request {
+            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Results { through: 8 } });
+            count += 1;
+        }
+    }
+    assert_eq!(count, 1);
+    let out = inbox_delivery(&mut domain, page, rows);
+    for request in &out {
+        if let Request::Send { .. } = request {
+            panic!("passive delivery does not mark read again");
+        }
+    }
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates }).is_empty());
+}
+#[test]
+fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() {
+    let (mut domain, _) = live_inbox(22);
+    let entered =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
+    let mut read = None;
+    for request in &entered {
+        if let Request::Read { read: token, what: Read::Conversations { .. } } = request {
+            read = Some(*token);
+        }
+    }
+    let mut rows = List::with_capacity(2);
+    rows.push(list_entry(7, Phase::Done, 30)).unwrap();
+    rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
+    let cursor = Cursor { value: text(b"next") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read.unwrap(),
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, 8);
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().delegates, 2);
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().budget.own, 5);
+    domain.reclaim();
+    let out = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: crate::action::Act::More {
+                window: skein_lib::Token::new(crate::pages::conversations::CONVERSATIONS_WINDOW),
+                end: crate::action::End::After,
+            },
+        },
+    );
+    let mut found = false;
+    for request in &out {
+        if let Request::Read { what, .. } = request {
+            assert_eq!(*what, Read::Conversations { project: None, after: Some(cursor.clone()) });
+            found = true;
+        }
+    }
+    assert!(found);
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenChat { task: 8 } });
+    let mut mark = false;
+    for request in &out {
+        if let Request::Send { ask, .. } = request {
+            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 3 } });
+            mark = true;
+        }
+    }
+    assert!(mark);
+}
+#[test]
+fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
+    let mut about = Domain::new(&LIMITS, 24);
+    let f = start(&mut about, List::with_capacity(0));
+    let mut value = frame(7);
+    value.projects = List::with_capacity(1);
+    value.projects.push(project(1, true)).unwrap();
+    let page = open_token(&delivered(&mut about, Time::ZERO, f, value));
+    let mut rows = List::with_capacity(1);
+    rows.push(entry(8, InboxGroup::Escalations, 10)).unwrap();
+    inbox_delivery(&mut about, page, rows);
+    assert!(about.objects.put(ObjectKey::Task(8), crate::objects::Body::Chip(list_entry(8, Phase::Held, 10).chip)));
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::pages::conversations::about(&mut about, &super::spine::env(Time::ZERO), ObjectKey::Task(8), &mut out);
+    let requests = super::spine::drain(out);
+    assert_eq!(requests.len(), 1);
+    let Request::Send { ask, .. } = &requests[0] else {
+        panic!("chat about the held task");
+    };
+    assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"held checkout") });
+    let mut domain = Domain::new(&LIMITS, 23);
+    let f = start(&mut domain, List::with_capacity(0));
+    let mut value = frame(7);
+    value.projects = List::with_capacity(1);
+    value.projects.push(project(1, true)).unwrap();
+    delivered(&mut domain, Time::ZERO, f, value);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: crate::action::Act::Edit { field: crate::fields::Purpose::NewChat, text: text(b"help") } },
+    );
+    for refused in [true, false] {
+        let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::StartChat { project: 1 } });
+        let mut token = None;
+        for request in &out {
+            if let Request::Send { request: sent, ask, .. } = request {
+                assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"help") });
+                token = Some(*sent);
+            }
+        }
+        assert!(
+            drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::StartChat { project: 1 } }).is_empty()
+        );
+        assert_eq!(
+            domain.page(),
+            &Page::Work {
+                address: Address::Inbox { project: None },
+                generation: 0,
+                behind: false,
+                excess: 0,
+                refused: None
+            }
+        );
+        let answer = if refused {
+            Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 2 } })
+        } else {
+            Answer::Done(Outcome::Made { what: Made::Chat { task: 42 } })
+        };
+        drive(&mut domain, Time::ZERO, Event::Answered { request: token.unwrap(), answer });
+        if refused {
+            assert!(domain.chats().refusal.is_some());
+        } else {
+            let Page::Work { address, .. } = domain.page() else {
+                panic!("chat opened");
+            };
+            assert_eq!(*address, Address::Task { task: 42, section: crate::address::TaskSection::Activity });
+            assert!(domain.fields().get(crate::fields::Purpose::NewChat).unwrap().text.bytes().is_empty());
+        }
+        domain.reclaim();
     }
 }
