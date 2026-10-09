@@ -253,8 +253,13 @@ fn news(domain: &mut Domain, env: &Env<Limits>, alert: Alert, own: bool, out: &m
             watches.push(subscriber.task).expect("watch count");
         }
     }
+    // Kept alerts have an account too, without joining the wake batch.
+    for subscriber in &subscribers {
+        if domain.watches.contains_key(&subscriber.task) {
+            crate::incidents::raised(domain, env, subscriber.task, &alert, out);
+        }
+    }
     for task in &watches {
-        crate::incidents::raised(domain, env, *task, &alert, out);
         let watch = domain.watches.get_mut(task).expect("live watch");
         let mut pending = List::with_capacity(env.limits.alerts_per_batch);
         for number in &watch.pending {

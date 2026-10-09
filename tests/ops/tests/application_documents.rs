@@ -293,6 +293,22 @@ fn incident_parts_keep_raised_scope_and_cut_timeline_across_a_cold_start() {
         own: false,
         alert: obs::Alert { number: 12, service: service.clone(), severity: 3 },
     }));
+    let kept = world.event(obs::Event::System(obs::SystemEvent::Alert {
+        own: false,
+        alert: obs::Alert { number: 13, service: service.clone(), severity: 0 },
+    }));
+    assert!(kept.iter().any(|request| matches!(request, obs::Request::News { subscribers, .. } if subscribers.iter().all(|subscriber| subscriber.class == obs::Class::Keep))));
+    assert!(
+        matches!(
+            observability_read(
+                &mut world,
+                obs::ClientScope::Project(1),
+                obs::ClientSubject::Alert { project: 1, alert: 13 }
+            ),
+            Ok(obs::ClientDocument::Alert { alert: obs::Alert { severity: 0, .. }, .. })
+        ),
+        "a kept alert has an owned account without waking the watch"
+    );
     let subject = obs::ClientSubject::Incident { project: 1, incident: 12 };
     let scope = obs::ClientScope::Project(1);
     let obs::ClientDocument::Incident { incident: first, .. } =
