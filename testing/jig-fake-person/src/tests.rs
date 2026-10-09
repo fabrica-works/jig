@@ -2,6 +2,32 @@ use super::*;
 use jig_client_view::{Binding, Builder, DrawingKind, Limits, Owner, Role, Run, State, View};
 use skein_lib::{Queue, Token};
 
+// Keep each scenario's fresh fixture and assertions, while sharing the test
+// process startup cost within the kits' serial budget (client/domain/testing.md,
+// sections 3 and 9).
+#[test]
+fn tree_queries_find_regions_words_and_drawing_fallbacks() {
+    finds_nested_regions_and_does_not_escape_their_subtrees();
+    text_queries_join_runs_and_ignore_case();
+    drawings_are_found_by_name_and_fallback_never_by_data();
+}
+
+#[test]
+fn scripted_people_report_acts_failures_and_bounded_waits() {
+    a_script_reports_shell_acts_whole_values_and_application_addresses();
+    missing_target_failure_names_the_step_and_regions_and_stays_terminal();
+    expectations_wait_for_changes_and_fail_at_their_deadlines();
+    pending_queries_and_pauses_advance_at_most_one_step();
+    unbound_disabled_and_noncomposer_controls_reject_scripted_acts();
+}
+
+#[test]
+fn random_people_replay_cover_enabled_controls_and_reject_unavailable_nodes() {
+    random_people_replay_the_same_seed_over_the_same_trees();
+    a_sweep_presses_every_bound_node_and_reaches_fields_composers_and_history();
+    random_people_never_act_on_unbound_disabled_or_unshown_nodes();
+}
+
 const LIMITS: Limits = Limits {
     nodes: 24,
     depth: 6,
@@ -74,7 +100,6 @@ fn fixture() -> View {
     })
 }
 
-#[test]
 fn finds_nested_regions_and_does_not_escape_their_subtrees() {
     let view = fixture();
     let mut face = TreeFace::new(view.tree());
@@ -87,7 +112,6 @@ fn finds_nested_regions_and_does_not_escape_their_subtrees() {
     );
 }
 
-#[test]
 fn text_queries_join_runs_and_ignore_case() {
     let view = fixture();
     let mut face = TreeFace::new(view.tree());
@@ -102,7 +126,6 @@ fn text_queries_join_runs_and_ignore_case() {
     assert!(matches!(TreeFace::new(unnamed.tree()).find(&Find::named(Role::Button, b"continue")), Found::Node(_)));
 }
 
-#[test]
 fn drawings_are_found_by_name_and_fallback_never_by_data() {
     let view = fixture();
     let mut face = TreeFace::new(view.tree());
@@ -113,7 +136,6 @@ fn drawings_are_found_by_name_and_fallback_never_by_data() {
     assert_eq!(face.find(&Find::text(b"secret data")), Found::Absent);
 }
 
-#[test]
 fn a_script_reports_shell_acts_whole_values_and_application_addresses() {
     let view = fixture();
     let mut face = TreeFace::new(view.tree());
@@ -144,7 +166,6 @@ fn a_script_reports_shell_acts_whole_values_and_application_addresses() {
     assert_eq!(person.at(), 5);
 }
 
-#[test]
 fn missing_target_failure_names_the_step_and_regions_and_stays_terminal() {
     let view = fixture();
     let mut face = TreeFace::new(view.tree());
@@ -158,7 +179,6 @@ fn missing_target_failure_names_the_step_and_regions_and_stays_terminal() {
     assert_eq!(why.to_string(), "no button named Release in the region named T7");
 }
 
-#[test]
 fn expectations_wait_for_changes_and_fail_at_their_deadlines() {
     let view = fixture();
     let empty = build(|b| {
@@ -187,7 +207,6 @@ fn expectations_wait_for_changes_and_fail_at_their_deadlines() {
     assert_eq!(timeout.next(&mut face, Time::from_nanos(2)), Next::Failed { step: 0, why: Why::StillThere { find } });
 }
 
-#[test]
 fn pending_queries_and_pauses_advance_at_most_one_step() {
     struct Pending;
     impl Face for Pending {
@@ -217,7 +236,6 @@ fn pending_queries_and_pauses_advance_at_most_one_step() {
     );
 }
 
-#[test]
 fn unbound_disabled_and_noncomposer_controls_reject_scripted_acts() {
     let view = fixture();
     let mut face = TreeFace::new(view.tree());
@@ -271,7 +289,6 @@ fn random_tree() -> View {
     })
 }
 
-#[test]
 fn random_people_replay_the_same_seed_over_the_same_trees() {
     let first = random_tree();
     let second = fixture();
@@ -285,7 +302,6 @@ fn random_people_replay_the_same_seed_over_the_same_trees() {
     }
 }
 
-#[test]
 fn a_sweep_presses_every_bound_node_and_reaches_fields_composers_and_history() {
     use std::collections::BTreeSet;
     let view = random_tree();
@@ -349,7 +365,6 @@ fn a_sweep_presses_every_bound_node_and_reaches_fields_composers_and_history() {
     }
 }
 
-#[test]
 fn random_people_never_act_on_unbound_disabled_or_unshown_nodes() {
     let view = build(|b| {
         b.open(Role::Page);
