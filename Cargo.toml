@@ -14,6 +14,7 @@ members = [
     "testing/jig-fake-store",
     "testing/jig-fake-workers",
     "testing/jig-fake-parties",
+    "testing/jig-fake-person",
     "testing/jig-test-system",
     "testing/jig-ops-fake-production",
     "examples/ops/domain",
@@ -53,6 +54,7 @@ publish = false
 jig-client = { path = "crates/jig-client" }
 jig-client-transcript = { path = "crates/jig-client-transcript" }
 jig-client-view = { path = "crates/jig-client-view" }
+jig-fake-person = { path = "testing/jig-fake-person" }
 skein-lib = { git = "https://git.ekanayaka.io/ai/skein.git" }
 skein-json = { git = "https://git.ekanayaka.io/ai/skein.git" }
 skein-world = { git = "https://git.ekanayaka.io/ai/skein.git" }

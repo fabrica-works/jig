@@ -266,6 +266,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-fake-person"
+version = "0.0.0"
+dependencies = [
+ "jig-client-view",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-fake-store"
 version = "0.0.0"
 

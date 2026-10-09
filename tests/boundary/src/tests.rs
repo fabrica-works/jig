@@ -509,3 +509,18 @@ fn client_transcript_is_the_client_only_smith_link() {
     assert_eq!(decoders, 1, "one transcript translator owns the Smith boundary");
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+#[test]
+fn fake_person_links_only_the_semantic_view_and_foundation() {
+    let people: Vec<_> =
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-fake-person")).collect();
+    assert_eq!(people.len(), 1, "one fake person kit");
+    for manifest in people {
+        assert_eq!(manifest.dependencies.len(), 2, "the person's two roles");
+        assert!(
+            manifest.dependencies.iter().all(|name| ["skein-lib", "jig-client-view"].contains(&name.as_str())),
+            "{}",
+            manifest.path.display()
+        );
+    }
+}

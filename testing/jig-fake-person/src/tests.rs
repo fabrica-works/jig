@@ -1,0 +1,236 @@
+use super::*;
+use jig_client_view::{Binding, Builder, DrawingKind, Limits, Owner, Role, Run, State, View};
+use skein_lib::{Queue, Token};
+
+const LIMITS: Limits = Limits {
+    nodes: 24,
+    depth: 6,
+    text_per_node: 80,
+    text_bytes: 400,
+    drawing_bytes: 32,
+    styles_per_node: 0,
+    patches: 144,
+    bindings: 8,
+    slots: 0,
+    markdown_depth: 2,
+};
+fn build(fill: impl FnOnce(&mut Builder)) -> View {
+    let mut view = View::new(&LIMITS);
+    let mut builder = view.builder();
+    fill(&mut builder);
+    let mut patches = Queue::with_capacity(LIMITS.patches);
+    view.finish(builder, 1, &mut patches);
+    view
+}
+fn binding(n: u64) -> Binding {
+    Binding { owner: Owner::Jig, token: Token::new(n) }
+}
+fn region(name: &[u8]) -> Target {
+    Target::Role { role: Role::Region, name: Box::from(name) }
+}
+fn fixture() -> View {
+    build(|b| {
+        b.open(Role::Page);
+        b.open(Role::Region);
+        b.name(b"Task T7");
+        b.open(Role::Region);
+        b.name(b"Proposal from I");
+        b.open(Role::Button);
+        b.name(b"Accept proposal");
+        b.bind(binding(1));
+        b.close();
+        b.open(Role::Text);
+        b.run(Run::Plain, b"Ready to ");
+        b.run(Run::Strong, b"release");
+        b.close();
+        b.open(Role::TextArea);
+        b.name(b"Reply");
+        b.bind(binding(2));
+        b.state(State::SubmitsOnEnter);
+        b.value(b"", 0);
+        b.close();
+        b.open(Role::TextField);
+        b.name(b"Subject");
+        b.bind(binding(3));
+        b.close();
+        b.open(Role::Button);
+        b.name(b"Disabled");
+        b.bind(binding(4));
+        b.state(State::Disabled);
+        b.close();
+        b.drawing(DrawingKind { owner: Owner::Other { child: 1 }, kind: 1 }, b"Error rate", b"secret data", 32);
+        b.text(Run::Plain, b"30 % since 10:02");
+        b.close();
+        b.close();
+        b.close();
+        b.open(Role::Region);
+        b.name(b"Task T8");
+        b.open(Role::Button);
+        b.name(b"Release");
+        b.close();
+        b.text(Run::Plain, "CAFÉ".as_bytes());
+        b.close();
+        b.close();
+    })
+}
+
+#[test]
+fn finds_nested_regions_and_does_not_escape_their_subtrees() {
+    let view = fixture();
+    let mut face = TreeFace::new(view.tree());
+    let find = Find::named(Role::Button, b"ACCEPT").within(Box::from([region(b"t7"), region(b"from i")]));
+    assert!(matches!(face.find(&find), Found::Node(_)));
+    assert_eq!(face.find(&Find::named(Role::Button, b"Release").within(Box::from([region(b"T7")]))), Found::Absent);
+    assert_eq!(
+        face.find(&Find::named(Role::Button, b"Accept").within(Box::from([region(b"T8"), region(b"from I")]))),
+        Found::Absent
+    );
+}
+
+#[test]
+fn text_queries_join_runs_and_ignore_case() {
+    let view = fixture();
+    let mut face = TreeFace::new(view.tree());
+    assert!(matches!(face.find(&Find::text(b"to RELEASE")), Found::Node(_)));
+    assert!(matches!(face.find(&Find::text("café".as_bytes())), Found::Node(_)));
+    assert_eq!(face.find(&Find::named(Role::Link, b"Accept")), Found::Absent);
+    let unnamed = build(|b| {
+        b.open(Role::Button);
+        b.text(Run::Plain, b"Continue");
+        b.close();
+    });
+    assert!(matches!(TreeFace::new(unnamed.tree()).find(&Find::named(Role::Button, b"continue")), Found::Node(_)));
+}
+
+#[test]
+fn drawings_are_found_by_name_and_fallback_never_by_data() {
+    let view = fixture();
+    let mut face = TreeFace::new(view.tree());
+    assert!(matches!(face.find(&Find::named(Role::Drawing, b"error RATE")), Found::Node(_)));
+    let fallback = Find::text(b"30 %")
+        .within(Box::from([Target::Role { role: Role::Drawing, name: Box::from(b"Error".as_slice()) }]));
+    assert!(matches!(face.find(&fallback), Found::Node(_)));
+    assert_eq!(face.find(&Find::text(b"secret data")), Found::Absent);
+}
+
+#[test]
+fn a_script_reports_shell_acts_whole_values_and_application_addresses() {
+    let view = fixture();
+    let mut face = TreeFace::new(view.tree());
+    let button = match face.find(&Find::named(Role::Button, b"Accept")) {
+        Found::Node(id) => id,
+        Found::Absent | Found::Pending => unreachable!(),
+    };
+    let field = match face.find(&Find::named(Role::TextArea, b"Reply")) {
+        Found::Node(id) => id,
+        Found::Absent | Found::Pending => unreachable!(),
+    };
+    let mut person = Person::new(Box::from([
+        Step::Go { address: String::from("inbox") },
+        Step::Press { find: Find::named(Role::Button, b"Accept") },
+        Step::Type { find: Find::named(Role::TextArea, b"Reply"), words: Box::from(b"all my words".as_slice()) },
+        Step::Send { find: Find::named(Role::TextArea, b"Reply") },
+        Step::Reload,
+    ]));
+    assert_eq!(person.next(&mut face, Time::from_nanos(0)), Next::Do(Doing::Go { address: String::from("inbox") }));
+    assert_eq!(person.next(&mut face, Time::from_nanos(0)), Next::Do(Doing::Act { node: button, act: Act::Press }));
+    assert_eq!(
+        person.next(&mut face, Time::from_nanos(0)),
+        Next::Do(Doing::Act { node: field, act: Act::Input { value: Box::from(b"all my words".as_slice()) } })
+    );
+    assert_eq!(person.next(&mut face, Time::from_nanos(0)), Next::Do(Doing::Act { node: field, act: Act::Submit }));
+    assert_eq!(person.next(&mut face, Time::from_nanos(0)), Next::Do(Doing::Reload));
+    assert_eq!(person.next(&mut face, Time::from_nanos(0)), Next::Done);
+    assert_eq!(person.at(), 5);
+}
+
+#[test]
+fn missing_target_failure_names_the_step_and_regions_and_stays_terminal() {
+    let view = fixture();
+    let mut face = TreeFace::new(view.tree());
+    let find = Find::named(Role::Button, b"Release").within(Box::from([region(b"T7")]));
+    let mut person = Person::<u8>::new(Box::from([Step::Reload, Step::Press { find: find.clone() }]));
+    assert_eq!(person.next(&mut face, Time::from_nanos(0)), Next::Do(Doing::Reload));
+    let failure = Next::Failed { step: 1, why: Why::Missing { find } };
+    assert_eq!(person.next(&mut face, Time::from_nanos(0)), failure);
+    assert_eq!(person.next(&mut face, Time::from_nanos(99)), failure);
+    let Next::Failed { why, .. } = failure else { unreachable!() };
+    assert_eq!(why.to_string(), "no button named Release in the region named T7");
+}
+
+#[test]
+fn expectations_wait_for_changes_and_fail_at_their_deadlines() {
+    let view = fixture();
+    let empty = build(|b| {
+        b.open(Role::Page);
+        b.close();
+    });
+    let mut face = TreeFace::new(view.tree());
+    let mut absent = TreeFace::new(empty.tree());
+    let find = Find::named(Role::Button, b"Accept");
+    let mut see = Person::<u8>::new(Box::from([Step::See { find: find.clone(), within: Duration::from_nanos(10) }]));
+    assert_eq!(see.next(&mut absent, Time::from_nanos(2)), Next::Wait { until: Some(Time::from_nanos(12)) });
+    assert_eq!(see.next(&mut face, Time::from_nanos(12)), Next::Wait { until: None });
+    assert_eq!(see.next(&mut face, Time::from_nanos(12)), Next::Done);
+    let mut gone = Person::<u8>::new(Box::from([Step::Gone { find: find.clone(), within: Duration::from_nanos(10) }]));
+    assert_eq!(gone.next(&mut face, Time::from_nanos(2)), Next::Wait { until: Some(Time::from_nanos(12)) });
+    assert_eq!(gone.next(&mut absent, Time::from_nanos(3)), Next::Wait { until: None });
+    let mut timeout =
+        Person::<u8>::new(Box::from([Step::See { find: find.clone(), within: Duration::from_nanos(10) }]));
+    assert_eq!(timeout.next(&mut absent, Time::from_nanos(2)), Next::Wait { until: Some(Time::from_nanos(12)) });
+    assert_eq!(
+        timeout.next(&mut absent, Time::from_nanos(12)),
+        Next::Failed { step: 0, why: Why::Missing { find: find.clone() } }
+    );
+    let mut timeout =
+        Person::<u8>::new(Box::from([Step::Gone { find: find.clone(), within: Duration::from_nanos(0) }]));
+    assert_eq!(timeout.next(&mut face, Time::from_nanos(2)), Next::Failed { step: 0, why: Why::StillThere { find } });
+}
+
+#[test]
+fn pending_queries_and_pauses_advance_at_most_one_step() {
+    struct Pending;
+    impl Face for Pending {
+        fn find(&mut self, _find: &Find) -> Found {
+            Found::Pending
+        }
+    }
+    let mut face = Pending;
+    let mut person = Person::<u8>::new(Box::from([
+        Step::Pause { span: Duration::from_nanos(10) },
+        Step::Press { find: Find::named(Role::Button, b"Accept") },
+    ]));
+    assert_eq!(person.next(&mut face, Time::from_nanos(1)), Next::Wait { until: Some(Time::from_nanos(11)) });
+    assert_eq!(person.next(&mut face, Time::from_nanos(10)), Next::Wait { until: Some(Time::from_nanos(11)) });
+    assert_eq!(person.next(&mut face, Time::from_nanos(11)), Next::Wait { until: None });
+    assert_eq!(person.at(), 1);
+    assert_eq!(person.next(&mut face, Time::from_nanos(12)), Next::Wait { until: None });
+    let find = Find::text(b"sent");
+    let mut person = Person::<u8>::new(Box::from([Step::See { find: find.clone(), within: Duration::from_nanos(2) }]));
+    assert_eq!(
+        person.next(&mut face, Time::from_nanos(u64::MAX - 1)),
+        Next::Wait { until: Some(Time::from_nanos(u64::MAX)) }
+    );
+    assert_eq!(
+        person.next(&mut face, Time::from_nanos(u64::MAX)),
+        Next::Failed { step: 0, why: Why::Missing { find } }
+    );
+}
+
+#[test]
+fn unbound_disabled_and_noncomposer_controls_reject_scripted_acts() {
+    let view = fixture();
+    let mut face = TreeFace::new(view.tree());
+    for step in [
+        Step::Press { find: Find::named(Role::Button, b"Disabled") },
+        Step::Press { find: Find::named(Role::Button, b"Release") },
+        Step::Send { find: Find::named(Role::TextField, b"Subject") },
+        Step::Type { find: Find::named(Role::Button, b"Accept"), words: Box::from(b"word".as_slice()) },
+    ] {
+        let mut person = Person::<u8>::new(Box::from([step]));
+        assert!(matches!(
+            person.next(&mut face, Time::from_nanos(0)),
+            Next::Failed { why: Why::Unexpected { .. }, .. }
+        ));
+    }
+}

@@ -1,0 +1,121 @@
+//! Immediate accessibility queries, never drawing data or style tokens.
+//! The preorder subtree sizes scope queries (client/domain/view.md, section 3).
+use crate::{Face, Find, Found, Target};
+use alloc::vec::Vec;
+use jig_client_view::{Act, Node, NodeId, Role, State, Tree};
+
+/// An immediate face over the last tree shown to the person.
+#[derive(Debug)]
+pub struct TreeFace<'a> {
+    tree: &'a Tree,
+}
+impl<'a> TreeFace<'a> {
+    /// Borrow the displayed tree; builders' unassigned ids are not visible ids.
+    #[must_use]
+    pub fn new(tree: &'a Tree) -> Self {
+        Self { tree }
+    }
+}
+
+fn contains(hay: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    match (core::str::from_utf8(hay), core::str::from_utf8(needle)) {
+        (Ok(hay), Ok(needle)) => hay.to_lowercase().contains(&needle.to_lowercase()),
+        (Ok(_) | Err(_), Ok(_) | Err(_)) => hay.windows(needle.len()).any(|part| part.eq_ignore_ascii_case(needle)),
+    }
+}
+fn text(node: &Node) -> Vec<u8> {
+    node.text.as_slice().iter().flat_map(|run| run.text.iter().copied()).collect()
+}
+fn matches(nodes: &[Node], index: usize, target: &Target) -> bool {
+    let node = &nodes[index];
+    match target {
+        Target::Role { role, name } => {
+            if node.role != *role {
+                return false;
+            }
+            if let Some(name_text) = &node.name {
+                return contains(name_text, name);
+            }
+            let end =
+                index.checked_add(usize::try_from(node.size).expect("subtree fits usize")).expect("subtree end fits");
+            let fallback: Vec<u8> = nodes[index..end].iter().flat_map(text).collect();
+            contains(&fallback, name)
+        }
+        Target::Text { text: words } => !node.text.is_empty() && contains(&text(node), words),
+    }
+}
+impl Face for TreeFace<'_> {
+    fn find(&mut self, find: &Find) -> Found {
+        let nodes = self.tree.nodes();
+        let mut start = 0;
+        let mut end = nodes.len();
+        for region in &find.within {
+            let Some((index, node)) =
+                nodes.iter().enumerate().take(end).skip(start).find(|(index, _)| matches(nodes, *index, region))
+            else {
+                return Found::Absent;
+            };
+            start = index.checked_add(1).expect("subtree index fits");
+            end = index.checked_add(usize::try_from(node.size).expect("subtree size fits")).expect("subtree end fits");
+        }
+        (start..end)
+            .find(|index| matches(nodes, *index, &find.target))
+            .map_or(Found::Absent, |index| Found::Node(nodes[index].id))
+    }
+    fn allows(&self, id: NodeId, act: &Act) -> bool {
+        let Some(node) = self.tree.find(id) else {
+            return false;
+        };
+        if self.tree.bound(id).is_none() || node.states.as_slice().contains(&State::Disabled) {
+            return false;
+        }
+        match act {
+            Act::Press | Act::Toggle => true,
+            Act::Input { .. } => node.role == Role::TextField || node.role == Role::TextArea,
+            Act::Submit => node.states.as_slice().contains(&State::SubmitsOnEnter),
+        }
+    }
+}
+
+pub(crate) fn role_name(role: Role) -> &'static str {
+    match role {
+        Role::Page => "page",
+        Role::Region => "region",
+        Role::Heading { .. } => "heading",
+        Role::Paragraph => "paragraph",
+        Role::Text => "text",
+        Role::List => "list",
+        Role::Item => "item",
+        Role::Table => "table",
+        Role::Row => "row",
+        Role::Cell => "cell",
+        Role::Term => "term",
+        Role::Description => "description",
+        Role::Button => "button",
+        Role::Link => "link",
+        Role::TextField => "text field",
+        Role::TextArea => "text area",
+        Role::Choice => "choice",
+        Role::ChoiceGroup => "choice group",
+        Role::Check => "check",
+        Role::Dialog => "dialog",
+        Role::Status => "status",
+        Role::Alert => "alert",
+        Role::Log => "log",
+        Role::Tree => "tree",
+        Role::TreeItem => "tree item",
+        Role::Tabs => "tabs",
+        Role::Tab => "tab",
+        Role::Progress => "progress",
+        Role::Time => "time",
+        Role::Code => "code",
+        Role::Quote => "quote",
+        Role::Separator => "separator",
+        Role::Figure => "figure",
+        Role::Slot => "slot",
+        Role::Drawing => "drawing",
+    }
+}
