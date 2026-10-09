@@ -196,7 +196,20 @@ fn settings(
                 crate::markdown::read(recurring.spec.bytes(), 2, b);
                 words.text(b, JigPhrase::Period, &[Hole::Number(recurring.period)]);
                 words.text(b, JigPhrase::Budget, &[Hole::Amount(recurring.budget)]);
-                words.deadline(b, recurring.next);
+                words.text(b, JigPhrase::CurrentPeriod, &[Hole::Number(recurring.current_period)]);
+                if let Some(began) = recurring.began {
+                    b.open(Role::Time);
+                    words.text(b, JigPhrase::PeriodBegan, &[Hole::Wall(words.adjusted_wall(began))]);
+                    b.close();
+                }
+                match recurring.next {
+                    Some(next) => {
+                        b.open(Role::Time);
+                        words.text(b, JigPhrase::NextRun, &[Hole::Wall(words.adjusted_wall(next))]);
+                        b.close();
+                    }
+                    None => words.text(b, JigPhrase::NextPeriod, &[]),
+                }
                 for task in &recurring.last {
                     crate::frame::control(
                         b,

@@ -592,7 +592,7 @@ fields!(Project {
     acts
 });
 fields!(Pool { party, period, budget });
-fields!(Recurring { number, spec, period, budget, last, next });
+fields!(Recurring { number, spec, period, budget, last, current_period, began, next });
 fields!(Note { number, revision, scope, description, body, by, tasks, changed, acts });
 fields!(Deployment { hosts, accounts, capacity, proposals, refusals, parts });
 fields!(Host { number, connected, grace, used, free, runs, refused });

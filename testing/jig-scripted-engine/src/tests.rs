@@ -885,3 +885,28 @@ fn closing_connector_payload_bounds() {
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
     assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload));
 }
+
+#[test]
+fn recurring_optional_boundaries_keep_whole_value_and_allocated_list_limits() {
+    let mut bounds = Bounds { rows: 2, ..Bounds::default() };
+    for next in [None, Some(Wall::from_nanos(u64::MAX))] {
+        let mut row = Recurring {
+            number: 1,
+            spec: text(b"job"),
+            period: 9,
+            budget: 20,
+            last: list(vec![7, 8]),
+            current_period: 9,
+            began: Some(Wall::from_nanos(1)),
+            next,
+        };
+        let bytes = u64::try_from(core::mem::size_of::<Recurring>()).unwrap() + List::<u64>::worst_case(2).unwrap() + 3;
+        bounds.document_bytes = bytes;
+        assert!(crate::payload::fits(&row, &bounds));
+        bounds.document_bytes = bytes.checked_sub(1).unwrap();
+        assert!(!crate::payload::fits(&row, &bounds));
+        bounds.document_bytes = u64::MAX;
+        row.last = List::with_capacity(3);
+        assert!(!crate::payload::fits(&row, &bounds));
+    }
+}

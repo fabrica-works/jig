@@ -657,7 +657,12 @@ pub struct Recurring {
     pub period: u64,
     pub budget: u64,
     pub last: List<u64>,
-    pub next: Wall,
+    /// The current period supplied by the engine's funding owner.
+    pub current_period: u64,
+    /// When its retained ledger opened, if that ledger exists.
+    pub began: Option<Wall>,
+    /// The period source's next boundary, when supplied.
+    pub next: Option<Wall>,
 }
 
 /// A note with its independently moving revision.

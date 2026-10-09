@@ -656,6 +656,14 @@ pub enum JigPhrase {
     Spend,
     /// Recurring tasks.
     Recurring,
+    /// A supplied next run wall time.
+    NextRun,
+    /// The source has not supplied the next period wall time.
+    NextPeriod,
+    /// The engine's current period number.
+    CurrentPeriod,
+    /// When its retained period ledger opened.
+    PeriodBegan,
     /// Settings.
     Settings,
     /// Goals.
@@ -1152,6 +1160,10 @@ impl JigPhrase {
             Self::Roles => 318,
             Self::Spend => 319,
             Self::Recurring => 320,
+            Self::NextRun => 407,
+            Self::NextPeriod => 408,
+            Self::CurrentPeriod => 409,
+            Self::PeriodBegan => 410,
             Self::Settings => 321,
             Self::Goals => 322,
             Self::Tasks => 323,
@@ -1254,6 +1266,7 @@ impl JigPhrase {
             | Self::Roles
             | Self::Spend
             | Self::Recurring
+            | Self::NextPeriod
             | Self::Settings
             | Self::Goals
             | Self::Tasks
@@ -1531,6 +1544,7 @@ impl JigPhrase {
             Self::HeldBelow
             | Self::BatchMade
             | Self::Period
+            | Self::CurrentPeriod
             | Self::RoleNumber
             | Self::PartyNumber
             | Self::DecidesKind
@@ -1613,9 +1627,14 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::Grace | Self::PassesUp | Self::At | Self::Since | Self::Deadline | Self::DeadlineHold => {
-                Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }])
-            }
+            Self::NextRun
+            | Self::PeriodBegan
+            | Self::Grace
+            | Self::PassesUp
+            | Self::At
+            | Self::Since
+            | Self::Deadline
+            | Self::DeadlineHold => Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }]),
             Self::BudgetMissing | Self::BudgetHold => Box::new([
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
@@ -1681,7 +1700,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 407] = [
+pub const ALL: [JigPhrase; 411] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -2007,6 +2026,10 @@ pub const ALL: [JigPhrase; 407] = [
     JigPhrase::Roles,
     JigPhrase::Spend,
     JigPhrase::Recurring,
+    JigPhrase::NextRun,
+    JigPhrase::NextPeriod,
+    JigPhrase::CurrentPeriod,
+    JigPhrase::PeriodBegan,
     JigPhrase::Settings,
     JigPhrase::Goals,
     JigPhrase::Tasks,
@@ -2093,7 +2116,7 @@ pub const ALL: [JigPhrase; 407] = [
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(407);
+    let mut rows = List::with_capacity(411);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

@@ -181,7 +181,9 @@ pub(super) fn project_doc() -> Project {
             period: 3,
             budget: 10,
             last: list([8]),
-            next: Wall::EPOCH,
+            current_period: 3,
+            began: Some(Wall::EPOCH),
+            next: Some(Wall::EPOCH),
         }]),
         parts: list([part()]),
         acts: list([Offered { act: ActKind::SetGoal, admission: Admission::Allowed }]),
@@ -485,6 +487,36 @@ fn work_pages_show_executor_sections_folds_project_settings_and_deployment_capac
     plan_folds(&words);
     history(&words);
     project_sections(&words);
+    recurring_times_use_supplied_boundaries_without_inferred_cadence(&words);
     goal_form(&words);
     deployment(&words);
+}
+
+fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Words) {
+    for next in [None, Some(Wall::from_nanos(3_600_000_000_000))] {
+        for began in [None, Some(Wall::from_nanos(1_800_000_000_000))] {
+            let (mut d, out) = entered(Address::Project { project: 4, section: ProjectSection::Recurring });
+            let read = out
+                .iter()
+                .find_map(|request| match request {
+                    Request::Read { read, what: Read::Project { .. } } => Some(*read),
+                    _ => None,
+                })
+                .unwrap();
+            let mut doc = project_doc();
+            let recurring = doc.recurring.get_mut(0).unwrap();
+            recurring.next = next;
+            recurring.current_period = 9;
+            recurring.began = began;
+            drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+            let (tree, _) = build(&d, 3, words);
+            assert!(contains(&tree, b"Daily work"));
+            assert!(contains(&tree, b"Period 3"));
+            assert!(contains(&tree, b"Current period 9"));
+            assert_eq!(contains(&tree, b"Period began at 01:30"), began.is_some());
+            assert_eq!(contains(&tree, b"Runs at the next period"), next.is_none());
+            assert_eq!(contains(&tree, b"Next runs at 02:00"), next.is_some());
+            assert!(!contains(&tree, b"Deadline"));
+        }
+    }
 }

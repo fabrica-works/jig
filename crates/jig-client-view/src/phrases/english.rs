@@ -10,7 +10,7 @@ use skein_lib::{List, bytes::copy_of};
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "English data matches the closed phrase vocabulary whole")]
 pub fn language() -> Language {
-    let mut phrases = List::with_capacity(407);
+    let mut phrases = List::with_capacity(411);
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
             JigPhrase::ConversationLog => Box::new([Segment::Text(copy_of(b"Conversation"))]),
@@ -101,6 +101,18 @@ pub fn language() -> Language {
             JigPhrase::Policy => Box::new([Segment::Text(copy_of(b"Policy"))]),
             JigPhrase::Roles => Box::new([Segment::Text(copy_of(b"Roles and services"))]),
             JigPhrase::Spend => Box::new([Segment::Text(copy_of(b"Spend"))]),
+            JigPhrase::CurrentPeriod => Box::new([
+                Segment::Text(copy_of(b"Current period ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::PeriodBegan => Box::new([
+                Segment::Text(copy_of(b"Period began at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::NextRun => {
+                Box::new([Segment::Text(copy_of(b"Next runs at ")), Segment::Hole { index: 0, kind: HoleKind::Wall }])
+            }
+            JigPhrase::NextPeriod => Box::new([Segment::Text(copy_of(b"Runs at the next period"))]),
             JigPhrase::Recurring => Box::new([Segment::Text(copy_of(b"Recurring tasks"))]),
             JigPhrase::Settings => Box::new([Segment::Text(copy_of(b"Settings"))]),
             JigPhrase::Goals => Box::new([Segment::Text(copy_of(b"Goals"))]),
@@ -923,6 +935,6 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
     Phrasebook::load(
         shapes(text),
         Box::new([language()]),
-        &PhraseLimits { languages: 1, phrases: 407, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
+        &PhraseLimits { languages: 1, phrases: 411, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
     )
 }

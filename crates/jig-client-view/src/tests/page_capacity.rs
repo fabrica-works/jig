@@ -210,7 +210,9 @@ fn project_pages(words: &Words) {
             period: u64::MAX,
             budget: u64::MAX,
             last: list([8, 9]),
-            next: Wall::from_nanos(u64::MAX),
+            current_period: u64::MAX,
+            began: Some(Wall::from_nanos(u64::MAX)),
+            next: Some(Wall::from_nanos(u64::MAX)),
         };
         doc.recurring = list([recurring.clone(), Recurring { number: 2, ..recurring }]);
         doc.pools = list([*doc.pools.get(0).unwrap(), *doc.pools.get(0).unwrap()]);
