@@ -1,0 +1,106 @@
+//! Seeded public truth and fake-person exploration (testing.md, sections 3 and 7).
+use crate::{Outcome, Scripted, Test, Until, World, stories};
+use jig_client::{
+    address::{Address, ProjectSection, TaskSection},
+    contract::{ObjectKey, ReadValue},
+};
+use jig_scripted_engine::Change;
+use jig_test_client_domain::{Address as RootAddress, family};
+use skein_lib::{Rng, Wall};
+
+/// Independently replayable story starting states for a random person.
+#[derive(Clone, Copy, Debug)]
+pub enum Start {
+    NewChat,
+    Chat,
+    Held,
+    Proposal,
+    Goal,
+    Incident,
+}
+impl Start {
+    pub const ALL: [Self; 6] = [Self::NewChat, Self::Chat, Self::Held, Self::Proposal, Self::Goal, Self::Incident];
+}
+fn fixture(seed: u64, start: Start) -> (World<Test, Scripted>, RootAddress) {
+    match start {
+        Start::NewChat => (stories::chat_world(seed), stories::conversation()),
+        Start::Chat => (stories::chat_ready(seed), stories::chat()),
+        Start::Held => (stories::held_chat(seed), stories::chat()),
+        Start::Proposal => (stories::proposal_world(seed), stories::inbox()),
+        Start::Goal => (
+            stories::goal_world(seed),
+            RootAddress::Jig(Address::Project { project: 1, section: ProjectSection::Goals }),
+        ),
+        Start::Incident => (stories::incident_world(seed), stories::incident()),
+    }
+}
+fn explore(mut world: World<Test, Scripted>, address: RootAddress, seed: u64) -> Outcome {
+    world.randomness(16, 150, 8);
+    world.measure_heap();
+    let mut rng = Rng::new(seed);
+    for party in [7, 8] {
+        let first = world.client(party, address);
+        world.random_person(first);
+        let second = world.tab(first);
+        world.random_person(second);
+        if rng.chance(500) {
+            let device = world.client(party, stories::inbox());
+            world.random_person(device);
+        }
+    }
+    world.run(Until::Done)
+}
+/// Random people across one real story's initial truth, with tabs and devices.
+#[must_use]
+pub fn story(seed: u64, start: Start) -> Outcome {
+    let (world, address) = fixture(seed, start);
+    explore(world, address, seed)
+}
+/// Random whole documents, addresses, family values and offers behind the same shell.
+#[must_use]
+pub fn world(seed: u64) -> Outcome {
+    let mut rng = Rng::new(seed);
+    let start = Start::ALL[usize::try_from(rng.below(6)).expect("six starts")];
+    let (mut world, mut address) = fixture(seed, start);
+    if let Some(ReadValue::Task(task)) = world.front().engine.truth().objects.get(&ObjectKey::Task(9)) {
+        let mut task = task.clone();
+        task.spec_revision.value = rng.between(1, 16);
+        task.spec = stories::text(if rng.chance(500) { b"Investigate" } else { b"Check service" });
+        task.priority = Some(u32::try_from(rng.between(1, 3)).expect("small priority"));
+        world
+            .front()
+            .engine
+            .act(
+                skein_lib::Time::ZERO,
+                Wall::EPOCH,
+                Change::Object { project: 1, key: ObjectKey::Task(9), value: ReadValue::Task(task) },
+            )
+            .expect("whole random task fits");
+    }
+    let mut family = world.front().engine.application().clone();
+    for document in family.documents.values_mut() {
+        match document {
+            family::Document::Item(item) => {
+                item.value = rng.below(64);
+                item.touchable = rng.chance(500);
+            }
+            family::Document::Part(part) => {
+                part.value = rng.below(64);
+            }
+        }
+    }
+    world
+        .front()
+        .engine
+        .act_application(skein_lib::Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, family, vec![])
+        .expect("whole random family fits");
+    match rng.below(4) {
+        0 => address = stories::inbox(),
+        1 => address = RootAddress::Jig(Address::Project { project: 1, section: ProjectSection::Tasks }),
+        2 if world.front().engine.truth().objects.contains_key(&ObjectKey::Task(9)) => {
+            address = RootAddress::Jig(Address::Task { task: 9, section: TaskSection::Overview });
+        }
+        _ => {}
+    }
+    explore(world, address, seed)
+}

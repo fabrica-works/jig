@@ -73,6 +73,8 @@ pub struct Scripted {
     page_watch: Option<Token>,
     link: Vec<Observed>,
     recovery: Option<Time>,
+    pending_sign_ins: Vec<u64>,
+    pending_faults: Vec<FrontFault>,
 }
 impl Scripted {
     /// Installs a checked story and its application documents.
@@ -95,6 +97,8 @@ impl Scripted {
             page_watch: None,
             link: initial,
             recovery: None,
+            pending_sign_ins: Vec::new(),
+            pending_faults: Vec::new(),
         }
     }
     fn transport(&mut self, client: ClientId, local: Token, first: bool, fresh: bool) -> Token {
@@ -128,6 +132,20 @@ fn scope(value: family::Scope) -> engine::ApplicationScope {
     }
 }
 impl Scripted {
+    fn recover(&mut self, now: Time, wall: Wall) {
+        if self.recovery.is_some_and(|at| at <= now) {
+            self.recovery = None;
+            self.link.push(Observed::Reachable { live: true });
+            for party in std::mem::take(&mut self.pending_sign_ins) {
+                self.engine
+                    .act(now, wall, engine::Change::SignIn { sign_in: party, party })
+                    .expect("recovered sign in fits");
+            }
+            for fault in std::mem::take(&mut self.pending_faults) {
+                self.fault(now, fault);
+            }
+        }
+    }
     fn routed(&mut self, client: ClientId, request: Request) -> Request {
         match request {
             Request::Send { attempt, key, ask } => {
@@ -262,11 +280,8 @@ impl Front<Test> for Scripted {
             | Request::Fact { .. } => unreachable!("shell classified a wire request"),
         }
     }
-    fn poll(&mut self, now: Time, _: Wall) -> Vec<(ClientId, Event)> {
-        if self.recovery.is_some_and(|at| at <= now) {
-            self.recovery = None;
-            self.link.push(Observed::Reachable { live: true });
-        }
+    fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
+        self.recover(now, wall);
         self.engine
             .poll(now)
             .into_iter()
@@ -358,7 +373,7 @@ impl Front<Test> for Scripted {
             .collect()
     }
     fn next_due(&self) -> Option<Time> {
-        [self.engine.next_due(), self.recovery].into_iter().flatten().min()
+        self.recovery.or_else(|| self.engine.next_due())
     }
     fn observed(&mut self) -> Vec<Observed> {
         let mut seen = std::mem::take(&mut self.link);
@@ -380,6 +395,10 @@ impl Front<Test> for Scripted {
     }
     fn fault(&mut self, now: Time, fault: FrontFault) {
         if matches!(fault, FrontFault::ObjectGone) {
+            if self.recovery.is_some_and(|at| now < at) {
+                self.pending_faults.push(fault);
+                return;
+            }
             if let Some(key) = self.last_object {
                 let wall = Wall::from_nanos(1_000_000_000_000 + now.as_nanos());
                 self.engine.act(now, wall, engine::Change::Forget { key }).expect("forget fits");
@@ -460,6 +479,12 @@ impl Front<Test> for Scripted {
     }
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
         let party = self.parties[&client];
+        if self.recovery.is_some_and(|at| now < at) {
+            if !self.pending_sign_ins.contains(&party) {
+                self.pending_sign_ins.push(party);
+            }
+            return;
+        }
         self.engine.act(now, wall, engine::Change::SignIn { sign_in: party, party }).expect("sign in fits");
     }
 }

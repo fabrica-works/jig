@@ -150,6 +150,19 @@ impl<A: App, F: Front<A>> World<A, F> {
             quota_failure: false,
         }
     }
+    /// Configure bounded random exploration before admitting any clients.
+    pub fn randomness(&mut self, steps: u32, faults_per_mille: u32, fault_limit: u32) {
+        assert!(self.clients.is_empty(), "configure randomness before admitting clients");
+        assert!(faults_per_mille <= 1000, "per-mille probability");
+        self.settings.random_steps = steps;
+        self.settings.faults_per_mille = faults_per_mille;
+        self.settings.fault_limit = fault_limit;
+    }
+    /// Count every client/view/model heap iteration from this fixture boundary.
+    pub fn measure_heap(&mut self) {
+        assert!(self.clients.is_empty(), "start the meter before admitting clients");
+        self.meter = Some(skein_world::domain::heap::Meter::new());
+    }
     /// Starts a device with an empty small store.
     pub fn client(&mut self, party: u64, address: A::Address) -> ClientId {
         self.make_client(party, address, Vec::new())
@@ -334,7 +347,12 @@ impl<A: App, F: Front<A>> World<A, F> {
             8 => Fault::Front(FrontFault::ObjectGone),
             9 => Fault::Front(FrontFault::SignedOut),
             10 => Fault::Front(FrontFault::Versions),
-            11 => Fault::OtherParty { client, party: if self.clients[client.0].party == 7 { 8 } else { 7 } },
+            11 => {
+                let Some(other) = self.clients.iter().find(|other| other.party != self.clients[client.0].party) else {
+                    return;
+                };
+                Fault::OtherParty { client, party: other.party }
+            }
             12 => {
                 let Some((client, node)) = self.last_removed else {
                     return;
@@ -405,6 +423,9 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     fn callback(&mut self, id: ClientId, event: Option<A::Event>) {
         if let Some(event) = &event {
+            if A::window_changed(event) {
+                self.observe(Observation::WindowChanged { client: id });
+            }
             for receipt in A::received(event) {
                 self.observe(Observation::Delivered { client: id, receipt });
             }
@@ -472,10 +493,9 @@ impl<A: App, F: Front<A>> World<A, F> {
             }
         }
         for (address, replace) in shows {
-            if self.clients[id.0].history[self.clients[id.0].at] != address {
-                self.observe(Observation::LeftPage { client: id });
-                self.clients[id.0].acted_card = None;
-            }
+            // A Show is navigation even when the chosen address is already current.
+            self.observe(Observation::LeftPage { client: id });
+            self.clients[id.0].acted_card = None;
             self.history(id, address, replace);
         }
         for back in signs {
@@ -515,7 +535,10 @@ impl<A: App, F: Front<A>> World<A, F> {
     fn walk_people(&mut self) -> bool {
         let mut progress = false;
         for index in 0..self.people.len() {
-            if self.people[index].done {
+            if self.people[index].done
+                || (matches!(self.people[index].person, PersonKind::Random { .. })
+                    && self.people[index].wake.is_some_and(|at| at > self.now))
+            {
                 continue;
             }
             let id = self.people[index].client;
@@ -568,6 +591,9 @@ impl<A: App, F: Front<A>> World<A, F> {
                             .collect::<Vec<_>>())
                         .collect::<Vec<_>>(),
                 ),
+            }
+            if matches!(self.people[index].person, PersonKind::Random { .. }) && !self.people[index].done {
+                self.people[index].wake = Some(self.now.saturating_add(self.settings.latency.draw(&mut self.rng)));
             }
         }
         progress

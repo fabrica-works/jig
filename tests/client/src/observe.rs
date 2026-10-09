@@ -149,7 +149,15 @@ pub fn received(event: &Event) -> Vec<Receipt> {
             domain::first::Event::Read { result: family::ReadResult::Value(doc), .. }
             | domain::first::Event::Watch { event: family::WatchEvent::Delivered(doc), .. },
         ) => vec![family(doc)],
-        Event::SignedOut => vec![Receipt::Parked],
+        Event::SignedOut
+        | Event::Jig(
+            jig_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
+            | jig_client::Event::Ended { end: WatchEnd::SignedOut, .. },
+        )
+        | Event::First(
+            domain::first::Event::Read { result: family::ReadResult::SignedOut, .. }
+            | domain::first::Event::Ended { end: family::WatchEnd::SignedOut, .. },
+        ) => vec![Receipt::Parked],
         Event::Start { .. } | Event::Went { .. } | Event::Act { .. } | Event::Jig(_) | Event::First(_) => vec![],
     }
 }
@@ -266,4 +274,33 @@ pub fn seen(tree: &Tree) -> Vec<Seen> {
         }
     }
     seen
+}
+
+/// Only decoded public person acts explain changing the displayed window (QUESTIONS 34).
+pub fn window_changed(event: &Event) -> bool {
+    let act = match event {
+        Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_client::Event::Act { act }) => act,
+        Event::Start { .. }
+        | Event::Went { .. }
+        | Event::Act { action: domain::Action::First(_) }
+        | Event::Answer { .. }
+        | Event::Jig(_)
+        | Event::First(_)
+        | Event::SignedOut => return false,
+    };
+    matches!(
+        act,
+        jig_client::action::Act::Go { .. }
+            | jig_client::action::Act::Fold { .. }
+            | jig_client::action::Act::FoldCall { .. }
+            | jig_client::action::Act::Filter { .. }
+            | jig_client::action::Act::More { .. }
+            | jig_client::action::Act::FilterInbox { .. }
+            | jig_client::action::Act::FilterTasks { .. }
+            | jig_client::action::Act::FilterNotes { .. }
+            | jig_client::action::Act::FilterPlan { .. }
+            | jig_client::action::Act::HistoryScope { .. }
+            | jig_client::action::Act::OpenEnded { .. }
+            | jig_client::action::Act::OpenUpdates
+    )
 }

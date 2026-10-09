@@ -32,6 +32,7 @@ pub struct Rules {
     link_within: Duration,
     clients: BTreeSet<ClientId>,
     reachable: Option<bool>,
+    parked: BTreeSet<ClientId>,
     durable: BTreeSet<u64>,
     made: BTreeMap<RequestKey, u64>,
     requests: BTreeMap<RequestKey, Pending>,
@@ -56,6 +57,7 @@ impl Rules {
             link_within,
             clients: BTreeSet::new(),
             reachable: None,
+            parked: BTreeSet::new(),
             durable: BTreeSet::from([0]),
             made: BTreeMap::new(),
             requests: BTreeMap::new(),
@@ -119,7 +121,9 @@ impl Rules {
                 for client in &self.clients {
                     if live {
                         judge.withdraw(&Deadline::Offline(*client));
-                        judge.rearm(Deadline::Online(*client), self.link_within);
+                        if !self.parked.contains(client) {
+                            judge.rearm(Deadline::Online(*client), self.link_within);
+                        }
                     } else {
                         judge.withdraw(&Deadline::Online(*client));
                         judge.rearm(Deadline::Offline(*client), self.heartbeat);
@@ -184,6 +188,9 @@ impl Rules {
                 }
             }
             Receipt::Party { party } => {
+                if self.parked.remove(&client) && self.reachable == Some(true) {
+                    judge.rearm(Deadline::Online(client), self.link_within);
+                }
                 for (key, pending) in &self.requests {
                     if pending.client == client && key.0 != party {
                         judge.withdraw(&Deadline::Request(key.0, key.1));
@@ -191,6 +198,8 @@ impl Rules {
                 }
             }
             Receipt::Parked => {
+                self.parked.insert(client);
+                judge.withdraw(&Deadline::Online(client));
                 for (key, pending) in &self.requests {
                     if pending.client == client {
                         judge.withdraw(&Deadline::Request(key.0, key.1));
@@ -286,7 +295,7 @@ impl Expectations for Rules {
             Observation::Request { client, party, sent } => self.request(client, party, sent, judge),
             Observation::Delivered { client, receipt } => self.delivered(client, receipt, judge),
             Observation::Shown { client, seen } => self.shown(client, seen, judge),
-            Observation::LeftPage { client } => {
+            Observation::LeftPage { client } | Observation::WindowChanged { client } => {
                 self.visible.retain(|(c, _), _| *c != client);
                 self.reasoned.retain(|(c, _)| *c != client);
             }

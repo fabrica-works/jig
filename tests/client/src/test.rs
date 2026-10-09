@@ -197,6 +197,9 @@ impl App for Test {
             // The shell model and comparison projections are bounded by another renderer envelope.
             + 2 * view::worst_case(&bounds, limits, &words, &family).expect("view worst case")
     }
+    fn window_changed(event: &Self::Event) -> bool {
+        crate::observe::window_changed(event)
+    }
     fn seen(tree: &Tree) -> Vec<crate::harness::Seen> {
         crate::observe::seen(tree)
     }

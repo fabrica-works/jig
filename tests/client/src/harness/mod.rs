@@ -43,6 +43,10 @@ pub trait App: Sized {
     fn received(event: &Self::Event) -> Vec<Receipt>;
     /// The enclosing card a person acted on, from the public tree alone.
     fn card(tree: &Tree, node: NodeId) -> Option<CardKey>;
+    /// Decode person-chosen display changes, such as filtering, folding or reading more.
+    fn window_changed(_event: &Self::Event) -> bool {
+        false
+    }
 }
 /// One persistent shell record change.
 #[derive(Debug)]
