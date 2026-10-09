@@ -9,11 +9,18 @@ use jig_client::{
 };
 use skein_lib::Token;
 mod conversations;
+mod deployment;
 mod inbox;
 mod not_the_work;
+pub mod project;
+mod task;
+mod work;
 pub use conversations::conversations;
+pub use deployment::deployment;
 pub use inbox::inbox;
 pub use not_the_work::not_the_work;
+pub use project::project;
+pub use task::task;
 
 pub(super) fn heading(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole]) {
     b.open(Role::Heading { level: 1 });
@@ -81,4 +88,23 @@ pub(super) fn object_key(object: jig_client::contract::ObjectKey) -> crate::Key 
         ObjectKey::Note { project, note } => (6, u64::from(project), note),
     };
     crate::Key { owner: crate::Owner::Jig, kind, a, b }
+}
+
+/// Build the current jig page; an application's own page returns false.
+pub fn page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+    use jig_client::{address::Address, pages::Page};
+    match client.page() {
+        Page::Elsewhere => return false,
+        Page::Work { address, .. } => match address {
+            Address::Inbox { .. } => inbox(b, client, words, bindings),
+            Address::Conversations { .. } => conversations(b, client, words, bindings),
+            Address::Task { .. } => task(b, client, words, bindings),
+            Address::Project { .. } => project(b, client, words, bindings),
+            Address::Deployment => deployment(b, client, words, bindings),
+        },
+        Page::Starting | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
+            not_the_work(b, client, words, bindings);
+        }
+    }
+    true
 }

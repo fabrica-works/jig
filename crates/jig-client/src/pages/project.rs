@@ -42,6 +42,8 @@ pub struct ProjectPage {
     pub task_filter: TaskFilter,
     pub notes: List<Id<Object>>,
     pub note_filter: Option<NoteFilter>,
+    /// Domain writes of the selected note scope and description.
+    pub note_writes: u64,
     pub notes_before: Option<Cursor>,
     pub notes_after: Option<Cursor>,
     pub spend: List<contract::SpendPeriod>,
@@ -63,6 +65,7 @@ impl ProjectPage {
             task_filter: TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
             notes: List::with_capacity(rows),
             note_filter: None,
+            note_writes: 0,
             notes_before: None,
             notes_after: None,
             spend: List::with_capacity(rows),
@@ -83,6 +86,7 @@ impl ProjectPage {
         self.task_filter = TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false };
         self.notes.clear();
         self.note_filter = None;
+        self.note_writes = self.note_writes.checked_add(1).expect("note writes remain");
         self.notes_before = None;
         self.notes_after = None;
         self.spend.clear();

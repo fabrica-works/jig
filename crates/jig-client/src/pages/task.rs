@@ -18,7 +18,7 @@ use crate::{
     objects::{Body, Object, Source},
     watches::Owner,
 };
-use skein_lib::{Env, Id, List, Queue, Token};
+use skein_lib::{Env, Id, List, Map, Queue, Token};
 /// Which plan rows a person has asked to see.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlanFilter {
@@ -36,11 +36,13 @@ pub struct Sections {
 }
 /// Bounded plan context, preserving counts of every held task beyond the window.
 #[derive(Debug)]
+#[expect(clippy::partial_pub_fields, reason = "fold choices change only through admitted page actions")]
 pub struct Plan {
     pub nodes: List<TreeNode>,
     pub folded: PhaseCounts,
     pub held_below: u32,
     pub filter: PlanFilter,
+    folds: Map<u64, bool>,
 }
 /// The page's header handle and section-specific read choices.
 #[derive(Debug)]
@@ -56,7 +58,13 @@ impl TaskPage {
     pub(crate) fn new(rows: u32) -> Self {
         Self {
             header: None,
-            plan: Plan { nodes: List::with_capacity(rows), folded: counts(), held_below: 0, filter: PlanFilter::All },
+            plan: Plan {
+                nodes: List::with_capacity(rows),
+                folded: counts(),
+                held_below: 0,
+                filter: PlanFilter::All,
+                folds: Map::with_capacity(rows),
+            },
             subtree_history: false,
             ended_after: None,
             ended_before: None,
@@ -69,6 +77,13 @@ impl TaskPage {
         self.plan.folded = counts();
         self.plan.held_below = 0;
         self.plan.filter = PlanFilter::All;
+        let mut keys = List::with_capacity(self.plan.folds.len());
+        for (task, _) in &self.plan.folds {
+            keys.push(*task).expect("fold key fits");
+        }
+        for task in &keys {
+            let _open = self.plan.folds.remove(task).expect("collected fold exists");
+        }
         self.subtree_history = false;
         self.ended_after = None;
         self.ended_before = None;
@@ -147,6 +162,21 @@ pub(crate) fn tree(domain: &mut Domain, tree: Tree) {
         }
         plan.nodes.push(node).expect("a row fits its window");
     }
+    let mut removed = List::with_capacity(plan.folds.len());
+    for (task, _) in &plan.folds {
+        let mut retained = false;
+        for node in &plan.nodes {
+            if node.chip.task == *task {
+                retained = true;
+            }
+        }
+        if !retained {
+            removed.push(*task).expect("fold key fits");
+        }
+    }
+    for task in &removed {
+        let _removed = plan.folds.remove(task);
+    }
     domain.changed();
 }
 fn add(counts: &mut PhaseCounts, phase: Phase) {
@@ -164,6 +194,14 @@ fn add(counts: &mut PhaseCounts, phase: Phase) {
     *value = value.checked_add(1).expect("a bounded tree count fits u32");
 }
 impl Plan {
+    /// Live subtrees begin open; ended subtrees begin folded to their line.
+    #[must_use]
+    pub fn expanded(&self, node: &TreeNode) -> bool {
+        match self.folds.get(&node.chip.task) {
+            Some(open) => *open,
+            None => crate::pages::conversations::live(node.chip.phase),
+        }
+    }
     /// Filtering preserves every retained row so changing the filter loses no facts.
     #[must_use]
     pub fn visible(&self, node: &TreeNode) -> bool {
@@ -336,6 +374,38 @@ fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) 
         crate::pages::routing::refuse(domain, Limit::Reads);
     }
 }
+/// Fold presentation belongs to this page and never changes committed work.
+pub(crate) fn fold(domain: &mut Domain, object: Token, open: bool) {
+    match domain.address {
+        Address::Task { section: TaskSection::Plan, .. } => {}
+        Address::Task { .. }
+        | Address::Inbox { .. }
+        | Address::Conversations { .. }
+        | Address::Project { .. }
+        | Address::Deployment => return,
+    }
+    let Some(object) = domain.objects.get(Id::from_token(object)) else {
+        return;
+    };
+    let task = match object.key {
+        ObjectKey::Task(task) => task,
+        ObjectKey::Proposal(_)
+        | ObjectKey::Escalation(_)
+        | ObjectKey::Question { .. }
+        | ObjectKey::PersonTask(_)
+        | ObjectKey::Result(_)
+        | ObjectKey::Note { .. } => return,
+    };
+    let plan = &mut domain.task_page.plan;
+    for node in &plan.nodes {
+        if node.chip.task == task {
+            if plan.folds.insert(task, open).is_ok() {
+                domain.changed();
+            }
+            return;
+        }
+    }
+}
 /// Selects a plan filter and reopens its live source without inventing history.
 pub(crate) fn filter(domain: &mut Domain, filter: PlanFilter) {
     domain.task_page.plan.filter = filter;
@@ -421,6 +491,8 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, 
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     List::<TreeNode>::worst_case(limits.rows)?
+        .checked_add(Map::<u64, bool>::worst_case(limits.rows)?)?
+        .checked_add(List::<u64>::worst_case(limits.rows)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(2)?)?
         .checked_add(u64::from(limits.text).checked_mul(2)?)
 }

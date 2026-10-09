@@ -61,6 +61,10 @@ pub enum JigMeaning {
     Priority,
     /// A typed amendment snapshot updated by one named form field.
     Amendment { change: Box<jig_client::contract::Amendment>, field: crate::confirmation::amendment::Field },
+    /// A typed project goal form field.
+    GoalField { form: jig_client::pages::project::goals::GoalForm, field: crate::pages::project::goals::Field },
+    /// Description search changes the current note scope only.
+    NoteSearch { filter: jig_client::pages::project::NoteFilter },
     /// A connector-owned part referred to by a slot, never an actionable node.
     Part(jig_client::contract::Part),
 }
@@ -107,7 +111,9 @@ impl JigBindings {
                     | JigMeaning::Field(_)
                     | JigMeaning::TaskNumber
                     | JigMeaning::Priority
-                    | JigMeaning::Amendment { .. } => return None,
+                    | JigMeaning::Amendment { .. }
+                    | JigMeaning::GoalField { .. }
+                    | JigMeaning::NoteSearch { .. } => return None,
                 }
             }
         }
@@ -160,7 +166,9 @@ impl JigBindings {
                     | JigMeaning::TaskNumber
                     | JigMeaning::Part(_)
                     | JigMeaning::Priority
-                    | JigMeaning::Amendment { .. } => return None,
+                    | JigMeaning::Amendment { .. }
+                    | JigMeaning::GoalField { .. }
+                    | JigMeaning::NoteSearch { .. } => return None,
                 }
             }
         }
@@ -175,6 +183,23 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
         if entry.token == token {
             return match &entry.meaning {
                 JigMeaning::Part(_) => None,
+                JigMeaning::GoalField { form, field } => match act {
+                    Act::Input { value } => crate::pages::project::goals::edit(*form, *field, &value),
+                    Act::Press | Act::Submit | Act::Toggle => None,
+                },
+                JigMeaning::NoteSearch { filter } => match act {
+                    Act::Input { value } => Some(jig_client::action::Act::FilterNotes {
+                        filter: jig_client::pages::project::NoteFilter {
+                            scope: filter.scope.clone(),
+                            description: if value.is_empty() {
+                                None
+                            } else {
+                                Some(jig_client::contract::Text::new(value, view.text_limit).ok()?)
+                            },
+                        },
+                    }),
+                    Act::Press | Act::Submit | Act::Toggle => None,
+                },
                 JigMeaning::Priority => match act {
                     Act::Input { value } => {
                         Some(jig_client::action::Act::Priority { priority: u32::try_from(number(&value)?).ok()? })

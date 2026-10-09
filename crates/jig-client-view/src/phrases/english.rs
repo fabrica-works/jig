@@ -10,9 +10,136 @@ use skein_lib::{List, bytes::copy_of};
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "English data matches the closed phrase vocabulary whole")]
 pub fn language() -> Language {
-    let mut phrases = List::with_capacity(309);
+    let mut phrases = List::with_capacity(377);
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::ProposalsWaiting => Box::new([
+                Segment::Text(copy_of(b"Pending proposals: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+
+            JigPhrase::RetryingPhase => Box::new([Segment::Text(copy_of(b"Retrying"))]),
+            JigPhrase::ResourceScope => Box::new([
+                Segment::Text(copy_of(b"Resource scope: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Name },
+            ]),
+            JigPhrase::ResultExpected => Box::new([Segment::Text(copy_of(b"Result expected"))]),
+            JigPhrase::ReportExpected => Box::new([Segment::Text(copy_of(b"A report"))]),
+            JigPhrase::WordsExpected => Box::new([Segment::Text(copy_of(b"Words"))]),
+            JigPhrase::ApprovalExpected => Box::new([Segment::Text(copy_of(b"Approval of the named state"))]),
+
+            JigPhrase::Overview => Box::new([Segment::Text(copy_of(b"Overview"))]),
+            JigPhrase::Activity => Box::new([Segment::Text(copy_of(b"Activity"))]),
+            JigPhrase::Plan => Box::new([Segment::Text(copy_of(b"Plan"))]),
+            JigPhrase::History => Box::new([Segment::Text(copy_of(b"History"))]),
+            JigPhrase::BudgetAuthority => Box::new([Segment::Text(copy_of(b"Budget and authority"))]),
+            JigPhrase::Panels => Box::new([Segment::Text(copy_of(b"Connectors"))]),
+            JigPhrase::Goal => Box::new([Segment::Text(copy_of(b"Goal"))]),
+            JigPhrase::Resources => Box::new([Segment::Text(copy_of(b"Resources"))]),
+            JigPhrase::Policy => Box::new([Segment::Text(copy_of(b"Policy"))]),
+            JigPhrase::Roles => Box::new([Segment::Text(copy_of(b"Roles and services"))]),
+            JigPhrase::Spend => Box::new([Segment::Text(copy_of(b"Spend"))]),
+            JigPhrase::Recurring => Box::new([Segment::Text(copy_of(b"Recurring tasks"))]),
+            JigPhrase::Settings => Box::new([Segment::Text(copy_of(b"Settings"))]),
+            JigPhrase::Goals => Box::new([Segment::Text(copy_of(b"Goals"))]),
+            JigPhrase::Tasks => Box::new([Segment::Text(copy_of(b"Tasks"))]),
+            JigPhrase::Notes => Box::new([Segment::Text(copy_of(b"Notes"))]),
+            JigPhrase::Reserved => {
+                Box::new([Segment::Text(copy_of(b"Reserved: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
+            }
+            JigPhrase::Left => {
+                Box::new([Segment::Text(copy_of(b"Left: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
+            }
+            JigPhrase::TotalBudget => Box::new([
+                Segment::Text(copy_of(b"Total budget: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+            ]),
+            JigPhrase::OwnBudget => {
+                Box::new([Segment::Text(copy_of(b"Own spend: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
+            }
+            JigPhrase::EndedBudget => Box::new([
+                Segment::Text(copy_of(b"Ended delegate spend: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+            ]),
+            JigPhrase::HeldBelow => {
+                Box::new([Segment::Text(copy_of(b"Held below: ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::FoldSubtree => Box::new([Segment::Text(copy_of(b"Fold subtree"))]),
+            JigPhrase::OpenSubtree => Box::new([Segment::Text(copy_of(b"Open subtree"))]),
+            JigPhrase::AllPlan => Box::new([Segment::Text(copy_of(b"All plan tasks"))]),
+            JigPhrase::HeldPlan => Box::new([Segment::Text(copy_of(b"Held only"))]),
+            JigPhrase::LivePlan => Box::new([Segment::Text(copy_of(b"Live only"))]),
+            JigPhrase::OwnHistory => Box::new([Segment::Text(copy_of(b"This task only"))]),
+            JigPhrase::SubtreeHistory => Box::new([Segment::Text(copy_of(b"This task and its subtree"))]),
+            JigPhrase::BatchMade => Box::new([
+                Segment::Text(copy_of(b"Made in batch ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::MovedWork => Box::new([Segment::Text(copy_of(b"Requester changed"))]),
+            JigPhrase::GoalWords => Box::new([Segment::Text(copy_of(b"Goal specification"))]),
+            JigPhrase::GoalBudget => Box::new([Segment::Text(copy_of(b"Goal budget"))]),
+            JigPhrase::GoalDeadline => Box::new([Segment::Text(copy_of(b"Goal deadline (UTC, YYYY-MM-DD HH:MM)"))]),
+            JigPhrase::GoalPriority => Box::new([Segment::Text(copy_of(b"Goal priority"))]),
+            JigPhrase::PriorityMeaning => {
+                Box::new([Segment::Text(copy_of(b"Priority orders work competing for one resource"))])
+            }
+            JigPhrase::PoolLeft => Box::new([
+                Segment::Text(copy_of(b"Your pool has left: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+            ]),
+            JigPhrase::GoalPropose => Box::new([Segment::Text(copy_of(b"Beyond your pool, this will be proposed"))]),
+            JigPhrase::NoteSearch => Box::new([Segment::Text(copy_of(b"Search notes by description"))]),
+            JigPhrase::AskedByMe => Box::new([Segment::Text(copy_of(b"Tasks I asked for"))]),
+            JigPhrase::AllTasks => Box::new([Segment::Text(copy_of(b"All tasks"))]),
+            JigPhrase::Period => {
+                Box::new([Segment::Text(copy_of(b"Period ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::RoleNumber => {
+                Box::new([Segment::Text(copy_of(b"Role ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::PartyNumber => {
+                Box::new([Segment::Text(copy_of(b"Party ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::Allotment => {
+                Box::new([Segment::Text(copy_of(b"Allotment: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
+            }
+            JigPhrase::DecidesKind => {
+                Box::new([Segment::Text(copy_of(b"Decides kind ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::PolicySpend => Box::new([
+                Segment::Text(copy_of(b"Spend per period: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+            ]),
+            JigPhrase::HostNumber => {
+                Box::new([Segment::Text(copy_of(b"Host ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::HostConnected => Box::new([Segment::Text(copy_of(b"Connected"))]),
+            JigPhrase::HostDisconnected => Box::new([Segment::Text(copy_of(b"Lost"))]),
+            JigPhrase::SlotsUsed => {
+                Box::new([Segment::Text(copy_of(b"Slots used: ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::SlotsFree => {
+                Box::new([Segment::Text(copy_of(b"Slots free: ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::AccountNumber => {
+                Box::new([Segment::Text(copy_of(b"LLM account ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::AccountUsable => Box::new([Segment::Text(copy_of(b"Usable"))]),
+            JigPhrase::AccountUnavailable => Box::new([Segment::Text(copy_of(b"Unavailable"))]),
+            JigPhrase::Capacity => Box::new([Segment::Text(copy_of(b"Capacity"))]),
+            JigPhrase::TasksLive => {
+                Box::new([Segment::Text(copy_of(b"Live tasks: ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::CapacityLimit => {
+                Box::new([Segment::Text(copy_of(b"Task limit: ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::Grace => Box::new([
+                Segment::Text(copy_of(b"Grace holds until ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::WaitingAccount => Box::new([Segment::Text(copy_of(b"Tasks waiting for this account"))]),
+            JigPhrase::ParkedResume => Box::new([Segment::Text(copy_of(b"Parked; your words resume it"))]),
+
             JigPhrase::OwnSpend => {
                 Box::new([Segment::Text(copy_of(b"Agent spend: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
             }
@@ -730,6 +857,6 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
     Phrasebook::load(
         shapes(text),
         Box::new([language()]),
-        &PhraseLimits { languages: 1, phrases: 309, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
+        &PhraseLimits { languages: 1, phrases: 377, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
     )
 }

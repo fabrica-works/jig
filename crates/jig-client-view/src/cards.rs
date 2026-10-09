@@ -184,6 +184,19 @@ pub fn card(
         Some(jig_client::objects::Body::Note { document, .. }) => {
             if open(b, client, object, place, document.description.bytes(), words, bindings) {
                 crate::markdown::read(document.body.bytes(), 2, b);
+                words.actor(b, document.by);
+                words.wall(b, document.changed);
+                for task in &document.tasks {
+                    crate::frame::control(
+                        b,
+                        words,
+                        bindings,
+                        Role::Link,
+                        JigPhrase::TaskPage,
+                        &[Hole::Number(*task)],
+                        Act::Go { address: jig_client::address::Address::task(*task) },
+                    );
+                }
                 common::acts(b, &facts.card, &document.acts, object, words, bindings);
                 close(b);
             }

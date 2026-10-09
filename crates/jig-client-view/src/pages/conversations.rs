@@ -23,7 +23,26 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
         );
         words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(row.project))]);
         b.text(Run::Plain, row.first_words.bytes());
-        runtime(b, &row.runtime, words, bindings);
+        runtime(b, client, &row.runtime, words, bindings);
+        match row.runtime {
+            Runtime::Held => {
+                if let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Task(row.chip.task)) {
+                    cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
+                }
+            }
+            Runtime::Ended => {
+                cards::chip::chip(b, client, &row.chip, words, bindings);
+            }
+            Runtime::Waiting { .. }
+            | Runtime::Idle
+            | Runtime::Starting
+            | Runtime::Running { .. }
+            | Runtime::WaitingForWords { .. }
+            | Runtime::BackingOff { .. }
+            | Runtime::Procedure { .. }
+            | Runtime::Person { .. }
+            | Runtime::Closing(_) => {}
+        }
         words.text(
             b,
             if row.unread.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
@@ -86,7 +105,7 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
     }
     super::excess(b, client, words);
 }
-pub(super) fn runtime(b: &mut Builder, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {
     match runtime {
         Runtime::Waiting { dependencies, hold } => {
             words.text(b, JigPhrase::Waiting, &[]);
@@ -97,12 +116,24 @@ pub(super) fn runtime(b: &mut Builder, runtime: &Runtime, words: &Words, binding
                 cards::common::part(b, part, words, bindings);
             }
         }
-        Runtime::Idle => words.text(b, JigPhrase::Idle, &[]),
+        Runtime::Idle => {
+            words.text(b, JigPhrase::Idle, &[]);
+            words.text(b, JigPhrase::ParkedResume, &[]);
+        }
         Runtime::Starting => words.text(b, JigPhrase::TaskStarting, &[]),
-        Runtime::Running { tool, .. } => match tool {
-            Some(tool) => words.text(b, JigPhrase::Tool, &[crate::words::name(tool.bytes())]),
-            None => words.text(b, JigPhrase::Writing, &[]),
-        },
+        Runtime::Running { tool, since, .. } => {
+            words.text(
+                b,
+                JigPhrase::ElapsedSpan,
+                &[Hole::Span(skein_lib::Duration::from_nanos(
+                    client.wall().as_nanos().saturating_sub(since.as_nanos()),
+                ))],
+            );
+            match tool {
+                Some(tool) => words.text(b, JigPhrase::Tool, &[crate::words::name(tool.bytes())]),
+                None => words.text(b, JigPhrase::Writing, &[]),
+            }
+        }
         Runtime::WaitingForWords { .. } => words.text(b, JigPhrase::WaitingWords, &[]),
         Runtime::BackingOff { at, attempt, tries, class, reason } => {
             words.text(

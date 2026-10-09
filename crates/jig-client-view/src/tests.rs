@@ -11,3 +11,5 @@ mod cards_objects;
 mod cards_access;
 
 mod pages;
+
+mod work_pages;

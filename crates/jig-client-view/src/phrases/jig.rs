@@ -624,6 +624,142 @@ pub enum JigPhrase {
     OwnSpend,
     /// Delegate spend: (0).
     DelegateSpend,
+    /// Overview.
+    Overview,
+    /// Activity.
+    Activity,
+    /// Plan.
+    Plan,
+    /// History.
+    History,
+    /// Budget and authority.
+    BudgetAuthority,
+    /// Connectors.
+    Panels,
+    /// Goal.
+    Goal,
+    /// Resources.
+    Resources,
+    /// Policy.
+    Policy,
+    /// Roles and services.
+    Roles,
+    /// Spend.
+    Spend,
+    /// Recurring tasks.
+    Recurring,
+    /// Settings.
+    Settings,
+    /// Goals.
+    Goals,
+    /// Tasks.
+    Tasks,
+    /// Notes.
+    Notes,
+    /// Reserved: (0).
+    Reserved,
+    /// Left: (0).
+    Left,
+    /// Total budget: (0).
+    TotalBudget,
+    /// Own spend: (0).
+    OwnBudget,
+    /// Ended delegate spend: (0).
+    EndedBudget,
+    /// Held below: (0).
+    HeldBelow,
+    /// Fold subtree.
+    FoldSubtree,
+    /// Open subtree.
+    OpenSubtree,
+    /// All plan tasks.
+    AllPlan,
+    /// Held only.
+    HeldPlan,
+    /// Live only.
+    LivePlan,
+    /// This task only.
+    OwnHistory,
+    /// This task and its subtree.
+    SubtreeHistory,
+    /// Made in batch (0).
+    BatchMade,
+    /// Requester changed.
+    MovedWork,
+    /// Goal specification.
+    GoalWords,
+    /// Goal budget.
+    GoalBudget,
+    /// Goal deadline (UTC, YYYY-MM-DD HH:MM).
+    GoalDeadline,
+    /// Goal priority.
+    GoalPriority,
+    /// Priority orders work competing for one resource.
+    PriorityMeaning,
+    /// Your pool has left: (0).
+    PoolLeft,
+    /// Beyond your pool, this will be proposed.
+    GoalPropose,
+    /// Search notes by description.
+    NoteSearch,
+    /// Tasks I asked for.
+    AskedByMe,
+    /// All tasks.
+    AllTasks,
+    /// Period (0).
+    Period,
+    /// Role (0).
+    RoleNumber,
+    /// Party (0).
+    PartyNumber,
+    /// Allotment: (0).
+    Allotment,
+    /// Decides kind (0).
+    DecidesKind,
+    /// Spend per period: (0).
+    PolicySpend,
+    /// Host (0).
+    HostNumber,
+    /// Connected.
+    HostConnected,
+    /// Lost.
+    HostDisconnected,
+    /// Slots used: (0).
+    SlotsUsed,
+    /// Slots free: (0).
+    SlotsFree,
+    /// LLM account (0).
+    AccountNumber,
+    /// Usable.
+    AccountUsable,
+    /// Unavailable.
+    AccountUnavailable,
+    /// Capacity.
+    Capacity,
+    /// Live tasks: (0).
+    TasksLive,
+    /// Task limit: (0).
+    CapacityLimit,
+    /// Grace holds until (0).
+    Grace,
+    /// Tasks waiting for this account.
+    WaitingAccount,
+    /// Parked; your words resume it.
+    ParkedResume,
+    /// Retrying.
+    RetryingPhase,
+    /// Resource scope: (0).
+    ResourceScope,
+    /// Result expected.
+    ResultExpected,
+    /// A report.
+    ReportExpected,
+    /// Words.
+    WordsExpected,
+    /// Approval of the named state.
+    ApprovalExpected,
+    /// Pending proposals: (0).
+    ProposalsWaiting,
 }
 impl JigPhrase {
     /// Stable phrase identity within jig's owner.
@@ -940,6 +1076,74 @@ impl JigPhrase {
             Self::SomeoneElse => 306,
             Self::OwnSpend => 307,
             Self::DelegateSpend => 308,
+            Self::Overview => 309,
+            Self::Activity => 310,
+            Self::Plan => 311,
+            Self::History => 312,
+            Self::BudgetAuthority => 313,
+            Self::Panels => 314,
+            Self::Goal => 315,
+            Self::Resources => 316,
+            Self::Policy => 317,
+            Self::Roles => 318,
+            Self::Spend => 319,
+            Self::Recurring => 320,
+            Self::Settings => 321,
+            Self::Goals => 322,
+            Self::Tasks => 323,
+            Self::Notes => 324,
+            Self::Reserved => 325,
+            Self::Left => 326,
+            Self::TotalBudget => 327,
+            Self::OwnBudget => 328,
+            Self::EndedBudget => 329,
+            Self::HeldBelow => 330,
+            Self::FoldSubtree => 331,
+            Self::OpenSubtree => 332,
+            Self::AllPlan => 333,
+            Self::HeldPlan => 334,
+            Self::LivePlan => 335,
+            Self::OwnHistory => 336,
+            Self::SubtreeHistory => 337,
+            Self::BatchMade => 338,
+            Self::MovedWork => 339,
+            Self::GoalWords => 340,
+            Self::GoalBudget => 341,
+            Self::GoalDeadline => 342,
+            Self::GoalPriority => 343,
+            Self::PriorityMeaning => 344,
+            Self::PoolLeft => 345,
+            Self::GoalPropose => 346,
+            Self::NoteSearch => 347,
+            Self::AskedByMe => 348,
+            Self::AllTasks => 349,
+            Self::Period => 350,
+            Self::RoleNumber => 351,
+            Self::PartyNumber => 352,
+            Self::Allotment => 353,
+            Self::DecidesKind => 354,
+            Self::PolicySpend => 355,
+            Self::HostNumber => 356,
+            Self::HostConnected => 357,
+            Self::HostDisconnected => 358,
+            Self::SlotsUsed => 359,
+            Self::SlotsFree => 360,
+            Self::AccountNumber => 361,
+            Self::AccountUsable => 362,
+            Self::AccountUnavailable => 363,
+            Self::Capacity => 364,
+            Self::TasksLive => 365,
+            Self::CapacityLimit => 366,
+            Self::Grace => 367,
+            Self::WaitingAccount => 368,
+            Self::ParkedResume => 369,
+            Self::RetryingPhase => 370,
+            Self::ResourceScope => 371,
+            Self::ResultExpected => 372,
+            Self::ReportExpected => 373,
+            Self::WordsExpected => 374,
+            Self::ApprovalExpected => 375,
+            Self::ProposalsWaiting => 376,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -948,7 +1152,52 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::NeedsYou
+            Self::Overview
+            | Self::Activity
+            | Self::Plan
+            | Self::History
+            | Self::BudgetAuthority
+            | Self::Panels
+            | Self::Goal
+            | Self::Resources
+            | Self::Policy
+            | Self::Roles
+            | Self::Spend
+            | Self::Recurring
+            | Self::Settings
+            | Self::Goals
+            | Self::Tasks
+            | Self::Notes
+            | Self::FoldSubtree
+            | Self::OpenSubtree
+            | Self::AllPlan
+            | Self::HeldPlan
+            | Self::LivePlan
+            | Self::OwnHistory
+            | Self::SubtreeHistory
+            | Self::MovedWork
+            | Self::GoalWords
+            | Self::GoalBudget
+            | Self::GoalDeadline
+            | Self::GoalPriority
+            | Self::PriorityMeaning
+            | Self::GoalPropose
+            | Self::NoteSearch
+            | Self::AskedByMe
+            | Self::AllTasks
+            | Self::HostConnected
+            | Self::HostDisconnected
+            | Self::AccountUsable
+            | Self::AccountUnavailable
+            | Self::Capacity
+            | Self::WaitingAccount
+            | Self::ParkedResume
+            | Self::RetryingPhase
+            | Self::ResultExpected
+            | Self::ReportExpected
+            | Self::WordsExpected
+            | Self::ApprovalExpected
+            | Self::NeedsYou
             | Self::InboxUpdates
             | Self::AllKinds
             | Self::AllGoals
@@ -1153,7 +1402,8 @@ impl JigPhrase {
             | Self::ClaimedPhase
             | Self::ActivePhase
             | Self::ClosingPhase => Box::new([]),
-            Self::SignInWith
+            Self::ResourceScope
+            | Self::SignInWith
             | Self::ByNamed
             | Self::SignedIn
             | Self::Project
@@ -1168,7 +1418,20 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::OnlyGoal
+            Self::HeldBelow
+            | Self::BatchMade
+            | Self::Period
+            | Self::RoleNumber
+            | Self::PartyNumber
+            | Self::DecidesKind
+            | Self::HostNumber
+            | Self::SlotsUsed
+            | Self::SlotsFree
+            | Self::AccountNumber
+            | Self::TasksLive
+            | Self::CapacityLimit
+            | Self::ProposalsWaiting
+            | Self::OnlyGoal
             | Self::Delegates
             | Self::Needs
             | Self::MoreNeeds
@@ -1231,7 +1494,7 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::PassesUp | Self::At | Self::Since | Self::Deadline | Self::DeadlineHold => {
+            Self::Grace | Self::PassesUp | Self::At | Self::Since | Self::Deadline | Self::DeadlineHold => {
                 Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
             Self::BudgetMissing | Self::BudgetHold => Box::new([
@@ -1246,9 +1509,19 @@ impl JigPhrase {
             Self::DeadlineMissing => {
                 Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }, HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
-            Self::OwnSpend | Self::DelegateSpend | Self::Amount | Self::Budget | Self::TakeoverFunds => {
-                Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }])
-            }
+            Self::Reserved
+            | Self::Left
+            | Self::TotalBudget
+            | Self::OwnBudget
+            | Self::EndedBudget
+            | Self::PoolLeft
+            | Self::Allotment
+            | Self::PolicySpend
+            | Self::OwnSpend
+            | Self::DelegateSpend
+            | Self::Amount
+            | Self::Budget
+            | Self::TakeoverFunds => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
             Self::WaitingSpan | Self::Span | Self::StallSpan | Self::ElapsedSpan => {
                 Box::new([HoleShape { kind: HoleKind::Span, bytes: 0 }])
             }
@@ -1288,7 +1561,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 309] = [
+pub const ALL: [JigPhrase; 377] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -1598,11 +1871,79 @@ pub const ALL: [JigPhrase; 309] = [
     JigPhrase::SomeoneElse,
     JigPhrase::OwnSpend,
     JigPhrase::DelegateSpend,
+    JigPhrase::Overview,
+    JigPhrase::Activity,
+    JigPhrase::Plan,
+    JigPhrase::History,
+    JigPhrase::BudgetAuthority,
+    JigPhrase::Panels,
+    JigPhrase::Goal,
+    JigPhrase::Resources,
+    JigPhrase::Policy,
+    JigPhrase::Roles,
+    JigPhrase::Spend,
+    JigPhrase::Recurring,
+    JigPhrase::Settings,
+    JigPhrase::Goals,
+    JigPhrase::Tasks,
+    JigPhrase::Notes,
+    JigPhrase::Reserved,
+    JigPhrase::Left,
+    JigPhrase::TotalBudget,
+    JigPhrase::OwnBudget,
+    JigPhrase::EndedBudget,
+    JigPhrase::HeldBelow,
+    JigPhrase::FoldSubtree,
+    JigPhrase::OpenSubtree,
+    JigPhrase::AllPlan,
+    JigPhrase::HeldPlan,
+    JigPhrase::LivePlan,
+    JigPhrase::OwnHistory,
+    JigPhrase::SubtreeHistory,
+    JigPhrase::BatchMade,
+    JigPhrase::MovedWork,
+    JigPhrase::GoalWords,
+    JigPhrase::GoalBudget,
+    JigPhrase::GoalDeadline,
+    JigPhrase::GoalPriority,
+    JigPhrase::PriorityMeaning,
+    JigPhrase::PoolLeft,
+    JigPhrase::GoalPropose,
+    JigPhrase::NoteSearch,
+    JigPhrase::AskedByMe,
+    JigPhrase::AllTasks,
+    JigPhrase::Period,
+    JigPhrase::RoleNumber,
+    JigPhrase::PartyNumber,
+    JigPhrase::Allotment,
+    JigPhrase::DecidesKind,
+    JigPhrase::PolicySpend,
+    JigPhrase::HostNumber,
+    JigPhrase::HostConnected,
+    JigPhrase::HostDisconnected,
+    JigPhrase::SlotsUsed,
+    JigPhrase::SlotsFree,
+    JigPhrase::AccountNumber,
+    JigPhrase::AccountUsable,
+    JigPhrase::AccountUnavailable,
+    JigPhrase::Capacity,
+    JigPhrase::TasksLive,
+    JigPhrase::CapacityLimit,
+    JigPhrase::Grace,
+    JigPhrase::WaitingAccount,
+    JigPhrase::ParkedResume,
+    JigPhrase::RetryingPhase,
+    JigPhrase::ResourceScope,
+    JigPhrase::ResultExpected,
+    JigPhrase::ReportExpected,
+    JigPhrase::WordsExpected,
+    JigPhrase::ApprovalExpected,
+    JigPhrase::ProposalsWaiting,
 ];
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(309);
+    let mut rows = List::with_capacity(377);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

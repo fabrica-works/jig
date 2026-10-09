@@ -13,7 +13,7 @@ use jig_client::{
     pages::Page,
 };
 use skein_lib::{List, Token};
-fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree, JigBindings) {
+pub(super) fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree, JigBindings) {
     let mut limits = super::cards::limits();
     limits.nodes = 2000;
     limits.bindings = 512;
@@ -24,15 +24,18 @@ fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree, JigBinding
     match kind {
         0 => crate::pages::inbox(&mut b, d, words, &mut bindings),
         1 => crate::pages::conversations(&mut b, d, words, &mut bindings),
+        3 => {
+            crate::pages::page(&mut b, d, words, &mut bindings);
+        }
         _ => crate::pages::not_the_work(&mut b, d, words, &mut bindings),
     }
     b.close();
     (b.finish(), bindings)
 }
-fn deliver(d: &mut Domain, token: Token, document: Delivery) -> Vec<Request> {
+pub(super) fn deliver(d: &mut Domain, token: Token, document: Delivery) -> Vec<Request> {
     drive(d, Event::Watch { watch: token, event: WatchEvent::Delivered(document) })
 }
-fn named_binding(tree: &Tree, name: &[u8]) -> Token {
+pub(super) fn named_binding(tree: &Tree, name: &[u8]) -> Token {
     tree.nodes().iter().find(|n| n.name.as_deref() == Some(name) && n.binding.is_some()).unwrap().binding.unwrap().token
 }
 fn special_pages(words: &crate::words::Words) {
@@ -343,7 +346,7 @@ fn conversation_states(words: &crate::words::Words) {
         for label in [expected, b"Live delegates: 2", b"More than 2 updates", b"Read earlier", b"Read later"] {
             assert!(contains(&tree, label), "{label:?}");
         }
-        let keyed: Vec<_> = tree.nodes().iter().filter_map(|n| n.key).collect();
+        let keyed: Vec<_> = tree.nodes().iter().filter_map(|n| n.key.filter(|key| key.kind == 20)).collect();
         assert_eq!(keyed[0].a, 2);
         assert_eq!(keyed[1].a, 1);
         assert_eq!(

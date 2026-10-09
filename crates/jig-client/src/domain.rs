@@ -676,7 +676,8 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
         Act::Change { change } => crate::confirm::change(domain, *change),
         Act::Confirm => confirm_act(domain, out),
         Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out),
-        Act::Submit { .. } | Act::Fold { .. } => {}
+        Act::Fold { object, open } => crate::pages::task::fold(domain, object, open),
+        Act::Submit { .. } => {}
     }
 }
 fn start(

@@ -673,7 +673,7 @@ fn dialog(d: &Domain, words: &crate::words::Words, bindings: &mut JigBindings) -
     assert!(tree.len() <= crate::confirmation_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
     tree
 }
-fn task_doc(acts: &[ActKind]) -> Task {
+pub(super) fn task_doc(acts: &[ActKind]) -> Task {
     Task {
         chip: chip(),
         goal: true,

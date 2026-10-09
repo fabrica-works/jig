@@ -50,6 +50,8 @@ pub struct Submission {
 /// Pending form and its durable result survive page context replacement.
 #[derive(Debug)]
 pub struct FormState {
+    /// Domain writes of the typed form, independent of list deliveries.
+    pub writes: u64,
     pub form: Option<GoalForm>,
     pub confirmation: Option<GoalConfirmation>,
     pub pending: Option<Submission>,
@@ -58,13 +60,14 @@ pub struct FormState {
 }
 impl FormState {
     pub(crate) const fn new() -> Self {
-        Self { form: None, confirmation: None, pending: None, refusal: None, answer: None }
+        Self { writes: 0, form: None, confirmation: None, pending: None, refusal: None, answer: None }
     }
 }
 pub(crate) fn configure(domain: &mut Domain, form: GoalForm) {
     if super::number(domain) != Some(form.project) {
         return;
     }
+    domain.project_page.form.writes = domain.project_page.form.writes.checked_add(1).expect("form writes remain");
     domain.project_page.form.form = Some(form);
     domain.project_page.form.confirmation = None;
     domain.project_page.form.refusal = None;

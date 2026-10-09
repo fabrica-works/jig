@@ -11,6 +11,7 @@ pub(crate) fn filter(domain: &mut Domain, filter: super::NoteFilter, out: &mut Q
     if super::number(domain).is_none() {
         return;
     }
+    domain.project_page.note_writes = domain.project_page.note_writes.checked_add(1).expect("note writes remain");
     domain.project_page.note_filter = Some(filter.clone());
     domain.project_page.notes.clear();
     domain.project_page.notes_before = None;

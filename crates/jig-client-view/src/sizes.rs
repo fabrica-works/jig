@@ -139,7 +139,8 @@ pub fn refusal_nodes(limits: &Limits) -> Option<u32> {
 /// Largest object card, including task, note and loading alternatives.
 #[must_use]
 pub fn card_nodes(limits: &Limits) -> Option<u32> {
-    let simple = frame_of_card(limits)?.checked_add(chip_nodes(limits)?.max(markdown(limits)?))?;
+    let note = markdown(limits)?.checked_add(limits.rows.checked_mul(2)?)?.checked_add(3)?;
+    let simple = frame_of_card(limits)?.checked_add(chip_nodes(limits)?.max(note))?;
     Some(
         simple
             .max(proposal_nodes(limits)?)
