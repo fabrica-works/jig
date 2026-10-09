@@ -115,9 +115,9 @@ fn limits() -> Limits {
         views: jig_core_views::Limits {
             runs: 2,
             watchers: 4,
-            backlog: 2,
-            report_bytes: 64,
-            snapshot_bytes: 128,
+            watchers_per_party: 8,
+            subjects_per_change: 64,
+            text_bytes: 64,
             facts: 8,
         },
         notes: jig_core_notes::Limits {

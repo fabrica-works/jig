@@ -134,6 +134,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         size_of::<crate::routing::ProcedureCreation>(),
         size_of::<crate::run::Transcript>(),
         size_of::<crate::RunProof>(),
+        size_of::<crate::ViewSubject>(),
     ] {
         if value > largest {
             return None;
@@ -141,6 +142,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     }
     for capacity in [
         limits.views.watchers,     // watching
+        limits.views.watchers,     // opaque subject translation
         limits.tasks.tasks,        // view phases
         limits.load_slots,         // reads
         limits.tasks.tasks,        // dependency results
@@ -226,6 +228,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(bytes(limits.call_records, bytes(limits.notes.recalled, note_entry)?)?)?;
     total = total.checked_add(bytes(task.tasks, u64::from(task.result_bytes).checked_mul(3)?)?)?;
     total = total.checked_add(u64::from(task.message_bytes))?;
+    total =
+        total.checked_add(Map::<skein_lib::Token, crate::documents::Document>::worst_case(limits.views.watchers)?)?;
+    total = total.checked_add(
+        u64::from(limits.views.watchers).checked_mul(crate::documents::document_worst_case(&limits.documents)?)?,
+    )?;
 
     // One decision may retain a routed event, a request, an owned row/load
     // copy and a connector handoff at each bounded route position.
@@ -240,7 +247,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.people.identity_bytes))?
         .checked_add(u64::from(limits.people.words))?
         .checked_add(u64::from(limits.notes.body_bytes))?
-        .checked_add(u64::from(limits.views.snapshot_bytes))?;
+        .checked_add(u64::from(limits.documents.text_bytes))?;
     total = total.checked_add(Queue::<fleet::Request>::worst_case(fleet::max_out(&limits.fleet).checked_mul(4)?)?)?;
     total = total.checked_add(Queue::<Event>::worst_case(route.writes)?)?;
     total = total.checked_add(Queue::<Request>::worst_case(route.writes.checked_add(1)?)?)?;

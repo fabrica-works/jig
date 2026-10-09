@@ -1,50 +1,43 @@
-//! Admission and memory bounds for live views (domain/engine.md, 13).
-
-use skein_lib::{Id, List, Map, Queue, Slab, Token};
-
-use crate::boundary::Chunk;
+//! Fixed pacing capacities (`domain/engine.md`, 11 and 13).
+//! There is no additional per-subject limit (`QUESTIONS.md`, item 17).
 use crate::facts::Fact;
 use crate::watch::Watcher;
+use skein_lib::{Id, List, Map, Queue, Slab, Token};
 
-/// Fixed capacities for the views child.
+/// Capacities fixed when the child is constructed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
-    /// Live runs followed.
+    /// Runs whose provisional text can be followed.
     pub runs: u32,
     /// Open watches.
     pub watchers: u32,
-    /// Chunks waiting behind one delivery.
-    pub backlog: u32,
-    /// Largest live report.
-    pub report_bytes: u32,
-    /// Largest initial snapshot.
-    pub snapshot_bytes: u32,
-    /// Best effort facts waiting to be drained.
+    /// Open watches belonging to one opaque party.
+    pub watchers_per_party: u32,
+    /// Subjects named by one change event.
+    pub subjects_per_change: u32,
+    /// Retained provisional bytes per followed run.
+    pub text_bytes: u32,
+    /// Best effort observations waiting to be drained.
     pub facts: u32,
 }
-
 pub(crate) fn slots(limits: &Limits) -> Option<u32> {
     limits.watchers.checked_mul(2)
 }
 
-/// Maximum live memory including watch backlogs and one event in hand.
+/// Maximum pacing memory, including one bounded change event and scan in hand.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.runs == 0 || limits.watchers == 0 || limits.backlog == 0 {
+    if limits.runs == 0
+        || limits.watchers == 0
+        || limits.watchers_per_party == 0
+        || limits.subjects_per_change == 0
+        || limits.text_bytes == 0
+    {
         return None;
     }
-    let runs = Map::<Token, Token>::worst_case(limits.runs)?.checked_mul(2)?;
-    let slots = slots(limits)?;
-    let watchers =
-        Slab::<Watcher>::worst_case(slots)?.checked_add(Map::<Token, Id<Watcher>>::worst_case(limits.watchers)?)?;
-    let backlogs = u64::from(slots).checked_mul(Queue::<Chunk>::worst_case(limits.backlog)?)?.checked_add(
-        u64::from(limits.watchers)
-            .checked_mul(u64::from(limits.backlog))?
-            .checked_mul(u64::from(limits.report_bytes))?,
-    )?;
-    let facts = Queue::<Fact>::worst_case(limits.facts)?;
-    let hand = u64::from(limits.report_bytes)
-        .max(u64::from(limits.snapshot_bytes))
-        .checked_add(List::<Id<Watcher>>::worst_case(limits.watchers)?)?;
-    runs.checked_add(watchers)?.checked_add(backlogs)?.checked_add(facts)?.checked_add(hand)
+    Slab::<Watcher>::worst_case(slots(limits)?)?
+        .checked_add(Map::<Token, Id<Watcher>>::worst_case(limits.watchers)?)?
+        .checked_add(Queue::<Fact>::worst_case(limits.facts)?)?
+        .checked_add(List::<Token>::worst_case(limits.subjects_per_change)?)?
+        .checked_add(List::<Id<Watcher>>::worst_case(limits.watchers)?)
 }

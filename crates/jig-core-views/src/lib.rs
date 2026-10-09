@@ -1,17 +1,9 @@
-//! The views child streams four live subjects: a run, a task tree, a
-//! project's goals, and a party's inbox (domain/engine.md, 11).
-//!
-//! A watch begins with its parent's snapshot. Its delivery is first.
-//! Each watcher has one delivery in flight and a bounded backlog. Overflow
-//! drops old chunks and counts them for the next delivery. Views keep no
-//! history and never affect decisions. The parent owns authorization,
-//! snapshots, and delivery to its clients.
-
+//! Level-triggered volatile watches (`domain/engine.md`, 11).
+//! The child keeps opaque subjects, windows and pacing marks. Its parent owns
+//! documents and authorization; changes coalesce while a delivery is in flight.
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
-
 extern crate alloc;
-
 mod boundary;
 mod domain;
 mod facts;
@@ -19,8 +11,7 @@ mod limits;
 #[cfg(test)]
 mod tests;
 mod watch;
-
-pub use boundary::{Chunk, End, Event, Kind, Refusal, Request, Subject};
+pub use boundary::{End, Event, Made, Refusal, Request, Window};
 pub use domain::{Domain, fire, max_out, step};
-pub use facts::{Dropped, Fact, Lost};
+pub use facts::Fact;
 pub use limits::{Limits, worst_case};

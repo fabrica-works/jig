@@ -1,123 +1,122 @@
+use crate::*;
 use alloc::boxed::Box;
-
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
-
-use crate::{Chunk, Domain, End, Event, Kind, Limits, Refusal, Request, Subject, max_out, step};
-
-const LIMITS: Limits = Limits { runs: 2, watchers: 4, backlog: 2, report_bytes: 16, snapshot_bytes: 16, facts: 32 };
-
+const LIMITS: Limits =
+    Limits { runs: 2, watchers: 4, watchers_per_party: 2, subjects_per_change: 4, text_bytes: 16, facts: 32 };
 fn drive(domain: &mut Domain, event: Event) -> Box<[Request]> {
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
     let mut out = Queue::with_capacity(max_out(&LIMITS));
-    step(domain, &env, event, &mut out);
+    step(domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS }, event, &mut out);
     let mut requests = List::with_capacity(max_out(&LIMITS));
-    while let Some(request) = out.pop() {
-        requests.push(request).expect("room for each request");
+    for _ in 0..out.len() {
+        requests.push(out.pop().expect("output count")).expect("bounded output");
     }
     requests.into_boxed()
 }
-
-fn watch(domain: &mut Domain, watcher: u64, subject: Subject) -> Box<[Request]> {
-    drive(domain, Event::Watch { watcher: Token::new(watcher), subject, snapshot: Box::from(&b"now"[..]) })
+fn watch(domain: &mut Domain, watcher: u64, party: u64) -> Box<[Request]> {
+    drive(
+        domain,
+        Event::Watch {
+            watcher: Token::new(watcher),
+            party: Token::new(party),
+            subject: Token::new(7),
+            window: Window { rows: 10, after: None },
+        },
+    )
 }
-
-#[test]
-fn a_watch_begins_with_its_snapshot() {
-    let mut domain = Domain::new(&LIMITS);
+fn ready(domain: &mut Domain, watcher: u64) {
     assert_eq!(
-        watch(&mut domain, 1, Subject::Tree { task: Token::new(7) }).as_ref(),
-        &[
-            Request::Watching { watcher: Token::new(1) },
-            Request::Deliver {
-                watcher: Token::new(1),
-                missed: 0,
-                chunks: Box::new([Chunk::Snapshot { at: Time::ZERO, content: Box::from(&b"now"[..]) }])
-            }
-        ]
+        drive(domain, Event::Made { watcher: Token::new(watcher), outcome: Made::Ready }),
+        Box::<[Request]>::from([Request::Deliver { watcher: Token::new(watcher) }])
     );
 }
-
+fn change(domain: &mut Domain) -> Box<[Request]> {
+    let mut subjects = List::with_capacity(1);
+    subjects.push(Token::new(7)).expect("one subject");
+    drive(domain, Event::Changed { subjects })
+}
 #[test]
-fn a_slow_watcher_is_told_what_it_missed() {
+fn ten_changes_in_flight_make_one_next_delivery() {
     let mut domain = Domain::new(&LIMITS);
-    watch(&mut domain, 1, Subject::Tree { task: Token::new(7) });
-    drive(&mut domain, Event::Started { task: Token::new(7), attempt: Token::new(1) });
-    for number in 1..=3_u32 {
-        assert!(drive(&mut domain, Event::Turn { task: Token::new(7), attempt: Token::new(1), number }).is_empty());
+    assert_eq!(watch(&mut domain, 1, 1).len(), 2);
+    ready(&mut domain, 1);
+    for _ in 0_u32..10 {
+        assert!(change(&mut domain).is_empty());
     }
+    assert_eq!(drive(&mut domain, Event::Delivered { watcher: Token::new(1) }).len(), 1);
+    ready(&mut domain, 1);
+    assert!(drive(&mut domain, Event::Delivered { watcher: Token::new(1) }).is_empty());
+}
+#[test]
+fn a_change_while_idle_makes_a_document_at_once() {
+    let mut domain = Domain::new(&LIMITS);
+    watch(&mut domain, 1, 1);
+    ready(&mut domain, 1);
+    drive(&mut domain, Event::Delivered { watcher: Token::new(1) });
+    assert_eq!(change(&mut domain).len(), 1);
+}
+#[test]
+fn unwatch_waits_for_a_delivery_to_end() {
+    let mut domain = Domain::new(&LIMITS);
+    watch(&mut domain, 1, 1);
+    ready(&mut domain, 1);
+    assert!(drive(&mut domain, Event::Unwatch { watcher: Token::new(1) }).is_empty());
+    assert!(change(&mut domain).is_empty());
     assert_eq!(
-        drive(&mut domain, Event::Delivered { watcher: Token::new(1), done: true }).as_ref(),
-        &[Request::Deliver {
-            watcher: Token::new(1),
-            missed: 2,
-            chunks: Box::new([Chunk::Report {
-                task: Token::new(7),
-                attempt: Token::new(1),
-                kind: Kind::Progress,
-                at: Time::ZERO,
-                content: Box::new(3_u32.to_be_bytes())
-            }])
-        }]
+        drive(&mut domain, Event::Delivered { watcher: Token::new(1) }),
+        Box::<[Request]>::from([Request::Ended { watcher: Token::new(1), end: End::Unwatched }])
     );
 }
-
 #[test]
-fn a_finished_run_ends_its_attempt_watch_after_delivery() {
+fn a_gone_subject_waits_and_preserves_its_reason() {
     let mut domain = Domain::new(&LIMITS);
-    drive(&mut domain, Event::Started { task: Token::new(7), attempt: Token::new(1) });
-    watch(&mut domain, 1, Subject::Run { task: Token::new(7), attempt: Token::new(1) });
-    assert!(drive(&mut domain, Event::Finished { task: Token::new(7) }).is_empty());
+    watch(&mut domain, 1, 1);
+    ready(&mut domain, 1);
+    assert!(drive(&mut domain, Event::Gone { subject: Token::new(7), why: End::NotAllowed }).is_empty());
     assert_eq!(
-        drive(&mut domain, Event::Delivered { watcher: Token::new(1), done: true }).as_ref(),
-        &[Request::Ended { watcher: Token::new(1), end: End::Finished }]
+        drive(&mut domain, Event::Delivered { watcher: Token::new(1) }),
+        Box::<[Request]>::from([Request::Ended { watcher: Token::new(1), end: End::NotAllowed }])
     );
 }
-
 #[test]
-fn a_new_attempt_fences_the_old_attempt() {
+fn closing_during_construction_waits_for_the_parent() {
     let mut domain = Domain::new(&LIMITS);
-    drive(&mut domain, Event::Started { task: Token::new(7), attempt: Token::new(1) });
-    drive(&mut domain, Event::Started { task: Token::new(7), attempt: Token::new(2) });
+    watch(&mut domain, 1, 1);
+    assert!(drive(&mut domain, Event::Unwatch { watcher: Token::new(1) }).is_empty());
     assert_eq!(
-        watch(&mut domain, 1, Subject::Run { task: Token::new(7), attempt: Token::new(1) }).as_ref(),
-        &[Request::Refused { watcher: Token::new(1), refusal: Refusal::Unknown }]
-    );
-    assert_eq!(watch(&mut domain, 2, Subject::Run { task: Token::new(7), attempt: Token::new(2) }).len(), 2);
-    assert!(
-        drive(
-            &mut domain,
-            Event::Reported {
-                task: Token::new(7),
-                attempt: Token::new(1),
-                kind: Kind::Text,
-                content: Box::from(&b"stale"[..])
-            }
-        )
-        .is_empty()
+        drive(&mut domain, Event::Made { watcher: Token::new(1), outcome: Made::Ready }),
+        Box::<[Request]>::from([Request::Ended { watcher: Token::new(1), end: End::Unwatched }])
     );
 }
-
 #[test]
-fn goals_and_inbox_have_distinct_subjects() {
+fn changes_during_construction_are_not_lost() {
     let mut domain = Domain::new(&LIMITS);
-    watch(&mut domain, 1, Subject::Goals { project: 2 });
-    watch(&mut domain, 2, Subject::Inbox { party: 9 });
-    drive(&mut domain, Event::Delivered { watcher: Token::new(1), done: true });
-    drive(&mut domain, Event::Delivered { watcher: Token::new(2), done: true });
+    watch(&mut domain, 1, 1);
+    change(&mut domain);
+    ready(&mut domain, 1);
+    assert_eq!(drive(&mut domain, Event::Delivered { watcher: Token::new(1) }).len(), 1);
+}
+#[test]
+fn watches_past_global_and_party_bounds_are_refused_busy() {
+    let mut domain = Domain::new(&LIMITS);
+    watch(&mut domain, 1, 1);
+    watch(&mut domain, 2, 1);
     assert_eq!(
-        drive(
-            &mut domain,
-            Event::TaskPhase { task: Token::new(7), trees: Box::new([]), project: 2, phase: 1, priority: Some(3) }
-        )
-        .len(),
-        1
+        watch(&mut domain, 3, 1),
+        Box::<[Request]>::from([Request::Refused { watcher: Token::new(3), refusal: Refusal::Busy }])
     );
+    watch(&mut domain, 3, 2);
+    watch(&mut domain, 4, 2);
     assert_eq!(
-        drive(&mut domain, Event::Inbox { party: 9, content: Box::from(&b"letter"[..]) }).as_ref(),
-        &[Request::Deliver {
-            watcher: Token::new(2),
-            missed: 0,
-            chunks: Box::new([Chunk::Inbox { party: 9, at: Time::ZERO, content: Box::from(&b"letter"[..]) }])
-        }]
+        watch(&mut domain, 5, 3),
+        Box::<[Request]>::from([Request::Refused { watcher: Token::new(5), refusal: Refusal::Busy }])
+    );
+}
+#[test]
+fn a_missing_document_ends_without_a_delivery() {
+    let mut domain = Domain::new(&LIMITS);
+    watch(&mut domain, 1, 1);
+    assert_eq!(
+        drive(&mut domain, Event::Made { watcher: Token::new(1), outcome: Made::Gone { why: End::Gone } }),
+        Box::<[Request]>::from([Request::Ended { watcher: Token::new(1), end: End::Gone }])
     );
 }

@@ -188,6 +188,19 @@ impl ToolFamilies {
 }
 
 /// The eight child domains of the core. Routing and durable live state are
+/// Subjects named by the core's existing party watch route.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ViewSubject {
+    /// A task's current attempt.
+    Run { task: Token, attempt: Token },
+    /// A task's delegate tree.
+    Tree { task: Token },
+    /// A project's goals.
+    Goals { project: u32 },
+    /// A party's inbox.
+    Inbox { party: u64 },
+}
+
 /// added here as the root's boundary is drawn.
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
@@ -198,6 +211,10 @@ pub struct Core {
     pub connectors: Box<[u16]>,
     /// Live view watcher correlation.
     pub watching: Map<Token, u64>,
+    /// Subjects owned by the parent; the child echoes each watch token.
+    pub view_subjects: Map<Token, ViewSubject>,
+    /// Documents awaiting the corresponding delivery terminal.
+    pub view_documents: Map<Token, documents::Document>,
     /// Last projected task phases.
     pub view_phases: Map<u64, (u32, Option<u32>)>,
     /// Historical result reads in flight.
@@ -424,6 +441,7 @@ impl Core {
 
     /// Allocate the eight children and the bounded live core tables.
     #[must_use]
+    #[expect(clippy::too_many_lines, reason = "construct every bounded child and parent route table together")]
     pub fn new(config: Config, limits: &Limits) -> Core {
         assert!(config.settings.tools.valid(), "each engine tool has one configured authority bit");
         assert!(*config.authority.limits() == limits.authority, "core prices its authority's configured bounds");
@@ -462,6 +480,8 @@ impl Core {
             restart_attempts: limits.fleet.attempts,
             counters: Counters::bootstrap(config.deployment),
             watching: Map::with_capacity(limits.views.watchers),
+            view_subjects: Map::with_capacity(limits.views.watchers),
+            view_documents: Map::with_capacity(limits.views.watchers),
             view_phases: Map::with_capacity(limits.tasks.tasks),
             reading_results: Map::with_capacity(limits.load_slots),
             dependency_results: Map::with_capacity(limits.tasks.tasks),

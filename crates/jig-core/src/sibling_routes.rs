@@ -7,7 +7,6 @@ use jig_core_authority as authority;
 use jig_core_fleet as fleet;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
-use jig_core_views as views;
 use skein_lib::{Env, List, Queue, Token, Wall};
 
 use crate::{CallKey, Core, Family, GoalRoute, Limits, PersonProposalRoute, RoutedCall, fresh};
@@ -143,16 +142,8 @@ impl Core {
 
     /// Route a restored task's current claim to views and the fleet, holding
     /// host adoption until the application's live-range load finishes.
-    pub fn adopt(&mut self, env: &Env<Limits>, task: u64, attempt: u64, kept: u32) {
+    pub fn adopt(&mut self, _env: &Env<Limits>, task: u64, attempt: u64, kept: u32) {
         assert!(self.unreported_restored.insert(task, attempt) == Ok(None), "one restored claim per task");
-        let mut view_out = Queue::with_capacity(views::max_out(&env.limits.views));
-        views::step(
-            &mut self.views,
-            &Env { now: env.now, wall: env.wall, limits: env.limits.views },
-            views::Event::Started { task: Token::new(task), attempt: Token::new(attempt) },
-            &mut view_out,
-        );
-        assert!(view_out.is_empty(), "restored run following has no external effect");
         let mut worked = kept > 0;
         for (key, _) in &self.call_parts {
             if key.task == task && key.attempt == attempt {
