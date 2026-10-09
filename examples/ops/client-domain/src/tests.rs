@@ -1,0 +1,901 @@
+#![expect(
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::disallowed_macros,
+    clippy::wildcard_enum_match_arm,
+    clippy::match_like_matches_macro,
+    reason = "test fixtures collect observed root outputs and locate their variants"
+)]
+use crate::{Address, Answered, Ask, Domain, Event, JigOut, Limits, Request, infrastructure, new, step, take};
+use jig_client::{
+    boundary::Offset,
+    contract::{self, Answer, Delivery, Frame, Needs, Outcome, Party, PartyKind, VersionRange, WatchEnd, WatchEvent},
+    limits::Backoff,
+    link::Link,
+};
+use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time, Token, Wall};
+const JIG: jig_client::Limits = jig_client::Limits {
+    watches: 4,
+    notices: 2,
+    notice_life: Duration::from_secs(5),
+    linger: Duration::from_secs(5),
+    save_delay: Duration::from_secs(1),
+    intents: 2,
+    fields: 4,
+    providers: 2,
+    objects: 2,
+    sources: 8,
+    reads: 4,
+    parts: 10,
+    delegates: 2,
+    document_bytes: 65536,
+    records: 2,
+    kept: 4,
+    drafts: 1,
+    projects: 2,
+    roles: 2,
+    charters: 2,
+    text: 32,
+    rows: 2,
+    conversation_words: 2,
+    navigation_entries: 8,
+    updates_count: 99,
+    backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
+    heartbeat: Duration::from_nanos(100),
+};
+fn limits() -> Limits {
+    Limits {
+        jig: JIG,
+        infrastructure: infrastructure::Limits {
+            parts: 10,
+            text: 32,
+            objects: 12,
+            watches: 24,
+            reads: 24,
+            requests: 4,
+            rows: 2,
+            retry: Duration::from_nanos(10),
+            document_bytes: 65536,
+        },
+        observability: crate::observability::Limits {
+            parts: 10,
+            objects: 12,
+            reads: 24,
+            watches: 24,
+            rows: 2,
+            text: 32,
+            retry: Duration::from_nanos(10),
+            document_bytes: 65536,
+        },
+        table: RequestLimits {
+            requests: 4,
+            bytes: 262_144,
+            out: 16,
+            first: Duration::from_nanos(10),
+            most: Duration::from_nanos(80),
+            margin: Duration::from_secs(1),
+        },
+    }
+}
+fn env() -> Env<Limits> {
+    Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }
+}
+fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    step(root, &env(), event, &mut out);
+    out_iter(out)
+}
+fn out_iter(mut out: Queue<Request>) -> Vec<Request> {
+    let mut rows = Vec::new();
+    while let Some(row) = out.pop() {
+        rows.push(row);
+    }
+    rows
+}
+fn taken(root: &mut Domain) -> Vec<Request> {
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    take(root, &env(), &mut out);
+    out_iter(out)
+}
+fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
+    let rows = drive(
+        root,
+        Event::Start {
+            address: Address::Jig(jig_client::address::Address::Inbox { project: None }),
+            kept,
+            offset: Offset { minutes: 0 },
+        },
+    );
+    rows.iter()
+        .find_map(|row| match row {
+            Request::Jig(JigOut::Open { watch, subject: contract::Subject::Frame }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap()
+}
+fn confirm(root: &mut Domain, watch: Token, party: u64) {
+    let frame = Frame {
+        party: Party {
+            number: party,
+            kind: PartyKind::Person,
+            name: contract::Text::new(Box::from(*b"Pat"), 32).unwrap(),
+        },
+        projects: List::with_capacity(0),
+        needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+        updates: contract::Count { value: 0, limited: false },
+        versions: VersionRange { first: 1, last: 1 },
+        retention: Duration::from_secs(1000),
+        deployment_role: Some(1),
+    };
+    drive(
+        root,
+        Event::Jig(jig_client::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) }),
+    );
+}
+fn ask(root: &mut Domain, asked: Token) -> Vec<Request> {
+    drive(
+        root,
+        Event::Jig(jig_client::Event::Ask {
+            ask: jig_client::intents::ByValue {
+                asked,
+                scope: 7,
+                ask: Box::new(contract::Ask::Stop { project: 1, task: 9 }),
+            },
+        }),
+    )
+}
+#[test]
+fn keyed_requests_leave_only_through_the_table_after_their_records() {
+    let mut root = new(&limits(), 7);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, 7);
+    assert!(ask(&mut root, Token::new(42)).is_empty());
+    let rows = taken(&mut root);
+    assert_eq!(rows.len(), 2);
+    let Request::Save { record: crate::store::Record::Table { record, .. } } = &rows[0] else {
+        unreachable!("save precedes send");
+    };
+    assert!(record.first_sent.is_some());
+    let Request::Send { ask: Ask::Jig(ask), .. } = &rows[1] else {
+        unreachable!("one jig request was sent");
+    };
+    assert_eq!(**ask, contract::Ask::Stop { project: 1, task: 9 });
+    assert!(taken(&mut root).is_empty());
+}
+#[test]
+fn a_final_answer_reaches_the_child_that_asked_unread_and_once() {
+    let mut root = new(&limits(), 8);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, 7);
+    ask(&mut root, Token::new(42));
+    let rows = taken(&mut root);
+    let attempt = rows
+        .iter()
+        .find_map(|r| match r {
+            Request::Send { attempt, .. } => Some(*attempt),
+            _ => None,
+        })
+        .unwrap();
+    let answer = Answer::Done(Outcome::Changed);
+    let rows = drive(
+        &mut root,
+        Event::Answer { attempt, envelope: RequestEnvelope::Final, answer: Some(Answered::Jig(answer.clone())) },
+    );
+    assert_eq!(rows, vec![Request::Jig(JigOut::Answered { asked: Token::new(42), answer: answer.clone() })]);
+    assert!(
+        drive(
+            &mut root,
+            Event::Answer { attempt, envelope: RequestEnvelope::Final, answer: Some(Answered::Jig(answer)) }
+        )
+        .is_empty()
+    );
+    let Request::Erase { key: crate::store::Key::Table(_) } = &taken(&mut root)[0] else {
+        unreachable!("final erases its request record");
+    };
+}
+#[test]
+fn a_reload_parks_kept_requests_until_jig_confirms_their_party() {
+    let mut old = new(&limits(), 9);
+    let watch = start(&mut old, List::with_capacity(0));
+    confirm(&mut old, watch, 7);
+    ask(&mut old, Token::new(42));
+    let rows = taken(&mut old);
+    let record = rows
+        .iter()
+        .filter_map(|r| match r {
+            Request::Save { record: crate::store::Record::Table { version, record } } => {
+                Some(crate::store::Record::Table { version: *version, record: record.clone() })
+            }
+            _ => None,
+        })
+        .next_back()
+        .unwrap();
+    let mut kept = List::with_capacity(1);
+    kept.push(record).unwrap();
+    let mut root = new(&limits(), 10);
+    let watch = start(&mut root, kept);
+    assert!(taken(&mut root).is_empty());
+    confirm(&mut root, watch, 8);
+    assert!(taken(&mut root).is_empty());
+    confirm(&mut root, watch, 7);
+    let sends = taken(&mut root);
+    let attempt = sends
+        .iter()
+        .find_map(|r| match r {
+            Request::Send { attempt, .. } => Some(*attempt),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        drive(
+            &mut root,
+            Event::Answer {
+                attempt,
+                envelope: RequestEnvelope::Final,
+                answer: Some(Answered::Jig(Answer::Done(Outcome::Changed)))
+            }
+        ),
+        vec![Request::Fact { fact: crate::Fact::KeptAnswered }]
+    );
+}
+#[test]
+fn link_and_confirmation_reach_both_children_and_park_the_table() {
+    let mut root = new(&limits(), 11);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, 7);
+    assert_eq!(root.infrastructure().link(), Link::Live);
+    assert_eq!(root.observability().link(), Link::Live);
+    assert_eq!(root.infrastructure().party(), Some(7));
+    assert_eq!(root.observability().party(), Some(7));
+    ask(&mut root, Token::new(42));
+    drive(&mut root, Event::Jig(jig_client::Event::Ended { watch, end: WatchEnd::Dropped }));
+    assert_eq!(root.infrastructure().link(), Link::Offline);
+    assert_eq!(root.observability().link(), Link::Offline);
+    for row in taken(&mut root) {
+        if let Request::Send { .. } = row {
+            unreachable!("offline requests are parked");
+        }
+    }
+    drive(&mut root, Event::SignedOut);
+    assert_eq!(root.infrastructure().party(), None);
+    assert_eq!(root.observability().party(), None);
+}
+
+#[test]
+fn a_current_signed_out_envelope_tells_jig_and_both_siblings() {
+    let mut root = new(&limits(), 12);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, 7);
+    ask(&mut root, Token::new(42));
+    let rows = taken(&mut root);
+    let Request::Send { attempt, .. } = &rows[1] else {
+        unreachable!("one request is in flight");
+    };
+    drive(&mut root, Event::Answer { attempt: *attempt, envelope: RequestEnvelope::SignedOut, answer: None });
+    assert_eq!(root.infrastructure().party(), None);
+    assert_eq!(root.observability().party(), None);
+    for row in taken(&mut root) {
+        if let Request::Send { .. } = row {
+            unreachable!("signed out requests remain parked");
+        }
+    }
+}
+
+fn restored_requests(count: u32) -> List<crate::store::Record> {
+    let mut old = new(&limits(), 30);
+    let watch = start(&mut old, List::with_capacity(0));
+    confirm(&mut old, watch, 7);
+    let mut kept = List::with_capacity(count);
+    for n in 0..count {
+        drive(
+            &mut old,
+            Event::Jig(jig_client::Event::Ask {
+                ask: jig_client::intents::ByValue {
+                    asked: Token::new(u64::from(n)),
+                    scope: 7,
+                    ask: Box::new(contract::Ask::Stop { project: 1, task: 9 + u64::from(n) }),
+                },
+            }),
+        );
+        for row in taken(&mut old) {
+            if let Request::Save { record: crate::store::Record::Table { version, record } } = row {
+                kept.push(crate::store::Record::Table { version, record }).unwrap();
+            }
+        }
+    }
+    kept
+}
+
+#[test]
+fn restored_foreign_scope_counts_are_routed_without_root_page_policy() {
+    let mut root = new(&limits(), 31);
+    let watch = start(&mut root, restored_requests(2));
+    confirm(&mut root, watch, 8);
+    assert_eq!(root.jig().page(), &jig_client::pages::Page::SomeoneElse);
+    assert_eq!(root.infrastructure().party(), Some(8));
+    assert!(taken(&mut root).is_empty());
+    confirm(&mut root, watch, 7);
+    assert_eq!(
+        taken(&mut root)
+            .iter()
+            .filter(|r| match r {
+                Request::Send { .. } => true,
+                _ => false,
+            })
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn restored_own_scope_sends_and_retires_each_final_request_once() {
+    let mut root = new(&limits(), 32);
+    let watch = start(&mut root, restored_requests(2));
+    confirm(&mut root, watch, 7);
+    assert!(work_page(root.jig().page()));
+    let sends: Vec<_> = taken(&mut root)
+        .into_iter()
+        .filter_map(|row| match row {
+            Request::Send { attempt, .. } => Some(attempt),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sends.len(), 2);
+    for attempt in sends {
+        let out = drive(
+            &mut root,
+            Event::Answer {
+                attempt,
+                envelope: RequestEnvelope::Final,
+                answer: Some(Answered::Jig(Answer::Done(Outcome::Changed))),
+            },
+        );
+        assert!(out.contains(&Request::Fact { fact: crate::Fact::KeptAnswered }));
+    }
+    confirm(&mut root, watch, 8);
+    assert!(work_page(root.jig().page()));
+}
+
+#[test]
+fn retention_unknown_retires_the_last_foreign_scope_and_clears_its_warning() {
+    let mut root = new(&limits(), 33);
+    let watch = start(&mut root, restored_requests(1));
+    confirm(&mut root, watch, 8);
+    assert_eq!(root.jig().page(), &jig_client::pages::Page::SomeoneElse);
+    let mut future = env();
+    future.now = Time::from_nanos(1_002_000_000_000);
+    future.wall = Wall::from_nanos(1_002_000_000_000);
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    crate::fire(&mut root, &future, &mut out);
+    take(&mut root, &future, &mut out);
+    assert!(work_page(root.jig().page()));
+}
+
+fn work_page(page: &jig_client::pages::Page) -> bool {
+    match page {
+        jig_client::pages::Page::Work { .. } => true,
+        jig_client::pages::Page::Starting
+        | jig_client::pages::Page::Elsewhere
+        | jig_client::pages::Page::SigningIn
+        | jig_client::pages::Page::Missing
+        | jig_client::pages::Page::OutOfDate
+        | jig_client::pages::Page::SomeoneElse => false,
+    }
+}
+fn ready(seed: u64) -> Domain {
+    let mut root = new(&limits(), seed);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, 7);
+    root
+}
+fn environment(revision: u64) -> infrastructure::Document {
+    use infrastructure::documents::{Creation, Environment, Purpose};
+    infrastructure::Document::Environment(Environment {
+        project: 3,
+        number: 5,
+        pool: 1,
+        name: Box::from(*b"preview"),
+        revision: contract::Revision { value: revision },
+        created_by: Creation { deployment: [7; 16], task: 9, origin: Purpose::Procedure { purpose: 2 }, purpose: 4 },
+        ready_at: None,
+        ready: None,
+        cost: None,
+        observed_until: None,
+        end: Some(infrastructure::documents::End {
+            revision: contract::Revision { value: revision },
+            until: Wall::from_nanos(50_000_000_000),
+        }),
+    })
+}
+fn family_page(root: &mut Domain) -> Vec<Request> {
+    drive(
+        root,
+        Event::Went {
+            place: crate::Place::Address(Address::Infrastructure(infrastructure::Address::Environment {
+                project: 3,
+                environment: 5,
+            })),
+        },
+    )
+}
+fn family_read(rows: &[Request]) -> Token {
+    rows.iter()
+        .find_map(|row| match row {
+            Request::Infrastructure(infrastructure::Out::Read { read, .. }) => Some(*read),
+            _ => None,
+        })
+        .unwrap()
+}
+fn family_watch(rows: &[Request]) -> Token {
+    rows.iter()
+        .find_map(|row| match row {
+            Request::Infrastructure(infrastructure::Out::Open { watch, .. }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap()
+}
+fn load_environment(root: &mut Domain) -> skein_lib::Id<infrastructure::Object> {
+    let rows = family_page(root);
+    drive(
+        root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read: family_read(&rows),
+            result: infrastructure::ReadResult::Value(Box::new(environment(2))),
+        }),
+    );
+    root.infrastructure().page().unwrap()
+}
+fn until(root: &mut Domain, object: Token) {
+    drive(
+        root,
+        Event::Act {
+            action: crate::Action::Infrastructure(infrastructure::Act::Until {
+                object,
+                revision: contract::Revision { value: 2 },
+                value: Wall::from_nanos(100_000_000_000),
+            }),
+        },
+    );
+}
+#[test]
+fn an_end_move_names_current_revision_and_only_durable_answer_finishes_the_card() {
+    let mut root = ready(41);
+    let object = load_environment(&mut root);
+    until(&mut root, object.token());
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::Infrastructure(infrastructure::Act::MoveEnd {
+                object: object.token(),
+                revision: contract::Revision { value: 1 },
+            }),
+        },
+    );
+    assert_eq!(
+        root.infrastructure().object(object).unwrap().card,
+        infrastructure::Card::Refused {
+            answer: infrastructure::Answer::Moved {
+                environment: 5,
+                revision: contract::Revision { value: 2 },
+                until: Some(Wall::from_nanos(50_000_000_000))
+            }
+        }
+    );
+    assert!(!taken(&mut root).iter().any(|row| match row {
+        Request::Send { .. } => true,
+        _ => false,
+    }));
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::Infrastructure(infrastructure::Act::MoveEnd {
+                object: object.token(),
+                revision: contract::Revision { value: 2 },
+            }),
+        },
+    );
+    let rows = taken(&mut root);
+    let (attempt, ask) = rows
+        .iter()
+        .find_map(|row| match row {
+            Request::Send { attempt, ask: Ask::Infrastructure(ask), .. } => Some((*attempt, ask)),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        ask,
+        &infrastructure::Ask::MoveEnd {
+            project: 3,
+            environment: 5,
+            revision: contract::Revision { value: 2 },
+            until: Wall::from_nanos(100_000_000_000)
+        }
+    );
+    let answer = infrastructure::Answer::MovedEnd {
+        environment: 5,
+        revision: contract::Revision { value: 3 },
+        until: Wall::from_nanos(100_000_000_000),
+    };
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt,
+            envelope: RequestEnvelope::Again,
+            answer: Some(Answered::Infrastructure(answer.clone())),
+        },
+    );
+    assert!(match root.infrastructure().object(object).unwrap().card {
+        infrastructure::Card::Deciding { .. } => true,
+        _ => false,
+    });
+    // A retry envelope did not deliver this body to the child.
+    let mut future = env();
+    future.now = Time::from_nanos(80);
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    take(&mut root, &future, &mut out);
+    let attempt = out_iter(out)
+        .iter()
+        .find_map(|row| match row {
+            Request::Send { attempt, .. } => Some(*attempt),
+            _ => None,
+        })
+        .unwrap();
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::Infrastructure(answer.clone())),
+        },
+    );
+    assert_eq!(root.infrastructure().object(object).unwrap().card, infrastructure::Card::Done { answer });
+}
+#[test]
+fn revision_changes_clear_drafts_and_old_watch_documents_cannot_reverse_facts() {
+    let mut root = ready(42);
+    let rows = family_page(&mut root);
+    let watch = family_watch(&rows);
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read: family_read(&rows),
+            result: infrastructure::ReadResult::Value(Box::new(environment(2))),
+        }),
+    );
+    let object = root.infrastructure().page().unwrap();
+    until(&mut root, object.token());
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Watch {
+            watch,
+            event: infrastructure::WatchEvent::Delivered(Box::new(environment(3))),
+        }),
+    );
+    assert_eq!(root.infrastructure().object(object).unwrap().draft, None);
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Watch {
+            watch,
+            event: infrastructure::WatchEvent::Delivered(Box::new(environment(1))),
+        }),
+    );
+    assert_eq!(
+        root.infrastructure().object(object).unwrap().value,
+        infrastructure::Value::Known(Box::new(environment(3)))
+    );
+}
+#[test]
+fn abandoned_read_and_closing_watch_tokens_cannot_recreate_a_page() {
+    let mut root = ready(43);
+    let rows = family_page(&mut root);
+    let watch = family_watch(&rows);
+    let read = family_read(&rows);
+    let rows = drive(
+        &mut root,
+        Event::Went {
+            place: crate::Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })),
+        },
+    );
+    assert!(rows.contains(&Request::Infrastructure(infrastructure::Out::Close { watch })));
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Watch {
+            watch,
+            event: infrastructure::WatchEvent::Delivered(Box::new(environment(2))),
+        }),
+    );
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Ended { watch, end: infrastructure::WatchEnd::Closed }),
+    );
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read,
+            result: infrastructure::ReadResult::Value(Box::new(environment(2))),
+        }),
+    );
+    assert_eq!(root.infrastructure().page(), None);
+    assert!(
+        drive(
+            &mut root,
+            Event::Infrastructure(infrastructure::Event::Ended { watch, end: infrastructure::WatchEnd::Closed })
+        )
+        .is_empty()
+    );
+}
+#[test]
+fn whole_document_limits_keep_unknown_owner_facts_unknown() {
+    let document = environment(2);
+    assert!(document.fits(&limits().infrastructure));
+    let mut bound = limits().infrastructure;
+    bound.text = 2;
+    assert!(!document.fits(&bound));
+    bound.text = 32;
+    bound.document_bytes = 1;
+    assert!(!document.fits(&bound));
+    let mut root = ready(44);
+    let object = load_environment(&mut root);
+    assert_eq!(root.infrastructure().object(object).unwrap().value, infrastructure::Value::Known(Box::new(document)));
+    let mut bound = limits();
+    bound.jig.kept = bound.table.requests - 1;
+    assert_eq!(crate::worst_case(&bound), None);
+}
+#[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the same exhaustive scoped lifecycle is checked independently for both connector families"
+)]
+fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_words() {
+    for connector in [jig_ops_connectors::Connector::Infrastructure, jig_ops_connectors::Connector::Observability] {
+        let mut root = ready(45);
+        let rows = drive(
+            &mut root,
+            Event::Went { place: crate::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+        );
+        let watch = rows
+            .iter()
+            .find_map(|row| match row {
+                Request::Jig(JigOut::Open { watch, subject: contract::Subject::Deployment }) => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
+        let number = jig_ops_connectors::number(connector);
+        let parts = connector_parts(number);
+        let expected = parts.clone();
+        let rows = drive(
+            &mut root,
+            Event::Jig(jig_client::Event::Watch {
+                watch,
+                event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
+                    hosts: List::with_capacity(0),
+                    accounts: List::with_capacity(0),
+                    capacity: List::with_capacity(0),
+                    proposals: 0,
+                    refusals: List::with_capacity(0),
+                    parts,
+                }))),
+            }),
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|row| match row {
+                    Request::Infrastructure(infrastructure::Out::Read { .. })
+                    | Request::Observability(crate::observability::Out::Read { .. }) => true,
+                    _ => false,
+                })
+                .count(),
+            6
+        );
+        let generation = root.jig().generation();
+        for part in &expected {
+            match connector {
+                jig_ops_connectors::Connector::Infrastructure => {
+                    assert!(root.infrastructure().contains(part, generation));
+                }
+                jig_ops_connectors::Connector::Observability => {
+                    assert!(root.observability().contains(part, generation));
+                }
+            }
+        }
+        for row in &rows {
+            match row {
+                Request::Infrastructure(infrastructure::Out::Read { subject, .. }) => {
+                    assert_eq!(
+                        subject.scope,
+                        match subject.kind {
+                            infrastructure::Kind::Project(project) => infrastructure::Scope::Project(project),
+                            _ => infrastructure::Scope::Deployment,
+                        }
+                    );
+                }
+                Request::Observability(crate::observability::Out::Read { subject, .. }) => {
+                    assert_eq!(
+                        subject.scope,
+                        match subject.kind {
+                            crate::observability::Kind::Project(project) =>
+                                crate::observability::Scope::Project(project),
+                            _ => crate::observability::Scope::Deployment,
+                        }
+                    );
+                }
+                _ => {}
+            }
+        }
+        let rows = drive(
+            &mut root,
+            Event::Went {
+                place: crate::Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })),
+            },
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|row| match row {
+                    Request::Infrastructure(infrastructure::Out::Close { .. })
+                    | Request::Observability(crate::observability::Out::Close { .. }) => true,
+                    _ => false,
+                })
+                .count(),
+            6
+        );
+        for part in &expected {
+            match connector {
+                jig_ops_connectors::Connector::Infrastructure => {
+                    assert!(!root.infrastructure().contains(part, generation));
+                }
+                jig_ops_connectors::Connector::Observability => {
+                    assert!(!root.observability().contains(part, generation));
+                }
+            }
+        }
+    }
+}
+#[test]
+fn incident_facts_keep_cuts_and_unknown_health_and_never_turn_a_watch_into_a_lead() {
+    use crate::observability::{
+        self,
+        documents::{Incident, Service, State},
+    };
+    let mut root = ready(46);
+    let rows = drive(
+        &mut root,
+        Event::Went {
+            place: crate::Place::Address(Address::Observability(observability::Address::Incident {
+                project: 3,
+                incident: 8,
+            })),
+        },
+    );
+    let read = rows
+        .iter()
+        .find_map(|row| match row {
+            Request::Observability(observability::Out::Read { read, .. }) => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    let watch = rows
+        .iter()
+        .find_map(|row| match row {
+            Request::Observability(observability::Out::Open { watch, .. }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let mut incident = Incident {
+        project: 3,
+        number: 8,
+        revision: contract::Revision { value: 2 },
+        watch: 99,
+        raised: Wall::EPOCH,
+        service: Service { environment: Box::from(*b"prod"), name: Box::from(*b"api") },
+        severity: 1,
+        state: State::Alerting,
+        timeline: List::with_capacity(2),
+        cut: true,
+        health: None,
+        lead: None,
+        proposals: List::with_capacity(2),
+    };
+    let document = observability::Document::Incident(incident.clone());
+    assert!(document.objects(2).is_empty());
+    drive(
+        &mut root,
+        Event::Observability(observability::Event::Read {
+            read,
+            result: observability::ReadResult::Value(Box::new(document)),
+        }),
+    );
+    let id = root.observability().page().unwrap();
+    incident.revision = contract::Revision { value: 3 };
+    incident.state = State::Resolved;
+    let resolved = observability::Document::Incident(incident.clone());
+    drive(
+        &mut root,
+        Event::Observability(observability::Event::Watch {
+            watch,
+            event: observability::WatchEvent::Delivered(Box::new(resolved.clone())),
+        }),
+    );
+    incident.revision = contract::Revision { value: 1 };
+    incident.state = State::Alerting;
+    drive(
+        &mut root,
+        Event::Observability(observability::Event::Watch {
+            watch,
+            event: observability::WatchEvent::Delivered(Box::new(observability::Document::Incident(incident))),
+        }),
+    );
+    assert_eq!(root.observability().object(id).unwrap().value, observability::Value::Known(Box::new(resolved)));
+}
+#[test]
+fn application_navigation_is_forwarded_before_start_and_retains_order() {
+    use jig_client::pages::navigation::{Destination, Navigation};
+    let mut root = new(&limits(), 47);
+    let mut navigation = Navigation::new(2);
+    navigation.entries.push(Destination::Jig(jig_client::address::Address::Inbox { project: None })).unwrap();
+    navigation
+        .entries
+        .push(Destination::Application {
+            owner: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+            number: 1,
+        })
+        .unwrap();
+    crate::configure_navigation(&mut root, navigation).unwrap();
+    assert_eq!(
+        root.jig().navigation().entries.as_slice()[1],
+        Destination::Application {
+            owner: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+            number: 1
+        }
+    );
+    start(&mut root, List::with_capacity(0));
+    assert!(crate::configure_navigation(&mut root, Navigation::new(0)).is_err());
+}
+
+fn connector_parts(number: u16) -> List<contract::Part> {
+    let mut parts = List::with_capacity(9);
+    for part in [
+        contract::Part::Connector { connector: number },
+        contract::Part::Resource { connector: number, path: contract::Text::new(Box::from(*b"service"), 32).unwrap() },
+        contract::Part::Kind { connector: number, kind: 1 },
+        contract::Part::Panel { connector: number, task: 9 },
+        contract::Part::Result { connector: number, task: 9 },
+        contract::Part::Effect { connector: number, proposal: contract::ProposalKey { proposer: 9, number: 2 } },
+        contract::Part::Hold { connector: number, task: 9 },
+        contract::Part::Project { connector: number, project: 3 },
+        contract::Part::Deployment { connector: number },
+    ] {
+        parts.push(part).unwrap();
+    }
+    parts
+}
+#[test]
+fn an_absent_owner_end_cannot_become_a_revision_naming_request() {
+    let mut root = ready(48);
+    let rows = family_page(&mut root);
+    let mut document = environment(2);
+    let infrastructure::Document::Environment(environment) = &mut document else { unreachable!() };
+    environment.end = None;
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read: family_read(&rows),
+            result: infrastructure::ReadResult::Value(Box::new(document)),
+        }),
+    );
+    let object = root.infrastructure().page().unwrap();
+    until(&mut root, object.token());
+    assert_eq!(root.infrastructure().object(object).unwrap().draft, None);
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::Infrastructure(infrastructure::Act::MoveEnd {
+                object: object.token(),
+                revision: contract::Revision { value: 2 },
+            }),
+        },
+    );
+    assert!(!taken(&mut root).iter().any(|row| match row {
+        Request::Send { .. } => true,
+        _ => false,
+    }));
+}

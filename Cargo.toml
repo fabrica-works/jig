@@ -22,6 +22,7 @@ members = [
     "testing/jig-test-system",
     "testing/jig-ops-fake-production",
     "examples/ops/connectors",
+    "examples/ops/client-domain",
     "examples/ops/domain",
     "examples/ops/domain-observability",
     "examples/ops/domain-infrastructure",
@@ -89,6 +90,7 @@ jig-fake-workers = { path = "testing/jig-fake-workers" }
 jig-fake-parties = { path = "testing/jig-fake-parties" }
 jig-test-system = { path = "testing/jig-test-system" }
 jig-ops-fake-production = { path = "testing/jig-ops-fake-production" }
+jig-ops-client-domain = { path = "examples/ops/client-domain" }
 jig-ops-connectors = { path = "examples/ops/connectors" }
 jig-ops-domain = { path = "examples/ops/domain" }
 jig-ops-domain-observability = { path = "examples/ops/domain-observability" }
