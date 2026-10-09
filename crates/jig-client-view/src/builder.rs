@@ -185,17 +185,24 @@ impl Builder {
     /// Name a link's address in its owner's vocabulary.
     pub fn link(&mut self, to: Binding) {
         assert!(self.node().role == Role::Link, "addresses belong to links");
+        if self.node().link.is_none() && self.node().binding.is_none() {
+            self.reserve_binding();
+        }
         self.node_mut().link = Some(to);
     }
 
     /// Bind an actable node to its owner's token.
     pub fn bind(&mut self, binding: Binding) {
         assert!(self.node().role != Role::Drawing, "a drawing is shown and never bound");
-        if self.node().binding.is_none() {
-            assert!(self.bindings < self.limits.bindings, "bindings fit their capacity");
-            self.bindings = self.bindings.checked_add(1).expect("binding count fits u32");
+        if self.node().binding.is_none() && self.node().link.is_none() {
+            self.reserve_binding();
         }
         self.node_mut().binding = Some(binding);
+    }
+
+    fn reserve_binding(&mut self) {
+        assert!(self.bindings < self.limits.bindings, "bindings fit their capacity");
+        self.bindings = self.bindings.checked_add(1).expect("binding count fits u32");
     }
 
     /// Open a drawing; its following child nodes are the fallback in words.

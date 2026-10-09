@@ -1,7 +1,7 @@
 use crate::{Binding, Builder, DrawingKind, Key, Limits, Owner, Role, Run, State, Style, worst_case};
 use skein_lib::{List, Token};
 
-const LIMITS: Limits = Limits {
+pub(super) const LIMITS: Limits = Limits {
     nodes: 12,
     depth: 4,
     text_per_node: 32,

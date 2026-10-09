@@ -293,6 +293,33 @@ impl Tree {
         }
         None
     }
+    /// Resolve an act's token in this displayed tree. A removed or unbound node
+    /// gives nothing. A link's address binding also names its navigation act.
+    #[must_use]
+    pub fn bound(&self, id: NodeId) -> Option<crate::Binding> {
+        if id == NodeId(0) {
+            return None;
+        }
+        let node = self.find(id)?;
+        node.binding.or(node.link)
+    }
+
+    /// Resolve the whole shell act; the owner interprets its token and value.
+    #[must_use]
+    pub fn act(&self, id: NodeId, act: crate::Act) -> Option<crate::BoundAct> {
+        let binding = self.bound(id)?;
+        Some(crate::BoundAct { binding, act })
+    }
+
+    /// Ask the view root to translate this link owner's address for the shell.
+    #[must_use]
+    pub fn address(&self, id: NodeId) -> Option<crate::Binding> {
+        if id == NodeId(0) {
+            return None;
+        }
+        self.find(id)?.link
+    }
+
     /// The number of nodes, including every fallback child.
     #[must_use]
     pub fn len(&self) -> u32 {

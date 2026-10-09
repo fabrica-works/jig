@@ -14,7 +14,7 @@ mod builder;
 mod limits;
 mod tree;
 
-pub use binding::Binding;
+pub use binding::{Act, Binding, BoundAct, number};
 pub use builder::{Builder, Slot, SlotId};
 pub use limits::{Limits, worst_case};
 pub use tree::{
