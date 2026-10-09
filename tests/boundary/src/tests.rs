@@ -399,3 +399,22 @@ fn name_fixture_reports_each_file_line_and_breach() {
         ]
     );
 }
+
+#[test]
+fn client_view_links_only_its_domain_and_foundation() {
+    let views: Vec<_> =
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-client-view")).collect();
+    assert_eq!(views.len(), 1, "the client view has one manifest");
+    let failures: Vec<_> = views
+        .into_iter()
+        .flat_map(|manifest| {
+            manifest
+                .dependencies
+                .iter()
+                .filter(|name| !["skein-lib", "jig-client"].contains(&name.as_str()))
+                .map(|name| format!("{}: {name}", manifest.path.display()))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
