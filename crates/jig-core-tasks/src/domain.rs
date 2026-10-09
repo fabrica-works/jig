@@ -568,6 +568,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::EffectsSettled { task } => crate::closing::effects_settled(domain, env, task, out),
         Event::Retained { task, root, holding } => crate::holds::retained(domain, env, task, root, &holding, out),
         Event::Settled { task } => crate::closing::settled(domain, env, task, out),
+        Event::PersonStallNotice { task, message } => crate::person::stalled(domain, env, task, message, out),
         Event::Restore { record } => crate::stored::restore(domain, env, record, out),
         Event::Restored => {
             crate::stored::restored(domain, env, out);
@@ -601,6 +602,9 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         && let Some(task) = task_mut(domain, number)
     {
         match task.record.phase {
+            Phase::Active(Active::Due | Active::Idle) if crate::person::pending(&task.record) => {
+                out.push(Request::PersonStallDue { task: number });
+            }
             Phase::Active(Active::BackingOff { .. }) => {
                 task.record.phase = Phase::Active(Active::Due);
                 publish(domain, env, number, out);
@@ -774,6 +778,7 @@ pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
     crate::proposals::withdraw_on_close(domain, env, number, out);
     milestone(domain, env, number, out);
     let task = task_mut(domain, number).expect("published task is live");
+    crate::person::waiting(&mut task.record, env);
     let held = match task.record.phase {
         Phase::Held { why, .. } => Some(why),
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => None,
@@ -790,6 +795,9 @@ pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
     task.observed_hold = held;
     let escalation = crate::escalation::begin(&mut task.record);
     let until = match task.record.phase {
+        Phase::Active(Active::Due | Active::Idle) if crate::person::pending(&task.record) => {
+            Some(task.record.person_wait.expect("active person wait").deadline)
+        }
         Phase::Active(Active::BackingOff { until }) => Some(until),
         Phase::Waiting
         | Phase::Active(
@@ -1025,6 +1033,7 @@ pub(crate) fn make_admitted(
                 depth,
                 executor: new.executor,
                 taken_by: None,
+                person_wait: None,
                 tracked: new.tracked,
                 recurring: match new.recurring {
                     Some(template) => Some(Box::new(crate::RecurringState {

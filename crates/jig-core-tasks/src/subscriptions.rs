@@ -21,6 +21,7 @@ fn hint_of(kind: MessageKind) -> Option<u64> {
         | MessageKind::Amendment { .. }
         | MessageKind::Question
         | MessageKind::Answer { .. }
+        | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_) => None,
     }
 }
@@ -220,6 +221,7 @@ pub(crate) fn notice(domain: &mut Domain, env: &Env<Limits>, number: u64, word: 
         | MessageKind::Amendment { .. }
         | MessageKind::Question
         | MessageKind::Answer { .. }
+        | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_) => false,
     };
     if !matching

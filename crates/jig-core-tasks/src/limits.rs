@@ -63,6 +63,8 @@ pub struct Limits {
     pub inbox_bytes: u32,
     /// Maximum bytes in one admitted word message.
     pub message_bytes: u32,
+    /// Time an active person task waits before becoming news for its requester.
+    pub person_stall: skein_lib::Duration,
     /// Time an undecided proposal waits at a nonfinal holder before passing upward.
     pub proposal_stall: skein_lib::Duration,
     /// Time an undecided escalation waits at a nonfinal holder before passing upward.
@@ -111,6 +113,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.message_bytes == 0
         || limits.message_bytes > limits.inbox_bytes
         || limits.hold_wait == skein_lib::Duration::ZERO
+        || limits.person_stall == skein_lib::Duration::ZERO
         || limits.proposal_stall == skein_lib::Duration::ZERO
         || limits.escalation_stall == skein_lib::Duration::ZERO
     {

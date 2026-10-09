@@ -17,10 +17,24 @@ pub struct ActivityLine {
 /// Ordered semantic activity; larger retained records are loaded by their exact identity.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Line {
-    Words { message: u64, by: Party, kind: MessageKind, words: Box<[u8]> },
+    Words {
+        message: u64,
+        by: Party,
+        kind: MessageKind,
+        words: Box<[u8]>,
+    },
     Heard(Word),
-    Decided { revision: u64 },
-    Milestone { position: u64 },
+    /// A notice sent by this task, kept after its recipient's waiting entry clears.
+    Notified {
+        recipient: Party,
+        word: Word,
+    },
+    Decided {
+        revision: u64,
+    },
+    Milestone {
+        position: u64,
+    },
 }
 
 pub(crate) fn append(task: &mut TaskRecord, at: Wall, line: Line, out: &mut Queue<Request>) {
@@ -42,6 +56,7 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, out: &mut Queue<Reques
         | MessageKind::Notice { .. }
         | MessageKind::Timer { .. }
         | MessageKind::News { .. }
+        | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_) => Line::Heard(word.clone()),
     };
     append(task, word.at, line, out);

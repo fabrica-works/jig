@@ -40,6 +40,7 @@ pub const LIMITS: Limits = Limits {
     message_bytes: 32,
     proposal_stall: Duration::from_millis(10),
     escalation_stall: Duration::from_secs(3600),
+    person_stall: Duration::from_secs(3600),
     saved_resources: 2,
     contract_choices: 4,
     charters: 2,
@@ -268,6 +269,15 @@ impl World {
 
     fn route_hint(&mut self, request: &Request) {
         match request {
+            Request::PersonStallDue { task } => {
+                self.message = self.message.checked_add(1).expect("stall message number room");
+                tasks::step(
+                    &mut self.domain,
+                    &self.env,
+                    Event::PersonStallNotice { task: *task, message: self.message },
+                    &mut self.out,
+                );
+            }
             Request::Notify { task, subscription, target, state, words } => {
                 self.message = self.message.checked_add(1).expect("message number room");
                 tasks::step(
@@ -403,6 +413,7 @@ impl World {
             | Event::Subscribe { .. }
             | Event::SubscribeTopic { .. }
             | Event::Unsubscribe { .. }
+            | Event::PersonStallNotice { .. }
             | Event::Notice { .. } => None,
         };
         match event {
@@ -464,6 +475,7 @@ impl World {
             | Event::Subscribe { .. }
             | Event::SubscribeTopic { .. }
             | Event::Unsubscribe { .. }
+            | Event::PersonStallNotice { .. }
             | Event::Turn { .. } => {}
         }
     }
@@ -587,6 +599,7 @@ impl World {
                 | Request::EscalationStalled { .. }
                 | Request::Sent { .. }
                 | Request::Relay { .. }
+                | Request::PersonStallDue { .. }
                 | Request::Notify { .. }
                 | Request::Timer { .. }
                 | Request::EndTopic { .. }
@@ -654,6 +667,7 @@ impl World {
                 | Request::Ended { .. }
                 | Request::EscalationNeeded { .. }
                 | Request::Relay { .. }
+                | Request::PersonStallDue { .. }
                 | Request::Notify { .. }
                 | Request::Timer { .. }
                 | Request::ProposalRerouteNeeded { .. }

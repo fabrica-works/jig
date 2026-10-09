@@ -86,6 +86,8 @@ pub enum MessageKind {
     /// Virtual inbox entry for a pending proposal; its reason is in `Word::words`.
     /// The proposal owns its durable state and takes no inbox room.
     Proposal { proposer: u64, proposal: u64, kind: crate::ProposalKind },
+    /// A person delegate passed its waiting deadline, delivered once to its requester.
+    PersonStalled { task: u64 },
     /// Final accepted or rejected proposal, delivered to its proposer.
     ProposalDecision { proposal: u64, accepted: bool },
     /// Whole words from a person or referenced task.
@@ -719,6 +721,24 @@ pub struct Revisions {
     pub person: u64,
 }
 
+/// One waiting interval of a person task, retained through claims and restart.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct PersonWait {
+    pub since: Wall,
+    pub stall: Duration,
+    pub deadline: Wall,
+    pub notice: Option<PersonStallNotice>,
+}
+
+/// One numbered news item issued when a person task passed its wait.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct PersonStallNotice {
+    pub message: u64,
+    pub at: Wall,
+    /// Exact immutable outgoing activity in this task's ordered tail.
+    pub activity: u64,
+}
+
 /// Owned durable task state emitted to root storage; root uses `RunContext` for preparation and
 /// does not maintain a mutable copy of this ledger. (domain/tasks.md, sections 3 and 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -764,6 +784,8 @@ pub struct TaskRecord {
     pub executor: Executor,
     /// Current role-task holder; direct-person tasks never need a claim.
     pub taken_by: Option<u64>,
+    /// The interval starts when dependency and resource waits clear.
+    pub person_wait: Option<PersonWait>,
     /// Durable core recurring template and last considered period.
     pub recurring: Option<Box<RecurringState>>,
     /// Goal priority retained with the task for project ordering.
@@ -1332,6 +1354,8 @@ pub enum Event {
         /// including preserved closing while held.
         task: u64,
     },
+    /// Root numbers the news requested by the due person-task timer.
+    PersonStallNotice { task: u64, message: u64 },
     /// Admit one `Live`/`Ledger` row during restoring; invalid input permanently fails restoration
     /// with `RestoreRefused`.
     Restore {
@@ -1362,6 +1386,8 @@ pub enum Request {
     RecurringDue { task: u64, period: u64, members: u32 },
     /// A changed requester tree asks root to recheck the current proposal recipient from the nearest holder.
     ProposalRerouteNeeded { proposer: u64, proposal: u64 },
+    /// Root supplies one message number for the elapsed person-task wait.
+    PersonStallDue { task: u64 },
     /// One nonfinal held decision passed its configured wait.
     EscalationStalled { task: u64, revision: u64, holder: crate::EscalationHolder },
     /// One nonfinal holder's wait bound elapsed; root chooses the next holder.

@@ -333,6 +333,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             | crate::MessageKind::Notice { .. }
             | crate::MessageKind::Timer { .. }
             | crate::MessageKind::News { .. }
+            | crate::MessageKind::PersonStalled { .. }
             | crate::MessageKind::Result(_) => {}
         }
     }
@@ -378,6 +379,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 Party::Task(_) => true,
                 Party::Person(_) | Party::Deployment { .. } => false,
             },
+            crate::MessageKind::PersonStalled { task: child } => child != 0 && word.from == Party::Task(child),
             crate::MessageKind::Timer { .. } => word.from == Party::Task(task.number),
         };
         let bound = match &word.kind {
@@ -392,6 +394,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             }
             crate::MessageKind::Proposal { .. }
             | crate::MessageKind::Escalation { .. }
+            | crate::MessageKind::PersonStalled { .. }
             | crate::MessageKind::Timer { .. } => 0,
         };
         if word.number <= previous
@@ -402,6 +405,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 }
                 crate::MessageKind::Proposal { .. }
                 | crate::MessageKind::Escalation { .. }
+                | crate::MessageKind::PersonStalled { .. }
                 | crate::MessageKind::Result(_)
                 | crate::MessageKind::ProposalDecision { .. }
                 | crate::MessageKind::Amendment { .. }
@@ -495,7 +499,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     }
     match task.executor {
         Executor::Agent { charter } => {
-            if task.recurring.is_some() || task.taken_by.is_some() {
+            if task.recurring.is_some() || task.taken_by.is_some() || task.person_wait.is_some() {
                 return false;
             }
             for configured in &domain.charters {
@@ -508,6 +512,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         Executor::Procedure { code, .. } if code != 0 && task.recurring.is_some() => match &task.recurring {
             Some(state) => {
                 task.taken_by.is_none()
+                    && task.person_wait.is_none()
                     && state.template.key != 0
                     && crate::recurring::valid_template(
                         limits,
@@ -523,7 +528,9 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             }
             None => false,
         },
-        Executor::Procedure { code, .. } => code != 0 && task.recurring.is_none() && task.taken_by.is_none(),
+        Executor::Procedure { code, .. } => {
+            code != 0 && task.recurring.is_none() && task.taken_by.is_none() && task.person_wait.is_none()
+        }
         Executor::Person(crate::PersonAddress::Person(person)) => {
             person != 0 && task.taken_by.is_none() && task.recurring.is_none() && person_counters(task)
         }
@@ -534,6 +541,27 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
 }
 
 fn person_counters(task: &TaskRecord) -> bool {
+    let waiting = match task.person_wait {
+        Some(wait) => {
+            wait.stall != skein_lib::Duration::ZERO
+                && wait.deadline.as_nanos() == wait.since.as_nanos().saturating_add(wait.stall.as_nanos())
+                && match wait.notice {
+                    Some(notice) => notice.message != 0 && notice.activity != 0 && notice.activity <= task.activity,
+                    None => true,
+                }
+        }
+        None => match task.phase {
+            Phase::Active(_) | Phase::Held { was: Was::Active(_), .. } => false,
+            Phase::Waiting
+            | Phase::Held { was: Was::Waiting | Was::Closing(_), .. }
+            | Phase::Closing(_)
+            | Phase::Ended(_) => true,
+        },
+    };
+    if !waiting {
+        return false;
+    }
+
     task.attempt == 0
         && task.run_spent == 0
         && task.run_reserved == 0
@@ -712,6 +740,42 @@ fn links(domain: &Domain, env: &Env<Limits>, task: &TaskRecord) -> bool {
         }
     }
     if descendants_made > task.made {
+        return false;
+    }
+    let mut stalls = 0_usize;
+    for child in &task.delegates {
+        if crate::person::credit(record(domain, *child).expect("validated child")) {
+            stalls = stalls.checked_add(1).expect("bounded person delegates");
+        }
+    }
+    let mut amendments = 0_usize;
+    for word in &task.inbox {
+        match word.kind {
+            crate::MessageKind::Amendment { .. } => amendments = amendments.checked_add(1).expect("bounded amendments"),
+            crate::MessageKind::Words
+            | crate::MessageKind::PersonStalled { .. }
+            | crate::MessageKind::Proposal { .. }
+            | crate::MessageKind::Escalation { .. }
+            | crate::MessageKind::ProposalDecision { .. }
+            | crate::MessageKind::Question
+            | crate::MessageKind::Answer { .. }
+            | crate::MessageKind::Notice { .. }
+            | crate::MessageKind::Timer { .. }
+            | crate::MessageKind::News { .. }
+            | crate::MessageKind::Result(_) => {}
+        }
+    }
+    let Some((subscriptions, _bytes)) = crate::subscriptions::credit(task, &env.limits) else { return false };
+    let messages = task
+        .inbox
+        .len()
+        .saturating_sub(amendments)
+        .saturating_add(task.delegates.len())
+        .saturating_add(task.questions.len())
+        .saturating_add(usize::from(task.proposal.is_some()))
+        .saturating_add(subscriptions)
+        .saturating_add(stalls);
+    if messages > usize::try_from(env.limits.inbox_messages).expect("message limit fits") {
         return false;
     }
     for reference in &task.references {

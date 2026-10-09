@@ -438,6 +438,7 @@ fn core_ask(
                                 | tasks::MessageKind::Answer { .. }
                                 | tasks::MessageKind::Notice { .. }
                                 | tasks::MessageKind::Timer { .. }
+                                | tasks::MessageKind::PersonStalled { .. }
                                 | tasks::MessageKind::Result(_) => {}
                             }
                         }

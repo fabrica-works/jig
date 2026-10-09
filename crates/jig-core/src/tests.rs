@@ -33,6 +33,7 @@ fn limits() -> Limits {
         message_bytes: 64,
         proposal_stall: Duration::from_millis(10),
         escalation_stall: Duration::from_secs(3600),
+        person_stall: Duration::from_secs(3600),
         saved_resources: 2,
         contract_choices: 1,
         charters: 1,
@@ -930,6 +931,10 @@ fn documents_person_task_has_the_current_revision_holder_and_answer_form() {
     };
     assert_eq!(task.address, tasks::PersonAddress::Role(0));
     assert_eq!(task.taken_by, Some(1));
+    let wait = core.tasks.task(5).unwrap().person_wait.unwrap();
+    assert_eq!(task.since, Some(wait.since));
+    assert_eq!(task.stall, Some(limits.tasks.person_stall));
+    assert_eq!(task.deadline, Some(wait.deadline));
     assert_eq!(task.revision, core.tasks.task(5).unwrap().revisions.person);
     let ContractLine::Verdict { choices, cut } = task.contract else { panic!() };
     assert!(!cut);

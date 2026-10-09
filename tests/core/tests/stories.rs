@@ -1008,7 +1008,8 @@ fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
 
 #[test]
 fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
-    let (mut configuration, limits) = jig_core_world::faults::plan_fixture(160);
+    let (mut configuration, mut limits) = jig_core_world::faults::plan_fixture(160);
+    limits.core.tasks.person_stall = skein_lib::Duration::from_secs(1);
     let kinds = Box::new([authority::Executor::Charter(1), authority::Executor::Role(0)]);
     configuration.core.settings.chat_authority.delegation.kinds = kinds.clone();
     let mut rules = configuration.core.authority.rules().clone();
@@ -1032,7 +1033,17 @@ fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
     choice.dependencies = Box::new([core::Dependency::Existing(input)]);
     let choice = delegate(&mut world, parent, 2, choice);
     let revision = live_row(&world, choice).revisions.person;
+    assert_eq!(live_row(&world, choice).person_wait, None);
     finish(&mut world, input_run, b"input arrived");
+    let waiting = live_row(&world, choice).person_wait.expect("dependency completion starts the person wait");
+    assert_eq!(waiting.stall, limits.core.tasks.person_stall);
+    world.advance(skein_lib::Duration::from_secs(2));
+    let notice = live_row(&world, choice).person_wait.expect("retained wait").notice.expect("root numbers stall news");
+    let news =
+        live_row(&world, parent.0).inbox.iter().find(|word| word.number == notice.message).expect("committed news");
+    assert_eq!(news.kind, tasks::MessageKind::PersonStalled { task: choice });
+    assert_eq!(news.from, tasks::Party::Task(choice));
+    assert_eq!(news.at, notice.at);
     let now = live_row(&world, choice).revisions.person;
     assert_eq!(now, revision + 1);
     ask(

@@ -1035,6 +1035,21 @@ pub(super) fn tag_tasks(
                 }
                 Request::Now(Box::new(Now::RefusedPayload { request: token, problem }))
             }
+            tasks::Request::PersonStallDue { task } => {
+                let message =
+                    crate::fresh(&mut core.counters, crate::Family::Message).expect("person stall number admitted");
+                let mut follow = Queue::with_capacity(room);
+                tasks::step(
+                    &mut core.tasks,
+                    &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                    tasks::Event::PersonStallNotice { task, message },
+                    &mut follow,
+                );
+                for _ in 0..follow.len() {
+                    pending.push(follow.pop().expect("person stall output count"));
+                }
+                continue;
+            }
             tasks::Request::Notify { task, subscription, target, state, words } => {
                 let event = core.notice(task, subscription, target, state, words, env.wall);
                 let mut follow = Queue::with_capacity(room);

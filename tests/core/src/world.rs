@@ -43,6 +43,7 @@ pub fn limits() -> root::Limits {
         message_bytes: 64,
         proposal_stall: Duration::from_millis(10),
         escalation_stall: Duration::from_secs(3600),
+        person_stall: Duration::from_secs(3600),
         saved_resources: 2,
         contract_choices: 1,
         charters: 1,

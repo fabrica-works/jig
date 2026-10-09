@@ -13,8 +13,8 @@
 //! Store-only notes, ended rows and proposal routing trails use the public row
 //! constructors. Notes retain their last write wall time; history and milestones lack
 //! wall times and amendment before snapshots until that work owns their records.
-//! Person stall timing and result followup identities are not retained today;
-//! their optional fields say so. Dependency results missing from live memory are
+//! Person stall times are kept from the active wait, distinct from creation.
+//! Result followup identities are not retained today; their optional field says so. Dependency results missing from live memory are
 //! stored references for the reader. Effect pricing belongs to its connector;
 //! a proposal's effect authority ceiling is never reported as its price.
 //! Recurring wall schedules and past-period/root spending need store/period

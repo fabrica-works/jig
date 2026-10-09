@@ -32,7 +32,7 @@ fn category(kind: MessageKind) -> u8 {
         MessageKind::Result(_) => 3,
         MessageKind::Notice { .. } => 4,
         MessageKind::Timer { .. } => 5,
-        MessageKind::News { .. } => 6,
+        MessageKind::News { .. } | MessageKind::PersonStalled { .. } => 6,
     }
 }
 
@@ -47,6 +47,7 @@ fn rule(domain: &Domain, number: u64, word: &Word) -> WakeRule {
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. } => WakeRule::Immediate,
+        MessageKind::PersonStalled { .. } => task.wake.news,
         MessageKind::Question => {
             if task.wake.questions {
                 WakeRule::Immediate
@@ -115,7 +116,7 @@ pub(crate) fn after_message(
 ) {
     let decision = match record(domain, number).expect("message task live").executor {
         crate::Executor::Procedure { .. } => match word.kind {
-            MessageKind::News { .. } => rule(domain, number, &word),
+            MessageKind::News { .. } | MessageKind::PersonStalled { .. } => rule(domain, number, &word),
             MessageKind::Words
             | MessageKind::Amendment { .. }
             | MessageKind::ProposalDecision { .. }

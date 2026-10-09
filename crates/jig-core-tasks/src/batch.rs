@@ -88,7 +88,15 @@ fn check_with_result_proposal(
             else {
                 return Err(problem(Some(number), Refusal::Busy));
             };
-            if !crate::inbox::room(domain, limits, number, size, result_bytes) {
+            let mut news = 0_u32;
+            for member in batch {
+                match member.executor {
+                    Executor::Person(_) => news = news.checked_add(1).expect("bounded person batch"),
+                    Executor::Agent { .. } | Executor::Procedure { .. } => {}
+                }
+            }
+            let Some(messages) = size.checked_add(news) else { return Err(problem(Some(number), Refusal::Busy)) };
+            if !crate::inbox::room(domain, limits, number, messages, result_bytes) {
                 return Err(problem(Some(number), Refusal::Busy));
             }
             if parent.depth.saturating_add(1) > limits.depth {

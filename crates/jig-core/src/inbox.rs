@@ -9,6 +9,12 @@ use skein_lib::List;
 
 use crate::{Core, Limits};
 
+/// Inbox words, role-routed proposals and the four scalar references: a
+/// person-held proposal, escalation, answerable person task and stall update.
+pub(crate) fn waiting_capacity(limits: &Limits) -> Option<u32> {
+    limits.tasks.inbox_messages.checked_add(limits.authority.roles)?.checked_add(4)
+}
+
 fn add(
     entries: &mut List<people::Entry>,
     row: &tasks::TaskRecord,
@@ -45,6 +51,7 @@ fn question_answered(row: &tasks::TaskRecord, question: u64) -> bool {
             | tasks::MessageKind::Notice { .. }
             | tasks::MessageKind::Timer { .. }
             | tasks::MessageKind::News { .. }
+            | tasks::MessageKind::PersonStalled { .. }
             | tasks::MessageKind::Result(_) => {}
         }
     }
@@ -56,13 +63,7 @@ impl Core {
     #[must_use]
     #[expect(clippy::too_many_lines, reason = "one exhaustive task projection covers all person-facing waiting kinds")]
     pub fn waiting_entries(&self, limits: &Limits, row: &tasks::TaskRecord) -> Box<[people::Entry]> {
-        let capacity = limits
-            .tasks
-            .inbox_messages
-            .checked_add(self.authority.limits().roles)
-            .expect("validated task inbox projection bound")
-            .checked_add(3)
-            .expect("validated task inbox projection bound");
+        let capacity = waiting_capacity(limits).expect("validated task inbox projection bound");
         let mut entries = List::with_capacity(capacity);
         match &row.phase {
             tasks::Phase::Ended(_) | tasks::Phase::Closing(_) => return entries.into_boxed(),
@@ -97,6 +98,7 @@ impl Core {
                         | tasks::MessageKind::Notice { .. }
                         | tasks::MessageKind::Timer { .. }
                         | tasks::MessageKind::News { .. }
+                        | tasks::MessageKind::PersonStalled { .. }
                         | tasks::MessageKind::Result(_)
                         | tasks::MessageKind::Escalation { .. } => {}
                     }
@@ -163,18 +165,41 @@ impl Core {
             | tasks::Escalation::Routing { .. }
             | tasks::Escalation::Rejected { .. } => {}
         }
+        if let Some(wait) = row.person_wait
+            && let Some(notice) = wait.notice
+            && let tasks::Party::Person(person) = row.requester
+        {
+            add(
+                &mut entries,
+                row,
+                people::Whom::Person(person),
+                people::EntryKind::Reply { message: notice.message },
+                notice.at,
+            );
+        }
+        let answerable = match row.phase {
+            tasks::Phase::Active(tasks::Active::Due | tasks::Active::Idle) => true,
+            tasks::Phase::Waiting
+            | tasks::Phase::Active(_)
+            | tasks::Phase::Held { .. }
+            | tasks::Phase::Closing(_)
+            | tasks::Phase::Ended(_) => false,
+        };
         match row.executor {
+            tasks::Executor::Person(_) if !answerable => {}
             tasks::Executor::Person(tasks::PersonAddress::Person(person)) => {
                 if row.taken_by.is_none() {
-                    add(&mut entries, row, people::Whom::Person(person), people::EntryKind::PersonTask, row.created_at);
+                    let since = row.person_wait.expect("active person wait").since;
+                    add(&mut entries, row, people::Whom::Person(person), people::EntryKind::PersonTask, since);
                 }
             }
             tasks::Executor::Person(tasks::PersonAddress::Role(role)) => {
+                let since = row.person_wait.expect("active person wait").since;
                 let whom = match row.taken_by {
                     Some(person) => people::Whom::Person(person),
                     None => people::Whom::Role { project: row.project, role },
                 };
-                add(&mut entries, row, whom, people::EntryKind::PersonTask, row.created_at);
+                add(&mut entries, row, whom, people::EntryKind::PersonTask, since);
             }
             tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => {}
         }

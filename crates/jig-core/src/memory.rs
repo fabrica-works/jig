@@ -247,6 +247,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // copy and a connector handoff at each bounded route position.
     let payload = new_task
         .checked_mul(u64::from(task.batch.max(1)).checked_add(2)?)?
+        .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?
         .checked_add(context)?
         .checked_add(u64::from(task.message_bytes.max(task.result_bytes)))?
         .checked_add(limits.policy_bytes)?

@@ -35,6 +35,7 @@ fn merge_key(kind: MessageKind) -> Option<(u8, u64)> {
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::ProposalDecision { .. }
+        | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_) => None,
     }
 }
@@ -89,6 +90,7 @@ pub(crate) fn prepare(
                 | MessageKind::Proposal { .. }
                 | MessageKind::Escalation { .. }
                 | MessageKind::ProposalDecision { .. }
+                | MessageKind::PersonStalled { .. }
                 | MessageKind::Result(_)
                 | MessageKind::Notice { .. }
                 | MessageKind::Timer { .. }
@@ -109,7 +111,14 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
     let Some(record) = record(domain, task) else {
         return false;
     };
-    let Some(reserved) = record.delegates.len().checked_add(record.questions.len()) else { return false };
+    let mut stall_credits = 0_usize;
+    for child in &record.delegates {
+        if crate::person::credit(crate::domain::record(domain, *child).expect("live delegate")) {
+            stall_credits = stall_credits.checked_add(1).expect("bounded person delegates");
+        }
+    }
+    let Some(reserved) = record.delegates.len().checked_add(stall_credits) else { return false };
+    let Some(reserved) = reserved.checked_add(record.questions.len()) else { return false };
     let Some(reserved) = reserved.checked_add(usize::from(record.proposal.is_some())) else { return false };
     let Some((subscription_count, subscription_bytes)) = crate::subscriptions::credit(record, limits) else {
         return false;
@@ -177,6 +186,7 @@ pub(crate) fn message(
         | MessageKind::Escalation { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::ProposalDecision { .. }
+        | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_)
         | MessageKind::Notice { .. }
         | MessageKind::Timer { .. }
@@ -249,6 +259,7 @@ pub(crate) fn message(
         | MessageKind::Escalation { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::ProposalDecision { .. }
+        | MessageKind::PersonStalled { .. }
         | MessageKind::Result(_)
         | MessageKind::Notice { .. }
         | MessageKind::Timer { .. }
@@ -327,6 +338,7 @@ pub(crate) fn delegate_result(
         | MessageKind::Answer { .. }
         | MessageKind::Notice { .. }
         | MessageKind::Timer { .. }
+        | MessageKind::PersonStalled { .. }
         | MessageKind::News { .. } => return,
     }
     if !match word.from {

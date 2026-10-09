@@ -409,6 +409,7 @@ impl Core {
             | tasks::MessageKind::Notice { .. }
             | tasks::MessageKind::Timer { .. }
             | tasks::MessageKind::News { .. }
+            | tasks::MessageKind::PersonStalled { .. }
             | tasks::MessageKind::Result(_) => previous,
         }
     }

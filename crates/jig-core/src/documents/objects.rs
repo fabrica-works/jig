@@ -109,8 +109,9 @@ pub struct PersonTask {
     pub spec: SpecLine,
     pub address: tasks::PersonAddress,
     pub taken_by: Option<u64>,
-    pub since: Wall,
+    pub since: Option<Wall>,
     pub stall: Option<skein_lib::Duration>,
+    pub deadline: Option<Wall>,
     pub contract: ContractLine,
     pub results: List<ShownResult>,
     pub cut: bool,
@@ -494,6 +495,7 @@ pub(super) fn question(
             | tasks::MessageKind::Notice { .. }
             | tasks::MessageKind::Timer { .. }
             | tasks::MessageKind::News { .. }
+            | tasks::MessageKind::PersonStalled { .. }
             | tasks::MessageKind::Result(_) => {}
         }
     }
@@ -523,6 +525,7 @@ pub(super) fn question(
             | tasks::MessageKind::Notice { .. }
             | tasks::MessageKind::Timer { .. }
             | tasks::MessageKind::News { .. }
+            | tasks::MessageKind::PersonStalled { .. }
             | tasks::MessageKind::Result(_) => return Err(Missing::Unknown),
         }
     }
@@ -558,8 +561,18 @@ pub(super) fn person(core: &Core, limits: &Limits, party: u64, number: u64) -> R
         spec: spec(limits, &row.spec),
         address,
         taken_by: row.taken_by,
-        since: row.created_at,
-        stall: None,
+        since: match row.person_wait {
+            Some(wait) => Some(wait.since),
+            None => None,
+        },
+        stall: match row.person_wait {
+            Some(wait) => Some(wait.stall),
+            None => None,
+        },
+        deadline: match row.person_wait {
+            Some(wait) => Some(wait.deadline),
+            None => None,
+        },
         contract: super::task_tree::contract(limits, &row.contract),
         results,
         cut: row.dependencies.len().checked_add(row.spec.inputs.len()).ok_or(Missing::TooLarge)? > bound(limits),
