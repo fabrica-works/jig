@@ -229,6 +229,14 @@ impl Engine {
         for mut pending in self.pending.drain(..count) {
             pending.commit.durable = Some(pending.due);
             self.durable_truth = pending.truth;
+            for change in &pending.commit.changes {
+                if let Change::Source(Source {
+                    read: jig_client::contract::Read::Activity { task, .. },
+                    rows: Rows::Activity(rows),
+                    ..
+                }) = change
+                    && self.runs.get(task).is_some_and(|run| rows.iter().any(|line| matches!(line.event, jig_client::contract::Activity::Turn { name, .. } if name == run.turn))) { self.runs.remove(task); }
+            }
             if let (Some(party), Some(key)) = (pending.commit.party, pending.commit.key) {
                 let retention = self.truth.frames.get(&party).expect("keyed party has a frame").retention;
                 if let Some(keyed) = self.keys.get_mut(&(party, key)) {

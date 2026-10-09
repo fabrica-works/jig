@@ -46,6 +46,8 @@ pub enum Change {
     Source(Source),
     /// Replace the authoritative subtree, including folded counts.
     Tree(Tree),
+    /// Replace committed inbox read positions for a party.
+    Seen { party: u64, results: u64, replies: Vec<jig_client::contract::ReplyPosition> },
 }
 impl Change {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
@@ -53,6 +55,7 @@ impl Change {
             Self::Source(value) => {
                 return value.validate(bounds);
             }
+            Self::Seen { replies, .. } => replies.len() <= bounds.rows as usize,
             Self::Tree(value) => payload::fits(value, bounds),
             Self::Frame(value) => payload::fits(value, bounds),
             Self::Object { project, key, value } => {
@@ -120,11 +123,17 @@ impl Truth {
                 self.sources.push(source.clone());
                 if let (jig_client::contract::Read::Activity { task, .. }, crate::Rows::Activity(rows)) =
                     (&source.read, &source.rows)
+                    && let Some(ReadValue::Task(doc)) = self.objects.get_mut(&ObjectKey::Task(*task))
                 {
-                    if let Some(ReadValue::Task(doc)) = self.objects.get_mut(&ObjectKey::Task(*task)) {
-                        doc.activity = rows.last().map_or(0, |line| line.position);
-                    }
+                    doc.activity = rows.last().map_or(0, |line| line.position);
                 }
+            }
+            Change::Seen { party, results, replies } => {
+                if !self.frames.contains_key(party) {
+                    return Err(Invalid::Identity);
+                }
+                self.results_seen.insert(*party, *results);
+                self.replies_seen.insert(*party, replies.clone());
             }
             Change::Tree(tree) => {
                 self.trees.insert(tree.task, tree.clone());
@@ -191,6 +200,9 @@ pub struct Script {
 }
 impl Script {
     pub(crate) fn validate(&self) -> core::result::Result<(), Invalid> {
+        if self.bounds.text < 8 || self.bounds.heartbeat == skein_lib::Duration::ZERO {
+            return Err(Invalid::Script);
+        }
         self.truth.validate(&self.bounds)?;
         for rule in &self.rules {
             if matches!(rule.answer, Answer::Refused(_)) && !rule.changes.is_empty() {

@@ -79,10 +79,10 @@ impl Engine {
         let tokens: Vec<_> = self.watches.keys().copied().collect();
         for token in tokens {
             let mut watch = self.watches.remove(&token).expect("selected watch exists");
-            let end = if self.truth.sign_ins.get(&watch.sign_in) != Some(&watch.party) {
-                Some(WatchEnd::SignedOut)
-            } else {
+            let end = if self.truth.sign_ins.get(&watch.sign_in) == Some(&watch.party) {
                 self.subject_end(watch.party, &watch.subject, true)
+            } else {
+                Some(WatchEnd::SignedOut)
             };
             if let Some(why) = end {
                 self.watches.insert(token, watch);
@@ -123,7 +123,11 @@ impl Engine {
         self.watches.values().map(|watch| {
             let heartbeat = watch.heard.saturating_add(self.bounds.heartbeat);
             if watch.dirty && !watch.in_flight {
-                let barrier = self.pending.last().map_or(watch.heard, |pending| pending.due);
+                let barrier = if matches!(watch.subject, Subject::Run { .. }) {
+                    watch.heard
+                } else {
+                    self.pending.last().map_or(watch.heard, |pending| pending.due)
+                };
                 heartbeat.min(barrier)
             } else {
                 heartbeat
@@ -157,7 +161,7 @@ impl Engine {
     }
     #[expect(clippy::too_many_lines, reason = "each contract subject has a distinct whole document")]
     fn delivery(&mut self, party: u64, subject: &Subject) -> Result<Option<Delivery>, WatchEnd> {
-        let value = match subject {
+        let mut value = match subject {
             Subject::Frame => Delivery::Frame(Box::new(self.truth.frames[&party].clone())),
             Subject::Task { task } => {
                 let Some(ReadValue::Task(doc)) = self.truth.objects.get(&ObjectKey::Task(*task)) else {
@@ -167,16 +171,17 @@ impl Engine {
             }
             Subject::Tree { task, window } => {
                 let mut tree = self.truth.trees.get(task).cloned().ok_or(WatchEnd::Unknown)?;
-                if tree.nodes.len() > *window {
-                    return Err(WatchEnd::Busy);
+                let nodes: Vec<_> = tree.nodes.iter().cloned().collect();
+                let count = nodes.len().min((*window).min(self.bounds.rows) as usize);
+                for node in &nodes[count..] {
+                    fold(&mut tree.folded, node.chip.phase);
                 }
-                // Folded counts are authoritative: the kit cannot invent them.
-                tree.nodes = list(&tree.nodes.iter().cloned().collect::<Vec<_>>());
+                tree.nodes = list(&nodes[..count]);
                 Delivery::Tree(Box::new(tree))
             }
             Subject::Chips { tasks } => {
                 let mut chips = Vec::new();
-                for task in tasks.iter() {
+                for task in tasks {
                     let Some(ReadValue::Task(doc)) = self.truth.objects.get(&ObjectKey::Task(*task)) else {
                         return Err(WatchEnd::Unknown);
                     };
@@ -186,9 +191,9 @@ impl Engine {
             }
             Subject::Inbox { window } => {
                 let read = Read::Inbox { project: None, kind: None, goal: None, after: None };
-                let rows = self.truth.sources.iter().find(|source| source.party == party && source.read == read);
-                let entries =
-                    if let Some(crate::Source { rows: Rows::Inbox(rows), .. }) = rows { rows.clone() } else { vec![] };
+                let Rows::Inbox(entries) = self.rows_for(party, &read) else {
+                    unreachable!("inbox rows");
+                };
                 let count = entries.len().min((*window).min(self.bounds.rows) as usize);
                 let frame = &self.truth.frames[&party];
                 Delivery::Inbox(Box::new(Inbox {
@@ -201,11 +206,11 @@ impl Engine {
                 }))
             }
             Subject::Goals { project } => {
-                let rows = self.truth.sources.iter().find(|source| {
-                    source.party == party && source.read == Read::Goals { project: *project, ended: false, after: None }
-                });
-                let rows =
-                    if let Some(crate::Source { rows: Rows::Goals(rows), .. }) = rows { rows.clone() } else { vec![] };
+                let Rows::Goals(rows) =
+                    self.rows_for(party, &Read::Goals { project: *project, ended: false, after: None })
+                else {
+                    unreachable!("goal rows");
+                };
                 let count = rows.len().min(self.bounds.rows as usize);
                 Delivery::Goals(Box::new(Goals {
                     project: *project,
@@ -214,13 +219,10 @@ impl Engine {
                 }))
             }
             Subject::Conversations => {
-                let rows = self.truth.sources.iter().find(|source| {
-                    source.party == party && source.read == Read::Conversations { project: None, after: None }
-                });
-                let rows = if let Some(crate::Source { rows: Rows::Conversations(rows), .. }) = rows {
-                    rows.clone()
-                } else {
-                    vec![]
+                let Rows::Conversations(rows) =
+                    self.rows_for(party, &Read::Conversations { project: None, after: None })
+                else {
+                    unreachable!("conversation rows");
                 };
                 let live: Vec<_> = rows.into_iter().filter(|line| !ended(line.chip.phase)).collect();
                 let count = live.len().min(self.bounds.rows as usize);
@@ -287,7 +289,50 @@ impl Engine {
                 Delivery::Deployment(Box::new(self.truth.deployment.clone().ok_or(WatchEnd::Unknown)?))
             }
         };
-        if payload::fits(&value, &self.bounds) { Ok(Some(value)) } else { Err(WatchEnd::Busy) }
+        loop {
+            if payload::fits(&value, &self.bounds) {
+                return Ok(Some(value));
+            }
+            match &mut value {
+                Delivery::Inbox(doc) => {
+                    if !shorten(&mut doc.entries) {
+                        return Err(WatchEnd::Busy);
+                    }
+                    doc.more = true;
+                }
+                Delivery::Goals(doc) => {
+                    if !shorten(&mut doc.rows) {
+                        return Err(WatchEnd::Busy);
+                    }
+                    doc.more = true;
+                }
+                Delivery::Tasks(doc) => {
+                    if !shorten(&mut doc.rows) {
+                        return Err(WatchEnd::Busy);
+                    }
+                    doc.more = true;
+                }
+                Delivery::Conversations(doc) => {
+                    if !shorten(&mut doc.rows) {
+                        return Err(WatchEnd::Busy);
+                    }
+                    doc.more = true;
+                }
+                Delivery::Tree(doc) => {
+                    let nodes: Vec<_> = doc.nodes.iter().cloned().collect();
+                    let Some(last) = nodes.last() else {
+                        return Err(WatchEnd::Busy);
+                    };
+                    fold(&mut doc.folded, last.chip.phase);
+                    doc.nodes = list(&nodes[..nodes.len() - 1]);
+                }
+                Delivery::Frame(_)
+                | Delivery::Task(_)
+                | Delivery::Chips(_)
+                | Delivery::Run(_)
+                | Delivery::Deployment(_) => return Err(WatchEnd::Busy),
+            }
+        }
     }
     /// Appends provisional bytes to the current writing turn, retaining its bounded tail.
     /// A new name starts at zero; activity is the only carrier of committed turns.
@@ -297,10 +342,10 @@ impl Engine {
         task: u64,
         turn: TurnName,
         began: Wall,
-        bytes: Text,
+        bytes: &Text,
         call: Option<Call>,
     ) -> Result<(), Invalid> {
-        if !payload::fits(&bytes, &self.bounds) || !payload::fits(&call, &self.bounds) {
+        if !payload::fits(bytes, &self.bounds) || !payload::fits(&call, &self.bounds) {
             return Err(Invalid::Payload);
         }
         if !self.truth.objects.contains_key(&ObjectKey::Task(task)) {
@@ -341,4 +386,27 @@ impl Engine {
 }
 fn ended(phase: Phase) -> bool {
     matches!(phase, Phase::Done | Phase::Failed | Phase::Cancelled)
+}
+
+fn shorten<T: Clone>(rows: &mut skein_lib::List<T>) -> bool {
+    let copy: Vec<_> = rows.iter().cloned().collect();
+    if copy.is_empty() {
+        return false;
+    }
+    *rows = list(&copy[..copy.len() - 1]);
+    true
+}
+fn fold(counts: &mut jig_client::contract::PhaseCounts, phase: Phase) {
+    let count = match phase {
+        Phase::Waiting | Phase::Idle | Phase::Due | Phase::Preparing | Phase::Claimed | Phase::BackingOff => {
+            &mut counts.waiting
+        }
+        Phase::Running | Phase::Active => &mut counts.running,
+        Phase::Held => &mut counts.held,
+        Phase::Closing => &mut counts.closing,
+        Phase::Done => &mut counts.done,
+        Phase::Failed => &mut counts.failed,
+        Phase::Cancelled => &mut counts.cancelled,
+    };
+    *count = count.saturating_add(1);
 }

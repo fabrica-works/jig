@@ -2,8 +2,8 @@
 use crate::{Bounds, Engine, Invalid, Up, payload};
 use jig_client::contract::{
     ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryLine,
-    HistoryPage, InboxEntry, InboxPage, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Read, ReadNone, ReadResult,
-    ReadValue, Result, SpendPage, SpendPeriod, Text,
+    HistoryPage, InboxEntry, InboxGroup, InboxPage, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Read, ReadNone,
+    ReadResult, ReadValue, Result, SpendPage, SpendPeriod, Text,
 };
 use skein_lib::{List, Time, Token};
 
@@ -33,7 +33,33 @@ impl Source {
         if cursor.is_some() || !payload::fits(&read, bounds) || !self.rows.matches(&read) {
             return Err(Invalid::Identity);
         }
-        self.rows.validate(bounds)
+        self.rows.validate(bounds)?;
+        if let Rows::Inbox(rows) = &self.rows {
+            for row in rows {
+                match (&row.group, &row.reply) {
+                    (InboxGroup::Replies, Some(line))
+                        if row.object == ObjectKey::Task(line.chip.task) && row.project == line.project => {}
+                    (InboxGroup::Replies, None | Some(_))
+                    | (
+                        InboxGroup::Questions
+                        | InboxGroup::Proposals
+                        | InboxGroup::Escalations
+                        | InboxGroup::PersonTasks
+                        | InboxGroup::Results,
+                        Some(_),
+                    ) => return Err(Invalid::Identity),
+                    (
+                        InboxGroup::Questions
+                        | InboxGroup::Proposals
+                        | InboxGroup::Escalations
+                        | InboxGroup::PersonTasks
+                        | InboxGroup::Results,
+                        None,
+                    ) => {}
+                }
+            }
+        }
+        Ok(())
     }
 }
 impl Rows {
@@ -190,12 +216,7 @@ impl Engine {
         if let Some(key) = object {
             return self.checked_read(self.truth.objects.get(&key).cloned());
         }
-        let rows = self
-            .truth
-            .sources
-            .iter()
-            .find(|source| source.party == party && source.read == query)
-            .map_or_else(|| empty(&query), |source| source.rows.clone());
+        let rows = self.rows_for(party, &query);
         let backward = matches!(query, Read::Activity { .. });
         let index = if let Some(cursor) = position {
             let bytes: [u8; 8] = cursor.value.bytes().try_into().map_err(|_| ReadNone::Gone)?;
@@ -211,6 +232,9 @@ impl Engine {
         };
         let maximum = usize::try_from(self.bounds.rows).expect("u32 fits usize");
         let mut count = maximum.min(if backward { index } else { rows.len() - index });
+        if count == 0 && rows.len() != 0 {
+            return Err(ReadNone::Busy);
+        }
         loop {
             let (start, end) = if backward { (index - count, index) } else { (index, index + count) };
             let before = (start != 0).then(|| cursor(self.next_position, &self.bounds));
@@ -233,6 +257,52 @@ impl Engine {
             if count == 0 && rows.len() != 0 {
                 return Err(ReadNone::Busy);
             }
+        }
+    }
+    pub(crate) fn rows_for(&self, party: u64, query: &Read) -> Rows {
+        let broad = if matches!(query, Read::Inbox { .. } | Read::InboxGroup { .. }) {
+            Read::Inbox { project: None, kind: None, goal: None, after: None }
+        } else if matches!(query, Read::Conversations { .. }) {
+            Read::Conversations { project: None, after: None }
+        } else {
+            query.clone()
+        };
+        let source = self
+            .truth
+            .sources
+            .iter()
+            .find(|source| source.party == party && source.read == *query)
+            .or_else(|| self.truth.sources.iter().find(|source| source.party == party && source.read == broad));
+        let rows = source.map_or_else(
+            || {
+                if matches!(query, Read::Notes { .. }) {
+                    Rows::Notes(self.truth.notes.values().cloned().collect())
+                } else {
+                    empty(query)
+                }
+            },
+            |source| source.rows.clone(),
+        );
+        match rows {
+            Rows::Inbox(rows) => Rows::Inbox(rows.into_iter().filter(|row| {
+                if !self.truth.visible(party,row.project) { return false; }
+                match query {
+                    Read::Inbox { project, kind, goal, .. } => project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
+                    Read::InboxGroup { project, group, .. } => project.is_none_or(|p| p == row.project) && *group == row.group,
+                    Read::Frame | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
+                    | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. }
+                    | Read::Conversations { .. } | Read::Goals { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
+                }
+            }).collect()),
+            Rows::Conversations(rows) => Rows::Conversations(rows.into_iter().filter(|row| {
+                self.truth.visible(party,row.project) && matches!(query, Read::Conversations { project, .. } if project.is_none_or(|p| p == row.project))
+            }).collect()),
+            Rows::Notes(rows) => Rows::Notes(rows.into_iter().filter(|row| {
+                matches!(query, Read::Notes { scope, description, .. } if *scope == row.scope && description.as_ref().is_none_or(|needle| needle.bytes().is_empty() || row.description.bytes().windows(needle.bytes().len()).any(|window| window == needle.bytes())))
+            }).collect()),
+            Rows::Goals(rows) => Rows::Goals(rows.into_iter().filter(|row| matches!(query, Read::Goals { ended, .. } if *ended == matches!(row.chip.phase,jig_client::contract::Phase::Done | jig_client::contract::Phase::Failed | jig_client::contract::Phase::Cancelled))).collect()),
+            Rows::Ended(rows) => Rows::Ended(rows), Rows::History(rows) => Rows::History(rows),
+            Rows::Activity(rows) => Rows::Activity(rows), Rows::Spend(rows) => Rows::Spend(rows),
         }
     }
     fn checked_read(&self, value: Option<ReadValue>) -> core::result::Result<ReadValue, ReadNone> {
