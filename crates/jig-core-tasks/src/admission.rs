@@ -93,22 +93,22 @@ pub(crate) fn turn(
         crate::Line::Turn { reply: task.last_reply, attempt, turn, read },
         out,
     );
+    let hint =
+        crate::ReplyHint { number: task.last_reply, activity: task.activity, attempt, turn, at: environment.wall };
     let mut replies = skein_lib::List::with_capacity(environment.limits.inbox_messages);
-    replies
-        .push(crate::ReplyHint {
-            number: task.last_reply,
-            activity: task.activity,
-            attempt,
-            turn,
-            at: environment.wall,
-        })
-        .expect("positive reply hint bound");
-    for &reply in task
-        .replies
-        .iter()
-        .take(usize::try_from(environment.limits.inbox_messages.saturating_sub(1)).expect("reply bound fits"))
-    {
+    let mut inserted = false;
+    for &reply in &task.replies {
+        if !inserted && (hint.at, hint.number) > (reply.at, reply.number) {
+            replies.push(hint).expect("bounded new reply hint");
+            inserted = true;
+        }
+        if replies.len() == environment.limits.inbox_messages {
+            break;
+        }
         replies.push(reply).expect("bounded older reply hints");
+    }
+    if !inserted && replies.len() < environment.limits.inbox_messages {
+        replies.push(hint).expect("bounded new reply hint");
     }
     task.replies = replies.into_boxed();
     post(domain, environment, number, cumulative, spent, out);

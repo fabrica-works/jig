@@ -154,4 +154,5 @@ fn five_independent_read_stories_fit_the_shared_process_budget() {
     a_conversation_reads_whole_from_its_end_after_its_words_were_taken();
     an_inbox_longer_than_the_engine_holds_pages_from_the_store();
     a_read_when_loads_are_full_is_busy();
+    jig_core_world::stories::reads::a_backward_wall_correction_keeps_reply_paging_whole_after_restart();
 }

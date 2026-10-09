@@ -395,27 +395,32 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     {
         return false;
     }
-    let mut reply_number = task.last_reply;
-    let mut activity = task.activity;
-    for reply in &task.replies {
+    let mut previous_reply = None;
+    for (index, reply) in task.replies.iter().enumerate() {
         if reply.number == 0
-            || reply.number != reply_number
+            || reply.number > task.last_reply
             || reply.activity == 0
-            || reply.activity > activity
+            || reply.activity > task.activity
             || reply.attempt == 0
             || reply.attempt > task.attempt
             || reply.turn == 0
+            || (reply.attempt == task.attempt && reply.turn > task.turn)
         {
             return false;
         }
-        reply_number = reply.number.checked_sub(1).expect("positive reply ordinal");
-        activity = reply.activity.checked_sub(1).expect("positive activity position");
-    }
-    if let Some(reply) = task.replies.first() {
-        if task.last_reply == 0 || reply.number != task.last_reply {
+        if let Some(key) = previous_reply
+            && key <= (reply.at, reply.number)
+        {
             return false;
         }
-    } else if task.last_reply != 0 {
+        for old in task.replies.iter().take(index) {
+            if old.number == reply.number || old.activity == reply.activity {
+                return false;
+            }
+        }
+        previous_reply = Some((reply.at, reply.number));
+    }
+    if task.last_reply != 0 && task.replies.is_empty() {
         return false;
     }
     let mut previous = 0;

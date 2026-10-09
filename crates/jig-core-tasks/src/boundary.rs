@@ -749,6 +749,7 @@ pub struct PersonStallNotice {
 }
 
 /// One committed turn's reply reference (domain/people.md, section 6).
+/// Retained hints form the newest (wall time, reply ordinal) prefix, independently of `last_reply`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ReplyHint {
     pub number: u64,

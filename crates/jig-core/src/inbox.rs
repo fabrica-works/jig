@@ -321,13 +321,12 @@ pub(crate) fn valid_header(core: &Core, limits: &Limits, row: &tasks::TaskRecord
     {
         return false;
     }
-    let mut number = row.last_reply;
-    let mut activity = row.activity;
-    for hint in &row.replies {
-        if hint.number != number
-            || hint.number == 0
+    let mut previous = None;
+    for (index, hint) in row.replies.iter().enumerate() {
+        if hint.number == 0
+            || hint.number > row.last_reply
             || hint.activity == 0
-            || hint.activity > activity
+            || hint.activity > row.activity
             || hint.attempt == 0
             || hint.attempt > deployment.runs
             || hint.attempt > row.attempt
@@ -336,8 +335,17 @@ pub(crate) fn valid_header(core: &Core, limits: &Limits, row: &tasks::TaskRecord
         {
             return false;
         }
-        number = number.checked_sub(1).expect("positive hint ordinal");
-        activity = hint.activity.checked_sub(1).expect("positive activity position");
+        if let Some(key) = previous
+            && key <= (hint.at, hint.number)
+        {
+            return false;
+        }
+        for old in row.replies.iter().take(index) {
+            if old.number == hint.number || old.activity == hint.activity {
+                return false;
+            }
+        }
+        previous = Some((hint.at, hint.number));
     }
     row.last_reply == 0 || !row.replies.is_empty()
 }

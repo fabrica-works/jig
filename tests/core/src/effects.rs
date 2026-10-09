@@ -76,6 +76,7 @@ pub struct World {
     pub reached_cut: Option<Cut>,
     hold_kinds: Vec<(u16, Box<[tasks::Kind]>)>,
     wall: u64,
+    wall_lag: u64,
 }
 
 #[derive(Debug)]
@@ -261,6 +262,7 @@ impl World {
             reached_cut: None,
             hold_kinds: Vec::new(),
             wall: 0,
+            wall_lag: 0,
         }
     }
 
@@ -304,8 +306,17 @@ impl World {
         self.drain();
     }
 
+    /// Correct wall time backwards while elapsed time continues monotonically.
+    pub fn correct_wall_backwards(&mut self, by: Duration) {
+        self.wall_lag = self.wall_lag.checked_add(by.as_nanos()).expect("wall correction fits");
+    }
+
     fn env(&self) -> Env<root::Limits> {
-        Env { now: Time::from_nanos(self.wall), wall: Wall::from_nanos(self.wall), limits: self.limits }
+        Env {
+            now: Time::from_nanos(self.wall),
+            wall: Wall::from_nanos(self.wall.saturating_sub(self.wall_lag)),
+            limits: self.limits,
+        }
     }
 
     /// Queue a burst so independent parties draw their pace between its inputs.
