@@ -174,6 +174,9 @@ pub fn card(
             );
             if open(b, client, object, place, &title, words, bindings) {
                 chip::chip(b, client, &task.chip, words, bindings);
+                if let Some(result) = &task.result {
+                    result::facts(b, client, result, words, bindings);
+                }
                 common::acts(b, &facts.card, &task.acts, object, words, bindings);
                 close(b);
             }

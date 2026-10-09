@@ -179,6 +179,11 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
             }),
         );
     }
+    // The added owner count reaches every distinct restored-scope slot too.
+    let counted = w.client(7, stories::inbox());
+    for scope in [7, 8, 9, 10] {
+        w.event(counted, jig_test_client_domain::Event::Jig(jig_client::Event::Kept { scope, requests: 1 }));
+    }
     let result = w.run(Until::Steps(2));
     assert!(result.heap_peak > 0, "counted every iteration");
     assert!(result.heap_peak <= result.heap_bound, "composed root, view and shell model envelope");

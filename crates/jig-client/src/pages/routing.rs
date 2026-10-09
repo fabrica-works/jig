@@ -127,7 +127,9 @@ pub(crate) fn navigate(
 }
 /// Opens only what the selected work page shows; services have no page.
 pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
-    if domain.confirmed.is_none() {
+    if domain.confirmed.is_none()
+        || domain.confirmed.is_some_and(|party| crate::domain::foreign_kept_requests(domain, party))
+    {
         domain.page = Page::SomeoneElse;
         domain.changed();
         return;
@@ -207,8 +209,7 @@ pub(crate) fn names(
     for key in &keys {
         if domain.objects.named(*key, source) {
             match domain.object_rows.rows.push(*key) {
-                Ok(()) => {}
-                Err(_) => break,
+                Ok(()) | Err(_) => {}
             }
             let id = domain.objects.find(*key).expect("named object is present");
             let object = domain.objects.get(id).expect("indexed object exists");
@@ -282,11 +283,18 @@ pub(crate) fn delivery(
         }
         Delivery::Tree(tree) => {
             crate::pages::task::tree(domain, *tree);
-            let mut keys = List::with_capacity(env.limits.rows);
+            let mut keys = List::with_capacity(crate::limits::tree_names(&env.limits).expect("tree names are bounded"));
             for node in &domain.task_page.plan.nodes {
-                match keys.push(ObjectKey::Task(node.chip.task)) {
-                    Ok(()) => {}
-                    Err(_) => break,
+                if !keys.as_slice().contains(&ObjectKey::Task(node.chip.task))
+                    && keys.push(ObjectKey::Task(node.chip.task)).is_err()
+                {
+                    break;
+                }
+                for proposal in &node.proposals {
+                    let key = ObjectKey::Proposal(*proposal);
+                    if !keys.as_slice().contains(&key) && keys.push(key).is_err() {
+                        break;
+                    }
                 }
             }
             names(domain, env, source, keys, out);

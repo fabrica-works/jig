@@ -76,6 +76,7 @@ pub struct Domain {
     pub(crate) wall: Wall,
     pub(crate) shown: u64,
     pub(crate) kept: List<Record>,
+    pub(crate) kept_requests: Map<u64, u32>,
     pub(crate) watches: Slab<Watch>,
     pub(crate) watch_ids: Map<Id<Watch>, ()>,
     pub(crate) frame_watch: Option<Id<Watch>>,
@@ -126,6 +127,7 @@ impl Domain {
             wall: Wall::EPOCH,
             shown: 0,
             kept: List::with_capacity(limits.records),
+            kept_requests: Map::with_capacity(limits.kept),
             watches: Slab::with_capacity(limits.watches),
             watch_ids: Map::with_capacity(limits.watches),
             frame_watch: None,
@@ -572,7 +574,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             | Event::SignedOut
             | Event::ShowObjects { .. }
             | Event::ObjectsLeft
-            | Event::Frame { .. } => {}
+            | Event::Frame { .. }
+            | Event::Kept { .. }
+            | Event::KeptGone { .. } => {}
         }
         return;
     }
@@ -588,6 +592,22 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::Act { act } => act_event(domain, env, act, out),
         Event::Start { .. } => {}
+        Event::Kept { scope, requests } => {
+            if requests != 0 && domain.kept_requests.insert(scope, requests).is_err() {
+                out.push(Request::Fact { fact: Fact::Refused { which: Limit::Requests } });
+            }
+            refresh_kept_page(domain, env, out);
+        }
+        Event::KeptGone { scope } => {
+            if let Some(requests) = domain.kept_requests.get(&scope).copied() {
+                if requests == 1 {
+                    domain.kept_requests.remove(&scope);
+                } else {
+                    domain.kept_requests.insert(scope, requests - 1).expect("existing scope retains its capacity");
+                }
+                refresh_kept_page(domain, env, out);
+            }
+        }
         Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
         Event::Progress { request, progress } => crate::intents::progress(domain, request, progress, out),
         Event::Answered { request, answer } => crate::intents::answered(domain, env, request, answer, out),
@@ -706,6 +726,32 @@ fn start(
     domain.frame_watch = domain.open(env, Subject::Frame, Owner::Frame, out);
     domain.changed();
 }
+// Restored table scopes are facts; the client owns the warning and its end.
+pub(crate) fn foreign_kept_requests(domain: &Domain, party: u64) -> bool {
+    for (scope, requests) in &domain.kept_requests {
+        if *scope != party && *requests != 0 {
+            return true;
+        }
+    }
+    false
+}
+fn refresh_kept_page(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let Some(party) = domain.frame.party() else {
+        return;
+    };
+    if domain.blocked || domain.confirmed.is_none() {
+        return;
+    }
+    if foreign_kept_requests(domain, party) {
+        if domain.page != Page::SomeoneElse {
+            domain.close_page(out);
+            domain.page = Page::SomeoneElse;
+            domain.changed();
+        }
+    } else if domain.page == Page::SomeoneElse {
+        domain.show_work(env, out);
+    }
+}
 fn frame_answer(domain: &Domain, asked: Token, out: &mut Queue<Request>) {
     let party = domain.frame.party();
     let address = match domain.page {
@@ -814,7 +860,7 @@ fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mu
     }
     out.push(Request::Retention { retention });
     domain.set_link(Link::Live, out);
-    if mismatch {
+    if mismatch || foreign_kept_requests(domain, party) {
         domain.close_page(out);
         domain.page = Page::SomeoneElse;
         domain.changed();
@@ -918,6 +964,27 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
                 | Subject::Run { .. }
                 | Subject::Deployment => false,
             };
+            if end == WatchEnd::SubjectEnded {
+                if let (Owner::Page { generation }, Subject::Task { task }) = (owner, &watch.subject) {
+                    if generation == domain.generation {
+                        let key = crate::contract::ObjectKey::Task(*task);
+                        let what = crate::contract::Read::Task { task: *task };
+                        let source = crate::objects::Source::Window { generation, number: 23 };
+                        // Transfer this source's slot before admission, so a
+                        // one-source limit can still read the terminal facts.
+                        if let Some(object) = domain.objects.find(key).and_then(|id| domain.objects.get_mut(id)) {
+                            object.sources.remove(&crate::objects::Source::Watch(id));
+                        }
+                        if domain.objects.name(key, source).is_none() {
+                            crate::pages::routing::refuse(domain, Limit::Objects);
+                        } else if !domain.reads.pending(&what)
+                            && domain.reads.ask(generation, source, what, out).is_none()
+                        {
+                            crate::pages::routing::refuse(domain, Limit::Reads);
+                        }
+                    }
+                }
+            }
             domain.retire(id);
             match owner {
                 Owner::Frame => domain.set_link(Link::Offline, out),

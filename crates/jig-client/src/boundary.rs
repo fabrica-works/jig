@@ -24,6 +24,10 @@ pub struct Offset {
 pub enum Event {
     /// Start with this domain records and display time offset.
     Start { address: Address, kept: List<Record>, offset: Offset },
+    /// Restored table requests, counted once per scope after Start.
+    Kept { scope: u64, requests: u32 },
+    /// One restored request retired, with or without a known outcome.
+    KeptGone { scope: u64 },
     /// The shell reports a place it went.
     Went { place: Place },
     /// A person acted on the view.

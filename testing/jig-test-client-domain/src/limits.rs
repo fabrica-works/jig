@@ -22,13 +22,16 @@ fn checked_max_out(limits: &Limits) -> Option<u32> {
 
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.table.out == 0
+    if limits.jig.kept < limits.table.requests
+        || limits.table.out == 0
         || limits.table.first == skein_lib::Duration::ZERO
         || limits.table.first > limits.table.most
     {
         return None;
     }
     let mut total = jig_client::worst_case(&limits.jig)?;
+    // Start counts restored scope facts only within that step.
+    total = total.checked_add(skein_lib::Map::<u64, u32>::worst_case(limits.table.requests)?)?;
     total = total.checked_add(first::worst_case(&limits.first)?)?;
     total = total.checked_add(crate::second::worst_case(limits.second_parts, limits.first.text)?)?;
     total = total.checked_add(RequestTable::<Owner, Ask>::worst_case(&limits.table)?)?;

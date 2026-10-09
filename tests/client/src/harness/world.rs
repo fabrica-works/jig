@@ -1,7 +1,7 @@
 //! Tabs retain records and history; epochs discard old deliveries. Each callback
 //! writes its store, dispatches wire duties, then applies and checks patches
 //! (client/domain/testing.md, 4; client/domain/view.md, 11).
-use super::{App, CardKey, Duty, Front, FrontFault, Observation, StoreWrite};
+use super::{App, CardKey, Duty, Fault, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
 use jig_client_view::{Act, NodeId, Tree};
 use jig_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
@@ -24,6 +24,8 @@ pub struct Settings {
     pub memory: bool,
     pub random_steps: u32,
     pub word_bytes: u32,
+    pub faults_per_mille: u32,
+    pub fault_limit: u32,
     pub heartbeat: Duration,
     pub request_within: Duration,
     pub link_within: Duration,
@@ -38,6 +40,8 @@ impl Default for Settings {
             memory: false,
             random_steps: 32,
             word_bytes: 32,
+            faults_per_mille: 0,
+            fault_limit: 32,
             heartbeat: Duration::from_millis(100),
             request_within: Duration::from_secs(2),
             link_within: Duration::from_millis(500),
@@ -61,6 +65,7 @@ pub struct Outcome {
     pub now: Time,
     pub iterations: u32,
     pub callbacks: u64,
+    pub faults: u64,
     pub dropped: u64,
     pub trace: Vec<String>,
     pub heap_peak: u64,
@@ -100,6 +105,9 @@ pub struct World<A: App, F: Front<A>> {
     clients: Vec<Client<A>>,
     people: Vec<Walker<A>>,
     schedule: Schedule<Due<A>>,
+    faults: Schedule<Fault>,
+    faults_drawn: u64,
+    last_removed: Option<(ClientId, NodeId)>,
     rng: Rng,
     trace: Trace,
     referee: Referee<super::referee::Rules>,
@@ -132,6 +140,9 @@ impl<A: App, F: Front<A>> World<A, F> {
             clients: Vec::new(),
             people: Vec::new(),
             schedule: Schedule::new(),
+            faults: Schedule::new(),
+            faults_drawn: 0,
+            last_removed: None,
             trace: Trace::default(),
             now: Time::ZERO,
             callbacks: 0,
@@ -261,8 +272,103 @@ impl<A: App, F: Front<A>> World<A, F> {
         self.quota_failure = true;
     }
     /// Injects a transport fault into the front.
-    pub fn fault(&mut self, fault: FrontFault) {
-        self.front.fault(self.now, fault);
+    pub fn fault(&mut self, fault: impl Into<Fault>) {
+        let fault = fault.into();
+        self.faults_drawn += 1;
+        self.trace.log(self.now, format!("fault {fault:?}"));
+        match fault {
+            Fault::Front(fault) => self.front.fault(self.now, fault),
+            Fault::DoublePress { client, node } => {
+                self.act(client, node, Act::Press);
+                self.act(client, node, Act::Press);
+            }
+            Fault::Reload { client } => self.reload(client),
+            Fault::StalePress { client, node } => self.act(client, node, Act::Press),
+            Fault::OtherParty { client, party } => self.sign_as(client, party),
+            Fault::TwoTabs { first, first_node, second, second_node } => {
+                self.act(first, first_node, Act::Press);
+                self.act(second, second_node, Act::Press);
+            }
+        }
+    }
+    /// Schedules a fault alongside deliveries and the owners' deadlines.
+    pub fn fault_at(&mut self, at: Time, fault: impl Into<Fault>) {
+        self.faults.send(at, fault.into());
+    }
+    /// A different shell sign-in restarts the client with its existing records.
+    pub fn sign_as(&mut self, client: ClientId, party: u64) {
+        self.clients[client.0].party = party;
+        self.front.bind(client, party);
+        self.front.sign_in(client, self.now, Wall::from_nanos(1_000_000_000_000 + self.now.as_nanos()));
+        self.reload(client);
+    }
+    fn draw_fault(&mut self) {
+        if self.clients.is_empty()
+            || self.faults_drawn >= u64::from(self.settings.fault_limit)
+            || !self.people.iter().any(|p| !p.done)
+            || !self.rng.chance(self.settings.faults_per_mille)
+        {
+            return;
+        }
+        let client = ClientId(
+            usize::try_from(self.rng.below(u64::try_from(self.clients.len()).expect("clients"))).expect("client index"),
+        );
+        let fault = match self.rng.below(14) {
+            0 => Fault::Front(FrontFault::Busy),
+            1 => Fault::Front(FrontFault::NotReady),
+            2 => Fault::Front(FrontFault::Restart { offline: Duration::from_millis(40) }),
+            3 => Fault::Front(FrontFault::Slow { span: Duration::from_millis(20) }),
+            4 => Fault::Front(FrontFault::DropWatch),
+            5 => Fault::Front(FrontFault::NoAnswer),
+            6 => Fault::Reload { client },
+            7 => {
+                let Some(node) = A::tree(&self.clients[client.0].view).nodes().iter().find(|n| {
+                    n.role == jig_client_view::Role::Button
+                        && n.binding.is_some()
+                        && !n.states.iter().any(|s| *s == jig_client_view::State::Disabled)
+                }) else {
+                    return;
+                };
+                Fault::DoublePress { client, node: node.id }
+            }
+            8 => Fault::Front(FrontFault::ObjectGone),
+            9 => Fault::Front(FrontFault::SignedOut),
+            10 => Fault::Front(FrontFault::Versions),
+            11 => Fault::OtherParty { client, party: if self.clients[client.0].party == 7 { 8 } else { 7 } },
+            12 => {
+                let Some((client, node)) = self.last_removed else {
+                    return;
+                };
+                Fault::StalePress { client, node }
+            }
+            13 => {
+                let c = &self.clients[client.0];
+                let Some((other, second_node, first_node)) = self
+                    .clients
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, o)| *i != client.0 && o.party == c.party && o.history[o.at] == c.history[c.at])
+                    .find_map(|(i, o)| {
+                        A::tree(&c.view)
+                            .nodes()
+                            .iter()
+                            .filter(|n| n.role == jig_client_view::Role::Button && n.binding.is_some())
+                            .find_map(|n| {
+                                A::tree(&o.view)
+                                    .nodes()
+                                    .iter()
+                                    .find(|m| m.role == n.role && m.name == n.name && m.binding.is_some())
+                                    .map(|m| (ClientId(i), m.id, n.id))
+                            })
+                    })
+                else {
+                    return;
+                };
+                Fault::TwoTabs { first: client, first_node, second: other, second_node }
+            }
+            _ => unreachable!("fourteen choices"),
+        };
+        self.fault(fault);
     }
     /// Exposes the truth boundary for fixture changes.
     pub fn front(&mut self) -> &mut F {
@@ -380,12 +486,16 @@ impl<A: App, F: Front<A>> World<A, F> {
             );
         }
         let c = &mut self.clients[id.0];
+        let old_nodes: Vec<_> = A::tree(&c.view).nodes().iter().map(|n| n.id).collect();
         let mut patches = Queue::with_capacity(A::patch_limit(&c.view));
         A::build(&mut c.view, &c.root, &mut patches);
         while let Some(patch) = patches.pop() {
             c.model.apply(patch);
         }
         c.model.check(A::tree(&c.view));
+        if let Some(node) = old_nodes.into_iter().find(|node| A::tree(&c.view).find(*node).is_none()) {
+            self.last_removed = Some((id, node));
+        }
         let seen = A::seen(A::tree(&c.view));
         self.callbacks += 1;
         self.trace.log(self.now, format!("client {} epoch {} tree {}", id.0, c.epoch, A::tree(&c.view).len()));
@@ -441,14 +551,22 @@ impl<A: App, F: Front<A>> World<A, F> {
                 Next::Wait { until } => self.people[index].wake = until,
                 Next::Done => self.people[index].done = true,
                 Next::Failed { step, why } => panic!(
-                    "seed {} client {} step {step}: {why}; tree {:?}",
+                    "seed {} client {} step {step}: {why}; tree {:?}; all trees {:?}",
                     self.settings.seed,
                     id.0,
                     A::tree(&self.clients[id.0].view)
                         .nodes()
                         .iter()
                         .filter_map(|n| n.name.as_ref().map(|s| String::from_utf8_lossy(s)))
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>(),
+                    self.clients
+                        .iter()
+                        .map(|client| A::tree(&client.view)
+                            .nodes()
+                            .iter()
+                            .filter_map(|n| n.name.as_ref().map(|s| String::from_utf8_lossy(s)))
+                            .collect::<Vec<_>>())
+                        .collect::<Vec<_>>(),
                 ),
             }
         }
@@ -462,6 +580,10 @@ impl<A: App, F: Front<A>> World<A, F> {
                 meter.start();
             }
             iterations += 1;
+            while let Some(fault) = self.faults.next(self.now) {
+                self.fault(fault);
+            }
+            self.draw_fault();
             let wall = Wall::from_nanos(1_000_000_000_000 + self.now.as_nanos());
             for (client, event) in self.front.poll(self.now, wall) {
                 self.schedule.send(
@@ -490,7 +612,11 @@ impl<A: App, F: Front<A>> World<A, F> {
             let progress = self.walk_people();
             let done = self.people.iter().all(|person| person.done);
             let stop = match until {
-                Until::Done => done && self.schedule.is_empty() && self.referee.verdict() == Verdict::Passed,
+                Until::Done => {
+                    done && self.schedule.is_empty()
+                        && self.faults.is_empty()
+                        && self.referee.verdict() == Verdict::Passed
+                }
                 Until::Time(at) => self.now >= at,
                 Until::Steps(count) => iterations >= count,
             };
@@ -504,6 +630,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             }
             let next = [
                 self.schedule.next_time(),
+                self.faults.next_time(),
                 self.front.next_due(),
                 self.referee.next_deadline(),
                 self.clients.iter().filter_map(|c| A::next_deadline(&c.root)).min(),
@@ -543,6 +670,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             now: self.now,
             iterations,
             callbacks: self.callbacks,
+            faults: self.faults_drawn,
             dropped: self.dropped,
             trace: self.trace.lines().to_vec(),
             heap_peak: self.heap_peak,

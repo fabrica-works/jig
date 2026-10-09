@@ -25,6 +25,8 @@ pub enum Seen {
     Card { key: CardKey, state: CardSeen, revision: Option<u64> },
     /// Words the person is told were sent.
     Words { task: u64, message: Option<u64>, words: Vec<u8> },
+    /// A visible non-work page explains why the whole previous page is hidden.
+    HiddenPage,
     /// The visible link status.
     Link { live: bool },
 }
@@ -44,6 +46,8 @@ pub enum Receipt {
     Card { key: CardKey, revisions: Vec<(u16, u64)> },
     /// A wire attempt ended; only final answers meet the request deadline.
     Answer { attempt: Token, final_answer: bool, words: Option<(u64, u64)> },
+    /// The frame confirms the party of this sign-in.
+    Party { party: u64 },
     /// Requests park until the party can sign in again.
     Parked,
 }

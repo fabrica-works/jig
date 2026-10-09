@@ -39,7 +39,8 @@ pub fn sent(request: &Request) -> Option<Sent> {
             Ask::AnswerPerson { task, revision, .. } => {
                 (Some(key(ObjectKey::PersonTask(*task))), Some((3, revision.value)), None)
             }
-            Ask::Release { task, revision, .. } | Ask::DecideEscalation { task, revision, .. } => {
+            Ask::Release { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((2, revision.value)), None),
+            Ask::DecideEscalation { task, revision, .. } => {
                 (Some(key(ObjectKey::Escalation(*task))), Some((2, revision.value)), None)
             }
             Ask::Amend { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((1, revision.value)), None),
@@ -76,6 +77,7 @@ fn task(t: &Task) -> Receipt {
 fn read(v: &ReadValue) -> Vec<Receipt> {
     match v {
         ReadValue::Task(t) => vec![task(t)],
+        ReadValue::Frame(f) => frame(f),
         ReadValue::Escalation(e) => vec![Receipt::Card {
             key: key(ObjectKey::Escalation(e.task.task)),
             revisions: vec![(1, e.steering.revision.value), (2, e.hold.revision.value)],
@@ -94,8 +96,7 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
                 NoteScope::Deployment | NoteScope::Goal(_) => None,
             })
             .collect(),
-        ReadValue::Frame(_)
-        | ReadValue::Proposal(_)
+        ReadValue::Proposal(_)
         | ReadValue::Question(_)
         | ReadValue::Result(_)
         | ReadValue::Ended(_)
@@ -107,6 +108,13 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::Spend(_)
         | ReadValue::Project(_)
         | ReadValue::Deployment(_) => vec![],
+    }
+}
+fn frame(frame: &Frame) -> Vec<Receipt> {
+    if frame.versions.first > 1 || frame.versions.last < 1 {
+        vec![Receipt::Parked]
+    } else {
+        vec![Receipt::Party { party: frame.party.number }]
     }
 }
 fn family(doc: &family::Document) -> Receipt {
@@ -136,6 +144,7 @@ pub fn received(event: &Event) -> Vec<Receipt> {
         }
         Event::Jig(jig_client::Event::Read { result: ReadResult::Value(v), .. }) => read(v),
         Event::Jig(jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(t)), .. }) => vec![task(t)],
+        Event::Jig(jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Frame(f)), .. }) => frame(f),
         Event::First(
             domain::first::Event::Read { result: family::ReadResult::Value(doc), .. }
             | domain::first::Event::Watch { event: family::WatchEvent::Delivered(doc), .. },
@@ -194,6 +203,15 @@ pub fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
 }
 pub fn seen(tree: &Tree) -> Vec<Seen> {
     let mut seen = Vec::new();
+    if [b"Sign in".as_slice(), b"Someone else's work", b"Page missing", b"Client out of date"].iter().any(|name| {
+        tree.nodes().iter().any(|n| {
+            n.role == Role::Heading { level: 1 }
+                && TreeFace::subtree(tree, n.id)
+                    .is_some_and(|mut face| matches!(face.find(&Find::text(name)), Found::Node(_)))
+        })
+    }) {
+        seen.push(Seen::HiddenPage);
+    }
     let offline = matches!(TreeFace::new(tree).find(&Find::named(Role::Status, b"Offline")), Found::Node(_));
     let live = matches!(TreeFace::new(tree).find(&Find::named(Role::Status, b"Live")), Found::Node(_));
     if offline || live {

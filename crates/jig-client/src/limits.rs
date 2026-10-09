@@ -38,6 +38,8 @@ pub struct Limits {
     /// the root box), list capacities, texts and nested documents.
     pub document_bytes: u64,
     pub records: u32,
+    /// Distinct scopes of restored requests counted until their retirement.
+    pub kept: u32,
     /// Per-task composers kept across navigation and restart.
     pub drafts: u32,
     pub projects: u32,
@@ -81,6 +83,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;
+    total = total.checked_add(List::<crate::contract::ObjectKey>::worst_case(tree_names(limits)?)?)?;
     total = total.checked_add(crate::application::worst_case(limits)?)?;
     total = total.checked_add(crate::conversation::worst_case(limits)?)?;
     total = total.checked_add(List::<crate::pages::navigation::Destination>::worst_case(limits.navigation_entries)?)?;
@@ -93,6 +96,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(crate::fields::worst_case(limits)?)?;
     total = total.checked_add(crate::drafts::worst_case(limits)?)?;
     total = total.checked_add(List::<u64>::worst_case(limits.records)?)?;
+    total = total.checked_add(Map::<u64, u32>::worst_case(limits.kept)?)?;
     total = total.checked_add(crate::confirm::worst_case(limits)?)?;
     total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows)?)?;
     total = total.checked_add(crate::signin::worst_case(limits)?)?;
@@ -122,4 +126,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
 #[must_use]
 pub fn timers(limits: &Limits) -> Option<u32> {
     limits.watches.checked_add(limits.objects)?.checked_add(limits.notices)?.checked_add(limits.records)?.checked_add(1)
+}
+
+/// One task and every bounded proposal name per retained tree row.
+pub(crate) fn tree_names(limits: &Limits) -> Option<u32> {
+    limits.rows.checked_mul(limits.rows.checked_add(1)?)
 }

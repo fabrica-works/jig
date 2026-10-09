@@ -28,6 +28,7 @@ pub fn limits() -> jig_test_client_domain::Limits {
             delegates: 2,
             document_bytes: 65536,
             records: 2,
+            kept: 4,
             drafts: 1,
             projects: 2,
             roles: 2,

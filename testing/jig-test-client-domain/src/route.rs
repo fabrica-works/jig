@@ -5,7 +5,7 @@ use crate::{
     owner::Owner,
     store::{Key, Record},
 };
-use skein_lib::{Env, List, Queue, RequestProgress};
+use skein_lib::{Env, List, Map, Queue, RequestProgress};
 pub(crate) fn jig_env(env: &Env<Limits>) -> Env<jig_client::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.jig }
 }
@@ -25,6 +25,7 @@ pub(crate) fn first(root: &mut Domain, env: &Env<Limits>, event: first::Event, o
 pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Start { address, kept, offset } => {
+            let mut scopes = Map::<u64, u32>::with_capacity(env.limits.table.requests);
             let mut jig_kept = List::with_capacity(env.limits.jig.records);
             for record in kept.into_boxed() {
                 match record {
@@ -36,8 +37,14 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                     Record::First(record) => first(root, env, first::Event::Restore { record }, out),
                     Record::Table { version, record } => {
                         let size = crate::domain::ask_size(&env.limits, &record.request);
-                        if version != crate::store::VERSION || root.table.restore(Owner::Kept, size, record).is_err() {
+                        let scope = record.scope;
+                        if version != crate::store::VERSION
+                            || root.table.restore(Owner::Kept { scope }, size, record).is_err()
+                        {
                             out.push(Request::Fact { fact: Fact::InvalidRecord });
+                        } else {
+                            let requests = scopes.get(&scope).copied().unwrap_or(0) + 1;
+                            scopes.insert(scope, requests).expect("one scope per admitted restored request");
                         }
                     }
                 }
@@ -47,6 +54,9 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                 Address::First(_) => jig_client::address::Address::Inbox { project: None },
             };
             jig(root, env, jig_client::Event::Start { address: jig_address, kept: jig_kept, offset }, out);
+            for (scope, requests) in &scopes {
+                jig(root, env, jig_client::Event::Kept { scope: *scope, requests: *requests }, out);
+            }
             match address {
                 Address::Jig(_) => first(root, env, first::Event::Left, out),
                 Address::First(address) => went(root, env, Place::Address(Address::First(address)), out),
@@ -186,6 +196,9 @@ pub(crate) fn progress(
             jig(root, env, jig_client::Event::Progress { request, progress }, out);
         }
         Owner::First(request) => first(root, env, first::Event::Progress { request, progress }, out),
-        Owner::Kept => {}
+        Owner::Kept { scope } => match progress {
+            RequestProgress::Unknown => jig(root, env, jig_client::Event::KeptGone { scope }, out),
+            RequestProgress::InFlight | RequestProgress::Retrying | RequestProgress::Parked => {}
+        },
     }
 }

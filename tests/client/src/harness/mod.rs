@@ -1,5 +1,7 @@
 //! Shell duties and the reusable application/front boundaries (testing.md, 4).
+mod faults;
 mod observation;
+pub use faults::Fault;
 pub mod referee;
 pub use observation::*;
 mod world;
@@ -79,4 +81,5 @@ pub enum FrontFault {
     NoAnswer,
     SignedOut,
     Versions,
+    ObjectGone,
 }

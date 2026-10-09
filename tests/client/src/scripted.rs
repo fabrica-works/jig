@@ -69,6 +69,8 @@ pub struct Scripted {
     committed: usize,
     last_attempt: Option<Token>,
     last_watch: Option<Token>,
+    last_object: Option<ObjectKey>,
+    page_watch: Option<Token>,
     link: Vec<Observed>,
     recovery: Option<Time>,
 }
@@ -89,6 +91,8 @@ impl Scripted {
             committed: 0,
             last_attempt: None,
             last_watch: None,
+            last_object: None,
+            page_watch: None,
             link: initial,
             recovery: None,
         }
@@ -181,10 +185,36 @@ impl Front<Test> for Scripted {
             }
             Request::Jig(out) => match out {
                 JigOut::Read { read, what } => {
+                    self.last_object = match &what {
+                        Read::Task { task } => Some(ObjectKey::Task(*task)),
+                        Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
+                        Read::Escalation { task } => Some(ObjectKey::Escalation(*task)),
+                        Read::Question { task, message } => {
+                            Some(ObjectKey::Question { task: *task, message: *message })
+                        }
+                        Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
+                        Read::Result { task } => Some(ObjectKey::Result(*task)),
+                        Read::Frame
+                        | Read::Ended { .. }
+                        | Read::History { .. }
+                        | Read::Activity { .. }
+                        | Read::InboxGroup { .. }
+                        | Read::Inbox { .. }
+                        | Read::Conversations { .. }
+                        | Read::Goals { .. }
+                        | Read::Spend { .. }
+                        | Read::Project { .. }
+                        | Read::Notes { .. }
+                        | Read::Deployment => self.last_object,
+                    };
                     self.engine.read(now, party, read, what).expect("read fits");
                 }
                 JigOut::Open { watch, subject } => {
                     self.last_watch = Some(watch);
+                    if let Subject::Task { task } = &subject {
+                        self.last_object = Some(ObjectKey::Task(*task));
+                        self.page_watch = Some(watch);
+                    }
                     self.engine.open(now, party, watch, subject).expect("watch fits");
                 }
                 JigOut::Continue { watch, subject } => match subject {
@@ -343,6 +373,24 @@ impl Front<Test> for Scripted {
         seen
     }
     fn fault(&mut self, now: Time, fault: FrontFault) {
+        if matches!(fault, FrontFault::ObjectGone) {
+            if let Some(key) = self.last_object {
+                let wall = Wall::from_nanos(1_000_000_000_000 + now.as_nanos());
+                self.engine.act(now, wall, engine::Change::Forget { key }).expect("forget fits");
+                // Its authoritative listing stops naming the vanished card too.
+                let sources = self.engine.truth().sources.clone();
+                for mut source in sources {
+                    if let engine::Rows::Inbox(rows) = &mut source.rows {
+                        let before = rows.len();
+                        rows.retain(|row| row.object != key);
+                        if rows.len() != before {
+                            self.engine.act(now, wall, engine::Change::Source(source)).expect("listing fits");
+                        }
+                    }
+                }
+            }
+            return;
+        }
         if let FrontFault::Restart { offline } = &fault {
             self.link.push(Observed::Reachable { live: false });
             self.recovery = Some(now.saturating_add(*offline));
@@ -352,12 +400,23 @@ impl Front<Test> for Scripted {
             FrontFault::NotReady => engine::Fault::NotReady,
             FrontFault::Restart { offline } => engine::Fault::Restart { offline },
             FrontFault::Slow { span } => engine::Fault::Slow { span },
-            FrontFault::DropWatch => engine::Fault::DropWatch { watch: self.last_watch.expect("watch opened") },
-            FrontFault::NoAnswer => engine::Fault::Lose { attempt: self.last_attempt.expect("attempt sent") },
+            FrontFault::DropWatch => {
+                let Some(watch) = self.page_watch.or(self.last_watch) else {
+                    return;
+                };
+                engine::Fault::DropWatch { watch }
+            }
+            FrontFault::NoAnswer => {
+                let Some(attempt) = self.last_attempt else {
+                    return;
+                };
+                engine::Fault::Lose { attempt }
+            }
             FrontFault::SignedOut => {
                 engine::Fault::SignOut { sign_in: *self.parties.values().next().expect("client bound") }
             }
             FrontFault::Versions => engine::Fault::Versions(VersionRange { first: 2, last: 2 }),
+            FrontFault::ObjectGone => unreachable!("object disappearance handled above"),
         };
         self.engine.fault(now, fault);
     }

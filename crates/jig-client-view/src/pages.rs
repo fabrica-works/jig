@@ -123,6 +123,30 @@ pub fn jig(b: &mut Builder, client: &Domain, nav: crate::SlotRef, words: &Words,
 }
 /// Finish page composition with the one confirmation and visible notices.
 pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    // A source can stop naming a card before its terminal facts arrive. The
+    // owner retains it on this page until the pending answer or linger ends.
+    match client.page() {
+        jig_client::pages::Page::Work { .. } | jig_client::pages::Page::Elsewhere => {
+            for (_, id) in client.objects().ids() {
+                let object = client.objects().get(*id).expect("indexed card exists");
+                if object.shown && object.sources.is_empty() {
+                    match object.card {
+                        jig_client::objects::Card::Deciding { .. }
+                        | jig_client::objects::Card::Leaving { .. }
+                        | jig_client::objects::Card::Unknown { .. } => {
+                            crate::cards::card(b, client, *id, &crate::cards::Place::Elsewhere, words, bindings);
+                        }
+                        jig_client::objects::Card::Open | jig_client::objects::Card::Refused { .. } => {}
+                    }
+                }
+            }
+        }
+        jig_client::pages::Page::Starting
+        | jig_client::pages::Page::SigningIn
+        | jig_client::pages::Page::Missing
+        | jig_client::pages::Page::OutOfDate
+        | jig_client::pages::Page::SomeoneElse => {}
+    }
     crate::confirmation::confirmation(b, client, words, bindings);
     crate::notices::notices(b, client, words, bindings);
 }

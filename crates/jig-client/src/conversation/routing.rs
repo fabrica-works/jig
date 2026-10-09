@@ -73,6 +73,26 @@ fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Re
     let keys = domain.conversation.names(env.limits.objects);
     let source = Source::Window { generation: domain.generation, number: 1 };
     crate::pages::routing::names(domain, env, source, keys, out);
+    // Immutable turns still refer to mutable decisions. A new activity snapshot
+    // refreshes those documents without deriving an outcome from the call text.
+    let keys = domain.conversation.names(env.limits.objects);
+    for key in &keys {
+        match key {
+            crate::contract::ObjectKey::Task(_) | crate::contract::ObjectKey::Result(_) => continue,
+            crate::contract::ObjectKey::Proposal(_)
+            | crate::contract::ObjectKey::Escalation(_)
+            | crate::contract::ObjectKey::Question { .. }
+            | crate::contract::ObjectKey::PersonTask(_)
+            | crate::contract::ObjectKey::Note { .. } => {}
+        }
+        let Some(id) = domain.objects.find(*key) else {
+            continue;
+        };
+        let what = crate::objects::document_read(*key);
+        if !domain.reads.pending(&what) && domain.reads.ask(domain.generation, Source::Card(id), what, out).is_none() {
+            crate::pages::routing::refuse(domain, Limit::Reads);
+        }
+    }
     let parts = domain.conversation.parts(env.limits.parts);
     crate::pages::routing::parts(domain, env, parts.as_slice(), out);
 }

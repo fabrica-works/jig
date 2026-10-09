@@ -112,6 +112,9 @@ impl Rules {
                 self.ended.insert(task);
             }
             Observed::Reachable { live } => {
+                if self.reachable == Some(live) {
+                    return;
+                }
                 self.reachable = Some(live);
                 for client in &self.clients {
                     if live {
@@ -180,6 +183,13 @@ impl Rules {
                     }
                 }
             }
+            Receipt::Party { party } => {
+                for (key, pending) in &self.requests {
+                    if pending.client == client && key.0 != party {
+                        judge.withdraw(&Deadline::Request(key.0, key.1));
+                    }
+                }
+            }
             Receipt::Parked => {
                 for (key, pending) in &self.requests {
                     if pending.client == client {
@@ -191,6 +201,11 @@ impl Rules {
     }
     fn shown(&mut self, client: ClientId, seen: Vec<Seen>, judge: &mut JudgeOf) {
         let mut cards = BTreeSet::new();
+        if seen.contains(&Seen::HiddenPage) {
+            judge.check(!seen.iter().any(|s| matches!(s, Seen::Card { .. })), "a hidden work page exposes a card");
+            self.visible.retain(|(c, _), _| *c != client);
+            self.reasoned.retain(|(c, _)| *c != client);
+        }
         for seen in seen {
             match seen {
                 Seen::Card { key, state, revision } => {
@@ -235,6 +250,7 @@ impl Rules {
                         self.promised.insert((task, message), words);
                     }
                 }
+                Seen::HiddenPage => {}
                 Seen::Link { live } => {
                     judge.meet(&if live { Deadline::Online(client) } else { Deadline::Offline(client) });
                 }

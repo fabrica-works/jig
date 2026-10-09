@@ -26,6 +26,7 @@ pub(super) const LIMITS: Limits = Limits {
     delegates: 2,
     document_bytes: 65536,
     records: 2,
+    kept: 4,
     drafts: 1,
     projects: 2,
     roles: 2,
@@ -315,4 +316,58 @@ fn a_watch_closed_during_backoff_needs_no_second_terminal_and_reclaims_its_slot(
     domain.reclaim();
     let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
     assert_ne!(open_token(&opened), page);
+}
+
+#[test]
+fn foreign_kept_requests_hide_work_but_confirm_only_the_frame_party() {
+    let mut domain = Domain::new(&LIMITS, 21);
+    let watch = start(&mut domain, List::with_capacity(0));
+    drive(&mut domain, Time::ZERO, Event::Kept { scope: 7, requests: 2 });
+    let out = delivered(&mut domain, Time::ZERO, watch, frame(8));
+    assert!(out.contains(&Request::Confirmed { party: Some(8) }));
+    assert_eq!(domain.page(), &Page::SomeoneElse);
+    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
+    assert_eq!(domain.page(), &Page::SomeoneElse);
+}
+
+#[test]
+fn the_last_foreign_kept_request_retiring_restores_the_work_page() {
+    let mut domain = Domain::new(&LIMITS, 22);
+    let watch = start(&mut domain, List::with_capacity(0));
+    drive(&mut domain, Time::ZERO, Event::Kept { scope: 7, requests: 2 });
+    drive(&mut domain, Time::ZERO, Event::Kept { scope: 9, requests: 1 });
+    delivered(&mut domain, Time::ZERO, watch, frame(8));
+    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
+    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
+    assert_eq!(domain.page(), &Page::SomeoneElse);
+    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 9 });
+    assert!(matches!(domain.page(), Page::Work { .. }));
+    assert!(drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 9 }).is_empty());
+}
+
+#[test]
+fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
+    let mut domain = Domain::new(&LIMITS, 23);
+    let watch = start(&mut domain, List::with_capacity(0));
+    drive(&mut domain, Time::ZERO, Event::Kept { scope: 7, requests: 2 });
+    delivered(&mut domain, Time::ZERO, watch, frame(7));
+    assert!(matches!(domain.page(), Page::Work { .. }));
+    drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
+    assert!(matches!(domain.page(), Page::Work { .. }));
+
+    let mut guarded = Domain::new(&LIMITS, 24);
+    let mut kept = List::with_capacity(1);
+    kept.push(Record::Draft {
+        version: crate::store::STORE_VERSION,
+        party: 8,
+        task: 9,
+        words: crate::contract::Text::new(Box::from(*b"old"), LIMITS.text).unwrap(),
+        touched: 1,
+    })
+    .unwrap();
+    let watch = start(&mut guarded, kept);
+    drive(&mut guarded, Time::ZERO, Event::Kept { scope: 7, requests: 1 });
+    delivered(&mut guarded, Time::ZERO, watch, frame(7));
+    drive(&mut guarded, Time::ZERO, Event::KeptGone { scope: 7 });
+    assert_eq!(guarded.page(), &Page::SomeoneElse);
 }

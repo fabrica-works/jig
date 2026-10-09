@@ -120,7 +120,10 @@ pub(crate) fn answered(
                 }
                 Some(crate::Answered::Jig(_)) | None => out.push(Request::Fact { fact: Fact::InvalidAnswer }),
             },
-            Owner::Kept => out.push(Request::Fact { fact: Fact::KeptAnswered }),
+            Owner::Kept { scope } => {
+                out.push(Request::Fact { fact: Fact::KeptAnswered });
+                route::jig(root, env, jig_client::Event::KeptGone { scope }, out);
+            }
         },
         RequestAnswered::Pending => match envelope {
             skein_lib::RequestEnvelope::SignedOut => route::jig(root, env, jig_client::Event::SignedOut, out),

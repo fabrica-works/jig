@@ -41,6 +41,7 @@ pub(super) const CLIENT: jig_client::Limits = jig_client::Limits {
     delegates: 2,
     document_bytes: 65536,
     records: 2,
+    kept: 4,
     drafts: 1,
     projects: 2,
     roles: 2,

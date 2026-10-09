@@ -30,6 +30,7 @@ const JIG: jig_client::Limits = jig_client::Limits {
     delegates: 2,
     document_bytes: 65536,
     records: 2,
+    kept: 4,
     drafts: 1,
     projects: 2,
     roles: 2,
@@ -632,4 +633,86 @@ fn family_capacities_refuse_overflow_and_resource_words_past_the_owner_bound() {
     assert!(side.show(part.clone(), 4));
     assert!(side.show(part, 4));
     assert!(!side.show(contract::Part::Kind { connector: crate::SECOND, kind: 2 }, 4));
+}
+
+fn restored_requests(count: u32) -> List<crate::store::Record> {
+    let mut old = new(&limits(), 30);
+    let watch = start(&mut old, List::with_capacity(0));
+    confirm(&mut old, watch, 7);
+    let mut kept = List::with_capacity(count);
+    for n in 0..count {
+        drive(
+            &mut old,
+            Event::Jig(jig_client::Event::Ask {
+                ask: jig_client::intents::ByValue {
+                    asked: Token::new(u64::from(n)),
+                    scope: 7,
+                    ask: Box::new(contract::Ask::Stop { project: 1, task: 9 + u64::from(n) }),
+                },
+            }),
+        );
+        for row in taken(&mut old) {
+            if let Request::Save { record: crate::store::Record::Table { version, record } } = row {
+                kept.push(crate::store::Record::Table { version, record }).unwrap();
+            }
+        }
+    }
+    kept
+}
+
+#[test]
+fn restored_foreign_scope_counts_are_routed_without_root_page_policy() {
+    let mut root = new(&limits(), 31);
+    let watch = start(&mut root, restored_requests(2));
+    confirm(&mut root, watch, 8);
+    assert_eq!(root.jig().page(), &jig_client::pages::Page::SomeoneElse);
+    assert_eq!(root.first().party(), Some(8));
+    assert!(taken(&mut root).is_empty());
+    confirm(&mut root, watch, 7);
+    assert_eq!(taken(&mut root).iter().filter(|r| matches!(r, Request::Send { .. })).count(), 2);
+}
+
+#[test]
+fn restored_own_scope_sends_and_retires_each_final_request_once() {
+    let mut root = new(&limits(), 32);
+    let watch = start(&mut root, restored_requests(2));
+    confirm(&mut root, watch, 7);
+    assert!(matches!(root.jig().page(), jig_client::pages::Page::Work { .. }));
+    let sends: Vec<_> = taken(&mut root)
+        .into_iter()
+        .filter_map(|row| match row {
+            Request::Send { attempt, .. } => Some(attempt),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sends.len(), 2);
+    for attempt in sends {
+        let out = drive(
+            &mut root,
+            Event::Answer {
+                attempt,
+                envelope: RequestEnvelope::Final,
+                answer: Some(Answered::Jig(Answer::Done(Outcome::Changed))),
+            },
+        );
+        assert!(out.contains(&Request::Fact { fact: crate::Fact::KeptAnswered }));
+    }
+    confirm(&mut root, watch, 8);
+    assert!(matches!(root.jig().page(), jig_client::pages::Page::Work { .. }));
+}
+
+#[test]
+fn retention_unknown_retires_the_last_foreign_scope_and_clears_its_warning() {
+    let mut root = new(&limits(), 33);
+    let watch = start(&mut root, restored_requests(1));
+    confirm(&mut root, watch, 8);
+    assert_eq!(root.jig().page(), &jig_client::pages::Page::SomeoneElse);
+    let mut future = env();
+    future.now = Time::from_nanos(1_002_000_000_000);
+    future.wall = Wall::from_nanos(1_002_000_000_000);
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    // Only the table expiry is relevant; the frame remains a public confirmed fact.
+    root.table.fire(future.now, future.wall);
+    take(&mut root, &future, &mut out);
+    assert!(matches!(root.jig().page(), jig_client::pages::Page::Work { .. }));
 }

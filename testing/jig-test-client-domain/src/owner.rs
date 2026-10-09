@@ -29,5 +29,5 @@ impl Connector {
 pub enum Owner {
     Jig(Token),
     First(Token),
-    Kept,
+    Kept { scope: u64 },
 }
