@@ -1,14 +1,12 @@
-//! Historical proposal and escalation answers routed back to authenticated parties
-//! (`domain/engine.md`, sections 5.3 and 4.4).
+//! Historical proposal and escalation answers and party read reservations
+//! routed back to authenticated parties (`domain/engine.md`, sections 5.3 and 4.4).
 
-use super::{Event, Limits, Now, Request, Requests};
-use crate::{Core, EscalationDecisionRecord};
-use skein_lib::{Env, Queue, ReplyTo, Token};
-
+use crate::{Core, EscalationDecisionRecord, Event, Limits, Now, Request, Requests};
 use alloc::boxed::Box;
 use jig_core_authority as authority;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
+use skein_lib::{Env, Queue, ReplyTo, Token};
 
 pub(super) fn route_escalation_read(
     core: &mut Core,
@@ -152,4 +150,30 @@ pub(super) fn route_historical_proposal(
     let mut out = Queue::with_capacity(1);
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+impl Core {
+    /// Whether this party already owns a historical result or inbox read.
+    #[must_use]
+    pub fn reading_result(&self, person: u64) -> bool {
+        self.reading_results.contains_key(&person)
+    }
+
+    /// Reserve one root store read for an authenticated party.
+    #[must_use]
+    pub fn reserve_result_read(&mut self, person: u64, waiter: Token) -> bool {
+        self.reading_results.insert(person, waiter) == Ok(None)
+    }
+
+    /// Release a completed or failed historical read.
+    #[must_use]
+    pub fn release_result_read(&mut self, person: u64, waiter: Token) -> bool {
+        self.reading_results.remove(&person) == Some(waiter)
+    }
+
+    /// Advance the committed inbox cursor after the root assembled its final page.
+    #[must_use]
+    pub fn advance_inbox_read(&mut self, person: u64, high: u64) -> Option<people::Stored> {
+        self.people.advance_read_position(person, high)
+    }
 }

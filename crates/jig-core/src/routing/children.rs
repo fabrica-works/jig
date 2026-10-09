@@ -1,16 +1,17 @@
 //! Brief, fleet and account outputs translated for the root, with sibling continuations
 //! (`domain/engine.md`, section 4.4).
 
-use super::{Ask, Held, Limits, Now, Request, Requests, Write, route_room, tag_people, tag_tasks};
-use crate::{Core, CoreRecord, Record};
-use skein_lib::{Env, Queue, ReplyTo, Token};
-
+use super::people_routes::tag_people;
+use super::route_room;
+use super::task_routes::tag_tasks;
+use crate::{Ask, Core, CoreRecord, Held, Limits, Now, Record, Request, Requests, Write};
 use alloc::boxed::Box;
 use jig_core_accounts as accounts;
 use jig_core_brief as brief;
 use jig_core_fleet as fleet;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
+use skein_lib::{Env, Queue, ReplyTo, Token};
 
 pub(super) fn append_people(core: &mut Core, env: &Env<Limits>, event: people::Event, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(people::max_out(&env.limits.people));

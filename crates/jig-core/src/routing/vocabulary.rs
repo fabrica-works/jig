@@ -1,8 +1,6 @@
 //! The core's vocabulary toward its root (`domain/engine.md`, section 4).
 
 use crate::{CallKey, CallPart, Delegate, EscalationDecisionRecord, Key, ProcedureAction, Record, RunCharter};
-use skein_lib::{List, Queue, ReplyTo, Token};
-
 use alloc::boxed::Box;
 use jig_core_accounts as accounts;
 use jig_core_authority as authority;
@@ -12,6 +10,7 @@ use jig_core_notes as notes;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 use jig_core_views as views;
+use skein_lib::{List, Queue, ReplyTo, Token};
 
 /// A request from the core to its application root. Its variant fixes the
 /// commit relationship before the root translates or wraps it.

@@ -1,21 +1,20 @@
 //! Task-child decisions routed to people, hosts and connectors
 //! (`domain/engine.md`, section 4.4).
 
-use super::{
-    Ask, Event, Held, Limits, Now, Request, Requests, Write, append_people, call_decision, ending_words,
-    person_message_refusal, person_move_refusal, person_task_refusal, result_notice, task_saved_view,
-};
+use super::children::append_people;
+use super::refusals::{person_message_refusal, person_move_refusal, person_task_refusal};
+use super::runs::call_decision;
+use super::view_routes::task_saved_view;
 use crate::{
-    CallPart, Core, CoreKey, CoreRecord, EscalationDecisionRecord, Key, PersonProposalRoute, PersonTaskRoute, Record,
-    RoutedCall, SentRoute,
+    Ask, CallPart, Core, CoreKey, CoreRecord, EscalationDecisionRecord, Event, Held, Key, Limits, Now,
+    PersonProposalRoute, PersonTaskRoute, Record, Request, Requests, RoutedCall, SentRoute, Write,
 };
-use skein_lib::{Env, List, Queue, ReplyTo, Token};
-
 use alloc::boxed::Box;
 use jig_core_authority as authority;
 use jig_core_brief as brief;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
+use skein_lib::{Env, List, Queue, ReplyTo, Token};
 
 #[expect(clippy::too_many_lines, reason = "one exhaustive task vocabulary routes its bounded child decision")]
 pub(super) fn tag_tasks(
@@ -1194,4 +1193,38 @@ pub(super) fn route_tasks(
     tasks::step(&mut core.tasks, &Env { now: env.now, wall: env.wall, limits: env.limits.tasks }, event, &mut out);
     crate::resources::resume(core, work);
     tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false)
+}
+pub(super) fn result_words(result: tasks::TaskResult) -> Box<[u8]> {
+    match result {
+        tasks::TaskResult::Report { words }
+        | tasks::TaskResult::Verdict { words, .. }
+        | tasks::TaskResult::Change { words, .. } => words,
+        tasks::TaskResult::Failure { reason } => reason,
+    }
+}
+
+pub(super) fn ending_words(ending: tasks::Ending) -> Box<[u8]> {
+    match ending {
+        tasks::Ending::Done(result) => result_words(result),
+        tasks::Ending::Failed { reason } => reason,
+        tasks::Ending::Cancelled { reason, result } => match result {
+            Some(result) => result_words(result),
+            None => reason,
+        },
+    }
+}
+
+pub(super) fn result_notice(ending: tasks::Ending) -> (tasks::ResultKind, Box<[u8]>) {
+    match ending {
+        tasks::Ending::Done(result) => match result {
+            tasks::TaskResult::Report { words } => (tasks::ResultKind::Report, words),
+            tasks::TaskResult::Verdict { code, words } => (tasks::ResultKind::Verdict { code }, words),
+            tasks::TaskResult::Change { connector, kind, resource, words } => {
+                (tasks::ResultKind::Change { connector, kind, resource }, words)
+            }
+            tasks::TaskResult::Failure { reason } => (tasks::ResultKind::Failed, reason),
+        },
+        tasks::Ending::Failed { reason } => (tasks::ResultKind::Failed, reason),
+        tasks::Ending::Cancelled { reason, .. } => (tasks::ResultKind::Cancelled, reason),
+    }
 }

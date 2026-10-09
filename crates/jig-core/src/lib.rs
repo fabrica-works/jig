@@ -35,7 +35,6 @@ pub use projections::{
     ProjectionTask, finish_decision, projection_bytes, projection_record_bytes,
 };
 mod proposals;
-mod reading;
 mod resources;
 mod restart;
 pub use restart::{RestartRequest, RestartStep};
@@ -53,7 +52,7 @@ mod conversation;
 pub use conversation::{DeliveryOutcome, SettledAnswer, SettledCall, conversation_worst_case};
 mod stored;
 mod translate;
-mod watch;
+pub use routing::watch_project;
 pub use run::{
     GoalRoute, HistoricalResult, Model, PendingRelay, PersonProposalRoute, PersonTaskRoute, RestoringProof, RoutedCall,
     RunAdmission, RunCharter, RunPolicy, Transcript,
@@ -63,7 +62,6 @@ pub use stored::{
     ProposalDecisionRecord, Record, Restored, RunProof, TerminalRecord, TurnProof, TurnRecord,
 };
 pub use translate::task_authority;
-pub use watch::watch_project;
 
 use alloc::boxed::Box;
 use jig_core_accounts as accounts;
