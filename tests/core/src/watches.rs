@@ -173,7 +173,9 @@ impl Parties {
                         }
                 }
                 root::Write::Save(root::Record::Core(core::Record::People(
-                    people::Stored::Person { number, .. } | people::Stored::ReadPosition { person: number, .. },
+                    people::Stored::Person { number, .. }
+                    | people::Stored::ReadResults { party: number, .. }
+                    | people::Stored::ReadChat { party: number, .. },
                 ))) => party_subject(&consumer.subject, *number),
                 root::Write::Save(root::Record::Core(core::Record::People(people::Stored::Roles {
                     holdings, ..

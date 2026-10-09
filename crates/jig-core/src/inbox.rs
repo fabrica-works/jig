@@ -60,6 +60,23 @@ fn question_answered(row: &tasks::TaskRecord, question: u64) -> bool {
 }
 
 impl Core {
+    /// The authenticated requester of a chat, also usable for a loaded ended task.
+    #[must_use]
+    pub fn chat_requester(&self, row: &tasks::TaskRecord) -> Option<u64> {
+        if row.tracked.is_some() || row.recurring.is_some() {
+            return None;
+        }
+        match row.executor {
+            tasks::Executor::Agent { charter } if charter == self.settings.charter => {}
+            tasks::Executor::Agent { .. } | tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => {
+                return None;
+            }
+        }
+        match row.requester {
+            tasks::Party::Person(party) => Some(party),
+            tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
+        }
+    }
     /// Project the currently waiting person-facing references of one task.
     #[must_use]
     #[expect(clippy::too_many_lines, reason = "one exhaustive task projection covers all person-facing waiting kinds")]
@@ -89,7 +106,11 @@ impl Core {
                             &mut entries,
                             row,
                             people::Whom::Person(person),
-                            people::EntryKind::Reply { message: word.number },
+                            if self.chat_requester(row).is_some() {
+                                people::EntryKind::ChatReply { message: word.number }
+                            } else {
+                                people::EntryKind::Reply { message: word.number }
+                            },
                             word.at,
                         ),
                         tasks::MessageKind::ProposalDecision { .. }

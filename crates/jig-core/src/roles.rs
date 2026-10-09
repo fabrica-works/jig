@@ -130,7 +130,8 @@ impl Core {
             people::Ask::Stop { task, .. } => (*task, authority::RequestKind::Cancel, 0),
             people::Ask::Cancel { task, reason, .. } => (*task, authority::RequestKind::Cancel, reason.len()),
             people::Ask::Release { task, .. } => (*task, authority::RequestKind::Release, 0),
-            people::Ask::Application { .. }
+            people::Ask::MarkSeen { .. }
+            | people::Ask::Application { .. }
             | people::Ask::TakePerson { .. }
             | people::Ask::HandBackPerson { .. }
             | people::Ask::AnswerPerson { .. }

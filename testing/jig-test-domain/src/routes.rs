@@ -951,6 +951,7 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::PolicyChanged { .. }
         | people::Outcome::PoolSet { .. }
         | people::Outcome::EscalationDecided { .. }
+        | people::Outcome::MarkedSeen { .. }
         | people::Outcome::Started { .. } => unreachable!("release core part returns a release terminal"),
     }
 }

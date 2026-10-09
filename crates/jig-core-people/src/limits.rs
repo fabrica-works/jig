@@ -13,11 +13,11 @@ use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Slab};
 pub struct Limits {
     /// Maximum retained parties and provider/subject index entries.
     pub people: u32,
-    /// Maximum cached unread result references per person; older entries are paged from tasks.
+    /// Maximum visible cached entries and unread count; results retain one extra overflow witness.
     pub inbox_entries: u32,
-    /// Maximum live task projections contributing to exact need counts.
+    /// Maximum live task and person-proposal projections contributing to the inbox census.
     pub inbox_tasks: u32,
-    /// Maximum need recipient references in one task projection, independent of cached entries.
+    /// Maximum recipient references in one task projection, independent of cached entries.
     pub inbox_recipients: u32,
     /// Maximum live secret-free sign-ins and expiry alarms.
     pub sign_ins: u32,
@@ -58,7 +58,10 @@ pub struct Limits {
 /// incoming/outgoing payloads and Request queue storage.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    limits.inbox_tasks.checked_mul(limits.inbox_recipients)?;
+    limits.inbox_entries.checked_add(1)?;
+    limits.people.checked_add(1)?;
+    let chat_positions = limits.people.checked_mul(limits.inbox_tasks)?;
+    limits.inbox_tasks.checked_mul(limits.inbox_recipients)?.checked_add(limits.inbox_entries.checked_add(1)?)?;
     limits.initial_owners.checked_add(4)?;
     limits.waiters.checked_add(1)?;
     limits.sign_ins.checked_add(1)?;
@@ -96,11 +99,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?
         .checked_add(List::<crate::domain::Need>::worst_case(limits.inbox_recipients)?)?
         .checked_add(Map::<u64, u64>::worst_case(limits.people)?)?
+        .checked_add(Map::<(u64, u64), u64>::worst_case(chat_positions)?)?
+        .checked_add(List::<u64>::worst_case(limits.people)?)?
+        .checked_add(Map::<u64, Box<[crate::Entry]>>::worst_case(limits.inbox_tasks)?)?
+        .checked_add(
+            u64::from(limits.inbox_tasks).checked_mul(List::<crate::Entry>::worst_case(limits.inbox_recipients)?)?,
+        )?
+        .checked_add(List::<crate::Entry>::worst_case(limits.inbox_recipients)?)?
         .checked_add(Map::<u64, Box<[crate::ResultRef]>>::worst_case(limits.people)?)?
         .checked_add(
-            u64::from(limits.people).checked_mul(List::<crate::ResultRef>::worst_case(limits.inbox_entries)?)?,
+            u64::from(limits.people)
+                .checked_mul(List::<crate::ResultRef>::worst_case(limits.inbox_entries.checked_add(1)?)?)?,
         )?
-        .checked_add(List::<crate::ResultRef>::worst_case(limits.inbox_entries)?)?
+        .checked_add(List::<crate::ResultRef>::worst_case(limits.inbox_entries.checked_add(1)?)?)?
         .checked_add(Map::<u64, SignIn>::worst_case(limits.sign_ins)?)?
         .checked_add(Deadlines::<u64>::worst_case(limits.sign_ins)?)?
         .checked_add(Map::<RequestKey, Answered>::worst_case(limits.requests)?)?

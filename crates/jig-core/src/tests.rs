@@ -469,6 +469,7 @@ fn tree_core() -> (Core, Limits) {
     limits.views.watchers = 8;
     limits.views.watchers_per_party = 8;
     limits.tasks.tasks = 16;
+    limits.people.inbox_tasks = 32;
     limits.tasks.project_tasks = 16;
     limits.tasks.tree_tasks = 16;
     limits.tasks.depth = 4;

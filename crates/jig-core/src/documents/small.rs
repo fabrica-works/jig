@@ -88,7 +88,9 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         u32::try_from(core.people.cached_results(party).ok_or(Missing::Unknown)?.len()).expect("cache count fits");
     for entry in &waiting {
         match entry.kind {
-            people::EntryKind::Reply { .. } => updates = updates.saturating_add(1),
+            people::EntryKind::Reply { .. } | people::EntryKind::ChatReply { .. } => {
+                updates = updates.saturating_add(1);
+            }
             people::EntryKind::Proposal { .. }
             | people::EntryKind::Escalation { .. }
             | people::EntryKind::Question { .. }

@@ -545,3 +545,95 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
     assert_eq!(world.spec_revision(7), Some(2));
     world.assert_settled();
 }
+
+#[test]
+fn reading_the_inbox_moves_no_position_until_the_party_marks_it_seen() {
+    let mut world = World::new(Settings::calm(80));
+    let person = member(&mut world);
+    world.remember_result(person, 7, 40);
+    assert_eq!(world.counts(person).unread, 1);
+    assert!(world.inbox(person).is_empty());
+    assert_eq!(world.results_seen(person), 0);
+    let seen = jig_core_people::Seen::Results { through: 40 };
+    let first = world.request(10, [1; 16], Ask::MarkSeen { seen });
+    let duplicate = world.request(10, [1; 16], Ask::MarkSeen { seen });
+    assert!(world.reply(first).is_none() && world.reply(duplicate).is_none());
+    assert_eq!(world.results_seen(person), 40, "live state runs ahead but replies await durability");
+    world.commit_all();
+    assert_eq!(world.reply(first), Some(Reply::Outcome(Outcome::MarkedSeen { seen })));
+    assert_eq!(world.reply(first), world.reply(duplicate));
+    assert_eq!(world.counts(person).unread, 0);
+    world.restart();
+    assert_eq!(world.results_seen(person), 40);
+    let retry = world.request(10, [1; 16], Ask::MarkSeen { seen });
+    world.commit_all();
+    assert_eq!(world.reply(retry), Some(Reply::Outcome(Outcome::MarkedSeen { seen })));
+    world.assert_settled();
+}
+
+#[test]
+fn a_chat_marked_seen_leaves_other_chats_unread() {
+    let mut world = World::new(Settings::calm(81));
+    let person = member(&mut world);
+    let mut chats = Vec::new();
+    for key in [1, 2] {
+        let call = world.ask(10, [key; 16], b"hello");
+        world.commit_all();
+        let Some(Reply::Outcome(Outcome::Started { task })) = world.reply(call) else { panic!("chat made") };
+        chats.push(task);
+        world.waiting(
+            task,
+            Box::new([Entry {
+                task,
+                project: 1,
+                whom: Whom::Person(person),
+                kind: EntryKind::ChatReply { message: task + 100 },
+                at: skein_lib::Wall::EPOCH,
+            }]),
+        );
+    }
+    assert_eq!(world.counts(person).unread, 2);
+    let seen = jig_core_people::Seen::Chat { task: chats[0], through: chats[0] + 100 };
+    let call = world.request(10, [3; 16], Ask::MarkSeen { seen });
+    assert!(world.reply(call).is_none());
+    world.commit_all();
+    assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::MarkedSeen { seen })));
+    assert_eq!(world.counts(person).unread, 1);
+    assert_eq!(world.inbox(person).len(), 1);
+    assert_eq!(world.chat_seen(person, chats[1]), 0);
+    let other_call = world.signin(20, 2);
+    world.commit_all();
+    let Some(Reply::SignedIn { person: other, .. }) = world.reply(other_call) else { panic!("other party") };
+    world.roles(1, Box::new([Holding { person, role: Role::Member }, Holding { person: other, role: Role::Member }]));
+    world.commit_all();
+    let refused = world.request(20, [4; 16], Ask::MarkSeen { seen });
+    world.commit_all();
+    assert_eq!(
+        world.reply(refused),
+        Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Member) })))
+    );
+    assert_eq!(world.chat_seen(other, chats[0]), 0);
+    world.restart();
+    assert_eq!(world.chat_seen(person, chats[0]), chats[0] + 100);
+    world.forget_chat(chats[0]);
+    world.commit_all();
+    assert_eq!(world.chat_seen(person, chats[0]), 0);
+    assert!(!world.records().contains_key(&jig_core_people::Key::ReadChat { party: person, task: chats[0] }));
+    world.assert_settled();
+}
+
+#[test]
+fn unread_updates_past_the_limit_are_said_as_more() {
+    let mut world = World::new(Settings::calm(82));
+    let person = member(&mut world);
+    let limit = jig_people_world::LIMITS.inbox_entries;
+    for position in 1..=u64::from(limit) + 2 {
+        world.remember_result(person, position, position);
+    }
+    assert_eq!(world.counts(person), jig_core_people::Counts { needs: 0, unread: limit, more_unread: true });
+    let seen = jig_core_people::Seen::Results { through: 2 };
+    world.request(10, [1; 16], Ask::MarkSeen { seen });
+    world.commit_all();
+    assert_eq!(world.counts(person), jig_core_people::Counts { needs: 0, unread: limit, more_unread: false });
+    world.assert_settled();
+}

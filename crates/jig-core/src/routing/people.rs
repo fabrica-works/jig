@@ -36,7 +36,8 @@ pub(super) fn route_people(
             }
             people::Event::Decided { request, outcome }
         }
-        other @ (people::Event::MakeService { .. }
+        other @ (people::Event::ForgetChat { .. }
+        | people::Event::MakeService { .. }
         | people::Event::Seed { .. }
         | people::Event::Waiting { .. }
         | people::Event::ApplyRoles { .. }
@@ -112,6 +113,7 @@ pub(super) fn tag_people(
                 | people::Reply::Outcome(
                     people::Outcome::Again(..)
                     | people::Outcome::SignedOut
+                    | people::Outcome::MarkedSeen { .. }
                     | people::Outcome::NoteEdited { .. }
                     | people::Outcome::ServiceMade { .. }
                     | people::Outcome::Adopted { .. }
@@ -214,6 +216,24 @@ pub(super) fn tag_people(
                         budget,
                         priority,
                     ),
+                    people::Ask::MarkSeen { seen } => {
+                        let outcome = match seen {
+                            people::Seen::Results { .. } => people::Outcome::MarkedSeen { seen },
+                            people::Seen::Chat { task, .. } => match core.tasks.task(task) {
+                                Some(row) => {
+                                    if core.chat_requester(row) == Some(person) {
+                                        people::Outcome::MarkedSeen { seen }
+                                    } else {
+                                        people::Outcome::Refused(people::Refusal::Role {
+                                            held: core.people.role(person, row.project),
+                                        })
+                                    }
+                                }
+                                None => people::Outcome::Refused(people::Refusal::Unknown),
+                            },
+                        };
+                        work.push(Event::People(people::Event::Decided { request, outcome }));
+                    }
                     people::Ask::StartChat { words, .. } => begin_chat_creation(
                         core,
                         env,

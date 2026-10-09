@@ -29,7 +29,8 @@ impl Core {
             people::Ask::TakePerson { task, .. }
             | people::Ask::HandBackPerson { task, .. }
             | people::Ask::AnswerPerson { task, .. } => *task,
-            people::Ask::Application { .. }
+            people::Ask::MarkSeen { .. }
+            | people::Ask::Application { .. }
             | people::Ask::Move { .. }
             | people::Ask::DecideProposal { .. }
             | people::Ask::Say { .. }
@@ -59,7 +60,8 @@ impl Core {
                         && match &ask {
                             people::Ask::AnswerPerson { .. } => true,
                             people::Ask::TakePerson { .. } | people::Ask::HandBackPerson { .. } => false,
-                            people::Ask::Application { .. }
+                            people::Ask::MarkSeen { .. }
+                            | people::Ask::Application { .. }
                             | people::Ask::Move { .. }
                             | people::Ask::DecideProposal { .. }
                             | people::Ask::Say { .. }
@@ -84,7 +86,8 @@ impl Core {
                     let handing_back = match &ask {
                         people::Ask::HandBackPerson { .. } => true,
                         people::Ask::TakePerson { .. } | people::Ask::AnswerPerson { .. } => false,
-                        people::Ask::Application { .. }
+                        people::Ask::MarkSeen { .. }
+                        | people::Ask::Application { .. }
                         | people::Ask::Move { .. }
                         | people::Ask::DecideProposal { .. }
                         | people::Ask::Say { .. }
@@ -136,7 +139,8 @@ impl Core {
                     },
                 )
             }
-            people::Ask::Application { .. }
+            people::Ask::MarkSeen { .. }
+            | people::Ask::Application { .. }
             | people::Ask::Move { .. }
             | people::Ask::DecideProposal { .. }
             | people::Ask::Say { .. }

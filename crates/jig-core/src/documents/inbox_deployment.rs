@@ -165,7 +165,9 @@ fn object(task: u64, kind: people::EntryKind) -> InboxObject {
         people::EntryKind::Proposal { number } => InboxObject::Proposal { proposer: Proposer::Task(task), number },
         people::EntryKind::Escalation { revision } => InboxObject::Escalation { revision },
         people::EntryKind::PersonTask => InboxObject::PersonTask,
-        people::EntryKind::Reply { message } => InboxObject::Reply { message },
+        people::EntryKind::Reply { message } | people::EntryKind::ChatReply { message } => {
+            InboxObject::Reply { message }
+        }
     }
 }
 fn updates(value: InboxObject) -> bool {
@@ -272,7 +274,7 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
             .insert(key(cursor)?, (entry.task, Some(entry.project), value, Some(entry.at), None, cursor))
             .expect("two bounded caches");
     }
-    for entry in results {
+    for entry in results.iter().take(usize::try_from(limits.people.inbox_entries).expect("cache bound fits")) {
         let project = result_project(core, entry.task);
         if let Some(project) = project
             && core.people.role(party, project).is_none()
@@ -372,7 +374,9 @@ pub(super) fn conversations(
         for entry in &waiting {
             if entry.task == row.number {
                 match entry.kind {
-                    people::EntryKind::Reply { .. } => replies = replies.checked_add(1).expect("bounded replies"),
+                    people::EntryKind::Reply { .. } | people::EntryKind::ChatReply { .. } => {
+                        replies = replies.checked_add(1).expect("bounded replies");
+                    }
                     people::EntryKind::Question { .. }
                     | people::EntryKind::Proposal { .. }
                     | people::EntryKind::Escalation { .. }

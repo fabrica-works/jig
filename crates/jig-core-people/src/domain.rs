@@ -6,8 +6,9 @@
 //! and durability; this child never performs IO or retains credential secrets.
 
 use crate::{
-    Again, Ask, Entry, EntryKind, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, LimitKind,
-    Limits, Outcome, ProjectRole, Refusal, Reply, Request, RequestKey, ResultRef, Role, Seed, Stored, Whom,
+    Again, Ask, Counts, Entry, EntryKind, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind,
+    LimitKind, Limits, Outcome, ProjectRole, Refusal, Reply, Request, RequestKey, ResultRef, Role, Seed, Seen, Stored,
+    Whom,
 };
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Env, Id, List, Map, Queue, ReplyTo, Slab, Time, Token, Wall};
@@ -56,7 +57,9 @@ pub struct Domain {
     phase: Phase,
     deployment_provider: u16,
     people: Map<u64, Identity>,
-    read_positions: Map<u64, u64>,
+    results_seen: Map<u64, u64>,
+    chats_seen: Map<(u64, u64), u64>,
+    replies: Map<u64, Box<[Entry]>>,
     unread: Map<u64, Box<[ResultRef]>>,
     waiting: Map<Whom, Box<[Entry]>>,
     needs: Map<u64, Box<[Need]>>,
@@ -103,7 +106,11 @@ impl Domain {
             phase: Phase::Restoring,
             deployment_provider,
             people: Map::with_capacity(limits.people),
-            read_positions: Map::with_capacity(limits.people),
+            results_seen: Map::with_capacity(limits.people),
+            chats_seen: Map::with_capacity(
+                limits.people.checked_mul(limits.inbox_tasks).expect("bounded chat positions"),
+            ),
+            replies: Map::with_capacity(limits.inbox_tasks),
             unread: Map::with_capacity(limits.people),
             needs: Map::with_capacity(limits.inbox_tasks),
             waiting: Map::with_capacity(
@@ -297,13 +304,13 @@ impl Domain {
         Some(session.person)
     }
 
-    /// Last committed result read position for an existing person, or zero before any read.
+    /// Last explicitly accepted results position for a known party, zero before any mark.
     #[must_use]
-    pub fn read_position(&self, person: u64) -> Option<u64> {
+    pub fn results_seen(&self, person: u64) -> Option<u64> {
         if !self.ready() || !self.people.contains_key(&person) {
             return None;
         }
-        Some(*self.read_positions.get(&person).unwrap_or(&0))
+        Some(*self.results_seen.get(&person).unwrap_or(&0))
     }
 
     /// Currently cached unread result references, newest first; missing older entries are loaded from ended tasks.
@@ -328,6 +335,17 @@ impl Domain {
         let mut visible = List::with_capacity(limits.inbox_entries);
         if let Some(entries) = self.waiting.get(&Whom::Person(person)) {
             for &entry in entries {
+                match entry.kind {
+                    EntryKind::Reply { .. } | EntryKind::ChatReply { .. } if !unread_reply(self, person, entry) => {
+                        continue;
+                    }
+                    EntryKind::Reply { .. }
+                    | EntryKind::ChatReply { .. }
+                    | EntryKind::Proposal { .. }
+                    | EntryKind::Escalation { .. }
+                    | EntryKind::Question { .. }
+                    | EntryKind::PersonTask => {}
+                }
                 insert_newest(&mut visible, entry);
             }
         }
@@ -378,37 +396,60 @@ impl Domain {
         }
     }
 
-    /// Advance one authenticated person's position inside the root decision that replies.
-    /// The returned people row is saved with the reply's commit.
-    pub fn advance_read_position(&mut self, person: u64, position: u64) -> Option<Stored> {
-        let old = self.read_position(person)?;
-        if position <= old {
-            return None;
-        }
-        let saved = self.read_positions.insert(person, position);
-        assert!(saved.is_ok(), "one position per admitted person");
-        if let Some(cached) = self.unread.get(&person) {
-            let mut retained = List::with_capacity(u32::try_from(cached.len()).expect("cached result bound"));
-            for &entry in cached {
-                if entry.position > position {
-                    retained.push(entry).expect("subset of cached entries");
-                }
-            }
-            let saved = self.unread.insert(person, retained.into_boxed());
-            assert!(saved.is_ok(), "cached person already admitted");
-        }
-        Some(Stored::ReadPosition { person, position })
+    /// Last position explicitly marked seen over one chat, zero before any mark.
+    #[must_use]
+    pub fn chat_seen(&self, person: u64, task: u64) -> Option<u64> {
+        self.identity(person)?;
+        Some(*self.chats_seen.get(&(person, task)).unwrap_or(&0))
     }
 
-    /// Cache up to the configured per-person entry bound; the store pages the rest.
+    /// Unread replies of one task, capped at `inbox_entries` with an explicit overflow bit.
+    #[must_use]
+    pub fn chat_unread(&self, limits: &Limits, person: u64, task: u64) -> Option<Counts> {
+        self.identity(person)?;
+        let mut unread = 0_u32;
+        if let Some(entries) = self.replies.get(&task) {
+            for entry in entries {
+                let chat_reply = match entry.kind {
+                    EntryKind::ChatReply { .. } => true,
+                    EntryKind::Reply { .. }
+                    | EntryKind::Proposal { .. }
+                    | EntryKind::Escalation { .. }
+                    | EntryKind::Question { .. }
+                    | EntryKind::PersonTask => false,
+                };
+                if chat_reply && unread_reply(self, person, *entry) {
+                    unread = unread.checked_add(1).expect("bounded task projection");
+                }
+            }
+        }
+        Some(Counts { needs: 0, unread: unread.min(limits.inbox_entries), more_unread: unread > limits.inbox_entries })
+    }
+
+    /// Exact needs and updates counted up to `inbox_entries`, independently of visible cache room.
+    #[must_use]
+    pub fn counts(&self, limits: &Limits, person: u64) -> Option<Counts> {
+        let needs = self.needs(person)?;
+        let mut unread = u32::try_from(self.cached_results(person)?.len()).expect("bounded result census");
+        for (_, entries) in &self.replies {
+            for entry in entries {
+                if unread_reply(self, person, *entry) {
+                    unread = unread.checked_add(1).expect("bounded projection census");
+                }
+            }
+        }
+        Some(Counts { needs, unread: unread.min(limits.inbox_entries), more_unread: unread > limits.inbox_entries })
+    }
+
+    /// Keep the newest `inbox_entries` plus one unread result witness; the store pages the rest.
     pub fn remember_result(&mut self, limits: &Limits, person: u64, entry: ResultRef) {
         if !self.ready()
             || !self.people.contains_key(&person)
-            || entry.position <= self.read_position(person).unwrap_or(0)
+            || entry.position <= self.results_seen(person).unwrap_or(0)
         {
             return;
         }
-        let cap = limits.inbox_entries;
+        let cap = limits.inbox_entries.checked_add(1).expect("bounded unread census");
         if cap == 0 {
             return;
         }
@@ -463,6 +504,7 @@ pub fn max_out(limits: &Limits) -> u32 {
         .max(limits.waiters.saturating_add(1))
         .max(limits.sign_ins.saturating_add(1))
         .max(limits.holdings.saturating_add(1))
+        .max(limits.people.saturating_add(1))
 }
 
 /// Apply one root-issued `event` with iteration clocks and immutable configured bounds in `env`;
@@ -474,6 +516,7 @@ pub fn max_out(limits: &Limits) -> u32 {
 /// targets for keyed replay.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::ForgetChat { task } => forget_chat(domain, &env.limits, task, out),
         Event::MakeService { request, person } => make_service(domain, env, request, person, out),
         Event::Seed { project, collaborators } => seed(domain, &env.limits, project, &collaborators, out),
         Event::Waiting { task, entries } => replace_waiting(domain, &env.limits, task, &entries),
@@ -544,6 +587,60 @@ fn insert_newest(entries: &mut List<Entry>, entry: Entry) {
     *entries = next;
 }
 
+fn unread_reply(domain: &Domain, person: u64, entry: Entry) -> bool {
+    let (message, seen) = match entry.kind {
+        EntryKind::Reply { message } => (message, *domain.results_seen.get(&person).unwrap_or(&0)),
+        EntryKind::ChatReply { message } => (message, *domain.chats_seen.get(&(person, entry.task)).unwrap_or(&0)),
+        EntryKind::Proposal { .. }
+        | EntryKind::Escalation { .. }
+        | EntryKind::Question { .. }
+        | EntryKind::PersonTask => return false,
+    };
+    entry.whom == Whom::Person(person) && role(domain, person, entry.project).is_some() && message > seen
+}
+
+fn mark_seen(domain: &mut Domain, limits: &Limits, party: u64, seen: Seen, out: &mut Queue<Request>) {
+    match seen {
+        Seen::Results { through } => {
+            if through <= *domain.results_seen.get(&party).unwrap_or(&0) {
+                return;
+            }
+            assert!(domain.results_seen.insert(party, through).is_ok(), "one result position per party");
+            if let Some(cached) = domain.unread.get(&party) {
+                let mut kept = List::with_capacity(limits.inbox_entries.checked_add(1).expect("bounded census"));
+                for &entry in cached {
+                    if entry.position > through {
+                        kept.push(entry).expect("cached subset");
+                    }
+                }
+                assert!(domain.unread.insert(party, kept.into_boxed()).is_ok(), "admitted result cache");
+            }
+            out.push(Request::Save { record: Stored::ReadResults { party, through } });
+        }
+        Seen::Chat { task, through } => {
+            if through <= *domain.chats_seen.get(&(party, task)).unwrap_or(&0) {
+                return;
+            }
+            assert!(domain.chats_seen.insert((party, task), through).is_ok(), "bounded live chat positions");
+            out.push(Request::Save { record: Stored::ReadChat { party, task, through } });
+        }
+    }
+}
+
+fn forget_chat(domain: &mut Domain, limits: &Limits, task: u64, out: &mut Queue<Request>) {
+    let mut parties = List::with_capacity(limits.people);
+    for ((party, chat), _) in &domain.chats_seen {
+        if *chat == task {
+            parties.push(*party).expect("at most one position per party and chat");
+        }
+    }
+    for party in parties.into_boxed() {
+        let _old = domain.chats_seen.remove(&(party, task));
+        out.push(Request::Erase { key: Key::ReadChat { party, task } });
+    }
+    drop(domain.replies.remove(&task));
+}
+
 fn addressed(domain: &Domain, person: u64, need: Need) -> bool {
     let Some(held) = role(domain, person, need.project) else { return false };
     match need.whom {
@@ -563,7 +660,7 @@ fn replace_needs(domain: &mut Domain, limits: &Limits, task: u64, entries: &[Ent
             continue;
         }
         match entry.kind {
-            EntryKind::Reply { .. } => continue,
+            EntryKind::Reply { .. } | EntryKind::ChatReply { .. } => continue,
             EntryKind::Proposal { .. }
             | EntryKind::Escalation { .. }
             | EntryKind::Question { .. }
@@ -584,6 +681,24 @@ fn replace_waiting(domain: &mut Domain, limits: &Limits, task: u64, entries: &[E
         return;
     }
     replace_needs(domain, limits, task, entries);
+    let mut replies = List::with_capacity(limits.inbox_recipients);
+    for &entry in entries {
+        match entry.kind {
+            EntryKind::Reply { .. } | EntryKind::ChatReply { .. } if entry.task == task && entry.project != 0 => {
+                replies.push(entry).expect("bounded reply projection");
+            }
+            EntryKind::Reply { .. }
+            | EntryKind::ChatReply { .. }
+            | EntryKind::Proposal { .. }
+            | EntryKind::Escalation { .. }
+            | EntryKind::Question { .. }
+            | EntryKind::PersonTask => {}
+        }
+    }
+    drop(domain.replies.remove(&task));
+    if !replies.is_empty() {
+        assert!(domain.replies.insert(task, replies.into_boxed()).is_ok(), "one reply projection per task");
+    }
     let mut recipients = List::with_capacity(domain.waiting.capacity());
     for (whom, _) in &domain.waiting {
         recipients.push(*whom).expect("one key per cached recipient");
@@ -697,7 +812,8 @@ fn outcome_reply(outcome: Outcome) -> Reply {
     match outcome {
         Outcome::Again(why) => Reply::Again(why),
         Outcome::SignedOut => Reply::SignedOut,
-        Outcome::Applied { .. }
+        Outcome::MarkedSeen { .. }
+        | Outcome::Applied { .. }
         | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
@@ -753,7 +869,8 @@ fn apply_roles(
     let flight = domain.pending.get(Id::from_token(request)).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let project = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::SetRoles { project, .. } => *project,
-        Ask::Application { .. }
+        Ask::MarkSeen { .. }
+        | Ask::Application { .. }
         | Ask::MakeService { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
@@ -796,7 +913,8 @@ fn apply_roles(
             }
             holdings.clone()
         }
-        Ask::Application { .. }
+        Ask::MarkSeen { .. }
+        | Ask::Application { .. }
         | Ask::MakeService { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
@@ -899,7 +1017,8 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
     let flight = domain.pending.get(Id::from_token(request)).expect("service creation names a live keyed flight");
     let (project, name, service_role) = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::MakeService { project, name, role } => (*project, name.clone(), *role),
-        Ask::Application { .. }
+        Ask::MarkSeen { .. }
+        | Ask::Application { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::SetGoal { .. }
@@ -1090,6 +1209,7 @@ fn end_signin(domain: &mut Domain, number: u64, out: &mut Queue<Request>) {
 
 fn project(ask: &Ask) -> u32 {
     match ask {
+        Ask::MarkSeen { .. } => 0,
         Ask::Application { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
@@ -1187,6 +1307,10 @@ fn valid_note(limits: &Limits, name: u64, scope: &crate::NoteScope, change: &cra
 
 fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
     match ask {
+        Ask::MarkSeen { seen } => match seen {
+            Seen::Results { .. } => true,
+            Seen::Chat { task, .. } => *task != 0,
+        },
         Ask::Application { .. } => true,
         Ask::EditNote { name, scope, change, .. } => valid_note(limits, *name, scope, change),
         Ask::MakeService { name, .. } => {
@@ -1299,7 +1423,8 @@ fn invalid_ask(ask: &Ask) -> Refusal {
             }
             LimitKind::Words
         }
-        Ask::Application { .. }
+        Ask::MarkSeen { .. }
+        | Ask::Application { .. }
         | Ask::TakePerson { .. }
         | Ask::HandBackPerson { .. }
         | Ask::Stop { .. }
@@ -1360,6 +1485,7 @@ fn invalid_ask(ask: &Ask) -> Refusal {
 fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     #[derive(PartialEq, Eq)]
     enum Expected {
+        MarkSeen(Seen),
         Application(u16),
         Note(u64),
         Service,
@@ -1385,6 +1511,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     }
 
     let expected = match ask {
+        Ask::MarkSeen { seen } => Expected::MarkSeen(*seen),
         Ask::Application { connector, .. } => Expected::Application(*connector),
         Ask::EditNote { name, .. } => Expected::Note(*name),
         Ask::MakeService { .. } => Expected::Service,
@@ -1423,6 +1550,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     };
 
     match outcome {
+        Outcome::MarkedSeen { seen } => expected == Expected::MarkSeen(seen),
         Outcome::Applied { connector, token } => expected == Expected::Application(connector) && token.raw() != 0,
         Outcome::NoteEdited { name } => expected == Expected::Note(name),
         Outcome::ServiceMade { person } => expected == Expected::Service && person != 0,
@@ -1572,10 +1700,41 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
     assert!(removed == Some(id), "flight has one key index");
 
     match outcome {
+        Outcome::MarkedSeen { seen } => mark_seen(domain, &env.limits, key.person, seen, out),
+        Outcome::Applied { .. }
+        | Outcome::NoteEdited { .. }
+        | Outcome::ServiceMade { .. }
+        | Outcome::Adopted { .. }
+        | Outcome::RolesSet { .. }
+        | Outcome::PolicyChanged { .. }
+        | Outcome::PoolSet { .. }
+        | Outcome::Started { .. }
+        | Outcome::Said { .. }
+        | Outcome::QuestionAnswered { .. }
+        | Outcome::Prioritised { .. }
+        | Outcome::Amended { .. }
+        | Outcome::AmendProposed { .. }
+        | Outcome::Moved { .. }
+        | Outcome::Stopped { .. }
+        | Outcome::Cancelled { .. }
+        | Outcome::Released { .. }
+        | Outcome::GoalStarted { .. }
+        | Outcome::GoalProposed { .. }
+        | Outcome::PersonTaken { .. }
+        | Outcome::PersonHandedBack { .. }
+        | Outcome::PersonAnswered { .. }
+        | Outcome::EscalationDecided { .. }
+        | Outcome::ProposalDecided { .. }
+        | Outcome::Refused(_)
+        | Outcome::Again(_)
+        | Outcome::SignedOut => {}
+    }
+    match outcome {
         // A refused admission is retryable with the same key, including
         // pressure reported by tasks or another child through the root.
         Outcome::Again(_) | Outcome::SignedOut => {}
-        Outcome::Applied { .. }
+        Outcome::MarkedSeen { .. }
+        | Outcome::Applied { .. }
         | Outcome::NoteEdited { .. }
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
@@ -1622,11 +1781,18 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
                 && !domain.identities.contains_key(&identity.key)
                 && domain.people.len() < env.limits.people
         }
-        Stored::ReadPosition { person, position } => {
+        Stored::ReadResults { party: person, through: position } => {
             person != &0
                 && *position != 0
-                && !domain.read_positions.contains_key(person)
-                && domain.read_positions.len() < env.limits.people
+                && !domain.results_seen.contains_key(person)
+                && domain.results_seen.len() < env.limits.people
+        }
+        Stored::ReadChat { party, task, through } => {
+            *party != 0
+                && *task != 0
+                && *through != 0
+                && !domain.chats_seen.contains_key(&(*party, *task))
+                && domain.chats_seen.len() < domain.chats_seen.capacity()
         }
         Stored::SignIn { number, .. } => {
             !domain.sign_ins.contains_key(number) && domain.sign_ins.len() < env.limits.sign_ins
@@ -1652,9 +1818,12 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
             let saved = domain.people.insert(number, identity);
             assert!(saved.is_ok(), "restored person admitted");
         }
-        Stored::ReadPosition { person, position } => {
-            let saved = domain.read_positions.insert(person, position);
+        Stored::ReadResults { party: person, through: position } => {
+            let saved = domain.results_seen.insert(person, position);
             assert!(saved == Ok(None), "restored read position admitted");
+        }
+        Stored::ReadChat { party, task, through } => {
+            assert!(domain.chats_seen.insert((party, task), through) == Ok(None), "restored chat position admitted");
         }
         Stored::SignIn { number, person, expires } => {
             let saved = domain.sign_ins.insert(number, SignIn { person, expires, due: deadline(env, expires) });
@@ -1727,7 +1896,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                         }
                     }
                 }
-                Ask::Application { .. }
+                Ask::MarkSeen { .. }
+                | Ask::Application { .. }
                 | Ask::EditNote { .. }
                 | Ask::MakeService { .. }
                 | Ask::StartChat { .. }
@@ -1751,7 +1921,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     unreachable!("restored role success has a matching roster ask");
                 }
             },
-            Outcome::Applied { .. }
+            Outcome::MarkedSeen { .. }
+            | Outcome::Applied { .. }
             | Outcome::NoteEdited { .. }
             | Outcome::Adopted { .. }
             | Outcome::Started { .. }
@@ -1779,9 +1950,14 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             }
         }
     }
-    for (person, _) in &domain.read_positions {
+    for (person, _) in &domain.results_seen {
         if !domain.people.contains_key(person) {
-            return restore_failed(domain, Key::ReadPosition(*person), Refusal::Unknown, out);
+            return restore_failed(domain, Key::ReadResults { party: *person }, Refusal::Unknown, out);
+        }
+    }
+    for ((party, task), _) in &domain.chats_seen {
+        if !domain.people.contains_key(party) {
+            return restore_failed(domain, Key::ReadChat { party: *party, task: *task }, Refusal::Unknown, out);
         }
     }
     domain.phase = Phase::Ready;
@@ -1809,7 +1985,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     let flight = domain.pending.get(id).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let application_project = match &flight.ask {
         Ask::Application { project, .. } => *project,
-        Ask::MakeService { .. }
+        Ask::MarkSeen { .. }
+        | Ask::MakeService { .. }
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
@@ -1833,7 +2010,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     };
     match &ask {
         Ask::Application { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
-        Ask::MakeService { .. }
+        Ask::MarkSeen { .. }
+        | Ask::MakeService { .. }
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
@@ -1928,7 +2106,8 @@ fn admission(domain: &Domain, person: u64, project: u32, role: Option<Role>, ask
             Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
             Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
         },
-        Ask::DecideEscalation { .. }
+        Ask::MarkSeen { .. }
+        | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
         | Ask::Move { .. }
         | Ask::TakePerson { .. }

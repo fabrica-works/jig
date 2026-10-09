@@ -29,6 +29,8 @@ pub enum EntryKind {
     PersonTask,
     /// A reply in a task requested by the person.
     Reply { message: u64 },
+    /// A committed reply belonging to one chat's independent read position.
+    ChatReply { message: u64 },
 }
 
 /// One volatile reference derived from a live task; content remains in tasks.
@@ -148,6 +150,23 @@ pub struct ResultRef {
     pub position: u64,
 }
 
+/// A party's requested read position (domain/people.md, section 6).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Seen {
+    /// Results committed through this position.
+    Results { through: u64 },
+    /// Replies of one chat through this position.
+    Chat { task: u64, through: u64 },
+}
+
+/// Exact needs and unread updates capped at the configured count limit.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Counts {
+    pub needs: u32,
+    pub unread: u32,
+    pub more_unread: bool,
+}
+
 /// A connector's resource path, opaque to people (domain/connectors.md, section 12).
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct ResourceName {
@@ -199,6 +218,8 @@ pub enum NoteChange {
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ask {
+    /// Mark results or one chat's replies seen under this party's key.
+    MarkSeen { seen: Seen },
     /// Application-owned request metadata; the root carries the value, and the protocol supplies its digest.
     Application { project: u32, connector: u16, digest: [u8; 32] },
     /// Correct or delete a note whose scope the party's project role permits.
@@ -327,6 +348,8 @@ pub enum EscalationChoice {
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// The named read position was accepted; it never moves backwards.
+    MarkedSeen { seen: Seen },
     /// Connector-owned durable outcome named by token; the root asks its owner for the value.
     Applied { connector: u16, token: Token },
     /// Unsaved retry answer; the request may be sent again.
@@ -436,7 +459,9 @@ pub enum Key {
     /// Logical person-record key.
     Person(u64),
     /// One person's durable position in committed result order.
-    ReadPosition(u64),
+    ReadResults { party: u64 },
+    /// One party's durable position over a chat's replies.
+    ReadChat { party: u64, task: u64 },
     /// Logical secret-free sign-in-record key.
     SignIn(/** Root-issued deployment sign-in number; cookie secrets and token digests stay below the domain. */ u64),
     /// Logical per-project roles-record key.
@@ -459,7 +484,9 @@ pub enum Stored {
         identity: Identity,
     },
     /// Monotonic read position for the named person; no result is copied here.
-    ReadPosition { person: u64, position: u64 },
+    ReadResults { party: u64, through: u64 },
+    /// Monotonic replies position, erased once an ended chat and its replies are gone.
+    ReadChat { party: u64, task: u64, through: u64 },
     /// Persistent secret-free sign-in; expired restored entries are erased when restore completes.
     SignIn {
         /** Root-issued sign-in number; at most `Limits::sign_ins` sign-in records are retained. */
@@ -499,7 +526,8 @@ impl Stored {
     pub const fn key(&self) -> Key {
         match self {
             Stored::Person { number, .. } => Key::Person(*number),
-            Stored::ReadPosition { person, .. } => Key::ReadPosition(*person),
+            Stored::ReadResults { party, .. } => Key::ReadResults { party: *party },
+            Stored::ReadChat { party, task, .. } => Key::ReadChat { party: *party, task: *task },
             Stored::SignIn { number, .. } => Key::SignIn(*number),
             Stored::Roles { project, .. } => Key::Roles(*project),
             Stored::Policy { project, .. } => Key::Policy(*project),
@@ -516,6 +544,8 @@ impl Stored {
     reason = "bounded whole keyed requests stay inline and event storage is priced by size_of"
 )]
 pub enum Event {
+    /// The owner forgot an ended chat and its reply references; retire its positions.
+    ForgetChat { task: u64 },
     /// Apply an authorized owner request to make a service with a fresh party number.
     MakeService { request: Token, person: u64 },
     /// Add previously unknown collaborators and their first project role in one decision.

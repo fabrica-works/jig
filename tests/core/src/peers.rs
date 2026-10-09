@@ -179,6 +179,12 @@ impl Peers {
             parties::Up::Request { to, sign_in, project, key, ask } => {
                 assert!(self.party_flights.insert(to, index).is_none());
                 let ask = match ask {
+                    parties::Ask::SeeResults { through } => {
+                        people::Ask::MarkSeen { seen: people::Seen::Results { through } }
+                    }
+                    parties::Ask::SeeChat { task, through } => {
+                        people::Ask::MarkSeen { seen: people::Seen::Chat { task: task_number(task), through } }
+                    }
                     parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
                     parties::Ask::Goal { words, budget, priority } => {
                         people::Ask::SetGoal { project, spec: words, charter: 1, budget, priority }

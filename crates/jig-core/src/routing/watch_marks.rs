@@ -163,7 +163,9 @@ pub(super) fn touch_number(core: &mut Core, limits: &Limits, task: u64) {
 
 pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
     match row {
-        people::Stored::Person { number, .. } | people::Stored::ReadPosition { person: number, .. } => {
+        people::Stored::Person { number, .. }
+        | people::Stored::ReadResults { party: number, .. }
+        | people::Stored::ReadChat { party: number, .. } => {
             core.touch_party(*number);
         }
         people::Stored::Roles { holdings, .. } => {
@@ -210,7 +212,8 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
                 core.touch_party(party);
             }
         }
-        people::Event::MakeService { .. }
+        people::Event::ForgetChat { .. }
+        | people::Event::MakeService { .. }
         | people::Event::Seed { .. }
         | people::Event::ApplyRoles { .. }
         | people::Event::SignedIn { .. }

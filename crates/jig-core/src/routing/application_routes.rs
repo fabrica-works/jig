@@ -161,6 +161,7 @@ impl Core {
                 }
                 people::Outcome::Again(..)
                 | people::Outcome::SignedOut
+                | people::Outcome::MarkedSeen { .. }
                 | people::Outcome::NoteEdited { .. }
                 | people::Outcome::ServiceMade { .. }
                 | people::Outcome::Adopted { .. }
@@ -187,7 +188,8 @@ impl Core {
                 | people::Outcome::Refused(..) => true,
             },
             people::Stored::Person { .. }
-            | people::Stored::ReadPosition { .. }
+            | people::Stored::ReadResults { .. }
+            | people::Stored::ReadChat { .. }
             | people::Stored::SignIn { .. }
             | people::Stored::Roles { .. }
             | people::Stored::Policy { .. } => true,

@@ -124,6 +124,13 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
             test.event(Event::Waiting { task, entries });
         }
         assert_eq!(test.domain.needs(1), Some(limits.inbox_tasks * limits.inbox_recipients));
+        for party in 1..=u64::from(limits.people) {
+            for position in 1..=u64::from(limits.inbox_entries) + 1 {
+                test.meter.start();
+                test.domain.remember_result(&limits, party, jig_core_people::ResultRef { task: position, position });
+                test.drain();
+            }
+        }
         for key in
             1..=u8::try_from(limits.requests.saturating_sub(limits.pending)).expect("test values are admitted and fit")
         {
@@ -149,5 +156,44 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
             fire(&mut test.domain, &test.env, &mut test.out);
             test.drain();
         }
+
+        full_chat_positions_and_replies_fit(limits);
+    }
+}
+
+fn full_chat_positions_and_replies_fit(limits: Limits) {
+    // Every per-chat position and the complete reply census fit with restore inputs and outputs.
+    let mut restored = Measured::new(limits);
+    for party in 1..=u64::from(limits.people) {
+        for task in 1..=u64::from(limits.inbox_tasks) {
+            restored.event(Event::Restore { record: jig_core_people::Stored::ReadChat { party, task, through: 1 } });
+        }
+        restored.event(Event::Restore {
+            record: jig_core_people::Stored::Person {
+                number: party,
+                identity: Identity {
+                    key: IdentityKey { provider: 0, subject: party.to_be_bytes().into() },
+                    login: Box::new([]),
+                    name: Box::new([]),
+                },
+            },
+        });
+    }
+    restored.event(Event::Restored);
+    for task in 1..=u64::from(limits.inbox_tasks) {
+        let entries = (0..limits.inbox_recipients)
+            .map(|message| Entry {
+                task,
+                project: 1,
+                whom: Whom::Person(1),
+                kind: EntryKind::ChatReply { message: u64::from(message) + 2 },
+                at: Wall::EPOCH,
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        restored.event(Event::Waiting { task, entries });
+    }
+    for task in 1..=u64::from(limits.inbox_tasks) {
+        restored.event(Event::ForgetChat { task });
     }
 }

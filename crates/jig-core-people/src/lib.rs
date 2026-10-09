@@ -68,9 +68,10 @@ pub use amendment::{
     WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
-    Adoption, Ask, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity, IdentityKey,
-    InitialOwner, Key, Kind, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole, ProposalChoice,
-    ProposalDecision, Reply, Request, RequestKey, ResourceName, ResourceRole, ResultRef, Role, Seed, Stored, Whom,
+    Adoption, Ask, Counts, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity,
+    IdentityKey, InitialOwner, Key, Kind, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole, ProposalChoice,
+    ProposalDecision, Reply, Request, RequestKey, ResourceName, ResourceRole, ResultRef, Role, Seed, Seen, Stored,
+    Whom,
 };
 pub use decisions::{FailureClass, HoldReason, Moved};
 pub use domain::{Domain, application_part, application_part_done, fire, max_out, step};

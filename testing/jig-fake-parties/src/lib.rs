@@ -40,6 +40,10 @@ pub enum Task {
 /// Requests in the client's independent vocabulary.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
+    /// Mark results read through one committed position.
+    SeeResults { through: u64 },
+    /// Mark one chat's replies read without affecting another chat.
+    SeeChat { task: Task, through: u64 },
     /// Start one chat.
     Chat { words: Box<[u8]> },
     /// Ask for tracked work.
@@ -302,6 +306,7 @@ impl Party {
     fn resolve(&self, ask: Ask) -> Option<Ask> {
         Some(match ask {
             Ask::Say { task, words, release, .. } => Ask::Say { task: self.task(task)?, words, release },
+            Ask::SeeChat { task, through } => Ask::SeeChat { task: self.task(task)?, through },
             Ask::Stop { task } => Ask::Stop { task: self.task(task)? },
             Ask::Release { task, revision, again } => Ask::Release { task: self.task(task)?, revision, again },
             Ask::Take { task } => Ask::Take { task: self.task(task)? },
@@ -312,7 +317,7 @@ impl Party {
                 let Some(Waiting::Proposal { proposer, proposal }) = self.waiting else { return None };
                 Ask::Decision { proposer, proposal, accept }
             }
-            other @ (Ask::Chat { .. } | Ask::Goal { .. } | Ask::Decision { .. }) => other,
+            other @ (Ask::SeeResults { .. } | Ask::Chat { .. } | Ask::Goal { .. } | Ask::Decision { .. }) => other,
         })
     }
 

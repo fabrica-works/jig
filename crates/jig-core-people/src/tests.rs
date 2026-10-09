@@ -78,38 +78,32 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
 }
 
 #[test]
-fn result_cache_is_bounded_and_read_position_restores() {
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
-    let mut out = Queue::with_capacity(max_out(&LIMITS));
-    let mut domain = Domain::new(&LIMITS, Box::new([]), 2);
-    step(
-        &mut domain,
-        &env,
-        Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } },
-        &mut out,
-    );
-    step(&mut domain, &env, Event::Restored, &mut out);
-    for (task, position) in [(3, 3), (1, 1), (2, 2)] {
-        domain.remember_result(&LIMITS, 1, ResultRef { task, position });
+fn only_keyed_mark_seen_moves_results_and_restores_the_position() {
+    let mut test = Test::new(LIMITS);
+    test.signin(1, 10, identity(0, 1));
+    for (task, position) in [(4, 4), (3, 3), (1, 1), (2, 2)] {
+        test.d.remember_result(&LIMITS, 1, ResultRef { task, position });
     }
-    assert_eq!(
-        domain.cached_results(1),
-        Some(&[ResultRef { task: 3, position: 3 }, ResultRef { task: 2, position: 2 }][..])
-    );
-    let row = domain.advance_read_position(1, 2).expect("monotonic read");
-    assert_eq!(row, Stored::ReadPosition { person: 1, position: 2 });
-    assert_eq!(domain.cached_results(1), Some(&[ResultRef { task: 3, position: 3 }][..]));
-    assert_eq!(domain.advance_read_position(1, 1), None, "position never moves backward");
-    let mut restored = Domain::new(&LIMITS, Box::new([]), 2);
-    step(&mut restored, &env, Event::Restore { record: row }, &mut out);
-    step(
-        &mut restored,
-        &env,
-        Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } },
-        &mut out,
-    );
-    step(&mut restored, &env, Event::Restored, &mut out);
-    assert_eq!(restored.read_position(1), Some(2));
+    assert_eq!(test.d.cached_results(1).unwrap().len(), 3, "one overflow witness beyond the count limit");
+    assert_eq!(test.d.counts(&LIMITS, 1), Some(Counts { needs: 0, unread: 2, more_unread: true }));
+    assert_eq!(test.d.results_seen(1), Some(0));
+    let seen = Seen::Results { through: 3 };
+    let request = route(&test.request(10, 1, Ask::MarkSeen { seen }));
+    let outputs = test.send(Event::Decided { request, outcome: Outcome::MarkedSeen { seen } });
+    assert_eq!(test.d.results_seen(1), Some(3));
+    assert_eq!(test.d.cached_results(1), Some(&[ResultRef { task: 4, position: 4 }][..]));
+    assert!(outputs.contains(&Request::Save { record: Stored::ReadResults { party: 1, through: 3 } }));
+    assert_eq!(reply(&test.request(10, 1, Ask::MarkSeen { seen })), Reply::Outcome(Outcome::MarkedSeen { seen }));
+    let backwards = Seen::Results { through: 1 };
+    let request = route(&test.request(10, 2, Ask::MarkSeen { seen: backwards }));
+    test.send(Event::Decided { request, outcome: Outcome::MarkedSeen { seen: backwards } });
+    assert_eq!(test.d.results_seen(1), Some(3));
+    let mut restored = Test::new(LIMITS);
+    restored.d = Domain::new(&LIMITS, Box::new([]), 2);
+    restored.send(Event::Restore { record: Stored::ReadResults { party: 1, through: 3 } });
+    restored.send(Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } });
+    restored.send(Event::Restored);
+    assert_eq!(restored.d.results_seen(1), Some(3));
 }
 
 #[test]
@@ -344,7 +338,8 @@ fn saved_answer(rows: &[Request]) -> Stored {
             Request::Save { record } => match record {
                 Stored::Answer { .. } => Some(record.clone()),
                 Stored::Person { .. }
-                | Stored::ReadPosition { .. }
+                | Stored::ReadResults { .. }
+                | Stored::ReadChat { .. }
                 | Stored::SignIn { .. }
                 | Stored::Roles { .. }
                 | Stored::Policy { .. } => None,
@@ -885,7 +880,8 @@ fn is_answer(request: &Request) -> bool {
         Request::Save { record } => match record {
             Stored::Answer { .. } => true,
             Stored::Person { .. }
-            | Stored::ReadPosition { .. }
+            | Stored::ReadResults { .. }
+            | Stored::ReadChat { .. }
             | Stored::SignIn { .. }
             | Stored::Roles { .. }
             | Stored::Policy { .. } => false,
@@ -905,7 +901,8 @@ fn is_roles(request: &Request) -> bool {
         Request::Save { record } => match record {
             Stored::Roles { .. } => true,
             Stored::Person { .. }
-            | Stored::ReadPosition { .. }
+            | Stored::ReadResults { .. }
+            | Stored::ReadChat { .. }
             | Stored::SignIn { .. }
             | Stored::Answer { .. }
             | Stored::Policy { .. } => false,

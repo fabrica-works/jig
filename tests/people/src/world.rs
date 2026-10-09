@@ -303,6 +303,29 @@ impl World {
         self.domain.role_for_identity(identity, project)
     }
 
+    pub fn remember_result(&mut self, person: u64, task: u64, position: u64) {
+        self.domain.remember_result(&self.env.limits, person, people::ResultRef { task, position });
+    }
+
+    #[must_use]
+    pub fn counts(&self, person: u64) -> people::Counts {
+        self.domain.counts(&self.env.limits, person).expect("known party counts")
+    }
+
+    #[must_use]
+    pub fn results_seen(&self, person: u64) -> u64 {
+        self.domain.results_seen(person).expect("known party results position")
+    }
+
+    #[must_use]
+    pub fn chat_seen(&self, person: u64, task: u64) -> u64 {
+        self.domain.chat_seen(person, task).expect("known party chat position")
+    }
+
+    pub fn forget_chat(&mut self, task: u64) {
+        self.send(Event::ForgetChat { task });
+    }
+
     pub fn waiting(&mut self, task: u64, entries: Box<[Entry]>) {
         self.send(Event::Waiting { task, entries });
     }
@@ -340,7 +363,8 @@ impl World {
                 Stored::SignIn { number, person, .. } if *number == sign_in => Some(*person),
                 Stored::SignIn { .. }
                 | Stored::Person { .. }
-                | Stored::ReadPosition { .. }
+                | Stored::ReadResults { .. }
+                | Stored::ReadChat { .. }
                 | Stored::Roles { .. }
                 | Stored::Answer { .. }
                 | Stored::Policy { .. } => None,
@@ -401,7 +425,7 @@ impl World {
                 Request::Erase { key } => changes.push(Change::Erase(key)),
                 Request::Reply { to, reply } => replies.push((to.into_token().raw(), reply)),
                 Request::Route { request, person, project, role, ask } => {
-                    assert_eq!(project, 1);
+                    assert!(project == 1 || matches!(ask.as_ref(), Ask::MarkSeen { .. }));
                     let key = self.context.expect("a routed call carries the client's key");
                     assert_eq!(person, key.person);
                     self.stats.routes += 1;
@@ -412,7 +436,9 @@ impl World {
                         Ask::MakeService { .. } => RouteKind::Service,
                         Ask::DecideProposal { .. } => RouteKind::Proposal,
                         Ask::TakePerson { .. } => RouteKind::TakePerson,
-                        Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => RouteKind::Control,
+                        Ask::MarkSeen { .. } | Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => {
+                            RouteKind::Control
+                        }
                         Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
@@ -433,16 +459,32 @@ impl World {
                         Some(Stored::Person { identity, .. }) => identity.key.provider == 1,
                         Some(_) | None => false,
                     };
-                    self.observe(Seen::Routed {
-                        role: role.expect("scripted request requires project membership"),
-                        kind,
-                        service,
-                    });
+                    self.observe(Seen::Routed { role: role.unwrap_or(Role::Observer), kind, service });
                     if self.defer_route {
                         assert_eq!(kind, RouteKind::Chat, "only chats use the deferred script");
                         self.deferred.push((request, key));
                     } else {
                         match *ask {
+                            Ask::MarkSeen { seen } => {
+                                let allowed = match seen {
+                                    people::Seen::Results { .. } => true,
+                                    people::Seen::Chat { task, .. } => self
+                                        .durable_tasks
+                                        .iter()
+                                        .any(|(key, number)| key.person == person && *number == task),
+                                };
+                                let outcome = if allowed {
+                                    Outcome::MarkedSeen { seen }
+                                } else {
+                                    Outcome::Refused(Refusal::Role { held: self.domain.role(person, 1) })
+                                };
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome },
+                                    &mut self.out,
+                                );
+                            }
                             Ask::Application { connector, .. } => {
                                 let token = Token::new(self.name());
                                 people::step(

@@ -784,7 +784,7 @@ fn inbox_row(
             }
             if !ended(owner)
                 || owner.requester != tasks::Party::Person(party)
-                || owner.result_position <= core.people.read_position(party).unwrap_or(0)
+                || owner.result_position <= core.people.results_seen(party).unwrap_or(0)
             {
                 return Ok(None);
             }
@@ -856,7 +856,7 @@ fn inbox_row(
                         documents::InboxObject::Escalation { revision }
                     }
                     jig_core_people::EntryKind::PersonTask => documents::InboxObject::PersonTask,
-                    jig_core_people::EntryKind::Reply { .. } => continue,
+                    jig_core_people::EntryKind::Reply { .. } | jig_core_people::EntryKind::ChatReply { .. } => continue,
                 };
                 let cursor = documents::Cursor::Inbox { task: owner.number, object, at: Some(entry.at) };
                 if row.inbox != Some(cursor) {
@@ -899,7 +899,7 @@ fn reply_update(
         | tasks::Line::Decided { .. }
         | tasks::Line::Milestone { .. } => return Ok(None),
     };
-    if word.number <= core.people.read_position(party).unwrap_or(0) {
+    if word.number <= core.people.results_seen(party).unwrap_or(0) {
         return Ok(None);
     }
     let object = documents::InboxObject::Reply { message: word.number };
