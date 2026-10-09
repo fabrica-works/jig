@@ -79,7 +79,8 @@ and on its families' views.
     paragraph, text, list, item, table, row, cell, term and
     description, button, link, text field, text area, choice, choice
     group, check, dialog, status, alert, log, tree, tree item, tabs,
-    tab, progress, time, code, quote, separator, figure, and slot;
+    tab, progress, time, code, quote, separator, figure, slot, and
+    drawing;
   - a name, where its text does not give it;
   - states: disabled, expanded, busy, current, invalid, pressed,
     selected, provisional, submits on enter;
@@ -94,6 +95,20 @@ and on its families' views.
   - a binding, on what a person acts on (section 5).
 - **Closed, so a new one breaks the build** wherever roles are matched:
   each shell's mapping, the fake person's queries.
+- **An application's own kinds of node** are drawings: a chart of an
+  incident's error rate, a map of a pool's environments, a timeline.
+  A drawing node carries:
+  - its kind: its owner and a number from the owner's closed set;
+  - its data, as bytes its owner's view writes, within a bound the owner
+    declares, which only the owner's drawing code reads;
+  - a name, and a fallback: ordinary nodes saying what it shows in words
+    and numbers ("error rate 30 % since 10:02, 2 % before"), which a
+    shell without the drawing shows, a screen reader reads, and the fake
+    person finds.
+
+  A drawing is shown, not acted on: what a person does about it is an
+  ordinary node beside it. Its data is compared whole by the diff, and a
+  change is one patch.
 - **No layout.** Where things go on a screen is the shell's and its
   styles', from roles, order and tokens. A phone and a terminal lay out
   the same tree differently.
@@ -252,6 +267,12 @@ application's view root adds its families' counts to jig's.
   - *the native one* (`jig-client-shell-native`): skein's HTTP client and
     its server-sent events reader, for Linux and for the worlds that make
     bytes real; with no view, it is a service's shell.
+- **Drawings are drawn by the application's code in the shell.** A shell
+  is ordinary Rust, so it takes, when it is built, the application's
+  drawing code for each kind of drawing it shows, which reads the
+  drawing's data and draws it on the platform (a canvas or vector
+  graphics in a browser). A kind a shell has no code for shows its
+  fallback.
 - **An application's shell:** a phone's or a desktop's, mapping the same
   tree onto its widgets, is the application's to write over the same
   domain and view.
@@ -278,10 +299,8 @@ application's view root adds its families' counts to jig's.
 
 ## 14. Open questions
 
-- **An application's own kinds of node:** a chart of an incident's error
-  rate, a map of a pool's environments. The tree's roles are closed and
-  jig's; whether an application may add kinds of node, which its own
-  shells draw, and how the fake person reads them.
+- **Drawings a person acts on:** zooming a chart, choosing a point on a
+  map; today a drawing is shown, and acts are nodes beside it.
 - **A text shell** for terminals, from the same tree, as `ops`'s terminal
   client (`../../examples.md`, section 8) would want.
 - **A markup macro,** if plain calls prove unreadable for whole pages:

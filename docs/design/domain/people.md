@@ -285,7 +285,8 @@ their task, or the task ends.
 - **Who may see what** among a project's parties: whether a chat and its
   transcript are its person's alone, or their role's, or the project's;
   what an observer reads. Today a role in the project lets a party watch
-  and read all of it.
+  and read all of it, which is enough while jig's client is built for
+  one person (`../client/domain/README.md`, section 5).
 - **Roles that span projects,** now that the inbox does.
 - **Guests:** someone with no identity at any provider, invited to one
   chat.

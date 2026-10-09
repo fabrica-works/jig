@@ -364,7 +364,8 @@ inbox, withdrawn, with R's result saying why.
 
 - **Who may see what:** whether a member reads another's chats and
   transcripts, what an observer sees (`../../domain/people.md`,
-  section 12). Each page shows what the engine lets the party read.
+  section 12); deferred while the client is built for one person. Each
+  page shows what the engine lets the party read.
 - **Digests:** what happened while the party was away, beyond updates.
 - **A plan as a graph,** rather than "after" on each line.
 - **Comparing attempts** of one task side by side.

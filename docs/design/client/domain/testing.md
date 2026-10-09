@@ -60,7 +60,8 @@ a step machine so that a browser's loop can run it later.
   step and why ("no button named Release in the region named T7").
 - **The tree face** answers its queries on the view's tree at once, the
   way an accessibility tree is searched, and turns its acts into the
-  acts the shell would report.
+  acts the shell would report. It reads a drawing by its name and its
+  fallback, as a screen reader does (view.md, section 3).
 - **A random person,** for the fuzzy suite, presses any bound node and
   types any words drawn from the seed, so a sweep reaches what no script
   names.

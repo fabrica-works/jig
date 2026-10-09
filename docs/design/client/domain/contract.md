@@ -419,7 +419,8 @@ be designed with the protocol layers (`../../README.md`, section 12):
   save a client the second round trip.
 - **Windows of a large tree:** how a tree watch's window follows what a
   person opened, so that a tree of hundreds of tasks costs what is shown.
-- **Who may see what** among a project's parties
-  (`../../domain/people.md`, section 12).
+- **Who may see what** among a project's parties, deferred while the
+  client is built for one person (`../../domain/people.md`,
+  section 12).
 - **Search** over tasks, results, notes and transcripts, which the engine
   has only over notes' descriptions.

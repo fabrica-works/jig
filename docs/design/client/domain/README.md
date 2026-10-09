@@ -186,10 +186,19 @@ where each is answered:
   section 3).
 - **Words come from a phrasebook,** one per language: jig ships English,
   and an application may give its own as data (view.md, section 7).
+- **An application may draw:** its own kinds of node (a chart, a map),
+  whose data its view writes and whose drawing code its shells take,
+  each with a fallback in words that every shell, a screen reader and the
+  fake person can read (view.md, sections 3 and 11).
 - **Home and navigation are the application's choice,** among jig's pages
   and its own (pages.md, section 2).
 - **A service uses jig's client domain without a view** (root.md,
   section 11).
+- **One person first.** The client is built first for one person, who
+  holds the roles they need in the projects they use. What only several
+  people raise (who may see what, a role's entries shared and taken) is
+  designed where it meets the domain, and waits until several people use
+  a deployment.
 - **A client outside the engine's versions says so,** and keeps what is
   pending until it is updated (contract.md, section 8).
 
@@ -197,11 +206,9 @@ where each is answered:
 
 Each document lists its own; the ones that reach across:
 
-- **Who may see what** among the parties of a project: whether a chat is
-  its person's alone, what an observer reads (`../../domain/people.md`,
+- **Who may see what** among the parties of a project, deferred while
+  the client is built for one person (`../../domain/people.md`,
   section 12);
-- **an application's own kinds of node,** such as a chart or a map,
-  which jig's view vocabulary does not have (view.md, section 14);
 - **a text shell** for terminals, from the same tree (view.md,
   section 14);
 - **bundling** an application's parts into the answer of the jig read
