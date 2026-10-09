@@ -28,6 +28,8 @@ pub enum Act {
     Dispose { task: u64, take_over: bool },
     /// Supply the task amendment in the open confirmation.
     Change { change: Box<crate::contract::Amendment> },
+    /// Read an object again after it moved or an answer became unknown.
+    LookAgain { object: Token },
     /// Confirm the open act.
     Confirm,
     /// Dismiss the confirmation or notice.

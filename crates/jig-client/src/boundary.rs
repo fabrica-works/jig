@@ -79,6 +79,8 @@ pub enum Request {
     FrameIs { asked: Token, frame: FrameShown },
     /// Tell a program its by value durable outcome.
     Answered { asked: Token, answer: Answer },
+    /// Tell a program that retention ended without a known outcome.
+    Unknown { asked: Token },
     /// Report a content free fact.
     Fact { fact: Fact },
 }

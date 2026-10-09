@@ -17,6 +17,10 @@ pub enum Kind {
     Answer { object: ObjectKey, answer: Answer },
     /// A durable page request answer whose page no longer shows it.
     PageAnswer { answer: Answer },
+    /// A table retention expired for a card no longer shown.
+    Unknown { object: ObjectKey, act: crate::contract::ActKind },
+    /// A page request expired without a known outcome.
+    PageUnknown { purpose: crate::pages::IntentPurpose },
     /// A refusal with no page or card to show it on.
     Refused(Limit),
 }

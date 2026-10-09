@@ -20,6 +20,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::{Id, List, Map, Set, Slab, Time, Token};
+pub mod answer;
 pub mod escalation;
 pub mod person_task;
 pub mod proposal;
@@ -80,6 +81,8 @@ pub enum Card {
     Deciding { request: Option<Token>, progress: Progress },
     /// Refused, with facts kept on its card.
     Refused { refusal: Refusal },
+    /// Retention ended without an answer; inspect the current object before acting again.
+    Unknown { act: crate::contract::ActKind, look: crate::contract::Read },
     /// Ended and still shown until its linger expires.
     Leaving { how: Left, until: Time },
 }
@@ -91,6 +94,8 @@ pub struct Object {
     pub body: Option<Body>,
     pub sources: Set<Source>,
     pub card: Card,
+    /// The last durable answer, also kept when the object remains open.
+    pub answer: Option<crate::contract::Answer>,
     /// Whether this card belongs to the current page, even after a source drops it.
     pub shown: bool,
     /// Navigation facts for an unread reply on this chat.
@@ -165,6 +170,7 @@ impl Objects {
                         Card::Open
                         | Card::Deciding { .. }
                         | Card::Refused { .. }
+                        | Card::Unknown { .. }
                         | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => {}
                     }
                     return Some(id);
@@ -180,7 +186,16 @@ impl Objects {
             Ok(_) => {}
             Err(_) => return None,
         }
-        let object = Object { key, project: None, body: None, sources, card: Card::Open, shown: true, reply: None };
+        let object = Object {
+            key,
+            project: None,
+            body: None,
+            sources,
+            card: Card::Open,
+            answer: None,
+            shown: true,
+            reply: None,
+        };
         let Ok(id) = self.slab.insert(object) else {
             return None;
         };
@@ -283,6 +298,7 @@ impl Objects {
                 Card::Open
                 | Card::Deciding { .. }
                 | Card::Refused { .. }
+                | Card::Unknown { .. }
                 | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => {}
             }
         }
@@ -308,6 +324,12 @@ impl Objects {
                 let object = self.slab.get(*id).expect("indexed object exists");
                 if object.sources.is_empty() {
                     match object.card {
+                        Card::Unknown { .. } => {
+                            if !object.shown {
+                                gone = Some(*key);
+                                break;
+                            }
+                        }
                         Card::Open | Card::Refused { .. } => {
                             gone = Some(*key);
                             break;
@@ -348,6 +370,7 @@ fn retained(object: &Object) -> bool {
         return true;
     }
     match object.card {
+        Card::Unknown { .. } => object.shown,
         Card::Deciding { .. } | Card::Leaving { .. } => true,
         Card::Open | Card::Refused { .. } => false,
     }
@@ -357,7 +380,7 @@ fn retained(object: &Object) -> bool {
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let slots = limits.objects.checked_mul(2)?;
-    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes.checked_mul(3)?)?;
+    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes.checked_mul(4)?)?;
     Slab::<Object>::worst_case(slots)?
         .checked_add(Map::<ObjectKey, Id<Object>>::worst_case(limits.objects)?)?
         .checked_add(List::<ObjectKey>::worst_case(limits.objects)?)?
@@ -428,12 +451,12 @@ pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &cra
                 Card::Open | Card::Refused { .. } => {
                     object.card = Card::Leaving { how: Left::Looking, until: domain.now.saturating_add(domain.linger) };
                 }
-                Card::Deciding { .. } | Card::Leaving { .. } => {}
+                Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
             }
         }
     }
 }
-fn document_read(key: ObjectKey) -> crate::contract::Read {
+pub(crate) fn document_read(key: ObjectKey) -> crate::contract::Read {
     use crate::contract::Read;
     match key {
         ObjectKey::Task(task) => Read::Task { task },
@@ -456,7 +479,7 @@ pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queu
                 Left::Looking => true,
                 Left::Answered { .. } | Left::Ended { .. } | Left::Unknown => false,
             },
-            Card::Open | Card::Deciding { .. } | Card::Refused { .. } => false,
+            Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Unknown { .. } => false,
         };
         if looking {
             let what = document_read(object.key);
@@ -512,6 +535,7 @@ pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
                 Card::Open
                 | Card::Deciding { .. }
                 | Card::Refused { .. }
+                | Card::Unknown { .. }
                 | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => false,
             }
         }
@@ -524,7 +548,7 @@ pub(crate) fn read_card(
     result: crate::contract::ReadResult,
     out: &mut skein_lib::Queue<crate::Request>,
 ) {
-    use crate::contract::{ReadNone, ReadResult, ReadValue};
+    use crate::contract::{ReadNone, ReadResult};
     let Some(receipt) = domain.reads.terminal(token) else {
         return;
     };
@@ -549,29 +573,12 @@ pub(crate) fn read_card(
     let key = object.key;
     let leaving = match &object.card {
         Card::Leaving { how: Left::Looking, .. } => true,
-        Card::Open | Card::Refused { .. } => false,
+        Card::Open | Card::Refused { .. } | Card::Unknown { .. } => false,
         Card::Deciding { .. }
         | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => return,
     };
     let body = match result {
-        ReadResult::Value(value) => match value {
-            ReadValue::Task(task) => Some(Body::Task(task)),
-            ReadValue::Proposal(proposal) => Some(Body::Proposal(proposal)),
-            ReadValue::Escalation(escalation) => Some(Body::Escalation(escalation)),
-            ReadValue::Question(question) => Some(Body::Question(question)),
-            ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
-            ReadValue::Result(result) => Some(Body::Result(result)),
-            ReadValue::Frame(_)
-            | ReadValue::Inbox(_)
-            | ReadValue::Activity(_)
-            | ReadValue::History(_)
-            | ReadValue::Conversations(_)
-            | ReadValue::Ended(_)
-            | ReadValue::Goals(_)
-            | ReadValue::Project(_)
-            | ReadValue::Notes(_)
-            | ReadValue::Deployment(_) => None,
-        },
+        ReadResult::Value(value) => read_body(key, value),
         ReadResult::None(why) => {
             match why {
                 ReadNone::SignedOut => crate::domain::signed_out(domain, out),
@@ -580,6 +587,7 @@ pub(crate) fn read_card(
             None
         }
     };
+    let refreshed = body.is_some();
     if let Some(body) = body {
         let stored = domain.objects.put(key, body);
         if !stored {
@@ -587,6 +595,15 @@ pub(crate) fn read_card(
         }
     }
     if !leaving {
+        let object = domain.objects.get_mut(id).expect("terminal card exists");
+        match object.card {
+            Card::Unknown { .. } => {
+                if refreshed {
+                    object.card = Card::Open;
+                }
+            }
+            Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Leaving { .. } => {}
+        }
         domain.changed();
         return;
     }
@@ -602,6 +619,44 @@ pub(crate) fn read_card(
     domain.timers.arm(crate::domain::Timer::Linger(id), until).expect("one linger timer per object fits");
     domain.changed();
 }
+fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> {
+    use crate::contract::ReadValue;
+    match value {
+        ReadValue::Task(task) => Some(Body::Task(task)),
+        ReadValue::Proposal(proposal) => Some(Body::Proposal(proposal)),
+        ReadValue::Escalation(escalation) => Some(Body::Escalation(escalation)),
+        ReadValue::Question(question) => Some(Body::Question(question)),
+        ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
+        ReadValue::Result(result) => Some(Body::Result(result)),
+        ReadValue::Frame(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::Activity(_)
+        | ReadValue::History(_)
+        | ReadValue::Conversations(_)
+        | ReadValue::Ended(_)
+        | ReadValue::Goals(_)
+        | ReadValue::Project(_)
+        | ReadValue::Deployment(_) => None,
+        ReadValue::Notes(page) => {
+            let project = match key {
+                ObjectKey::Note { project, .. } => project,
+                ObjectKey::Task(_)
+                | ObjectKey::Proposal(_)
+                | ObjectKey::Escalation(_)
+                | ObjectKey::Question { .. }
+                | ObjectKey::PersonTask(_)
+                | ObjectKey::Result(_) => return None,
+            };
+            for note in page.rows.into_boxed() {
+                if key == (ObjectKey::Note { project, note: note.number }) {
+                    return Some(Body::Note { project, document: Box::new(note) });
+                }
+            }
+            None
+        }
+    }
+}
+
 impl Body {
     /// The object named by these facts, validated before replacing a body.
     #[must_use]

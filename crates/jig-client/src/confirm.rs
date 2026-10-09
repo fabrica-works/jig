@@ -98,7 +98,11 @@ pub(crate) fn close(domain: &mut Domain) {
     if let Some(object) = domain.objects.get_mut(open.object) {
         match object.card {
             Card::Deciding { request: None, .. } => object.card = open.previous,
-            Card::Open | Card::Deciding { request: Some(_), .. } | Card::Refused { .. } | Card::Leaving { .. } => {}
+            Card::Open
+            | Card::Deciding { request: Some(_), .. }
+            | Card::Refused { .. }
+            | Card::Unknown { .. }
+            | Card::Leaving { .. } => {}
         }
     }
     clear_fields(domain);
@@ -120,7 +124,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
     };
     match object.card {
         Card::Open | Card::Refused { .. } => {}
-        Card::Deciding { .. } | Card::Leaving { .. } => return,
+        Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
     }
     let proposed = match acts::offered(object, act) {
         Admission::Allowed => None,

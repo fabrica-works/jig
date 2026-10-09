@@ -585,11 +585,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             Act::Dispose { task, take_over } => crate::confirm::dispose(domain, task, take_over),
             Act::Change { change } => crate::confirm::change(domain, *change),
             Act::Confirm => crate::confirm::send(domain, out),
+            Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out),
             Act::Submit { .. } | Act::Fold { .. } => {}
         },
         Event::Start { .. } => {}
         Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
-        Event::Progress { request, progress } => crate::intents::progress(domain, request, progress),
+        Event::Progress { request, progress } => crate::intents::progress(domain, request, progress, out),
         Event::Answered { request, answer } => crate::intents::answered(domain, env, request, answer, out),
         Event::SignedOut => signed_out(domain, out),
         Event::Read { read, result } => {
@@ -870,7 +871,8 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     }
                     crate::objects::Card::Open
                     | crate::objects::Card::Deciding { .. }
-                    | crate::objects::Card::Refused { .. } => {}
+                    | crate::objects::Card::Refused { .. }
+                    | crate::objects::Card::Unknown { .. } => {}
                 }
             }
         }

@@ -116,6 +116,16 @@ impl Intents {
         self.slab.retire(id);
         Some(receipt)
     }
+    /// Retires a request once the table's retention expires, without inventing an answer.
+    pub fn unknown(&mut self, token: Token) -> Option<Origin> {
+        let id = Id::from_token(token);
+        self.ids.remove(&id)?;
+        let intent = self.slab.get_mut(id).expect("registered intent exists");
+        intent.progress = Progress::Unknown;
+        let origin = intent.origin;
+        self.slab.retire(id);
+        Some(origin)
+    }
     /// Frees slots only after their durable terminal was delivered.
     pub fn reclaim(&mut self) {
         self.slab.reclaim();
@@ -144,8 +154,9 @@ pub fn send_card(
     match domain.intents.ask(scope, origin, ask, out) {
         Some(id) => {
             let progress = domain.intents.get(id).expect("joined intent exists").progress;
-            domain.objects.get_mut(object_id).expect("named card exists").card =
-                crate::objects::Card::Deciding { request: Some(id.token()), progress };
+            let object = domain.objects.get_mut(object_id).expect("named card exists");
+            object.card = crate::objects::Card::Deciding { request: Some(id.token()), progress };
+            object.answer = None;
             domain.changed();
             Some(id.token())
         }
@@ -173,7 +184,11 @@ pub(crate) fn by_value(domain: &mut crate::Domain, value: ByValue, out: &mut Que
         });
     }
 }
-pub(crate) fn progress(domain: &mut crate::Domain, request: Token, progress: Progress) {
+pub(crate) fn progress(domain: &mut crate::Domain, request: Token, progress: Progress, out: &mut Queue<Request>) {
+    if progress == Progress::Unknown {
+        unknown(domain, request, out);
+        return;
+    }
     let Some(origin) = domain.intents.progress(request, progress) else {
         return;
     };
@@ -204,33 +219,23 @@ pub(crate) fn answered(
         Origin::Page { generation, purpose } => {
             crate::pages::conversations::answered(domain, env, request, generation, purpose, receipt.answer, out);
         }
-        Origin::Card { object, .. } => {
-            if let Some(id) = domain.objects.find(object) {
-                if !domain.objects.get(id).expect("named card exists").shown {
-                    crate::notices::show(
-                        domain,
-                        crate::notices::Kind::Answer { object, answer: receipt.answer.clone() },
-                    );
-                }
-                match receipt.answer {
-                    Answer::Refused(refusal) => {
-                        domain.objects.get_mut(id).expect("named card exists").card =
-                            crate::objects::Card::Refused { refusal };
-                    }
-                    Answer::Done(outcome) => {
-                        if crate::objects::stops_waiting(object, &outcome) {
-                            let left = domain.leave_answer(id, outcome);
-                            assert!(left, "answered card exists");
-                        } else {
-                            domain.objects.get_mut(id).expect("named card exists").card = crate::objects::Card::Open;
-                        }
-                    }
-                }
-                domain.objects.prune();
-                domain.changed();
-            } else {
-                crate::notices::show(domain, crate::notices::Kind::Answer { object, answer: receipt.answer });
+        Origin::Card { object, act } => crate::objects::answer::answered(domain, object, act, receipt.answer, out),
+    }
+}
+fn unknown(domain: &mut crate::Domain, request: Token, out: &mut Queue<Request>) {
+    let Some(origin) = domain.intents.unknown(request) else {
+        return;
+    };
+    match origin {
+        Origin::Card { object, act } => crate::objects::answer::unknown(domain, object, act),
+        Origin::Program { asked } => out.push(Request::Unknown { asked }),
+        Origin::Page { purpose, .. } => {
+            if domain.chats.starting == Some(request) {
+                domain.chats.starting = None;
+                domain.chats.words = None;
             }
+            crate::notices::show(domain, crate::notices::Kind::PageUnknown { purpose });
         }
     }
+    domain.changed();
 }
