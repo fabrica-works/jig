@@ -13,6 +13,8 @@ mod binding;
 mod builder;
 mod diff;
 mod limits;
+pub mod markdown;
+pub mod phrases;
 mod render;
 mod tree;
 

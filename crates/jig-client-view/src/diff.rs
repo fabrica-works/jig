@@ -20,6 +20,7 @@ pub struct Attribute {
     pub styles: List<Style>,
     /// The shell asks the view root for this node's address when this is set.
     pub linked: bool,
+    pub external: Option<Box<[u8]>>,
     pub bound: bool,
     pub drawing: Option<Drawing>,
 }
@@ -32,6 +33,7 @@ impl Attribute {
             states: node.states.clone(),
             styles: node.styles.clone(),
             linked: node.link.is_some(),
+            external: node.external.clone(),
             bound: node.binding.is_some() || node.link.is_some(),
             drawing: node.drawing.clone(),
         }
@@ -248,6 +250,7 @@ fn attributes(old: &Node, new: &Node, out: &mut Queue<Patch>) {
         || old.states != new.states
         || old.styles != new.styles
         || old.link != new.link
+        || old.external != new.external
         || was_bound != bound
         || old.drawing != new.drawing
     {

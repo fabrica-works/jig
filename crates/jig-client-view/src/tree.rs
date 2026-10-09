@@ -197,6 +197,8 @@ pub struct Node {
     pub text: List<TextRun>,
     pub value: Option<Value>,
     pub link: Option<crate::Binding>,
+    /// A checked external Markdown target, independent of application addresses.
+    pub external: Option<Box<[u8]>>,
     pub key: Option<Key>,
     pub binding: Option<crate::Binding>,
     pub slot: Option<SlotRef>,
@@ -215,6 +217,7 @@ impl Node {
             text: List::with_capacity(0),
             value: None,
             link: None,
+            external: None,
             key: None,
             binding: None,
             slot: None,
@@ -234,6 +237,7 @@ impl Node {
             text: List::with_capacity(runs),
             value: None,
             link: None,
+            external: None,
             key: None,
             binding: None,
             slot: None,
@@ -248,6 +252,9 @@ impl Node {
         }
         if let Some(value) = &self.value {
             bytes = bytes.checked_add(length(&value.text)).expect("node bytes fit u32");
+        }
+        if let Some(external) = &self.external {
+            bytes = bytes.checked_add(length(external)).expect("node bytes fit u32");
         }
         for run in &self.text {
             bytes = bytes.checked_add(length(&run.text)).expect("node bytes fit u32");
@@ -318,6 +325,15 @@ impl Tree {
             return None;
         }
         self.find(id)?.link
+    }
+
+    /// A checked external Markdown link for a shell to show directly.
+    #[must_use]
+    pub fn external(&self, id: NodeId) -> Option<&[u8]> {
+        if id == NodeId(0) {
+            return None;
+        }
+        self.find(id)?.external.as_deref()
     }
 
     /// The number of nodes, including every fallback child.

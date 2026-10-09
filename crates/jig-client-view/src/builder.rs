@@ -185,10 +185,25 @@ impl Builder {
     /// Name a link's address in its owner's vocabulary.
     pub fn link(&mut self, to: Binding) {
         assert!(self.node().role == Role::Link, "addresses belong to links");
+        assert!(self.node().external.is_none(), "a link has one address");
         if self.node().link.is_none() && self.node().binding.is_none() {
             self.reserve_binding();
         }
         self.node_mut().link = Some(to);
+    }
+
+    /// Give a Markdown link its checked http or https target.
+    pub fn external(&mut self, to: &[u8]) {
+        assert!(self.node().role == Role::Link, "external addresses belong to links");
+        assert!(self.node().link.is_none(), "a link has one address");
+        assert!(crate::markdown::safe_url(to), "external target is checked http or https");
+        let old = match &self.node().external {
+            Some(bytes) => length(bytes),
+            None => 0,
+        };
+        self.charge(old, length(to));
+        let target = copy_of(to);
+        self.node_mut().external = Some(target);
     }
 
     /// Bind an actable node to its owner's token.

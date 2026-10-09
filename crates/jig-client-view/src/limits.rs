@@ -13,9 +13,9 @@ use skein_lib::{List, Queue, Stack};
 pub struct Limits {
     pub nodes: u32,
     pub depth: u32,
-    /// Name, runs and field value together on a node.
+    /// Name, runs, field value and external target together on a node.
     pub text_per_node: u32,
-    /// Name, runs and field value together across the tree.
+    /// Name, runs, field value and external target together across the tree.
     pub text_bytes: u32,
     pub drawing_bytes: u32,
     pub styles_per_node: u32,
@@ -45,7 +45,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let maps = List::<Option<u32>>::worst_case(limits.nodes)?.checked_mul(4)?;
     let children = List::<u32>::worst_case(limits.nodes)?;
     let ancestry = Stack::<Open>::worst_case(limits.depth)?.checked_mul(2)?;
+    let markdown = crate::markdown::worst_case(limits.text_bytes, limits.markdown_depth)?;
     trees
+        .checked_add(markdown)?
         .checked_add(stacks)?
         .checked_add(slots)?
         .checked_add(patches)?

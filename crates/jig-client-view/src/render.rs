@@ -75,6 +75,11 @@ impl View {
     pub fn act(&self, node: NodeId, act: Act) -> Option<BoundAct> {
         self.tree().act(node, act)
     }
+    /// A checked external target the shell may show without an owner translation.
+    #[must_use]
+    pub fn external(&self, node: NodeId) -> Option<&[u8]> {
+        self.tree().external(node)
+    }
     /// Hand the link's address binding to the view root for translation.
     #[must_use]
     pub fn address(&self, node: NodeId) -> Option<Binding> {
