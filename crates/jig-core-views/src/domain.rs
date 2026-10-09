@@ -34,6 +34,11 @@ impl Domain {
     pub fn runs(&self) -> u32 {
         self.runs.len()
     }
+    /// Whether an opaque run has any admitted follower.
+    #[must_use]
+    pub fn follows(&self, run: Token) -> bool {
+        self.runs.contains_key(&run)
+    }
     /// Watches have no timers.
     #[must_use]
     pub const fn next_deadline(&self) -> Option<Time> {

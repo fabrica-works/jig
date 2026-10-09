@@ -127,8 +127,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
     for (_, binding) in &core.view_subjects {
         let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
         let touched = match subject {
-            Subject::Task { task } => *task == row.number,
-            Subject::Run { task } => *task == row.number && core.proofs.contains_key(task),
+            Subject::Task { task } | Subject::Run { task } => *task == row.number,
             Subject::Tree { task } => trees.as_slice().contains(task),
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
             Subject::Goals { project } => *project == row.project && goal,
@@ -229,6 +228,66 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
         return Requests::Out(out);
     }
     let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded watch finish").held);
+    append(end_invalid(core, env), &mut out);
+    // Attempt endings discard volatile text without ending the task's watch.
+    for (_, binding) in &core.view_subjects {
+        let subject = &core.view_names.get(binding.subject).expect("bound watched subject").subject;
+        let task = match subject {
+            Subject::Run { task } => Some(*task),
+            Subject::Frame { .. }
+            | Subject::Task { .. }
+            | Subject::Tree { .. }
+            | Subject::Chips { .. }
+            | Subject::Inbox { .. }
+            | Subject::Goals { .. }
+            | Subject::Conversations { .. }
+            | Subject::Deployment
+            | Subject::Proposal { .. }
+            | Subject::Escalation { .. }
+            | Subject::Question { .. }
+            | Subject::PersonTask { .. }
+            | Subject::Result { .. }
+            | Subject::Project { .. }
+            | Subject::Note { .. } => None,
+        };
+        let Some(task) = task else { continue };
+        let ended = match views::position(&core.views, skein_lib::Token::new(task)) {
+            Some((writing, _)) => match core.proofs.get(&task) {
+                Some(proof) => {
+                    proof.terminal.is_some()
+                        || proof.attempt != writing.attempt
+                        || match proof.turn {
+                            Some(kept) => writing.turn <= kept.turn,
+                            None => false,
+                        }
+                }
+                None => true,
+            },
+            None => false,
+        };
+        if ended {
+            let mut quiet = Queue::with_capacity(1);
+            views::step(
+                &mut core.views,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.views },
+                views::Event::RunEnded { run: skein_lib::Token::new(task) },
+                &mut quiet,
+            );
+            assert!(quiet.is_empty(), "ending writing emits no output");
+        }
+    }
+    let changed = core::mem::replace(&mut core.changed_views, Set::with_capacity(env.limits.views.watchers));
+    for name in &changed {
+        let mut subjects = List::with_capacity(1);
+        subjects.push(name.token()).expect("one opaque subject mark");
+        append(super::view_routes::route_view(core, env, views::Event::Changed { subjects }), &mut out);
+    }
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+
+pub(super) fn end_invalid(core: &mut Core, env: &Env<Limits>) -> Requests {
+    let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded admission endings").held);
     let mut watches = List::with_capacity(core.view_subjects.len());
     for (watcher, binding) in &core.view_subjects {
         watches.push((*watcher, binding.clone())).expect("bounded watch snapshot");
@@ -242,12 +301,6 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
         if let Some(end) = ending {
             append(super::view_routes::route_view(core, env, views::Event::EndWatch { watcher, end }), &mut out);
         }
-    }
-    let changed = core::mem::replace(&mut core.changed_views, Set::with_capacity(env.limits.views.watchers));
-    for name in &changed {
-        let mut subjects = List::with_capacity(1);
-        subjects.push(name.token()).expect("one opaque subject mark");
-        append(super::view_routes::route_view(core, env, views::Event::Changed { subjects }), &mut out);
     }
     out.push(Request::Decided);
     Requests::Out(out)

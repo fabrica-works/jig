@@ -322,6 +322,12 @@ pub fn terminal(agent: &mut Agent, env: &Env<Limits>, client: Token, completion:
 
 #[expect(clippy::too_many_lines, reason = "every Smith request has one explicit route")]
 fn route(agent: &mut Agent, env: &Env<Limits>, client: Token, out: &mut Queue<Request>) {
+    // A terminal releases the Smith domain below. Move its observed content
+    // first, so the parent names it before routing that terminal's turn.
+    for _ in 0..env.limits.smith.session.facts {
+        let Some(content) = agent.pop_content(client) else { break };
+        out.push(Request::Content { client, content });
+    }
     for _ in 0..smith::max_out(&env.limits.smith) {
         let Some(request) = agent.lower.pop() else { break };
         let run = agent.runs.get(&client).expect("output belongs to live run");

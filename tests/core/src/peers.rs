@@ -76,6 +76,9 @@ impl Peers {
             workers::Up::Lost { channel } => {
                 root::Event::Core(core::Event::Fleet(fleet::Event::Lost { channel: Token::new(channel) }))
             }
+            workers::Up::Text { task, attempt, turn, offset, text, .. } => {
+                root::Event::Text { task, attempt, turn, offset, text }
+            }
             workers::Up::Turn { channel, task, attempt, turn, spent, read, body } => root::Event::Turn {
                 channel: Token::new(channel),
                 task,

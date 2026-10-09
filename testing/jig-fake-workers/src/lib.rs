@@ -52,6 +52,8 @@ pub enum Call {
 /// One action of an assigned run's script.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Script {
+    /// Provisional text explicitly named by its next committed turn.
+    Text { turn: u32, offset: u32, text: Box<[u8]> },
     /// Take a whole turn, within the independently supplied allowance.
     Turn { body: Box<[u8]>, cost: u64, read: Option<u64> },
     /// Ask one call and wait for its answer before advancing.
@@ -95,6 +97,8 @@ pub enum End {
 /// Independent reports at the worker face; the world translates them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
+    /// Best-effort writing, never retained for contact replay.
+    Text { channel: u64, task: u64, attempt: u64, turn: u32, offset: u32, text: Box<[u8]> },
     /// Begin a connection and list every retained slot.
     Hello { channel: u64, slots: u32, stop_bound: Duration, hosting: Box<[(u64, u64, bool)]> },
     /// The channel disappeared.
@@ -336,6 +340,7 @@ impl Worker {
 
     /// Advance each run by at most one action, with at most two retained turns.
     #[must_use]
+    #[expect(clippy::too_many_lines, reason = "one scripted tick advances each independent host slot exhaustively")]
     pub fn tick(&mut self, now: Time) -> Vec<Up> {
         if self.vanished {
             return Vec::new();
@@ -379,6 +384,14 @@ impl Worker {
             run.until = None;
             let Some(action) = run.script.pop_front() else { continue };
             let emitted = match action {
+                Script::Text { turn, offset, text } => Some(Up::Text {
+                    channel: self.channel,
+                    task: run.assignment.task,
+                    attempt: run.assignment.attempt,
+                    turn,
+                    offset,
+                    text,
+                }),
                 Script::Turn { body, cost, read } => {
                     run.spent = run.spent.checked_add(cost).expect("spend fits");
                     assert!(run.spent <= run.assignment.budget, "scripted completion stays in its allowance");

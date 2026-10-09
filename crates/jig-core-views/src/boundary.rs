@@ -66,6 +66,17 @@ pub struct Follow {
     pub offset: u32,
 }
 
+/// Current volatile writing, copied only when a document is constructed.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Writing {
+    pub turn: TurnName,
+    pub from: u32,
+    pub to: u32,
+    pub text: Box<[u8]>,
+    pub cut: bool,
+    pub call: Option<Call>,
+}
+
 /// Events from the parent.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {

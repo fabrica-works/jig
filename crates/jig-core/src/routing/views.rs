@@ -279,3 +279,86 @@ fn watch_document(
         Err(Missing::Unknown | Missing::Ended | Missing::TooLarge) => Err(views::End::Gone),
     }
 }
+
+impl Core {
+    /// Position for a host whose content facts omit the turn and offset.
+    /// The root reports this fallback; hosts should eventually name their turns.
+    #[must_use]
+    pub fn provisional_position(&self, run: Token, attempt: Token) -> Option<(views::TurnName, u32)> {
+        if !self.views.follows(run) {
+            return None;
+        }
+        let proof = self.proofs.get(&run.raw())?;
+        if proof.attempt != attempt.raw() || proof.terminal.is_some() {
+            return None;
+        }
+        let turn = match proof.turn {
+            Some(turn) => turn.turn.checked_add(1)?,
+            None => 1,
+        };
+        let name = views::TurnName { attempt: attempt.raw(), turn };
+        let offset = match views::position(&self.views, run) {
+            Some((turn, to)) if turn == name => to,
+            Some(_) | None => 0,
+        };
+        Some((name, offset))
+    }
+}
+
+#[expect(clippy::too_many_arguments, reason = "a live host reports its fenced turn, offset, text and call")]
+pub(super) fn run_text(
+    core: &mut Core,
+    env: &Env<Limits>,
+    run: Token,
+    attempt: Token,
+    turn: u32,
+    offset: u32,
+    text: Box<[u8]>,
+    call: Option<views::Call>,
+) -> Requests {
+    let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded stream route").held);
+    append_stream(super::watch_marks::end_invalid(core, env), &mut out);
+    let live = match core.proofs.get(&run.raw()) {
+        Some(proof) => {
+            proof.attempt == attempt.raw()
+                && proof.terminal.is_none()
+                && turn != 0
+                && match proof.turn {
+                    Some(kept) => turn > kept.turn,
+                    None => true,
+                }
+        }
+        None => false,
+    };
+    if live {
+        append_stream(
+            route_view(
+                core,
+                env,
+                views::Event::Text { run, turn: views::TurnName { attempt: attempt.raw(), turn }, offset, text, call },
+            ),
+            &mut out,
+        );
+    }
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+
+pub(super) fn stream_delivered(core: &mut Core, env: &Env<Limits>, watcher: Token) -> Requests {
+    let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded stream terminal").held);
+    append_stream(super::watch_marks::end_invalid(core, env), &mut out);
+    append_stream(route_view(core, env, views::Event::StreamDelivered { watcher }), &mut out);
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+fn append_stream(requests: Requests, out: &mut Queue<Request>) {
+    let Requests::Out(mut requests) = requests;
+    for _ in 0..requests.len() {
+        match requests.pop().expect("stream output count") {
+            Request::Decided => {}
+            request @ (Request::Held(_) | Request::Now(_) | Request::Write(_) | Request::Ask { .. }) => {
+                out.push(request);
+            }
+        }
+    }
+}

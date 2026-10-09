@@ -29,6 +29,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.slots).checked_mul(per_run)?)?
         .checked_add(Queue::<smith::Request>::worst_case(smith::max_out(&limits.smith))?)?
         .checked_add(Queue::<Request>::worst_case(max_out(limits))?)?
+        .checked_add(u64::from(limits.smith.session.facts).checked_mul(limits.smith.session.session_bytes)?)?
         .checked_add(
             u64::from(limits.smith.endpoints)
                 .checked_mul(u64::try_from(size_of::<smith::run::charter::Endpoint>()).ok()?)?,
@@ -39,6 +40,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
 #[must_use]
 pub const fn max_out(limits: &Limits) -> u32 {
     smith::max_out(&limits.smith)
+        .saturating_add(limits.smith.session.facts)
         .saturating_add(limits.smith.run.calls)
         .saturating_add(limits.smith.run.conversations)
         .saturating_add(2)

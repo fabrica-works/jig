@@ -193,6 +193,14 @@ pub enum Event {
         to: ReplyTo,
         call: core::SettledCall,
     },
+    /// A scripted worker's provisional writing, named by its host.
+    Text {
+        task: u64,
+        attempt: u64,
+        turn: u32,
+        offset: u32,
+        text: Box<[u8]>,
+    },
     /// A scripted worker's retained turn, including its opaque body.
     Turn {
         channel: Token,
@@ -471,6 +479,18 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         Event::Core(event) => decide(domain, env, Work::Core(event)),
         Event::ReadAnswer { to, call } => decide(domain, env, Work::ReadAnswer { to, call }),
         Event::Connector { number, event } => decide(domain, env, Work::Connector { number, event }),
+        Event::Text { task, attempt, turn, offset, text } => decide(
+            domain,
+            env,
+            Work::Core(core::Event::RunText {
+                run: Token::new(task),
+                attempt: Token::new(attempt),
+                turn,
+                offset,
+                text,
+                call: None,
+            }),
+        ),
         Event::Turn { channel, task, attempt, turn, cumulative, read, transcript } => {
             decide(domain, env, Work::Turn { channel, task, attempt, turn, cumulative, read, transcript });
         }

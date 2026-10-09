@@ -154,3 +154,56 @@ fn deferred_smith_work_is_ready_after_reclaim_and_resumed_before_parking() {
     assert!(completed, "resuming reaches the provider boundary");
     assert!(!agent.is_ready(), "waiting for a provider completion permits parking");
 }
+
+#[test]
+fn observed_provider_content_precedes_the_turn_emitted_for_it() {
+    let (mut agent, limits, start) = fixture();
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut out = Queue::with_capacity(max_out(&limits));
+    let client = Token::new(7);
+    step(&mut agent, &env, host::Event::Spawn { client, start }, &mut out);
+    let mut owner = None;
+    while let Some(item) = out.pop() {
+        if let Request::Lower { request: smith::Request::Complete { owner: name, .. }, .. } = item {
+            owner = Some(name);
+        }
+    }
+    crate::terminal(
+        &mut agent,
+        &env,
+        client,
+        crate::Completion::Completed {
+            owner: owner.unwrap(),
+            completion: smith::llm::Completion {
+                content: Box::new([smith::llm::Said::Text { text: Box::from(&b"live turn"[..]), replay: None }]),
+                stop: smith::llm::Stop::EndTurn,
+                usage: smith::llm::Usage {
+                    input_tokens: 1,
+                    output_tokens: 1,
+                    cache_read_tokens: 0,
+                    cache_write_tokens: 0,
+                },
+            },
+        },
+        &mut out,
+    );
+    let mut content_seen = false;
+    let mut turn_seen = false;
+    while let Some(item) = out.pop() {
+        match item {
+            Request::Content { client: seen, content: smith::Content::Text { text, .. } } => {
+                assert_eq!(seen, client);
+                assert_eq!(text.as_ref(), b"live turn");
+                assert!(!turn_seen);
+                content_seen = true;
+            }
+            Request::Host(host::Request::Turn { .. }) => {
+                assert!(content_seen);
+                turn_seen = true;
+            }
+            Request::Content { .. } | Request::Host(_) | Request::Lower { .. } => {}
+        }
+    }
+    assert!(content_seen);
+    assert!(turn_seen);
+}

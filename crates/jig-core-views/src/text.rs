@@ -193,6 +193,9 @@ pub(crate) fn offer_one(domain: &mut Domain, id: Id<Watcher>, out: &mut Queue<Re
     }
 }
 fn offer(watch: &mut Watcher, run: &Run, out: &mut Queue<Request>) {
+    if run.ended {
+        return;
+    }
     match watch.state {
         State::ClosingMake { .. } | State::ClosingDelivery { .. } | State::ClosingStream { .. } => return,
         State::Idle | State::Making { .. } | State::Sending { .. } => {}
@@ -243,6 +246,9 @@ pub(crate) fn delivered(domain: &mut Domain, token: Token, out: &mut Queue<Reque
 
 pub(crate) fn ended(domain: &mut Domain, token: Token) {
     if let Some(run) = domain.runs.get_mut(&token) {
+        if run.ended {
+            return;
+        }
         run.ended = true;
         run.from = 0;
         run.to = 0;
@@ -250,4 +256,34 @@ pub(crate) fn ended(domain: &mut Domain, token: Token) {
         run.call = None;
         run.revision = run.revision.checked_add(1).expect("provisional revision space");
     }
+}
+
+/// Copy the current run's suffix within the document's independent byte bound.
+#[must_use]
+pub fn writing(domain: &Domain, token: Token, capacity: u32) -> Option<crate::Writing> {
+    let run = domain.runs.get(&token)?;
+    if run.ended {
+        return None;
+    }
+    let turn = run.turn?;
+    let from = run.from.max(run.to.saturating_sub(capacity));
+    let index = usize::try_from(from.checked_sub(run.from).expect("bounded writing offset")).expect("byte index");
+    Some(crate::Writing {
+        turn,
+        from,
+        to: run.to,
+        text: copy_of(run.text.get(index..).expect("retained suffix")),
+        cut: from != 0,
+        call: bounded_call(run.call.clone(), capacity),
+    })
+}
+
+/// Current turn and end offset without copying provisional bytes.
+#[must_use]
+pub fn position(domain: &Domain, token: Token) -> Option<(TurnName, u32)> {
+    let run = domain.runs.get(&token)?;
+    if run.ended {
+        return None;
+    }
+    Some((run.turn?, run.to))
 }

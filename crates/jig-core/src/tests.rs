@@ -415,10 +415,13 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
         .unwrap();
     assert_eq!(
         make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()),
-        Ok(Document::Run(Run { task: 1, attempt: 7, committed_turn: 3, writing: None }))
+        Ok(Document::Run(Run { task: 1, attempt: Some(7), committed_turn: 3, writing: None }))
     );
     core.proofs.remove(&1);
-    assert_eq!(make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()), Err(Missing::Ended));
+    assert_eq!(
+        make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()),
+        Ok(Document::Run(Run { task: 1, attempt: None, committed_turn: 0, writing: None }))
+    );
 }
 
 #[test]
@@ -1804,3 +1807,161 @@ fn taking_a_changed_delivery_after_signin_expiry_ends_instead_of_making_a_docume
 }
 
 mod activity;
+fn open_run_watch(core: &mut Core, limits: &Limits, number: u64) {
+    let watcher = Token::new(number);
+    watch_outputs(
+        core,
+        limits,
+        Event::Watch { watcher, sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+    );
+    watch_outputs(core, limits, Event::Delivered { watcher });
+}
+fn run_text_outputs(
+    core: &mut Core,
+    limits: &Limits,
+    attempt: u64,
+    turn: u32,
+    offset: u32,
+    text: &[u8],
+) -> Box<[Request]> {
+    watch_outputs(
+        core,
+        limits,
+        Event::RunText {
+            run: Token::new(1),
+            attempt: Token::new(attempt),
+            turn,
+            offset,
+            text: skein_lib::bytes::copy_of(text),
+            call: None,
+        },
+    )
+}
+fn assert_stream(request: &Request, watcher: u64, turn: views::TurnName, from: u32, to: u32, text: &[u8], cut: bool) {
+    let Request::Now(now) = request else { panic!("provisional stream uses the door") };
+    let Now::RunText { watcher: got, turn: named, from: start, to: end, text: bytes, cut: trimmed, .. } = now.as_ref()
+    else {
+        panic!("typed text stream")
+    };
+    assert_eq!(
+        (*got, *named, *start, *end, bytes.as_ref(), *trimmed),
+        (Token::new(watcher), turn, from, to, text, cut)
+    );
+}
+
+#[test]
+fn two_watchers_of_one_run_advance_independent_turn_offsets() {
+    let (mut core, limits) = watch_core();
+    for watcher in [30, 31] {
+        open_run_watch(&mut core, &limits, watcher);
+    }
+    let turn = views::TurnName { attempt: 7, turn: 1 };
+    let first = run_text_outputs(&mut core, &limits, 7, 1, 0, b"abc");
+    assert_stream(&first[0], 30, turn, 0, 3, b"abc", false);
+    assert_stream(&first[1], 31, turn, 0, 3, b"abc", false);
+    watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(30) });
+    let second = run_text_outputs(&mut core, &limits, 7, 1, 3, b"def");
+    assert_stream(&second[0], 30, turn, 3, 6, b"def", false);
+    watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(30) });
+    let third = run_text_outputs(&mut core, &limits, 7, 1, 6, b"ghi");
+    assert_stream(&third[0], 30, turn, 6, 9, b"ghi", false);
+    let slow = watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(31) });
+    assert_stream(&slow[0], 31, turn, 3, 9, b"defghi", false);
+    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+        panic!("run document")
+    };
+    let writing = run.writing.unwrap();
+    assert_eq!((writing.turn, writing.from, writing.to, writing.text.as_ref()), (turn, 0, 9, b"abcdefghi".as_slice()));
+}
+
+#[test]
+fn turn_three_writing_follows_committed_turn_two_and_fences_old_attempts() {
+    let (mut core, limits) = watch_core();
+    core.proofs.get_mut(&1).unwrap().turn = Some(TurnProof { turn: 2, cumulative: 0, read: None });
+    open_run_watch(&mut core, &limits, 30);
+    assert_eq!(run_text_outputs(&mut core, &limits, 6, 3, 0, b"stale").len(), 1);
+    assert_eq!(run_text_outputs(&mut core, &limits, 7, 2, 0, b"committed").len(), 1);
+    let out = run_text_outputs(&mut core, &limits, 7, 3, 0, b"third");
+    assert_stream(&out[0], 30, views::TurnName { attempt: 7, turn: 3 }, 0, 5, b"third", false);
+    assert_eq!(
+        core.provisional_position(Token::new(1), Token::new(7)),
+        Some((views::TurnName { attempt: 7, turn: 3 }, 5))
+    );
+    core.proofs.get_mut(&1).unwrap().turn = Some(TurnProof { turn: 3, cumulative: 0, read: None });
+    finish_watch_outputs(&mut core, &limits);
+    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+        panic!("run document")
+    };
+    assert!(run.writing.is_none());
+    assert_eq!(watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(30) }).len(), 1);
+}
+
+#[test]
+fn a_slow_run_stream_reports_the_bounded_suffix_and_cut_offset() {
+    let (mut core, limits) = watch_core();
+    open_run_watch(&mut core, &limits, 30);
+    let width = usize::try_from(limits.views.text_bytes).unwrap();
+    let mut a = List::with_capacity(limits.views.text_bytes);
+    let mut b = List::with_capacity(limits.views.text_bytes);
+    for _ in 0..width {
+        a.push(b'a').unwrap();
+        b.push(b'b').unwrap();
+    }
+    let a = a.into_boxed();
+    let b = b.into_boxed();
+    run_text_outputs(&mut core, &limits, 7, 1, 0, &a);
+    run_text_outputs(&mut core, &limits, 7, 1, limits.views.text_bytes, &b);
+    run_text_outputs(&mut core, &limits, 7, 1, limits.views.text_bytes * 2, &a);
+    let out = watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(30) });
+    assert_stream(
+        &out[0],
+        30,
+        views::TurnName { attempt: 7, turn: 1 },
+        limits.views.text_bytes * 2,
+        limits.views.text_bytes * 3,
+        &a,
+        true,
+    );
+}
+
+#[test]
+fn a_run_watch_stays_open_between_attempts_and_the_new_attempt_starts_at_zero() {
+    let (mut core, limits) = watch_core();
+    open_run_watch(&mut core, &limits, 30);
+    run_text_outputs(&mut core, &limits, 7, 1, 0, b"old");
+    core.proofs.get_mut(&1).unwrap().terminal =
+        Some(TerminalRecord { task: 1, attempt: 7, cumulative: 0, end: tasks::End::Parked });
+    watch_outputs(&mut core, &limits, Event::Tasks(tasks::Event::Hold { task: 1, why: tasks::Hold::Budget }));
+    let ended = finish_watch_outputs(&mut core, &limits);
+    let Request::Held(held) = &ended[0] else { panic!("idle run document") };
+    let Held::Delivery { document, .. } = held.as_ref() else { panic!("attempt ending leaves the watch open") };
+    let Document::Run(run) = document.as_ref() else { panic!("idle run") };
+    assert_eq!(run.attempt, None);
+    assert!(run.writing.is_none());
+    assert!(core.view_subjects.contains_key(&Token::new(30)));
+    watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(30) });
+    let proof = core.proofs.get_mut(&1).unwrap();
+    proof.attempt = 8;
+    proof.turn = None;
+    proof.terminal = None;
+    let next = run_text_outputs(&mut core, &limits, 8, 1, 0, b"new");
+    assert_stream(&next[0], 30, views::TurnName { attempt: 8, turn: 1 }, 0, 3, b"new", false);
+}
+
+#[test]
+fn an_expired_run_signin_receives_no_next_provisional_suffix() {
+    let (mut core, limits) = watch_core();
+    open_run_watch(&mut core, &limits, 30);
+    run_text_outputs(&mut core, &limits, 7, 1, 0, b"first");
+    run_text_outputs(&mut core, &limits, 7, 1, 5, b"secret");
+    let at = Duration::from_secs(61).as_nanos();
+    let Requests::Out(mut out) = step(
+        &mut core,
+        &Env { now: Time::from_nanos(at), wall: Wall::from_nanos(at), limits },
+        Event::StreamDelivered { watcher: Token::new(30) },
+    );
+    let Request::Held(held) = out.pop().unwrap() else { panic!("held expiry ending") };
+    let Held::WatchEnded { why, .. } = held.as_ref() else { panic!("no provisional suffix after expiry") };
+    assert_eq!(*why, views::End::SignedOut);
+    assert_eq!(out.len(), 1);
+}

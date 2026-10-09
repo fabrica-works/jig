@@ -389,6 +389,7 @@ impl Observer {
             | root::Event::Committed { .. }
             | root::Event::WriterRead { .. }
             | root::Event::ConnectorTimer { .. }
+            | root::Event::Text { .. }
             | root::Event::Failed { .. } => {}
         }
     }

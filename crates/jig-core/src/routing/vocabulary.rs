@@ -317,6 +317,10 @@ pub enum Event {
     Unwatch { watcher: Token },
     /// The protocol took a watch's held document.
     Delivered { watcher: Token },
+    /// The protocol took one provisional stream delivery.
+    StreamDelivered { watcher: Token },
+    /// A live host's text, fenced by its attempt and named turn.
+    RunText { run: Token, attempt: Token, turn: u32, offset: u32, text: Box<[u8]>, call: Option<views::Call> },
     /// Task lifecycle or hub work.
     Tasks(tasks::Event),
     /// An application asks for one admitted recurring core procedure.

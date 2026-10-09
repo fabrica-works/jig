@@ -115,3 +115,21 @@ fn a_vanished_workers_lost_spend_excludes_acknowledged_turns() {
     assert_eq!(worker.actual_spent, 5);
     assert_eq!(worker.lost_spent, 3);
 }
+
+#[test]
+fn scripted_text_names_its_turn_and_is_not_replayed_after_reconnection() {
+    let mut worker = Worker::new(
+        7,
+        1,
+        vec![Box::new([Script::Text { turn: 3, offset: 4, text: Box::from(&b"live"[..]) }, Script::Wait])],
+    );
+    drop(worker.tick(Time::ZERO));
+    worker.assign(assigned());
+    assert_eq!(
+        worker.tick(Time::ZERO),
+        [Up::Text { channel: 7, task: 1, attempt: 1, turn: 3, offset: 4, text: Box::from(&b"live"[..]) }]
+    );
+    drop(worker.fault(Fault::DropChannel { for_: Duration::from_millis(1) }, Time::ZERO));
+    let replay = worker.tick(Time::from_nanos(1_000_000));
+    assert!(matches!(replay.as_slice(), [Up::Hello { .. }]));
+}

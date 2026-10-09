@@ -1353,6 +1353,10 @@ fn agent_out(
     use smith_host_domain as smith;
     for _ in 0..out.len() {
         let event = match out.pop().expect("inline agent requests") {
+            agent::Request::Content { client, content } => {
+                inline_content(domain, env, decision, work, client, content);
+                continue;
+            }
             agent::Request::Lower { client, request } => {
                 held(decision, Output::Llm { client, request });
                 continue;
@@ -1454,4 +1458,58 @@ fn agent_out(
         };
         work.push(Work::Host(host::Event::from_agent(event)));
     }
+}
+
+/// Smith content currently omits a turn name. Core supplies the next turn
+/// after its last committed prefix and the current volatile end offset.
+/// `client/domain/contract.md`, 7.3; report this host gap when copying the root.
+fn inline_content(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    decision: &mut Decision<Write, Output>,
+    work: &mut Queue<Work>,
+    client: Token,
+    content: smith_domain::Content,
+) {
+    let Some(hosting) = domain.host.hosting(client) else { return };
+    match content {
+        smith_domain::Content::Text { text, .. } => {
+            let bound = usize::try_from(env.limits.core.views.text_bytes).expect("stream byte limit");
+            for chunk in text.chunks(bound) {
+                inline_report(domain, env, decision, work, hosting, skein_lib::bytes::copy_of(chunk), None);
+            }
+        }
+        smith_domain::Content::Call { name, input, .. } => {
+            let bound = usize::try_from(env.limits.core.views.text_bytes).expect("stream byte limit");
+            let tool_bytes = name.len().min(bound);
+            let input_bytes = input.len().min(bound.checked_sub(tool_bytes).expect("bounded tool"));
+            let call = jig_core_views::Call {
+                // Provider content is descriptive; no engine call has been admitted yet.
+                number: 0,
+                tool: skein_lib::bytes::copy_of(name.get(..tool_bytes).expect("tool prefix")),
+                input: skein_lib::bytes::copy_of(input.get(..input_bytes).expect("input prefix")),
+                cut: tool_bytes != name.len() || input_bytes != input.len(),
+            };
+            inline_report(domain, env, decision, work, hosting, Box::new([]), Some(call));
+        }
+        smith_domain::Content::Tool { .. } | smith_domain::Content::Usage { .. } => {}
+    }
+}
+
+fn inline_report(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    decision: &mut Decision<Write, Output>,
+    work: &mut Queue<Work>,
+    hosting: host::Hosting,
+    text: Box<[u8]>,
+    call: Option<jig_core_views::Call>,
+) {
+    let Some((turn, offset)) = domain.core.provisional_position(hosting.run, hosting.attempt) else { return };
+    let requests = core::step(
+        &mut domain.core,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.core },
+        core::Event::RunText { run: hosting.run, attempt: hosting.attempt, turn: turn.turn, offset, text, call },
+    );
+    core_out(domain, env, decision, requests, work);
 }

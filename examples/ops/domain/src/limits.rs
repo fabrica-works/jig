@@ -73,7 +73,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<(Token, Token), [u8; 16]>::worst_case(callbacks)?)?
         .checked_add(Map::<Box<[u8]>, HostCall>::worst_case(calls)?)?;
     // A complete assignment includes its charter, transcript, grants and
-    // settled call tail. These bytes also bound any other concrete output.
+    // settled call tail. Held documents and provisional suffixes have their
+    // own independent bounds; the queued carrier below takes their maximum.
     let assignment = limits
         .host
         .charter_bytes
@@ -88,7 +89,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(limits.host.turn_bytes)?
         .checked_add(limits.host.outcome_bytes)?
         .checked_add(u64::from(limits.observability.answer_bytes))?
-        .checked_add(65_536)?;
+        .checked_add(65_536)?
+        .max(core::documents::document_worst_case(&limits.core.documents)?)
+        .max(u64::from(limits.core.views.text_bytes).checked_mul(2)?);
     let envelopes = u64::from(limits.core.call_records.checked_add(limits.observability.reads)?.checked_add(calls)?)
         .checked_mul(limits.core.fleet.call_name_bytes.checked_add(32)?)?;
     let owned = u64::from(limits.core.tasks.tasks)

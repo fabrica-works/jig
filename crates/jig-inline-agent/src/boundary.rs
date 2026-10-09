@@ -21,6 +21,8 @@ pub enum Completion {
 #[derive(PartialEq, Eq, Debug)]
 #[expect(clippy::large_enum_variant, reason = "the host boundary's sealed terminal is carried directly to its root")]
 pub enum Request {
+    /// Bounded observed content, before the turn or terminal it accompanies.
+    Content { client: Token, content: smith::Content },
     /// What Smith's process host would tell its parent.
     Host(host::Request),
     /// LLM work routed directly through the composing root.

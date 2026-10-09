@@ -111,15 +111,20 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
     })
 }
 
-pub(super) fn run(core: &Core, party: u64, number: u64) -> Result<Run, Missing> {
+pub(super) fn run(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<Run, Missing> {
     visible(core, party, number)?;
-    let proof = core.proofs.get(&number).ok_or(Missing::Ended)?;
-    if proof.terminal.is_some() {
-        return Err(Missing::Ended);
-    }
+    let proof = match core.proofs.get(&number) {
+        Some(proof) if proof.terminal.is_none() => proof,
+        Some(_) | None => return Ok(Run { task: number, attempt: None, committed_turn: 0, writing: None }),
+    };
     let committed_turn = match proof.turn {
         Some(turn) => turn.turn,
         None => 0,
     };
-    Ok(Run { task: number, attempt: proof.attempt, committed_turn, writing: None })
+    let writing = match jig_core_views::writing(&core.views, skein_lib::Token::new(number), limits.documents.text_bytes)
+    {
+        Some(writing) if writing.turn.attempt == proof.attempt && writing.turn.turn > committed_turn => Some(writing),
+        Some(_) | None => None,
+    };
+    Ok(Run { task: number, attempt: Some(proof.attempt), committed_turn, writing })
 }

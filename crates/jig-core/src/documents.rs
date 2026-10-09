@@ -230,9 +230,9 @@ pub struct Frame {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Run {
     pub task: u64,
-    pub attempt: u64,
+    pub attempt: Option<u64>,
     pub committed_turn: u32,
-    pub writing: Option<bool>,
+    pub writing: Option<jig_core_views::Writing>,
 }
 
 /// One whole typed document, within its configured limits.
@@ -297,7 +297,7 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             Ok(Document::Chips(chips))
         }
         Subject::Run { task } => {
-            let run = small::run(core, party, *task)?;
+            let run = small::run(core, limits, party, *task)?;
             Ok(Document::Run(run))
         }
         Subject::Task { task } => {
@@ -367,6 +367,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     u64::try_from(size_of::<Document>()).ok()?.checked_add(
         chips
             .max(frame)
+            .max(u64::from(limits.text_bytes).checked_mul(2)?)
             .max(task_tree::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
             .max(project_note::worst_case(limits)?)
