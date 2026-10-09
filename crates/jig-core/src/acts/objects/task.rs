@@ -7,6 +7,7 @@ use jig_core_authority as authority;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 
+#[expect(clippy::too_many_lines, reason = "one exhaustive object judgment preserves standing before task phase facts")]
 pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: u64) -> Admission {
     let Some(row) = core.tasks.task(number) else { return Admission::Refused(people::Refusal::Unknown) };
     let held = core.people.role(party, row.project);
@@ -16,6 +17,10 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
     match act {
         Act::Write => allowed(write(core, limits, party, number)),
         Act::Amend | Act::AmendRelease => {
+            let admission = bounds::amend(core, limits, party, number, held);
+            if let Admission::Refused(_) = admission {
+                return admission;
+            }
             if let Err(why) = mutable(row) {
                 return Admission::Refused(why);
             }
@@ -28,21 +33,9 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
                     | tasks::Phase::Ended(_) => return Admission::Refused(people::Refusal::NotWaiting),
                 }
             }
-            bounds::amend(core, limits, party, number, held)
+            admission
         }
         Act::Stop | Act::Cancel | Act::Release => {
-            if let Err(why) = mutable(row) {
-                return Admission::Refused(why);
-            }
-            if act == Act::Release {
-                match row.phase {
-                    tasks::Phase::Held { .. } => {}
-                    tasks::Phase::Waiting
-                    | tasks::Phase::Active(_)
-                    | tasks::Phase::Closing(_)
-                    | tasks::Phase::Ended(_) => return Admission::Refused(people::Refusal::NotWaiting),
-                }
-            }
             let ask = match act {
                 Act::Stop => people::Ask::Stop { project: row.project, task: number },
                 Act::Cancel => people::Ask::Cancel { project: row.project, task: number, reason: Box::new([]) },
@@ -75,10 +68,24 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
                 | Act::MakeService
                 | Act::SetPool => unreachable!("control act selected"),
             };
-            match core.control_admit(&ask, party, row.project, held, limits.tasks.depth, limits.tasks.result_bytes) {
-                Ok(_) => Admission::Allowed,
-                Err(why) => Admission::Refused(why),
+            if let Err(why) =
+                core.control_admit(&ask, party, row.project, held, limits.tasks.depth, limits.tasks.result_bytes)
+            {
+                return Admission::Refused(why);
             }
+            if let Err(why) = mutable(row) {
+                return Admission::Refused(why);
+            }
+            if act == Act::Release {
+                match row.phase {
+                    tasks::Phase::Held { .. } => {}
+                    tasks::Phase::Waiting
+                    | tasks::Phase::Active(_)
+                    | tasks::Phase::Closing(_)
+                    | tasks::Phase::Ended(_) => return Admission::Refused(people::Refusal::NotWaiting),
+                }
+            }
+            Admission::Allowed
         }
         Act::TakeOver => {
             allowed(core.move_admit(party, held, row.project, number, limits.tasks.tree_tasks, limits.tasks.depth))
