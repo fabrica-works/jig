@@ -1,1 +1,2 @@
+mod slots;
 mod tree;

@@ -5,8 +5,29 @@
 //! page nodes, fallback children and fragment nodes.
 
 use crate::tree::length;
-use crate::{Binding, Drawing, DrawingKind, Key, Limits, Node, Role, Run, State, Style, TextRun, Tree, Value};
-use skein_lib::{Stack, bytes::copy_of};
+use crate::{Binding, Drawing, DrawingKind, Key, Limits, Node, Role, Run, SlotRef, State, Style, TextRun, Tree, Value};
+use alloc::boxed::Box;
+use core::mem::replace;
+use skein_lib::{List, Stack, bytes::copy_of};
+
+/// A fragment position's identity during one build.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SlotId(pub u32);
+
+/// An unfilled fragment request, in preorder within one splice pass.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Slot {
+    pub id: SlotId,
+    pub reference: SlotRef,
+    /// Zero for a page's slot, one for a fragment's slot, two left loading.
+    pub depth: u8,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PlacedSlot {
+    slot: Slot,
+    index: u32,
+}
 
 /// A tree under construction and its bounded parent stack.
 #[derive(Debug)]
@@ -16,6 +37,9 @@ pub struct Builder {
     open: Stack<u32>,
     text_bytes: u32,
     bindings: u32,
+    slots: List<PlacedSlot>,
+    next_slot: u32,
+    spare: List<Node>,
 }
 
 impl Builder {
@@ -28,6 +52,9 @@ impl Builder {
             open: Stack::with_capacity(limits.depth),
             text_bytes: 0,
             bindings: 0,
+            slots: List::with_capacity(limits.slots),
+            next_slot: 0,
+            spare: List::with_capacity(limits.nodes),
         }
     }
 
@@ -36,7 +63,16 @@ impl Builder {
     pub fn reuse(mut tree: Tree, limits: &Limits) -> Builder {
         assert!(tree.nodes.capacity() == limits.nodes, "spare tree has the configured capacity");
         tree.nodes.clear();
-        Builder { tree, limits: *limits, open: Stack::with_capacity(limits.depth), text_bytes: 0, bindings: 0 }
+        Builder {
+            tree,
+            limits: *limits,
+            open: Stack::with_capacity(limits.depth),
+            text_bytes: 0,
+            bindings: 0,
+            slots: List::with_capacity(limits.slots),
+            next_slot: 0,
+            spare: List::with_capacity(limits.nodes),
+        }
     }
 
     /// Begin a node; calls between this and `close` build its children.
@@ -173,10 +209,176 @@ impl Builder {
         self.node_mut().drawing = Some(Drawing { kind, data });
     }
 
+    /// Leave an owner reference with a named busy fallback. The caller supplies
+    /// the phrasebook's loading words, so the builder chooses no language.
+    pub fn slot(&mut self, reference: SlotRef, loading_name: &[u8]) {
+        assert!(self.next_slot < self.limits.slots, "slots fit their capacity");
+        let index = self.tree.len();
+        let id = SlotId(self.next_slot);
+        self.next_slot = self.next_slot.checked_add(1).expect("slot identities fit u32");
+        self.open(Role::Slot);
+        self.node_mut().slot = Some(reference);
+        self.open(Role::Status);
+        self.name(loading_name);
+        self.state(State::Busy);
+        self.close();
+        self.close();
+        let slot = Slot { id, reference, depth: 0 };
+        self.slots.push(PlacedSlot { slot, index }).expect("slots fit their capacity");
+    }
+
+    /// Snapshot the unfilled slots for pass zero or one; pass two remains
+    /// visible as loading. Identities survive earlier insertions in a pass.
+    #[must_use]
+    pub fn slots(&self, pass: u8) -> Box<[Slot]> {
+        assert!(pass <= 2, "slots nest at most two deep");
+        let mut found = List::with_capacity(self.limits.slots);
+        for index in 0..self.tree.len() {
+            for placed in &self.slots {
+                if placed.index == index && placed.slot.depth == pass {
+                    found.push(placed.slot).expect("snapshot fits slot capacity");
+                }
+            }
+        }
+        found.into_boxed()
+    }
+
+    /// Replace a slot's loading fallback with a fragment's ordinary nodes.
+    /// A fragment may leave slots for the next pass; a third fill asserts.
+    pub fn splice(&mut self, id: SlotId, mut fragment: Builder) {
+        assert!(self.open.is_empty() && fragment.open.is_empty(), "splice only complete trees");
+        assert!(self.limits == fragment.limits, "fragments use the whole tree limits");
+        assert!(fragment.next_slot == fragment.slots.len(), "fragments are built before their slots are filled");
+        let mut target = None;
+        for placed in &self.slots {
+            if placed.slot.id == id {
+                target = Some(*placed);
+                break;
+            }
+        }
+        let target = target.expect("slot is still unfilled");
+        let index = target.index;
+        let depth = target.slot.depth;
+        assert!(depth < 2, "slots nest at most two deep");
+        let removed = self.tree.get(index).expect("slot exists").size.checked_sub(1).expect("slot includes itself");
+        let end = index.checked_add(removed).expect("slot end fits u32");
+        let end = end.checked_add(1).expect("slot end fits u32");
+        let count = self
+            .tree
+            .len()
+            .checked_sub(removed)
+            .expect("fallback is in tree")
+            .checked_add(fragment.tree.len())
+            .expect("tree count fits u32");
+        assert!(count <= self.limits.nodes, "spliced tree fits its node capacity");
+        let slots = self.next_slot.checked_add(fragment.next_slot).expect("slot count fits u32");
+        assert!(slots <= self.limits.slots, "spliced slots fit their capacity");
+        let bindings = self.bindings.checked_add(fragment.bindings).expect("binding count fits u32");
+        assert!(bindings <= self.limits.bindings, "spliced bindings fit their capacity");
+        let mut old_bytes = 0_u32;
+        for at in index.checked_add(1).expect("slot child index fits u32")..end {
+            old_bytes = old_bytes
+                .checked_add(self.tree.get(at).expect("fallback node exists").text_bytes())
+                .expect("text count fits u32");
+        }
+        let bytes = self
+            .text_bytes
+            .checked_sub(old_bytes)
+            .expect("fallback bytes are held")
+            .checked_add(fragment.text_bytes)
+            .expect("text count fits u32");
+        assert!(bytes <= self.limits.text_bytes, "spliced tree fits its text capacity");
+        let added = fragment.tree.len();
+        for at in 0..self.tree.len() {
+            let old = self.tree.nodes.get_mut(at).expect("preorder node exists");
+            let mut node = replace(old, Node::vacant());
+            if at < index {
+                let subtree_end = at.checked_add(node.size).expect("subtree end fits u32");
+                if subtree_end > index {
+                    node.size = resized(node.size, removed, added);
+                }
+            }
+            if at == index {
+                node.size = added.checked_add(1).expect("slot size fits u32");
+                self.spare.push(node).expect("spliced tree fits its node capacity");
+                for child_at in 0..fragment.tree.len() {
+                    let child = fragment.tree.nodes.get_mut(child_at).expect("fragment node exists");
+                    let child = replace(child, Node::vacant());
+                    self.spare.push(child).expect("spliced tree fits its node capacity");
+                }
+            } else if at < index || at >= end {
+                self.spare.push(node).expect("spliced tree fits its node capacity");
+            }
+        }
+        self.tree.nodes.clear();
+        let built = replace(&mut self.spare, List::with_capacity(0));
+        let empty = replace(&mut self.tree.nodes, built);
+        self.spare = empty;
+        let old_slots = replace(&mut self.slots, List::with_capacity(self.limits.slots));
+        for mut placed in old_slots.into_boxed() {
+            if placed.slot.id != id {
+                if placed.index >= end {
+                    placed.index = resized(placed.index, removed, added);
+                }
+                self.slots.push(placed).expect("spliced slots fit their capacity");
+            }
+        }
+        for placed in fragment.slots.into_boxed() {
+            let slot_id = SlotId(self.next_slot);
+            self.next_slot = self.next_slot.checked_add(1).expect("slot identities fit u32");
+            let reference = placed.slot.reference;
+            let nested = depth.checked_add(1).expect("slot depth fits u8");
+            let slot = Slot { id: slot_id, reference, depth: nested };
+            let child_index = index
+                .checked_add(1)
+                .expect("slot child fits u32")
+                .checked_add(placed.index)
+                .expect("slot index fits u32");
+            self.slots.push(PlacedSlot { slot, index: child_index }).expect("spliced slots fit their capacity");
+        }
+        self.text_bytes = bytes;
+        self.bindings = bindings;
+        self.check_depth();
+    }
+
+    /// Show the owner's explanation when it cannot show the requested part.
+    pub fn unshowable(&mut self, id: SlotId, name: &[u8]) {
+        let mut fragment = Builder::new(&self.limits);
+        fragment.open(Role::Status);
+        fragment.name(name);
+        fragment.close();
+        self.splice(id, fragment);
+    }
+
+    fn check_depth(&self) {
+        let mut ends = Stack::with_capacity(self.limits.depth);
+        for index in 0..self.tree.len() {
+            for _level in 0..ends.len() {
+                let end = *ends.top().expect("ancestor remains");
+                if index < end {
+                    break;
+                }
+                let popped = ends.pop().expect("closed ancestor remains");
+                assert!(popped == end, "pop removes the top ancestor");
+            }
+            let size = self.tree.get(index).expect("node exists").size;
+            let end = index.checked_add(size).expect("subtree end fits u32");
+            ends.push(end).expect("spliced tree fits its depth capacity");
+        }
+    }
+
     /// Hand over a tree only after every open node has been closed.
     #[must_use]
     pub fn finish(self) -> Tree {
         assert!(self.open.is_empty(), "all tree nodes are closed");
         self.tree
     }
+}
+
+fn resized(value: u32, removed: u32, added: u32) -> u32 {
+    value
+        .checked_sub(removed)
+        .expect("old subtree includes removed children")
+        .checked_add(added)
+        .expect("spliced index fits u32")
 }

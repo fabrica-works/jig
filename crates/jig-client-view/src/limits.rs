@@ -1,9 +1,10 @@
 //! Configured tree storage (client/domain/view.md, section 10).
 //! The caller derives these capacities from the domain and its own fragments.
 //! `worst_case` counts owned heap, excluding allocator overhead, for two trees
-//! and a builder. Patch storage is added by the diff's owner.
+//! and builders with their splice scratch. Patch storage is added by the diff's owner.
 
-use crate::{Node, State, Style, TextRun};
+use crate::builder::PlacedSlot;
+use crate::{Node, Slot, State, Style, TextRun};
 use skein_lib::{List, Stack};
 
 /// Capacities checked before each builder allocation.
@@ -23,7 +24,7 @@ pub struct Limits {
     pub markdown_depth: u32,
 }
 
-/// Heap for two full trees and their bounded builder stack, or arithmetic overflow.
+/// Heap for a visible tree, two builders, splice scratch and slot snapshots.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let nodes = List::<Node>::worst_case(limits.nodes)?;
@@ -33,5 +34,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let drawings = u64::from(limits.drawing_bytes).checked_mul(u64::from(limits.nodes))?;
     let payloads = u64::from(limits.text_bytes).checked_add(drawings)?;
     let tree = nodes.checked_add(states)?.checked_add(styles)?.checked_add(runs)?.checked_add(payloads)?;
-    tree.checked_mul(2)?.checked_add(Stack::<u32>::worst_case(limits.depth)?)
+    let trees = tree.checked_mul(3)?.checked_add(nodes.checked_mul(2)?)?;
+    let stacks = Stack::<u32>::worst_case(limits.depth)?.checked_mul(3)?;
+    let slots = List::<PlacedSlot>::worst_case(limits.slots)?
+        .checked_mul(3)?
+        .checked_add(List::<Slot>::worst_case(limits.slots)?.checked_mul(2)?)?;
+    trees.checked_add(stacks)?.checked_add(slots)
 }

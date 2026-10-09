@@ -204,6 +204,24 @@ pub struct Node {
 }
 
 impl Node {
+    pub(crate) fn vacant() -> Node {
+        Node {
+            id: NodeId(0),
+            role: Role::Text,
+            size: 1,
+            name: None,
+            states: List::with_capacity(0),
+            styles: List::with_capacity(0),
+            text: List::with_capacity(0),
+            value: None,
+            link: None,
+            key: None,
+            binding: None,
+            slot: None,
+            drawing: None,
+        }
+    }
+
     pub(crate) fn new(role: Role, limits: &crate::Limits) -> Node {
         let runs = if role == Role::Text { limits.text_per_node } else { 0 };
         Node {

@@ -15,7 +15,7 @@ mod limits;
 mod tree;
 
 pub use binding::Binding;
-pub use builder::Builder;
+pub use builder::{Builder, Slot, SlotId};
 pub use limits::{Limits, worst_case};
 pub use tree::{
     Drawing, DrawingKind, Key, Node, NodeId, Owner, Role, Run, SlotRef, State, Style, TextRun, Tree, Value,
