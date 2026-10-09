@@ -75,7 +75,7 @@ pub enum Position {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Cursor {
     /// Remaining live rows, before entering the store range.
-    Live { scope: Scope, after: documents::Cursor },
+    Live { scope: Scope, after: documents::Cursor, store_after: Option<Position> },
     /// Exclusive owner key; `None` starts the stored portion after live rows.
     Store { scope: Scope, after: Option<Position> },
 }
@@ -151,6 +151,14 @@ pub struct Row {
     pub inbox: Option<documents::Cursor>,
 }
 
+impl Row {
+    /// Complete ownership of this transport row and its requested evidence.
+    #[must_use]
+    pub fn owned_bytes(&self) -> Option<u64> {
+        row_bytes(self)
+    }
+}
+
 /// The one terminal event of a store load.
 #[derive(Debug)]
 pub enum Loaded {
@@ -163,7 +171,7 @@ pub enum Loaded {
 }
 
 /// An ended object's document and its durable ending facts.
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Historical {
     pub value: Past,
     pub at: Option<Wall>,
@@ -171,7 +179,7 @@ pub struct Historical {
 }
 
 /// Typed historical values, made by the same owners as live documents.
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Past {
     /// Full ended task overview and retained outcome.
     Task { document: Box<documents::Task>, result: Box<documents::ResultDoc> },
@@ -200,7 +208,7 @@ pub enum Past {
 }
 
 /// One semantic row of a read page.
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PageRow {
     /// An ended delegate's status and outcome.
     EndedDelegate(documents::EndedDelegate),
@@ -223,7 +231,7 @@ pub enum PageRow {
 }
 
 /// One bounded list page; no continuation means the range ended.
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Page {
     pub rows: List<PageRow>,
     pub next: Option<Cursor>,
@@ -231,7 +239,7 @@ pub struct Page {
 }
 
 /// Exactly one terminal, held until its preceding decisions are durable.
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
     /// A current document.
     Document(Box<Document>),

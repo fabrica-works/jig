@@ -61,6 +61,8 @@ pub struct World {
     pub peers: Option<crate::peers::Peers>,
     /// Independent document consumers, enabled only in watch stories.
     pub watches: Option<crate::peers::WatchParties>,
+    /// Independent read parties and owner-range store transport, enabled in read stories.
+    pub reads: Option<crate::reads::Parties>,
     /// Referee observations, independent of the root state.
     pub observer: crate::observations::Observer,
     heap: crate::observations::Heap,
@@ -231,6 +233,7 @@ impl World {
             stopped: false,
             peers: None,
             watches: None,
+            reads: None,
             observer,
             heap,
             restoring: None,
@@ -317,6 +320,9 @@ impl World {
                 if let Some(watches) = &mut self.watches {
                     watches.inbound(&event);
                 }
+                if let Some(reads) = &mut self.reads {
+                    reads.inbound(&event);
+                }
                 self.trace.push(format!("input {event:?}"));
                 root::step(&mut self.domain, &env, event);
             }
@@ -335,6 +341,9 @@ impl World {
                         }
                         if let Some(watches) = &mut self.watches {
                             watches.commit(number, &rows);
+                        }
+                        if let Some(reads) = &mut self.reads {
+                            reads.commit(number);
                         }
                         self.commits.push(rows.clone());
                         self.store.submit(number, crate::store_writes(rows), self.store_delay);
@@ -441,7 +450,9 @@ impl World {
                 && self.events.is_empty()
                 && self.store.pending.is_empty()
                 && !self.store.loading()
-                && (self.domain.quiescent() || !self.store.held.is_empty())
+                && (self.domain.quiescent()
+                    || !self.store.held.is_empty()
+                    || self.reads.as_ref().is_some_and(crate::reads::Parties::paused))
                 && self.watches.as_ref().is_none_or(crate::peers::WatchParties::quiescent)
             {
                 return;
@@ -465,6 +476,16 @@ impl World {
             }
         }
         match delivery {
+            root::Delivery::Core(core::Held::Read { reply, answer }) => {
+                if let Some(reads) = &mut self.reads {
+                    reads.replied(reply, answer, &self.store);
+                }
+            }
+            root::Delivery::Core(core::Held::ReadLoad { load, range }) => {
+                if let Some(reads) = &mut self.reads {
+                    self.events.extend(reads.load(load, *range, &self.store));
+                }
+            }
             root::Delivery::Core(core::Held::Applied { .. }) => {
                 panic!("root assembles connector outcomes before journaling")
             }
@@ -591,9 +612,7 @@ impl World {
             }
             root::Delivery::Core(core::Held::PeopleReply { reply, .. }) => self.people_answers.push(reply),
             root::Delivery::Core(
-                core::Held::ReadLoad { .. }
-                | core::Held::Read { .. }
-                | core::Held::Delivery { .. }
+                core::Held::Delivery { .. }
                 | core::Held::WatchEnded { .. }
                 | core::Held::SettledCall { .. }
                 | core::Held::Assign { .. }
@@ -903,6 +922,9 @@ impl World {
         self.store.crash();
         if let Some(watches) = &mut self.watches {
             watches.restart(self.store.applied);
+        }
+        if let Some(reads) = &mut self.reads {
+            reads.restart(self.store.applied);
         }
         self.observer.cold(self.wall, &self.store);
         self.stopped = false;

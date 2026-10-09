@@ -143,7 +143,7 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
     let mut after_store = None;
     let mut stored = false;
     match cursor(&read) {
-        Some(Cursor::Live { scope, after }) => {
+        Some(Cursor::Live { scope, after, store_after }) => {
             if Some(scope) != target.as_ref() {
                 return terminal(reply, Answer::None(Why::Unknown));
             }
@@ -151,6 +151,7 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
                 return terminal(reply, Answer::None(Why::Unknown));
             }
             after_live = Some(*after);
+            after_store.clone_from(store_after);
         }
         Some(Cursor::Store { scope, after }) => {
             if Some(scope) != target.as_ref() {
@@ -160,6 +161,14 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
             after_store.clone_from(after);
         }
         None => {}
+    }
+    if let Some(position) = &after_store
+        && match &target {
+            Some(scope) => !rows::position_allowed(scope, position),
+            None => true,
+        }
+    {
+        return terminal(reply, Answer::None(Why::Unknown));
     }
     if !stored && let Some(subject) = subject(&read, party) {
         let window = Window { rows: env.limits.documents.rows, after: after_live };
@@ -172,8 +181,10 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
             DocumentClock { now: env.now, wall: env.wall },
         ) {
             Ok(document) => {
-                let answer = rows::live_page(core, &env.limits, party, &read, document);
-                return terminal(reply, answer);
+                if !rows::needs_store(&read, &document) {
+                    let answer = rows::live_page(core, &env.limits, party, &read, document);
+                    return terminal(reply, answer);
+                }
             }
             Err(Missing::NotAllowed) => return terminal(reply, Answer::None(Why::Unknown)),
             Err(Missing::TooLarge) => return terminal(reply, Answer::None(Why::Busy)),
@@ -183,11 +194,6 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
     let Some(scope) = target else {
         return terminal(reply, Answer::None(Why::Unknown));
     };
-    if let Some(position) = &after_store
-        && !rows::position_allowed(&scope, position)
-    {
-        return terminal(reply, Answer::None(Why::Unknown));
-    }
     if !rows::scope_allowed(core, party, &scope) {
         return terminal(reply, Answer::None(Why::Unknown));
     }

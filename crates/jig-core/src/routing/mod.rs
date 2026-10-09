@@ -310,7 +310,7 @@ pub fn room_max(limits: &Limits) -> Option<JournalRoom> {
 pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
-        Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: 1 }),
+        Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: room.held }),
         Event::Application { .. }
         | Event::ApplicationPart { .. }
         | Event::ApplicationFinished { .. }

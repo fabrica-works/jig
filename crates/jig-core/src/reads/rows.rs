@@ -68,6 +68,96 @@ fn inbox_filter(core: &Core, limits: &Limits, filter: Filter, entry: &documents:
     }
 }
 
+pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
+    match document {
+        Document::Inbox(value) => match read {
+            Read::Inbox { group: Group::Updates, .. } => {
+                if !value.updates_time_complete {
+                    return true;
+                }
+                for entry in &value.updates {
+                    match entry.object {
+                        documents::InboxObject::Reply { .. } if entry.activity.is_none() => return true,
+                        documents::InboxObject::Reply { .. }
+                        | documents::InboxObject::Result { .. }
+                        | documents::InboxObject::Question { .. }
+                        | documents::InboxObject::Proposal { .. }
+                        | documents::InboxObject::Escalation { .. }
+                        | documents::InboxObject::PersonTask => {}
+                    }
+                }
+                false
+            }
+            Read::Inbox { group: Group::Needs, .. }
+            | Read::Frame
+            | Read::Task { .. }
+            | Read::Proposal { .. }
+            | Read::Escalation { .. }
+            | Read::Question { .. }
+            | Read::PersonTask { .. }
+            | Read::Result { .. }
+            | Read::Reply { .. }
+            | Read::Turn { .. }
+            | Read::EndedDelegates { .. }
+            | Read::History { .. }
+            | Read::Activity { .. }
+            | Read::Conversations { .. }
+            | Read::Goals { .. }
+            | Read::Project { .. }
+            | Read::Notes { .. }
+            | Read::Spend { .. }
+            | Read::Deployment => false,
+        },
+        Document::Frame(_)
+        | Document::Chips(_)
+        | Document::Run(_)
+        | Document::Task(_)
+        | Document::Tree(_)
+        | Document::Proposal(_)
+        | Document::Escalation(_)
+        | Document::Question(_)
+        | Document::PersonTask(_)
+        | Document::Result(_)
+        | Document::Conversations(_)
+        | Document::Goals(_)
+        | Document::Project(_)
+        | Document::Note(_)
+        | Document::Deployment(_) => false,
+    }
+}
+
+fn inbox_position(group: Group, cursor: documents::Cursor, activity: Option<u64>) -> Option<Position> {
+    match cursor {
+        documents::Cursor::Inbox { task, object, at } => {
+            let key = match group {
+                Group::Updates => match object {
+                    documents::InboxObject::Result { .. } => Key::Tasks(tasks::Key::Ended(task)),
+                    documents::InboxObject::Reply { .. } => {
+                        Key::Tasks(tasks::Key::Activity { task, position: activity? })
+                    }
+                    documents::InboxObject::Question { .. }
+                    | documents::InboxObject::Proposal { .. }
+                    | documents::InboxObject::Escalation { .. }
+                    | documents::InboxObject::PersonTask => return None,
+                },
+                Group::Needs => match object {
+                    documents::InboxObject::Proposal { proposer: Proposer::Party(_), number } => {
+                        Key::Tasks(tasks::Key::PersonProposal(number))
+                    }
+                    documents::InboxObject::Question { .. }
+                    | documents::InboxObject::Proposal { proposer: Proposer::Task(_), .. }
+                    | documents::InboxObject::Escalation { .. }
+                    | documents::InboxObject::PersonTask => Key::Tasks(tasks::Key::Live(task)),
+                    documents::InboxObject::Result { .. } | documents::InboxObject::Reply { .. } => return None,
+                },
+            };
+            Some(Position::Inbox { at, task, object, key })
+        }
+        documents::Cursor::Number { .. } => None,
+    }
+}
+
+#[expect(clippy::too_many_lines, reason = "the exhaustive live-to-store seam keeps each document family visible")]
 pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, document: Document) -> Answer {
     let mut rows = List::with_capacity(limits.documents.rows);
     let (page_scope, next) = match document {
@@ -93,16 +183,46 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 | Read::Spend { .. }
                 | Read::Deployment => unreachable!("inbox subject comes from inbox read"),
             };
+            let needs_done = !value.updates.is_empty();
             let source = match group {
                 Group::Needs => value.needs,
                 Group::Updates => value.updates,
             };
+            let mut last = None;
             for entry in source.into_boxed() {
+                last = Some((entry.cursor, entry.activity));
                 if inbox_filter(core, limits, *filter, &entry) {
                     rows.push(PageRow::Inbox(entry)).expect("live page fits");
                 }
             }
-            (Scope::Inbox { group: *group, filter: *filter }, value.next)
+            let scope = Scope::Inbox { group: *group, filter: *filter };
+            let next = match value.next {
+                Some(after) if *group == Group::Updates || !needs_done => Some(Cursor::Live {
+                    scope,
+                    store_after: match last {
+                        Some((cursor, activity)) => inbox_position(*group, cursor, activity),
+                        None => match super::cursor(read) {
+                            Some(Cursor::Live { store_after, .. }) => store_after.clone(),
+                            Some(Cursor::Store { .. }) | None => None,
+                        },
+                    },
+                    after: match last {
+                        Some((after, _)) => after,
+                        None => after,
+                    },
+                }),
+                Some(_) | None => {
+                    let after = match last {
+                        Some((cursor, activity)) => inbox_position(*group, cursor, activity),
+                        None => match super::cursor(read) {
+                            Some(Cursor::Live { store_after, .. }) => store_after.clone(),
+                            Some(Cursor::Store { .. }) | None => None,
+                        },
+                    };
+                    Some(Cursor::Store { scope, after })
+                }
+            };
+            return Answer::Page(Box::new(Page { rows, next, cut: false }));
         }
         Document::Conversations(value) => {
             for row in value.lines.into_boxed() {
@@ -152,7 +272,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
         | Document::Deployment(_)) => return Answer::Document(Box::new(document)),
     };
     let next = match next {
-        Some(after) => Cursor::Live { scope: page_scope, after },
+        Some(after) => Cursor::Live { scope: page_scope, after, store_after: None },
         None => Cursor::Store { scope: page_scope, after: None },
     };
     Answer::Page(Box::new(Page { rows, next: Some(next), cut: false }))
@@ -413,12 +533,27 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 if *proposer != Proposer::Party(value.proposer) || value.number != *proposal {
                     return Ok(None);
                 }
-                let decision = match row.related {
-                    Some(Record::Core(CoreRecord::ProposalDecision(value))) if value.proposal == *proposal => {
-                        Some(value)
-                    }
-                    Some(_) | None => None,
+                let decision = match &row.related {
+                    Some(record) => match proposal_decision(record) {
+                        Some(decision)
+                            if decision.proposal == *proposal
+                                && decision.project == value.project
+                                && decision.proposer == tasks::Party::Person(value.proposer) =>
+                        {
+                            Some(*decision)
+                        }
+                        Some(_) | None => None,
+                    },
+                    None => None,
                 };
+                match value.state {
+                    tasks::PersonProposalState::Accepted { .. } if decision.is_none() => {
+                        return Ok(Some(Answer::None(Why::Gone)));
+                    }
+                    tasks::PersonProposalState::Accepted { .. }
+                    | tasks::PersonProposalState::Pending { .. }
+                    | tasks::PersonProposalState::Rejected { .. } => {}
+                }
                 let (at, by) = match &value.state {
                     tasks::PersonProposalState::Pending { since } => (Some(*since), None),
                     tasks::PersonProposalState::Accepted { by } => (
@@ -455,10 +590,11 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
             }
             let owner = row_owner(&row).expect("matched owner");
             let hold = match &row.related {
-                Some(Record::Tasks(tasks::Stored::Milestone(value))) if value.task == *task => {
-                    Some(documents::milestone_from_row(limits, value))
-                }
-                Some(_) | None => None,
+                Some(record) => match milestone_record(record) {
+                    Some(value) if value.task == *task => Some(documents::milestone_from_row(limits, value)),
+                    Some(_) | None => None,
+                },
+                None => None,
             };
             Ok(Some(historical(
                 Past::Escalation {
@@ -506,22 +642,25 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
             }
             let owner = row_owner(&row).expect("matched owner");
             let answer = match &row.related {
-                Some(Record::Tasks(tasks::Stored::Activity(answer))) => match &answer.line {
-                    tasks::Line::Words { message, by, kind: tasks::MessageKind::Answer { question }, words }
-                        if *question == *number =>
-                    {
-                        Some(answer.clone())
-                    }
-                    tasks::Line::Words { .. }
-                    | tasks::Line::Heard(_)
-                    | tasks::Line::Notified { .. }
-                    | tasks::Line::RunBegan { .. }
-                    | tasks::Line::RunEnded { .. }
-                    | tasks::Line::Turn { .. }
-                    | tasks::Line::Decided { .. }
-                    | tasks::Line::Milestone { .. } => None,
+                Some(record) => match activity_record(record) {
+                    Some(answer) if answer.task == *task && answer.position > line.position => match &answer.line {
+                        tasks::Line::Words { kind: tasks::MessageKind::Answer { question }, .. }
+                            if *question == *number =>
+                        {
+                            Some(answer.clone())
+                        }
+                        tasks::Line::Words { .. }
+                        | tasks::Line::Heard(_)
+                        | tasks::Line::Notified { .. }
+                        | tasks::Line::RunBegan { .. }
+                        | tasks::Line::RunEnded { .. }
+                        | tasks::Line::Turn { .. }
+                        | tasks::Line::Decided { .. }
+                        | tasks::Line::Milestone { .. } => None,
+                    },
+                    Some(_) | None => None,
                 },
-                Some(_) | None => None,
+                None => None,
             };
             let ending = if ended(owner) {
                 Some(Box::new(documents::result_from_row(core, limits, range.party, owner)?))
@@ -755,7 +894,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
     }
 }
 
-#[expect(clippy::too_many_lines, reason = "one exhaustive owner conversion for the two inbox groups")]
+#[expect(clippy::too_many_lines, reason = "One exhaustive projection of the two inbox groups.")]
 fn inbox_row(
     core: &Core,
     limits: &Limits,
@@ -764,6 +903,25 @@ fn inbox_row(
     filter: Filter,
     row: Row,
 ) -> Result<Option<PageRow>, Missing> {
+    match &row.value {
+        Record::Tasks(tasks::Stored::PersonProposal(proposal)) => {
+            return person_proposal_need(core, limits, party, group, filter, &row, proposal);
+        }
+        Record::Tasks(
+            tasks::Stored::Activity(_)
+            | tasks::Stored::History(_)
+            | tasks::Stored::Milestone(_)
+            | tasks::Stored::Live(_)
+            | tasks::Stored::Ended(_)
+            | tasks::Stored::Stub(_)
+            | tasks::Stored::Ledger(_)
+            | tasks::Stored::Writer(_)
+            | tasks::Stored::Pool(_),
+        )
+        | Record::Core(_)
+        | Record::People(_)
+        | Record::Notes(_) => {}
+    }
     let Some(owner) = row_owner(&row) else {
         return Ok(None);
     };
@@ -787,30 +945,15 @@ fn inbox_row(
             {
                 return Ok(None);
             }
-            if let Some(entries) = core.people.cached_results(party) {
-                for entry in entries {
-                    if entry.task == owner.number {
-                        return Ok(None);
-                    }
-                }
-            }
             let object = documents::InboxObject::Result { position: owner.result_position };
             let cursor = documents::Cursor::Inbox { task: owner.number, object, at: owner.ended_at };
             if row.inbox != Some(cursor) {
                 return Err(Missing::Unknown);
             }
             Ok(Some(PageRow::Inbox(documents::InboxEntry {
-                task: documents::TaskLink::Stored {
-                    number: owner.number,
-                    status: match owner.phase {
-                        tasks::Phase::Ended(tasks::Ending::Done(_)) => Some(tasks::Status::Done),
-                        tasks::Phase::Ended(tasks::Ending::Failed { .. }) => Some(tasks::Status::Failed),
-                        tasks::Phase::Ended(tasks::Ending::Cancelled { .. }) => Some(tasks::Status::Cancelled),
-                        tasks::Phase::Waiting
-                        | tasks::Phase::Active(_)
-                        | tasks::Phase::Closing(_)
-                        | tasks::Phase::Held { .. } => None,
-                    },
+                task: documents::TaskLink::Retained {
+                    chip: documents::chip_from_row(limits, owner),
+                    at: owner.ended_at,
                 },
                 project: Some(owner.project),
                 object,
@@ -824,18 +967,7 @@ fn inbox_row(
             // The store may page current owner rows beyond the people's cache.
             // One waiting reference per row is selected by its related activity.
             let entries = core.waiting_entries(limits, owner);
-            let cached = core.people.cached_waiting(&limits.people, party).ok_or(Missing::Unknown)?;
             for entry in &entries {
-                let mut already_shown = false;
-                for known in &cached {
-                    if known == entry {
-                        already_shown = true;
-                        break;
-                    }
-                }
-                if already_shown {
-                    continue;
-                }
                 let addressed = match entry.whom {
                     jig_core_people::Whom::Person(person) => person == party,
                     jig_core_people::Whom::Role { project, role } => match core.people.role(party, project) {
@@ -876,6 +1008,56 @@ fn inbox_row(
     }
 }
 
+fn person_proposal_need(
+    core: &Core,
+    _limits: &Limits,
+    party: u64,
+    group: Group,
+    filter: Filter,
+    row: &Row,
+    proposal: &tasks::PersonProposal,
+) -> Result<Option<PageRow>, Missing> {
+    if group != Group::Needs
+        || (filter.project.is_some() && filter.project != Some(proposal.project))
+        || (filter.goal.is_some() && filter.goal != Some(proposal.goal.number))
+    {
+        return Ok(None);
+    }
+    let at = match proposal.state {
+        tasks::PersonProposalState::Pending { since } => since,
+        tasks::PersonProposalState::Accepted { .. } | tasks::PersonProposalState::Rejected { .. } => return Ok(None),
+    };
+    let mut addressed = false;
+    for entry in core.person_proposal_entries(proposal) {
+        match entry.whom {
+            jig_core_people::Whom::Person(person) => addressed = addressed || person == party,
+            jig_core_people::Whom::Role { project, role } => {
+                if let Some(held) = core.people.role(party, project) {
+                    addressed = addressed || held.number() == role;
+                }
+            }
+        }
+    }
+    if !addressed {
+        return Ok(None);
+    }
+    let object =
+        documents::InboxObject::Proposal { proposer: Proposer::Party(proposal.proposer), number: proposal.number };
+    let cursor = documents::Cursor::Inbox { task: proposal.goal.number, object, at: Some(at) };
+    if row.inbox != Some(cursor) {
+        return Err(Missing::Unknown);
+    }
+    Ok(Some(PageRow::Inbox(documents::InboxEntry {
+        task: documents::TaskLink::Stored { number: proposal.goal.number, status: None },
+        project: Some(proposal.project),
+        object,
+        activity: None,
+        at: Some(at),
+        unread: None,
+        cursor,
+    })))
+}
+
 fn reply_update(
     core: &Core,
     limits: &Limits,
@@ -906,14 +1088,6 @@ fn reply_update(
     if row.inbox != Some(cursor) {
         return Err(Missing::Unknown);
     }
-    if let Some(cached) = core.people.cached_waiting(&limits.people, party) {
-        for entry in cached {
-            if entry.task == owner.number && entry.kind == (jig_core_people::EntryKind::Reply { message: word.number })
-            {
-                return Ok(None);
-            }
-        }
-    }
     Ok(Some(PageRow::Inbox(documents::InboxEntry {
         task: documents::TaskLink::Retained { chip: documents::chip_from_row(limits, owner), at: owner.ended_at },
         project: Some(owner.project),
@@ -923,6 +1097,44 @@ fn reply_update(
         unread: Some(true),
         cursor,
     })))
+}
+
+fn proposal_decision(record: &Record) -> Option<&crate::ProposalDecisionRecord> {
+    match record {
+        Record::Core(CoreRecord::ProposalDecision(value)) => Some(value),
+        Record::Core(
+            CoreRecord::Deployment(_)
+            | CoreRecord::Projection(_)
+            | CoreRecord::RunProof(_)
+            | CoreRecord::Call(_)
+            | CoreRecord::Terminal(_)
+            | CoreRecord::Turn(_)
+            | CoreRecord::EscalationDecision(_),
+        )
+        | Record::Tasks(_)
+        | Record::Notes(_)
+        | Record::People(_) => None,
+    }
+}
+
+fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
+    match record {
+        Record::Tasks(tasks::Stored::Milestone(value)) => Some(value),
+        Record::Tasks(
+            tasks::Stored::Activity(_)
+            | tasks::Stored::PersonProposal(_)
+            | tasks::Stored::History(_)
+            | tasks::Stored::Live(_)
+            | tasks::Stored::Ended(_)
+            | tasks::Stored::Stub(_)
+            | tasks::Stored::Ledger(_)
+            | tasks::Stored::Writer(_)
+            | tasks::Stored::Pool(_),
+        )
+        | Record::Core(_)
+        | Record::People(_)
+        | Record::Notes(_) => None,
+    }
 }
 
 fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
@@ -1009,27 +1221,25 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
 }
 
 fn inbox_key_allowed(group: Group, task: u64, object: documents::InboxObject, key: &Key) -> bool {
-    match (group, object) {
-        (Group::Updates, documents::InboxObject::Result { .. }) => key_kind(key) == KeyKind::Ended(task),
-        (Group::Updates, documents::InboxObject::Reply { .. }) => key_kind(key) == KeyKind::Activity(task),
-        (Group::Needs, documents::InboxObject::Proposal { proposer: Proposer::Party(_), number }) => {
-            key_kind(key) == KeyKind::PersonProposal(number)
-        }
-        (
-            Group::Needs,
-            documents::InboxObject::Question { .. }
-            | documents::InboxObject::Proposal { proposer: Proposer::Task(_), .. }
-            | documents::InboxObject::Escalation { .. }
-            | documents::InboxObject::PersonTask,
-        ) => key_kind(key) == KeyKind::Live(task),
-        (Group::Needs, documents::InboxObject::Result { .. } | documents::InboxObject::Reply { .. })
-        | (
-            Group::Updates,
+    match group {
+        Group::Updates => match object {
+            documents::InboxObject::Result { .. } => key_kind(key) == KeyKind::Ended(task),
+            documents::InboxObject::Reply { .. } => key_kind(key) == KeyKind::Activity(task),
             documents::InboxObject::Question { .. }
             | documents::InboxObject::Proposal { .. }
             | documents::InboxObject::Escalation { .. }
-            | documents::InboxObject::PersonTask,
-        ) => false,
+            | documents::InboxObject::PersonTask => false,
+        },
+        Group::Needs => match object {
+            documents::InboxObject::Proposal { proposer: Proposer::Party(_), number } => {
+                key_kind(key) == KeyKind::PersonProposal(number)
+            }
+            documents::InboxObject::Question { .. }
+            | documents::InboxObject::Proposal { proposer: Proposer::Task(_), .. }
+            | documents::InboxObject::Escalation { .. }
+            | documents::InboxObject::PersonTask => key_kind(key) == KeyKind::Live(task),
+            documents::InboxObject::Result { .. } | documents::InboxObject::Reply { .. } => false,
+        },
     }
 }
 
