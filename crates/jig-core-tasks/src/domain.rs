@@ -210,6 +210,13 @@ impl Domain {
         record(self, number)
     }
 
+    /// Reservation a new requester must fund, including this task's live reservations
+    /// but excluding spend already charged (domain/authority.md, 7).
+    #[must_use]
+    pub fn takeover_budget(&self, number: u64) -> Option<u64> {
+        crate::funders::remaining(record(self, number)?.numbers)
+    }
+
     /// Borrow an ended result reference still named by a live task; content is stored history.
     #[must_use]
     pub fn stub(&self, number: u64) -> Option<&crate::Stub> {

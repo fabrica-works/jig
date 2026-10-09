@@ -134,8 +134,8 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
     for (_, binding) in &core.view_subjects {
         let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
         let touched = match subject {
-            Subject::Task { task } | Subject::Run { task } => *task == row.number,
-            Subject::Tree { task } => trees.as_slice().contains(task),
+            Subject::Task { task } | Subject::Tree { task } => trees.as_slice().contains(task),
+            Subject::Run { task } => *task == row.number,
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
             Subject::Goals { project } => *project == row.project && goal,
             Subject::Conversations { party } => owner == Some(*party),

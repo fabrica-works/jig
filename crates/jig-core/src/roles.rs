@@ -46,10 +46,7 @@ impl Core {
                 lacking: people::Lack::Budget { needs: self.settings.person_budget, left: role_policy.period_spend },
             });
         }
-        let Some(spent) = context.numbers.spent.checked_add(context.numbers.spent_below) else {
-            return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-        };
-        let Some(left) = context.numbers.budget.checked_sub(spent) else {
+        let Some(left) = self.tasks.takeover_budget(task) else {
             return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
         let (_, pool_numbers) = self.goal_pool(project, person);

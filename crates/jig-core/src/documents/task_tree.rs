@@ -213,6 +213,8 @@ pub struct Task {
     pub executor: tasks::Executor,
     pub requester: tasks::Party,
     pub lineage: List<Chip>,
+    /// Every live direct delegate; identities are never omitted from a close decision.
+    pub delegates: List<super::LiveDelegate>,
     pub spec_revision: u64,
     /// Last committed immutable activity position.
     pub activity: u64,
@@ -686,6 +688,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         executor: row.executor,
         requester: row.requester,
         lineage: ordered,
+        delegates: super::live_delegates::from_row(core, limits, party, row)?,
         spec_revision: row.revisions.spec,
         activity: row.activity,
         words: super::small::text(&row.spec.words, limits.documents.text_bytes),
@@ -882,6 +885,8 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(text.checked_mul(5)?)?
         .checked_add(path)?
         .checked_add(chip)?
+        .checked_add(List::<super::LiveDelegate>::worst_case(limits.lines)?)?
+        .checked_add(lines.checked_mul(chip)?)?
         .checked_add(List::<Chip>::worst_case(limits.lines)?.checked_add(lines.checked_mul(chip)?)?.checked_mul(2)?)?
         .checked_add(List::<Parameter>::worst_case(limits.lines)?.checked_add(lines.checked_mul(text)?)?)?
         .checked_add(List::<ResourceLine>::worst_case(limits.lines)?.checked_add(lines.checked_mul(path)?)?)?

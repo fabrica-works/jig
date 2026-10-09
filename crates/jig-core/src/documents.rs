@@ -40,6 +40,8 @@ pub use project_note::{
     Ledger, Member, Note, NoteLocation, Policy, PolicyRole, Project, ProjectResource, Recurring, Requirement,
     ResourceRole, SpendLine, note_from_entry,
 };
+mod live_delegates;
+pub use live_delegates::LiveDelegate;
 mod task_tree;
 pub use task_tree::{
     AuthorityLine, BudgetLine, ContractLine, Ending, EscalationState, FoldedCount, GoalLine, Goals, GrantLine,
