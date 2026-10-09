@@ -816,6 +816,9 @@ pub struct TaskRecord {
     /// Current live direct delegates, bounded by `Limits::delegates`; requester ending waits until
     /// they are gone.
     pub delegates: Box<[u64]>,
+    /// Exact result-created task identities, retained after delegates end or are taken.
+    /// A result admits one batch, directly or through its accepted proposal.
+    pub result_followups: Box<[u64]>,
     /// Introduced peer tasks this task may message or name as a live dependency.
     pub references: Box<[u64]>,
     /// Open questions with one reserved answer slot apiece.

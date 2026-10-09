@@ -94,7 +94,7 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
     use skein_lib::{Env, Queue, Time, Wall};
     let mut source = World::new(25, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
-    for corrupt in 0..4 {
+    for corrupt in 0..8 {
         let mut domain = Domain::new(&LIMITS, 25, Box::new([1]));
         let env = Env { limits: LIMITS, now: Time::ZERO, wall: Wall::EPOCH };
         let mut out = Queue::with_capacity(max_out(&LIMITS));
@@ -116,6 +116,25 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
                         record.root = 1;
                         record.depth = 1;
                     }
+                }
+                4 => record.result_followups = Box::new([3]),
+                5..=7 => {
+                    record.contract = jig_core_tasks::Contract::Verdict {
+                        choices: Box::new([jig_core_tasks::Verdict { code: 7, words: 32, followups: 2 }]),
+                    };
+                    record.phase = Phase::Closing(jig_core_tasks::Closing {
+                        stage: jig_core_tasks::Stage::Delegates,
+                        ending: jig_core_tasks::Ending::Done(jig_core_tasks::TaskResult::Verdict {
+                            code: 7,
+                            words: Box::new([]),
+                        }),
+                    });
+                    record.result_followups = match corrupt {
+                        5 => Box::new([3, 3]),
+                        6 => Box::new([3, 4, 5]),
+                        7 => Box::new([0, number]),
+                        _ => unreachable!(),
+                    };
                 }
                 _ => unreachable!(),
             }

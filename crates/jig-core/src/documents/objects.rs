@@ -126,7 +126,8 @@ pub struct ResultDoc {
     pub requester: tasks::Party,
     pub executor: tasks::Executor,
     pub chosen_by: Option<u64>,
-    /// The live row does not distinguish result-created followups from earlier delegates.
+    /// Exact result-created tasks, including those already ended or taken away.
+    /// The owner always supplies `Some`, including a known empty batch.
     pub followups: Option<List<TaskLink>>,
     pub delegates: List<TaskLink>,
     pub proposal: Option<super::ProposalRef>,
@@ -597,8 +598,12 @@ pub fn result_from_row(
         | tasks::Phase::Active(_)
         | tasks::Phase::Held { was: tasks::Was::Waiting | tasks::Was::Active(_), .. } => return Err(Missing::Ended),
     };
-    let mut followups = List::with_capacity(limits.documents.lines);
+    let mut delegates = List::with_capacity(limits.documents.lines);
     for task in row.delegates.iter().take(bound(limits)) {
+        delegates.push(super::task_tree::link(core, limits, party, *task)?).expect("bounded delegates");
+    }
+    let mut followups = List::with_capacity(limits.documents.lines);
+    for task in row.result_followups.iter().take(bound(limits)) {
         followups.push(super::task_tree::link(core, limits, party, *task)?).expect("bounded followups");
     }
     Ok(ResultDoc {
@@ -613,13 +618,13 @@ pub fn result_from_row(
             tasks::Executor::Person(tasks::PersonAddress::Role(_)) => row.taken_by,
             tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => None,
         },
-        delegates: followups,
-        followups: None,
+        delegates,
+        followups: Some(followups),
         proposal: match &row.proposal {
             Some(value) => Some(super::ProposalRef { proposer: Proposer::Task(value.proposer), number: value.number }),
             None => None,
         },
-        cut: row.delegates.len() > bound(limits),
+        cut: row.delegates.len() > bound(limits) || row.result_followups.len() > bound(limits),
     })
 }
 pub(super) fn result(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<ResultDoc, Missing> {

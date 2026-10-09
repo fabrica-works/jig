@@ -195,6 +195,7 @@ pub(crate) fn activation(
     crate::run::activation(domain, environment, to, number, attempt, end.clone(), saved, out);
     match (&end, result_admitted) {
         (End::FinishedWithFollowups { followups: ResultFollowups::Delegates(batch), .. }, true) => {
+            crate::domain::remember_result_followups(domain, &environment.limits, number, batch);
             crate::domain::make_admitted(domain, environment, crate::Party::Task(number), batch.clone(), out);
         }
         (End::FinishedWithFollowups { followups: ResultFollowups::Proposal(proposal), .. }, true) => {

@@ -274,6 +274,41 @@ fn valid_escalation(task: &TaskRecord, limits: &Limits) -> bool {
     }
 }
 
+fn valid_followups(task: &TaskRecord) -> bool {
+    if task.result_followups.is_empty() {
+        return true;
+    }
+    let ending = match &task.phase {
+        Phase::Closing(closing) | Phase::Held { was: Was::Closing(closing), .. } => &closing.ending,
+        Phase::Waiting
+        | Phase::Active(_)
+        | Phase::Held { was: Was::Waiting | Was::Active(_), .. }
+        | Phase::Ended(_) => {
+            return false;
+        }
+    };
+    let code = match ending {
+        Ending::Done(crate::TaskResult::Verdict { code, .. })
+        | Ending::Cancelled { result: Some(crate::TaskResult::Verdict { code, .. }), .. } => *code,
+        Ending::Done(
+            crate::TaskResult::Report { .. } | crate::TaskResult::Change { .. } | crate::TaskResult::Failure { .. },
+        )
+        | Ending::Failed { .. }
+        | Ending::Cancelled { .. } => return false,
+    };
+    match &task.contract {
+        crate::Contract::Verdict { choices } => {
+            for choice in choices {
+                if choice.code == code {
+                    return task.result_followups.len() <= usize::try_from(choice.followups).expect("u32 fits usize");
+                }
+            }
+            false
+        }
+        crate::Contract::Report { .. } | crate::Contract::Change { .. } => false,
+    }
+}
+
 #[expect(clippy::too_many_lines, reason = "one complete restored task shape is checked before retention")]
 fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     if task.run_spent > task.numbers.spent
@@ -286,6 +321,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || task.made == 0
         || task.made > limits.tree_tasks
         || task.delegates.len() > usize::try_from(limits.delegates).expect("u32 fits usize")
+        || task.result_followups.len() > usize::try_from(limits.batch).expect("u32 fits usize")
         || task.references.len() > usize::try_from(limits.references).expect("u32 fits usize")
         || task.subscriptions.len() > usize::try_from(limits.subscriptions).expect("u32 fits usize")
         || task.waiting_on.len() > usize::try_from(limits.dependencies).expect("u32 fits usize")
@@ -301,6 +337,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || !valid_phase(task, limits)
         || !valid_escalation(task, limits)
         || !valid_proposal(task, limits)
+        || !valid_followups(task)
     {
         return false;
     }
@@ -455,7 +492,19 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     {
         return false;
     }
-    for numbers in [&*task.delegates, &*task.references, &*task.dependencies, &*task.spec.inputs, &*task.waiting_on] {
+    for followup in &task.result_followups {
+        if *followup == 0 || *followup == task.number {
+            return false;
+        }
+    }
+    for numbers in [
+        &*task.delegates,
+        &*task.result_followups,
+        &*task.references,
+        &*task.dependencies,
+        &*task.spec.inputs,
+        &*task.waiting_on,
+    ] {
         for (at, number) in numbers.iter().enumerate() {
             for earlier in numbers.iter().take(at) {
                 if earlier == number {

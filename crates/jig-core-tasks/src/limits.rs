@@ -163,6 +163,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?,
         )?
         .checked_add(u64::from(limits.delegates).checked_mul(8)?)?
+        .checked_add(u64::from(limits.batch).checked_mul(8)?)?
         .checked_add(u64::from(limits.references).checked_mul(8)?)?
         .checked_add(
             u64::from(limits.subscriptions).checked_mul(u64::try_from(size_of::<crate::Subscription>()).ok()?)?,

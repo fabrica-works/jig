@@ -956,6 +956,7 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
     });
     row.ended_at = Some(Wall::from_nanos(19));
     let result = result_from_row(&core, &limits, 1, &row).unwrap();
+    assert!(result.followups.as_ref().unwrap().is_empty());
     assert_eq!(result.at, Some(Wall::from_nanos(19)));
     assert_eq!(result.task.phase, PhaseLine::Ended);
     let Ending::Cancelled { by, at, result, .. } = result.ending else { panic!() };
@@ -985,6 +986,27 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
             Ending::Done(ResultValue::Report(_) | ResultValue::Failure(_)) | Ending::Cancelled { .. } => panic!(),
         }
     }
+    row.phase = tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict { code: 3, words: Box::new([]) }));
+    row.delegates = Box::new([1]);
+    row.result_followups = Box::new([3, 99]);
+    let result = result_from_row(&core, &limits, 1, &row).unwrap();
+    let TaskLink::Live(delegate) = result.delegates.get(0).unwrap() else { panic!() };
+    assert_eq!(delegate.number, 1);
+    let followups = result.followups.unwrap();
+    let TaskLink::Live(child) = followups.get(0).unwrap() else { panic!() };
+    assert_eq!(child.number, 3);
+    match followups.get(1).unwrap() {
+        TaskLink::Stored { number, status } => {
+            assert_eq!(*number, 99);
+            assert_eq!(*status, None);
+        }
+        TaskLink::Live(_) => panic!(),
+    }
+    let mut limited = limits;
+    limited.documents.lines = 1;
+    let result = result_from_row(&core, &limited, 1, &row).unwrap();
+    assert!(result.cut);
+    assert_eq!(result.followups.unwrap().len(), 1);
 }
 
 #[test]

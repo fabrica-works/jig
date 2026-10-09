@@ -65,6 +65,9 @@ fn a_verdicts_proposal_is_accepted_and_its_followups_run_before_result_delivery(
         batch: Box::new([child]),
     });
     assert_eq!(w.replies[&key], Reply::Made(vec![2]));
+    assert_eq!(w.record(1).result_followups.as_ref(), [2]);
+    w.restart();
+    assert_eq!(w.record(1).result_followups.as_ref(), [2]);
     let to = w.to();
     w.send(Event::DecideProposal {
         reply_to: to,
@@ -80,8 +83,12 @@ fn a_verdicts_proposal_is_accepted_and_its_followups_run_before_result_delivery(
     w.finish(2);
     w.settle(2);
     assert!(w.results.contains_key(&2) && !w.results.contains_key(&1));
+    assert!(w.record(1).delegates.is_empty());
+    assert_eq!(w.record(1).result_followups.as_ref(), [2]);
     w.settle(1);
     assert!(w.results.contains_key(&1));
+    let jig_core_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
+    assert_eq!(row.result_followups.as_ref(), [2]);
     assert!(w.activations.contains(&3));
 }
 
@@ -101,7 +108,10 @@ fn a_verdicts_proposal_is_rejected_and_its_result_is_delivered() {
     });
     assert!(w.closing.contains(&1));
     assert!(!w.activations.contains(&2));
+    assert!(w.record(1).result_followups.is_empty());
     w.settle(1);
+    let jig_core_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
+    assert!(row.result_followups.is_empty());
     assert!(matches!(w.results.get(&1), Some(Ending::Done(TaskResult::Verdict { code: 7, .. }))));
     assert!(w.activations.contains(&3));
 }
@@ -149,12 +159,19 @@ fn an_authorized_verdict_makes_followups_in_its_result_commit_and_waits_for_them
     );
     assert_eq!(w.record(1).delegates.as_ref(), [2]);
     assert!(w.record(2).created_at == w.record(1).created_at);
+    w.restart();
+    assert_eq!(w.record(1).result_followups.as_ref(), [2]);
     assert!(w.results.is_empty() && !w.activations.contains(&3));
     w.claim_budget(2, 2, 5);
     w.finish(2);
     w.settle(2);
+    assert!(w.record(1).delegates.is_empty());
+    assert_eq!(w.record(1).result_followups.as_ref(), [2]);
     w.settle(1);
     assert!(w.results.contains_key(&1) && w.activations.contains(&3));
+    w.restart();
+    let jig_core_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
+    assert_eq!(row.result_followups.as_ref(), [2]);
 }
 
 #[test]

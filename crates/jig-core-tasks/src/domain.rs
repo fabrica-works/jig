@@ -917,8 +917,20 @@ fn make_result_followups(
     {
         return out.push(Request::Refused { reply_to: to, problem });
     }
+    remember_result_followups(domain, &env.limits, proposer, &batch);
     let numbers = make_admitted(domain, env, Party::Task(proposer), batch, out);
     out.push(Request::Made { reply_to: to, tasks: numbers });
+}
+
+/// Retain the exact preflighted result batch before construction publishes its creator.
+pub(crate) fn remember_result_followups(domain: &mut Domain, limits: &Limits, number: u64, batch: &[New]) {
+    let mut identities = List::with_capacity(limits.batch);
+    for member in batch {
+        identities.push(member.number).expect("admitted result batch");
+    }
+    let row = &mut task_mut(domain, number).expect("admitted result creator").record;
+    assert!(row.result_followups.is_empty(), "one admitted result batch");
+    row.result_followups = identities.into_boxed();
 }
 
 /// Construct a whole batch after its entrance and funding were preflighted in this decision.
@@ -1072,6 +1084,7 @@ pub(crate) fn make_admitted(
                 executor: new.executor,
                 taken_by: None,
                 person_wait: None,
+                result_followups: Box::new([]),
                 tracked: new.tracked,
                 recurring: match new.recurring {
                     Some(template) => Some(Box::new(crate::RecurringState {
