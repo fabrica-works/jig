@@ -669,3 +669,6 @@ fn party_ending_party(value: people::Party) -> parties::EndingParty {
         people::Party::Deployment { project } => parties::EndingParty::Deployment { project },
     }
 }
+
+/// Independent consumers of contract documents, alongside the scripted peers.
+pub use crate::watches::Parties as WatchParties;

@@ -652,3 +652,23 @@ fn a_batch_member_without_its_covered_acceptance_is_rejected() {
         assert_eq!(fake.commit(2, rows).expect_err("the fake forged batch permission").promise, Promise::Authority);
     }
 }
+
+#[test]
+fn a_watch_delivery_before_its_no_write_decisions_prior_commit_is_caught() {
+    let mut fence = jig_core_world::watches::Fence::opened(7);
+    assert_eq!(fence.delivered(6), Err("watch delivery preceded its durable fence"));
+    fence.delivered(7).expect("every preceding commit is durable");
+    assert_eq!(fence.delivered(7), Err("watch delivery overtook its acknowledgement"));
+}
+
+#[test]
+fn a_changed_watch_missing_its_last_delivery_is_caught() {
+    let mut fence = jig_core_world::watches::Fence::opened(7);
+    fence.delivered(7).expect("first delivery");
+    fence.changed(8);
+    assert_eq!(fence.finish(), Err("a changed open watch missed its last delivery"));
+    fence.consumed(9);
+    assert_eq!(fence.delivered(8), Err("watch delivery preceded its durable fence"));
+    fence.delivered(9).expect("replacement also waits for intervening unrelated commit");
+    fence.finish().expect("last state reached the party");
+}

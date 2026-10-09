@@ -58,6 +58,8 @@ pub struct World {
     pub stopped: bool,
     /// Independent scripted hosts and clients, when this scenario uses them.
     pub peers: Option<crate::peers::Peers>,
+    /// Independent document consumers, enabled only in watch stories.
+    pub watches: Option<crate::peers::WatchParties>,
     /// Referee observations, independent of the root state.
     pub observer: crate::observations::Observer,
     heap: crate::observations::Heap,
@@ -226,6 +228,7 @@ impl World {
             store_delay: 0,
             stopped: false,
             peers: None,
+            watches: None,
             observer,
             heap,
             restoring: None,
@@ -283,6 +286,12 @@ impl World {
         Env { now: Time::from_nanos(self.wall), wall: Wall::from_nanos(self.wall), limits: self.limits }
     }
 
+    /// Queue a burst so independent parties draw their pace between its inputs.
+    pub fn send_all(&mut self, events: Vec<root::Event>) {
+        self.events.extend(events);
+        self.drain();
+    }
+
     pub fn send(&mut self, event: root::Event) {
         self.events.push_back(event);
         self.drain();
@@ -303,6 +312,9 @@ impl World {
             self.observer.systems(self.wall, &self.systems);
             if let Some(mut event) = self.events.pop_front() {
                 self.observer.inbound(&self.store, self.wall, &mut event);
+                if let Some(watches) = &mut self.watches {
+                    watches.inbound(&event);
+                }
                 self.trace.push(format!("input {event:?}"));
                 root::step(&mut self.domain, &env, event);
             }
@@ -318,6 +330,9 @@ impl World {
                         let mut rows = Vec::new();
                         while let Some(write) = writes.pop() {
                             rows.push(write);
+                        }
+                        if let Some(watches) = &mut self.watches {
+                            watches.commit(number, &rows);
                         }
                         self.commits.push(rows.clone());
                         self.store.submit(number, crate::store_writes(rows), self.store_delay);
@@ -367,7 +382,11 @@ impl World {
                             valid: Duration::from_secs(60),
                         })));
                     }
-                    root::Request::Now(_) => {}
+                    root::Request::Now(now) => {
+                        if let Some(watches) = &mut self.watches {
+                            watches.now(&now);
+                        }
+                    }
                     root::Request::Stop => self.stopped = true,
                 }
             }
@@ -384,6 +403,9 @@ impl World {
                 }
                 self.observer.systems(self.wall, &self.systems);
                 self.restore_pages();
+                if let Some(watches) = &mut self.watches {
+                    self.events.extend(watches.tick());
+                }
                 if self.domain.ready()
                     && let Some(peers) = &mut self.peers
                 {
@@ -400,6 +422,7 @@ impl World {
                 && self.store.pending.is_empty()
                 && !self.store.loading()
                 && (self.domain.quiescent() || !self.store.held.is_empty())
+                && self.watches.as_ref().is_none_or(crate::peers::WatchParties::quiescent)
             {
                 return;
             }
@@ -410,6 +433,9 @@ impl World {
     #[expect(clippy::too_many_lines, reason = "one exhaustive delivery handler drives the script's independent peers")]
     fn delivered(&mut self, mut delivery: root::Delivery) {
         self.observer.delivered(self.wall, &mut delivery);
+        if let Some(watches) = &mut self.watches {
+            watches.released(&delivery, self.store.applied);
+        }
         if let Some(peers) = &mut self.peers {
             peers.delivered(&delivery);
             if let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery {
@@ -843,6 +869,9 @@ impl World {
     pub fn restart_with(&mut self, config: root::Config) {
         self.observer.observe(self.wall, crate::referee::Observed::Restart);
         self.store.crash();
+        if let Some(watches) = &mut self.watches {
+            watches.restart(self.store.applied);
+        }
         self.observer.cold(self.wall, &self.store);
         self.stopped = false;
         self.restoring = None;

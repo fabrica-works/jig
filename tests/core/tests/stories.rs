@@ -1080,3 +1080,6 @@ fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
     );
     assert!(world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(choice)))));
 }
+
+#[path = "stories/watches.rs"]
+mod watches;
