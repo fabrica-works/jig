@@ -2,7 +2,7 @@
 //! Records restore, save and erase under this owner; client/domain/client.md, 11.
 use crate::{address::Address, contract::Text};
 /// A key owned by this domain in the small store.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StoreKey {
     /// The previous jig address.
     Place,
@@ -99,6 +99,7 @@ pub fn erase(domain: &mut Domain, key: StoreKey, out: &mut Queue<Request>) {
             domain.kept.push(record).expect("filter preserves bounded record capacity");
         }
     }
+    domain.timers.cancel(crate::domain::Timer::Save(key));
     out.push(Request::Erase { key });
 }
 /// Saves the selected jig place for the currently confirmed party.
@@ -107,6 +108,32 @@ pub(crate) fn place(domain: &mut Domain, out: &mut Queue<Request>) {
         let saved = save(domain, Record::Place { version: STORE_VERSION, party, address: domain.address }, out);
         if !saved {
             crate::pages::routing::refuse(domain, Limit::Records);
+        }
+    }
+}
+
+/// Keeps a policy's draft immediately and coalesces its shell saves on a
+/// monotonic deadline. Jig 21 chooses when a draft uses this API.
+pub fn coalesce(domain: &mut Domain, record: Record, out: &mut Queue<Request>) -> bool {
+    if !record.valid(domain.text_limit) || domain.confirmed != Some(record.party()) {
+        return false;
+    }
+    let key = record.key();
+    if !retain(domain, record) {
+        out.push(Request::Fact { fact: Fact::Refused { which: Limit::Records } });
+        return false;
+    }
+    domain
+        .timers
+        .arm(crate::domain::Timer::Save(key), domain.now.saturating_add(domain.save_delay))
+        .expect("one save deadline per record fits");
+    true
+}
+pub(crate) fn fire_save(domain: &Domain, key: StoreKey, out: &mut Queue<Request>) {
+    for record in &domain.kept {
+        if record.key() == key {
+            out.push(Request::Save { record: record.clone() });
+            return;
         }
     }
 }

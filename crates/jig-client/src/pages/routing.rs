@@ -31,7 +31,9 @@ fn page_edges(before: Option<contract::Cursor>, after: Option<contract::Cursor>)
 pub(crate) fn refuse(domain: &mut Domain, which: Limit) {
     match &mut domain.page {
         Page::Work { refused, .. } => *refused = Some(which),
-        Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {}
+        Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
+            crate::notices::show(domain, crate::notices::Kind::Refused(which));
+        }
     }
     domain.changed();
 }
@@ -78,6 +80,7 @@ pub(crate) fn navigate(
     domain.reads.abandon(domain.generation);
     out.push(Request::PartsLeft { generation: domain.generation });
     domain.objects.clear();
+    domain.clock.page_times = false;
     domain.object_rows.rows.clear();
     domain.object_rows.edges = blank_edges();
     domain.conversation_rows.rows.clear();
@@ -189,7 +192,7 @@ fn names(
     excess(domain, missed);
     domain.object_rows.rows.clear();
     for key in &keys {
-        if domain.objects.find(*key).is_some() {
+        if domain.objects.named(*key, source) {
             match domain.object_rows.rows.push(*key) {
                 Ok(()) => {}
                 Err(_) => break,

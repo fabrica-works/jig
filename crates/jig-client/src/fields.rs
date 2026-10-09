@@ -44,6 +44,10 @@ impl Fields {
     pub fn get(&self, purpose: Purpose) -> Option<&Field> {
         self.rows.get(&purpose)
     }
+    /// Removes a purpose when its page or confirmation policy no longer keeps it.
+    pub fn remove(&mut self, purpose: Purpose) -> Option<Field> {
+        self.rows.remove(&purpose)
+    }
     /// A person's edit changes text and never advances the domain-write count.
     pub fn edit(&mut self, purpose: Purpose, text: Text) -> Result<(), Limit> {
         self.set(purpose, text, false)

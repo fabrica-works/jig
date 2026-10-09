@@ -26,3 +26,32 @@ impl FrameState {
         Some(frame.party.number)
     }
 }
+
+/// Checks each allocation this spine itself keeps from the frame. Other whole
+/// documents arrive within the decoding owner's `document_bytes` budget.
+#[must_use]
+pub fn fits(frame: &Frame, limits: &crate::Limits) -> bool {
+    if !frame.party.name.fits(limits.text) || frame.projects.capacity() > limits.projects {
+        return false;
+    }
+    for project in &frame.projects {
+        if !project.name.fits(limits.text)
+            || project.roles.capacity() > limits.roles
+            || project.chats.capacity() > limits.charters
+            || project.goals.capacity() > limits.charters
+        {
+            return false;
+        }
+        for charter in &project.chats {
+            if !charter.name.fits(limits.text) {
+                return false;
+            }
+        }
+        for charter in &project.goals {
+            if !charter.name.fits(limits.text) {
+                return false;
+            }
+        }
+    }
+    true
+}

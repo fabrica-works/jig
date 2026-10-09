@@ -1,6 +1,6 @@
 //! Container capacities and byte bounds owned by the client.
-//! Every container is allocated from these at new. Jig 20.5 completes the spine
-//! terms; jig 21–23 add their own entities. See client/domain/client.md, 14.
+//! Every retained container is sized from these at new; jig 21–23 add their
+//! own entities. See client/domain/client.md, 14.
 use crate::{
     contract::{Charter, Frame, ProjectRole},
     domain::Timer,
@@ -17,10 +17,14 @@ pub struct Backoff {
     pub most: Duration,
 }
 
-/// Configured limits for the frame and watch spine.
+/// Configured capacities, payload bounds and durations for the client spine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Limits {
     pub watches: u32,
+    pub notices: u32,
+    pub notice_life: Duration,
+    pub linger: Duration,
+    pub save_delay: Duration,
     pub intents: u32,
     pub fields: u32,
     pub providers: u32,
@@ -28,7 +32,8 @@ pub struct Limits {
     pub sources: u32,
     pub reads: u32,
     pub parts: u32,
-    /// Total owned heap within any one decoded document, including its containers.
+    /// Whole payload budget enforced by the decoding owner: boxes (including
+    /// the root box), list capacities, texts and nested documents.
     pub document_bytes: u64,
     pub records: u32,
     pub projects: u32,
@@ -44,6 +49,9 @@ pub struct Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.watches == 0
+        || limits.notice_life == Duration::ZERO
+        || limits.linger == Duration::ZERO
+        || limits.save_delay == Duration::ZERO
         || limits.heartbeat == Duration::ZERO
         || limits.backoff.first == Duration::ZERO
         || limits.backoff.first > limits.backoff.most
@@ -57,11 +65,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(limits.parts.checked_mul(2)?)?
         .checked_add(16)?;
     limits.objects.checked_mul(2)?;
+    let timer_capacity = timers(limits)?;
     if limits.sources == 0 {
         return None;
     }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;
     total = total.checked_add(crate::intents::worst_case(limits)?)?;
+    total = total.checked_add(crate::notices::worst_case(limits)?)?;
     total = total.checked_add(crate::fields::worst_case(limits)?)?;
     total = total.checked_add(crate::signin::worst_case(limits)?)?;
     total = total.checked_add(crate::objects::worst_case(limits)?)?;
@@ -70,7 +80,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(u64::from(limits.reads).checked_mul(limits.document_bytes)?)?;
     total = total.checked_add(crate::windows::worst_case(limits)?)?;
     total = total.checked_add(Map::<Id<Watch>, ()>::worst_case(limits.watches)?)?;
-    total = total.checked_add(Deadlines::<Timer>::worst_case(limits.watches)?)?;
+    total = total.checked_add(Deadlines::<Timer>::worst_case(timer_capacity)?)?;
     total = total.checked_add(List::<Record>::worst_case(limits.records)?)?;
     total = total.checked_add(u64::from(limits.records).checked_mul(u64::from(limits.text))?)?;
     total = total.checked_add(u64::try_from(size_of::<Frame>()).ok()?)?;
@@ -83,4 +93,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(u64::from(limits.projects).checked_mul(project)?)?;
     // Chips subjects own at most one configured task-number list each.
     total.checked_add(u64::from(limits.watches).checked_mul(List::<u64>::worst_case(limits.rows)?)?)
+}
+
+/// One deadline per watch, lingering object, visible notice and saved record,
+/// plus the minute tick. Checked before any container is allocated.
+#[must_use]
+pub fn timers(limits: &Limits) -> Option<u32> {
+    limits.watches.checked_add(limits.objects)?.checked_add(limits.notices)?.checked_add(limits.records)?.checked_add(1)
 }

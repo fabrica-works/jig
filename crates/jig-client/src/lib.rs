@@ -9,6 +9,7 @@ pub mod action;
 pub mod acts;
 pub mod address;
 pub mod boundary;
+pub(crate) mod clock;
 pub mod confirm;
 pub mod contract;
 pub mod conversation;

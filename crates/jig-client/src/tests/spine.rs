@@ -12,6 +12,10 @@ use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 
 pub(super) const LIMITS: Limits = Limits {
     watches: 4,
+    notices: 2,
+    notice_life: Duration::from_secs(5),
+    linger: Duration::from_secs(5),
+    save_delay: Duration::from_secs(1),
     intents: 2,
     fields: 4,
     providers: 2,
@@ -132,12 +136,14 @@ fn frame_confirms_its_party_and_link_changes_once_each_way() {
         drive(&mut domain, Time::ZERO, Event::Ended { watch, end: WatchEnd::Dropped }).as_ref(),
         &[Request::Link { link: Link::Offline }]
     );
+    assert_eq!(domain.notices().ids().len(), 1);
     let retry = domain.next_deadline().unwrap();
     assert_eq!(tick(&mut domain, retry).as_ref(), &[Request::Open { watch, subject: crate::contract::Subject::Frame }]);
     assert_eq!(
         delivered(&mut domain, retry, watch, frame(7)).as_ref(),
         &[Request::Retention { retention: Duration::from_secs(1000) }, Request::Link { link: Link::Live }]
     );
+    assert_eq!(domain.notices().ids().len(), 2);
 }
 
 #[test]

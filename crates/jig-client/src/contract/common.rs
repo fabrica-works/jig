@@ -21,6 +21,11 @@ impl Text {
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
+    /// Whether the already decoded text fits another owner's byte bound.
+    #[must_use]
+    pub fn fits(&self, limit: u32) -> bool {
+        self.bytes.len() <= usize::try_from(limit).expect("u32 fits usize")
+    }
     /// Moves the bytes to their next owner.
     #[must_use]
     pub fn into_bytes(self) -> Box<[u8]> {

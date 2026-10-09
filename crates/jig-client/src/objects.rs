@@ -95,6 +95,14 @@ impl Objects {
     pub fn find(&self, key: ObjectKey) -> Option<Id<Object>> {
         self.index.get(&key).copied()
     }
+    /// Whether a specific source successfully names this object.
+    #[must_use]
+    pub fn named(&self, key: ObjectKey, source: Source) -> bool {
+        let Some(id) = self.find(key) else {
+            return false;
+        };
+        self.slab.get(id).expect("indexed object exists").sources.contains(&source)
+    }
     /// The number of live objects held, excluding retired slots.
     #[must_use]
     pub fn len(&self) -> u32 {
@@ -262,7 +270,7 @@ fn retained(object: &Object) -> bool {
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let slots = limits.objects.checked_mul(2)?;
-    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes)?;
+    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes.checked_mul(2)?)?;
     Slab::<Object>::worst_case(slots)?
         .checked_add(Map::<ObjectKey, Id<Object>>::worst_case(limits.objects)?)?
         .checked_add(List::<ObjectKey>::worst_case(limits.objects)?)?

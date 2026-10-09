@@ -1,6 +1,6 @@
 //! The client spine: frame facts, the shared link, page generation and watches.
 //! No platform or application value is known. Each entry handles one owned event;
-//! fire expires one timer, and reclaim frees only watches whose terminals arrived.
+//! fire expires one timer, and reclaim frees entities whose obligations ended.
 //! Nothing is accepted before Start. See client/domain/client.md, 3, 4 and 8.
 //!
 //! | Client | Event | Next | Emits |
@@ -26,19 +26,32 @@ use crate::{
 };
 use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Rng, Slab, Time, Token, Wall};
 
-/// A watch timer; one timer per watch is armed at a time.
+/// Client deadlines: one per watch, notice, linger and saved record, plus a tick.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Timer {
     /// No event arrived within the heartbeat.
     Silent(Id<Watch>),
     /// The old attempt ended and backoff permits another open.
     Reopen(Id<Watch>),
+    /// A visible notice reaches its monotonic end.
+    Notice(Id<crate::notices::Notice>),
+    /// A leaving card has lingered.
+    Linger(Id<crate::objects::Object>),
+    /// A draft save has coalesced.
+    Save(crate::store::StoreKey),
+    /// A shown wall time needs another minute's wording.
+    Minute,
 }
 
 /// Jig's client state, owned once by the application client root.
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) started: bool,
+    pub(crate) now: Time,
+    pub(crate) clock: crate::clock::State,
+    pub(crate) notices: crate::notices::Notices,
+    pub(crate) linger: Duration,
+    pub(crate) save_delay: Duration,
     pub(crate) confirmed: Option<u64>,
     pub(crate) text_limit: u32,
     pub(crate) intents: crate::intents::Intents,
@@ -73,6 +86,11 @@ impl Domain {
         assert!(crate::limits::worst_case(limits).is_some(), "client limits are valid");
         Self {
             started: false,
+            now: Time::ZERO,
+            clock: crate::clock::State { page_times: false, armed: false },
+            notices: crate::notices::Notices::new(limits.notices, limits.notice_life),
+            linger: limits.linger,
+            save_delay: limits.save_delay,
             confirmed: None,
             text_limit: limits.text,
             intents: crate::intents::Intents::new(limits.intents),
@@ -91,7 +109,7 @@ impl Domain {
             watches: Slab::with_capacity(limits.watches),
             watch_ids: Map::with_capacity(limits.watches),
             frame_watch: None,
-            timers: Deadlines::with_capacity(limits.watches),
+            timers: Deadlines::with_capacity(crate::limits::timers(limits).expect("timer capacity is validated")),
             rng: Rng::new(seed),
             objects: crate::objects::Objects::new(limits.objects, limits.sources),
             reads: crate::reads::Reads::new(limits.reads),
@@ -114,6 +132,27 @@ impl Domain {
             }
         }
         self.signin.providers.push(provider)
+    }
+    /// Visible notices and their monotonic ends.
+    #[must_use]
+    pub const fn notices(&self) -> &crate::notices::Notices {
+        &self.notices
+    }
+    /// Page policy names whether its own documents show wall times.
+    pub fn timed_page(&mut self, showing: bool) {
+        self.clock.page_times = showing;
+        crate::clock::sync(self);
+    }
+    /// An object policy leaves a card visible for the configured linger.
+    pub fn leave(&mut self, id: Id<crate::objects::Object>, ending: crate::contract::Ending) -> bool {
+        let Some(object) = self.objects.get_mut(id) else {
+            return false;
+        };
+        let until = self.now.saturating_add(self.linger);
+        object.card = crate::objects::Card::Leaving { ending, until };
+        self.timers.arm(Timer::Linger(id), until).expect("one linger deadline per object fits");
+        self.changed();
+        true
     }
     /// Provider names for the sign-in page.
     #[must_use]
@@ -238,13 +277,20 @@ impl Domain {
         self.objects.reclaim();
         self.reads.reclaim();
         self.intents.reclaim();
+        self.notices.reclaim();
+        crate::clock::sync(self);
     }
     pub(crate) fn changed(&mut self) {
         self.shown = self.shown.saturating_add(1);
     }
     pub(crate) fn set_link(&mut self, link: Link, out: &mut Queue<Request>) {
         if self.link != link {
+            let previous = self.link;
             self.link = link;
+            match previous {
+                Link::Starting => {}
+                Link::Live | Link::Offline => crate::notices::show(self, crate::notices::Kind::Link(link)),
+            }
             self.changed();
             out.push(Request::Link { link });
         }
@@ -391,6 +437,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         return;
     }
+    domain.now = env.now;
     domain.wall = env.wall;
     match event {
         Event::Frame { asked } => frame_answer(domain, asked, out),
@@ -406,12 +453,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                     out.push(Request::Fact { fact: Fact::Refused { which } });
                 }
             },
+            Act::Dismiss => crate::notices::dismiss_first(domain),
             Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
             Act::Submit { .. }
             | Act::Intend { .. }
             | Act::Choose { .. }
             | Act::Confirm
-            | Act::Dismiss
             | Act::Fold { .. }
             | Act::Filter { .. }
             | Act::More { .. } => {}
@@ -424,6 +471,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Read { read, result } => crate::pages::routing::read_result(domain, env, read, result, out),
     }
     crate::signin::returned(domain, env, out);
+    crate::clock::sync(domain);
 }
 fn start(
     domain: &mut Domain,
@@ -434,6 +482,7 @@ fn start(
     out: &mut Queue<Request>,
 ) {
     domain.started = true;
+    domain.now = env.now;
     domain.wall = env.wall;
     domain.address = address;
     domain.offset = offset;
@@ -497,6 +546,10 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
     }
 }
 fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mut Queue<Request>) {
+    if !crate::frame::fits(&frame, &env.limits) {
+        out.push(Request::Fact { fact: Fact::Refused { which: Limit::Objects } });
+        return;
+    }
     let range: VersionRange = frame.versions;
     if !range.contains(CLIENT_VERSION) {
         domain.blocked = true;
@@ -629,11 +682,31 @@ pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
 }
 /// Fires at most one expired deadline, respecting watch terminal obligations.
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    domain.now = env.now;
     domain.wall = env.wall;
     let Some(timer) = domain.timers.expire(env.now) else {
         return;
     };
     match timer {
+        Timer::Minute => crate::clock::minute(domain),
+        Timer::Notice(id) => crate::notices::dismiss(domain, id.token()),
+        Timer::Save(key) => crate::store::fire_save(domain, key, out),
+        Timer::Linger(id) => {
+            if let Some(object) = domain.objects.get(id) {
+                match object.card {
+                    crate::objects::Card::Leaving { until, .. } => {
+                        if until <= env.now {
+                            let key = object.key;
+                            domain.objects.remove(key);
+                            domain.changed();
+                        }
+                    }
+                    crate::objects::Card::Open
+                    | crate::objects::Card::Deciding { .. }
+                    | crate::objects::Card::Refused { .. } => {}
+                }
+            }
+        }
         Timer::Silent(id) => {
             let Some(watch) = domain.watches.get_mut(id) else {
                 return;
@@ -677,6 +750,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             }
         }
     }
+    crate::clock::sync(domain);
 }
 /// The next deadline of the client, for roots using free entry points.
 #[must_use]

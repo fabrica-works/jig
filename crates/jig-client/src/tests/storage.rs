@@ -104,6 +104,9 @@ fn source_replacement_keeps_shared_names_and_admits_in_order() {
     assert_eq!(objects.replace(a, &[first, second, third]), 1);
     let id = objects.find(first).unwrap();
     assert_eq!(objects.replace(b, &[first]), 0);
+    let c = Source::Window { generation: 1, number: 3 };
+    assert_eq!(objects.replace(c, &[first]), 1);
+    assert!(!objects.named(first, c));
     assert_eq!(objects.replace(a, &[second]), 0);
     assert_eq!(objects.find(first), Some(id));
     assert_eq!(objects.replace(b, &[]), 0);
@@ -157,7 +160,6 @@ fn deployment_parts_are_shown_with_the_page_generation() {
     assert_eq!(out.as_ref(), &[Request::ShowPart { part, generation: 1 }]);
 }
 
-#[test]
 fn object_window_slides_from_both_ends_and_gates_live_rows() {
     let mut window = ObjectWindow::new(2);
     assert_eq!(
@@ -180,7 +182,6 @@ fn object_window_slides_from_both_ends_and_gates_live_rows() {
     assert_eq!(window.rows.as_slice(), &[ObjectKey::Task(0), ObjectKey::Task(1)]);
 }
 
-#[test]
 fn conversation_window_slides_from_both_ends_and_gates_live_rows() {
     let mut window = ConversationWindow::new(2);
     assert_eq!(
@@ -203,7 +204,6 @@ fn conversation_window_slides_from_both_ends_and_gates_live_rows() {
     assert_eq!(window.rows.as_slice(), &[conversation(0), conversation(1)]);
 }
 
-#[test]
 fn turn_window_slides_from_both_ends_and_gates_live_rows() {
     let mut window = TurnWindow::new(2);
     assert_eq!(
@@ -222,7 +222,6 @@ fn turn_window_slides_from_both_ends_and_gates_live_rows() {
     assert_eq!(window.rows.as_slice(), &[activity(0), activity(1)]);
 }
 
-#[test]
 fn history_window_slides_from_both_ends_and_gates_live_rows() {
     let mut window = HistoryWindow::new(2);
     assert_eq!(
@@ -239,4 +238,12 @@ fn history_window_slides_from_both_ends_and_gates_live_rows() {
     window.edges.before = Edge::End;
     assert!(window.live(rows([history(0)]), edges(), End::Before));
     assert_eq!(window.rows.as_slice(), &[history(0), history(1)]);
+}
+
+#[test]
+fn every_concrete_window_slides_from_both_ends_and_gates_live_rows() {
+    object_window_slides_from_both_ends_and_gates_live_rows();
+    conversation_window_slides_from_both_ends_and_gates_live_rows();
+    turn_window_slides_from_both_ends_and_gates_live_rows();
+    history_window_slides_from_both_ends_and_gates_live_rows();
 }

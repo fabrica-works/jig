@@ -192,6 +192,12 @@ pub(crate) fn answered(domain: &mut crate::Domain, request: Token, answer: Answe
         Origin::Program { asked } => out.push(Request::Answered { asked, answer: receipt.answer }),
         Origin::Card { object, .. } => {
             if let Some(id) = domain.objects.find(object) {
+                if domain.objects.get(id).expect("named card exists").sources.is_empty() {
+                    crate::notices::show(
+                        domain,
+                        crate::notices::Kind::Answer { object, answer: receipt.answer.clone() },
+                    );
+                }
                 let card = &mut domain.objects.get_mut(id).expect("named card exists").card;
                 match receipt.answer {
                     Answer::Refused(refusal) => *card = crate::objects::Card::Refused { refusal },
@@ -199,6 +205,8 @@ pub(crate) fn answered(domain: &mut crate::Domain, request: Token, answer: Answe
                 }
                 domain.objects.prune();
                 domain.changed();
+            } else {
+                crate::notices::show(domain, crate::notices::Kind::Answer { object, answer: receipt.answer });
             }
         }
     }
