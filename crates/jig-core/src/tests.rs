@@ -92,6 +92,7 @@ fn limits() -> Limits {
         amendment_bytes: 512,
         sign_in_lifetime: Duration::from_secs(60),
         request_retention: Duration::from_secs(120),
+        room_refusals: 2,
         facts: 2,
     };
     let fleet = fleet::Limits {
@@ -2477,4 +2478,79 @@ fn a_core_read_answer_waits_for_the_last_commit_already_made() {
         panic!("held document released after durability")
     };
     assert!(released.is_empty());
+}
+
+#[test]
+fn deployment_capacity_carries_keyed_refusal_identity_time_and_bounded_omissions() {
+    let (mut core, mut limits) = make_tree();
+    limits.people.projects = 2;
+    limits.documents.lines = 1;
+    restore_document_party(&mut core, &limits, &[0, 1]);
+    let identity = core.people.identity(1).unwrap().clone();
+    let mut env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    people::step(
+        &mut core.people,
+        &env,
+        people::Event::SignedIn {
+            reply_to: ReplyTo::new(Token::new(500)),
+            person: 10,
+            sign_in: 20,
+            identity,
+            kind: people::Kind::Person,
+        },
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    for key in 1..=3_u8 {
+        people::step(
+            &mut core.people,
+            &env,
+            people::Event::Ask {
+                reply_to: ReplyTo::new(Token::new(501)),
+                sign_in: 20,
+                key: [key; 16],
+                ask: people::Ask::StartChat { project: 1, words: Box::from(&b"chat"[..]) },
+            },
+            &mut out,
+        );
+        let mut routed = None;
+        while let Some(request) = out.pop() {
+            match request {
+                people::Request::Route { request, .. } => routed = Some(request),
+                people::Request::Save { .. }
+                | people::Request::Erase { .. }
+                | people::Request::Reply { .. }
+                | people::Request::ServiceMade { .. }
+                | people::Request::RolesApplied { .. }
+                | people::Request::RolesRefused { .. }
+                | people::Request::RestoreRefused { .. } => {}
+            }
+        }
+        env.wall = Wall::from_nanos(u64::from(key));
+        people::step(
+            &mut core.people,
+            &env,
+            people::Event::Decided {
+                request: routed.expect("one keyed route"),
+                outcome: people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::LiveTasks }),
+            },
+            &mut out,
+        );
+        while out.pop().is_some() {}
+        core.people.reclaim();
+    }
+    let Document::Deployment(document) = make(&core, &limits, 1, &Subject::Deployment, &window()).unwrap() else {
+        panic!()
+    };
+    assert!(document.cut);
+    assert_eq!(document.person_room_refusals.len(), 1);
+    let refusal = document.person_room_refusals.get(0).unwrap();
+    assert_eq!(refusal.key, people::RequestKey { person: 1, key: [3; 16] });
+    assert_eq!(refusal.project, Some(1));
+    assert_eq!(refusal.action, people::CapacityAction::Chat);
+    assert_eq!(refusal.at, Wall::from_nanos(3));
+    assert_eq!(refusal.cause, people::CapacityCause::Limit { which: people::LimitKind::LiveTasks });
+    assert_eq!(document.person_room_refusals_forgotten, 0);
+    assert_eq!(document.person_answer_retention, limits.people.request_retention);
 }

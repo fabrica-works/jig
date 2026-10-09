@@ -25,6 +25,7 @@ const LIMITS: Limits = Limits {
     amendment_bytes: 256,
     sign_in_lifetime: Duration::from_secs(60),
     request_retention: Duration::from_secs(120),
+    room_refusals: 2,
     facts: 8,
 };
 
@@ -941,6 +942,7 @@ fn pending_capacity_refuses_before_routing_and_the_key_can_retry() {
     test.member();
     let first = route(&test.request(10, 1, ask(1)));
     assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+    assert_eq!(test.d.capacity_refusals().get(0).expect("pending pressure").cause, CapacityCause::Pending { limit: 1 });
     test.send(Event::Decided {
         request: first,
         outcome: Outcome::Refused(Refusal::Authority { lacking: Lack::Shape }),
@@ -1351,4 +1353,100 @@ fn an_amendment_answer_keeps_the_release_fact_and_named_hold_in_its_key() {
     assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
     let changed = Ask::Amend { project: 1, task: 7, revision: 1, amendment: change, release: Some(3) };
     assert_eq!(reply(&test.request(10, 1, changed)), Reply::Refused(Refusal::KeyConflict));
+}
+
+#[test]
+fn capacity_facts_keep_actual_times_replay_and_diagnostics_independent() {
+    let mut test = Test::new(Limits { requests: 1, room_refusals: 1, facts: 0, ..LIMITS });
+    test.member();
+    let request = route(&test.request(10, 1, ask(1)));
+    assert!(test.request(10, 1, ask(1)).is_empty());
+    test.env.wall = Wall::from_nanos(7);
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::Busy));
+    let first = test.d.capacity_refusals();
+    assert_eq!(first.len(), 1);
+    assert_eq!(first.get(0).expect("waiter refusal").cause, CapacityCause::Waiters { limit: 2 });
+    assert_eq!(first.get(0).expect("actual time").at, test.env.wall);
+    test.env.wall = Wall::from_nanos(8);
+    assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
+    assert_eq!(test.d.capacity_refusals_lost(), 1);
+    let entrance = test.d.capacity_refusals();
+    let value = entrance.get(0).expect("request pressure");
+    assert_eq!(value.key, RequestKey { person: 1, key: [2; 16] });
+    assert_eq!(value.project, Some(1));
+    assert_eq!(value.action, CapacityAction::Chat);
+    assert_eq!(value.cause, CapacityCause::Requests { limit: 1 });
+    assert_eq!(value.at, Wall::from_nanos(8));
+    assert_eq!(reply(&test.request(10, 1, ask(2))), Reply::Refused(Refusal::KeyConflict));
+    assert_eq!(test.d.capacity_refusals(), entrance);
+    assert_eq!(test.d.pop_fact(), None);
+    assert_eq!(test.d.capacity_refusals(), entrance);
+    test.env.wall = Wall::from_nanos(9);
+    let refusal = Outcome::Refused(Refusal::Limit { which: LimitKind::LiveTasks });
+    let completed = test.send(Event::Decided { request, outcome: refusal });
+    assert_eq!(reply(&completed), Reply::Outcome(refusal));
+    let permanent = test.d.capacity_refusals();
+    assert_eq!(permanent.len(), 2);
+    assert_eq!(permanent.get(0).expect("newest answer").key.key, [1; 16]);
+    assert_eq!(permanent.get(0).expect("original time").at, Wall::from_nanos(9));
+    test.env.wall = Wall::from_nanos(10);
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Outcome(refusal));
+    assert_eq!(test.d.capacity_refusals(), permanent, "replay creates no refusal or new timestamp");
+    let mut cold = Test::new(test.env.limits);
+    cold.env.wall = test.env.wall;
+    cold.d = Domain::new(&cold.env.limits, Box::new([]), 2);
+    cold.send(Event::Restore { record: saved_answer(&completed) });
+    cold.send(Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } });
+    cold.send(Event::Restored);
+    assert!(cold.d.ready());
+    let restored = cold.d.capacity_refusals();
+    assert_eq!(restored.len(), 1, "entrance history is live-only");
+    assert_eq!(restored.get(0), permanent.get(0), "permanent facts retain the durable answer time");
+    assert_eq!(cold.d.capacity_refusals_lost(), 0);
+    cold.env.wall = Wall::from_nanos(Duration::from_secs(120).as_nanos() + 10);
+    cold.env.now = Time::from_nanos(cold.env.wall.as_nanos());
+    let mut out = Queue::with_capacity(max_out(&cold.env.limits));
+    fire(&mut cold.d, &cold.env, &mut out);
+    assert!(cold.d.capacity_refusals().is_empty(), "permanent facts follow keyed-answer retention");
+}
+
+#[test]
+fn zero_room_history_counts_omissions_without_changing_busy_or_key_admission() {
+    let mut test = Test::new(Limits { pending: 0, room_refusals: 0, ..LIMITS });
+    test.member();
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::Busy));
+    assert!(test.d.capacity_refusals().is_empty());
+    assert_eq!(test.d.capacity_refusals_lost(), 1);
+    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::Busy));
+    assert_eq!(test.d.capacity_refusals_lost(), 2);
+    assert_eq!(worst_case(&Limits { requests: u32::MAX, room_refusals: 1, ..LIMITS }), None);
+    assert_eq!(capacity::permanent(Outcome::Refused(Refusal::Limit { which: LimitKind::Words })), None);
+    assert_eq!(capacity::permanent(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) })), None);
+    assert_eq!(
+        capacity::permanent(Outcome::Again(Again::Busy)),
+        None,
+        "routed busy is not assumed to be room pressure"
+    );
+}
+
+#[test]
+fn read_position_room_pressure_keeps_scoped_identity_without_a_project() {
+    let mut test = Test::new(Limits { pending: 0, room_refusals: 1, ..LIMITS });
+    test.member();
+    let seen = Seen::Chat { task: 91, through: 8 };
+    test.env.wall = Wall::from_nanos(17);
+    assert_eq!(reply(&test.request(10, 3, Ask::MarkSeen { seen })), Reply::Again(Again::Busy));
+    let facts = test.d.capacity_refusals();
+    assert_eq!(facts.len(), 1);
+    assert_eq!(
+        *facts.get(0).expect("scoped refusal"),
+        CapacityRefusal {
+            key: RequestKey { person: 1, key: [3; 16] },
+            project: None,
+            action: CapacityAction::MarkSeen { seen },
+            at: Wall::from_nanos(17),
+            cause: CapacityCause::Pending { limit: 0 },
+        }
+    );
+    assert_eq!(capacity::permanent(Outcome::MarkedSeen { seen }), None);
 }

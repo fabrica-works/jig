@@ -79,6 +79,7 @@ pub fn limits() -> root::Limits {
         amendment_bytes: 512,
         sign_in_lifetime: Duration::from_secs(60),
         request_retention: Duration::from_secs(120),
+        room_refusals: 2,
         facts: 2,
     };
     let fleet = fleet::Limits {

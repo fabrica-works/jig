@@ -173,7 +173,8 @@ pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
                 core.touch_party(holding.person);
             }
         }
-        people::Stored::SignIn { .. } | people::Stored::Policy { .. } | people::Stored::Answer { .. } => {}
+        people::Stored::Answer { .. } => core.touch_deployment(),
+        people::Stored::SignIn { .. } | people::Stored::Policy { .. } => {}
     }
 }
 

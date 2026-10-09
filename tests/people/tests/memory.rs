@@ -45,6 +45,7 @@ impl Measured {
     }
 
     fn drain(&mut self) -> Option<Token> {
+        let _capacity = self.domain.capacity_refusals();
         let measured = self.meter.end();
         let mut routed = None;
         while let Some(request) = self.out.pop() {
@@ -135,7 +136,12 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
             1..=u8::try_from(limits.requests.saturating_sub(limits.pending)).expect("test values are admitted and fit")
         {
             let token = test.ask(key).expect("test values are admitted and fit");
-            test.event(Event::Decided { request: token, outcome: Outcome::Started { task: u64::from(key) } });
+            let outcome = if key == 1 {
+                Outcome::Refused(jig_core_people::Refusal::Limit { which: jig_core_people::LimitKind::LiveTasks })
+            } else {
+                Outcome::Started { task: u64::from(key) }
+            };
+            test.event(Event::Decided { request: token, outcome });
         }
         let mut tokens = [None; 8];
         for (slot, key) in
@@ -146,7 +152,9 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
                 assert!(test.ask(key).is_none());
             }
         }
-        assert!(test.ask(250).is_none());
+        for _ in 0..=limits.room_refusals {
+            assert!(test.ask(250).is_none());
+        }
         for token in tokens.into_iter().flatten() {
             test.event(Event::Decided { request: token, outcome: Outcome::Started { task: 90 } });
         }

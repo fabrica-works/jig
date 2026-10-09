@@ -74,6 +74,8 @@ pub struct Domain {
     flights: Map<RequestKey, Id<Pending>>,
     facts: Queue<Fact>,
     lost: u64,
+    room_refusals: Queue<crate::CapacityRefusal>,
+    room_refusals_lost: u64,
 }
 
 impl Domain {
@@ -130,6 +132,8 @@ impl Domain {
             flights: Map::with_capacity(limits.pending),
             facts: Queue::with_capacity(limits.facts),
             lost: 0,
+            room_refusals: Queue::with_capacity(limits.room_refusals),
+            room_refusals_lost: 0,
         }
     }
 
@@ -172,6 +176,46 @@ impl Domain {
     #[must_use]
     pub const fn facts_lost(&self) -> u64 {
         self.lost
+    }
+
+    /// Recent permanent room refusals from retained keyed answers, together with
+    /// bounded unsaved entrance pressure, newest wall time first. Reads copy no ask
+    /// payloads and change no diagnostic, replay or expiry state.
+    #[must_use]
+    pub fn capacity_refusals(&self) -> List<crate::CapacityRefusal> {
+        let capacity =
+            self.answers.capacity().checked_add(self.room_refusals.capacity()).expect("accepted room limits");
+        let mut ordered = Map::with_capacity(capacity);
+        let mut ordinal = 0_u32;
+        for (key, answer) in &self.answers {
+            if let Some(cause) = crate::capacity::permanent(answer.outcome) {
+                let value = crate::CapacityRefusal {
+                    key: *key,
+                    project: crate::capacity::project(&answer.ask),
+                    action: crate::capacity::action(&answer.ask),
+                    at: answer.at,
+                    cause,
+                };
+                ordered.insert((value.at, ordinal), value).expect("bounded permanent refusal snapshot");
+                ordinal = ordinal.checked_add(1).expect("bounded refusal ordinal");
+            }
+        }
+        for value in &self.room_refusals {
+            ordered.insert((value.at, ordinal), *value).expect("bounded entrance refusal snapshot");
+            ordinal = ordinal.checked_add(1).expect("bounded refusal ordinal");
+        }
+        let mut result = List::with_capacity(capacity);
+        for (_, value) in ordered.iter().rev() {
+            result.push(*value).expect("bounded refusal view");
+        }
+        result
+    }
+
+    /// Unsaved entrance-pressure records evicted from the bounded live history.
+    /// Permanent answers instead follow their configured request retention.
+    #[must_use]
+    pub const fn capacity_refusals_lost(&self) -> u64 {
+        self.room_refusals_lost
     }
 
     /// Pure bounded membership lookup used by root escalation routing and authenticated named
@@ -1643,6 +1687,7 @@ fn admit_ask(
             return refused(to, Refusal::KeyConflict, out);
         }
         if flight.replies.len() >= env.limits.waiters {
+            room_pressure(domain, env, key, &ask, crate::CapacityCause::Waiters { limit: env.limits.waiters });
             return again(to, Again::Busy, out);
         }
         flight.replies.push(to).expect("bounded list room checked");
@@ -1650,6 +1695,7 @@ fn admit_ask(
     }
     // An accepted flight reserves one answered record, even while pending.
     if domain.answers.len().saturating_add(domain.flights.len()) >= env.limits.requests {
+        room_pressure(domain, env, key, &ask, crate::CapacityCause::Requests { limit: env.limits.requests });
         return again(to, Again::Busy, out);
     }
     let project = project(&ask);
@@ -1661,6 +1707,7 @@ fn admit_ask(
         return out.push(Request::Reply { to, reply: outcome_reply(outcome) });
     }
     if domain.pending.is_full() {
+        room_pressure(domain, env, key, &ask, crate::CapacityCause::Pending { limit: env.limits.pending });
         return again(to, Again::Busy, out);
     }
     let mut replies = List::with_capacity(env.limits.waiters);
@@ -1671,6 +1718,24 @@ fn admit_ask(
     assert!(indexed == Ok(None), "one key per flight within pending capacity");
     out.push(Request::Route { request: id.token(), person: key.person, project, role, ask: Box::new(ask) });
     fact(domain, Fact::Routed { person: key.person });
+}
+
+fn room_pressure(domain: &mut Domain, env: &Env<Limits>, key: RequestKey, ask: &Ask, cause: crate::CapacityCause) {
+    if domain.room_refusals.capacity() == 0 {
+        domain.room_refusals_lost = domain.room_refusals_lost.saturating_add(1);
+        return;
+    }
+    if domain.room_refusals.room() == 0 {
+        domain.room_refusals.pop();
+        domain.room_refusals_lost = domain.room_refusals_lost.saturating_add(1);
+    }
+    domain.room_refusals.push(crate::CapacityRefusal {
+        key,
+        project: crate::capacity::project(ask),
+        action: crate::capacity::action(ask),
+        at: env.wall,
+        cause,
+    });
 }
 
 fn save_answer(

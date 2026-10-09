@@ -55,6 +55,7 @@
 extern crate alloc;
 mod amendment;
 mod boundary;
+mod capacity;
 mod decisions;
 mod domain;
 mod facts;
@@ -73,6 +74,7 @@ pub use boundary::{
     ProposalDecision, Reply, Request, RequestKey, ResourceName, ResourceRole, ResultRef, Role, Seed, Seen, Stored,
     Whom,
 };
+pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{FailureClass, HoldReason, Moved};
 pub use domain::{Domain, application_part, application_part_done, fire, max_out, step};
 pub use facts::Fact;

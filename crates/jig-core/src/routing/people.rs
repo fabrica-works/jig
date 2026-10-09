@@ -101,8 +101,24 @@ pub(super) fn tag_people(
                 super::view_routes::touch_people_row(core, &record);
                 Request::Write(Write::Save(Record::People(record)))
             }
-            people::Request::Erase { key } => Request::Write(Write::Erase(Key::People(key))),
+            people::Request::Erase { key } => {
+                match key {
+                    people::Key::Answer(_) => core.touch_deployment(),
+                    people::Key::Person(_)
+                    | people::Key::ReadResults { .. }
+                    | people::Key::ReadChat { .. }
+                    | people::Key::SignIn(_)
+                    | people::Key::Roles(_)
+                    | people::Key::Policy(_) => {}
+                }
+                Request::Write(Write::Erase(Key::People(key)))
+            }
             people::Request::Reply { to, reply } => match reply {
+                reply @ (people::Reply::Again(people::Again::Busy)
+                | people::Reply::Outcome(people::Outcome::Again(people::Again::Busy))) => {
+                    core.touch_deployment();
+                    Request::Held(Box::new(Held::PeopleReply { to, sign_in: core.signing_in, reply }))
+                }
                 people::Reply::Outcome(people::Outcome::Applied { connector, token }) => {
                     Request::Held(Box::new(Held::Applied { to, connector, token }))
                 }

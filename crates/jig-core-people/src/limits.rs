@@ -5,7 +5,7 @@
 use crate::domain::{Answered, Pending, SignIn};
 use crate::{Fact, Holding, Identity, IdentityKey, InitialOwner, RequestKey};
 use alloc::boxed::Box;
-use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Slab};
+use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Slab, Wall};
 
 /// Immutable root-configured capacities and payload limits for people's retained state and one-step
 /// outputs; validate via `worst_case` before construction. (domain/people.md, sections 2–5).
@@ -31,6 +31,9 @@ pub struct Limits {
     pub initial_owners: u32,
     /// Maximum completed keys plus slots reserved by pending flights.
     pub requests: u32,
+    /// Maximum unsaved entrance-pressure records, independent of diagnostic capacity.
+    /// Permanent room refusals remain in the bounded keyed-answer table.
+    pub room_refusals: u32,
     /// Maximum simultaneous routed keyed flights.
     pub pending: u32,
     /// Positive maximum reply destinations per flight, including its first caller.
@@ -62,6 +65,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     limits.people.checked_add(1)?;
     let chat_positions = limits.people.checked_mul(limits.inbox_tasks)?;
     limits.inbox_tasks.checked_mul(limits.inbox_recipients)?.checked_add(limits.inbox_entries.checked_add(1)?)?;
+    let refusal_views = limits.requests.checked_add(limits.room_refusals)?;
     limits.initial_owners.checked_add(4)?;
     limits.waiters.checked_add(1)?;
     limits.sign_ins.checked_add(1)?;
@@ -126,5 +130,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?)?
         .checked_add(List::<(u64, SignIn)>::worst_case(limits.sign_ins)?)?
         .checked_add(List::<Holding>::worst_case(limits.holdings)?)?
+        .checked_add(Queue::<crate::CapacityRefusal>::worst_case(limits.room_refusals)?)?
+        .checked_add(Map::<(Wall, u32), crate::CapacityRefusal>::worst_case(refusal_views)?)?
+        .checked_add(List::<crate::CapacityRefusal>::worst_case(refusal_views)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)
 }
