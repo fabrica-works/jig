@@ -198,6 +198,7 @@ pub struct Phrasebook {
     shapes: Box<[PhraseShape]>,
     languages: Box<[Language]>,
     capacities: List<Capacity>,
+    limits: PhraseLimits,
 }
 /// A task chip's title span in the saying, for the caller's binding table.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -298,7 +299,12 @@ impl Phrasebook {
             }
             capacities.push(Capacity { id: shape.id, bytes }).expect("declared phrases fit their limit");
         }
-        Ok(Phrasebook { shapes, languages, capacities })
+        Ok(Phrasebook { shapes, languages, capacities, limits: *limits })
+    }
+    /// The checked loading envelope, for a composing root to price its words.
+    #[must_use]
+    pub const fn limits(&self) -> &PhraseLimits {
+        &self.limits
     }
     /// The longest bound of any loaded language's form for this phrase.
     #[must_use]

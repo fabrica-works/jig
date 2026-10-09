@@ -10,6 +10,7 @@ members = [
     "testing/jig-test-connector",
     "testing/jig-test-domain",
     "testing/jig-test-client-domain",
+    "testing/jig-test-client-view",
     "testing/jig-conformance",
     "tests/conformance",
     "testing/jig-fake-store",
@@ -78,6 +79,7 @@ jig-core-accounts = { path = "crates/jig-core-accounts" }
 jig-test-connector = { path = "testing/jig-test-connector" }
 jig-test-domain = { path = "testing/jig-test-domain" }
 jig-test-client-domain = { path = "testing/jig-test-client-domain" }
+jig-test-client-view = { path = "testing/jig-test-client-view" }
 jig-conformance = { path = "testing/jig-conformance" }
 jig-fake-store = { path = "testing/jig-fake-store" }
 jig-fake-workers = { path = "testing/jig-fake-workers" }

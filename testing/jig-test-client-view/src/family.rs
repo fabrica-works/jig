@@ -1,0 +1,201 @@
+//! Family pages and part fragments, with jig objects left to jig (root.md, 6–9).
+use crate::{
+    bindings::{Bindings, Meaning},
+    drawing,
+    words::{Word, Words},
+};
+use jig_client::contract::{ObjectKey, Part};
+use jig_client_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
+use jig_test_client_domain::{
+    family::{Document, ItemState},
+    first::{self, Card, Value},
+};
+use skein_lib::{Decimal, Id, Token};
+pub const NAV: SlotRef =
+    SlotRef { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, token: Token::new(0) };
+/// A fragment includes a document heading, drawing fallback, card status and form.
+pub const PART_NODES: u32 = 24;
+pub const NAV_NODES: u32 = 2;
+pub fn navigation(b: &mut Builder, address: first::Address, words: &Words, bindings: &mut Bindings) {
+    b.open(Role::Link);
+    let text = words.say(Word::Navigation, &[]);
+    b.name(&text);
+    words.text(b, Word::Navigation, &[]);
+    let binding = bindings.insert(Meaning::Action(first::Act::Go { address }));
+    b.link(binding);
+    b.bind(binding);
+    b.close();
+}
+pub fn page(b: &mut Builder, side: &first::Side, words: &Words, bindings: &mut Bindings) {
+    b.open(Role::Heading { level: 1 });
+    words.text(b, Word::Family, &[]);
+    b.close();
+    let Some(id) = side.page() else {
+        words.status(b, Word::Unknown, &[]);
+        return;
+    };
+    b.open(Role::List);
+    object(b, side, id, words, bindings);
+    let object = side.object(id).expect("page object is named");
+    match &object.value {
+        Value::Known(Document::Item(item)) => {
+            jig_slot(b, ObjectKey::Task(item.task), words, bindings);
+            for proposal in &item.proposals {
+                jig_slot(b, ObjectKey::Proposal(*proposal), words, bindings);
+            }
+        }
+        Value::Known(Document::Part(_)) | Value::Loading | Value::Unknown => {}
+    }
+    b.close();
+}
+fn jig_slot(b: &mut Builder, key: ObjectKey, words: &Words, bindings: &mut Bindings) {
+    let binding = bindings.insert(Meaning::Object(key));
+    b.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
+}
+pub fn part(b: &mut Builder, side: &first::Side, part: &Part, generation: u32, words: &Words, bindings: &mut Bindings) {
+    if !side.contains(part, generation) {
+        words.status(b, Word::Unshowable, &[]);
+        return;
+    }
+    match part {
+        Part::Connector { connector } => words.text(b, Word::Connector, &[Hole::Number(u64::from(*connector))]),
+        Part::Resource { path, .. } => {
+            words.text(b, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(path.bytes()))]);
+        }
+        Part::Kind { kind, .. } => words.text(b, Word::Kind, &[Hole::Number(u64::from(*kind))]),
+        Part::Panel { .. }
+        | Part::Result { .. }
+        | Part::Effect { .. }
+        | Part::Hold { .. }
+        | Part::Project { .. }
+        | Part::Deployment { .. } => {
+            let Some(facts) = side.part(part) else {
+                words.status(b, Word::Unshowable, &[]);
+                return;
+            };
+            let id = side.find(facts.subject).expect("held part is registered");
+            b.open(Role::List);
+            object(b, side, id, words, bindings);
+            b.close();
+        }
+    }
+}
+fn object(b: &mut Builder, side: &first::Side, id: Id<first::Object>, words: &Words, bindings: &mut Bindings) {
+    let Some(object) = side.object(id) else {
+        words.status(b, Word::Unknown, &[]);
+        return;
+    };
+    b.open(Role::Item);
+    b.key(Key { owner: NAV.owner, kind: 1, a: id.token().raw(), b: 0 });
+    b.open(Role::Region);
+    let title = match &object.value {
+        Value::Known(Document::Item(item)) => words.say(Word::Item, &[Hole::Number(item.key)]),
+        Value::Known(Document::Part(part)) => words.say(Word::Part, &[Hole::Number(part.revision.value)]),
+        Value::Loading | Value::Unknown => words.say(Word::Family, &[]),
+    };
+    b.name(&title);
+    match &object.value {
+        Value::Loading => {
+            b.open(Role::Status);
+            b.name(&words.say(Word::Loading, &[]));
+            b.state(State::Busy);
+            words.text(b, Word::Loading, &[]);
+            b.close();
+        }
+        Value::Unknown => words.status(b, Word::Unknown, &[]),
+        Value::Known(document) => match document {
+            Document::Item(item) => {
+                b.open(Role::Heading { level: 2 });
+                words.text(b, Word::Item, &[Hole::Number(item.key)]);
+                b.close();
+                let word = match item.state {
+                    ItemState::Ready => Word::Ready,
+                    ItemState::Held => Word::Held,
+                    ItemState::Ended => Word::Ended,
+                };
+                words.status(b, word, &[]);
+                drawing::value(b, words, item.value);
+                if item.touchable {
+                    button(
+                        b,
+                        Word::Touch,
+                        first::Act::Touch { object: id.token(), revision: item.revision },
+                        &object.card,
+                        words,
+                        bindings,
+                    );
+                }
+            }
+            Document::Part(part) => {
+                b.open(Role::Heading { level: 3 });
+                words.text(b, Word::Part, &[Hole::Number(part.revision.value)]);
+                b.close();
+                drawing::value(b, words, part.value);
+                if let Some(parameters) = part.parameters
+                    && parameters.amendable
+                {
+                    b.open(Role::TextField);
+                    b.name(&words.say(Word::Parameters, &[]));
+                    let value = object.draft.unwrap_or(parameters.value);
+                    b.value(Decimal::of(value).as_bytes(), part.revision.value);
+                    if disabled(&object.card) {
+                        b.state(State::Disabled);
+                    } else {
+                        b.bind(
+                            bindings.insert(Meaning::Parameters { object: id.token(), revision: parameters.revision }),
+                        );
+                    }
+                    b.close();
+                    button(
+                        b,
+                        Word::Apply,
+                        first::Act::Touch { object: id.token(), revision: parameters.revision },
+                        &object.card,
+                        words,
+                        bindings,
+                    );
+                }
+            }
+        },
+    }
+    card(b, &object.card, words);
+    b.close();
+    b.close();
+}
+fn disabled(card: &Card) -> bool {
+    match card {
+        Card::Deciding { .. } | Card::Unknown => true,
+        Card::Open | Card::Refused { .. } | Card::Done { .. } => false,
+    }
+}
+fn button(b: &mut Builder, word: Word, action: first::Act, card: &Card, words: &Words, bindings: &mut Bindings) {
+    b.open(Role::Button);
+    b.name(&words.say(word, &[]));
+    words.text(b, word, &[]);
+    if disabled(card) {
+        b.state(State::Disabled);
+    } else {
+        b.bind(bindings.insert(Meaning::Action(action)));
+    }
+    b.close();
+}
+fn card(b: &mut Builder, card: &Card, words: &Words) {
+    match card {
+        Card::Open => {}
+        Card::Unknown => words.status(b, Word::Unknown, &[]),
+        Card::Deciding { progress, .. } => {
+            let word = match progress {
+                skein_lib::RequestProgress::InFlight => Word::Deciding,
+                skein_lib::RequestProgress::Retrying => Word::Retrying,
+                skein_lib::RequestProgress::Parked => Word::Parked,
+                skein_lib::RequestProgress::Unknown => Word::Unknown,
+            };
+            words.status(b, word, &[]);
+        }
+        Card::Refused { answer } | Card::Done { answer } => match answer {
+            first::Answer::Touched { revision, .. } => words.status(b, Word::Touched, &[Hole::Number(revision.value)]),
+            first::Answer::Moved { revision, .. } => words.status(b, Word::Moved, &[Hole::Number(revision.value)]),
+            first::Answer::Gone => words.status(b, Word::Gone, &[]),
+        },
+    }
+}

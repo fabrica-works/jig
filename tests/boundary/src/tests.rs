@@ -477,6 +477,7 @@ fn client_roles_cover_step_crates_and_exclude_the_world() {
     assert!(client_step("jig-client-view"));
     assert!(client_step("jig-client-transcript"));
     assert!(client_step("jig-test-client-domain"));
+    assert!(client_step("jig-test-client-view"));
     assert!(client_step("jig-ops-connectors"));
     assert!(!client_step("jig-client-world"));
     assert!(!client_step("jig-fake-person"));
@@ -557,4 +558,18 @@ fn test_client_domain_links_only_its_child_and_foundation() {
         .expect("root source is readable");
     assert!(source.contains("cfg_attr(not(test), no_std)"), "the client root is step code");
     assert!(source.contains("forbid(unsafe_code)"), "the client root forbids unsafe code");
+}
+
+#[test]
+fn test_client_view_links_only_client_children_and_foundation() {
+    let roots: Vec<_> =
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-test-client-view")).collect();
+    assert_eq!(roots.len(), 1, "one test application client view");
+    let mut dependencies = roots[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(dependencies, ["jig-client", "jig-client-view", "jig-test-client-domain", "skein-lib"]);
+    let source = fs::read_to_string(kit_root().join("testing/jig-test-client-view/src/lib.rs"))
+        .expect("view source is readable");
+    assert!(source.contains("cfg_attr(not(test), no_std)"), "the view root is step code");
+    assert!(source.contains("forbid(unsafe_code)"), "the view root forbids unsafe code");
 }
