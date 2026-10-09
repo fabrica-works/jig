@@ -418,3 +418,65 @@ fn client_view_links_only_its_domain_and_foundation() {
         .collect();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+#[test]
+fn client_domain_depends_on_foundation_alone() {
+    let failures: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-client"))
+        .flat_map(|manifest| {
+            manifest
+                .dependencies
+                .iter()
+                .filter(|name| name.as_str() != "skein-lib")
+                .map(|name| format!("{}: {name}", manifest.path.display()))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+fn client_step(name: &str) -> bool {
+    name == "jig-client"
+        || (name.starts_with("jig-client-") && name != "jig-client-world")
+        || matches!(
+            name,
+            "jig-test-client-domain"
+                | "jig-test-client-view"
+                | "jig-ops-connectors"
+                | "jig-ops-client-domain"
+                | "jig-ops-client-view"
+        )
+}
+
+#[test]
+fn client_and_engine_step_crates_share_no_dependencies() {
+    let failures: Vec<_> = manifests()
+        .into_iter()
+        .flat_map(|manifest| {
+            let name = manifest.name.as_deref().unwrap_or("");
+            manifest
+                .dependencies
+                .iter()
+                .filter(|dependency| {
+                    (client_step(name) && dependency.starts_with("jig-core"))
+                        || (name.starts_with("jig-core") && client_step(dependency))
+                })
+                .map(|dependency| format!("{}: {dependency}", manifest.path.display()))
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn client_roles_cover_step_crates_and_exclude_the_world() {
+    assert!(client_step("jig-client"));
+    assert!(client_step("jig-client-view"));
+    assert!(client_step("jig-client-transcript"));
+    assert!(client_step("jig-test-client-domain"));
+    assert!(client_step("jig-ops-connectors"));
+    assert!(!client_step("jig-client-world"));
+    assert!(!client_step("jig-fake-person"));
+    assert!(!client_step("jig-scripted-engine"));
+}

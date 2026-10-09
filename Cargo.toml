@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/jig-client",
     "crates/jig-client-view",
     "crates/jig-core-accounts",
     "testing/jig-test-connector",
@@ -48,6 +49,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-client = { path = "crates/jig-client" }
 jig-client-view = { path = "crates/jig-client-view" }
 skein-lib = { git = "https://git.ekanayaka.io/ai/skein.git" }
 skein-json = { git = "https://git.ekanayaka.io/ai/skein.git" }

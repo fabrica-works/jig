@@ -57,6 +57,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-client-view"
 version = "0.0.0"
 dependencies = [
