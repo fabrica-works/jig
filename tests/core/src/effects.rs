@@ -534,7 +534,8 @@ impl World {
             }
             root::Delivery::Core(core::Held::PeopleReply { reply, .. }) => self.people_answers.push(reply),
             root::Delivery::Core(
-                core::Held::Delivery { .. }
+                core::Held::Read { .. }
+                | core::Held::Delivery { .. }
                 | core::Held::WatchEnded { .. }
                 | core::Held::SettledCall { .. }
                 | core::Held::Assign { .. }

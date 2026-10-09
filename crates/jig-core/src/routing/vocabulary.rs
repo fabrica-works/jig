@@ -89,6 +89,8 @@ pub enum Write {
 /// Core output that must follow the decision's commit.
 #[derive(Debug)]
 pub enum Held {
+    /// One authenticated read answer after every preceding commit is durable.
+    Read { reply: ReplyTo, answer: crate::reads::Answer },
     /// Current subject document, held until every preceding commit is durable.
     Delivery { watcher: Token, document: Box<crate::documents::Document> },
     /// A watch has ended after every outstanding terminal.
@@ -299,6 +301,8 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// An unkeyed one-shot read on the supplied live sign-in.
+    Read { reply: ReplyTo, sign_in: u64, read: crate::reads::Read },
     /// A connector's final projection write has settled, or its project has no home there.
     ProjectionSettled { goal: u64, connector: u16 },
     /// A protocol-rendered answer, with opaque workspace evidence preserved verbatim.

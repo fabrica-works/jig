@@ -302,7 +302,8 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             key,
             call: crate::assemble::answer(domain, key, part),
         })),
-        other @ (core::Held::Delivery { .. }
+        other @ (core::Held::Read { .. }
+        | core::Held::Delivery { .. }
         | core::Held::WatchEnded { .. }
         | core::Held::PeopleReply { .. }
         | core::Held::Result { .. }

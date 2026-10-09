@@ -37,6 +37,8 @@ pub use projections::{
     ProjectionTask, finish_decision, projection_bytes, projection_record_bytes,
 };
 mod proposals;
+/// Authenticated one-shot reads whose answers wait for durability.
+pub mod reads;
 mod resources;
 mod restart;
 pub use restart::{RestartRequest, RestartStep};

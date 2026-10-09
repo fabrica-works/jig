@@ -914,6 +914,10 @@ pub fn root_bound(limits: &root::Limits) -> Option<u64> {
     children
         .checked_mul(slots.checked_add(2)?)?
         .checked_add(Journal::<root::Write, root::Delivery>::worst_case(&limits.journal)?)?
+        .checked_add(
+            core::documents::document_worst_case(&limits.core.documents)?
+                .checked_mul(u64::from(limits.journal.held).checked_add(u64::from(limits.journal.release))?)?,
+        )?
         .checked_add(Queue::<core::Now>::worst_case(limits.journal.now)?)?
         .checked_add(Map::<u64, root::Assignment>::worst_case(limits.core.tasks.tasks)?)?
         .checked_add(Map::<u64, Box<[tasks::Name]>>::worst_case(limits.core.tasks.tasks)?)?

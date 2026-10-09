@@ -1989,3 +1989,97 @@ fn an_expired_run_signin_receives_no_next_provisional_suffix() {
     assert_eq!(*why, views::End::SignedOut);
     assert_eq!(out.len(), 1);
 }
+
+fn read_answer(core: &mut Core, limits: &Limits, sign_in: u64, read: reads::Read) -> Held {
+    let outputs = watch_outputs(core, limits, Event::Read { reply: ReplyTo::new(Token::new(90)), sign_in, read });
+    let mut held = None;
+    for output in outputs {
+        match output {
+            Request::Held(answer) => {
+                assert!(held.is_none(), "one answer per read");
+                held = Some(*answer);
+            }
+            Request::Decided => {}
+            Request::Write(_) | Request::Ask { .. } | Request::Now(_) => panic!("read changes nothing"),
+        }
+    }
+    held.expect("one terminal answer")
+}
+
+#[test]
+fn live_reads_use_owner_documents_without_a_key_or_state_change() {
+    let (mut core, limits) = watch_core();
+    for (read, subject) in [
+        (reads::Read::Frame, Subject::Frame { party: 1 }),
+        (reads::Read::Task { task: 1 }, Subject::Task { task: 1 }),
+        (reads::Read::Project { project: 1 }, Subject::Project { project: 1 }),
+        (reads::Read::Deployment, Subject::Deployment),
+    ] {
+        let expected = make_with_clock(
+            &core,
+            &limits,
+            1,
+            &subject,
+            &Window { rows: limits.documents.rows, after: None },
+            DocumentClock { now: Time::ZERO, wall: Wall::EPOCH },
+        )
+        .unwrap();
+        let Held::Read { reply, answer: reads::Answer::Document(document) } = read_answer(&mut core, &limits, 10, read)
+        else {
+            panic!("live document expected")
+        };
+        assert_eq!(reply.into_token(), Token::new(90));
+        assert_eq!(*document, expected);
+    }
+}
+
+#[test]
+fn invisible_and_absent_reads_have_the_same_unknown_answer() {
+    let (mut core, limits) = watch_core();
+    for (sign_in, read) in
+        [(99, reads::Read::Frame), (10, reads::Read::Project { project: 9 }), (10, reads::Read::Task { task: 99 })]
+    {
+        let Held::Read { answer, .. } = read_answer(&mut core, &limits, sign_in, read) else {
+            panic!("read terminal expected")
+        };
+        assert_eq!(answer, reads::Answer::None(reads::Why::Unknown));
+    }
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    people::step(
+        &mut core.people,
+        &env,
+        people::Event::Restore { record: people::Stored::Roles { project: 1, holdings: Box::new([]) } },
+        &mut out,
+    );
+    let Held::Read { answer, .. } = read_answer(&mut core, &limits, 10, reads::Read::Task { task: 1 }) else {
+        panic!("read terminal expected")
+    };
+    assert_eq!(answer, reads::Answer::None(reads::Why::Unknown));
+}
+
+#[test]
+fn a_core_read_answer_waits_for_the_last_commit_already_made() {
+    use skein_lib::{Journal, JournalLimits, JournalRoom, Released};
+    let (mut core, limits) = watch_core();
+    let journal_limits = JournalLimits { commits: 2, writes: 1, held: 4, now: 1, release: 4 };
+    let mut journal = Journal::<u64, Held>::new(&journal_limits);
+    let room = JournalRoom { writes: 1, held: 1 };
+    let mut prior = journal.decision(&room).unwrap();
+    prior.write(123).unwrap();
+    journal.accept(prior);
+    let commit = journal.commit().unwrap().number;
+    let mut read = journal.decision(&room).unwrap();
+    read.hold(read_answer(&mut core, &limits, 10, reads::Read::Task { task: 1 })).unwrap();
+    journal.accept(read);
+    assert!(journal.commit().is_none(), "read makes no commit");
+    let mut released = Queue::with_capacity(4);
+    assert_eq!(journal.release(&mut released), Released::None);
+    assert!(released.is_empty());
+    journal.committed(commit);
+    assert_eq!(journal.release(&mut released), Released::Some);
+    let Some(Held::Read { answer: reads::Answer::Document(_), .. }) = released.pop() else {
+        panic!("held document released after durability")
+    };
+    assert!(released.is_empty());
+}
