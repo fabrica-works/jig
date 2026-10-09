@@ -5,8 +5,8 @@
 //! bounded text and lists. Its caller holds the answer until durable.
 //!
 //! Frame and inbox counts include every live need and bounded unread updates.
-//! Read positions move only on a keyed mark. Object acts belong to the acts
-//! work. Activity positions belong to the activity work. Run writing status,
+//! Read positions move only on a keyed mark. Objects carry actor-specific offers
+//! from the shared admission judges. Run writing status,
 //! provisional text and calls belong to the watch stream; committed turns never
 //! enter its text. Application subjects belong to their connectors.
 //!
@@ -28,6 +28,7 @@ pub use inbox_deployment::{
     Inbox, InboxEntry, InboxObject, ProjectCapacity, RunLocation, conversation_from_row, make_with_clock,
 };
 mod objects;
+mod offers;
 mod project_note;
 mod small;
 pub use objects::{
@@ -430,5 +431,6 @@ pub fn budget_from_row(row: &tasks::TaskRecord) -> BudgetLine {
 
 /// Complete bounded authority facts used when judging draft controls.
 pub(crate) fn act_authority(limits: &Limits, value: &tasks::Authority) -> Result<AuthorityLine, Missing> {
-    task_tree::authority(limits, value)
+    let value = task_tree::authority(limits, value)?;
+    if value.cut { Err(Missing::TooLarge) } else { Ok(value) }
 }

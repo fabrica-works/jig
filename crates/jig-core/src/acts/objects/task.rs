@@ -73,8 +73,8 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
             {
                 return Admission::Refused(why);
             }
-            if let Err(why) = mutable(row) {
-                return Admission::Refused(why);
+            if let tasks::Phase::Ended(ending) = &row.phase {
+                return Admission::Refused(crate::routing::refusals::ended(ending));
             }
             if act == Act::Release {
                 match row.phase {

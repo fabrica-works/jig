@@ -26,7 +26,7 @@ pub fn store_writes(
 }
 
 pub mod observations;
-pub use jig_conformance::referee;
+pub mod referee;
 
 pub mod faults;
 

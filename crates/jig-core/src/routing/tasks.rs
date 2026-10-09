@@ -820,9 +820,17 @@ pub(super) fn tag_tasks(
                 }
                 match &record {
                     tasks::Stored::Ended(task) => touch_task(core, &env.limits, task),
-                    tasks::Stored::PersonProposal(_) => core.touch_deployment(),
+                    tasks::Stored::PersonProposal(row) => {
+                        core.touch_deployment();
+                        core.touch_project_objects(row.project);
+                    }
+                    tasks::Stored::Ledger(row) => match row.funder {
+                        tasks::Funder::Pool { project, .. }
+                        | tasks::Funder::Period { project, .. }
+                        | tasks::Funder::Recurring { project, .. } => core.touch_project_objects(project),
+                        tasks::Funder::Task(_) => {}
+                    },
                     tasks::Stored::Live(_)
-                    | tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::History(_)

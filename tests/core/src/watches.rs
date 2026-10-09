@@ -98,6 +98,8 @@ pub struct Parties {
     automatic: bool,
     consumers: BTreeMap<u64, Consumer>,
     projects: BTreeMap<u64, BTreeSet<u32>>,
+    task_projects: BTreeMap<u64, u32>,
+    proposal_projects: BTreeMap<u64, u32>,
     pub deliveries: Vec<(u64, u64, Document)>,
     pub application_deliveries: Vec<(u64, u64, u16, jig_test_connector::ClientDocument)>,
     pub endings: Vec<(u64, views::End)>,
@@ -113,6 +115,8 @@ impl Parties {
             automatic,
             consumers: BTreeMap::new(),
             projects: BTreeMap::new(),
+            task_projects: BTreeMap::new(),
+            proposal_projects: BTreeMap::new(),
             deliveries: Vec::new(),
             application_deliveries: Vec::new(),
             endings: Vec::new(),
@@ -187,10 +191,24 @@ impl Parties {
 
     pub fn commit(&mut self, number: u64, writes: &[root::Write]) {
         self.made = number;
+        for write in writes {
+            match write {
+                root::Write::Save(root::Record::Core(core::Record::Tasks(
+                    tasks::Stored::Live(row) | tasks::Stored::Ended(row),
+                ))) => {
+                    self.task_projects.insert(row.number, row.project);
+                }
+                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) => {
+                    self.proposal_projects.insert(row.number, row.project);
+                }
+                root::Write::Save(_) | root::Write::Erase(_) => {}
+            }
+        }
         for consumer in self.consumers.values_mut() {
             let touched = writes.iter().any(|write| match write {
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => {
                     task_subject(&consumer.subject, row.number)
+                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
@@ -198,13 +216,15 @@ impl Parties {
                 }
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => {
                     task_subject(&consumer.subject, row.number)
+                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
                         }
                 }
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) => {
-                    party_subject(&consumer.subject, row.proposer)
+                    project_subject(&consumer.subject, row.project, &self.task_projects, &self.proposal_projects)
+                        || party_subject(&consumer.subject, row.proposer)
                         || self.projects.iter().any(|(party, projects)| {
                             projects.contains(&row.project) && party_subject(&consumer.subject, *party)
                         })
@@ -218,11 +238,19 @@ impl Parties {
                     project,
                     holdings,
                 }))) => {
-                    holdings.iter().any(|holding| party_subject(&consumer.subject, holding.person))
+                    project_subject(&consumer.subject, *project, &self.task_projects, &self.proposal_projects)
+                        || holdings.iter().any(|holding| party_subject(&consumer.subject, holding.person))
                         || self.projects.iter().any(|(party, projects)| {
                             projects.contains(project) && party_subject(&consumer.subject, *party)
                         })
                 }
+                root::Write::Save(root::Record::Core(core::Record::People(people::Stored::Policy { project, .. }))) =>
+                    project_subject(&consumer.subject, *project, &self.task_projects, &self.proposal_projects),
+                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ledger(row)))) => match row.funder {
+                    tasks::Funder::Pool { project, .. } | tasks::Funder::Period { project, .. } | tasks::Funder::Recurring { project, .. } =>
+                        project_subject(&consumer.subject, project, &self.task_projects, &self.proposal_projects),
+                    tasks::Funder::Task(_) => false,
+                },
                 root::Write::Erase(root::Key::Core(core::Key::People(people::Key::ReadChat { party, .. }))) => {
                     party_subject(&consumer.subject, *party)
                 }
@@ -268,6 +296,30 @@ impl Parties {
                 consumer.fence.delivered(durable).unwrap_or_else(|why| {
                     panic!("watch durable prerequisite {watcher:?} at {durable}: {why}; {document:?}")
                 });
+                match document.as_ref() {
+                    Document::Task(row) => {
+                        self.task_projects.insert(row.chip.number, row.project);
+                    }
+                    Document::Proposal(row) => {
+                        self.proposal_projects.insert(row.number, row.project);
+                    }
+                    Document::Escalation(row) => {
+                        self.task_projects.insert(row.task.chip.number, row.task.project);
+                    }
+                    Document::Frame(_)
+                    | Document::Tree(_)
+                    | Document::Chips(_)
+                    | Document::Inbox(_)
+                    | Document::Goals(_)
+                    | Document::Conversations(_)
+                    | Document::Run(_)
+                    | Document::Deployment(_)
+                    | Document::Question(_)
+                    | Document::PersonTask(_)
+                    | Document::Result(_)
+                    | Document::Project(_)
+                    | Document::Note(_) => {}
+                }
                 if let Document::Frame(frame) = document.as_ref() {
                     self.projects.insert(frame.party, frame.projects.iter().map(|role| role.project).collect());
                 }
@@ -347,22 +399,57 @@ fn task_subject(watched: &Watched, task: u64) -> bool {
         Watched::Application { .. } => return false,
     };
     match subject {
-        Subject::Task { task: watched } | Subject::Tree { task: watched } | Subject::Run { task: watched } => {
-            *watched == task
-        }
+        Subject::Task { task: watched }
+        | Subject::Tree { task: watched }
+        | Subject::Run { task: watched }
+        | Subject::Escalation { task: watched }
+        | Subject::Question { task: watched, .. }
+        | Subject::PersonTask { task: watched }
+        | Subject::Result { task: watched }
+        | Subject::Proposal { proposer: core::documents::Proposer::Task(watched), .. } => *watched == task,
         Subject::Chips { tasks } => tasks.as_slice().contains(&task),
         Subject::Frame { .. }
         | Subject::Inbox { .. }
         | Subject::Goals { .. }
         | Subject::Conversations { .. }
         | Subject::Deployment
-        | Subject::Proposal { .. }
-        | Subject::Escalation { .. }
-        | Subject::Question { .. }
-        | Subject::PersonTask { .. }
-        | Subject::Result { .. }
+        | Subject::Proposal { proposer: core::documents::Proposer::Party(_), .. }
         | Subject::Project { .. }
         | Subject::Note { .. }
+        | Subject::Application { .. } => false,
+    }
+}
+
+fn project_subject(
+    watched: &Watched,
+    project: u32,
+    tasks: &BTreeMap<u64, u32>,
+    proposals: &BTreeMap<u64, u32>,
+) -> bool {
+    let Watched::Jig(subject) = watched else {
+        return false;
+    };
+    match subject {
+        Subject::Project { project: owned } | Subject::Goals { project: owned } => *owned == project,
+        Subject::Note { .. } => true,
+        Subject::Task { task }
+        | Subject::Tree { task }
+        | Subject::Run { task }
+        | Subject::Escalation { task }
+        | Subject::Question { task, .. }
+        | Subject::PersonTask { task }
+        | Subject::Result { task }
+        | Subject::Proposal { proposer: core::documents::Proposer::Task(task), .. } => {
+            tasks.get(task) == Some(&project)
+        }
+        Subject::Proposal { proposer: core::documents::Proposer::Party(_), number } => {
+            proposals.get(number) == Some(&project)
+        }
+        Subject::Chips { tasks: watched } => watched.iter().any(|task| tasks.get(task) == Some(&project)),
+        Subject::Frame { .. }
+        | Subject::Inbox { .. }
+        | Subject::Conversations { .. }
+        | Subject::Deployment
         | Subject::Application { .. } => false,
     }
 }

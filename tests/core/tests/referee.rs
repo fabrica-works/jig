@@ -716,3 +716,13 @@ fn referee_scenario_family() {
     bounded_referee_cases();
     valid_referee_cases();
 }
+
+#[test]
+fn a_delivered_document_offering_what_admission_refuses_is_caught() {
+    use jig_core::acts::Admission;
+    use jig_core_people::{Outcome, Refusal, Reply, Role};
+    let refusal = Refusal::Role { held: Some(Role::Observer) };
+    let actual = Reply::Outcome(Outcome::Refused(refusal));
+    assert!(jig_core_world::referee::offers::check(&Admission::Allowed, &actual).is_err());
+    assert_eq!(jig_core_world::referee::offers::check(&Admission::Refused(refusal), &actual), Ok(()));
+}

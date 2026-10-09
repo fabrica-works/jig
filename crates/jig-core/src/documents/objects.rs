@@ -90,6 +90,7 @@ pub struct FundingOffer {
 /// A pending proposal. Acts and a store-loaded routing trail are supplied later.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Proposal {
+    pub acts: List<crate::acts::Offered>,
     pub proposer: Proposer,
     pub number: u64,
     pub project: u32,
@@ -103,11 +104,13 @@ pub struct Proposal {
 /// budget, previous phase and kept result without duplicating a second snapshot.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Escalation {
+    pub acts: List<crate::acts::Offered>,
     pub task: Box<Task>,
 }
 /// An unanswered question's words are whole; over its byte bound it is refused.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Question {
+    pub acts: List<crate::acts::Offered>,
     pub task: Chip,
     pub message: u64,
     pub from: tasks::Party,
@@ -123,6 +126,7 @@ pub struct ShownResult {
 /// The person task's current spec, address, form and shown results.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PersonTask {
+    pub acts: List<crate::acts::Offered>,
     pub task: Chip,
     pub revision: u64,
     pub requester: tasks::Party,
@@ -139,6 +143,7 @@ pub struct PersonTask {
 /// One result by its contract; a store-loaded row supplies ended outcomes.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ResultDoc {
+    pub acts: List<crate::acts::Offered>,
     pub task: Chip,
     pub contract: ContractLine,
     pub ending: Ending,
@@ -488,14 +493,27 @@ pub(super) fn proposal(
                 .expect("one widening source");
         }
     }
-    Ok(Proposal { proposer, number, project, reason, action: made, as_holder, waiting, funding: offers })
+    Ok(Proposal {
+        acts: super::offers::subject(core, limits, party, &super::Subject::Proposal { proposer, number })?,
+        proposer,
+        number,
+        project,
+        reason,
+        action: made,
+        as_holder,
+        waiting,
+        funding: offers,
+    })
 }
 pub(super) fn escalation(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<Escalation, Missing> {
     let task = super::task_tree::task(core, limits, party, number)?;
     if task.hold.is_none() {
         return Err(Missing::Ended);
     }
-    Ok(Escalation { task: Box::new(task) })
+    Ok(Escalation {
+        acts: super::offers::subject(core, limits, party, &super::Subject::Escalation { task: number })?,
+        task: Box::new(task),
+    })
 }
 pub(super) fn question(
     core: &Core,
@@ -533,6 +551,12 @@ pub(super) fn question(
                     return Err(Missing::TooLarge);
                 }
                 return Ok(Question {
+                    acts: super::offers::subject(
+                        core,
+                        limits,
+                        party,
+                        &super::Subject::Question { task: number, message },
+                    )?,
                     task: super::small::chip(core, limits, party, number)?,
                     message,
                     from: word.from,
@@ -593,6 +617,7 @@ pub fn person_from_row(
             .expect("bounded dependency results");
     }
     Ok(PersonTask {
+        acts: super::offers::person(core, limits, party, row)?,
         task: super::small::chip_with_core(core, limits, row)?,
         revision: row.revisions.person,
         requester: row.requester,
@@ -644,6 +669,7 @@ pub fn result_from_row(
         followups.push(super::task_tree::link(core, limits, party, *task)?).expect("bounded followups");
     }
     Ok(ResultDoc {
+        acts: super::offers::subject(core, limits, party, &super::Subject::Result { task: row.number })?,
         task: super::small::chip_with_core(core, limits, row)?,
         contract: super::task_tree::contract(limits, &row.contract),
         ending: super::task_tree::ending(limits, value),
@@ -732,8 +758,9 @@ pub fn ended_delegate_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Resu
 pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     // A task page prices every nested authority, part, chip, form and result
     // carrier. A proposal batch or person task can hold one per bounded line.
-    super::task_tree::worst_case(limits)?
+    super::task_tree::overview_worst_case(limits)?
         .checked_mul(u64::from(limits.lines).checked_add(4)?)?
+        .checked_add(u64::from(limits.lines).checked_add(2)?.checked_mul(super::offers::heap_worst_case(limits)?)?)?
         .checked_add(u64::try_from(size_of::<Proposal>()).ok()?)?
         .checked_add(u64::try_from(size_of::<PersonTask>()).ok()?)
 }

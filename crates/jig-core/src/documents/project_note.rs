@@ -98,6 +98,7 @@ pub struct Recurring {
 /// One project's adopted resources, current policy, membership and spend.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Project {
+    pub acts: List<crate::acts::Offered>,
     pub number: u32,
     pub resources: List<ProjectResource>,
     pub policy: Policy,
@@ -120,6 +121,7 @@ pub enum NoteLocation {
 /// no changed wall time; its revision is carried unchanged.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Note {
+    pub acts: List<crate::acts::Offered>,
     pub number: u64,
     pub scope: NoteLocation,
     pub description: Text,
@@ -413,6 +415,7 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
             .expect("bounded spending rows");
     }
     Ok(Project {
+        acts: super::offers::subject(core, limits, party, &super::Subject::Project { project: number })?,
         number,
         resources,
         policy: policy(limits, value)?,
@@ -466,7 +469,23 @@ pub fn note_from_entry(core: &Core, limits: &Limits, party: u64, value: &notes::
     for task in value.references.iter().take(bound(limits)) {
         tasks.push(*task).expect("bounded referenced tasks");
     }
+    let edit_scope = match &value.scope {
+        notes::Scope::Deployment => people::NoteScope::Deployment,
+        notes::Scope::Project { .. } => people::NoteScope::Project,
+        notes::Scope::Goal { goal, .. } => people::NoteScope::Goal { goal: *goal },
+        notes::Scope::Resources { connector, pattern, .. } => people::NoteScope::Resources {
+            connector: *connector,
+            pattern: people::Pattern {
+                segments: pattern.segments.clone(),
+                last: match &pattern.last {
+                    notes::Last::Exact(last) => people::Last::Exact(last.clone()),
+                    notes::Last::Open(last) => people::Last::Open(last.clone()),
+                },
+            },
+        },
+    };
     Ok(Note {
+        acts: super::offers::note(core, party, project, &edit_scope),
         number: value.name,
         scope,
         description: super::small::text(&value.description, limits.documents.text_bytes),
@@ -480,9 +499,11 @@ pub fn note_from_entry(core: &Core, limits: &Limits, party: u64, value: &notes::
 }
 
 pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
-    // Recurring lines each carry a bounded batch; role lines each carry full
-    // authority. The task page bound includes their nested text/part/list data.
+    // Nested project carriers have no task steering offers of their own.
     let count = u64::from(limits.lines);
     let carriers = count.checked_mul(count)?.checked_add(count.checked_mul(8)?)?.checked_add(8)?;
-    super::task_tree::worst_case(limits)?.checked_mul(carriers)?.checked_add(u64::try_from(size_of::<Project>()).ok()?)
+    super::task_tree::overview_worst_case(limits)?
+        .checked_mul(carriers)?
+        .checked_add(super::offers::heap_worst_case(limits)?)?
+        .checked_add(u64::try_from(size_of::<Project>()).ok()?)
 }

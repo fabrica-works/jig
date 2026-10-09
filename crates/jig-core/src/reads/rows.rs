@@ -679,6 +679,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
             Ok(Some(historical(
                 Past::Question {
                     question: documents::Question {
+                        acts: List::with_capacity(0),
                         task: documents::chip_from_row_with_core(core, limits, owner)?,
                         message: *number,
                         from: *by,

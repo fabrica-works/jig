@@ -207,6 +207,7 @@ pub enum Parameter {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Task {
     pub chip: Chip,
+    pub acts: List<crate::acts::Offered>,
     pub project: u32,
     pub goal: Option<u64>,
     pub priority: Option<u32>,
@@ -681,6 +682,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
     Ok(Task {
+        acts: super::offers::task(core, limits, party, row)?,
         chip: super::small::chip_with_core(core, limits, row)?,
         project: row.project,
         goal,
@@ -868,17 +870,13 @@ pub(super) fn goals(core: &Core, limits: &Limits, party: u64, project: u32, wind
     Ok(Goals { lines, next: if more { last } else { None } })
 }
 
-pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
+pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     let text = u64::from(limits.text_bytes);
     let lines = u64::from(limits.lines);
     let rows = u64::from(limits.rows);
     let chip = super::chip_phase::heap_worst_case(limits)?;
     let path = List::<Box<[u8]>>::worst_case(limits.lines)?.checked_add(lines.checked_mul(text)?)?;
-    let grant = path.checked_add(text)?;
-    let authority = List::<GrantLine>::worst_case(limits.lines)?
-        .checked_add(List::<NoteScope>::worst_case(limits.lines)?)?
-        .checked_add(lines.checked_mul(grant)?.checked_mul(2)?)?
-        .checked_add(List::<tasks::AuthorityExecutor>::worst_case(limits.lines)?)?;
+    let authority = authority_worst_case(limits)?;
     let references = List::<TaskLink>::worst_case(limits.lines)?.checked_add(lines.checked_mul(chip)?)?;
     let task = u64::try_from(size_of::<Task>())
         .ok()?
@@ -903,4 +901,19 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(List::<FoldedCount>::worst_case(1)?)?;
     let goals = List::<GoalLine>::worst_case(limits.rows)?.checked_add(rows.checked_mul(chip)?)?;
     Some(task.max(tree).max(goals))
+}
+
+pub(super) fn grant_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
+    List::<Box<[u8]>>::worst_case(limits.lines)?
+        .checked_add(u64::from(limits.lines).checked_add(1)?.checked_mul(u64::from(limits.text_bytes))?)
+}
+pub(super) fn authority_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
+    List::<GrantLine>::worst_case(limits.lines)?
+        .checked_add(List::<NoteScope>::worst_case(limits.lines)?)?
+        .checked_add(u64::from(limits.lines).checked_mul(grant_worst_case(limits)?)?.checked_mul(2)?)?
+        .checked_add(List::<tasks::AuthorityExecutor>::worst_case(limits.lines)?)
+}
+
+pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
+    overview_worst_case(limits)?.checked_add(super::offers::heap_worst_case(limits)?)
 }

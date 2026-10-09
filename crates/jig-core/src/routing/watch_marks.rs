@@ -4,7 +4,7 @@
 //! no state snapshots and coalesce in a set. Once projection handoffs finish,
 //! the views child asks for documents from the decision's final live state.
 
-use crate::documents::Subject;
+use crate::documents::{Proposer, Subject};
 use crate::{Core, Limits, Request, Requests};
 use jig_core_people as people;
 use jig_core_tasks as tasks;
@@ -76,6 +76,7 @@ impl Core {
     }
 
     pub(crate) fn touch_project_parties(&mut self, project: u32) {
+        self.touch_project_objects(project);
         let mut parties = List::with_capacity(self.view_subjects.len());
         for (_, binding) in &self.view_subjects {
             if self.people.role(binding.party, project).is_some() {
@@ -84,6 +85,53 @@ impl Core {
         }
         for party in parties.into_boxed() {
             self.touch_party(party);
+        }
+    }
+
+    /// Role, policy and funding facts govern offers on every project object.
+    pub(crate) fn touch_project_objects(&mut self, project: u32) {
+        for (_, binding) in &self.view_subjects {
+            let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
+            let touched = match subject {
+                Subject::Project { project: owned } | Subject::Goals { project: owned } => *owned == project,
+                // Store-only note names do not retain their scope in this core.
+                Subject::Note { .. } => true,
+                Subject::Task { task }
+                | Subject::Tree { task }
+                | Subject::Run { task }
+                | Subject::Escalation { task }
+                | Subject::Question { task, .. }
+                | Subject::PersonTask { task }
+                | Subject::Result { task }
+                | Subject::Proposal { proposer: Proposer::Task(task), .. } => match self.tasks.task(*task) {
+                    Some(row) => row.project == project,
+                    None => false,
+                },
+                Subject::Proposal { proposer: Proposer::Party(party), number } => {
+                    match self.tasks.person_proposal(*party, *number) {
+                        Some(row) => row.project == project,
+                        None => false,
+                    }
+                }
+                Subject::Chips { tasks } => {
+                    let mut touched = false;
+                    for task in tasks {
+                        touched |= match self.tasks.task(*task) {
+                            Some(row) => row.project == project,
+                            None => false,
+                        };
+                    }
+                    touched
+                }
+                Subject::Frame { .. }
+                | Subject::Inbox { .. }
+                | Subject::Conversations { .. }
+                | Subject::Deployment
+                | Subject::Application { .. } => false,
+            };
+            if touched {
+                let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
+            }
         }
     }
 }
@@ -135,7 +183,13 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
         let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
         let touched = match subject {
             Subject::Task { task } | Subject::Tree { task } => trees.as_slice().contains(task),
-            Subject::Run { task } => *task == row.number,
+            Subject::Run { task }
+            | Subject::Escalation { task }
+            | Subject::Question { task, .. }
+            | Subject::PersonTask { task }
+            | Subject::Result { task }
+            | Subject::Proposal { proposer: Proposer::Task(task), .. } => *task == row.number,
+            Subject::Project { project } => *project == row.project,
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
             Subject::Goals { project } => *project == row.project && goal,
             Subject::Conversations { party } => owner == Some(*party),
@@ -144,12 +198,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             | Subject::Deployment
             | Subject::Note { .. }
             | Subject::Application { .. }
-            | Subject::Project { .. }
-            | Subject::Escalation { .. }
-            | Subject::Question { .. }
-            | Subject::PersonTask { .. }
-            | Subject::Result { .. }
-            | Subject::Proposal { .. } => false,
+            | Subject::Proposal { proposer: Proposer::Party(_), .. } => false,
         };
         if touched {
             let _new = core.changed_views.insert(binding.subject).expect("bounded watched marks");

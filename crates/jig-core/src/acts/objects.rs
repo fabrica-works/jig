@@ -16,7 +16,32 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
         documents::Subject::Question { task: number, message } => {
             allowed(question(core, limits, party, act, *number, *message))
         }
-        documents::Subject::Escalation { task } => allowed(escalation(core, limits, party, act, *task)),
+        documents::Subject::Escalation { task } => match act {
+            Act::AmendRelease | Act::Cancel => task::admit(core, limits, party, act, *task),
+            Act::Write
+            | Act::Answer
+            | Act::Take
+            | Act::HandBack
+            | Act::Accept
+            | Act::Reject
+            | Act::PassUp
+            | Act::Release
+            | Act::LeaveHeld
+            | Act::Amend
+            | Act::Stop
+            | Act::Close
+            | Act::TakeOver
+            | Act::SetGoal
+            | Act::Prioritise
+            | Act::MarkSeen
+            | Act::EditNote
+            | Act::DeleteNote
+            | Act::Adopt
+            | Act::ChangePolicy
+            | Act::SetRoles
+            | Act::MakeService
+            | Act::SetPool => allowed(escalation(core, limits, party, act, *task)),
+        },
         documents::Subject::Proposal { proposer, number } => {
             allowed(proposal(core, limits, party, act, *proposer, *number))
         }

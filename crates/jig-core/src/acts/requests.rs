@@ -17,7 +17,9 @@ pub(crate) fn request(
 ) -> Result<(), people::Refusal> {
     let (act, subject) = match ask {
         people::Ask::Application { .. } => return Ok(()),
-        people::Ask::StartChat { .. } => return standing::role(core, project, role, Act::SetGoal),
+        people::Ask::StartChat { .. } | people::Ask::SetGoal { .. } => {
+            return standing::role(core, project, role, Act::SetGoal);
+        }
         people::Ask::Say { task, .. } => (Act::Write, documents::Subject::Task { task: *task }),
         people::Ask::AnswerQuestion { task, question, .. } => {
             (Act::Answer, documents::Subject::Question { task: *task, message: *question })
@@ -47,27 +49,14 @@ pub(crate) fn request(
             (act, documents::Subject::Escalation { task: *task })
         }
         people::Ask::Release { task, .. } => (Act::Release, documents::Subject::Task { task: *task }),
-        people::Ask::Amend { task, release, .. } => {
-            let held = match core.tasks.task(*task) {
-                Some(row) => match row.phase {
-                    jig_core_tasks::Phase::Held { .. } => true,
-                    jig_core_tasks::Phase::Waiting
-                    | jig_core_tasks::Phase::Active(_)
-                    | jig_core_tasks::Phase::Closing(_)
-                    | jig_core_tasks::Phase::Ended(_) => false,
-                },
-                None => false,
-            };
-            (
-                if release.is_some() && held { Act::AmendRelease } else { Act::Amend },
-                documents::Subject::Task { task: *task },
-            )
-        }
+        // Full draft judges are called by their request routes. Constructing
+        // receiving-bound facts here would make a document's display limits
+        // decide otherwise valid engine requests.
+        people::Ask::Amend { .. } => return standing::role(core, project, role, Act::Amend),
         people::Ask::Stop { task, .. } => (Act::Stop, documents::Subject::Task { task: *task }),
         people::Ask::Cancel { task, .. } => (Act::Cancel, documents::Subject::Task { task: *task }),
         people::Ask::Close { chat, .. } => (Act::Close, documents::Subject::Task { task: *chat }),
         people::Ask::Move { task, .. } => (Act::TakeOver, documents::Subject::Task { task: *task }),
-        people::Ask::SetGoal { .. } => (Act::SetGoal, documents::Subject::Project { project }),
         people::Ask::Prioritise { .. } => (Act::Prioritise, documents::Subject::Goals { project }),
         people::Ask::MarkSeen { seen } => match seen {
             people::Seen::Results { .. } => (Act::MarkSeen, documents::Subject::Inbox { party: person }),

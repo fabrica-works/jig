@@ -61,6 +61,8 @@ pub struct World {
     pub peers: Option<crate::peers::Peers>,
     /// Independent document consumers, enabled only in watch stories.
     pub watches: Option<crate::peers::WatchParties>,
+    /// Independent offer observer, enabled for immediately acting scripted parties.
+    pub offers: Option<crate::referee::offers::Referee>,
     /// Independent read parties and owner-range store transport, enabled in read stories.
     pub reads: Option<crate::reads::Parties>,
     /// Referee observations, independent of the root state.
@@ -253,6 +255,7 @@ impl World {
             stopped: false,
             peers: None,
             watches: None,
+            offers: None,
             reads: None,
             observer,
             heap,
@@ -347,6 +350,9 @@ impl World {
             self.observer.systems(self.wall, &self.systems);
             if let Some(mut event) = self.events.pop_front() {
                 self.observer.inbound(&self.store, self.wall, &mut event);
+                if let Some(offers) = &mut self.offers {
+                    offers.inbound(&event);
+                }
                 if let Some(watches) = &mut self.watches {
                     watches.inbound(&event);
                 }
@@ -371,6 +377,9 @@ impl World {
                         }
                         if let Some(watches) = &mut self.watches {
                             watches.commit(number, &rows);
+                        }
+                        if let Some(offers) = &mut self.offers {
+                            offers.committed(number);
                         }
                         if let Some(reads) = &mut self.reads {
                             reads.commit(number);
@@ -508,6 +517,9 @@ impl World {
     #[expect(clippy::too_many_lines, reason = "one exhaustive delivery handler drives the script's independent peers")]
     fn delivered(&mut self, mut delivery: root::Delivery) {
         self.observer.delivered(self.wall, &mut delivery);
+        if let Some(offers) = &mut self.offers {
+            offers.delivered(&delivery);
+        }
         if let Some(watches) = &mut self.watches {
             watches.released(&delivery, self.store.applied);
         }
