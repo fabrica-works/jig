@@ -1,8 +1,8 @@
 //! Last-change facts are owned by accepted row mutations, including cold restore.
 use super::revisions::{Harness, task, to};
 use crate::{
-    Contract, Control, Event, Executor, Funder, Hold, Key, Numbers, Party, RecurringOverlap, RecurringTemplate,
-    Request, Stored,
+    Contract, Control, EscalationHolder, Event, Executor, Funder, Hold, Key, Numbers, Party, RecurringOverlap,
+    RecurringTemplate, Request, Stored,
 };
 use skein_lib::Wall;
 
@@ -18,6 +18,7 @@ fn changed_tracks_creation_real_changes_backward_walls_restore_and_ending() {
     test.env.wall = Wall::from_nanos(50);
     test.send(Event::Hold { task: 1, why: Hold::Budget });
     assert_eq!(test.domain.task(1).expect("changed hold").changed, test.env.wall);
+    test.route(1, EscalationHolder::Person(9), 1);
     test.env.wall = Wall::from_nanos(300);
     test.restart();
     assert_eq!(test.domain.task(1).expect("restored").changed, Wall::from_nanos(50));
