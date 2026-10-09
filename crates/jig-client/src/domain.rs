@@ -326,6 +326,11 @@ impl Domain {
     pub const fn wall(&self) -> Wall {
         self.wall
     }
+    /// The current page generation, including application pages.
+    #[must_use]
+    pub const fn generation(&self) -> u32 {
+        self.generation
+    }
     /// The page's objects held once by key.
     #[must_use]
     pub fn objects(&self) -> &crate::objects::Objects {
@@ -483,7 +488,7 @@ impl Domain {
             let watch = self.watches.get_mut(*id).expect("registered watch exists");
             match watch.owner {
                 Owner::Frame => {}
-                Owner::Page { .. } => close_watch(watch, *id, &mut self.timers, out),
+                Owner::Page { .. } | Owner::Application { .. } => close_watch(watch, *id, &mut self.timers, out),
             }
         }
     }
@@ -498,7 +503,7 @@ impl Domain {
         for (id, ()) in &self.watch_ids {
             let watch = self.watches.get(*id).expect("registered watch exists");
             match watch.owner {
-                Owner::Frame => {}
+                Owner::Frame | Owner::Application { .. } => {}
                 Owner::Page { generation } => {
                     if generation == self.generation && watch.behind {
                         behind = true;
@@ -565,6 +570,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             | Event::Watch { .. }
             | Event::Ended { .. }
             | Event::SignedOut
+            | Event::ShowObjects { .. }
+            | Event::ObjectsLeft
             | Event::Frame { .. } => {}
         }
         return;
@@ -585,6 +592,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Progress { request, progress } => crate::intents::progress(domain, request, progress, out),
         Event::Answered { request, answer } => crate::intents::answered(domain, env, request, answer, out),
         Event::SignedOut => signed_out(domain, out),
+        Event::ShowObjects { objects } => crate::application::show(domain, env, objects, out),
+        Event::ObjectsLeft => crate::application::left(domain, out),
         Event::Read { read, result } => {
             if crate::objects::is_card_read(domain, read) {
                 crate::objects::read_card(domain, read, result, out);
@@ -728,6 +737,11 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
             watch.state = Following::Live;
             watch.behind = false;
             match owner {
+                Owner::Application { generation } => {
+                    if generation == domain.generation {
+                        crate::application::delivery(domain, env, delivery, out);
+                    }
+                }
                 Owner::Frame => match delivery {
                     Delivery::Frame(frame) => frame_delivery(domain, env, *frame, out),
                     Delivery::Task(_)
@@ -835,7 +849,7 @@ fn retry(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, out: &mut Queue<
     watch.behind = true;
     let frame = match watch.owner {
         Owner::Frame => true,
-        Owner::Page { .. } => false,
+        Owner::Page { .. } | Owner::Application { .. } => false,
     };
     domain.timers.cancel(Timer::Silent(id));
     let span = backoff(&mut domain.rng, &env.limits, attempt);
@@ -907,6 +921,7 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
             domain.retire(id);
             match owner {
                 Owner::Frame => domain.set_link(Link::Offline, out),
+                Owner::Application { .. } => {}
                 Owner::Page { generation } => {
                     if generation == domain.generation && task_subject {
                         match domain.address {
@@ -985,7 +1000,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             watch.behind = true;
             let frame = match watch.owner {
                 Owner::Frame => true,
-                Owner::Page { .. } => false,
+                Owner::Page { .. } | Owner::Application { .. } => false,
             };
             out.push(Request::Close { watch: id.token() });
             if frame {

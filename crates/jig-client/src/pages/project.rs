@@ -207,7 +207,13 @@ pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, parts: List<Pa
             crate::pages::routing::refuse(domain, contract::Limit::Objects);
             break;
         }
-        out.push(Request::ShowPart { part, generation: domain.generation });
+        let scope = match domain.address {
+            Address::Project { project, .. } => contract::PartScope::Project(project),
+            Address::Inbox { .. } | Address::Conversations { .. } | Address::Task { .. } | Address::Deployment => {
+                contract::PartScope::Deployment
+            }
+        };
+        out.push(Request::ShowPart { part, generation: domain.generation, scope });
         count = count.saturating_add(1);
     }
 }

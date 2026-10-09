@@ -106,7 +106,9 @@ pub(crate) fn route_jig(
             jig_client::Request::SignIn { provider, back } => {
                 out.push(Request::SignIn { provider, back: Address::Jig(back) });
             }
-            jig_client::Request::ShowPart { part, generation } => crate::parts::show(root, env, part, generation, out),
+            jig_client::Request::ShowPart { part, generation, scope } => {
+                crate::parts::show(root, env, part, generation, scope, out);
+            }
             jig_client::Request::PartsLeft { generation } => {
                 first(root, env, first::Event::PartsLeft { generation }, out);
                 root.second.left(generation);
@@ -136,7 +138,12 @@ pub(crate) fn route_jig(
         }
     }
 }
-fn route_first(root: &mut Domain, env: &Env<Limits>, child: &mut Queue<first::Request>, out: &mut Queue<Request>) {
+pub(crate) fn route_first(
+    root: &mut Domain,
+    env: &Env<Limits>,
+    child: &mut Queue<first::Request>,
+    out: &mut Queue<Request>,
+) {
     for _ in 0..child.len() {
         match child.pop().expect("counted first output") {
             first::Request::Frame { asked } => jig(root, env, jig_client::Event::Frame { asked }, out),
@@ -147,7 +154,17 @@ fn route_first(root: &mut Domain, env: &Env<Limits>, child: &mut Queue<first::Re
             first::Request::Send { request, scope, ask } => {
                 crate::domain::ask(root, env, Owner::First(request), scope, Ask::First(ask), out);
             }
-            first::Request::Out(value) => out.push(Request::First(value)),
+            first::Request::Out(value) => match value {
+                first::Out::Fact { fact: first::Fact::SignedOut } => jig(root, env, jig_client::Event::SignedOut, out),
+                first::Out::Read { .. }
+                | first::Out::Open { .. }
+                | first::Out::Close { .. }
+                | first::Out::Fact { fact: first::Fact::Full | first::Fact::InvalidDocument } => {
+                    out.push(Request::First(value));
+                }
+            },
+            first::Request::ShowObjects { objects } => jig(root, env, jig_client::Event::ShowObjects { objects }, out),
+            first::Request::ObjectsLeft => jig(root, env, jig_client::Event::ObjectsLeft, out),
         }
     }
 }

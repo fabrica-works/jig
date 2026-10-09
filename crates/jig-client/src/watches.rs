@@ -21,6 +21,8 @@ pub enum Owner {
     Frame,
     /// The page generation that opened it.
     Page { generation: u32 },
+    /// Jig objects held for an application page.
+    Application { generation: u32 },
 }
 
 /// One watch's explicit lifecycle, including the old attempt's terminal.

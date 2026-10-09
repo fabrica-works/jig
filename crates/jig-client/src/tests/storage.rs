@@ -178,7 +178,7 @@ fn deployment_parts_are_shown_with_the_page_generation() {
         Time::ZERO,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(deployment))) },
     );
-    assert_eq!(out.as_ref(), &[Request::ShowPart { part, generation: 1 }]);
+    assert_eq!(out.as_ref(), &[Request::ShowPart { part, generation: 1, scope: PartScope::Deployment }]);
 }
 
 fn object_window_slides_from_both_ends_and_gates_live_rows() {

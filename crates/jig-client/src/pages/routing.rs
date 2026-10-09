@@ -181,7 +181,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         Address::Deployment => open(domain, env, Subject::Deployment, out),
     }
 }
-fn document_read(key: ObjectKey) -> Read {
+pub(crate) fn document_read(key: ObjectKey) -> Read {
     match key {
         ObjectKey::Task(task) => Read::Task { task },
         ObjectKey::Proposal(proposal) => Read::Proposal { proposal },
@@ -237,7 +237,12 @@ pub(crate) fn parts(domain: &mut Domain, env: &Env<crate::Limits>, values: &[Par
             refuse(domain, Limit::Objects);
             break;
         }
-        out.push(Request::ShowPart { part: part.clone(), generation: domain.generation });
+        let scope = crate::application::scope(domain, part);
+        if let Some(scope) = scope {
+            out.push(Request::ShowPart { part: part.clone(), generation: domain.generation, scope });
+        } else {
+            refuse(domain, Limit::Reads);
+        }
         count = count.saturating_add(1);
     }
 }
@@ -365,6 +370,13 @@ pub(crate) fn read_result(
     };
     if receipt.abandoned || receipt.generation != domain.generation {
         return;
+    }
+    match receipt.source {
+        Source::Window { number: crate::application::WINDOW, .. } => {
+            crate::application::read_result(domain, env, receipt.what, result, out);
+            return;
+        }
+        Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
     }
     let inbox_read = match &receipt.what {
         Read::History { subtree, .. } => {

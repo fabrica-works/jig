@@ -3,6 +3,7 @@
     clippy::disallowed_methods,
     clippy::disallowed_macros,
     clippy::wildcard_enum_match_arm,
+    clippy::match_like_matches_macro,
     reason = "test fixtures collect observed root outputs and locate their variants"
 )]
 use crate::{Address, Answered, Ask, Domain, Event, JigOut, Limits, Request, first, new, step, take};
@@ -25,7 +26,7 @@ const JIG: jig_client::Limits = jig_client::Limits {
     objects: 2,
     sources: 8,
     reads: 4,
-    parts: 8,
+    parts: 10,
     delegates: 2,
     document_bytes: 65536,
     records: 2,
@@ -44,7 +45,16 @@ const JIG: jig_client::Limits = jig_client::Limits {
 fn limits() -> Limits {
     Limits {
         jig: JIG,
-        first: first::Limits { parts: 8, text: 32 },
+        first: first::Limits {
+            parts: 10,
+            text: 32,
+            objects: 12,
+            watches: 24,
+            reads: 24,
+            requests: 4,
+            rows: 2,
+            retry: Duration::from_nanos(10),
+        },
         second_parts: 8,
         table: RequestLimits {
             requests: 4,
@@ -258,4 +268,368 @@ fn a_current_signed_out_envelope_tells_jig_and_both_siblings() {
             unreachable!("signed out requests remain parked");
         }
     }
+}
+
+fn ready(seed: u64) -> Domain {
+    let mut root = new(&limits(), seed);
+    let watch = start(&mut root, List::with_capacity(0));
+    confirm(&mut root, watch, 7);
+    root
+}
+fn family_read(rows: &[Request]) -> Token {
+    rows.iter()
+        .find_map(|row| match row {
+            Request::First(first::Out::Read { read, .. }) => Some(*read),
+            _ => None,
+        })
+        .unwrap()
+}
+fn family_watch(rows: &[Request]) -> Token {
+    rows.iter()
+        .find_map(|row| match row {
+            Request::First(first::Out::Open { watch, .. }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap()
+}
+fn item(revision: u64) -> crate::family::Document {
+    let mut proposals = List::with_capacity(1);
+    proposals.push(contract::ProposalKey { proposer: 9, number: 2 }).unwrap();
+    crate::family::Document::Item(crate::family::Item {
+        project: 3,
+        key: 5,
+        revision: contract::Revision { value: revision },
+        state: crate::family::ItemState::Ready,
+        value: 13,
+        task: 9,
+        proposals,
+        touchable: true,
+    })
+}
+fn family_page(root: &mut Domain) -> Vec<Request> {
+    drive(root, Event::Went { place: crate::Place::Address(Address::First(first::Address { project: 3, item: 5 })) })
+}
+#[test]
+fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
+    let mut root = ready(21);
+    let opened = drive(
+        &mut root,
+        Event::Went { place: crate::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+    );
+    let watch = opened
+        .iter()
+        .find_map(|row| match row {
+            Request::Jig(JigOut::Open { watch, subject: contract::Subject::Deployment }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let mut parts = List::with_capacity(10);
+    for part in [
+        contract::Part::Resource {
+            connector: crate::FIRST,
+            path: contract::Text::new(Box::from(*b"name"), 32).unwrap(),
+        },
+        contract::Part::Kind { connector: crate::FIRST, kind: 4 },
+        contract::Part::Panel { connector: crate::FIRST, task: 9 },
+        contract::Part::Result { connector: crate::FIRST, task: 9 },
+        contract::Part::Effect { connector: crate::FIRST, proposal: contract::ProposalKey { proposer: 9, number: 2 } },
+        contract::Part::Hold { connector: crate::FIRST, task: 9 },
+        contract::Part::Project { connector: crate::FIRST, project: 3 },
+        contract::Part::Deployment { connector: crate::FIRST },
+        contract::Part::Resource {
+            connector: crate::SECOND,
+            path: contract::Text::new(Box::from(*b"other"), 32).unwrap(),
+        },
+        contract::Part::Kind { connector: crate::SECOND, kind: 6 },
+    ] {
+        parts.push(part).unwrap();
+    }
+    let expected = parts.clone();
+    let rows = drive(
+        &mut root,
+        Event::Jig(jig_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
+                hosts: List::with_capacity(0),
+                accounts: List::with_capacity(0),
+                capacity: List::with_capacity(0),
+                proposals: 0,
+                refusals: List::with_capacity(0),
+                parts,
+            }))),
+        }),
+    );
+    let generation = root.jig().generation();
+    for part in &expected.as_slice()[..8] {
+        assert!(root.first().contains(part, generation));
+    }
+    assert!(root.second().contains(&expected.as_slice()[8]));
+    assert!(root.second().contains(&expected.as_slice()[9]));
+    assert_eq!(
+        rows.iter()
+            .filter(|row| match row {
+                Request::First(first::Out::Read { .. }) => true,
+                _ => false,
+            })
+            .count(),
+        6
+    );
+    assert_eq!(root.first().part(&expected.as_slice()[2]).unwrap().value, first::Value::Loading);
+    let read = family_read(&rows);
+    drive(&mut root, Event::First(first::Event::Read { read, result: first::ReadResult::Unknown }));
+    assert_eq!(root.first().part(&expected.as_slice()[2]).unwrap().value, first::Value::Unknown);
+    let rows = drive(
+        &mut root,
+        Event::Went {
+            place: crate::Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })),
+        },
+    );
+    for part in &expected.as_slice()[..8] {
+        assert!(!root.first().contains(part, generation));
+    }
+    assert!(!root.second().contains(&expected.as_slice()[8]));
+    assert!(!root.second().contains(&expected.as_slice()[9]));
+    assert_eq!(
+        rows.iter()
+            .filter(|row| match row {
+                Request::First(first::Out::Close { .. }) => true,
+                _ => false,
+            })
+            .count(),
+        6
+    );
+    drive(&mut root, Event::First(first::Event::Read { read, result: first::ReadResult::Value(item(1)) }));
+    assert!(root.first().part(&expected.as_slice()[2]).is_none());
+}
+#[test]
+fn a_family_page_hands_its_task_and_proposal_to_jigs_working_set() {
+    let mut root = ready(22);
+    let rows_initial = family_page(&mut root);
+    let read = family_read(&rows_initial);
+    let rows = drive(&mut root, Event::First(first::Event::Read { read, result: first::ReadResult::Value(item(1)) }));
+    assert!(root.jig().objects().find(contract::ObjectKey::Task(9)).is_some());
+    assert!(
+        root.jig()
+            .objects()
+            .find(contract::ObjectKey::Proposal(contract::ProposalKey { proposer: 9, number: 2 }))
+            .is_some()
+    );
+    assert!(rows.iter().any(|row| match row {
+        Request::Jig(JigOut::Open { subject: contract::Subject::Chips { .. }, .. }) => true,
+        _ => false,
+    }));
+    assert!(rows.iter().any(|row| match row {
+        Request::Jig(JigOut::Open { subject: contract::Subject::Inbox { .. }, .. }) => true,
+        _ => false,
+    }));
+    let watch = family_watch(&rows_initial);
+    let rows =
+        drive(&mut root, Event::First(first::Event::Watch { watch, event: first::WatchEvent::Delivered(item(1)) }));
+    assert!(!rows.iter().any(|row| match row {
+        Request::Jig(JigOut::Open { .. }) => true,
+        _ => false,
+    }));
+}
+#[test]
+fn family_touch_refuses_a_moved_revision_and_final_answers_stay_with_the_family() {
+    let mut root = ready(23);
+    let rows = family_page(&mut root);
+    drive(
+        &mut root,
+        Event::First(first::Event::Read { read: family_read(&rows), result: first::ReadResult::Value(item(2)) }),
+    );
+    let id = root.first().page().unwrap();
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::First(first::Act::Touch {
+                object: id.token(),
+                revision: contract::Revision { value: 1 },
+            }),
+        },
+    );
+    assert_eq!(
+        root.first().object(id).unwrap().card,
+        first::Card::Refused { answer: first::Answer::Moved { item: 5, revision: contract::Revision { value: 2 } } }
+    );
+    assert!(taken(&mut root).is_empty());
+    assert!(
+        drive(
+            &mut root,
+            Event::Act {
+                action: crate::Action::First(first::Act::Touch {
+                    object: id.token(),
+                    revision: contract::Revision { value: 2 }
+                })
+            }
+        )
+        .is_empty()
+    );
+    let rows = taken(&mut root);
+    let Request::Save { record: crate::store::Record::Table { .. } } = &rows[0] else { panic!("record first") };
+    let Request::Send { attempt, ask: Ask::First(ask), .. } = &rows[1] else { panic!("family request") };
+    assert_eq!(
+        *ask,
+        first::Ask::Touch { project: 3, item: 5, revision: contract::Revision { value: 2 }, parameters: None }
+    );
+    let answer = first::Answer::Touched { item: 5, revision: contract::Revision { value: 3 } };
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt: *attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::First(answer.clone())),
+        },
+    );
+    assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer });
+}
+#[test]
+fn panel_parameters_are_the_familys_revision_naming_request() {
+    let mut root = ready(24);
+    let part = contract::Part::Panel { connector: crate::FIRST, task: 9 };
+    let rows = drive(
+        &mut root,
+        Event::First(first::Event::Show { part: part.clone(), generation: 4, scope: crate::family::Scope::Project(3) }),
+    );
+    let subject =
+        crate::family::Subject { scope: crate::family::Scope::Project(3), kind: crate::family::Kind::Panel(9) };
+    drive(
+        &mut root,
+        Event::First(first::Event::Read {
+            read: family_read(&rows),
+            result: first::ReadResult::Value(crate::family::Document::Part(crate::family::PartDocument {
+                subject,
+                revision: contract::Revision { value: 4 },
+                value: 13,
+                parameters: Some(crate::family::Parameters {
+                    item: 5,
+                    revision: contract::Revision { value: 2 },
+                    value: 13,
+                    amendable: true,
+                }),
+            })),
+        }),
+    );
+    let object = root.first().find(subject).unwrap().token();
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::First(first::Act::Parameters {
+                object,
+                revision: contract::Revision { value: 2 },
+                value: 21,
+            }),
+        },
+    );
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::First(first::Act::Touch { object, revision: contract::Revision { value: 2 } }),
+        },
+    );
+    let rows = taken(&mut root);
+    let Request::Send { ask: Ask::First(ask), .. } = &rows[1] else { panic!("family parameters request") };
+    assert_eq!(
+        *ask,
+        first::Ask::Touch { project: 3, item: 5, revision: contract::Revision { value: 2 }, parameters: Some(21) }
+    );
+}
+
+#[test]
+fn closing_family_watches_keep_their_terminal_obligation_and_stale_tokens_do_nothing() {
+    let mut root = ready(25);
+    let rows = family_page(&mut root);
+    let watch = family_watch(&rows);
+    let read = family_read(&rows);
+    drive(
+        &mut root,
+        Event::Went {
+            place: crate::Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })),
+        },
+    );
+    drive(&mut root, Event::First(first::Event::Watch { watch, event: first::WatchEvent::Delivered(item(2)) }));
+    assert!(root.first().page().is_none());
+    assert!(drive(&mut root, Event::First(first::Event::Ended { watch, end: first::WatchEnd::Closed })).is_empty());
+    assert!(drive(&mut root, Event::First(first::Event::Ended { watch, end: first::WatchEnd::Closed })).is_empty());
+    drive(&mut root, Event::First(first::Event::Read { read, result: first::ReadResult::Value(item(2)) }));
+    drive(&mut root, Event::First(first::Event::Read { read, result: first::ReadResult::Value(item(2)) }));
+    let rows = family_page(&mut root);
+    let current = family_watch(&rows);
+    assert_ne!(watch, current);
+    drive(&mut root, Event::First(first::Event::Ended { watch: current, end: first::WatchEnd::Dropped }));
+    assert_eq!(crate::next_deadline(&root), Some(Time::ZERO.saturating_add(Duration::from_nanos(10))));
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    let mut later = env();
+    later.now = Time::ZERO.saturating_add(Duration::from_nanos(10));
+    crate::fire(&mut root, &later, &mut out);
+    assert_eq!(family_watch(&out_iter(out)), current);
+}
+
+#[test]
+fn an_unknown_family_request_inspects_before_another_touch() {
+    let mut root = ready(26);
+    let rows = family_page(&mut root);
+    drive(
+        &mut root,
+        Event::First(first::Event::Read { read: family_read(&rows), result: first::ReadResult::Value(item(2)) }),
+    );
+    let object = root.first().page().unwrap();
+    let action =
+        crate::Action::First(first::Act::Touch { object: object.token(), revision: contract::Revision { value: 2 } });
+    drive(&mut root, Event::Act { action: action.clone() });
+    let first::Card::Deciding { request, .. } = root.first().object(object).unwrap().card else {
+        panic!("the family owns its deciding request");
+    };
+    let rows = drive(
+        &mut root,
+        Event::First(first::Event::Progress { request, progress: skein_lib::RequestProgress::Unknown }),
+    );
+    assert_eq!(root.first().object(object).unwrap().card, first::Card::Unknown);
+    assert_eq!(root.first().object(object).unwrap().value, first::Value::Loading);
+    assert!(drive(&mut root, Event::Act { action }).is_empty());
+    drive(
+        &mut root,
+        Event::First(first::Event::Read { read: family_read(&rows), result: first::ReadResult::Value(item(3)) }),
+    );
+    assert_eq!(root.first().object(object).unwrap().card, first::Card::Open);
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::First(first::Act::Touch {
+                object: object.token(),
+                revision: contract::Revision { value: 2 },
+            }),
+        },
+    );
+    assert_eq!(
+        root.first().object(object).unwrap().card,
+        first::Card::Refused { answer: first::Answer::Moved { item: 5, revision: contract::Revision { value: 3 } } }
+    );
+}
+
+#[test]
+fn family_capacities_refuse_overflow_and_resource_words_past_the_owner_bound() {
+    let mut bounds = limits();
+    bounds.first.objects = u32::MAX;
+    assert!(crate::worst_case(&bounds).is_none());
+    bounds = limits();
+    bounds.first.retry = Duration::ZERO;
+    assert!(crate::worst_case(&bounds).is_none());
+    let mut root = ready(27);
+    let part = contract::Part::Resource {
+        connector: crate::FIRST,
+        path: contract::Text::new(Box::from([b'x'; 33]), 33).unwrap(),
+    };
+    let rows = drive(
+        &mut root,
+        Event::First(first::Event::Show { part: part.clone(), generation: 4, scope: crate::family::Scope::Deployment }),
+    );
+    assert_eq!(rows, vec![Request::First(first::Out::Fact { fact: first::Fact::Full })]);
+    assert!(!root.first().contains(&part, 4));
+    let mut side = crate::second::Side::new(1, 32, 1);
+    assert!(!side.show(part, 4));
+    let part = contract::Part::Kind { connector: crate::SECOND, kind: 1 };
+    assert!(side.show(part.clone(), 4));
+    assert!(side.show(part, 4));
+    assert!(!side.show(contract::Part::Kind { connector: crate::SECOND, kind: 2 }, 4));
 }

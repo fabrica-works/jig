@@ -236,3 +236,10 @@ pub struct Count {
     pub value: u32,
     pub limited: bool,
 }
+
+/// The owner-supplied scope of a part's application document (contract.md, 7.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PartScope {
+    Project(u32),
+    Deployment,
+}

@@ -438,7 +438,11 @@ fn task_sections_and_activity_sources_follow_the_executor() {
             Executor::Procedure { connector, .. } => {
                 assert_eq!(
                     requests.as_ref(),
-                    &[Request::ShowPart { part: Part::Panel { connector, task: 8 }, generation: 1 }]
+                    &[Request::ShowPart {
+                        part: Part::Panel { connector, task: 8 },
+                        generation: 1,
+                        scope: PartScope::Project(1)
+                    }]
                 );
             }
             Executor::Party { .. } | Executor::Role { .. } => {
@@ -622,7 +626,7 @@ fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
         Time::ZERO,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
     );
-    assert_eq!(requests.as_ref(), &[Request::ShowPart { part: resource, generation: 1 }]);
+    assert_eq!(requests.as_ref(), &[Request::ShowPart { part: resource, generation: 1, scope: PartScope::Project(1) }]);
     let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
     assert!(left.contains(&Request::PartsLeft { generation: 1 }));
     assert!(domain.task_page().header.is_none());
@@ -1034,7 +1038,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         Time::ZERO,
         Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) },
     );
-    assert_eq!(shown.as_ref(), &[Request::ShowPart { part: resource, generation: 2 }]);
+    assert_eq!(shown.as_ref(), &[Request::ShowPart { part: resource, generation: 2, scope: PartScope::Project(1) }]);
     assert_eq!(domain.project_page().document.as_ref().unwrap().period, 1);
     let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
     let watch = open_token(&opened);
@@ -1054,7 +1058,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         Time::ZERO,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(doc))) },
     );
-    assert_eq!(shown.as_ref(), &[Request::ShowPart { part, generation: 3 }]);
+    assert_eq!(shown.as_ref(), &[Request::ShowPart { part, generation: 3, scope: PartScope::Deployment }]);
     assert_eq!(domain.deployment_page().document.as_ref().unwrap().proposals, 3);
 }
 

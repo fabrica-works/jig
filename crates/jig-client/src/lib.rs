@@ -8,6 +8,7 @@ extern crate alloc;
 pub mod action;
 pub mod acts;
 pub mod address;
+pub mod application;
 pub mod boundary;
 pub(crate) mod clock;
 pub mod confirm;

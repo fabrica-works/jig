@@ -1,29 +1,23 @@
-//! First connector's client side. Its own page and small-store position are
-//! child state, never root state (client/domain/root.md, sections 7 and 8).
+//! First connector's client side. Parts and family objects have one working
+//! set, owned reads/watches and revision-naming acts (root.md, sections 6–8).
+use crate::family::{self, Document, Kind, Scope, Subject};
+pub use crate::family::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
 use jig_client::{
     contract::{Part, Revision},
     frame::FrameShown,
     link::Link,
 };
-use skein_lib::{Env, List, Queue, RequestProgress, Time, Token};
+use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Address {
     pub project: u32,
     pub item: u64,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Ask {
-    Touch { project: u32, item: u64, revision: Revision },
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Answer {
-    Touched { item: u64, revision: Revision },
-    Moved { item: u64, revision: Revision },
-    Gone,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
     Go { address: Address },
+    Touch { object: Token, revision: Revision },
+    Parameters { object: Token, revision: Revision, value: u64 },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
@@ -31,19 +25,33 @@ pub enum Key {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Record {
-    Place { version: u16, address: Address },
+    Place { version: u16, party: u64, address: Address },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Out {}
+pub enum Out {
+    Read { read: Token, subject: Subject },
+    Open { watch: Token, subject: Subject },
+    Close { watch: Token },
+    Fact { fact: Fact },
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Fact {
+    Full,
+    InvalidDocument,
+    SignedOut,
+}
 #[derive(Debug)]
 pub enum Event {
-    Show { part: Part, generation: u32 },
+    Show { part: Part, generation: u32, scope: Scope },
     PartsLeft { generation: u32 },
     Went { address: Address },
     Left,
     Act { act: Act },
     Answered { request: Token, answer: Answer },
     Progress { request: Token, progress: RequestProgress },
+    Read { read: Token, result: ReadResult },
+    Watch { watch: Token, event: WatchEvent },
+    Ended { watch: Token, end: WatchEnd },
     Link { link: Link },
     Confirmed { party: Option<u64> },
     FrameIs { asked: Token, frame: FrameShown },
@@ -56,33 +64,115 @@ pub enum Request {
     Save { record: Record },
     Send { request: Token, scope: u64, ask: Ask },
     Out(Out),
+    ShowObjects { objects: List<jig_client::contract::ObjectKey> },
+    ObjectsLeft,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     pub parts: u32,
+    pub objects: u32,
+    pub reads: u32,
+    pub watches: u32,
+    pub requests: u32,
+    pub rows: u32,
     pub text: u32,
+    pub retry: skein_lib::Duration,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Value {
+    Loading,
+    Unknown,
+    Known(Document),
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Card {
+    Open,
+    Deciding { request: Token, progress: RequestProgress },
+    Refused { answer: Answer },
+    Unknown,
+    Done { answer: Answer },
 }
 #[derive(Debug)]
-pub struct Side {
-    parts: List<Held>,
-    address: Option<Address>,
-    link: Link,
-    party: Option<u64>,
-    shown: u64,
+#[expect(clippy::partial_pub_fields, reason = "the view reads values; the side alone owns read and watch obligations")]
+pub struct Object {
+    pub subject: Subject,
+    pub value: Value,
+    pub card: Card,
+    pub draft: Option<u64>,
+    read: Option<Id<Reading>>,
+    watch: Option<Id<Watching>>,
 }
 #[derive(Debug)]
 struct Held {
     part: Part,
     generation: u32,
+    subject: Option<Subject>,
+}
+#[derive(Debug)]
+struct Reading {
+    live: bool,
+    subject: Subject,
+    party: u64,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Following {
+    Live,
+    Waiting,
+    Dropped { again: Time },
+    Closing,
+}
+#[derive(Debug)]
+struct Watching {
+    subject: Subject,
+    state: Following,
+}
+#[derive(Debug)]
+struct Pending {
+    live: bool,
+    object: Id<Object>,
+}
+#[derive(Debug)]
+pub struct Side {
+    parts: List<Held>,
+    objects: Slab<Object>,
+    names: Map<Subject, Id<Object>>,
+    reads: Slab<Reading>,
+    watches: Slab<Watching>,
+    watch_ids: Map<Id<Watching>, ()>,
+    pending: Slab<Pending>,
+    address: Option<Address>,
+    generation: u32,
+    link: Link,
+    party: Option<u64>,
+    kept: Option<Record>,
+    shown: u64,
 }
 impl Side {
     #[must_use]
     pub fn new(limits: &Limits, _seed: u64) -> Self {
-        Self { parts: List::with_capacity(limits.parts), address: None, link: Link::Starting, party: None, shown: 0 }
+        Self {
+            parts: List::with_capacity(limits.parts),
+            objects: Slab::with_capacity(limits.objects.checked_mul(2).expect("object retirement room fits")),
+            names: Map::with_capacity(limits.objects),
+            reads: Slab::with_capacity(limits.reads),
+            watches: Slab::with_capacity(limits.watches),
+            watch_ids: Map::with_capacity(limits.watches),
+            pending: Slab::with_capacity(limits.requests),
+            address: None,
+            generation: 0,
+            link: Link::Starting,
+            party: None,
+            kept: None,
+            shown: 0,
+        }
     }
     #[must_use]
     pub const fn address(&self) -> Option<Address> {
         self.address
+    }
+    #[must_use]
+    pub const fn generation(&self) -> u32 {
+        self.generation
     }
     #[must_use]
     pub const fn link(&self) -> Link {
@@ -92,6 +182,39 @@ impl Side {
     pub const fn party(&self) -> Option<u64> {
         self.party
     }
+    #[must_use]
+    pub fn find(&self, subject: Subject) -> Option<Id<Object>> {
+        self.names.get(&subject).copied()
+    }
+    #[must_use]
+    pub fn object(&self, id: Id<Object>) -> Option<&Object> {
+        let object = self.objects.get(id)?;
+        if self.names.get(&object.subject) == Some(&id) { Some(object) } else { None }
+    }
+    #[must_use]
+    pub fn page(&self) -> Option<Id<Object>> {
+        let address = self.address?;
+        self.find(Subject { scope: Scope::Project(address.project), kind: Kind::Item(address.item) })
+    }
+    #[must_use]
+    pub fn part(&self, part: &Part) -> Option<&Object> {
+        for held in &self.parts {
+            if &held.part == part {
+                let subject = held.subject?;
+                return self.object(self.find(subject)?);
+            }
+        }
+        None
+    }
+    #[must_use]
+    pub fn contains(&self, part: &Part, generation: u32) -> bool {
+        for held in &self.parts {
+            if &held.part == part && held.generation == generation {
+                return true;
+            }
+        }
+        false
+    }
     fn changed(&mut self) {
         self.shown = self.shown.checked_add(1).expect("shown count fits");
     }
@@ -100,74 +223,571 @@ impl Side {
 pub const fn shown(side: &Side) -> u64 {
     side.shown
 }
-pub fn step(side: &mut Side, _env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
+pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Show { part, generation } => {
-            for held in &side.parts {
-                if held.part == part && held.generation == generation {
-                    return;
-                }
+        Event::Show { part, generation, scope } => {
+            if !part_fits(&part, env.limits.text) {
+                full(out);
+                return;
             }
-            if side.parts.push(Held { part, generation }).is_ok() {
-                side.changed();
+            if side.contains(&part, generation) {
+                return;
             }
+            let subject = family::subject(&part, scope);
+            if side.parts.push(Held { part, generation, subject }).is_err() {
+                full(out);
+                return;
+            }
+            if let Some(subject) = subject {
+                hold(side, env, subject, out);
+            }
+            side.changed();
         }
         Event::PartsLeft { generation } => {
-            let capacity = side.parts.capacity();
-            let old = core::mem::replace(&mut side.parts, List::with_capacity(capacity));
+            let old = core::mem::replace(&mut side.parts, List::with_capacity(env.limits.parts));
             for held in old.into_boxed() {
                 if held.generation != generation {
                     assert!(side.parts.push(held).is_ok(), "remaining parts fit");
                 }
             }
+            prune(side, out);
             side.changed();
         }
         Event::Went { address } => {
             side.address = Some(address);
+            side.generation = side.generation.checked_add(1).expect("page generation fits");
+            prune(side, out);
             side.changed();
             out.push(Request::Frame { asked: Token::new(0) });
+            hold(side, env, Subject { scope: Scope::Project(address.project), kind: Kind::Item(address.item) }, out);
+            save(side, out);
         }
         Event::Left => {
             side.address = None;
+            out.push(Request::ObjectsLeft);
+            prune(side, out);
             side.changed();
         }
         Event::Act { act } => match act {
             Act::Go { address } => out.push(Request::Show { address }),
-        },
-        Event::Link { link } => {
-            side.link = link;
-            side.changed();
-        }
-        Event::Confirmed { party } => {
-            side.party = party;
-            side.changed();
-        }
-        Event::FrameIs { asked: _, frame } => {
-            side.party = frame.party;
-            side.link = frame.link;
-            side.changed();
-        }
-        Event::Restore { record } => match record {
-            Record::Place { version, address } => {
-                if version == 1 {
-                    side.address = Some(address);
+            Act::Touch { object, revision } => touch(side, Id::from_token(object), revision, out),
+            Act::Parameters { object, revision, value } => {
+                let id = Id::from_token(object);
+                if let Some(object) = side.objects.get_mut(id)
+                    && parameters_revision(&object.value) == Some(revision)
+                {
+                    object.draft = Some(value);
+                    side.changed();
                 }
             }
         },
-        Event::Answered { request: _, answer: _ } | Event::Progress { request: _, progress: _ } => {}
+        Event::Answered { request, answer } => answered(side, env, request, answer, out),
+        Event::Progress { request, progress } => progress_changed(side, env, request, progress, out),
+        Event::Read { read, result } => read_result(side, env, read, result, out),
+        Event::Watch { watch, event } => watch_event(side, env, watch, event, out),
+        Event::Ended { watch, end } => ended(side, env, Id::from_token(watch), end, out),
+        Event::Link { link } => {
+            side.link = link;
+            sync(side, env, out);
+            side.changed();
+        }
+        Event::Confirmed { party } => {
+            if side.party != party {
+                hide(side, out);
+            }
+            side.party = party;
+            sync(side, env, out);
+            save(side, out);
+            side.changed();
+        }
+        Event::FrameIs { asked: _, frame: _ } => {}
+        Event::Restore { record } => match record {
+            Record::Place { version, party, address } => {
+                if version == 1 {
+                    side.kept = Some(Record::Place { version, party, address });
+                }
+            }
+        },
+    }
+    prune(side, out);
+}
+fn save(side: &mut Side, out: &mut Queue<Request>) {
+    if let Some(party) = side.party
+        && let Some(address) = side.address
+    {
+        let record = Record::Place { version: 1, party, address };
+        side.kept = Some(record.clone());
+        out.push(Request::Save { record });
+    }
+}
+#[expect(clippy::manual_map, reason = "step code matches optional values explicitly")]
+fn parameters_revision(value: &Value) -> Option<Revision> {
+    match value {
+        Value::Known(Document::Part(part)) => match part.parameters {
+            Some(parameters) => Some(parameters.revision),
+            None => None,
+        },
+        Value::Known(Document::Item(_)) | Value::Loading | Value::Unknown => None,
+    }
+}
+fn hold(side: &mut Side, env: &Env<Limits>, subject: Subject, out: &mut Queue<Request>) {
+    if side.find(subject).is_none() {
+        if side.names.len() == side.names.capacity() {
+            full(out);
+            return;
+        }
+        let object = Object { subject, value: Value::Loading, card: Card::Open, draft: None, read: None, watch: None };
+        let Ok(id) = side.objects.insert(object) else {
+            full(out);
+            return;
+        };
+        assert!(side.names.insert(subject, id).is_ok(), "names mirror object capacity");
+    }
+    acquire(side, env, subject, out);
+}
+fn acquire(side: &mut Side, _env: &Env<Limits>, subject: Subject, out: &mut Queue<Request>) {
+    if side.party.is_none() || side.link != Link::Live {
+        return;
+    }
+    let Some(id) = side.find(subject) else {
+        return;
+    };
+    let object = side.objects.get_mut(id).expect("named object exists");
+    match object.value {
+        Value::Unknown => return,
+        Value::Known(_) | Value::Loading => {}
+    }
+    if object.read.is_none() && matches_loading(&object.value) {
+        match side.reads.insert(Reading {
+            live: true,
+            subject,
+            party: side.party.expect("only a confirmed party reads"),
+        }) {
+            Ok(read) => {
+                object.read = Some(read);
+                out.push(Request::Out(Out::Read { read: read.token(), subject }));
+            }
+            Err(_) => full(out),
+        }
+    }
+    if object.watch.is_none() {
+        match side.watches.insert(Watching { subject, state: Following::Waiting }) {
+            Ok(watch) => {
+                assert!(side.watch_ids.insert(watch, ()).is_ok(), "watch index mirrors slab");
+                object.watch = Some(watch);
+                out.push(Request::Out(Out::Open { watch: watch.token(), subject }));
+            }
+            Err(_) => full(out),
+        }
+    }
+}
+fn matches_loading(value: &Value) -> bool {
+    match value {
+        Value::Loading => true,
+        Value::Known(_) | Value::Unknown => false,
+    }
+}
+fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Document, out: &mut Queue<Request>) {
+    if document.subject() != subject || !document.fits(env.limits.rows) {
+        out.push(Request::Out(Out::Fact { fact: Fact::InvalidDocument }));
+        return;
+    }
+    let Some(id) = side.find(subject) else {
+        return;
+    };
+    let object = side.objects.get_mut(id).expect("named object exists");
+    match &object.value {
+        Value::Known(current) => {
+            if current.revision().value > document.revision().value {
+                return;
+            }
+            if current.revision() != document.revision() {
+                object.draft = None;
+            }
+        }
+        Value::Loading | Value::Unknown => {}
+    }
+    object.value = Value::Known(document);
+    match object.card {
+        Card::Unknown => object.card = Card::Open,
+        Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Done { .. } => {}
+    }
+    if side.page() == Some(id) {
+        let object = side.objects.get(id).expect("page object exists");
+        match &object.value {
+            Value::Known(document) => out.push(Request::ShowObjects { objects: document.objects(env.limits.rows) }),
+            Value::Loading | Value::Unknown => {}
+        }
+    }
+    side.changed();
+}
+fn unknown(side: &mut Side, subject: Subject) {
+    if let Some(id) = side.find(subject) {
+        side.objects.get_mut(id).expect("named object exists").value = Value::Unknown;
+        side.changed();
+    }
+}
+fn named(side: &Side, subject: Subject) -> bool {
+    if let Some(address) = side.address
+        && subject == (Subject { scope: Scope::Project(address.project), kind: Kind::Item(address.item) })
+    {
+        return true;
+    }
+    for held in &side.parts {
+        if held.subject == Some(subject) {
+            return true;
+        }
+    }
+    false
+}
+fn prune(side: &mut Side, out: &mut Queue<Request>) {
+    let mut gone = List::with_capacity(side.names.capacity());
+    for (subject, _) in &side.names {
+        let object = side
+            .objects
+            .get(*side.names.get(subject).expect("registered subject exists"))
+            .expect("named object exists");
+        let pending = match object.card {
+            Card::Deciding { .. } => true,
+            Card::Open | Card::Refused { .. } | Card::Unknown | Card::Done { .. } => false,
+        };
+        if !named(side, *subject) && !pending {
+            assert!(gone.push(*subject).is_ok(), "pruned keys fit names");
+        }
+    }
+    for subject in gone.into_boxed() {
+        let id = side.names.remove(&subject).expect("pruned subject exists");
+        if let Some(object) = side.objects.get_mut(id) {
+            if let Some(watch) = object.watch.take() {
+                close(side, watch, out);
+            }
+            side.objects.retire(id);
+        }
+    }
+}
+fn close(side: &mut Side, id: Id<Watching>, out: &mut Queue<Request>) {
+    if let Some(watch) = side.watches.get_mut(id) {
+        match watch.state {
+            Following::Closing => {}
+            Following::Dropped { .. } => retire_watch(side, id),
+            Following::Live | Following::Waiting => {
+                watch.state = Following::Closing;
+                out.push(Request::Out(Out::Close { watch: id.token() }));
+            }
+        }
+    }
+}
+fn retire_watch(side: &mut Side, id: Id<Watching>) {
+    let old = side.watch_ids.remove(&id);
+    assert!(old.is_some(), "retired watch was indexed");
+    side.watches.retire(id);
+}
+fn hide(side: &mut Side, out: &mut Queue<Request>) {
+    let mut ids = List::with_capacity(side.watch_ids.capacity());
+    for (id, ()) in &side.watch_ids {
+        assert!(ids.push(*id).is_ok(), "watch ids fit");
+    }
+    for id in ids.into_boxed() {
+        close(side, id, out);
+    }
+    for (_, id) in &side.names {
+        let object = side.objects.get_mut(*id).expect("named object exists");
+        object.value = Value::Loading;
+    }
+}
+fn sync(side: &mut Side, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let mut subjects = List::with_capacity(side.names.capacity());
+    for (subject, _) in &side.names {
+        assert!(subjects.push(*subject).is_ok(), "subjects fit registry");
+    }
+    for subject in subjects.into_boxed() {
+        acquire(side, env, subject, out);
+    }
+    if side.link != Link::Live {
+        hide(side, out);
+    }
+}
+fn ended(side: &mut Side, env: &Env<Limits>, id: Id<Watching>, end: WatchEnd, out: &mut Queue<Request>) {
+    if side.watch_ids.get(&id).is_none() {
+        return;
+    }
+    let Some(watch) = side.watches.get(id) else {
+        return;
+    };
+    let subject = watch.subject;
+    let closing = watch.state == Following::Closing;
+    if closing {
+        retire_watch(side, id);
+    } else {
+        match end {
+            WatchEnd::Dropped => {
+                side.watches.get_mut(id).expect("watch exists").state =
+                    Following::Dropped { again: env.now.saturating_add(env.limits.retry) }
+            }
+            WatchEnd::Unknown => {
+                retire_watch(side, id);
+                unknown(side, subject);
+            }
+            WatchEnd::SignedOut => {
+                retire_watch(side, id);
+                out.push(Request::Out(Out::Fact { fact: Fact::SignedOut }));
+            }
+            WatchEnd::Closed => retire_watch(side, id),
+        }
+    }
+    if closing || end != WatchEnd::Dropped {
+        if let Some(object) = side.find(subject) {
+            let object = side.objects.get_mut(object).expect("named object exists");
+            if object.watch == Some(id) {
+                object.watch = None;
+            }
+        }
+        acquire(side, env, subject, out);
+    }
+    side.changed();
+}
+fn touch(side: &mut Side, id: Id<Object>, revision: Revision, out: &mut Queue<Request>) {
+    let Some(party) = side.party else {
+        return;
+    };
+    let Some(object) = side.object(id) else {
+        return;
+    };
+    match object.card {
+        Card::Deciding { .. } | Card::Unknown => return,
+        Card::Open | Card::Refused { .. } | Card::Done { .. } => {}
+    }
+    let document = match &object.value {
+        Value::Known(document) => document,
+        Value::Loading | Value::Unknown => return,
+    };
+    let (project, item, current, allowed) = match document {
+        Document::Item(item) => (item.project, item.key, item.revision, item.touchable),
+        Document::Part(part) => {
+            let Some(parameters) = part.parameters else {
+                return;
+            };
+            let project = match part.subject.scope {
+                Scope::Project(project) => project,
+                Scope::Deployment => return,
+            };
+            (project, parameters.item, parameters.revision, parameters.amendable)
+        }
+    };
+    if current != revision {
+        side.objects.get_mut(id).expect("named object exists").card =
+            Card::Refused { answer: Answer::Moved { item, revision: current } };
+        side.changed();
+        return;
+    }
+    if !allowed {
+        return;
+    }
+    let parameters = object.draft;
+    let Ok(request) = side.pending.insert(Pending { live: true, object: id }) else {
+        full(out);
+        return;
+    };
+    side.objects.get_mut(id).expect("named object exists").card =
+        Card::Deciding { request: request.token(), progress: RequestProgress::Parked };
+    out.push(Request::Send {
+        request: request.token(),
+        scope: party,
+        ask: Ask::Touch { project, item, revision, parameters },
+    });
+    side.changed();
+}
+fn full(out: &mut Queue<Request>) {
+    out.push(Request::Out(Out::Fact { fact: Fact::Full }));
+}
+pub fn fire(side: &mut Side, env: &Env<Limits>, out: &mut Queue<Request>) {
+    for (id, ()) in &side.watch_ids {
+        let watch = side.watches.get_mut(*id).expect("watch exists");
+        match watch.state {
+            Following::Dropped { again } => {
+                if again <= env.now && side.link == Link::Live && side.party.is_some() {
+                    watch.state = Following::Waiting;
+                    out.push(Request::Out(Out::Open { watch: id.token(), subject: watch.subject }));
+                }
+            }
+            Following::Waiting | Following::Live | Following::Closing => {}
+        }
     }
 }
 #[must_use]
-pub const fn next_deadline(_side: &Side) -> Option<Time> {
-    None
+pub fn next_deadline(side: &Side) -> Option<Time> {
+    let mut next: Option<Time> = None;
+    for (id, ()) in &side.watch_ids {
+        let watch = side.watches.get(*id).expect("watch exists");
+        match watch.state {
+            Following::Dropped { again } => {
+                if side.link == Link::Live && side.party.is_some() {
+                    next = Some(match next {
+                        Some(old) => old.min(again),
+                        None => again,
+                    });
+                }
+            }
+            Following::Waiting | Following::Live | Following::Closing => {}
+        }
+    }
+    next
+}
+pub fn reclaim(side: &mut Side) {
+    side.objects.reclaim();
+    side.reads.reclaim();
+    side.watches.reclaim();
+    side.pending.reclaim();
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    List::<Held>::worst_case(limits.parts)?
+    if limits.retry == skein_lib::Duration::ZERO {
+        return None;
+    }
+    checked_max_out(limits)?;
+    let mut total = List::<Held>::worst_case(limits.parts)?
         .checked_mul(2)?
-        .checked_add(u64::from(limits.parts).checked_mul(u64::from(limits.text))?)
+        .checked_add(u64::from(limits.parts).checked_mul(u64::from(limits.text))?)?;
+    total = total.checked_add(Slab::<Object>::worst_case(limits.objects.checked_mul(2)?)?)?.checked_add(Map::<
+        Subject,
+        Id<Object>,
+    >::worst_case(
+        limits.objects,
+    )?)?;
+    let payload = List::<jig_client::contract::ProposalKey>::worst_case(limits.rows)?;
+    total = total.checked_add(u64::from(limits.objects.checked_mul(2)?).checked_mul(payload)?)?;
+    total = total
+        .checked_add(Slab::<Reading>::worst_case(limits.reads)?)?
+        .checked_add(Slab::<Watching>::worst_case(limits.watches)?)?
+        .checked_add(Map::<Id<Watching>, ()>::worst_case(limits.watches)?)?
+        .checked_add(Slab::<Pending>::worst_case(limits.requests)?)?;
+    total = total
+        .checked_add(List::<Subject>::worst_case(limits.objects)?)?
+        .checked_add(List::<Id<Watching>>::worst_case(limits.watches)?)?;
+    total.checked_add(List::<jig_client::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
 }
 #[must_use]
-pub const fn max_out(_limits: &Limits) -> u32 {
-    4
+pub fn max_out(limits: &Limits) -> u32 {
+    checked_max_out(limits).expect("side output capacities are checked")
+}
+pub(crate) fn checked_max_out(limits: &Limits) -> Option<u32> {
+    limits.objects.checked_mul(6)?.checked_add(limits.watches.checked_mul(2)?)?.checked_add(16)
+}
+
+fn read_result(side: &mut Side, env: &Env<Limits>, read: Token, result: ReadResult, out: &mut Queue<Request>) {
+    let id = Id::from_token(read);
+    let Some(reading) = side.reads.get_mut(id) else {
+        return;
+    };
+    if !reading.live {
+        return;
+    }
+    reading.live = false;
+    let subject = reading.subject;
+    let party = reading.party;
+    side.reads.retire(id);
+    let Some(object) = side.find(subject) else {
+        return;
+    };
+    let object = side.objects.get_mut(object).expect("named object exists");
+    if object.read != Some(id) {
+        return;
+    }
+    object.read = None;
+    if side.party != Some(party) {
+        acquire(side, env, subject, out);
+        return;
+    }
+    match result {
+        ReadResult::Value(document) => received(side, env, subject, document, out),
+        ReadResult::Unknown => unknown(side, subject),
+        ReadResult::Busy => full(out),
+        ReadResult::SignedOut => out.push(Request::Out(Out::Fact { fact: Fact::SignedOut })),
+    }
+}
+
+fn watch_event(side: &mut Side, env: &Env<Limits>, watch: Token, event: WatchEvent, out: &mut Queue<Request>) {
+    let id = Id::from_token(watch);
+    if side.watch_ids.get(&id).is_none() {
+        return;
+    }
+    let Some(watching) = side.watches.get_mut(id) else {
+        return;
+    };
+    if watching.state == Following::Closing {
+        return;
+    }
+    let subject = watching.subject;
+    watching.state = Following::Live;
+    match event {
+        WatchEvent::Opened | WatchEvent::Alive => {}
+        WatchEvent::Delivered(document) => received(side, env, subject, document, out),
+    }
+}
+
+fn answered(side: &mut Side, _env: &Env<Limits>, request: Token, answer: Answer, _out: &mut Queue<Request>) {
+    let id = Id::from_token(request);
+    if let Some(pending) = side.pending.get_mut(id) {
+        if !pending.live {
+            return;
+        }
+        let object = pending.object;
+        pending.live = false;
+        side.pending.retire(id);
+        if let Some(object) = side.objects.get_mut(object) {
+            object.card = match &answer {
+                Answer::Touched { .. } => Card::Done { answer: answer.clone() },
+                Answer::Moved { .. } | Answer::Gone => Card::Refused { answer: answer.clone() },
+            };
+            side.changed();
+        }
+    }
+}
+
+fn progress_changed(
+    side: &mut Side,
+    env: &Env<Limits>,
+    request: Token,
+    progress: RequestProgress,
+    out: &mut Queue<Request>,
+) {
+    let id = Id::from_token(request);
+    if let Some(pending) = side.pending.get_mut(id) {
+        if !pending.live {
+            return;
+        }
+        let object = pending.object;
+        if let Some(object) = side.objects.get_mut(object) {
+            object.card = match progress {
+                RequestProgress::Unknown => Card::Unknown,
+                RequestProgress::InFlight | RequestProgress::Retrying | RequestProgress::Parked => {
+                    Card::Deciding { request, progress }
+                }
+            };
+            side.changed();
+        }
+        if progress == RequestProgress::Unknown {
+            side.pending.get_mut(id).expect("pending exists").live = false;
+            side.pending.retire(id);
+            if let Some(object) = side.objects.get_mut(object) {
+                object.value = Value::Loading;
+                let subject = object.subject;
+                acquire(side, env, subject, out);
+            }
+        }
+    }
+}
+
+fn part_fits(part: &Part, text: u32) -> bool {
+    match part {
+        Part::Resource { path, .. } => path.fits(text),
+        Part::Connector { .. }
+        | Part::Kind { .. }
+        | Part::Panel { .. }
+        | Part::Result { .. }
+        | Part::Effect { .. }
+        | Part::Hold { .. }
+        | Part::Project { .. }
+        | Part::Deployment { .. } => true,
+    }
 }

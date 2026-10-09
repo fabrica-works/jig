@@ -303,6 +303,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         )
         | None => return,
     };
+    let project = task.project;
     let executor = task.chip.executor;
     let phase = task.chip.phase;
     let values = parts(task, section, env.limits.parts.saturating_add(1));
@@ -313,7 +314,11 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
             break;
         }
         emitted = emitted.saturating_add(1);
-        out.push(Request::ShowPart { part, generation: domain.generation });
+        out.push(Request::ShowPart {
+            part,
+            generation: domain.generation,
+            scope: contract::PartScope::Project(project),
+        });
     }
     if section == TaskSection::Plan {
         if crate::pages::conversations::live(phase) {

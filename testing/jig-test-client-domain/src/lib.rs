@@ -7,6 +7,7 @@ extern crate alloc;
 pub mod address;
 pub mod boundary;
 pub mod domain;
+pub mod family;
 pub mod first;
 pub mod limits;
 pub mod owner;

@@ -40,6 +40,10 @@ pub enum Event {
     Watch { watch: Token, event: WatchEvent },
     /// The one terminal of a watch.
     Ended { watch: Token, end: WatchEnd },
+    /// An application page names jig objects for the current page generation.
+    ShowObjects { objects: List<crate::contract::ObjectKey> },
+    /// The application page stopped naming jig objects.
+    ObjectsLeft,
     /// A keyed request envelope ended the sign in.
     SignedOut,
     /// A sibling requests the current frame within this step.
@@ -68,7 +72,7 @@ pub enum Request {
     /// Sign in and come back to an address.
     SignIn { provider: u16, back: Address },
     /// Have the part owner show its value.
-    ShowPart { part: Part, generation: u32 },
+    ShowPart { part: Part, generation: u32, scope: crate::contract::PartScope },
     /// The old page no longer shows its parts.
     PartsLeft { generation: u32 },
     /// Tell siblings and the table the shared link.

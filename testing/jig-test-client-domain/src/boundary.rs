@@ -44,6 +44,7 @@ pub enum JigOut {
 pub enum Fact {
     Jig(jig_client::facts::Fact),
     TableFull,
+    PartsFull,
     InvalidRecord,
     InvalidAnswer,
     UnknownConnector,

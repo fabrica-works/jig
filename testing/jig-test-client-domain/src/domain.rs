@@ -21,7 +21,7 @@ pub fn new(limits: &Limits, seed: u64) -> Domain {
     Domain {
         jig: jig_client::Domain::new(&limits.jig, rng.next_u64()),
         first: first::Side::new(&limits.first, rng.next_u64()),
-        second: crate::second::Side::new(limits.second_parts, rng.next_u64()),
+        second: crate::second::Side::new(limits.second_parts, limits.first.text, rng.next_u64()),
         table: RequestTable::new(&limits.table, rng.next_u64()),
     }
 }
@@ -46,6 +46,9 @@ pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(jig_client::max_out(&env.limits.jig));
     jig_client::fire(&mut root.jig, &route::jig_env(env), &mut child);
     route::route_jig(root, env, &mut child, out);
+    let mut child = Queue::with_capacity(first::max_out(&env.limits.first));
+    first::fire(&mut root.first, &Env { now: env.now, wall: env.wall, limits: env.limits.first }, &mut child);
+    route::route_first(root, env, &mut child, out);
     root.table.fire(env.now, env.wall);
 }
 #[must_use]
@@ -84,6 +87,7 @@ pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     root.table.reclaim();
     jig_client::reclaim(&mut root.jig);
+    first::reclaim(&mut root.first);
 }
 #[must_use]
 pub fn shown(root: &Domain) -> u64 {

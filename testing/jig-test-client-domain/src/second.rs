@@ -7,6 +7,7 @@ pub struct Side {
     link: Link,
     party: Option<u64>,
     shown: u64,
+    text: u32,
 }
 #[derive(Debug)]
 struct Held {
@@ -15,8 +16,8 @@ struct Held {
 }
 impl Side {
     #[must_use]
-    pub fn new(capacity: u32, _seed: u64) -> Self {
-        Self { parts: List::with_capacity(capacity), link: Link::Starting, party: None, shown: 0 }
+    pub fn new(capacity: u32, text: u32, _seed: u64) -> Self {
+        Self { parts: List::with_capacity(capacity), link: Link::Starting, party: None, shown: 0, text }
     }
     #[must_use]
     pub const fn link(&self) -> Link {
@@ -34,10 +35,32 @@ impl Side {
         self.party = party;
         self.changed();
     }
-    pub(crate) fn show(&mut self, part: Part, generation: u32) {
-        if self.parts.push(Held { part, generation }).is_ok() {
-            self.changed();
+    pub(crate) fn show(&mut self, part: Part, generation: u32) -> bool {
+        match &part {
+            Part::Resource { path, .. } => {
+                if !path.fits(self.text) {
+                    return false;
+                }
+            }
+            Part::Connector { .. }
+            | Part::Kind { .. }
+            | Part::Panel { .. }
+            | Part::Result { .. }
+            | Part::Effect { .. }
+            | Part::Hold { .. }
+            | Part::Project { .. }
+            | Part::Deployment { .. } => {}
         }
+        for held in &self.parts {
+            if held.part == part && held.generation == generation {
+                return true;
+            }
+        }
+        if self.parts.push(Held { part, generation }).is_err() {
+            return false;
+        }
+        self.changed();
+        true
     }
     pub(crate) fn left(&mut self, generation: u32) {
         let capacity = self.parts.capacity();
