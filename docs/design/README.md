@@ -61,8 +61,8 @@ go deeper into each part. The mechanics are those of skein's
   In each case the application's root composes jig's part with its own,
   in its domain and in its protocol layer.
 - **The core never depends on smith.** Only jig's agent hosts, and the
-  client's view of conversations, link smith. An application without
-  agents never does.
+  client's decoding of turns below its domain, link smith. An
+  application without agents never does.
 - **Flexibility and orthogonality over convenience.** An application
   writes some predictable code to wire jig in. Agents write such code
   well, and getting it wrong cannot break a promise silently.
@@ -179,7 +179,8 @@ application root    routing between its children, translation; its store, channe
   - **accounts**: the LLM credentials;
   - **brief**: a run's context, in typed sections within a byte budget;
   - **notes**: what agents learn, in scopes;
-  - **views**: live streams to watchers.
+  - **views**: parties' watches, each delivered its subject's current
+    document as it changes.
 - **Agents are optional.** An application without them configures no
   charters. The batch check then refuses tasks with agent executors, and
   the fleet and accounts stay idle.
@@ -273,9 +274,12 @@ step(root, event):
 store answers n → journal.committed(n) → the outputs held for n leave, in order
 ```
 
-Outputs that decide nothing leave through one explicit door of the
-journal, untagged, so review finds every use. These are facts streamed
-to watchers and answers to a run's read tools.
+Outputs that decide nothing and show nothing durable leave through one
+explicit door of the journal, untagged, so review finds every use. These
+are a run's text streamed to watchers as it is written, and answers to a
+run's read tools. What parties read and watch shows state, so it is
+held like any other output (`client/domain/contract.md`, sections 6 and
+7).
 
 ### 6.4 Ordering belongs to the core
 
@@ -467,24 +471,36 @@ and the conformance world crashes the application at every commit.
 
 ## 10. The client
 
-- **jig's part:**
+- **jig's part** (`client/domain/`):
   - the client domain over the primitives: tasks as a tree,
-    conversations, a person's inbox, proposals, escalations, questions,
-    person tasks, results and live runs, with the pending keyed requests,
-    pages and streams;
+    conversations, a party's inbox, proposals, escalations, questions,
+    person tasks, results and live runs, with pages, the link, and what
+    a page reads and watches;
   - the wire documents for these;
-  - their views, conversations among them, rendered with smith's
-    transcript crate, which is the client's only use of smith;
+  - their views, conversations among them, whose turns are decoded with
+    smith's transcript crate below the domain, the client's only use of
+    smith;
   - shells: the browser's, and a native one on skein's HTTP client for
     Linux and the worlds;
   - the fake person, who reads the view tree by role, name and text.
 - **The application's part:**
-  - its own kinds of object, as children of its client root;
+  - its own kinds of object, families, as children of its client root;
   - their wire documents and their views.
 
   The client root composes these with jig's client domain, under the
-  same rule as the engine's: the root routes, and jig's client domain
-  keeps the invariants of pending requests and pages.
+  same rule as the engine's: the root routes, and never decides or
+  orders.
+- **The same rails as the engine's,** made for a client:
+  - **a barrier in skein-lib:** every keyed request leaves through
+    skein-lib's request table, which keeps it in the client's small store
+    before it is sent, and sends it again under its key until its answer
+    is durable, as the journal keeps the engine's outputs;
+  - **the owner keeps the value:** jig's documents carry jig's values,
+    and name an application's as parts, which jig's pages show in slots
+    the application's children fill;
+  - **views are level-triggered:** a watch delivers its subject's current
+    document whenever it changed, one delivery in flight, so nothing is
+    queued and nothing missed.
 - **Any client, on any platform:** a browser through wasm32, a phone, a
   desktop application on Linux, macOS or Windows, a command-line tool, or
   another service.
@@ -496,10 +512,11 @@ and the conformance world crashes the application at every commit.
     gets back whole bodies and whole stream events. A shell may use the
     browser's fetch, the operating system's own HTTP stack, or skein's
     HTTP client, whose io is Linux's. Each shell is small.
-  - **The view is optional.** The view tree suits graphical clients. A
+  - **The view is optional.** The view tree is semantic, shaped as an
+    accessibility tree, and each shell maps it onto its platform. A
     command-line tool may want a text view of its own. A service may use
     the domain and the protocol only: keyed requests sent again until
-    durable, streams and paging.
+    durable, watches and paging.
 - **Clients that are not people.** Every party today is a person who
   signed in, with a role in a project. A service acting through a client
   needs an identity and a role too: a service is a party of its own kind
@@ -520,7 +537,8 @@ and the conformance world crashes the application at every commit.
 | the engine's protocol layer, `iterate` and `main` | the application, from jig's and skein's pieces |
 | agents' hosts: the hub, the inline agent, the charter's translation / the worker's root, kinds of workspace, `main` (none without agents) | jig / the application |
 | the agent / its charters | smith / the application |
-| the client domain, views, wire and shells / its own objects and its client root | jig / the application |
+| the client domain, views, wire and shells / its families and its client and view roots | jig / the application |
+| the request table | skein (skein-lib) |
 | the conformance world, the referee, scripted workers and people, the fake person / its worlds and its systems' fakes | jig / the application |
 
 Before code, an application writes its connectors' vocabularies and
@@ -540,8 +558,10 @@ application as its first user.
   connectors, the core, the application's root, parties, hosts, and
   testing. Its `README.md` gives the reading order and the names, and
   the decisions it took on what this document left open.
-- **`client/domain/`:** the client's domain, its views and its wire, to
-  be designed.
+- **`client/domain/`:** the client's domain: what a client holds, the
+  application's client root, jig's pages and cards, the contract with
+  the engine, the view, and testing. Its `README.md` gives the reading
+  order, the names, and the decisions it took.
 - **examples.md:** the example application, `ops`, and the reference
   root.
 - **Below the domain,** to come with the protocol layers: the store's
@@ -563,9 +583,9 @@ application as its first user.
 ## 14. Open questions
 
 The domain's design took decisions on most of what this document left
-open (`domain/README.md`, section 5). What remains here:
+open (`domain/README.md`, section 5), and the client's on how jig's
+pages show an application's objects (`client/domain/README.md`,
+section 5). What remains here:
 
-- **The client's pages:** how jig's pages show an application's objects,
-  for example as one kind of card per family (`client/domain/`).
 - **Versioning:** how jig is released and pinned, and how a change to its
   vocabulary reaches every application.

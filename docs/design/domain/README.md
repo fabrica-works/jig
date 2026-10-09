@@ -4,8 +4,8 @@ Provisional, 2026-10-07. The design of jig's domain layer: the core an
 application's engine composes, the contract its connectors meet, what
 its root does, where its agents run, and how all of it is tested. jig as
 a whole, and why it is a kit, is `../README.md`; the client's domain is
-yet to be designed (`../README.md`, section 10). The mechanics are those
-of skein's `programming-model.md`.
+`../client/domain/`, designed separately. The mechanics are those of
+skein's `programming-model.md`.
 
 ## 1. Reading order
 
@@ -49,7 +49,7 @@ an application's engine
 │   ├── jig-core-accounts       LLM accounts
 │   ├── jig-core-brief          briefs
 │   ├── jig-core-notes          notes
-│   └── jig-core-views          live streams
+│   └── jig-core-views          parties' watches
 ├── <connector>…                the application's (connectors.md)
 ├── jig-host                    hosted runs on the engine's slots, if it runs agents (hosts.md)
 ├── jig-inline-agent            their agent: smith's domains in this process
@@ -225,6 +225,34 @@ where each is answered:
   the inline agent in the engine), its link to the core its root's. The
   run's lifecycle is built and tested once (hosts.md, sections 1 and 4
   to 6).
+- **Level-triggered views:** a watch delivers its subject's current
+  document, one delivery in flight, changes coalesced, never queued; only
+  a run's text as it is written is a stream, from an offset; an
+  application's subjects are watched the same way (engine.md,
+  section 11). This and what follows are what the client's design asks
+  of the domain (`../client/domain/contract.md`, section 9).
+- **What a party reads is durable:** a read's answer and a watch's
+  delivery wait for the last commit made before them (engine.md, 5.2).
+  What marks a watch changed is named by each commit (engine.md,
+  section 11).
+- **The inbox across projects,** its read positions (one over results,
+  one per chat) moved by an explicit request (people.md, section 6).
+- **Decisions name what they saw:** a release names its hold's revision,
+  an amendment its task's spec's, a person task's answer its own; each
+  moves only when that thing changes, and a decision whose revision
+  moved is refused as moved (people.md, 5.1).
+- **One request per act:** words that release a stopped chat; an
+  amendment that releases; closing a chat with its delegates'
+  disposals; an uncertain effect's release saying whether to make it
+  again (people.md, 5.1).
+- **Refusals with facts,** and **acts offered** in each object's
+  document, so a client never computes authority
+  (`../client/domain/contract.md`, sections 4 and 5).
+- **An application's keyed requests** kept by the people child as jig's
+  are, their outcomes by their connector (people.md, 5.1;
+  connectors.md, 5.5).
+- **A task's activity kept** in commit order, the words parties wrote
+  among it (engine.md, 7.2).
 
 ## 6. What is open
 

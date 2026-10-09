@@ -19,18 +19,21 @@
   module or type level, never stamped on every field.
 - **Every crate of jig is step code under the strict subset** of
   programming-model.md, section 10, except jig's test kits, which are
-  ordinary Rust like every world. jig defines no traits and no generic
+  ordinary Rust like every world, and the client's shells, which are
+  ordinary Rust like skein's shell. jig defines no traits and no generic
   items in step code. A mechanism that must be generic, such as the
-  journal (`README.md`, 6.2), belongs in skein-lib, and goes there before
-  its jig consumer.
+  journal (`README.md`, 6.2) or the client's request table
+  (`client/domain/root.md`, section 4), belongs in skein-lib, and goes
+  there before its jig consumer.
 - **jig owns every invariant it promises.** An application's root only
   routes and translates (`README.md`, section 6). A change that would
   make an application's root decide or order something is a change to
   jig's design first.
 - **The core never depends on smith.** Only the inline agent, the
-  charter's translation into smith's terms and the client's view of
-  conversations do; the hub, `jig-host`, does not. An application without
-  agents never links smith (`README.md`, section 9).
+  charter's translation into smith's terms and the client's decoding of
+  turns, below its domain, do; the hub, `jig-host`, and the client's
+  domain and view do not. An application without agents never links
+  smith (`README.md`, section 9).
 - **No system is named in jig's code:** no forge, repository, branch, pull
   request, issue or git. Systems are an application's connectors.
 - **Work locally,** on isolated branches merged with `--ff-only`. Do not

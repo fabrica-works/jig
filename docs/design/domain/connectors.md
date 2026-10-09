@@ -341,6 +341,25 @@ goal's changes, or the alerts on the services an incident's
 remediations touched. The core subscribes each goal to them as its
 subtree names resources (core.md, 6.2).
 
+### 5.5 What clients see of it
+
+A connector's values reach a party's client in the application's own
+documents, beside jig's (`../client/domain/contract.md`, section 5):
+
+- **its subjects,** which parties watch as they watch jig's: the
+  connector marks each changed, through the root, as its state changes,
+  and makes its document when the views make a delivery
+  (engine.md, section 11);
+- **its parts,** which jig's documents name by reference (a resource, a
+  kind, a task's panel, a proposed effect, a hold's account), read and
+  followed by its side of the application's client;
+- **its keyed requests:** a request about one of its own objects comes
+  to it through the root, keyed by the people child; it decides it
+  within the decision, asks the core for what it needs on the party's
+  behalf, and keeps its outcome under the people child's token, durably,
+  for the retention, to give again when the request is sent again
+  (people.md, 5.1).
+
 ## 6. Procedures
 
 ### 6.1 What a procedure is

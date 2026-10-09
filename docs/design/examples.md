@@ -48,13 +48,13 @@ examples/ops/domain                   jig-ops-domain                   the engin
 examples/ops/domain-observability     jig-ops-domain-observability     the observability connector
 examples/ops/domain-infrastructure    jig-ops-domain-infrastructure    the infrastructure connector
 examples/ops/client-domain            jig-ops-client-domain            the client's root: jig's client domain, incidents, environments
-examples/ops/client-view              jig-ops-client-view              the views of incidents and environments
+examples/ops/client-view              jig-ops-client-view              the view root: jig's view, and incidents' and environments'
 testing/jig-ops-fake-production       jig-ops-fake-production          the fake production: services, quotas, logs, metrics
 tests/ops                             jig-ops-world                    its worlds, on jig's conformance world
 ```
 
-The client's crates come with jig's client domain (`README.md`,
-section 10); the protocol layers, `iterate` and `main` with a real
+The client's crates come with the building of jig's client
+(`client/domain/`); the protocol layers, `iterate` and `main` with a real
 backend (section 9). Until then `ops` is its domains and its worlds, as
 an application is before its protocol layer (`README.md`, section 11).
 
@@ -282,11 +282,23 @@ Q, a developer
 
 ## 8. Its client
 
+Its client root is the reference client root (`client/domain/root.md`,
+section 12):
+
 - **jig's pages,** for tasks, conversations, proposals and a person's
-  inbox, plus two kinds of object of its own:
-  - incidents: their state, their timeline, the service's health;
-  - environments: their pool, their cost, their end.
-- **A person in the worlds** is jig's fake person, reading the view tree.
+  inbox, with the inbox as home, plus two families of its own:
+  - incidents: their state, their timeline, the service's health, and
+    their lead task's chip, proposals and plan, as jig's cards;
+  - environments: their pool, their cost, their end, and a request to
+    move the end, keyed like jig's.
+- **Its parts in jig's slots:** infrastructure's panels for remediate and
+  provision tasks, its words for a proposed restart, its account of
+  drift ("deleted by hand"); both connectors' resources and kinds in
+  words (`client/domain/root.md`, section 6).
+- **A person in the worlds** is jig's fake person, reading the view tree:
+  P accepting a restart from an incident's page
+  (`client/domain/pages.md`, section 10); Q asking for an environment in
+  a chat, and accepting what it costs.
 - **A terminal client** later, to show a client that is not a browser
   (`README.md`, section 10).
 

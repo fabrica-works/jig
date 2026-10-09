@@ -46,8 +46,8 @@ and 8. What is still open is listed in section 12.
 - **The core never depends on smith.** It keeps turns as bytes and its
   charter in its own terms. One translation of jig's puts them into
   smith's, for workers and the engine alike (section 8). Only the hosts'
-  agent capabilities, that translation, and a client's view of
-  conversations link smith.
+  agent capabilities, that translation, and a client's decoding of turns
+  (`../client/domain/client.md`, section 10) link smith.
 - **Committed turns survive.** Turns and answers are kept until the core
   acknowledges them, once committed, and sent again after every hello.
   What a host loses before it was committed (its turns, when a worker

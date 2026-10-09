@@ -509,8 +509,9 @@ wiring, to these, seen from outside (testing.md):
   none is.
 - **Nothing ahead of its commit.** Nothing a party was answered, a host
   was assigned or acknowledged, or a system was asked to do, depended on
-  state the store did not keep. What people watch live may run ahead of
-  it, as views are best effort.
+  state the store did not keep. What people read and watch waits for the
+  commits it shows; only a run's text, as it is written, runs ahead of
+  the store, and is marked provisional.
 - **Order.** A task starts only after its dependencies are done and
   closed; one run at most writes a resource at a time; a pool admits no
   holder beyond the slots it is known to have, and one that shrank admits

@@ -6,8 +6,8 @@ do, what they ask of the engine and what waits for them, the chats they
 hold with agents, the tasks they carry out themselves, and how they hear
 of what waits. Parties are requesters and executors, as tasks are
 (core.md, section 9); this document is that party in depth. The clients
-they use are jig's client and the application's (`../README.md`,
-section 10). What is still open is listed in section 12.
+they use are jig's client and the application's (`../client/domain/`).
+What is still open is listed in section 12.
 
 ## 1. In one page
 
@@ -47,8 +47,8 @@ capability. It keeps:
   until answered;
 - **inboxes:** for each party with something waiting, what waits, by
   reference to the task or proposal it is (section 6);
-- **live connections,** to which it pushes what changes in their
-  inboxes, through the views (engine.md, section 11).
+- **live watches** of their frames and inboxes, which the views deliver
+  as they change (engine.md, section 11).
 
 It knows nothing of tasks beyond their numbers and what the core tells
 it waits for whom; every request goes to the core, which routes it to
@@ -122,25 +122,39 @@ answered once durable (engine.md, 5.2):
 |---|---|---|
 | start a chat | a person, member | a task with a chat's charter, its requester the person, its budget the role's default for chats (section 7) |
 | set a goal | member, within their allotment; beyond it, a proposal | a tracked task, with the charter or procedure, budget and priority asked for |
-| write to a task | the task in their tree, or maintainer | words in its inbox (tasks.md, 8.1) |
-| answer | addressed to them or their role | an answer to a question, or a person task's result (section 8) |
+| write to a task | the task in their tree, or maintainer | words in its inbox (tasks.md, 8.1); a chat the person stopped released too, if they ask, in the same request |
+| answer | addressed to them or their role; a person task's revision as they saw it | an answer to a question, or a person task's result (section 8) |
 | decide a proposal or an escalation | waiting for them, as the requester of its tree or in a role the policy names | accepted, if their authority covers it; rejected, with a reason; or passed up (tasks.md, section 9) |
-| amend, cancel, release | the task in their tree, or maintainer | tasks.md, sections 5 and 7 |
+| amend, cancel, release | the task in their tree, or maintainer; for an amendment or a release, the revision they saw | tasks.md, sections 5 and 7; an amendment and a release as one request, if they ask; for an effect held uncertain, whether to make it again |
+| close a chat | the person its requester | each live delegate cancelled or made theirs, as they say; the chat asked to finish, and cancelled after a grace (section 7) |
 | make themselves a task's requester | they may amend it | tasks.md, section 7 |
 | stop a run | the task in their tree, or maintainer | its run cancelled and its task held for a party's stop |
 | prioritise goals | maintainer | the goals' priorities amended |
 | adopt a resource; change the policy, roles or services | owner | the project changed (5.2) |
 | edit or delete a note | the note's scope within their role | the note revised (engine.md, section 10) |
-| watch | observer | a live view (engine.md, section 11) |
+| take or hand back a person task | addressed to a role they hold | held by them, so no other answers it; or back to the role (section 8) |
+| set a party's pool | owner | the pool opened or resized in the current period, what was spent and reserved kept |
+| mark seen | the party themselves | their read position moved over results, or over one chat's replies (section 6) |
 
-- **A request refused** says why: the role, the authority it lacked, a
-  limit, a task since ended.
+- **A request refused** says why, with its facts: the role, the
+  authority it lacked and by how much, and whether a proposal could be
+  accepted; a limit; the object's revision since; a task since ended
+  (`../client/domain/contract.md`, section 4).
+- **A decision names what it saw.** A release, an amendment and a person
+  task's answer carry the revision the party was shown; one whose object
+  has changed since is refused as moved, saying what it is now.
 - **Two parties deciding one thing:** the first commit decides; the
   second is told it was decided, by whom, and how.
 - **Requests about an application's own objects** (an environment's end
   moved, an incident's page) are the application's: its client sends
   them, its root routes them to the connector they concern, and what they
-  change in the core is a request of the table above.
+  change in the core is a request of the table above. This child keeps
+  them by key as it keeps its own: admitted on the party's sign-in and
+  role, joined when sent twice, and their answer, the connector's
+  outcome, kept under the key by token.
+- **A watch is not a request:** it decides nothing and keeps no answer.
+  It is admitted on the party's sign-in and on what their role lets them
+  see, and ends when they leave (engine.md, section 11).
 
 ### 5.2 The project itself
 
@@ -155,8 +169,8 @@ in flight stopped cancels it.
 
 ## 6. A party's inbox
 
-What waits for a party, newest first, each entry naming the task or
-proposal it is:
+What waits for a party, across every project they hold a role in, each
+entry naming the task or proposal it is and its project:
 
 - **questions** from tasks they asked for, chats included;
 - **proposals** routed to them, or to a role they hold;
@@ -169,12 +183,18 @@ proposal it is:
 - **Derived from the tasks,** not kept apart: an entry is there while its
   proposal is pending, its person task is active, its question is
   unanswered, or its result unread. The only state of the inbox's own is
-  each party's read position over results and replies, committed when
-  they read.
+  each party's read positions, one over results and one per chat over its
+  replies, moved by their request to mark what they have seen (5.1),
+  never by a page being read.
+- **Across projects,** since a party who works in several decides in one
+  place; a client filters it by project (`../client/domain/pages.md`,
+  section 3).
 - **What is addressed to a role** is in the inbox of every party holding
   it, until one of them acts, when it leaves every one.
 - **Bounded:** the people child domain holds each party's entries up to a
-  limit; a client pages through the rest, loaded from the store.
+  limit; a client pages through the rest, loaded from the store. What
+  needs the party is counted exactly, since it is derived from live
+  tasks; updates unread are counted up to a limit.
 
 ## 7. Chats
 
@@ -218,7 +238,7 @@ A task whose executor is a party, or a role (core.md, 3.2):
 ## 9. Notifications
 
 - **In a client,** live: a signed-in party's inbox changes reach their
-  open connections through the views, as they commit.
+  open watches through the views, once their commits are durable.
 - **Beyond the client:** a page to the person on call, a mail, a chat
   system's message, each as a connector of the application's whose
   effects are messages to parties, keyed and made once like any other
@@ -229,13 +249,14 @@ A task whose executor is a party, or a role (core.md, 3.2):
 
 What a client's protocol layer, on the engine's side, owes this domain:
 
-- **Requests and pages** over HTTP, **live streams** for views and
-  inbox changes, as jig's client documents and the application's.
+- **Requests, reads and watches,** as jig's client documents and the
+  application's, over one connection per client
+  (`../client/domain/contract.md`, section 10).
 - **Signing in:** each provider's exchange, the sign-ins' tokens held by
   the protocol layer, named in the domain by a sign-in's number;
   services' credentials issued and checked there.
-- **Rendering** what the domain carries as bytes: transcripts' turns,
-  results, specs.
+- **Turns** carried as the bytes the domain keeps, for the client's
+  protocol layer to decode (`../client/domain/client.md`, section 10).
 - **Keys** for requests, made by the client, carried with each request.
 
 ## 11. The world
@@ -261,7 +282,10 @@ their task, or the task ends.
   system as the person who gave it, with the credential they signed in
   with, so that the system's own protection requires it independently.
   It needs that credential kept, which today is dropped.
-- **People across projects:** a deployment-wide view of every inbox a
-  party has, and roles that span projects.
+- **Who may see what** among a project's parties: whether a chat and its
+  transcript are its person's alone, or their role's, or the project's;
+  what an observer reads. Today a role in the project lets a party watch
+  and read all of it.
+- **Roles that span projects,** now that the inbox does.
 - **Guests:** someone with no identity at any provider, invited to one
   chat.

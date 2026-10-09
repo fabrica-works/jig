@@ -78,7 +78,7 @@ jig-core                    the core: routing among its children, runs, calls, t
 ├── jig-core-accounts       LLM accounts: refreshing, granting
 ├── jig-core-brief          a run's brief, from typed sections and connectors' sized ones, within a budget
 ├── jig-core-notes          notes: scopes, entries, indexes
-└── jig-core-views          live streams out
+└── jig-core-views          parties' watches, level-triggered
 ```
 
 The tree follows programming-model.md, 4.5: each child domain has its
@@ -223,10 +223,15 @@ commit it follows from:
   requests;
 - **messages relayed to a live run,** so a run never reads what a
   restart would not have;
-- **loads,** so a load sees every commit before it.
+- **loads,** so a load sees every commit before it;
+- **what parties read and watch:** a read's answer and a watch's
+  delivery decide nothing, but are made from state that may run ahead of
+  the store, so each waits for the last commit made before it, as an
+  output of a decision with no commit of its own (section 11).
 
-What decides nothing waits for nothing: facts streamed to watchers
-(section 11), and the answers to a run's reads.
+What decides nothing and shows nothing durable waits for nothing: a
+run's text streamed to watchers as it is written (section 11), and the
+answers to a run's reads.
 
 ### 5.3 Loads
 
@@ -238,6 +243,10 @@ What decides nothing waits for nothing: facts streamed to watchers
   a party's page.
 - **Bounded:** the loads in flight, and the bytes a load brings, are
   limits; a load past its bytes is cut, and says how much.
+- **Parties' reads** are documents and pages the client's contract lists
+  (`../client/domain/contract.md`, section 6): from live state where the
+  engine holds it, loaded otherwise, and answered once the last commit
+  made is durable (5.2).
 
 ### 5.4 What the store keeps of the core
 
@@ -250,7 +259,7 @@ What decides nothing waits for nothing: facts streamed to watchers
 | tasks: every field of tasks.md, section 3, holds and their queues, writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
 | calls committed since each live task's last turn, by attempt and name, with the core's part of their answers | the core | with their task |
 | funders' numbers: each party's pool and each project's spend, per period | tasks | at start |
-| a task's history: made, amended, held, released, cancelled, by whom, why | tasks | on demand |
+| a task's history: made, amended, held, released, cancelled, by whom, why; and its activity: words written to it, runs begun and ended, what it heard (7.2) | tasks | on demand |
 | inboxes: messages not yet taken | tasks | with their task |
 | proposals: pending, and decided ones' outcome | tasks | pending ones at start |
 | transcripts: turns, with their spend | the core | to resume; on demand |
@@ -391,6 +400,11 @@ When an agent task is due (tasks.md, 5.2), the core:
 ### 7.2 Transcripts
 
 - **A transcript belongs to its task,** whichever runs added to it.
+- **Beside it, the task's activity:** the words parties wrote to it as
+  they wrote them, its runs' beginnings and ends, the results and news it
+  heard and the decisions made about it, kept in the order they
+  committed, so a client reads a conversation whole after its words have
+  been taken from the inbox (`../client/domain/contract.md`, section 6).
 - **Committed turn by turn.** A run sends each turn up as it ends: what
   the LLM said and the calls it made, their results, what it spent, and
   the last inbox message it read. The core commits the turn with its
@@ -584,22 +598,45 @@ prefers. The notes child domain knows scopes, entries and indexes:
 
 ## 11. Views
 
-The views child domain streams what runs report, and what tasks do, to
-the parties watching:
+The views child domain keeps parties' watches, and paces what each is
+delivered. What a watch shows, and what a client reads, is the client's
+contract (`../client/domain/contract.md`, sections 5 to 7).
 
-- **Watches:** a run (its streaming text, its tool calls, its turns as
-  they commit), a task's tree (phases as they change), a project's goals,
-  a party's inbox. A watch starts from a snapshot the core gives,
-  delivered first.
-- **A slow watcher never holds the engine up:** one delivery in flight, a
-  bounded backlog, what overflows dropped and the watcher told.
-- **Nothing is stored:** what runs report as it happens is for watching
-  only.
+- **Watches:** the frame of a party (who they are, their projects, what
+  needs them); a task; a task's tree; a party's inbox, across projects; a
+  project's goals; a party's conversations; a task's live run; the
+  deployment; and an application's own subjects, through the root to the
+  connector that owns them.
+- **Level-triggered,** as facts are (core.md, section 4). A delivery is
+  the subject's whole current document, within the watch's window, made
+  by the subject's owner when the delivery is made: the core, or a
+  connector through the root. A watch has one delivery in flight; a
+  change meanwhile marks it, and the next delivery, once the watcher has
+  taken the last, is made from the state as it is then. Changes in
+  between are coalesced, never queued.
+- **A slow watcher never holds the engine up,** and is never told it
+  missed anything: it sees fewer deliveries. What the views child keeps
+  per watch is its subject, its window, and two marks: a delivery in
+  flight, and a change since. Nothing grows.
+- **Marked by commits:** each decision's commit names the tasks, projects
+  and parties it touched, and the views mark the watches they concern: a
+  task's own, the trees along its lineage, chips naming it, its
+  project's goals, its requester's conversations, and the frames and
+  inboxes of parties whose entries changed. A connector marks its own
+  subjects (connectors.md, 5.5).
+- **Durable before shown:** a delivery waits for the last commit made
+  before it, as every read's answer does (5.2).
+- **A run's text as it is written** is the one stream: kept per live run
+  being watched, within a bound, named by the turn the host reports it
+  for, and delivered from the offset each watcher has; never stored, and
+  marked provisional. It decides nothing and leaves at once (5.2). A
+  committed turn reaches a client through the task's activity, read
+  (7.2).
 - **History is the store's.** What a client shows of the past (a task's
-  results, its transcript, a plan's revisions and why) is loaded (5.3),
+  results, its activity, a plan's revisions and why) is read (5.3),
   paged, never held.
 
-Nothing the core decides depends on a fact or a view arriving.
+Nothing the core decides depends on a view arriving.
 
 ## 12. Accounts
 
@@ -652,7 +689,7 @@ protocol layer, which composes jig's pieces with its own:
 - **Connectors:** each its own protocol, the application's.
 - **Parties:** a client protocol carrying jig's documents and the
   application's, with sign-in by the application's providers
-  (people.md, section 10).
+  (people.md, section 10; `../client/domain/contract.md`, section 10).
 - **Accounts:** OAuth refreshes with the LLM providers.
 - **Configuration:** the deployment's rules, connectors and their
   systems' addresses and credentials, LLM endpoints, accounts and models'
