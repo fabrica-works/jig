@@ -20,6 +20,7 @@ fn batch(world: &mut World, task: u64, period: u64, child: u64) {
     world.send(Event::TickRecurring { task, period });
     world.send(Event::RecurringBatch { task, period, numbers: Box::new([child]) });
     assert_eq!(world.record(child).funder, Funder::Recurring { project: 1, task, period });
+    assert_eq!(world.record(task).recurring.as_ref().expect("template").last_batch.as_ref(), [child]);
 }
 
 #[test]
@@ -37,12 +38,17 @@ fn a_recurring_task_continues_across_a_period_reset() {
         tasks::End::Finished { result: tasks::TaskResult::Report { words: Box::new([1]) }, cancel_delegates: false },
     );
     world.settle(10);
+    assert!(world.record(9).delegates.is_empty());
+    assert_eq!(world.record(9).recurring.as_ref().expect("template").last_batch.as_ref(), [10]);
+    world.restart();
+    assert_eq!(world.record(9).recurring.as_ref().expect("template").last_batch.as_ref(), [10]);
     world.open_period(2, 100_000);
     batch(&mut world, 9, 2, 11);
     assert_eq!(world.record(9).recurring.as_ref().expect("template").last_period, 2);
     assert!(world.records.contains_key(&tasks::Key::Ledger(Funder::Recurring { project: 1, task: 9, period: 1 })));
     world.restart();
     assert_eq!(world.record(11).funder, Funder::Recurring { project: 1, task: 9, period: 2 });
+    assert_eq!(world.record(9).recurring.as_ref().expect("template").last_batch.as_ref(), [11]);
 }
 
 #[test]
@@ -82,6 +88,7 @@ fn a_recurring_template_waits_for_its_old_batch_before_the_new_period() {
     world.send(Event::RecurringBatch { task: 9, period: 2, numbers: Box::new([11]) });
     assert_eq!(world.record(9).recurring.as_ref().expect("template").pending_period, None);
     assert_eq!(world.record(11).funder, Funder::Recurring { project: 1, task: 9, period: 2 });
+    assert_eq!(world.record(9).recurring.as_ref().expect("template").last_batch.as_ref(), [11]);
 }
 
 #[test]

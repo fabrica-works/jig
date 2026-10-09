@@ -607,6 +607,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 task.taken_by.is_none()
                     && task.person_wait.is_none()
                     && state.template.key != 0
+                    && crate::recurring::valid_last_batch(limits, task.number, state)
                     && crate::recurring::valid_template(
                         limits,
                         task.project,

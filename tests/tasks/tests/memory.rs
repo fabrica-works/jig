@@ -394,3 +394,69 @@ fn borrowed_stored_bytes_matches_allocator_for_every_retained_row() {
         assert_eq!(meter.held(), actual, "borrowed row measurement allocates nothing");
     }
 }
+
+#[test]
+fn the_complete_maximum_recurring_batch_and_retained_ids_fit_the_owner_bound() {
+    let limits = Limits { tasks: 5, project_tasks: 5, tree_tasks: 5, depth: 2, delegates: 4, batch: 4, ..LIMITS };
+    let mut measured = Measured::new(&limits);
+    measured.event(Event::Restored);
+    let reply_to = measured.to();
+    measured.event(Event::OpenPeriod { reply_to, project: 1, period: 7, budget: 100_000 });
+    let mut template = Vec::new();
+    for number in 1..=u64::from(limits.batch) {
+        let mut member = task(number, &[]);
+        member.numbers.budget = 10;
+        member.authority.budget.spend = 10;
+        template.push(member);
+    }
+    let mut master = task(1, &[]);
+    master.executor = tasks::Executor::Procedure { connector: 1, code: 1 };
+    master.numbers = tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 };
+    master.funder = Funder::Period { project: 1, period: 7 };
+    master.recurring = Some(Box::new(tasks::RecurringTemplate {
+        key: 1,
+        batch: template.into_boxed_slice(),
+        overlap: tasks::RecurringOverlap::Skip,
+    }));
+    let reply_to = measured.to();
+    measured.event(Event::Make { reply_to, creator: Party::Deployment { project: 1 }, batch: Box::new([master]) });
+    assert!(!measured.refused);
+    measured.event(Event::TickRecurring { task: 1, period: 7 });
+    measured.event(Event::RecurringBatch { task: 1, period: 7, numbers: Box::new([2, 3, 4, 5]) });
+    assert_eq!(
+        measured
+            .d
+            .task(1)
+            .expect("recurring master live")
+            .recurring
+            .as_ref()
+            .expect("recurring template retained")
+            .last_batch
+            .as_ref(),
+        [2, 3, 4, 5]
+    );
+    for number in 2..=5 {
+        let reply_to = measured.to();
+        measured.event(Event::Control {
+            reply_to,
+            by: Party::Task(1),
+            task: number,
+            control: tasks::Control::Cancel { reason: Box::new([]) },
+        });
+        measured.event(Event::EffectsSettled { task: number });
+        measured.event(Event::Settled { task: number });
+    }
+    assert!(measured.d.task(1).expect("recurring master live").delegates.is_empty());
+    assert_eq!(
+        measured
+            .d
+            .task(1)
+            .expect("recurring master live")
+            .recurring
+            .as_ref()
+            .expect("recurring template retained")
+            .last_batch
+            .as_ref(),
+        [2, 3, 4, 5]
+    );
+}

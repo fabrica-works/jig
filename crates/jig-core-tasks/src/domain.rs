@@ -1148,6 +1148,7 @@ pub(crate) fn make_admitted(
                 recurring: match new.recurring {
                     Some(template) => Some(Box::new(crate::RecurringState {
                         template: *template,
+                        last_batch: Box::new([]),
                         last_period: 0,
                         pending_period: None,
                     })),

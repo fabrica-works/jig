@@ -261,7 +261,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                 payload
                     .checked_add(proposal_payload)?
                     .checked_add(proposal_payload)?
-                    .checked_add(u64::try_from(size_of::<crate::RecurringState>()).ok()?)?,
+                    .checked_add(u64::try_from(size_of::<crate::RecurringState>()).ok()?)?
+                    .checked_add(u64::from(limits.batch).checked_mul(8)?)?,
             )?,
         )?
         .checked_add(u64::from(limits.charters).checked_mul(4)?)?

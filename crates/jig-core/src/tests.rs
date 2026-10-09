@@ -2660,3 +2660,5 @@ mod hold_origin;
 mod live_delegates;
 
 mod periods;
+
+mod last_batch;

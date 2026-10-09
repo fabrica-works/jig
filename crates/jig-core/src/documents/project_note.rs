@@ -366,8 +366,11 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
             for member in state.template.batch.iter().take(bound(limits)) {
                 batch.push(super::objects::proposed(limits, member)?).expect("bounded template");
             }
+            if state.last_batch.len() > bound(limits) {
+                return Err(Missing::TooLarge);
+            }
             let mut last_batch = List::with_capacity(limits.documents.lines);
-            for task in row.delegates.iter().take(bound(limits)) {
+            for task in &state.last_batch {
                 last_batch.push(*task).expect("bounded last batch");
             }
             recurring
@@ -389,7 +392,7 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
                     last_period: state.last_period,
                     pending_period: state.pending_period,
                     last_batch,
-                    cut: row.delegates.len() > bound(limits) || state.template.batch.len() > bound(limits),
+                    cut: state.template.batch.len() > bound(limits),
                 })
                 .expect("bounded recurring tasks");
         }

@@ -220,6 +220,8 @@ pub struct RecurringTemplate {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct RecurringState {
     pub template: RecurringTemplate,
+    /// Exact IDs of the last accepted template batch, retained after its members end.
+    pub last_batch: Box<[u64]>,
     pub last_period: u64,
     pub pending_period: Option<u64>,
 }

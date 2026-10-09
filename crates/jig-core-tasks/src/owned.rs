@@ -275,7 +275,8 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
         .checked_add(match &task.recurring {
             Some(state) => {
                 let mut total = bytes(size_of::<crate::RecurringState>())?
-                    .checked_add(bytes(size_of_val(&*state.template.batch))?)?;
+                    .checked_add(bytes(size_of_val(&*state.template.batch))?)?
+                    .checked_add(bytes(size_of_val(&*state.last_batch))?)?;
                 for member in &state.template.batch {
                     total = total
                         .checked_add(spec_bytes(&member.spec)?)?
