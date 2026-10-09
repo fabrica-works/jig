@@ -191,3 +191,84 @@ pub fn chat_ready(seed: u64) -> World<Test, Scripted> {
         .expect("task fits");
     world
 }
+
+/// Project facts used by settings, goals and memory stories.
+#[must_use]
+pub fn project() -> Project {
+    let task = task();
+    let role = RolePolicy { number: 1, authority: task.authority.clone(), allotment: 10, decisions: list([1, 2]) };
+    let recurring = Recurring {
+        number: 1,
+        spec: text(&[b'r'; 32]),
+        period: 3,
+        budget: 10,
+        last: list([8, 9]),
+        current_period: 3,
+        began: Some(Wall::EPOCH),
+        next: Some(Wall::EPOCH),
+    };
+    let part = Part::Project { connector: jig_test_client_domain::FIRST, project: 1 };
+    Project {
+        period: 3,
+        spend_lines: list([TaskSpend { chip: task.chip.clone(), spent: 5 }, TaskSpend { chip: task.chip, spent: 6 }]),
+        number: 1,
+        name: text(&[b'p'; 32]),
+        policy: Policy {
+            ceiling: task.authority,
+            period: 3,
+            spend: 20,
+            roles: list([role.clone(), RolePolicy { number: 2, ..role }]),
+            requirements: list([part.clone(), part.clone()]),
+            deciders: list([Decider { kind: 1, role: 1 }, Decider { kind: 2, role: 2 }]),
+        },
+        roles: list([Holding { party: 7, role: 1 }, Holding { party: 7, role: 2 }]),
+        spend: task.budget,
+        pools: list([
+            Pool { party: 7, period: 3, budget: task.budget },
+            Pool { party: 8, period: 3, budget: task.budget },
+        ]),
+        resources: list([part.clone(), part.clone()]),
+        services: list([
+            Party { number: 1, kind: PartyKind::Service, name: text(&[b's'; 32]) },
+            Party { number: 2, kind: PartyKind::Service, name: text(&[b's'; 32]) },
+        ]),
+        recurring: list([recurring.clone(), Recurring { number: 2, ..recurring }]),
+        parts: list([part.clone(), part]),
+        acts: list([Offered { act: ActKind::SetGoal, admission: Admission::Allowed }]),
+    }
+}
+/// Full bounded deployment facts for every capacity panel.
+#[must_use]
+pub fn deployment() -> Deployment {
+    let chip = task().chip;
+    let host = |number| Host {
+        number,
+        connected: false,
+        grace: Some(Wall::EPOCH),
+        used: 1,
+        free: 1,
+        runs: list([chip.clone(), chip.clone()]),
+        refused: Some(text(&[b'h'; 32])),
+    };
+    let account = |number| Account {
+        number,
+        usable: false,
+        reason: Some(text(&[b'a'; 32])),
+        runs: list([chip.clone(), chip.clone()]),
+        waiting: list([chip.clone(), chip.clone()]),
+    };
+    Deployment {
+        hosts: list([host(1), host(2)]),
+        accounts: list([account(1), account(2)]),
+        capacity: list([
+            Capacity { project: None, live: 1, limit: 2 },
+            Capacity { project: Some(1), live: 1, limit: 2 },
+        ]),
+        proposals: 2,
+        refusals: list([Refusal::Limit { which: Limit::Objects }, Refusal::Limit { which: Limit::Reads }]),
+        parts: list([
+            Part::Deployment { connector: jig_test_client_domain::FIRST },
+            Part::Deployment { connector: jig_test_client_domain::SECOND },
+        ]),
+    }
+}

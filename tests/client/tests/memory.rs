@@ -1,10 +1,10 @@
+use jig_client::address::{Address, ProjectSection as P, TaskSection as T};
 use jig_client_world::{Settings, Until, stories};
 use skein_lib::{Time, Wall};
 use skein_world::domain::heap::Counting;
 #[global_allocator]
 static HEAP: Counting = Counting;
-fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_world::Scripted> {
-    let mut w = stories::configured(Settings { memory: true, seed: 5, ..Settings::default() });
+fn full_task() -> jig_client::contract::Task {
     let mut task = stories::task();
     task.chip.title = stories::text(&[b't'; 32]);
     task.lineage = jig_client_world::test::list([8, 7]);
@@ -21,6 +21,33 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
     task.references = task.dependencies.clone();
     task.inputs = task.dependencies.clone();
     task.lineage_chips = task.dependencies.clone();
+    task.delegates = jig_client_world::test::list([
+        jig_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
+        jig_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
+    ]);
+    task.writer_slots = jig_client_world::test::list([
+        jig_client::contract::WriterSlot {
+            resource: jig_client::contract::Part::Resource {
+                connector: jig_test_client_domain::FIRST,
+                path: stories::text(&[b'r'; 32]),
+            },
+            task: 9,
+            attempt: Some(1),
+        },
+        jig_client::contract::WriterSlot {
+            resource: jig_client::contract::Part::Resource {
+                connector: jig_test_client_domain::FIRST,
+                path: stories::text(&[b'r'; 32]),
+            },
+            task: 9,
+            attempt: Some(2),
+        },
+    ]);
+    task
+}
+fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_world::Scripted> {
+    let mut w = stories::configured(Settings { memory: true, seed: 5, ..Settings::default() });
+    let task = full_task();
     w.front()
         .engine
         .act(
@@ -84,6 +111,12 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
         .engine
         .act_application(Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, family, vec![])
         .expect("full family fits");
+    for change in [
+        jig_scripted_engine::Change::Project(Box::new(stories::project())),
+        jig_scripted_engine::Change::Deployment(stories::deployment()),
+    ] {
+        w.front().engine.act(Time::ZERO, Wall::EPOCH, change).expect("full page fixture fits");
+    }
     w
 }
 #[test]
@@ -92,19 +125,34 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
     let c = w.client(7, stories::inbox());
     let _tab = w.tab(c);
     w.run(Until::Time(Time::from_nanos(50_000_000)));
-    for address in [
+    let mut addresses = vec![
         stories::conversation(),
-        stories::chat(),
-        jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
-            project: 1,
-            section: jig_client::address::ProjectSection::Overview,
-        }),
-        jig_test_client_domain::Address::Jig(jig_client::address::Address::Deployment),
+        jig_test_client_domain::Address::Jig(Address::Deployment),
         jig_test_client_domain::Address::First(jig_test_client_domain::first::Address { project: 1, item: 1 }),
-    ] {
+    ];
+    addresses.extend(
+        [T::Overview, T::Activity, T::Plan, T::History, T::Budget, T::Panels]
+            .map(|section| jig_test_client_domain::Address::Jig(Address::Task { task: 9, section })),
+    );
+    addresses.extend(
+        [
+            P::Overview,
+            P::Goals,
+            P::Tasks,
+            P::Notes,
+            P::Settings,
+            P::Resources,
+            P::Policy,
+            P::Roles,
+            P::Spend,
+            P::Recurring,
+        ]
+        .map(|section| jig_test_client_domain::Address::Jig(Address::Project { project: 1, section })),
+    );
+    for address in addresses {
         let task = address == stories::chat();
         w.go(c, address);
-        w.run(Until::Time(w.now().saturating_add(skein_lib::Duration::from_millis(100))));
+        w.run(Until::Time(w.now().saturating_add(skein_lib::Duration::from_millis(20))));
         if task {
             w.person(
                 c,
