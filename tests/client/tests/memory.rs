@@ -3,8 +3,7 @@ use skein_lib::{Time, Wall};
 use skein_world::domain::heap::Counting;
 #[global_allocator]
 static HEAP: Counting = Counting;
-#[test]
-fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() {
+fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_world::Scripted> {
     let mut w = stories::configured(Settings { memory: true, seed: 5, ..Settings::default() });
     let mut task = stories::task();
     task.chip.title = stories::text(&[b't'; 32]);
@@ -85,6 +84,11 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
         .engine
         .act_application(Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, family, vec![])
         .expect("full family fits");
+    w
+}
+#[test]
+fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() {
+    let mut w = full_world();
     let c = w.client(7, stories::inbox());
     let _tab = w.tab(c);
     w.run(Until::Time(Time::from_nanos(50_000_000)));
@@ -98,8 +102,19 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
         jig_test_client_domain::Address::Jig(jig_client::address::Address::Deployment),
         jig_test_client_domain::Address::First(jig_test_client_domain::first::Address { project: 1, item: 1 }),
     ] {
+        let task = address == stories::chat();
         w.go(c, address);
         w.run(Until::Time(w.now().saturating_add(skein_lib::Duration::from_millis(100))));
+        if task {
+            w.person(
+                c,
+                vec![jig_fake_person::Step::See {
+                    find: jig_fake_person::Find::text(&[b't'; 32]),
+                    within: skein_lib::Duration::from_secs(1),
+                }],
+            );
+            w.run(Until::Done);
+        }
     }
     // Each field reaches its text envelope, then one more proves refusal is bounded.
     for field in [

@@ -6,7 +6,7 @@ use crate::model::Model;
 use jig_client_view::{Act, NodeId, Tree};
 use jig_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
 use skein_lib::{Duration, Env, Queue, Rng, Time, Wall};
-use skein_world::domain::{Schedule, Span, Trace};
+use skein_world::domain::{Referee, Schedule, Span, Trace, Verdict};
 
 /// One tab or device in this world.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -48,6 +48,10 @@ pub enum Until {
 /// Clock, callback and heap evidence from a completed run.
 #[derive(Debug)]
 pub struct Outcome {
+    /// Observation-based referee result at this run boundary.
+    pub verdict: Verdict,
+    /// Safety checks and liveness obligations met.
+    pub judged: (u64, u64),
     pub now: Time,
     pub iterations: u32,
     pub callbacks: u64,
@@ -91,6 +95,7 @@ pub struct World<A: App, F: Front<A>> {
     schedule: Schedule<Due<A>>,
     rng: Rng,
     trace: Trace,
+    referee: Referee<super::referee::Rules>,
     now: Time,
     callbacks: u64,
     dropped: u64,
@@ -116,6 +121,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             people: Vec::new(),
             schedule: Schedule::new(),
             trace: Trace::default(),
+            referee: Referee::new(super::referee::Rules::default()),
             now: Time::ZERO,
             callbacks: 0,
             dropped: 0,
@@ -416,6 +422,11 @@ impl<A: App, F: Front<A>> World<A, F> {
                     Due { client, epoch: self.clients[client.0].epoch, event },
                 );
             }
+            for observed in self.front.observed() {
+                self.referee.observe(self.now, observed, &mut Vec::new());
+            }
+            self.referee.fire(self.now, &mut Vec::new());
+            self.referee.assert_holding(self.settings.seed);
             while let Some(due) = self.schedule.next(self.now) {
                 if due.epoch == self.clients[due.client.0].epoch {
                     self.front.received(due.client, &due.event);
@@ -479,6 +490,8 @@ impl<A: App, F: Front<A>> World<A, F> {
                 .collect::<Vec<_>>()
         );
         Outcome {
+            verdict: self.referee.verdict(),
+            judged: self.referee.judged(),
             now: self.now,
             iterations,
             callbacks: self.callbacks,

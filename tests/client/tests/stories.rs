@@ -24,6 +24,8 @@ fn signing_in_and_starting_a_chat() {
     );
     let outcome = w.run(Until::Done);
     assert!(outcome.callbacks > 4);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
     assert_eq!(w.front().engine.commits().iter().filter(|commit| commit.key.is_some()).count(), 1);
 }
 #[test]

@@ -129,6 +129,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-world"
+version = "0.0.0"
+dependencies = [
+ "jig-client",
+ "jig-client-view",
+ "jig-fake-person",
+ "jig-scripted-engine",
+ "jig-test-client-domain",
+ "jig-test-client-view",
+ "sha2",
+ "skein-lib",
+ "skein-world",
+]
+
+[[package]]
 name = "jig-conformance"
 version = "0.0.0"
 dependencies = [

@@ -1,4 +1,5 @@
 //! Shell duties and the reusable application/front boundaries (testing.md, 4).
+pub mod referee;
 mod world;
 use jig_client_view::{Act, NodeId, Patch, Tree};
 use skein_lib::{Env, Queue, Time, Wall};
