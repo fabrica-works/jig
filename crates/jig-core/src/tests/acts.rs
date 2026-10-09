@@ -314,19 +314,21 @@ fn offered_person_handoffs_and_answers_reach_the_child_and_change_the_offer() {
     assert_eq!(core.person_tasks.remove(&Token::new(81)), Some(PersonTaskRoute::Take(5)));
     assert_eq!(core.tasks.task(5).unwrap().taken_by, Some(1));
     assert_eq!(offers::admit(&core, &limits, 1, Act::Take, &subject), Admission::Refused(people::Refusal::NotWaiting));
+    holding(&mut core, &limits, people::Role::Observer);
     assert_eq!(offers::admit(&core, &limits, 1, Act::HandBack, &subject), Admission::Allowed);
     let event = core
         .person_task(
             Token::new(82),
             1,
             1,
-            Some(people::Role::Owner),
+            Some(people::Role::Observer),
             people::Ask::HandBackPerson { project: 1, task: 5 },
         )
         .unwrap();
     send_task(&mut core, &limits, event);
     assert_eq!(core.person_tasks.remove(&Token::new(82)), Some(PersonTaskRoute::HandBack(5)));
     assert_eq!(core.tasks.task(5).unwrap().taken_by, None);
+    holding(&mut core, &limits, people::Role::Owner);
     let why = people::Refusal::NotWaiting;
     assert_eq!(offers::admit(&core, &limits, 1, Act::Answer, &subject), Admission::Refused(why));
     let answer = people::Ask::AnswerPerson {
@@ -351,6 +353,41 @@ fn offered_person_handoffs_and_answers_reach_the_child_and_change_the_offer() {
         offers::admit(&core, &limits, 1, Act::Answer, &subject),
         Admission::Refused(people::Refusal::Ended { how: people::Ending::Decided { by: 1, at: actor.at } })
     );
+}
+
+#[test]
+fn a_named_person_can_answer_without_project_membership() {
+    let (mut core, limits) = make_tree();
+    let mut row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
+    row.executor = tasks::Executor::Person(tasks::PersonAddress::Person(1));
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(86)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    people::step(
+        &mut core.people,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
+        people::Event::Roles { project: 1, holdings: Box::new([]) },
+        &mut out,
+    );
+    assert_eq!(core.people.role(1, 1), None);
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Answer, &Subject::PersonTask { task: 5 }), Admission::Allowed);
+    let answer = people::Ask::AnswerPerson {
+        project: 1,
+        task: 5,
+        revision: core.tasks.task(5).unwrap().revisions.person,
+        result: people::PersonResult::Report { words: b"done".as_slice().into() },
+    };
+    let event = core.person_task(Token::new(87), 1, 1, None, answer).unwrap();
+    send_task(&mut core, &limits, event);
+    assert_eq!(core.person_tasks.remove(&Token::new(87)), Some(PersonTaskRoute::Answer(5)));
+    assert_eq!(core.tasks.task(5).unwrap().person_answer.unwrap().by, 1);
 }
 
 #[test]

@@ -170,7 +170,6 @@ pub(crate) fn person(
 ) -> Result<(), people::Refusal> {
     let row = core.tasks.task(number).ok_or(people::Refusal::Unknown)?;
     let held = core.people.role(party, row.project);
-    standing::role(core, row.project, held, act)?;
     let addressed = match row.executor {
         tasks::Executor::Person(tasks::PersonAddress::Person(person)) => person == party && act == Act::Answer,
         tasks::Executor::Person(tasks::PersonAddress::Role(role)) => {

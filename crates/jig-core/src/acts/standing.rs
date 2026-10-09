@@ -37,13 +37,7 @@ pub(crate) fn role(core: &Core, project: u32, held: Option<people::Role>, act: A
         | Act::LeaveHeld
         | Act::Stop
         | Act::Cancel
-        | Act::TakeOver => match held {
-            Some(people::Role::Observer) => Err(people::Refusal::Role { held }),
-            Some(
-                people::Role::Owner | people::Role::Maintainer | people::Role::Member | people::Role::Policy { .. },
-            )
-            | None => Ok(()),
-        },
-        Act::MarkSeen => Ok(()),
+        | Act::TakeOver
+        | Act::MarkSeen => Ok(()),
     }
 }
