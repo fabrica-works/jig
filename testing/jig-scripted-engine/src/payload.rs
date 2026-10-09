@@ -457,6 +457,7 @@ impl Payload for Recipient {
         match self {
             Self::Task(value0) | Self::Party(value0) => sum(&[value0.heap(bounds)]),
             Self::Role { project, role } => sum(&[project.heap(bounds), role.heap(bounds)]),
+            Self::Roles { project, roles } => sum(&[project.heap(bounds), roles.heap(bounds)]),
         }
     }
 }

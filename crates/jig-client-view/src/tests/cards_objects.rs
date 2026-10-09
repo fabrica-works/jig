@@ -1158,6 +1158,7 @@ fn jig_object_cards_hold_actions_confirmations_and_notices() {
     closing_connectors_use_their_owners_words(&words);
     person_chip_preserves_absent_readiness(&words);
     authority_refusal_uses_only_supplied_proposal_eligibility(&words);
+    collective_recipients_name_every_supplied_role_in_order(&words);
 }
 
 fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
@@ -1214,4 +1215,15 @@ fn authority_refusal_uses_only_supplied_proposal_eligibility(words: &crate::word
         assert!(contains(&tree, b"Proposal approval authority is missing"));
         assert_eq!(contains(&tree, b"Nobody in this project may accept it"), proposable == Some(false));
     }
+}
+
+fn collective_recipients_name_every_supplied_role_in_order(words: &crate::words::Words) {
+    let mut b = Builder::new(&limits());
+    b.open(Role::Page);
+    cards::common::recipient(&mut b, &Recipient::Roles { project: 4, roles: list([7, 2]) }, words);
+    b.close();
+    let tree = b.finish();
+    let names: Vec<_> =
+        tree.nodes().iter().flat_map(|node| node.text.as_slice().iter().map(|run| run.text.as_ref())).collect();
+    assert_eq!(names, [b"Waiting at policy roles in project 4".as_slice(), b"Role 7", b"Role 2"]);
 }

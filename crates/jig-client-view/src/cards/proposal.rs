@@ -36,7 +36,7 @@ pub fn proposal(
     action(b, &document.action, words, bindings);
     super::common::authority(b, &document.needs, words, bindings);
     super::common::funding(b, &document.funding, document.needs.budget, words);
-    super::common::recipient(b, document.waiting, words);
+    super::common::recipient(b, &document.waiting, words);
     super::common::trail(b, &document.trail, words);
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
@@ -119,7 +119,7 @@ fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words, bindings: 
 }
 /// Changes retain the before/after facts instead of interpreting instructions.
 pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &mut JigBindings) {
-    if let Some(to) = change.addressed {
+    if let Some(to) = &change.addressed {
         super::common::recipient(b, to, words);
     }
     if let Some(text) = &change.words {

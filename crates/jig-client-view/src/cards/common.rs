@@ -101,12 +101,18 @@ pub fn closing(b: &mut Builder, closing: &jig_client::contract::Closing, words: 
     }
 }
 /// Say where an object is waiting, without deriving its policy recipient.
-pub fn recipient(b: &mut Builder, to: Recipient, words: &Words) {
+pub fn recipient(b: &mut Builder, to: &Recipient, words: &Words) {
     match to {
-        Recipient::Task(task) => words.text(b, JigPhrase::WaitingTask, &[Hole::Number(task)]),
-        Recipient::Party(party) => words.text(b, JigPhrase::WaitingParty, &[Hole::Number(party)]),
+        Recipient::Task(task) => words.text(b, JigPhrase::WaitingTask, &[Hole::Number(*task)]),
+        Recipient::Party(party) => words.text(b, JigPhrase::WaitingParty, &[Hole::Number(*party)]),
         Recipient::Role { project, role } => {
-            words.text(b, JigPhrase::WaitingRole, &[Hole::Number(u64::from(project)), Hole::Number(u64::from(role))]);
+            words.text(b, JigPhrase::WaitingRole, &[Hole::Number(u64::from(*project)), Hole::Number(u64::from(*role))]);
+        }
+        Recipient::Roles { project, roles } => {
+            words.text(b, JigPhrase::WaitingRoles, &[Hole::Number(u64::from(*project))]);
+            for role in roles {
+                words.text(b, JigPhrase::RoleNumber, &[Hole::Number(u64::from(*role))]);
+            }
         }
     }
 }

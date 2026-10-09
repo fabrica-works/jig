@@ -1390,3 +1390,45 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
     }
     assert!(closed);
 }
+
+#[test]
+fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
+    use crate::{action::Act, fields::Purpose, pages::project::goals::GoalForm};
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    let mut roles = List::with_capacity(2);
+    roles.push(7).unwrap();
+    roles.push(2).unwrap();
+    let recipient = Recipient::Roles { project: 1, roles };
+    let mut doc = project_document();
+    let Admission::Bounded { beyond, .. } = &mut doc.acts.get_mut(0).unwrap().admission else {
+        panic!("bounded goal offer");
+    };
+    *beyond = Beyond::Proposed { to: recipient.clone() };
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"collective") } },
+    );
+    let form = GoalForm { project: 1, charter: 1, budget: 21, deadline: None, priority: 1 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let open = domain.project_page().form.confirmation.as_ref().unwrap();
+    assert_eq!(open.to, Some(recipient));
+    assert!(open.proposed);
+    let emitted = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert_eq!(emitted.len(), 1);
+    let Request::Send { ask, .. } = &emitted[0] else { panic!("one goal intent") };
+    assert_eq!(
+        **ask,
+        Ask::SetGoal {
+            project: 1,
+            spec: text(b"collective"),
+            executor: Executor::Agent { charter: 1 },
+            budget: 21,
+            priority: 1,
+            deadline: None,
+        }
+    );
+}

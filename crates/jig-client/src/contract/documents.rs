@@ -252,7 +252,7 @@ pub struct Offered {
 }
 
 /// Where an object waits.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Recipient {
     /// At a task above.
     Task(u64),
@@ -260,6 +260,8 @@ pub enum Recipient {
     Party(u64),
     /// At a policy role.
     Role { project: u32, role: u16 },
+    /// Every policy role that may accept this kind of proposal, in supplied order.
+    Roles { project: u32, roles: List<u16> },
 }
 
 /// A hold revision and the facts it decides.

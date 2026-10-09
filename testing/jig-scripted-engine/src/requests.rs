@@ -145,8 +145,8 @@ impl<A: crate::Application> Engine<A> {
                 }
             }
             let waiting = match value {
-                ReadValue::Proposal(value) => Some(value.waiting),
-                ReadValue::Escalation(value) => Some(value.waiting),
+                ReadValue::Proposal(value) => Some(&value.waiting),
+                ReadValue::Escalation(value) => Some(&value.waiting),
                 ReadValue::Frame(_)
                 | ReadValue::Task(_)
                 | ReadValue::Question(_)
@@ -364,13 +364,19 @@ impl<A: crate::Application> Engine<A> {
         Ok((Answer::Refused(Refusal::NotOffered), Vec::new()))
     }
 }
-pub(crate) fn recipient(truth: &crate::Truth, party: u64, to: Recipient) -> bool {
+pub(crate) fn recipient(truth: &crate::Truth, party: u64, to: &Recipient) -> bool {
     match to {
-        Recipient::Party(number) => number == party,
+        Recipient::Party(number) => *number == party,
         Recipient::Role { project, role } => truth.frames.get(&party).is_some_and(|frame| {
-            frame.projects.iter().any(|p| p.project == project && p.roles.iter().any(|r| *r == role))
+            frame.projects.iter().any(|p| p.project == *project && p.roles.iter().any(|r| r == role))
         }),
-        Recipient::Task(task) => truth.objects.get(&ObjectKey::Task(task)).is_some_and(|value| {
+        Recipient::Roles { project, roles } => truth.frames.get(&party).is_some_and(|frame| {
+            frame
+                .projects
+                .iter()
+                .any(|p| p.project == *project && roles.iter().any(|role| p.roles.iter().any(|r| r == role)))
+        }),
+        Recipient::Task(task) => truth.objects.get(&ObjectKey::Task(*task)).is_some_and(|value| {
             if let ReadValue::Task(v) = value { v.requester == Actor::Party(party) } else { false }
         }),
     }

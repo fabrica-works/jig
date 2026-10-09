@@ -60,6 +60,7 @@ fn full_amendment() -> Amendment {
 }
 fn full_proposal(action: ProposalAction) -> Proposal {
     let mut value = proposal(action);
+    value.waiting = Recipient::Roles { project: 4, roles: list([7, 2]) };
     value.why = full_text();
     value.needs = full_authority();
     value.trail = full_trail();

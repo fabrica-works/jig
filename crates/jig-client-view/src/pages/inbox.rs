@@ -50,7 +50,7 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
                     words.text(b, JigPhrase::PassesUp, &[Hole::Wall(words.adjusted_wall(at))]);
                 }
                 match entry.recipient {
-                    Some(Recipient::Role { .. }) => words.text(b, JigPhrase::OnCall, &[]),
+                    Some(Recipient::Role { .. } | Recipient::Roles { .. }) => words.text(b, JigPhrase::OnCall, &[]),
                     Some(Recipient::Party(_) | Recipient::Task(_)) | None => {}
                 }
                 if let Some(id) = client.objects().find(entry.object) {

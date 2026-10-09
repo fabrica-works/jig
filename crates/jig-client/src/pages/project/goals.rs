@@ -185,9 +185,9 @@ pub(crate) fn sync(domain: &mut Domain) {
     };
     let open = domain.project_page.form.confirmation.as_mut().expect("open above");
     if open.to != to || open.pool_left != pool_left {
+        open.proposed = to.is_some();
         open.to = to;
         open.pool_left = pool_left;
-        open.proposed = to.is_some();
         domain.changed();
     }
 }

@@ -6,7 +6,7 @@ use skein_lib::Wall;
 
 fn beyond(value: &Beyond) -> Admission {
     match value {
-        Beyond::Proposed { to } => Admission::Proposed { to: *to },
+        Beyond::Proposed { to } => Admission::Proposed { to: to.clone() },
         Beyond::Refused(why) => Admission::Refused(why.clone()),
     }
 }

@@ -102,7 +102,7 @@ pub fn form(
     input(b, change, Field::Instructions, JigPhrase::NewInstructions, open.writes, words, bindings);
     input(b, change, Field::Budget, JigPhrase::NewBudget, open.writes, words, bindings);
     input(b, change, Field::Deadline, JigPhrase::NewDeadline, open.writes, words, bindings);
-    if let Some(to) = change.addressed {
+    if let Some(to) = &change.addressed {
         common::recipient(b, to, words);
         input(b, change, Field::Party, JigPhrase::AddressParty, open.writes, words, bindings);
         input(b, change, Field::Task, JigPhrase::AddressTask, open.writes, words, bindings);
@@ -220,7 +220,7 @@ fn before(object: &Object) -> Option<Amendment> {
     Some(match &object.body {
         Some(Body::Task(doc)) => Amendment {
             addressed: match &*doc.chip.details {
-                jig_client::contract::ChipPhase::Person { addressed, .. } => Some(*addressed),
+                jig_client::contract::ChipPhase::Person { addressed, .. } => Some(addressed.clone()),
                 jig_client::contract::ChipPhase::Waiting { .. }
                 | jig_client::contract::ChipPhase::Idle { .. }
                 | jig_client::contract::ChipPhase::Starting
@@ -239,7 +239,7 @@ fn before(object: &Object) -> Option<Amendment> {
             authority: Some(doc.authority.clone()),
         },
         Some(Body::Escalation(doc)) => Amendment {
-            addressed: doc.steering.addressed,
+            addressed: doc.steering.addressed.clone(),
             words: Some(doc.steering.spec.clone()),
             instructions: Some(doc.steering.instructions.clone()),
             wake: Some(doc.steering.wake.clone()),

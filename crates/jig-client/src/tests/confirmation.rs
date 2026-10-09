@@ -441,3 +441,42 @@ fn bounded_amendment_dimensions() {
     draft.authority = Some(narrower);
     assert_eq!(admission::amendment(&offer, &draft, &existing), Admission::Allowed);
 }
+
+#[test]
+fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
+    let (mut domain, _) = live();
+    let mut row = task();
+    let mut roles = List::with_capacity(2);
+    roles.push(7).unwrap();
+    roles.push(2).unwrap();
+    let recipient = Recipient::Roles { project: 1, roles };
+    let mut direct = row.authority.clone();
+    direct.budget = 15;
+    let mut ceiling = row.authority.clone();
+    ceiling.budget = 100;
+    row.acts = offered(
+        ActKind::Amend,
+        Admission::Bounded {
+            within: Bounds::Amend {
+                budget_left: 5,
+                grants: List::with_capacity(0),
+                authority: Box::new(direct),
+                ceiling: Box::new(ceiling),
+            },
+            beyond: Beyond::Proposed { to: recipient.clone() },
+        },
+    );
+    let id = install(&mut domain, Body::Task(Box::new(row.clone())));
+    intend(&mut domain, id, ActKind::Amend);
+    let mut draft = change();
+    let mut after = row.authority.clone();
+    after.budget = 16;
+    draft.authority = Some(after);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+    assert_eq!(domain.confirmation().unwrap().proposed, Some(recipient));
+    assert!(domain.confirmation().unwrap().missing.is_none());
+    assert_eq!(
+        sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
+        &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: false }
+    );
+}

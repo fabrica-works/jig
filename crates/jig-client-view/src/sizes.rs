@@ -50,7 +50,7 @@ fn amendment(limits: &Limits) -> Option<u32> {
     markdown(limits)?
         .checked_mul(2)?
         .checked_add(authority(limits)?)?
-        .checked_add(limits.rows.checked_mul(4)?)?
+        .checked_add(limits.rows.checked_mul(5)?)?
         .checked_add(5)
 }
 fn proposal_action(limits: &Limits) -> Option<u32> {
@@ -74,6 +74,7 @@ pub fn proposal_nodes(limits: &Limits) -> Option<u32> {
         .checked_add(authority(limits)?)?
         .checked_add(trail(limits)?)?
         .checked_add(outcome(limits)?)?
+        .checked_add(limits.rows)?
         .checked_add(8)
 }
 fn result_value(limits: &Limits) -> Option<u32> {
@@ -109,6 +110,7 @@ pub fn person_task_nodes(limits: &Limits) -> Option<u32> {
         .checked_add(markdown(limits)?)?
         .checked_add(person_contract(limits)?)?
         .checked_add(outcome(limits)?)?
+        .checked_add(limits.rows)?
         .checked_add(9)
 }
 /// Whole question, including the answer field and retained answer.
@@ -125,6 +127,7 @@ pub fn escalation_nodes(limits: &Limits) -> Option<u32> {
         .checked_add(limits.rows.checked_mul(5)?)?
         .checked_add(trail(limits)?)?
         .checked_add(outcome(limits)?)?
+        .checked_add(limits.rows)?
         .checked_add(12)
 }
 /// Unread reply, preserving the whole task's chip and first words.
@@ -161,13 +164,14 @@ pub fn frame_nodes(limits: &Limits) -> Option<u32> {
 /// One object or goal dialog, with every delegate and amendment field.
 #[must_use]
 pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
-    let form = amendment(limits)?.checked_mul(2)?.checked_add(limits.rows.checked_mul(2)?)?.checked_add(14)?;
+    let form = amendment(limits)?.checked_mul(2)?.checked_add(limits.rows.checked_mul(3)?)?.checked_add(14)?;
     let delegates = chip_nodes(limits)?.checked_add(4)?.checked_mul(limits.delegates.max(limits.rows))?;
     // The closed act table takes one alternative; using their sum also covers
     // live context, missing/changed statuses, impact, reason and review buttons.
     chip_nodes(limits)?
         .checked_add(form.max(proposal_action(limits)?).max(person_contract(limits)?).max(markdown(limits)?))?
         .checked_add(delegates)?
+        .checked_add(limits.rows)?
         .checked_add(64)
 }
 /// Full visible notices and the oldest notice's dismissal control.

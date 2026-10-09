@@ -910,3 +910,50 @@ fn recurring_optional_boundaries_keep_whole_value_and_allocated_list_limits() {
         assert!(!crate::payload::fits(&row, &bounds));
     }
 }
+
+#[test]
+fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list() {
+    let recipient = Recipient::Roles { project: 1, roles: list(vec![7, 1]) };
+    let mut setup = script();
+    setup.truth.frames.get_mut(&2).unwrap().projects.get_mut(0).unwrap().roles = list(vec![99]);
+    assert!(crate::requests::recipient(&setup.truth, 1, &recipient));
+    assert!(!crate::requests::recipient(&setup.truth, 2, &recipient));
+    let mut row = proposal();
+    row.waiting = recipient.clone();
+    setup.truth.objects.insert(ObjectKey::Proposal(row.key), ReadValue::Proposal(Box::new(row.clone())));
+    let mut engine = Engine::new(setup, 1).unwrap();
+    send(&mut engine, 0, 11, 1, 1, Ask::DecideProposal { project: 1, proposal: row.key, decision: Decision::Accepted });
+    let up = engine.poll(Time::from_nanos(10_000_000));
+    assert_eq!(
+        final_answer(&up[0]),
+        &Answer::Done(Outcome::Decided { by: Actor::Party(1), how: Decision::Accepted, at: Wall::EPOCH })
+    );
+    let mut bounds = Bounds { rows: 2, ..Bounds::default() };
+    bounds.document_bytes =
+        u64::try_from(core::mem::size_of::<Recipient>()).unwrap() + List::<u16>::worst_case(2).unwrap();
+    assert!(crate::payload::fits(&recipient, &bounds));
+    bounds.document_bytes = bounds.document_bytes.checked_sub(1).unwrap();
+    assert!(!crate::payload::fits(&recipient, &bounds));
+    for bounded in [false, true] {
+        let mut setup = script();
+        let mut row = row.clone();
+        let recipient = Recipient::Roles { project: 1, roles: List::with_capacity(33) };
+        row.acts.get_mut(0).unwrap().admission = if bounded {
+            Admission::Bounded {
+                within: jig_client::contract::Bounds::Goal {
+                    pool_left: 10,
+                    charters: list(vec![1]),
+                    latest: None,
+                    budget: 0,
+                    maximum_budget: 100,
+                    maximum_deadline: None,
+                },
+                beyond: Beyond::Proposed { to: recipient },
+            }
+        } else {
+            Admission::Proposed { to: recipient }
+        };
+        setup.truth.objects.insert(ObjectKey::Proposal(row.key), ReadValue::Proposal(Box::new(row)));
+        assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload));
+    }
+}

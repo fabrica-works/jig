@@ -40,7 +40,7 @@ pub fn escalation(
     }
     super::chip::chip(b, client, &document.task, words, bindings);
     held(b, client, &document.hold, words, bindings);
-    super::common::recipient(b, document.waiting, words);
+    super::common::recipient(b, &document.waiting, words);
     super::common::trail(b, &document.trail, words);
     if let Some(ending) = &document.ending {
         words.ending(b, ending);

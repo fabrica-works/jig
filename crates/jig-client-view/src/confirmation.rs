@@ -25,7 +25,7 @@ pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         }
         if open.proposed.is_some() {
             words.text(b, JigPhrase::WillPropose, &[]);
-            if let Some(to) = open.proposed {
+            if let Some(to) = &open.proposed {
                 common::recipient(b, to, words);
             }
         }
@@ -64,7 +64,7 @@ pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         if open.proposed {
             words.text(b, JigPhrase::WillPropose, &[]);
         }
-        if let Some(to) = open.to {
+        if let Some(to) = &open.to {
             common::recipient(b, to, words);
         }
         end(b, words, bindings, false, true);

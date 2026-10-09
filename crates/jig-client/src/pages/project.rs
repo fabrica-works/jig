@@ -301,6 +301,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_mul(limits.document_bytes)?
         .checked_mul(4)?
         .checked_add(limits.document_bytes.checked_mul(2)?)?
+        .checked_add(List::<u16>::worst_case(limits.rows)?)?
         .checked_add(List::<GoalLine>::worst_case(limits.rows)?.checked_mul(2)?)?
         .checked_add(List::<TaskLine>::worst_case(limits.rows)?)?
         .checked_add(List::<Id<Object>>::worst_case(limits.rows)?)?

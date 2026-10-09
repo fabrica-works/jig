@@ -167,7 +167,7 @@ pub fn details(
         }
         ChipPhase::Procedure { panel } => super::common::part(b, panel, words, bindings),
         ChipPhase::Person { addressed, taken, since } => {
-            super::common::recipient(b, *addressed, words);
+            super::common::recipient(b, addressed, words);
             if let Some(by) = taken {
                 words.text(b, JigPhrase::TakenBy, &[name(by.name.bytes())]);
             }
