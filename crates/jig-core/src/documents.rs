@@ -9,8 +9,30 @@
 //! work. Activity positions belong to the activity work. Run writing status,
 //! provisional text and calls belong to the watch stream; committed turns never
 //! enter its text. Application subjects belong to their connectors.
+//!
+//! Store-only notes, ended rows and proposal routing trails use the public row
+//! constructors. Notes lack changed wall times; history and milestones lack
+//! wall times and amendment before snapshots until that work owns their records.
+//! Person stall timing and result followup identities are not retained today;
+//! their optional fields say so. Dependency results missing from live memory are
+//! stored references for the reader. Effect pricing belongs to its connector;
+//! a proposal's effect authority ceiling is never reported as its price.
+//! Recurring wall schedules and past-period/root spending need store/period
+//! owners; the project reports period numbers and current live-root spending.
 
+mod objects;
+mod project_note;
 mod small;
+pub use objects::{
+    AmendmentChange, AmendmentState, EndedDelegate, Escalation, FundingOffer, HistoryLine, MilestoneLine,
+    MilestonePhase, PersonTask, Proposal, ProposalAction, ProposalHistory, ProposalHistoryState, ProposalWaiting,
+    ProposedTask, Question, ResultDoc, RetainedAction, ShownResult, SpecLine, ended_delegate_from_row,
+    history_from_row, milestone_from_row, result_from_row, retained_action,
+};
+pub use project_note::{
+    Ledger, Member, Note, NoteLocation, Policy, PolicyRole, Project, ProjectResource, Recurring, Requirement,
+    ResourceRole, SpendLine, note_from_entry,
+};
 mod task_tree;
 pub use task_tree::{
     AuthorityLine, BudgetLine, ContractLine, Ending, EscalationState, FoldedCount, GoalLine, Goals, GrantLine,
@@ -215,6 +237,20 @@ pub enum Document {
     Tree(Tree),
     /// Live goals in priority order.
     Goals(Goals),
+    /// A pending immutable proposal.
+    Proposal(Box<Proposal>),
+    /// A held task and its preserved story.
+    Escalation(Escalation),
+    /// Whole unanswered question text.
+    Question(Question),
+    /// A current person task and its form.
+    PersonTask(Box<PersonTask>),
+    /// An outcome retained in a live closing row.
+    Result(Box<ResultDoc>),
+    /// Project resources, roles, policy and ledgers.
+    Project(Box<Project>),
+    /// A note loaded by its owning child.
+    Note(Note),
 }
 
 /// Make the current visible document without changing state or emitting effects.
@@ -257,16 +293,22 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             let goals = task_tree::goals(core, limits, party, *project, window)?;
             Ok(Document::Goals(goals))
         }
-        Subject::Inbox { .. }
-        | Subject::Conversations { .. }
-        | Subject::Deployment
-        | Subject::Proposal { .. }
-        | Subject::Escalation { .. }
-        | Subject::Question { .. }
-        | Subject::PersonTask { .. }
-        | Subject::Result { .. }
-        | Subject::Project { .. }
-        | Subject::Note { .. } => Err(Missing::Unknown),
+        Subject::Inbox { .. } | Subject::Conversations { .. } | Subject::Deployment => Err(Missing::Unknown),
+        Subject::Proposal { proposer, number } => {
+            Ok(Document::Proposal(Box::new(objects::proposal(core, limits, party, *proposer, *number)?)))
+        }
+        Subject::Escalation { task } => Ok(Document::Escalation(objects::escalation(core, limits, party, *task)?)),
+        Subject::Question { task, message } => {
+            Ok(Document::Question(objects::question(core, limits, party, *task, *message)?))
+        }
+        Subject::PersonTask { task } => {
+            Ok(Document::PersonTask(Box::new(objects::person(core, limits, party, *task)?)))
+        }
+        Subject::Result { task } => Ok(Document::Result(Box::new(objects::result(core, limits, party, *task)?))),
+        Subject::Project { project } => {
+            Ok(Document::Project(Box::new(project_note::project(core, limits, party, *project)?)))
+        }
+        Subject::Note { .. } => Err(Missing::Ended),
     }
 }
 
@@ -289,5 +331,11 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
         .checked_add(List::<OfferedCharter>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(charter)?)?
         .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?;
-    u64::try_from(size_of::<Document>()).ok()?.checked_add(chips.max(frame).max(task_tree::worst_case(limits)?))
+    u64::try_from(size_of::<Document>()).ok()?.checked_add(
+        chips
+            .max(frame)
+            .max(task_tree::worst_case(limits)?)
+            .max(objects::worst_case(limits)?)
+            .max(project_note::worst_case(limits)?),
+    )
 }

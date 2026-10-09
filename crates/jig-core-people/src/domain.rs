@@ -203,6 +203,15 @@ impl Domain {
         Some(result)
     }
 
+    /// Borrow the retained role holders of one project without changing admission.
+    #[must_use]
+    pub fn project_members(&self, project: u32) -> Option<&[Holding]> {
+        if !self.ready() {
+            return None;
+        }
+        Some(self.roles.get(&project)?)
+    }
+
     /// Resolve a provider-authenticated collaborator to this project's role.
     #[must_use]
     pub fn role_for_identity(&self, key: IdentityKey, project: u32) -> Option<(u64, Role)> {

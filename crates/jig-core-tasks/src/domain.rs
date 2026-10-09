@@ -165,6 +165,12 @@ impl Domain {
         self.funding.get(&funder)
     }
 
+    /// Borrow all authentic external ledgers; callers filter their project and period.
+    #[must_use]
+    pub const fn funding_records(&self) -> &Map<crate::Funder, crate::FundingRecord> {
+        &self.funding
+    }
+
     /// Pure remaining ledger slots for a root-administered period/pool pair.
     #[must_use]
     pub fn funding_room(&self) -> u32 {

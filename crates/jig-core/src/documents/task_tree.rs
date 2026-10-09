@@ -115,7 +115,7 @@ pub enum Ending {
     /// Failed with these words.
     Failed(Text),
     /// Cancelled, preserving any previously completed result.
-    Cancelled { reason: Text, result: Option<ResultValue> },
+    Cancelled { reason: Text, result: Option<ResultValue>, by: tasks::Party, at: Wall },
 }
 
 /// One task reference, including a historical result still named by live work.
@@ -437,7 +437,9 @@ pub(super) fn ending(limits: &Limits, value: &tasks::Ending) -> Ending {
     match value {
         tasks::Ending::Done(result) => Ending::Done(result_value(limits, result)),
         tasks::Ending::Failed { reason } => Ending::Failed(super::small::text(reason, limits.documents.text_bytes)),
-        tasks::Ending::Cancelled { reason, result, .. } => Ending::Cancelled {
+        tasks::Ending::Cancelled { reason, result, by, at } => Ending::Cancelled {
+            by: *by,
+            at: *at,
             reason: super::small::text(reason, limits.documents.text_bytes),
             result: match result {
                 Some(result) => Some(result_value(limits, result)),
@@ -495,7 +497,7 @@ fn size(value: u32) -> usize {
     usize::try_from(value).expect("bounded count fits usize")
 }
 
-fn link(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<TaskLink, Missing> {
+pub(super) fn link(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<TaskLink, Missing> {
     match core.tasks.task(number) {
         Some(_) => Ok(TaskLink::Live(super::small::chip(core, limits, party, number)?)),
         None => Ok(TaskLink::Stored {

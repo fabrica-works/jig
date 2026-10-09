@@ -26,6 +26,11 @@ pub(super) fn visible(core: &Core, party: u64, number: u64) -> Result<&tasks::Ta
 
 pub(super) fn chip(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<Chip, Missing> {
     let row = visible(core, party, number)?;
+    Ok(chip_from_row(limits, row))
+}
+
+pub(super) fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Chip {
+    let number = row.number;
     let first = skein_lib::bytes::find(&row.spec.words, b"\n").unwrap_or(row.spec.words.len());
     let title = text(row.spec.words.get(..first).expect("first line prefix"), limits.documents.text_bytes);
     let executor = match row.executor {
@@ -56,7 +61,7 @@ pub(super) fn chip(core: &Core, limits: &Limits, party: u64, number: u64) -> Res
         tasks::Phase::Held { why, .. } => PhaseLine::Held { reason: *why, revision: row.revisions.hold },
         tasks::Phase::Ended(_) => PhaseLine::Ended,
     };
-    Ok(Chip { number, title, executor, phase })
+    Chip { number, title, executor, phase }
 }
 
 pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, Missing> {

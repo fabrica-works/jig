@@ -114,6 +114,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<people::ProjectRole>::worst_case(limits.people.projects)?)?
         .checked_add(List::<tasks::ViewTask>::worst_case(limits.tasks.tasks.checked_mul(2)?)?)?
         .checked_add(Map::<(u32, u64), u64>::worst_case(limits.tasks.tasks)?)?
+        .checked_add(Map::<(u64, u64), u64>::worst_case(limits.tasks.tasks)?)?
         .checked_add(pending)?
         .checked_add(roles)?;
     for child in children {

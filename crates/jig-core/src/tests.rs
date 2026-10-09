@@ -682,3 +682,476 @@ fn documents_part_keys_are_preserved_or_refused_whole() {
     assert!(document_worst_case(&limits.documents).is_some());
     assert!(worst_case(&limits).is_some());
 }
+
+#[test]
+fn documents_proposal_tracks_the_current_holder_and_funding_after_a_pass() {
+    let (mut core, limits) = make_tree();
+    let next = new_row(&core, 5, tasks::Funder::Task(1), None);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Propose {
+            reply_to: ReplyTo::new(Token::new(50)),
+            proposal: tasks::Proposal {
+                number: 10,
+                proposer: 2,
+                project: 1,
+                action: tasks::ProposalAction::Batch(Box::new([next])),
+                reason: Box::from(&b"More room"[..]),
+                as_holder: true,
+                state: tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Task(1), since: Wall::EPOCH },
+            },
+        },
+    );
+    let target = Subject::Proposal { proposer: Proposer::Task(2), number: 10 };
+    let Document::Proposal(proposal) = make(&core, &limits, 1, &target, &window()).unwrap() else { panic!() };
+    assert_eq!(proposal.reason.bytes.as_ref(), b"More room");
+    assert_eq!(proposal.waiting.holder, tasks::ProposalHolder::Task(1));
+    assert_eq!(proposal.funding.get(0).unwrap().source, tasks::Funder::Task(1));
+    assert_eq!(proposal.funding.get(0).unwrap().needed, 10);
+    assert_eq!(proposal.funding.get(0).unwrap().left, Some(70));
+    assert_eq!(proposal.funding.get(0).unwrap().after, Some(60));
+    let ProposalAction::Batch(batch) = proposal.action else { panic!() };
+    assert_eq!(batch.get(0).unwrap().number, 5);
+    assert_eq!(batch.get(0).unwrap().authority.ceiling.spend, 10);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::DecideProposal {
+            reply_to: ReplyTo::new(Token::new(51)),
+            proposer: 2,
+            proposal: 10,
+            message: None,
+            by: tasks::Party::Task(1),
+            decision: tasks::ProposalDecision::Pass { holder: tasks::ProposalHolder::Person(1) },
+        },
+    );
+    let Document::Proposal(proposal) = make(&core, &limits, 1, &target, &window()).unwrap() else { panic!() };
+    assert_eq!(proposal.waiting.holder, tasks::ProposalHolder::Person(1));
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::WithdrawProposal { reply_to: ReplyTo::new(Token::new(52)), proposer: 2, proposal: 10 },
+    );
+    assert_eq!(make(&core, &limits, 1, &target, &window()), Err(Missing::Ended));
+}
+
+#[test]
+fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after() {
+    let (mut core, limits) = make_tree();
+    let mut changed = core.tasks.task(2).unwrap().spec.clone();
+    changed.words = Box::from(&b"New question"[..]);
+    let mut wider = core.tasks.task(2).unwrap().authority.clone();
+    wider.budget.spend = 15;
+    let actions = [
+        tasks::ProposalAction::Effect {
+            connector: 2,
+            authority: wider.clone(),
+            attempt: 7,
+            completion: 8,
+            position: 9,
+            purpose: 11,
+        },
+        tasks::ProposalAction::Amend {
+            task: 2,
+            amendment: tasks::Amendment {
+                spec: Some(changed),
+                wake: None,
+                dependencies: None,
+                authority: Some(wider.clone()),
+                reason: Box::from(&b"Reconsider"[..]),
+            },
+        },
+        tasks::ProposalAction::Widen { task: 2, authority: wider },
+        tasks::ProposalAction::Release { task: 3 },
+    ];
+    for (offset, action) in actions.into_iter().enumerate() {
+        let number = u64::try_from(offset).unwrap() + 20;
+        send_task(
+            &mut core,
+            &limits,
+            tasks::Event::Propose {
+                reply_to: ReplyTo::new(Token::new(number)),
+                proposal: tasks::Proposal {
+                    number,
+                    proposer: 2,
+                    project: 1,
+                    action,
+                    reason: Box::from(&b"Reason"[..]),
+                    as_holder: false,
+                    state: tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Task(1), since: Wall::EPOCH },
+                },
+            },
+        );
+        let Document::Proposal(proposal) =
+            make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(2), number }, &window()).unwrap()
+        else {
+            panic!()
+        };
+        match proposal.action {
+            ProposalAction::Effect { part, purpose, .. } => {
+                assert_eq!(part.connector, 2);
+                assert_eq!(part.key, PartKey::Number(number));
+                assert_eq!(purpose, 11);
+                assert!(proposal.funding.is_empty());
+            }
+            ProposalAction::Amend { before, after, .. } => {
+                assert_eq!(before.spec.words.bytes.as_ref(), b"Work\nDetailed instructions");
+                assert_eq!(after.spec.words.bytes.as_ref(), b"New question");
+                assert_eq!(after.authority.ceiling.spend, 15);
+                assert_eq!(proposal.funding.get(0).unwrap().needed, 5);
+            }
+            ProposalAction::Widen { before, after, .. } => {
+                assert_eq!(before.ceiling.spend, 10);
+                assert_eq!(after.ceiling.spend, 15);
+            }
+            ProposalAction::Release { hold, .. } => assert_eq!(hold.unwrap().reason, tasks::Hold::Budget),
+            ProposalAction::Batch(_) => panic!(),
+        }
+        send_task(
+            &mut core,
+            &limits,
+            tasks::Event::WithdrawProposal { reply_to: ReplyTo::new(Token::new(90)), proposer: 2, proposal: number },
+        );
+    }
+}
+
+#[test]
+fn documents_every_escalation_reason_keeps_the_task_story_and_independent_revision() {
+    let reasons = [
+        tasks::Hold::Failures(tasks::Class::Lost),
+        tasks::Hold::Stalled,
+        tasks::Hold::Dependency(2),
+        tasks::Hold::Stopped,
+        tasks::Hold::StoppedBy { party: 1 },
+        tasks::Hold::Drift,
+        tasks::Hold::Effects,
+        tasks::Hold::EffectFailed,
+        tasks::Hold::Uncertain { entry: 4 },
+        tasks::Hold::Budget,
+        tasks::Hold::Deadline,
+        tasks::Hold::HoldsWaited,
+        tasks::Hold::ResourceUnavailable,
+        tasks::Hold::ResourceAccess,
+        tasks::Hold::PoolLost { pool: 6 },
+        tasks::Hold::Procedure,
+    ];
+    for reason in reasons {
+        let (mut core, limits) = make_tree();
+        send_task(&mut core, &limits, tasks::Event::Hold { task: 2, why: reason });
+        let Document::Escalation(value) = make(&core, &limits, 1, &Subject::Escalation { task: 2 }, &window()).unwrap()
+        else {
+            panic!()
+        };
+        let hold = value.task.hold.unwrap();
+        assert_eq!(hold.reason, reason);
+        assert_eq!(hold.revision, core.tasks.task(2).unwrap().revisions.hold);
+        assert_eq!(hold.before, PriorPhase::Active(tasks::Active::Due));
+        assert_eq!(value.task.budget.numbers.budget, 10);
+        assert_eq!(value.task.lineage.get(0).unwrap().number, 1);
+    }
+}
+
+#[test]
+fn documents_question_words_are_whole_or_refused_and_answered_questions_end() {
+    let (mut core, mut limits) = make_tree();
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Message {
+            reply_to: ReplyTo::new(Token::new(60)),
+            project: 1,
+            task: 1,
+            word: tasks::Word {
+                number: 60,
+                from: tasks::Party::Task(2),
+                kind: tasks::MessageKind::Question,
+                words: Box::from(&b"Whole question?"[..]),
+                at: Wall::from_nanos(9),
+                hits: 1,
+                eligible: true,
+            },
+        },
+    );
+    let target = Subject::Question { task: 1, message: 60 };
+    let Document::Question(question) = make(&core, &limits, 1, &target, &window()).unwrap() else { panic!() };
+    assert_eq!(question.words.as_ref(), b"Whole question?");
+    assert_eq!(question.at, Wall::from_nanos(9));
+    limits.documents.text_bytes = 5;
+    assert_eq!(make(&core, &limits, 1, &target, &window()), Err(Missing::TooLarge));
+    limits.documents.text_bytes = 256;
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Message {
+            reply_to: ReplyTo::new(Token::new(61)),
+            project: 1,
+            task: 1,
+            word: tasks::Word {
+                number: 61,
+                from: tasks::Party::Person(1),
+                kind: tasks::MessageKind::Answer { question: 60 },
+                words: Box::from(&b"Yes"[..]),
+                at: Wall::from_nanos(10),
+                hits: 1,
+                eligible: true,
+            },
+        },
+    );
+    assert_eq!(make(&core, &limits, 1, &target, &window()), Err(Missing::Ended));
+}
+
+#[test]
+fn documents_person_task_has_the_current_revision_holder_and_answer_form() {
+    let (mut core, limits) = make_tree();
+    let mut row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
+    row.executor = tasks::Executor::Person(tasks::PersonAddress::Role(0));
+    row.contract =
+        tasks::Contract::Verdict { choices: Box::new([tasks::Verdict { code: 3, words: 32, followups: 0 }]) };
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(70)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::TakePerson { reply_to: ReplyTo::new(Token::new(71)), task: 5, person: 1 },
+    );
+    let Document::PersonTask(task) = make(&core, &limits, 1, &Subject::PersonTask { task: 5 }, &window()).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(task.address, tasks::PersonAddress::Role(0));
+    assert_eq!(task.taken_by, Some(1));
+    assert_eq!(task.revision, core.tasks.task(5).unwrap().revisions.person);
+    let ContractLine::Verdict { choices, cut } = task.contract else { panic!() };
+    assert!(!cut);
+    assert_eq!(choices.get(0).unwrap().code, 3);
+}
+
+#[test]
+fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() {
+    let (core, limits) = make_tree();
+    let mut row = core.tasks.task(2).unwrap().clone();
+    row.phase = tasks::Phase::Ended(tasks::Ending::Cancelled {
+        reason: Box::from(&b"Done enough"[..]),
+        result: Some(tasks::TaskResult::Report { words: Box::from(&b"Partial work"[..]) }),
+        by: tasks::Party::Person(1),
+        at: Wall::from_nanos(19),
+    });
+    row.ended_at = Some(Wall::from_nanos(19));
+    let result = result_from_row(&core, &limits, 1, &row).unwrap();
+    assert_eq!(result.at, Some(Wall::from_nanos(19)));
+    assert_eq!(result.task.phase, PhaseLine::Ended);
+    let Ending::Cancelled { by, at, result, .. } = result.ending else { panic!() };
+    assert_eq!(by, tasks::Party::Person(1));
+    assert_eq!(at, Wall::from_nanos(19));
+    let ResultValue::Report(words) = result.unwrap() else { panic!() };
+    assert_eq!(words.bytes.as_ref(), b"Partial work");
+    let delegate = ended_delegate_from_row(&limits, &row).unwrap();
+    assert_eq!(delegate.chip.number, 2);
+    assert_eq!(delegate.at, row.ended_at);
+    for ending in [
+        tasks::Ending::Done(tasks::TaskResult::Verdict { code: 3, words: Box::from(&b"Choice"[..]) }),
+        tasks::Ending::Failed { reason: Box::from(&b"Failure"[..]) },
+        tasks::Ending::Done(tasks::TaskResult::Change {
+            connector: 2,
+            kind: 3,
+            resource: 4,
+            words: Box::from(&b"Changed"[..]),
+        }),
+    ] {
+        row.phase = tasks::Phase::Ended(ending);
+        let result = result_from_row(&core, &limits, 1, &row).unwrap();
+        match result.ending {
+            Ending::Done(ResultValue::Verdict { code, .. }) => assert_eq!(code, 3),
+            Ending::Done(ResultValue::Change { part, .. }) => assert_eq!(part.key, PartKey::Number(4)),
+            Ending::Failed(reason) => assert_eq!(reason.bytes.as_ref(), b"Failure"),
+            Ending::Done(ResultValue::Report(_) | ResultValue::Failure(_)) | Ending::Cancelled { .. } => panic!(),
+        }
+    }
+}
+
+#[test]
+fn documents_notes_carry_the_child_revision_and_cut_display_text_only() {
+    let (core, mut limits) = make_tree();
+    limits.documents.text_bytes = 5;
+    let mut references = List::with_capacity(1);
+    references.push(2).unwrap();
+    let entry = notes::Entry {
+        name: 8,
+        scope: notes::Scope::Project { project: 1 },
+        description: Box::from(&b"Description"[..]),
+        body: Box::from(&b"Full body"[..]),
+        references,
+        author: notes::Author::Task { task: 2, attempt: 1 },
+        revision: 7,
+    };
+    let note = note_from_entry(&core, &limits, 1, &entry).unwrap();
+    assert_eq!(note.revision, 7);
+    assert_eq!(note.writer, entry.author);
+    assert_eq!(note.tasks.get(0), Some(&2));
+    assert!(note.description.cut);
+    assert!(note.body.cut);
+    assert_eq!(note.changed, None);
+    assert_eq!(make(&core, &limits, 1, &Subject::Note { note: 8 }, &window()), Err(Missing::Ended));
+}
+
+#[test]
+fn documents_history_retains_every_change_kind_and_a_passed_proposal_state() {
+    let (_, limits) = make_tree();
+    let changes = [
+        tasks::Change::Cancelled,
+        tasks::Change::Released,
+        tasks::Change::Amended,
+        tasks::Change::Prioritised { priority: 3 },
+        tasks::Change::Moved,
+        tasks::Change::Proposed,
+        tasks::Change::ProposalPassed,
+        tasks::Change::ProposalAccepted,
+        tasks::Change::ProposalRejected,
+        tasks::Change::ProposalWithdrawn,
+    ];
+    for change in changes {
+        let row = tasks::History {
+            task: 2,
+            revision: 5,
+            by: tasks::Party::Person(1),
+            change,
+            reason: Box::from(&b"Why"[..]),
+            proposal: Some(Box::new(tasks::Proposal {
+                number: 6,
+                proposer: 2,
+                project: 1,
+                action: tasks::ProposalAction::Release { task: 2 },
+                reason: Box::from(&b"Why"[..]),
+                as_holder: false,
+                state: tasks::ProposalState::Pending {
+                    holder: tasks::ProposalHolder::Person(1),
+                    since: Wall::from_nanos(8),
+                },
+            })),
+        };
+        let history = history_from_row(&limits, &row).unwrap();
+        assert_eq!(history.change, change);
+        assert_eq!(history.by, row.by);
+        assert_eq!(history.reason.bytes.as_ref(), b"Why");
+        assert_eq!(
+            history.proposal.unwrap().state,
+            ProposalHistoryState::Pending(ProposalWaiting {
+                holder: tasks::ProposalHolder::Person(1),
+                since: Wall::from_nanos(8)
+            })
+        );
+    }
+}
+
+#[test]
+fn documents_project_exposes_two_roles_members_pool_and_resource_parts() {
+    let (mut core, limits) = make_tree();
+    let mut policy = core.authority.policy(1).unwrap().clone();
+    let mut second = policy.roles[0].clone();
+    second.number = 1;
+    policy.roles = Box::new([policy.roles[0].clone(), second]);
+    let mut admitted = authority_limits();
+    admitted.roles = 2;
+    core.authority = authority::Domain::new(core.authority.rules().clone(), admitted).unwrap();
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    let first_identity = core.people.identity(1).unwrap().clone();
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    let mut restored = Queue::with_capacity(people::max_out(&limits.people));
+    for record in [
+        people::Stored::Person { number: 1, identity: first_identity },
+        people::Stored::Person {
+            number: 2,
+            identity: people::Identity {
+                key: people::IdentityKey {
+                    provider: core.settings.deployment_provider,
+                    subject: Box::from(&b"service"[..]),
+                },
+                login: Box::from(&b"service"[..]),
+                name: Box::from(&b"Service"[..]),
+            },
+        },
+        people::Stored::Roles {
+            project: 1,
+            holdings: Box::new([
+                people::Holding { person: 1, role: people::Role::Owner },
+                people::Holding { person: 2, role: people::Role::Maintainer },
+            ]),
+        },
+    ] {
+        people::step(&mut core.people, &env, people::Event::Restore { record }, &mut restored);
+        while restored.pop().is_some() {}
+    }
+    people::step(&mut core.people, &env, people::Event::Restored, &mut restored);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::CarvePool {
+            reply_to: ReplyTo::new(Token::new(80)),
+            project: 1,
+            person: 1,
+            period: 1,
+            budget: 200,
+        },
+    );
+    core.resource_roles
+        .insert(
+            resources::Key {
+                project: 1,
+                name: tasks::Name { connector: 2, path: Box::new([Box::from(&b"resource"[..])]) },
+            },
+            connector::ResourceRole::Owned,
+        )
+        .unwrap();
+    let Document::Project(project) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(project.policy.roles.len(), 2);
+    assert_eq!(project.members.get(0).unwrap().role, people::Role::Owner);
+    assert_eq!(project.members.get(1).unwrap().kind, people::Kind::Service);
+    assert_eq!(project.members.get(1).unwrap().role, people::Role::Maintainer);
+    assert_eq!(project.current_period.unwrap().numbers.reserved, 300);
+    assert_eq!(project.pools.get(0).unwrap().left, 200);
+    assert_eq!(project.resources.get(0).unwrap().part.connector, 2);
+    assert_eq!(project.resources.get(0).unwrap().role, ResourceRole::Owned);
+    assert_eq!(project.spend.get(0).unwrap().chip.number, 1);
+    assert_eq!(project.spend.get(0).unwrap().numbers.reserved, 30);
+}
+
+#[test]
+fn documents_lifecycle_history_keeps_holds_and_endings() {
+    let (_, limits) = make_tree();
+    let row = tasks::Milestone {
+        task: 2,
+        position: 3,
+        phase: tasks::Phase::Held { was: tasks::Was::Active(tasks::Active::Due), why: tasks::Hold::Deadline },
+    };
+    let line = milestone_from_row(&limits, &row);
+    assert_eq!(line.position, 3);
+    assert_eq!(
+        line.phase,
+        MilestonePhase::Held { before: PriorPhase::Active(tasks::Active::Due), why: tasks::Hold::Deadline }
+    );
+    assert_eq!(line.at, None);
+    let line = milestone_from_row(
+        &limits,
+        &tasks::Milestone {
+            task: 2,
+            position: 4,
+            phase: tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::from(&b"Failure"[..]) }),
+        },
+    );
+    let MilestonePhase::Ended(Ending::Failed(words)) = line.phase else { panic!() };
+    assert_eq!(words.bytes.as_ref(), b"Failure");
+}
