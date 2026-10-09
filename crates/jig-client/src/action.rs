@@ -56,6 +56,12 @@ pub enum Act {
     StartChat { project: u32 },
     /// Open a listed chat and mark its replies through what was displayed.
     OpenChat { task: u64 },
+    /// Choose the new goal charter, budget, deadline and priority.
+    GoalForm { form: crate::pages::project::goals::GoalForm },
+    /// Filter the project live task source.
+    FilterTasks { filter: crate::contract::TaskFilter },
+    /// Select note scope and description search.
+    FilterNotes { filter: crate::pages::project::NoteFilter },
     /// Select held or live plan rows.
     FilterPlan { filter: crate::pages::task::PlanFilter },
     /// Read the task history alone or with its subtree.

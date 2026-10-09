@@ -115,6 +115,7 @@ struct NoteFields {
 }
 /// Opens only an act present and admitted in the engine's document.
 pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>, act: ActKind) {
+    domain.project_page.form.confirmation = None;
     close(domain);
     if domain.blocked || domain.confirmed.is_none() {
         return;

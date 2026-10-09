@@ -43,6 +43,8 @@ pub enum Read {
     Conversations { project: Option<u32>, after: Option<Cursor> },
     /// Live or ended goals.
     Goals { project: u32, ended: bool, after: Option<Cursor> },
+    /// Project spend by period, with an opaque continuation.
+    Spend { project: u32, after: Option<Cursor> },
     /// One project.
     Project { project: u32 },
     /// Scoped notes.
@@ -136,6 +138,8 @@ pub enum ReadValue {
     Conversations(Box<ConversationPage>),
     /// Goals.
     Goals(Box<GoalPage>),
+    /// Project spend periods.
+    Spend(Box<SpendPage>),
     /// A project.
     Project(Box<Project>),
     /// Notes.
@@ -168,4 +172,12 @@ pub enum ReadResult {
     Value(ReadValue),
     /// Why no value came.
     None(ReadNone),
+}
+
+/// Bounded past spend periods with opaque page ends.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SpendPage {
+    pub rows: List<super::SpendPeriod>,
+    pub before: Option<Cursor>,
+    pub after: Option<Cursor>,
 }

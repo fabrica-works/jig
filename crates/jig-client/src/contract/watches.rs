@@ -19,6 +19,8 @@ pub enum Subject {
     Inbox { window: u32 },
     /// Project live goals.
     Goals { project: u32 },
+    /// Filtered live tasks in one project.
+    Tasks { project: u32, filter: super::TaskFilter, window: u32 },
     /// Party live chats.
     Conversations,
     /// A task run text from the client offset.
@@ -42,6 +44,8 @@ pub enum Delivery {
     Inbox(Box<Inbox>),
     /// The live goals.
     Goals(Box<Goals>),
+    /// Filtered live project tasks.
+    Tasks(Box<super::Tasks>),
     /// The live chats.
     Conversations(Box<Conversations>),
     /// Provisional run text.

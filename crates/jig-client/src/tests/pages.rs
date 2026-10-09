@@ -29,7 +29,6 @@ pub(super) fn project(number: u32, chats: bool) -> ProjectRole {
         pool: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(7) },
     }
 }
-#[test]
 fn the_frame_counts_needs_exactly_and_caps_updates_on_every_page() {
     let mut domain = Domain::new(&LIMITS, 1);
     let f = start(&mut domain, List::with_capacity(0));
@@ -58,7 +57,6 @@ fn the_frame_counts_needs_exactly_and_caps_updates_on_every_page() {
     assert_eq!(domain.frame_summary().project, Some(1));
     assert_eq!(Address::task(42), Address::Task { task: 42, section: crate::address::TaskSection::Overview });
 }
-#[test]
 fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     let mut domain = Domain::new(&LIMITS, 2);
     let mut navigation = Navigation::new(8);
@@ -96,7 +94,6 @@ fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     assert!(fresh.configure_navigation(Navigation::new(9)).is_err());
     assert_eq!(own.place(), Place::Elsewhere);
 }
-#[test]
 fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility() {
     let mut domain = Domain::new(&LIMITS, 4);
     let f = start(&mut domain, List::with_capacity(0));
@@ -134,7 +131,6 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
     delivered(&mut other, Time::ZERO, f, frame(7));
     assert_eq!(other.page(), &Page::SomeoneElse);
 }
-#[test]
 fn deployment_without_a_role_is_missing_and_never_watched() {
     let mut domain = Domain::new(&LIMITS, 8);
     let f = start(&mut domain, List::with_capacity(0));
@@ -200,7 +196,6 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
         budget: Budget { total: 20, own: 5, ended: 1, reserved: 2, left: 12, funder: Actor::Party(7) },
     }
 }
-#[test]
 fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder() {
     for group in [InboxGroup::Proposals, InboxGroup::Results] {
         let (mut domain, page) = live_inbox(20);
@@ -241,7 +236,6 @@ fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_h
         assert!(domain.inbox().rows.is_empty());
     }
 }
-#[test]
 fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
     let (mut domain, page) = live_inbox(21);
     drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates });
@@ -253,7 +247,7 @@ fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
     for request in &out {
         if let Request::Send { ask, .. } = request {
             assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Results { through: 8 } });
-            count += 1;
+            count = count.checked_add(1).expect("bounded emitted requests");
         }
     }
     assert_eq!(count, 1);
@@ -265,7 +259,6 @@ fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
     }
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates }).is_empty());
 }
-#[test]
 fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() {
     let (mut domain, _) = live_inbox(22);
     let entered =
@@ -324,7 +317,6 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
     }
     assert!(mark);
 }
-#[test]
 fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
     let mut about = Domain::new(&LIMITS, 24);
     let f = start(&mut about, List::with_capacity(0));
@@ -396,7 +388,6 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
     }
 }
 
-#[test]
 fn task_sections_and_activity_sources_follow_the_executor() {
     use crate::{address::TaskSection, pages::task};
     for executor in [
@@ -465,7 +456,6 @@ fn tree_node(number: u64, phase: Phase, held: u32) -> TreeNode {
         held_below: held,
     }
 }
-#[test]
 fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
     use crate::pages::task::{self, PlanFilter};
     let mut limits = LIMITS;
@@ -552,7 +542,6 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
     };
     assert_eq!(*what, Read::Ended { task: 9, after: Some(cursor) });
 }
-#[test]
 fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
     use crate::{
         action::{Act, End},
@@ -603,7 +592,6 @@ fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
     };
     assert_eq!(*what, Read::History { task: 8, subtree: true, after: Some(cursor) });
 }
-#[test]
 fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
     use crate::address::TaskSection;
     let mut domain = Domain::new(&LIMITS, 22);
@@ -634,4 +622,434 @@ fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
 
 fn empty_phase_counts() -> PhaseCounts {
     PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+}
+
+fn project_document() -> Project {
+    let mut acts = List::with_capacity(1);
+    acts.push(Offered { act: ActKind::SetGoal, admission: Admission::Allowed }).unwrap();
+    Project {
+        number: 1,
+        period: 1,
+        spend_lines: List::with_capacity(0),
+        name: text(b"shop"),
+        policy: Policy {
+            ceiling: super::objects::authority(),
+            period: 1,
+            spend: 0,
+            roles: List::with_capacity(0),
+            requirements: List::with_capacity(0),
+            deciders: List::with_capacity(0),
+        },
+        roles: List::with_capacity(0),
+        spend: project(1, false).pool,
+        pools: List::with_capacity(0),
+        resources: List::with_capacity(0),
+        services: List::with_capacity(0),
+        recurring: List::with_capacity(0),
+        parts: List::with_capacity(0),
+        acts,
+    }
+}
+fn project_open(section: ProjectSection) -> (Domain, Box<[Request]>) {
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    let mut value = frame(7);
+    let mut role = project(1, true);
+    role.goals = List::with_capacity(1);
+    role.goals.push(Charter { number: 1, name: text(b"lead") }).unwrap();
+    value.projects = List::with_capacity(1);
+    value.projects.push(role).unwrap();
+    delivered(&mut domain, Time::ZERO, f, value);
+    let opened =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Project { project: 1, section }) });
+    (domain, opened)
+}
+fn project_read(requests: &[Request]) -> skein_lib::Token {
+    for request in requests {
+        if let Request::Read { read, what: Read::Project { project: 1 } } = request {
+            return *read;
+        }
+    }
+    panic!("project read")
+}
+fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine {
+    let mut chip = super::objects::chip(number);
+    chip.phase = phase;
+    GoalLine {
+        chip,
+        priority,
+        progress: empty_phase_counts(),
+        budget: project(1, false).pool,
+        deadline: None,
+        held_below: 2,
+        changed: skein_lib::Wall::from_nanos(changed),
+    }
+}
+fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
+    use crate::{
+        action::{Act, End},
+        pages::project::GOALS_WINDOW,
+    };
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let project_read = project_read(&opened);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read: project_read, result: ReadResult::Value(ReadValue::Project(Box::new(project_document()))) },
+    );
+    let watch = open_token(&opened);
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(9, 20, Phase::Waiting, 1)).unwrap();
+    rows.push(goal_line(8, 1, Phase::Running, 2)).unwrap();
+    let facts = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: true }))),
+        },
+    );
+    assert_eq!(domain.project_page().goals.as_slice()[0].chip.task, 8);
+    assert_eq!(domain.project_page().goals.as_slice()[1].chip.task, 9);
+    assert!(domain.project_page().goals_more);
+    assert!(domain.objects().find(ObjectKey::Task(8)).is_some());
+    let Request::Read { read, what: Read::Task { task: 8 } } = facts[0] else {
+        panic!("goal task facts read");
+    };
+    let mut task = super::confirmation::task();
+    task.goal = true;
+    task.priority = Some(1);
+    task.acts = List::with_capacity(1);
+    task.acts.push(Offered { act: ActKind::Prioritise, admission: Admission::Allowed }).unwrap();
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(task))) });
+    let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    assert_eq!(crate::acts::offered(domain.objects().get(id).unwrap(), ActKind::Prioritise), Admission::Allowed);
+
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(8, 1, Phase::Running, 2)).unwrap();
+    rows.push(goal_line(9, 2, Phase::Running, 1)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: false }))),
+        },
+    );
+    assert_eq!(domain.project_page().goals.as_slice()[0].chip.task, 9);
+    let Request::Read { read, .. } = opened[3] else { panic!("ended goals read") };
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
+    rows.push(goal_line(9, 2, Phase::Done, 2)).unwrap();
+    let cursor = Cursor { value: text(b"ended goals edge") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().ended.as_slice()[0].chip.task, 9);
+    domain.reclaim();
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(GOALS_WINDOW), end: End::After } },
+    );
+    let Request::Read { what, .. } = &more[0] else { panic!("ended goals continuation") };
+    assert_eq!(*what, Read::Goals { project: 1, ended: true, after: Some(cursor) });
+    project_task_filters_and_spend_pages();
+}
+fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
+    use crate::{action::Act, fields::Purpose, pages::project::goals::GoalForm};
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project_document()))) },
+    );
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"new goal") } });
+    let form = GoalForm { project: 1, charter: 1, budget: 21, deadline: None, priority: 2 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    let opened = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(opened.is_empty());
+    let confirmation = domain.project_page().form.confirmation.as_ref().unwrap();
+    assert!(confirmation.proposed);
+    assert_eq!(confirmation.pool_left, 20);
+    assert!(domain.confirmation().is_none());
+    let mut task = super::confirmation::task();
+    task.acts = List::with_capacity(1);
+    task.acts.push(Offered { act: ActKind::Write, admission: Admission::Allowed }).unwrap();
+    let id =
+        domain.objects.name(ObjectKey::Task(8), crate::objects::Source::Window { generation: 1, number: 99 }).unwrap();
+    assert!(domain.objects.put(ObjectKey::Task(8), crate::objects::Body::Task(Box::new(task))));
+    crate::confirm::open(&mut domain, &super::spine::env(Time::ZERO), id, ActKind::Write);
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert!(domain.confirmation().is_some());
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(domain.project_page().form.confirmation.is_some());
+    assert!(domain.confirmation().is_none());
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let Request::Send { request, ask, .. } = &sent[0] else { panic!("one goal intent") };
+    assert_eq!(
+        **ask,
+        Ask::SetGoal {
+            project: 1,
+            spec: text(b"new goal"),
+            executor: Executor::Agent { charter: 1 },
+            budget: 21,
+            priority: 2,
+            deadline: None
+        }
+    );
+    assert_eq!(sent.len(), 1);
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    let request = *request;
+    drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Refused(Refusal::NotOffered) });
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
+    assert_eq!(domain.fields().get(Purpose::NewGoal).unwrap().text, text(b"new goal"));
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let Request::Send { request, .. } = sent[0] else { panic!("retry goal") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"later words") } },
+    );
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Answered { request, answer: Answer::Done(Outcome::Made { what: Made::Goal { task: 42 } }) },
+    );
+    assert_eq!(domain.address, Address::task(42));
+    assert_eq!(domain.fields().get(Purpose::NewGoal).unwrap().text, text(b"later words"));
+}
+fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
+    use crate::{action::Act, objects::Body};
+    let (mut domain, opened) = project_open(ProjectSection::Notes);
+    let Request::Read { read, .. } = opened[2] else { panic!("notes read") };
+    let mut acts = List::with_capacity(2);
+    acts.push(Offered { act: ActKind::EditNote, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
+    let note = Note {
+        number: 3,
+        revision: Revision { value: 1 },
+        scope: NoteScope::Project(1),
+        description: text(b"description"),
+        body: text(b"body"),
+        by: Actor::Party(7),
+        tasks: List::with_capacity(0),
+        changed: skein_lib::Wall::EPOCH,
+        acts,
+    };
+    let mut rows = List::with_capacity(1);
+    rows.push(note.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage { rows, before: None, after: None }))),
+        },
+    );
+    let id = domain.project_page().notes.as_slice()[0];
+    assert_eq!(crate::acts::offered(domain.objects().get(id).unwrap(), ActKind::EditNote), Admission::Allowed);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::DeleteNote } });
+    assert_eq!(domain.confirmation().unwrap().revision, Some(Revision { value: 1 }));
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let Request::Send { request, .. } = sent[0] else { panic!("delete note request") };
+    let refresh = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Answered {
+            request,
+            answer: Answer::Refused(Refusal::Moved { now: Revision { value: 2 }, what: Moved::Note }),
+        },
+    );
+    let Request::Read { read, .. } = refresh[0] else { panic!("moved note read") };
+    let mut newer = note;
+    newer.revision = Revision { value: 2 };
+    newer.body = text(b"new body");
+    let mut rows = List::with_capacity(1);
+    rows.push(newer).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage { rows, before: None, after: None }))),
+        },
+    );
+    let Some(Body::Note { document, .. }) = &domain.objects().get(id).unwrap().body else { panic!("updated note") };
+    assert_eq!(document.revision, Revision { value: 2 });
+    assert_eq!(document.body, text(b"new body"));
+    assert_eq!(domain.project_page().notes.as_slice()[0], id);
+    domain.reclaim();
+    let moved = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Settings }) },
+    );
+    let read = project_read(&moved);
+    let mut doc = project_document();
+    let resource = Part::Resource { connector: 1, path: text(b"resource") };
+    doc.resources = List::with_capacity(1);
+    doc.resources.push(resource.clone()).unwrap();
+    let shown = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) },
+    );
+    assert_eq!(shown.as_ref(), &[Request::ShowPart { part: resource, generation: 2 }]);
+    assert_eq!(domain.project_page().document.as_ref().unwrap().period, 1);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
+    let watch = open_token(&opened);
+    let part = Part::Deployment { connector: 1 };
+    let mut parts = List::with_capacity(1);
+    parts.push(part.clone()).unwrap();
+    let doc = Deployment {
+        hosts: List::with_capacity(0),
+        accounts: List::with_capacity(0),
+        capacity: List::with_capacity(0),
+        proposals: 3,
+        refusals: List::with_capacity(0),
+        parts,
+    };
+    let shown = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(doc))) },
+    );
+    assert_eq!(shown.as_ref(), &[Request::ShowPart { part, generation: 3 }]);
+    assert_eq!(domain.deployment_page().document.as_ref().unwrap().proposals, 3);
+}
+
+fn project_task_filters_and_spend_pages() {
+    use crate::{
+        action::{Act, End},
+        pages::project::SPEND_WINDOW,
+    };
+    let (mut domain, opened) = project_open(ProjectSection::Tasks);
+    let watch = open_token(&opened);
+    let filter = domain.project_page().task_filter;
+    let mut rows = List::with_capacity(2);
+    rows.push(TaskLine {
+        chip: tree_node(8, Phase::Running, 0).chip,
+        goal: Some(10),
+        requester: Actor::Party(7),
+        asked_by_me: true,
+        changed: skein_lib::Wall::from_nanos(1),
+    })
+    .unwrap();
+    rows.push(TaskLine {
+        chip: tree_node(9, Phase::Running, 0).chip,
+        goal: Some(10),
+        requester: Actor::Party(8),
+        asked_by_me: false,
+        changed: skein_lib::Wall::from_nanos(2),
+    })
+    .unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks {
+                project: 1,
+                filter,
+                rows: rows.clone(),
+                more: true,
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().tasks.as_slice()[0].chip.task, 9);
+    assert!(domain.project_page().tasks_more);
+    let filter = TaskFilter {
+        phase: Some(Phase::Running),
+        executor: Some(Executor::Party { party: 7 }),
+        goal: Some(10),
+        asked_by_me: true,
+    };
+    let opened = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterTasks { filter } });
+    let watch = open_token(&opened);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { project: 1, filter, rows, more: false }))),
+        },
+    );
+    assert_eq!(domain.project_page().tasks.len(), 1);
+    assert!(!domain.project_page().tasks_more);
+    assert_eq!(domain.project_page().tasks.as_slice()[0].chip.task, 8);
+    let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    assert_eq!(domain.objects().get(id).unwrap().project, Some(1));
+    let (mut domain, opened) = project_open(ProjectSection::Spend);
+    let Request::Read { read, what: Read::Spend { project: 1, .. } } = opened[2] else { panic!("past spend read") };
+    let mut rows = List::with_capacity(1);
+    rows.push(SpendPeriod {
+        period: 1,
+        budget: project(1, false).pool,
+        pools: List::with_capacity(0),
+        tasks: List::with_capacity(0),
+    })
+    .unwrap();
+    let cursor = Cursor { value: text(b"past period edge") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Spend(Box::new(SpendPage {
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().spend.as_slice()[0].period, 1);
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(SPEND_WINDOW), end: End::After } },
+    );
+    let Request::Read { what, .. } = &more[0] else { panic!("past spend continuation") };
+    assert_eq!(*what, Read::Spend { project: 1, after: Some(cursor) });
+}
+
+// One process per page family keeps startup costs within this session's share;
+// each scenario above still allocates its own state and retains every assertion.
+#[test]
+fn frame_navigation_and_non_work_pages_follow_owner_facts() {
+    the_frame_counts_needs_exactly_and_caps_updates_on_every_page();
+    navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages();
+    non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility();
+    deployment_without_a_role_is_missing_and_never_watched();
+}
+#[test]
+fn inbox_and_conversation_pages_preserve_context_order_and_request_lifetimes() {
+    inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder();
+    opening_updates_sends_one_mark_seen_for_the_newest_result_displayed();
+    conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor();
+    starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer();
+}
+#[test]
+fn task_pages_preserve_executor_sections_tree_history_and_part_lifetimes() {
+    task_sections_and_activity_sources_follow_the_executor();
+    task_plan_keeps_folded_held_counts_and_filters_without_losing_rows();
+    task_history_pages_and_scope_changes_discard_old_scope_reads();
+    task_parts_follow_the_section_and_leave_with_the_page_generation();
+}
+#[test]
+fn project_and_deployment_pages_preserve_facts_confirmations_and_revision_checks() {
+    project_board_orders_live_waiting_and_ended_goals_and_names_task_cards();
+    a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once();
+    project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts();
 }

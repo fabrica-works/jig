@@ -527,6 +527,7 @@ pub struct Conversations {
 /// A goal on the project board.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GoalLine {
+    pub changed: Wall,
     pub chip: Chip,
     pub priority: u32,
     pub progress: PhaseCounts,
@@ -546,6 +547,8 @@ pub struct Goals {
 /// A project, its policy, roles, spend and parts.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Project {
+    pub period: u64,
+    pub spend_lines: List<TaskSpend>,
     pub number: u32,
     pub name: Text,
     pub policy: Policy,
@@ -760,4 +763,44 @@ pub struct WriterSlot {
 pub struct LiveDelegate {
     pub chip: Chip,
     pub takeover_budget: u64,
+}
+
+/// Project task list context, without copying whole task documents.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TaskFilter {
+    pub phase: Option<Phase>,
+    pub executor: Option<Executor>,
+    pub goal: Option<u64>,
+    pub asked_by_me: bool,
+}
+/// One project task's context, supplied by its authoritative owner.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TaskLine {
+    pub asked_by_me: bool,
+    pub chip: Chip,
+    pub goal: Option<u64>,
+    pub requester: Actor,
+    pub changed: Wall,
+}
+/// Bounded live project tasks in last-change order.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Tasks {
+    pub project: u32,
+    pub filter: TaskFilter,
+    pub rows: List<TaskLine>,
+    pub more: bool,
+}
+/// Spend attributed to one goal or chat, largest first.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TaskSpend {
+    pub chip: Chip,
+    pub spent: u64,
+}
+/// Whole current or historical project-period spend facts.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SpendPeriod {
+    pub period: u64,
+    pub budget: Budget,
+    pub pools: List<Pool>,
+    pub tasks: List<TaskSpend>,
 }

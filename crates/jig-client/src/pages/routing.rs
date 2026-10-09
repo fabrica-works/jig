@@ -3,7 +3,7 @@
 use crate::{
     Domain, Request,
     action::End,
-    address::{Address, Place, ProjectSection, TaskSection},
+    address::{Address, Place, TaskSection},
     contract::{self, Delivery, Limit, ObjectKey, Part, PartyKind, Read, ReadResult, ReadValue, Subject},
     facts::Fact,
     objects::{Body, Source},
@@ -81,6 +81,8 @@ pub(crate) fn navigate(
     out.push(Request::PartsLeft { generation: domain.generation });
     domain.objects.clear();
     domain.task_page.clear();
+    domain.project_page.clear();
+    domain.deployment_page.document = None;
     domain.clock.page_times = false;
     domain.inbox.rows.clear();
     domain.inbox.reading = None;
@@ -175,25 +177,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
                 TaskSection::History => read(domain, 2, Read::History { task, subtree: false, after: None }, out),
             }
         }
-        Address::Project { project, section } => {
-            match section {
-                ProjectSection::Overview | ProjectSection::Goals | ProjectSection::Tasks => {
-                    open(domain, env, Subject::Goals { project }, out);
-                }
-                ProjectSection::Notes => read(
-                    domain,
-                    3,
-                    Read::Notes { scope: contract::NoteScope::Project(project), description: None, after: None },
-                    out,
-                ),
-                ProjectSection::Resources
-                | ProjectSection::Policy
-                | ProjectSection::Roles
-                | ProjectSection::Spend
-                | ProjectSection::Recurring => {}
-            }
-            read(domain, 0, Read::Project { project }, out);
-        }
+        Address::Project { .. } => crate::pages::project::enter(domain, env, out),
         Address::Deployment => open(domain, env, Subject::Deployment, out),
     }
 }
@@ -257,6 +241,7 @@ pub(crate) fn parts(domain: &mut Domain, env: &Env<crate::Limits>, values: &[Par
         count = count.saturating_add(1);
     }
 }
+
 fn one(domain: &mut Domain, source: Source, key: ObjectKey, body: Body) {
     let missed = domain.objects.replace(source, &[key]);
     if missed > 0 {
@@ -345,23 +330,8 @@ pub(crate) fn delivery(
             domain.timed_page(!domain.inbox.rows.is_empty());
             domain.changed();
         }
-        Delivery::Goals(goals) => {
-            let mut keys = List::with_capacity(env.limits.rows);
-            for row in &goals.rows {
-                match keys.push(ObjectKey::Task(row.chip.task)) {
-                    Ok(()) => {}
-                    Err(_) => break,
-                }
-            }
-            names(domain, env, source, keys, out);
-            for row in goals.rows.into_boxed() {
-                let key = ObjectKey::Task(row.chip.task);
-                let stored = domain.objects.put(key, Body::Chip(row.chip));
-                if stored {
-                    domain.changed();
-                }
-            }
-        }
+        Delivery::Goals(goals) => crate::pages::project::live(domain, env, source, *goals, out),
+        Delivery::Tasks(tasks) => crate::pages::project::task_rows(domain, env, source, *tasks, out),
         Delivery::Conversations(conversations) => {
             domain.chats.more = conversations.more;
             if domain.conversation_rows.edges.reaches(End::Before) {
@@ -376,7 +346,7 @@ pub(crate) fn delivery(
             }
             domain.changed();
         }
-        Delivery::Deployment(deployment) => parts(domain, env, deployment.parts.as_slice(), out),
+        Delivery::Deployment(deployment) => crate::pages::deployment::document(domain, env, deployment, out),
     }
 }
 fn read_body(domain: &mut Domain, key: ObjectKey, body: Body) {
@@ -411,6 +381,15 @@ pub(crate) fn read_result(
                 return;
             }
         }
+        Read::Notes { scope, description, .. } => {
+            let valid = match &domain.project_page.note_filter {
+                Some(filter) => filter.scope == *scope && filter.description == *description,
+                None => false,
+            };
+            if !valid {
+                return;
+            }
+        }
         Read::Frame
         | Read::Task { .. }
         | Read::Proposal { .. }
@@ -423,7 +402,7 @@ pub(crate) fn read_result(
         | Read::Inbox { .. }
         | Read::InboxGroup { .. }
         | Read::Goals { .. }
-        | Read::Notes { .. }
+        | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Deployment => {}
     }
@@ -464,7 +443,9 @@ fn read_value(
     out: &mut Queue<Request>,
 ) {
     match value {
-        ReadValue::Frame(_) | ReadValue::Notes(_) => {}
+        ReadValue::Frame(_) => {}
+        ReadValue::Notes(page) => crate::pages::project::notes::page(domain, source, *page),
+        ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
         ReadValue::Proposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
@@ -540,18 +521,9 @@ fn read_value(
                 }
             }
         }
-        ReadValue::Goals(page) => {
-            let mut keys = List::with_capacity(env.limits.rows);
-            for goal in &page.rows {
-                match keys.push(ObjectKey::Task(goal.chip.task)) {
-                    Ok(()) => {}
-                    Err(_) => break,
-                }
-            }
-            names(domain, env, source, keys, out);
-        }
-        ReadValue::Project(project) => parts(domain, env, project.parts.as_slice(), out),
-        ReadValue::Deployment(deployment) => parts(domain, env, deployment.parts.as_slice(), out),
+        ReadValue::Goals(page) => crate::pages::project::ended(domain, env, source, *page, out),
+        ReadValue::Project(project) => crate::pages::project::document(domain, env, project, out),
+        ReadValue::Deployment(deployment) => crate::pages::deployment::document(domain, env, deployment, out),
     }
 }
 

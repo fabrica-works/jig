@@ -103,6 +103,7 @@ pub(crate) fn stream(
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
+        | Subject::Tasks { .. }
         | Subject::Goals { .. }
         | Subject::Conversations
         | Subject::Deployment => return,

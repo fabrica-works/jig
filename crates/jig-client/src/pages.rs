@@ -33,6 +33,8 @@ pub enum Page {
 pub enum IntentPurpose {
     /// A new chat whose task page opens once made.
     StartChat,
+    /// A goal made or proposed from the project board.
+    SetGoal,
     /// One explicitly opened read position.
     Seen(crate::contract::Seen),
 }

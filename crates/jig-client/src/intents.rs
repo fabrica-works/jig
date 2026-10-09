@@ -321,6 +321,7 @@ fn unknown(domain: &mut crate::Domain, request: Token, out: &mut Queue<Request>)
                 domain.chats.starting = None;
                 domain.chats.words = None;
             }
+            crate::pages::project::goals::unknown(domain, request);
             crate::notices::show(domain, crate::notices::Kind::PageUnknown { purpose });
         }
     }

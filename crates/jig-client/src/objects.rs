@@ -431,6 +431,14 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
             }
             Some(false)
         }
+        Delivery::Tasks(tasks) => {
+            for row in &tasks.rows {
+                if key == ObjectKey::Task(row.chip.task) {
+                    return Some(true);
+                }
+            }
+            Some(false)
+        }
         Delivery::Goals(goals) => {
             for row in &goals.rows {
                 if key == ObjectKey::Task(row.chip.task) {
@@ -511,6 +519,7 @@ fn read_key(what: &crate::contract::Read) -> Option<ObjectKey> {
         | Read::InboxGroup { .. }
         | Read::Inbox { .. }
         | Read::Conversations { .. }
+        | Read::Spend { .. }
         | Read::Goals { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
@@ -634,6 +643,7 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
         | ReadValue::History(_)
         | ReadValue::Conversations(_)
         | ReadValue::Ended(_)
+        | ReadValue::Spend(_)
         | ReadValue::Goals(_)
         | ReadValue::Project(_)
         | ReadValue::Deployment(_) => None,
@@ -703,6 +713,13 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
         crate::contract::Delivery::Inbox(inbox) => {
             for entry in &inbox.entries {
                 if rows.push(Context { object: entry.object, project: entry.project }).is_err() {
+                    break;
+                }
+            }
+        }
+        crate::contract::Delivery::Tasks(tasks) => {
+            for row in &tasks.rows {
+                if rows.push(Context { object: ObjectKey::Task(row.chip.task), project: tasks.project }).is_err() {
                     break;
                 }
             }

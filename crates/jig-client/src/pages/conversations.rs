@@ -135,6 +135,7 @@ pub(crate) fn answered(
     out: &mut Queue<Request>,
 ) {
     match purpose {
+        IntentPurpose::SetGoal => crate::pages::project::goals::answered(domain, env, request, generation, answer, out),
         IntentPurpose::Seen(_) => {
             match answer {
                 Answer::Done(_) => {}

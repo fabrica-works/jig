@@ -64,6 +64,8 @@ pub struct Domain {
     pub(crate) link: Link,
     pub(crate) page: Page,
     pub(crate) inbox: crate::pages::inbox::Inbox,
+    pub(crate) project_page: crate::pages::project::ProjectPage,
+    pub(crate) deployment_page: crate::pages::deployment::DeploymentPage,
     pub(crate) task_page: crate::pages::task::TaskPage,
     pub(crate) chats: crate::pages::conversations::State,
     pub(crate) navigation: crate::pages::navigation::Navigation,
@@ -112,6 +114,8 @@ impl Domain {
             link: Link::Starting,
             page: Page::Starting,
             inbox: crate::pages::inbox::Inbox::new(limits.rows),
+            project_page: crate::pages::project::ProjectPage::new(limits.rows),
+            deployment_page: crate::pages::deployment::DeploymentPage::new(),
             task_page: crate::pages::task::TaskPage::new(limits.rows),
             chats: crate::pages::conversations::State::new(),
             navigation: crate::pages::navigation::Navigation::new(limits.navigation_entries),
@@ -150,6 +154,16 @@ impl Domain {
     #[must_use]
     pub const fn inbox(&self) -> &crate::pages::inbox::Inbox {
         &self.inbox
+    }
+    /// Current project facts, board, notes and the goal form.
+    #[must_use]
+    pub const fn project_page(&self) -> &crate::pages::project::ProjectPage {
+        &self.project_page
+    }
+    /// Current admitted deployment facts.
+    #[must_use]
+    pub const fn deployment_page(&self) -> &crate::pages::deployment::DeploymentPage {
+        &self.deployment_page
     }
     /// The task header and its bounded plan and history choices.
     #[must_use]
@@ -459,6 +473,11 @@ impl Domain {
             self.frame_watch = None;
         }
     }
+    pub(crate) fn close_one(&mut self, id: Id<Watch>, out: &mut Queue<Request>) {
+        if let Some(watch) = self.watches.get_mut(id) {
+            close_watch(watch, id, &mut self.timers, out);
+        }
+    }
     pub(crate) fn close_page(&mut self, out: &mut Queue<Request>) {
         for (id, ()) in &self.watch_ids {
             let watch = self.watches.get_mut(*id).expect("registered watch exists");
@@ -600,13 +619,7 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
                 out.push(Request::Fact { fact: Fact::Refused { which } });
             }
         },
-        Act::Dismiss => {
-            if domain.confirming.is_some() {
-                crate::confirm::close(domain);
-            } else {
-                crate::notices::dismiss_first(domain);
-            }
-        }
+        Act::Dismiss => dismiss_act(domain),
         Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
         Act::StartChat { project } => crate::pages::conversations::start(domain, env, project, out),
         Act::OpenChat { task } => crate::pages::conversations::open_chat(domain, env, task, out),
@@ -622,7 +635,12 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
             crate::conversation::routing::more(domain, window, end, out);
             crate::pages::conversations::more(domain, window, end, out);
             crate::pages::task::more(domain, window, end, out);
+            crate::pages::project::more(domain, window, end, out);
         }
+        Act::GoalForm { form } => crate::pages::project::goals::configure(domain, form),
+        Act::FilterTasks { filter } => crate::pages::project::tasks(domain, env, filter, out),
+        Act::FilterNotes { filter } => crate::pages::project::notes::filter(domain, filter, out),
+        Act::Submit { field: crate::fields::Purpose::NewGoal } => crate::pages::project::goals::open(domain),
         Act::FilterPlan { filter } => crate::pages::task::filter(domain, filter),
         Act::HistoryScope { subtree } => crate::pages::task::history(domain, subtree, out),
         Act::OpenEnded { task } => crate::pages::task::open_ended(domain, task, out),
@@ -656,7 +674,7 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
         Act::Again { again } => crate::confirm::again(domain, again),
         Act::Dispose { task, take_over } => crate::confirm::dispose(domain, task, take_over),
         Act::Change { change } => crate::confirm::change(domain, *change),
-        Act::Confirm => crate::confirm::send(domain, out),
+        Act::Confirm => confirm_act(domain, out),
         Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out),
         Act::Submit { .. } | Act::Fold { .. } => {}
     }
@@ -715,6 +733,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                     | Delivery::Tree(_)
                     | Delivery::Chips(_)
                     | Delivery::Inbox(_)
+                    | Delivery::Tasks(_)
                     | Delivery::Goals(_)
                     | Delivery::Conversations(_)
                     | Delivery::Run(_)
@@ -841,6 +860,7 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
+        | Subject::Tasks { .. }
         | Subject::Goals { .. }
         | Subject::Conversations
         | Subject::Deployment => {}
@@ -877,6 +897,7 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
+                | Subject::Tasks { .. }
                 | Subject::Goals { .. }
                 | Subject::Conversations
                 | Subject::Run { .. }
@@ -1000,4 +1021,21 @@ pub fn next_deadline(domain: &Domain) -> Option<Time> {
 /// Frees retired slots at the loop's reclaim point.
 pub fn reclaim(domain: &mut Domain) {
     domain.reclaim();
+}
+
+fn confirm_act(domain: &mut Domain, out: &mut Queue<Request>) {
+    if domain.project_page.form.confirmation.is_some() {
+        crate::pages::project::goals::send(domain, out);
+    } else {
+        crate::confirm::send(domain, out);
+    }
+}
+fn dismiss_act(domain: &mut Domain) {
+    if domain.project_page.form.confirmation.take().is_some() {
+        domain.changed();
+    } else if domain.confirming.is_some() {
+        crate::confirm::close(domain);
+    } else {
+        crate::notices::dismiss_first(domain);
+    }
 }

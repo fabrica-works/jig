@@ -11,6 +11,8 @@ pub enum ProjectSection {
     Tasks,
     /// Project notes.
     Notes,
+    /// Policy, resources, roles, spend and recurring settings.
+    Settings,
     /// Adopted resources.
     Resources,
     /// Project policy.
