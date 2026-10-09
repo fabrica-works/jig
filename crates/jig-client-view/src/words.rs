@@ -182,6 +182,45 @@ impl Words {
             Outcome::Changed => self.text(b, JigPhrase::Changed, &[]),
         }
     }
+    /// Say the supplied missing authority without claiming proposal eligibility.
+    pub fn lacking(&self, b: &mut Builder, lacking: &Lacking) {
+        match lacking {
+            Lacking::Approver => self.text(b, JigPhrase::ApprovalAuthorityMissing, &[]),
+            Lacking::Budget { needed, left } => {
+                self.text(b, JigPhrase::BudgetMissing, &[Hole::Amount(*left), Hole::Amount(*needed)]);
+            }
+            Lacking::Grant(grant) => self.text(
+                b,
+                JigPhrase::GrantMissing,
+                &[
+                    Hole::Number(u64::from(grant.kind)),
+                    Hole::Number(u64::from(grant.connector)),
+                    name(grant.pattern.bytes()),
+                ],
+            ),
+            Lacking::TaskKind(executor) => {
+                self.text(b, JigPhrase::KindMissing, &[]);
+                self.executor(b, *executor);
+            }
+            Lacking::Depth { needed, allowed } => self.text(
+                b,
+                JigPhrase::DepthMissing,
+                &[Hole::Number(u64::from(*needed)), Hole::Number(u64::from(*allowed))],
+            ),
+            Lacking::Deadline { asked, latest } => {
+                self.text(
+                    b,
+                    JigPhrase::DeadlineMissing,
+                    &[Hole::Wall(self.adjusted_wall(*asked)), Hole::Wall(self.adjusted_wall(*latest))],
+                );
+            }
+            Lacking::Tasks { needed, left } => self.text(
+                b,
+                JigPhrase::TasksMissing,
+                &[Hole::Number(u64::from(*needed)), Hole::Number(u64::from(*left))],
+            ),
+        }
+    }
     /// Say the refusal's facts, without deriving whether an act is permitted.
     pub fn refusal(&self, b: &mut Builder, refusal: &Refusal) {
         match refusal {
@@ -190,41 +229,12 @@ impl Words {
                 JigPhrase::RoleMissing,
                 &[Hole::Number(u64::from(*project)), Hole::Number(u64::from(*role))],
             ),
-            Refusal::Authority { lacking } => match lacking {
-                Lacking::Budget { needed, left } => {
-                    self.text(b, JigPhrase::BudgetMissing, &[Hole::Amount(*left), Hole::Amount(*needed)]);
+            Refusal::Authority { lacking, proposable } => {
+                self.lacking(b, lacking);
+                if let Some(false) = proposable {
+                    self.text(b, JigPhrase::NobodyMayAccept, &[]);
                 }
-                Lacking::Grant(grant) => self.text(
-                    b,
-                    JigPhrase::GrantMissing,
-                    &[
-                        Hole::Number(u64::from(grant.kind)),
-                        Hole::Number(u64::from(grant.connector)),
-                        name(grant.pattern.bytes()),
-                    ],
-                ),
-                Lacking::TaskKind(executor) => {
-                    self.text(b, JigPhrase::KindMissing, &[]);
-                    self.executor(b, *executor);
-                }
-                Lacking::Depth { needed, allowed } => self.text(
-                    b,
-                    JigPhrase::DepthMissing,
-                    &[Hole::Number(u64::from(*needed)), Hole::Number(u64::from(*allowed))],
-                ),
-                Lacking::Deadline { asked, latest } => {
-                    self.text(
-                        b,
-                        JigPhrase::DeadlineMissing,
-                        &[Hole::Wall(self.adjusted_wall(*asked)), Hole::Wall(self.adjusted_wall(*latest))],
-                    );
-                }
-                Lacking::Tasks { needed, left } => self.text(
-                    b,
-                    JigPhrase::TasksMissing,
-                    &[Hole::Number(u64::from(*needed)), Hole::Number(u64::from(*left))],
-                ),
-            },
+            }
             Refusal::Limit { which } => match which {
                 Limit::LiveTasks { project, limit } => self.text(
                     b,

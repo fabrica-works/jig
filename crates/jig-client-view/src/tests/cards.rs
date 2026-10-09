@@ -184,7 +184,9 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
         Card::Deciding { request: Some(Token::new(1)), progress: Progress::Retrying },
         Card::Deciding { request: Some(Token::new(1)), progress: Progress::Parked },
         Card::Deciding { request: Some(Token::new(1)), progress: Progress::Unknown },
-        Card::Refused { refusal: Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 } } },
+        Card::Refused {
+            refusal: Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 }, proposable: None },
+        },
         Card::Unknown { act: ActKind::Cancel, look: Read::Task { task: 7 } },
         Card::Leaving {
             how: Left::Answered {

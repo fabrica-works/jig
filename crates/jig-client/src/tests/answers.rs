@@ -79,7 +79,7 @@ fn durable_outcomes_remain_on_open_cards_and_decided_first_leaves_with_all_facts
 fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_losing_the_refusal() {
     let refusals = [
         Refusal::Role { project: 1, role: 2 },
-        Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 } },
+        Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 }, proposable: None },
         Refusal::Limit { which: Limit::LiveTasks { project: 1, limit: 2 } },
         Refusal::Moved { now: Revision { value: 12 }, what: Moved::Spec },
         Refusal::Ended { how: Ending::Done },

@@ -48,7 +48,10 @@ fn offered(act: ActKind) -> List<Offered> {
         Offered { act, admission: Admission::Allowed },
         Offered {
             act: ActKind::PassUp,
-            admission: Admission::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 } }),
+            admission: Admission::Refused(Refusal::Authority {
+                lacking: Lacking::Budget { needed: 40, left: 12 },
+                proposable: None,
+            }),
         },
     ])
 }
@@ -949,7 +952,10 @@ fn notice_scenarios(words: &crate::words::Words) {
         Kind::Link(jig_client::link::Link::Live),
         Kind::Answer { object: ObjectKey::Task(8), answer: Answer::Done(Outcome::Changed) },
         Kind::PageAnswer {
-            answer: Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 } }),
+            answer: Answer::Refused(Refusal::Authority {
+                lacking: Lacking::Budget { needed: 40, left: 12 },
+                proposable: None,
+            }),
         },
         Kind::Unknown { object: ObjectKey::Escalation(8), act: ActKind::Release },
         Kind::PageUnknown { purpose: jig_client::pages::IntentPurpose::SetGoal },
@@ -1151,6 +1157,7 @@ fn jig_object_cards_hold_actions_confirmations_and_notices() {
     sizes::scenario(&words);
     closing_connectors_use_their_owners_words(&words);
     person_chip_preserves_absent_readiness(&words);
+    authority_refusal_uses_only_supplied_proposal_eligibility(&words);
 }
 
 fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
@@ -1194,5 +1201,17 @@ fn person_chip_preserves_absent_readiness(words: &crate::words::Words) {
         b.close();
         let tree = b.finish();
         assert_eq!(contains(&tree, b"Since"), since.is_some());
+    }
+}
+
+fn authority_refusal_uses_only_supplied_proposal_eligibility(words: &crate::words::Words) {
+    for proposable in [None, Some(true), Some(false)] {
+        let mut b = Builder::new(&limits());
+        b.open(Role::Page);
+        words.refusal(&mut b, &Refusal::Authority { lacking: Lacking::Approver, proposable });
+        b.close();
+        let tree = b.finish();
+        assert!(contains(&tree, b"Proposal approval authority is missing"));
+        assert_eq!(contains(&tree, b"Nobody in this project may accept it"), proposable == Some(false));
     }
 }

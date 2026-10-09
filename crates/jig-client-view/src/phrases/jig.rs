@@ -250,6 +250,10 @@ pub enum JigPhrase {
     ClosingConnector,
     /// The named connector owns the effects being settled.
     ClosingEffects,
+    /// No policy recipient may accept this proposal.
+    NobodyMayAccept,
+    /// Missing proposal approval authority.
+    ApprovalAuthorityMissing,
     /// Held.
     Held,
     /// Ended.
@@ -893,6 +897,8 @@ impl JigPhrase {
             Self::Closing => 119,
             Self::ClosingConnector => 403,
             Self::ClosingEffects => 404,
+            Self::NobodyMayAccept => 405,
+            Self::ApprovalAuthorityMissing => 406,
             Self::Held => 120,
             Self::Ended => 121,
             Self::WaitingParty => 122,
@@ -1310,6 +1316,8 @@ impl JigPhrase {
             | Self::Reply
             | Self::ClosingConnector
             | Self::ClosingEffects
+            | Self::NobodyMayAccept
+            | Self::ApprovalAuthorityMissing
             | Self::LoadingPart
             | Self::LoadingObject
             | Self::ActWrite
@@ -1569,7 +1577,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 379] = [
+pub const ALL: [JigPhrase; 381] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -1692,6 +1700,8 @@ pub const ALL: [JigPhrase; 379] = [
     JigPhrase::Closing,
     JigPhrase::ClosingConnector,
     JigPhrase::ClosingEffects,
+    JigPhrase::NobodyMayAccept,
+    JigPhrase::ApprovalAuthorityMissing,
     JigPhrase::Held,
     JigPhrase::Ended,
     JigPhrase::WaitingParty,
@@ -1953,7 +1963,7 @@ pub const ALL: [JigPhrase; 379] = [
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(379);
+    let mut rows = List::with_capacity(381);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

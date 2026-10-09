@@ -755,6 +755,7 @@ fields!(SpendPage { rows, before, after });
 impl Payload for Lacking {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Approver => Some(0),
             Self::Budget { needed, left } => sum(&[needed.heap(bounds), left.heap(bounds)]),
             Self::Grant(value0) => sum(&[value0.heap(bounds)]),
             Self::TaskKind(value0) => sum(&[value0.heap(bounds)]),
@@ -785,7 +786,7 @@ impl Payload for Refusal {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Role { project, role } => sum(&[project.heap(bounds), role.heap(bounds)]),
-            Self::Authority { lacking } => sum(&[lacking.heap(bounds)]),
+            Self::Authority { lacking, proposable } => sum(&[lacking.heap(bounds), proposable.heap(bounds)]),
             Self::Limit { which } => sum(&[which.heap(bounds)]),
             Self::Moved { now, what } => sum(&[now.heap(bounds), what.heap(bounds)]),
             Self::Ended { how } => sum(&[how.heap(bounds)]),

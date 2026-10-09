@@ -377,7 +377,7 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
             }
         );
         let answer = if refused {
-            Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 2 } })
+            Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 2 }, proposable: None })
         } else {
             Answer::Done(Outcome::Made { what: Made::Chat { task: 42 } })
         };
@@ -931,6 +931,31 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
     crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), refused, &mut out);
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
     assert_eq!(domain.project_page().form.refusal, Some(Refusal::Role { project: 1, role: 2 }));
+    let nobody = Refusal::Authority { lacking: Lacking::Approver, proposable: Some(false) };
+    let mut refused = domain.project_page().document.as_ref().unwrap().clone();
+    refused.acts.get_mut(0).unwrap().admission = Admission::Bounded {
+        within: Bounds::Goal {
+            pool_left: 20,
+            charters: {
+                let mut rows = List::with_capacity(1);
+                rows.push(99).unwrap();
+                rows
+            },
+            latest: Some(latest),
+            budget: 3,
+            maximum_budget: 100,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Refused(nobody.clone()),
+    };
+    crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), refused, &mut out);
+    let form = GoalForm { project: 1, charter: 99, budget: 4, deadline: Some(latest), priority: 1 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    let emitted = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(emitted.is_empty());
+    assert_eq!(domain.project_page().form.refusal, Some(nobody));
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
 }
 
 fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {

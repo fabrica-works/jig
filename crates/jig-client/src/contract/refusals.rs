@@ -5,6 +5,8 @@ use skein_lib::Wall;
 /// The authority the engine found lacking.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Lacking {
+    /// No policy role may accept this kind of proposal.
+    Approver,
     /// The budget needed and left.
     Budget { needed: u64, left: u64 },
     /// The grant missing.
@@ -64,8 +66,8 @@ pub enum Moved {
 pub enum Refusal {
     /// The project role does not allow the act.
     Role { project: u32, role: u16 },
-    /// Authority lacked a named permission or amount.
-    Authority { lacking: Lacking },
+    /// Authority lacked a named permission or amount; proposal eligibility is supplied when known.
+    Authority { lacking: Lacking, proposable: Option<bool> },
     /// An admission limit was reached.
     Limit { which: Limit },
     /// The decided thing changed.

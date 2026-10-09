@@ -172,7 +172,6 @@ fn nested_chip_payload_bounds(chip: &Chip) {
 #[test]
 fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     bounded_offer_payloads_and_predictions();
-    closing_connector_payload_bounds();
     let mut setup = script();
     let chip = Chip {
         task: 8,
@@ -244,7 +243,10 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     setup.rules.push(Rule {
         party: None,
         ask: ask.clone(),
-        answer: Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 100, left: 5 } }),
+        answer: Answer::Refused(Refusal::Authority {
+            lacking: Lacking::Budget { needed: 100, left: 5 },
+            proposable: None,
+        }),
         changes: vec![],
     });
     let mut engine = Engine::new(setup, 3).expect("valid script");
@@ -783,6 +785,7 @@ fn restart_faults_and_application_hooks_keep_one_durable_truth() {
 
 fn bounded_offer_payloads_and_predictions() {
     use jig_client::contract::Bounds as DraftBounds;
+    closing_connector_payload_bounds();
     let mut direct = authority();
     direct.budget = 110;
     let mut ceiling = direct.clone();

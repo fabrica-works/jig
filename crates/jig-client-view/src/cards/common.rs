@@ -7,7 +7,7 @@ use crate::{
 use jig_client::{
     Domain,
     action::Act,
-    contract::{ActKind, Admission, Authority, Budget, Offered, Part, Passed, Recipient, Refusal},
+    contract::{ActKind, Admission, Authority, Budget, Offered, Part, Passed, Recipient},
     fields::Purpose,
     objects::{Card, Object},
 };
@@ -169,7 +169,7 @@ pub fn trail(b: &mut Builder, rows: &List<Passed>, words: &Words) {
         words.wall(b, passed.at);
         b.text(Run::Plain, passed.reason.bytes());
         if let Some(lacking) = &passed.lacking {
-            words.refusal(b, &Refusal::Authority { lacking: lacking.clone() });
+            words.lacking(b, lacking);
         }
     }
 }
