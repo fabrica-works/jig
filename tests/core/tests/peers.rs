@@ -56,7 +56,6 @@ fn acts(world: &mut World, party: usize, script: Box<[Act]>) {
     world.drain();
 }
 
-#[test]
 fn a_scripted_worker_takes_turns_answers_calls_and_finishes_with_acknowledgements() {
     let mut world = scripted(
         201,
@@ -82,7 +81,6 @@ fn a_scripted_worker_takes_turns_answers_calls_and_finishes_with_acknowledgement
     assert_eq!(peers.workers[0].actual_spent, 2);
 }
 
-#[test]
 fn three_workers_and_the_engines_own_slot_use_the_same_host_scripts() {
     let (config, limits) = fixture(202, 1);
     let workers = [0, 7, 8, 9]
@@ -117,7 +115,6 @@ fn three_workers_and_the_engines_own_slot_use_the_same_host_scripts() {
     assert!(peers.quiescent(), "{:?}", world.trace);
 }
 
-#[test]
 fn a_members_chat_proposes_a_goal_it_cannot_fund_and_a_maintainer_accepts_it_as_their_own() {
     let mut world = scripted(
         203,
@@ -155,7 +152,6 @@ fn a_members_chat_proposes_a_goal_it_cannot_fund_and_a_maintainer_accepts_it_as_
     );
 }
 
-#[test]
 fn a_person_chooses_between_two_reports_and_the_result_reaches_its_requester() {
     let mut world = scripted(
         204,
@@ -192,7 +188,6 @@ fn a_person_chooses_between_two_reports_and_the_result_reaches_its_requester() {
     assert!(peers.quiescent(), "{:?}", world.trace);
 }
 
-#[test]
 fn a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt() {
     let mut world = scripted(
         205,
@@ -236,7 +231,6 @@ fn a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt() {
     assert!(peers.quiescent(), "{:?}", world.trace);
 }
 
-#[test]
 fn a_request_sent_twice_creates_one_chat_and_replays_the_same_answer() {
     let mut world = scripted(206, vec![Box::new([Script::Finish { report: Box::from(&b"done"[..]) }])], false);
     acts(
@@ -267,7 +261,6 @@ fn a_request_sent_twice_creates_one_chat_and_replays_the_same_answer() {
     assert_eq!(replies[0], replies[1]);
 }
 
-#[test]
 fn a_worker_reconnects_and_resends_retained_turns_after_hello() {
     let mut world = scripted(
         207,
@@ -299,4 +292,17 @@ fn a_worker_reconnects_and_resends_retained_turns_after_hello() {
         2,
         "retained turn follows the new hello"
     );
+}
+
+// Each scenario keeps its own fresh world and all original assertions.
+// A shared entrypoint avoids one process startup per short scenario.
+#[test]
+fn peers_scenarios() {
+    a_scripted_worker_takes_turns_answers_calls_and_finishes_with_acknowledgements();
+    three_workers_and_the_engines_own_slot_use_the_same_host_scripts();
+    a_members_chat_proposes_a_goal_it_cannot_fund_and_a_maintainer_accepts_it_as_their_own();
+    a_person_chooses_between_two_reports_and_the_result_reaches_its_requester();
+    a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt();
+    a_request_sent_twice_creates_one_chat_and_replays_the_same_answer();
+    a_worker_reconnects_and_resends_retained_turns_after_hello();
 }

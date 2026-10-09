@@ -53,6 +53,10 @@ pub struct Domain {
     /// The parent has loaded its claims: strays' deadlines run.
     pub(crate) loaded: bool,
     pub(crate) facts: Facts,
+    pub(crate) lost_hosts: Map<Token, crate::history::LostHost>,
+    pub(crate) hello_refusals: Queue<crate::HelloRefusalRecord>,
+    pub(crate) host_history_lost: u64,
+    pub(crate) hello_history_lost: u64,
 }
 
 impl Domain {
@@ -93,6 +97,10 @@ impl Domain {
             claims: 0,
             loaded: false,
             facts: Facts::with_capacity(limits.facts),
+            lost_hosts: Map::with_capacity(limits.history),
+            hello_refusals: Queue::with_capacity(limits.history),
+            host_history_lost: 0,
+            hello_history_lost: 0,
         }
     }
 
@@ -127,11 +135,12 @@ impl Domain {
         self.turns.len()
     }
 
-    /// When the earliest alarm falls due.
-    /// Copy bounded connected host facts without changing placement.
+    /// Copy bounded connected and retained lost host facts without changing placement.
     #[must_use]
     pub fn host_views(&self) -> List<crate::HostView> {
-        let mut result = List::with_capacity(self.tokens.capacity());
+        let mut result = List::with_capacity(
+            self.tokens.capacity().checked_add(self.lost_hosts.capacity()).expect("accepted history limits"),
+        );
         for (_, id) in &self.tokens {
             let value = self.channels.get(*id).expect("connected channel");
             result
@@ -141,10 +150,54 @@ impl Domain {
                     slots: value.slots,
                     used: value.hosts.len(),
                     draining: value.draining,
+                    connected: true,
+                    grace_until: None,
                 })
                 .expect("one view per connected channel");
         }
+        for (_, host) in &self.lost_hosts {
+            if self.tokens.contains_key(&host.channel) {
+                continue;
+            }
+            let mut used = 0_u32;
+            for (_, id) in &self.names {
+                let value = self.attempts.get(*id).expect("named attempt");
+                if attempt::lost_host(value) == Some(host.channel) {
+                    used = used.checked_add(1).expect("bounded lost host slots");
+                }
+            }
+            result
+                .push(crate::HostView {
+                    channel: host.channel,
+                    kind: HostKind::Worker,
+                    slots: host.slots,
+                    used,
+                    draining: host.draining,
+                    connected: false,
+                    grace_until: Some(host.until),
+                })
+                .expect("bounded connected and lost hosts");
+        }
         result
+    }
+    /// Recent refused hellos, newest first, independent of diagnostic drains.
+    #[must_use]
+    pub fn hello_refusals(&self) -> List<crate::HelloRefusalRecord> {
+        let mut result = List::with_capacity(self.hello_refusals.capacity());
+        for record in self.hello_refusals.iter().rev() {
+            result.push(*record).expect("bounded hello history");
+        }
+        result
+    }
+    /// Lost channel records evicted from the bounded history.
+    #[must_use]
+    pub const fn host_history_lost(&self) -> u64 {
+        self.host_history_lost
+    }
+    /// Refused hellos evicted from the bounded history.
+    #[must_use]
+    pub const fn hello_history_lost(&self) -> u64 {
+        self.hello_history_lost
     }
     /// Copy bounded current attempt facts, without exposing outstanding replies.
     #[must_use]
@@ -158,7 +211,9 @@ impl Domain {
                 attempt::State::Claimed { at, .. } => (crate::AttemptState::Claimed, Some(at), None),
                 attempt::State::Cancelled { at, .. } => (crate::AttemptState::Cancelled, Some(at), None),
                 attempt::State::Handed { at } => (crate::AttemptState::Handed, Some(at), None),
-                attempt::State::Acknowledged { until } => (crate::AttemptState::Acknowledged, None, Some(until)),
+                attempt::State::Acknowledged { until } => {
+                    (crate::AttemptState::Acknowledged, Some(attempt::Where::Adrift { until }), Some(until))
+                }
                 attempt::State::Stray { at, until } => (crate::AttemptState::Stray, Some(at), until),
                 attempt::State::Kept { at, until, .. } => (crate::AttemptState::Kept, Some(at), until),
                 attempt::State::Fenced { at } => (crate::AttemptState::Fenced, Some(at), None),
@@ -169,7 +224,9 @@ impl Domain {
                     let channel = self.channels.get(channel).expect("attempt host");
                     (crate::Placement::Connected { channel: channel.token, kind: channel.kind }, until)
                 }
-                Some(attempt::Where::Adrift { until }) => (crate::Placement::Adrift { until }, Some(until)),
+                Some(attempt::Where::Adrift { until }) => {
+                    (crate::Placement::Adrift { channel: value.lost_host, until }, Some(until))
+                }
                 None => (crate::Placement::None, until),
             };
             result

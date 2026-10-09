@@ -136,7 +136,6 @@ impl Fake {
     }
 }
 
-#[test]
 fn authority_rejects_task_creation_beyond_each_source_ceiling() {
     for source in [Source::Person(1), Source::Deployment, Source::Task(2)] {
         let mut fake = Fake::new(Recovery::Keyed);
@@ -158,7 +157,6 @@ fn authority_rejects_task_creation_beyond_each_source_ceiling() {
     }
 }
 
-#[test]
 fn authority_rejects_grants_tools_note_scopes_and_delegation_outside_policy() {
     for variant in 0..5 {
         let mut fake = Fake::new(Recovery::Keyed);
@@ -178,7 +176,6 @@ fn authority_rejects_grants_tools_note_scopes_and_delegation_outside_policy() {
     }
 }
 
-#[test]
 fn authority_checks_policy_at_the_effects_decision_and_the_admitted_payload() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -200,7 +197,6 @@ fn authority_checks_policy_at_the_effects_decision_and_the_admitted_payload() {
     }
 }
 
-#[test]
 fn authority_requires_a_met_observation_within_freshness_when_decided() {
     for (state, at) in [(Some(12), 1), (Some(13), 0)] {
         let mut fake = Fake::new(Recovery::Keyed);
@@ -219,7 +215,6 @@ fn authority_requires_a_met_observation_within_freshness_when_decided() {
     }
 }
 
-#[test]
 fn authority_requires_guarded_requirements_to_be_checked_by_the_system() {
     let mut fake = Fake::new(Recovery::Conditional);
     fake.referee.policy.requirements.push(Requirement {
@@ -233,7 +228,6 @@ fn authority_requires_guarded_requirements_to_be_checked_by_the_system() {
     assert_eq!(fake.commit(1, snapshot()).expect_err("guard omitted").promise, Promise::Authority);
 }
 
-#[test]
 fn spend_rejects_overdrawn_direct_below_and_reserved_balances() {
     for variant in 0..3 {
         let mut fake = Fake::new(Recovery::Keyed);
@@ -249,7 +243,6 @@ fn spend_rejects_overdrawn_direct_below_and_reserved_balances() {
     }
 }
 
-#[test]
 fn spend_requires_the_maximum_effect_price_in_the_deciding_commit() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -257,7 +250,6 @@ fn spend_requires_the_maximum_effect_price_in_the_deciding_commit() {
     assert_eq!(fake.commit(1, rows).expect_err("undercharged effect").promise, Promise::Spend);
 }
 
-#[test]
 fn spend_requires_a_reservation_before_assignment_and_each_completion() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.caught(Observed::Assigned { task: 1, attempt: 1, budget: 11 }, Promise::Spend);
@@ -266,7 +258,6 @@ fn spend_requires_a_reservation_before_assignment_and_each_completion() {
     fake.caught(Observed::Completion { task: 1, attempt: 1, cumulative: 11 }, Promise::Spend);
 }
 
-#[test]
 fn spend_allows_only_the_lost_unacknowledged_turn_bound_beyond_budget() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.send(Observed::Assigned { task: 1, attempt: 1, budget: 10 }).expect("reserved assignment");
@@ -275,7 +266,6 @@ fn spend_allows_only_the_lost_unacknowledged_turn_bound_beyond_budget() {
     fake.caught(Observed::Spend { task: 1, spent: 105, lost_bound: 4 }, Promise::Spend);
 }
 
-#[test]
 fn once_catches_two_applied_keyed_or_conditional_copies_across_restart() {
     for recovery in [Recovery::Keyed, Recovery::Conditional] {
         let mut fake = Fake::ready(recovery);
@@ -287,7 +277,6 @@ fn once_catches_two_applied_keyed_or_conditional_copies_across_restart() {
     }
 }
 
-#[test]
 fn once_catches_a_repeated_idempotent_set_with_a_different_target() {
     let mut fake = Fake::ready(Recovery::Idempotent);
     fake.send(Observed::Effect { connector: 1, effect: effect() }).expect("first set");
@@ -296,7 +285,6 @@ fn once_catches_a_repeated_idempotent_set_with_a_different_target() {
     assert_eq!(fake.commit(2, rows).expect_err("idempotent target changed").promise, Promise::Once);
 }
 
-#[test]
 fn once_catches_unrecoverable_repetition_without_a_person_and_accepts_the_decision() {
     let mut fake = Fake::ready(Recovery::Unrecoverable);
     fake.send(Observed::Effect { connector: 1, effect: effect() }).expect("first send");
@@ -307,7 +295,6 @@ fn once_catches_unrecoverable_repetition_without_a_person_and_accepts_the_decisi
     fake.send(Observed::Effect { connector: 1, effect: effect() }).expect("explicit retry");
 }
 
-#[test]
 fn once_catches_partial_and_split_task_batches() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.caught(Observed::Batch { members: vec![1, 2] }, Promise::Once);
@@ -317,7 +304,6 @@ fn once_catches_partial_and_split_task_batches() {
     fake.caught(Observed::Batch { members: vec![1, 2] }, Promise::Once);
 }
 
-#[test]
 fn commit_catches_every_class_of_delivery_before_its_durable_prerequisite() {
     for receipt in [
         Receipt::Task(1),
@@ -339,7 +325,6 @@ fn commit_catches_every_class_of_delivery_before_its_durable_prerequisite() {
     fake.caught(Observed::Assigned { task: 1, attempt: 1, budget: 10 }, Promise::Commit);
 }
 
-#[test]
 fn commit_catches_a_store_that_loses_a_previously_observed_receipt() {
     let mut fake = Fake::ready(Recovery::Keyed);
     let mut rows = snapshot();
@@ -349,7 +334,6 @@ fn commit_catches_a_store_that_loses_a_previously_observed_receipt() {
     fake.caught(Observed::Released { requires: vec![Receipt::Claim(1, 1)] }, Promise::Commit);
 }
 
-#[test]
 fn order_catches_starting_before_dependencies_are_done_and_closed() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -359,7 +343,6 @@ fn order_catches_starting_before_dependencies_are_done_and_closed() {
     fake.caught(Observed::Assigned { task: 1, attempt: 1, budget: 10 }, Promise::Order);
 }
 
-#[test]
 fn order_catches_two_writer_slots_for_the_same_resource() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -367,7 +350,6 @@ fn order_catches_two_writer_slots_for_the_same_resource() {
     assert_eq!(fake.commit(1, rows).expect_err("two writers").promise, Promise::Order);
 }
 
-#[test]
 fn order_catches_pool_over_admission_and_admission_while_shrinking() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -389,7 +371,6 @@ fn order_catches_pool_over_admission_and_admission_while_shrinking() {
     assert_eq!(fake.commit(3, rows).expect_err("new holder while draining").promise, Promise::Order);
 }
 
-#[test]
 fn order_catches_applying_a_condition_to_a_different_prior_state() {
     let mut fake = Fake::new(Recovery::Conditional);
     let mut rows = snapshot();
@@ -401,7 +382,6 @@ fn order_catches_applying_a_condition_to_a_different_prior_state() {
     fake.caught(Observed::Effect { connector: 1, effect: copy }, Promise::Order);
 }
 
-#[test]
 fn order_catches_a_parent_ending_before_its_delegate() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -413,7 +393,6 @@ fn order_catches_a_parent_ending_before_its_delegate() {
     assert_eq!(fake.commit(1, rows).expect_err("delegate is still live").promise, Promise::Order);
 }
 
-#[test]
 fn nothing_lost_catches_words_and_results_missing_their_deadlines() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.send(Observed::Words { task: 1, message: 9 }).expect("words accepted");
@@ -428,7 +407,6 @@ fn nothing_lost_catches_words_and_results_missing_their_deadlines() {
     fake.caught(Observed::Tick, Promise::Lost);
 }
 
-#[test]
 fn nothing_lost_catches_a_proposal_hidden_from_every_live_holder() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -436,7 +414,6 @@ fn nothing_lost_catches_a_proposal_hidden_from_every_live_holder() {
     assert_eq!(fake.commit(1, rows).expect_err("proposal invisible").promise, Promise::Lost);
 }
 
-#[test]
 fn nothing_lost_catches_uncertainty_that_restarts_keep_postponing() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.send(Observed::Uncertain { connector: 1, key: key() }).expect("uncertain");
@@ -448,14 +425,12 @@ fn nothing_lost_catches_uncertainty_that_restarts_keep_postponing() {
     fake.caught(Observed::Restart, Promise::Lost);
 }
 
-#[test]
 fn ownership_catches_writes_outside_the_owned_namespace() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.referee.policy.owned.clear();
     fake.caught(Observed::Effect { connector: 1, effect: effect() }, Promise::Ownership);
 }
 
-#[test]
 fn ownership_catches_overwriting_another_hands_unchecked_change() {
     let mut fake = Fake::ready(Recovery::Keyed);
     let mut copy = effect();
@@ -463,7 +438,6 @@ fn ownership_catches_overwriting_another_hands_unchecked_change() {
     fake.caught(Observed::Effect { connector: 1, effect: copy }, Promise::Ownership);
 }
 
-#[test]
 fn bounded_catches_heap_growth_and_a_story_that_never_ends() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.caught(Observed::Heap { held: 11, maximum: 10 }, Promise::Bounded);
@@ -473,7 +447,6 @@ fn bounded_catches_heap_growth_and_a_story_that_never_ends() {
     fake.caught(Observed::Tick, Promise::Bounded);
 }
 
-#[test]
 fn legitimate_repeated_sets_visible_proposals_and_delivered_words_remain_valid() {
     let mut fake = Fake::ready(Recovery::Idempotent);
     for _ in 0..2 {
@@ -488,7 +461,6 @@ fn legitimate_repeated_sets_visible_proposals_and_delivered_words_remain_valid()
     fake.send(Observed::Restart).expect("satisfied deliveries survive restart");
 }
 
-#[test]
 fn authority_catches_lifetime_delegate_exhaustion_even_after_children_end() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -508,7 +480,6 @@ fn authority_catches_lifetime_delegate_exhaustion_even_after_children_end() {
     assert_eq!(fake.commit(5, rows).expect_err("lifetime capacity exhausted").promise, Promise::Authority);
 }
 
-#[test]
 fn spend_aggregates_all_effect_maxima_in_one_atomic_commit() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -518,7 +489,6 @@ fn spend_aggregates_all_effect_maxima_in_one_atomic_commit() {
     assert_eq!(fake.commit(1, rows).expect_err("two maxima charged only once").promise, Promise::Spend);
 }
 
-#[test]
 fn skeins_referee_drives_the_same_observations_and_keeps_deadlines_across_restart() {
     use skein_lib::Time;
     use skein_world::domain::{Referee as Scenario, Verdict};
@@ -533,7 +503,6 @@ fn skeins_referee_drives_the_same_observations_and_keeps_deadlines_across_restar
     assert!(matches!(scenario.verdict(), Verdict::Failed(_)));
 }
 
-#[test]
 fn authority_catches_claiming_a_holder_exception_without_durable_acceptance() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -541,7 +510,6 @@ fn authority_catches_claiming_a_holder_exception_without_durable_acceptance() {
     assert_eq!(fake.commit(1, rows).expect_err("no durable proposal acceptance").promise, Promise::Authority);
 }
 
-#[test]
 fn nothing_lost_catches_a_result_sent_to_the_wrong_requester() {
     let mut fake = Fake::ready(Recovery::Keyed);
     let mut rows = snapshot();
@@ -551,14 +519,12 @@ fn nothing_lost_catches_a_result_sent_to_the_wrong_requester() {
     fake.caught(Observed::Result { task: 1, to: Source::Person(2) }, Promise::Lost);
 }
 
-#[test]
 fn commit_catches_a_cold_store_that_lost_something_a_host_already_saw() {
     let mut fake = Fake::ready(Recovery::Keyed);
     fake.send(Observed::Released { requires: vec![Receipt::Claim(1, 1)] }).expect("durable claim released");
     fake.caught(Observed::ColdStore { receipts: BTreeSet::new() }, Promise::Commit);
 }
 
-#[test]
 fn durable_words_reach_the_task_even_while_its_requester_keeps_execution_held() {
     let mut fake = Fake::new(Recovery::Keyed);
     let mut rows = snapshot();
@@ -570,7 +536,6 @@ fn durable_words_reach_the_task_even_while_its_requester_keeps_execution_held() 
     fake.send(Observed::Restart).expect("execution need not run to retain delivered words");
 }
 
-#[test]
 fn projections_need_project_grants_and_a_tracked_goal_and_charge_no_task() {
     for invalid in [None, Some(0), Some(1)] {
         let mut fake = Fake::new(Recovery::Keyed);
@@ -620,7 +585,6 @@ fn accepted_batch() -> Snapshot {
     rows
 }
 
-#[test]
 fn an_accepted_batch_uses_the_persons_authority_and_keeps_the_proposer_as_requester() {
     let mut fake = Fake::new(Recovery::Keyed);
     fake.commit(1, proposed_batch()).expect("proposal waits for its covered person");
@@ -631,7 +595,6 @@ fn an_accepted_batch_uses_the_persons_authority_and_keeps_the_proposer_as_reques
     fake.send(Observed::Result { task: 2, to: Source::Task(1) }).expect("result reaches its proposer");
 }
 
-#[test]
 fn a_batch_member_without_its_covered_acceptance_is_rejected() {
     for fault in 0..3 {
         let mut fake = Fake::new(Recovery::Keyed);
@@ -671,4 +634,85 @@ fn a_changed_watch_missing_its_last_delivery_is_caught() {
     assert_eq!(fence.delivered(8), Err("watch delivery preceded its durable fence"));
     fence.delivered(9).expect("replacement also waits for intervening unrelated commit");
     fence.finish().expect("last state reached the party");
+}
+
+// Each helper above still constructs its own outside peer and checks every
+// original contradiction. Grouping keeps process startup within the world budget.
+
+fn authority_referee_cases() {
+    authority_rejects_task_creation_beyond_each_source_ceiling();
+    authority_rejects_grants_tools_note_scopes_and_delegation_outside_policy();
+    authority_checks_policy_at_the_effects_decision_and_the_admitted_payload();
+    authority_requires_a_met_observation_within_freshness_when_decided();
+    authority_requires_guarded_requirements_to_be_checked_by_the_system();
+    authority_catches_lifetime_delegate_exhaustion_even_after_children_end();
+    authority_catches_claiming_a_holder_exception_without_durable_acceptance();
+    projections_need_project_grants_and_a_tracked_goal_and_charge_no_task();
+    an_accepted_batch_uses_the_persons_authority_and_keeps_the_proposer_as_requester();
+    a_batch_member_without_its_covered_acceptance_is_rejected();
+}
+
+fn spend_referee_cases() {
+    spend_rejects_overdrawn_direct_below_and_reserved_balances();
+    spend_requires_the_maximum_effect_price_in_the_deciding_commit();
+    spend_requires_a_reservation_before_assignment_and_each_completion();
+    spend_allows_only_the_lost_unacknowledged_turn_bound_beyond_budget();
+    spend_aggregates_all_effect_maxima_in_one_atomic_commit();
+}
+
+fn once_referee_cases() {
+    once_catches_two_applied_keyed_or_conditional_copies_across_restart();
+    once_catches_a_repeated_idempotent_set_with_a_different_target();
+    once_catches_unrecoverable_repetition_without_a_person_and_accepts_the_decision();
+    once_catches_partial_and_split_task_batches();
+}
+
+fn commit_referee_cases() {
+    commit_catches_every_class_of_delivery_before_its_durable_prerequisite();
+    commit_catches_a_store_that_loses_a_previously_observed_receipt();
+    commit_catches_a_cold_store_that_lost_something_a_host_already_saw();
+}
+
+fn order_referee_cases() {
+    order_catches_starting_before_dependencies_are_done_and_closed();
+    order_catches_two_writer_slots_for_the_same_resource();
+    order_catches_pool_over_admission_and_admission_while_shrinking();
+    order_catches_applying_a_condition_to_a_different_prior_state();
+    order_catches_a_parent_ending_before_its_delegate();
+}
+
+fn nothing_lost_referee_cases() {
+    nothing_lost_catches_words_and_results_missing_their_deadlines();
+    nothing_lost_catches_a_proposal_hidden_from_every_live_holder();
+    nothing_lost_catches_uncertainty_that_restarts_keep_postponing();
+    nothing_lost_catches_a_result_sent_to_the_wrong_requester();
+    durable_words_reach_the_task_even_while_its_requester_keeps_execution_held();
+}
+
+fn ownership_referee_cases() {
+    ownership_catches_writes_outside_the_owned_namespace();
+    ownership_catches_overwriting_another_hands_unchecked_change();
+}
+
+fn bounded_referee_cases() {
+    bounded_catches_heap_growth_and_a_story_that_never_ends();
+}
+
+fn valid_referee_cases() {
+    legitimate_repeated_sets_visible_proposals_and_delivered_words_remain_valid();
+    skeins_referee_drives_the_same_observations_and_keeps_deadlines_across_restart();
+}
+
+// Each named scenario preserves its own fixture and original assertions.
+#[test]
+fn referee_scenario_family() {
+    authority_referee_cases();
+    spend_referee_cases();
+    once_referee_cases();
+    commit_referee_cases();
+    order_referee_cases();
+    nothing_lost_referee_cases();
+    ownership_referee_cases();
+    bounded_referee_cases();
+    valid_referee_cases();
 }

@@ -17,7 +17,7 @@
 //! dropped.
 //!
 //! A lost channel's attempts are kept for the grace, adrift, and the worker
-//! is forgotten. A worker that refuses an assignment as busy is shutting
+//! remains in bounded display history. A worker that refuses an assignment as busy is shutting
 //! down, or fuller than the fleet knew: nothing more is placed on it until
 //! it frees a slot.
 //!
@@ -99,6 +99,16 @@ pub(crate) fn cache(channel: &mut Channel, limits: &Limits, workstream: u64) {
 pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hello: Hello, out: &mut Queue<Request>) {
     let limits = &env.limits;
     if channel == Token::new(0) {
+        crate::history::refused(
+            domain,
+            crate::HelloRefusalRecord {
+                channel,
+                at: env.wall,
+                slots: hello.slots,
+                stop_bound: hello.stop_bound,
+                why: crate::HelloRefusal::ReservedChannel,
+            },
+        );
         domain.facts.push(Fact::TurnedAway);
         out.push(Request::Refuse { channel });
         return;
@@ -109,6 +119,20 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
     }
     let too_long = hello.stop_bound >= limits.grace;
     if domain.channels.is_full() || too_long {
+        crate::history::refused(
+            domain,
+            crate::HelloRefusalRecord {
+                channel,
+                at: env.wall,
+                slots: hello.slots,
+                stop_bound: hello.stop_bound,
+                why: if too_long {
+                    crate::HelloRefusal::StopBound { grace: limits.grace }
+                } else {
+                    crate::HelloRefusal::Workers { limit: limits.workers }
+                },
+            },
+        );
         domain.facts.push(Fact::TurnedAway);
         out.push(Request::Refuse { channel });
         return;
@@ -167,12 +191,15 @@ pub(crate) fn lost(domain: &mut Domain, env: &Env<Limits>, channel: Token) {
         return;
     };
     let entry = domain.channels.get_mut(id).expect("a named channel is in contact");
+    let slots = entry.slots;
+    let draining = entry.draining;
     let hosts = mem::replace(&mut entry.hosts, Set::with_capacity(0));
     let until = env.now.saturating_add(env.limits.grace);
     for &attempt in &hosts {
-        attempt::adrift(domain, attempt, until);
+        attempt::adrift(domain, attempt, channel, until);
     }
     domain.channels.retire(id);
+    crate::history::lost(domain, crate::history::LostHost { channel, slots, draining, until });
     domain.facts.push(Fact::Lost { adrift: hosts.len() });
 }
 

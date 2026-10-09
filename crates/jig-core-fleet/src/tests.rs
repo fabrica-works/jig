@@ -5,8 +5,8 @@ use alloc::boxed::Box;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 use crate::{
-    Answer, Assignment, Bounce, Call, Domain, Event, Fact, Hello, HostKind, Hosted, Kinds, Limits, Message, Phase,
-    Refusal, Request, Undelivered, Withdrawal, fire, max_out, resume, step, worst_case,
+    Answer, Assignment, Bounce, Call, Domain, Event, Fact, Hello, HelloRefusal, HostKind, Hosted, Kinds, Limits,
+    Message, Phase, Refusal, Request, Undelivered, Withdrawal, fire, max_out, resume, step, worst_case,
 };
 
 const LIMITS: Limits = Limits {
@@ -20,6 +20,7 @@ const LIMITS: Limits = Limits {
     turns: 0,
     grace: Duration::from_secs(10),
     facts: 64,
+    history: 4,
 };
 
 const C1: Token = Token::new(101);
@@ -381,6 +382,11 @@ fn a_hello_is_turned_away_only_when_there_is_no_room_for_a_worker() {
     // Its loss is of no worker the fleet knows.
     assert!(h.step(Event::Lost { channel: C4 }).is_empty());
     assert!(h.facts().contains(&Fact::TurnedAway));
+    let record = *h.domain.hello_refusals().get(0).unwrap();
+    assert_eq!(record.channel, C4);
+    assert_eq!(record.slots, 2);
+    assert_eq!(record.why, HelloRefusal::Workers { limit: LIMITS.workers });
+    assert_eq!(*h.domain.hello_refusals().get(0).unwrap(), record);
 }
 
 #[test]
@@ -389,6 +395,52 @@ fn a_second_hello_on_a_channel_is_dropped() {
     h.hello(C1, 2, &[], &[]);
     assert!(h.hello(C1, 1, &[], &[hosted(R1, A1, Phase::Active)]).is_empty());
     assert_eq!(h.domain.attempts(), 0);
+}
+
+#[test]
+fn retained_host_and_hello_history_is_bounded_and_independent_of_diagnostics() {
+    let mut h = Harness::new(Limits { workers: 1, history: 1, facts: 0, ..LIMITS });
+    h.hello(C1, 2, &[], &[]);
+    h.env.wall = Wall::from_nanos(8);
+    h.hello(C2, 2, &[], &[]);
+    assert_eq!(h.domain.hello_refusals().get(0).unwrap().at, Wall::from_nanos(8));
+    h.env.wall = Wall::from_nanos(9);
+    assert_eq!(
+        &*h.step(Event::Hello {
+            channel: C3,
+            hello: Hello {
+                stop_bound: LIMITS.grace,
+                slots: u32::MAX,
+                workstreams: Box::new([]),
+                hosting: Box::new([])
+            },
+        }),
+        &[Request::Refuse { channel: C3 }]
+    );
+    let record = *h.domain.hello_refusals().get(0).unwrap();
+    assert_eq!(record.channel, C3);
+    assert_eq!(record.at, Wall::from_nanos(9));
+    assert_eq!(record.slots, u32::MAX);
+    assert_eq!(record.why, HelloRefusal::StopBound { grace: LIMITS.grace });
+    assert_eq!(h.domain.hello_history_lost(), 1);
+    assert!(h.facts().is_empty());
+    assert_eq!(*h.domain.hello_refusals().get(0).unwrap(), record);
+    h.step(Event::Lost { channel: C1 });
+    h.hello(C2, 2, &[], &[]);
+    h.step(Event::Lost { channel: C2 });
+    assert_eq!(h.domain.host_history_lost(), 1);
+    assert_eq!(h.domain.host_views().len(), 1);
+    assert_eq!(h.domain.host_views().get(0).unwrap().channel, C2);
+    h.hello(C2, 1, &[], &[]);
+    h.step(Event::Lost { channel: C2 });
+    assert_eq!(h.domain.host_views().len(), 1);
+    assert_eq!(h.domain.host_views().get(0).unwrap().slots, 1);
+    assert_eq!(h.domain.host_history_lost(), 1);
+    let mut empty = Harness::new(Limits { history: 0, ..LIMITS });
+    empty.hello(C1, 2, &[], &[]);
+    empty.step(Event::Lost { channel: C1 });
+    assert!(empty.domain.host_views().is_empty());
+    assert_eq!(empty.domain.host_history_lost(), 1);
 }
 
 #[test]
@@ -787,8 +839,14 @@ fn a_lost_worker_s_runs_are_kept_for_the_grace_then_presumed_lost() {
     h.step(Event::Cancel { run: R2, attempt: A2 });
     h.at(5);
     assert!(h.step(Event::Lost { channel: C1 }).is_empty());
+    let host = *h.domain.host_views().get(0).unwrap();
+    assert_eq!(host.channel, C1);
+    assert!(!host.connected);
+    assert_eq!((host.slots, host.used), (2, 2));
+    assert_eq!(host.grace_until, Some(Time::ZERO.saturating_add(Duration::from_secs(15))));
     assert!(h.at(14).is_empty());
     assert_eq!(&*h.at(15), &[lost(R1, A1), lost(R2, A2)]);
+    assert_eq!(h.domain.host_views().get(0).unwrap().used, 0);
     // Back past the grace: an attempt listed then is a stray, which the
     // parent hears of.
     assert_eq!(&*h.hello(C2, 2, &[], &[hosted(R1, A1, Phase::Active)]), &[listed(R1, A1)]);

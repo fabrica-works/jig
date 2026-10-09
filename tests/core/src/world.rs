@@ -90,6 +90,7 @@ pub fn limits() -> root::Limits {
         turns: 2,
         grace: Duration::from_secs(5),
         facts: 2,
+        history: 2,
     };
     let writes = tasks::max_out(&tasks) * 8
         + people::max_out(&people) * 4

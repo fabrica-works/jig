@@ -103,6 +103,7 @@ fn limits() -> Limits {
         turns: 2,
         grace: Duration::from_secs(5),
         facts: 2,
+        history: 2,
     };
     Limits {
         documents: DocumentLimits {
@@ -1419,22 +1420,53 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
     assert_eq!(deployment.hosts.get(0).unwrap().used, 1);
     assert_eq!(deployment.hosts.get(0).unwrap().free, 0);
     assert_eq!(deployment.attempts.get(0).unwrap().attempt, 9);
+    fleet::step(
+        &mut core.fleet,
+        &env,
+        fleet::Event::Hello {
+            channel: Token::new(11),
+            hello: fleet::Hello {
+                stop_bound: Duration::ZERO,
+                slots: 2,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+            },
+        },
+        &mut out,
+    );
     fleet::step(&mut core.fleet, &env, fleet::Event::Lost { channel: Token::new(10) }, &mut out);
     let Document::Deployment(deployment) =
         make_with_clock(&core, &limits, 1, &Subject::Deployment, &window(), clock).unwrap()
     else {
         panic!()
     };
-    assert!(deployment.hosts.is_empty());
+    let host = deployment.hosts.get(0).unwrap();
+    assert_eq!(host.channel, 10);
+    assert!(!host.connected);
+    assert_eq!(host.slots, 1);
+    assert_eq!(host.used, 1);
+    assert_eq!(host.runs.get(0).unwrap().attempt, 9);
+    assert_eq!(host.grace_until, Some(Wall::from_nanos(1000 + limits.fleet.grace.as_nanos())));
+    assert_eq!(host.grace_remaining, Some(limits.fleet.grace));
     assert_eq!(deployment.workers.used, 0);
     assert_eq!(deployment.attempts.len(), 1);
-    let RunLocation::Adrift { until, remaining } = deployment.attempts.get(0).unwrap().location else { panic!() };
+    let refused = deployment.hello_refusals.get(0).unwrap();
+    assert_eq!(refused.channel, 11);
+    assert_eq!(refused.at, env.wall);
+    assert_eq!(refused.why, fleet::HelloRefusal::Workers { limit: 1 });
+    let RunLocation::Adrift { channel, until, remaining } = deployment.attempts.get(0).unwrap().location else {
+        panic!()
+    };
+    assert_eq!(channel, Some(10));
     assert_eq!(until, Some(Wall::from_nanos(1000 + limits.fleet.grace.as_nanos())));
     assert_eq!(remaining, Some(limits.fleet.grace));
     let Document::Deployment(without_clock) = make(&core, &limits, 1, &Subject::Deployment, &window()).unwrap() else {
         panic!()
     };
-    assert_eq!(without_clock.attempts.get(0).unwrap().location, RunLocation::Adrift { until: None, remaining: None });
+    assert_eq!(
+        without_clock.attempts.get(0).unwrap().location,
+        RunLocation::Adrift { channel: Some(10), until: None, remaining: None }
+    );
 }
 #[test]
 fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {

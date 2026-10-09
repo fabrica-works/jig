@@ -64,12 +64,12 @@ pub struct DocumentClock {
     pub now: Time,
     pub wall: Wall,
 }
-/// Placement facts do not retain a lost channel's identity, which fleet forgets.
+/// Lost identity is present when this engine observed the channel before loss.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum RunLocation {
     None,
     Connected { channel: u64, kind: fleet::HostKind },
-    Adrift { until: Option<Wall>, remaining: Option<Duration> },
+    Adrift { channel: Option<u64>, until: Option<Wall>, remaining: Option<Duration> },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct HostRun {
@@ -89,6 +89,9 @@ pub struct Host {
     pub used: u32,
     pub free: u32,
     pub draining: bool,
+    pub connected: bool,
+    pub grace_until: Option<Wall>,
+    pub grace_remaining: Option<Duration>,
     pub runs: List<HostRun>,
     pub cut: bool,
 }
@@ -134,7 +137,19 @@ pub struct Deployment {
     pub proposals: Capacity,
     pub projects: List<ProjectCapacity>,
     pub grace_bound: Duration,
+    pub hello_refusals: List<HelloRefusalLine>,
+    pub hosts_forgotten: u64,
+    pub hello_refusals_forgotten: u64,
     pub cut: bool,
+}
+/// Recent refused hello facts, without protocol rights or advertised workstream payloads.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct HelloRefusalLine {
+    pub channel: u64,
+    pub at: Wall,
+    pub slots: u32,
+    pub stop_bound: Duration,
+    pub why: fleet::HelloRefusal,
 }
 
 fn line_bound(limits: &Limits) -> usize {
@@ -374,7 +389,11 @@ fn host_run(core: &Core, limits: &Limits, clock: Option<DocumentClock>, value: &
     let location = match value.placement {
         fleet::Placement::None => RunLocation::None,
         fleet::Placement::Connected { channel, kind } => RunLocation::Connected { channel: channel.raw(), kind },
-        fleet::Placement::Adrift { until } => RunLocation::Adrift {
+        fleet::Placement::Adrift { channel, until } => RunLocation::Adrift {
+            channel: match channel {
+                Some(value) => Some(value.raw()),
+                None => None,
+            },
             until: wall_deadline(clock, until),
             remaining: match clock {
                 Some(clock) => Some(until.saturating_since(clock.now)),
@@ -402,6 +421,7 @@ fn host_run(core: &Core, limits: &Limits, clock: Option<DocumentClock>, value: &
     clippy::too_many_lines,
     reason = "one deployment document gathers bounded child-owned host, account and capacity facts"
 )]
+#[expect(clippy::manual_map, reason = "step code has no closures (programming-model.md, section 10)")]
 pub(super) fn deployment(
     core: &Core,
     limits: &Limits,
@@ -420,7 +440,10 @@ pub(super) fn deployment(
         let mut host_cut = false;
         for run in &source_runs {
             match run.placement {
-                fleet::Placement::Connected { channel, .. } if channel == value.channel => {
+                fleet::Placement::Connected { channel, .. }
+                | fleet::Placement::Adrift { channel: Some(channel), .. }
+                    if channel == value.channel =>
+                {
                     if runs.room() > 0 {
                         runs.push(host_run(core, limits, clock, run)).expect("bounded host runs");
                     } else {
@@ -438,12 +461,39 @@ pub(super) fn deployment(
                 used: value.used,
                 free: value.slots.checked_sub(value.used).expect("host occupants fit slots"),
                 draining: value.draining,
+                connected: value.connected,
+                grace_until: match value.grace_until {
+                    Some(at) => wall_deadline(clock, at),
+                    None => None,
+                },
+                grace_remaining: match value.grace_until {
+                    Some(at) => match clock {
+                        Some(value) => Some(at.saturating_since(value.now)),
+                        None => None,
+                    },
+                    None => None,
+                },
                 runs,
                 cut: host_cut,
             })
             .expect("bounded hosts");
     }
     cut |= usize::try_from(source_hosts.len()).expect("host count fits") > line_bound(limits);
+    cut |= core.fleet.host_history_lost() != 0 || core.fleet.hello_history_lost() != 0;
+    let mut hello_refusals = List::with_capacity(limits.documents.lines);
+    let refused = core.fleet.hello_refusals();
+    for value in refused.iter().take(line_bound(limits)) {
+        hello_refusals
+            .push(HelloRefusalLine {
+                channel: value.channel.raw(),
+                at: value.at,
+                slots: value.slots,
+                stop_bound: value.stop_bound,
+                why: value.why,
+            })
+            .expect("bounded hello refusals");
+    }
+    cut |= usize::try_from(refused.len()).expect("hello count fits") > line_bound(limits);
     let mut attempts = List::with_capacity(limits.documents.lines);
     for value in source_runs.iter().take(line_bound(limits)) {
         attempts.push(host_run(core, limits, clock, value)).expect("bounded attempt rows");
@@ -574,6 +624,9 @@ pub(super) fn deployment(
         },
         projects,
         grace_bound: limits.fleet.grace,
+        hello_refusals,
+        hosts_forgotten: core.fleet.host_history_lost(),
+        hello_refusals_forgotten: core.fleet.hello_history_lost(),
         cut,
     })
 }
@@ -622,6 +675,7 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     // whose bound prices all its chip/part/list children. Hosts nest run lists.
     super::task_tree::worst_case(limits)?
         .checked_mul(carriers)?
+        .checked_add(List::<HelloRefusalLine>::worst_case(limits.lines)?)?
         .checked_add(u64::try_from(size_of::<Deployment>()).ok()?)
 }
 
@@ -632,12 +686,19 @@ pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(limits.fleet.slots)?
         .checked_add(limits.fleet.engine_slots)?
         .checked_add(limits.fleet.attempts)?;
-    List::<fleet::HostView>::worst_case(limits.fleet.workers.checked_add(u32::from(limits.fleet.engine_slots > 0))?)?
-        .checked_add(List::<fleet::AttemptView>::worst_case(tracked)?)?
-        .checked_add(List::<accounts::Fact>::worst_case(limits.accounts.accounts)?)?
-        .checked_add(Map::<
-            (bool, u64, u64, u64, InboxObject),
-            (u64, Option<u32>, InboxObject, Option<Wall>, Option<bool>, Cursor),
-        >::worst_case(limits.people.inbox_entries.checked_mul(2)?)?)?
-        .checked_add(List::<people::Entry>::worst_case(limits.people.inbox_entries.checked_mul(3)?)?)
+    List::<fleet::HostView>::worst_case(
+        limits
+            .fleet
+            .workers
+            .checked_add(u32::from(limits.fleet.engine_slots > 0))?
+            .checked_add(limits.fleet.history)?,
+    )?
+    .checked_add(List::<fleet::HelloRefusalRecord>::worst_case(limits.fleet.history)?)?
+    .checked_add(List::<fleet::AttemptView>::worst_case(tracked)?)?
+    .checked_add(List::<accounts::Fact>::worst_case(limits.accounts.accounts)?)?
+    .checked_add(Map::<
+        (bool, u64, u64, u64, InboxObject),
+        (u64, Option<u32>, InboxObject, Option<Wall>, Option<bool>, Cursor),
+    >::worst_case(limits.people.inbox_entries.checked_mul(2)?)?)?
+    .checked_add(List::<people::Entry>::worst_case(limits.people.inbox_entries.checked_mul(3)?)?)
 }

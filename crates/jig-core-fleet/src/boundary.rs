@@ -558,7 +558,7 @@ pub enum Refusal {
     Duplicate,
 }
 
-/// Read-only connected host facts; no protocol channel or reply right is retained.
+/// Read-only connected and retained lost host facts; no reply right is retained.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct HostView {
     pub channel: Token,
@@ -566,6 +566,8 @@ pub struct HostView {
     pub slots: u32,
     pub used: u32,
     pub draining: bool,
+    pub connected: bool,
+    pub grace_until: Option<skein_lib::Time>,
 }
 /// The semantic attempt state, without its outstanding reply right.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -587,7 +589,7 @@ pub enum AttemptState {
 pub enum Placement {
     None,
     Connected { channel: Token, kind: HostKind },
-    Adrift { until: skein_lib::Time },
+    Adrift { channel: Option<Token>, until: skein_lib::Time },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct AttemptView {

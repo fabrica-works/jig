@@ -23,6 +23,7 @@ const LIMITS: Limits = Limits {
     turns: 0,
     grace: Duration::from_secs(10),
     facts: 16,
+    history: 4,
 };
 
 /// The fleet under `limits`, measured: each step's peak is checked against
@@ -322,6 +323,22 @@ fn every_entry_point_stays_within_the_worst_case() {
     fleet.at(30);
     fleet.settle();
     assert_eq!((fleet.domain.attempts(), fleet.domain.calls()), (0, 0));
+    for number in 10..=10 + LIMITS.history {
+        fleet.hello(channel(number), Vec::new());
+        fleet.step(Event::Lost { channel: channel(number) });
+        fleet.hello(Token::new(0), Vec::new());
+    }
+    assert!(fleet.domain.host_history_lost() > 0);
+    assert!(fleet.domain.hello_history_lost() > 0);
+    fleet.meter.start();
+    let hosts = fleet.domain.host_views();
+    let attempts = fleet.domain.attempt_views();
+    let refusals = fleet.domain.hello_refusals();
+    assert!(!hosts.is_empty());
+    assert!(attempts.is_empty());
+    assert_eq!(refusals.len(), LIMITS.history);
+    let measured = fleet.meter.end();
+    fleet.meter.check(measured, fleet.bound, &fleet.env.limits);
 }
 
 #[test]

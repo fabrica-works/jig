@@ -10,7 +10,6 @@ use skein_world::domain::heap::{self, Meter};
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
 
-#[test]
 fn core_children_routes_and_an_in_flight_decision_fit_the_checked_bound() {
     let limits = world::limits();
     let bound = core::worst_case(&limits.core).expect("walking limits price every core owner");
@@ -43,7 +42,6 @@ fn core_children_routes_and_an_in_flight_decision_fit_the_checked_bound() {
     observer.observe(0, jig_core_world::referee::Observed::Heap { held: meter.held(), maximum: bound });
 }
 
-#[test]
 fn room_and_memory_refuse_unrepresentable_or_missing_limits() {
     let limits = world::limits().core;
     assert!(core::worst_case(&core::Limits { connectors: 0, ..limits }).is_some());
@@ -55,7 +53,6 @@ fn room_and_memory_refuse_unrepresentable_or_missing_limits() {
     );
 }
 
-#[test]
 fn both_worlds_check_the_counted_heap_at_every_iteration() {
     let mut walking = world::World::goal(190);
     walking.run_goal();
@@ -65,4 +62,12 @@ fn both_worlds_check_the_counted_heap_at_every_iteration() {
     effects.call(2, 9000);
     effects.restart(191, false);
     assert!(jig_core_world::observations::root_bound(&world::limits()).is_some());
+}
+
+// Each named scenario preserves its own fixture and original assertions.
+#[test]
+fn memory_scenario_family() {
+    core_children_routes_and_an_in_flight_decision_fit_the_checked_bound();
+    room_and_memory_refuse_unrepresentable_or_missing_limits();
+    both_worlds_check_the_counted_heap_at_every_iteration();
 }

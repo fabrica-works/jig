@@ -27,8 +27,8 @@
 
 mod inbox_deployment;
 pub use inbox_deployment::{
-    Account, Capacity, ConversationLine, Conversations, Deployment, DocumentClock, Host, HostRun, Inbox, InboxEntry,
-    InboxObject, ProjectCapacity, RunLocation, make_with_clock,
+    Account, Capacity, ConversationLine, Conversations, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun,
+    Inbox, InboxEntry, InboxObject, ProjectCapacity, RunLocation, make_with_clock,
 };
 mod objects;
 mod project_note;

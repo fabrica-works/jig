@@ -4,7 +4,6 @@ use jig_core_world::effects::World;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
 
-#[test]
 fn a_chat_answers_parks_and_resumes() {
     let mut world = World::new(101, false);
     let first = world.assigned.as_ref().expect("chat assigned").attempt;
@@ -39,7 +38,6 @@ fn a_chat_answers_parks_and_resumes() {
     assert!(world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))));
 }
 
-#[test]
 fn a_turn_admits_its_read_fence_and_spend_together_and_duplicates_change_nothing() {
     let mut world = World::new(102, false);
     let message = world.say(73);
@@ -57,7 +55,6 @@ fn a_turn_admits_its_read_fence_and_spend_together_and_duplicates_change_nothing
     assert_eq!(world.store.applied, commits);
 }
 
-#[test]
 fn settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it() {
     let mut world = World::new(103, false);
     world.turn(1, 1, None, b"turn");
@@ -109,7 +106,6 @@ fn settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it
     assert!(world.assigned.as_ref().expect("resumed again").answered.is_empty());
 }
 
-#[test]
 fn a_chat_past_the_resume_limit_starts_fresh() {
     let mut world = World::new(104, false);
     world.turn(1, 1, None, &[b'a'; 200]);
@@ -119,7 +115,6 @@ fn a_chat_past_the_resume_limit_starts_fresh() {
     assert!(world.assigned.as_ref().expect("fresh chat").transcript.is_empty());
 }
 
-#[test]
 fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
     let limits = jig_core_world::world::limits().core;
     let config = jig_core_world::world::config(105).core;
@@ -151,7 +146,6 @@ fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
     assert_eq!(core.transcripts.get(&1).expect("loaded transcript").bytes, 4);
 }
 
-#[test]
 fn an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh() {
     let mut world = World::new(106, false);
     world.turn(1, 1, None, b"unusable bytes");
@@ -172,7 +166,6 @@ fn an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh
     );
 }
 
-#[test]
 fn settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes() {
     let mut world = World::new(107, false);
     for (completion, name) in [(4, &b"first"[..]), (2, &b"second"[..])] {
@@ -217,4 +210,17 @@ fn settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes() {
     assert_eq!(answers[0].name.as_ref(), b"first");
     assert_eq!(answers[1].name.as_ref(), b"second");
     assert!(answers[0].serial < answers[1].serial);
+}
+
+// Each scenario keeps its own fresh world and all original assertions.
+// A shared entrypoint avoids one process startup per short scenario.
+#[test]
+fn runs_scenarios() {
+    a_chat_answers_parks_and_resumes();
+    a_turn_admits_its_read_fence_and_spend_together_and_duplicates_change_nothing();
+    settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it();
+    a_chat_past_the_resume_limit_starts_fresh();
+    loaded_transcript_pages_reject_repeated_and_reversed_turns();
+    an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh();
+    settled_answers_resume_in_commit_order_and_a_replay_preserves_exact_bytes();
 }

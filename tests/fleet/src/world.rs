@@ -29,6 +29,7 @@ pub const LIMITS: Limits = Limits {
     turns: 0,
     grace: Duration::from_secs(20),
     facts: 64,
+    history: 8,
 };
 
 /// How a world's attempts ended and what the fleet did on the way, by kind,

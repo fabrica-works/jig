@@ -18,7 +18,6 @@ fn effect_scenario(world: &mut World) {
     world.end(jig_core_tasks::End::Parked, 2);
 }
 
-#[test]
 fn every_commit_of_a_turn_effect_and_terminal_survives_both_crash_cuts() {
     let mut reference = World::new(300, false);
     let first = reference.store.applied + 1;
@@ -45,7 +44,6 @@ fn every_commit_of_a_turn_effect_and_terminal_survives_both_crash_cuts() {
     }
 }
 
-#[test]
 fn a_failed_commit_at_every_scenario_boundary_stops_before_any_later_output() {
     let mut reference = World::new(301, false);
     let first = reference.store.applied + 1;
@@ -67,7 +65,6 @@ fn a_failed_commit_at_every_scenario_boundary_stops_before_any_later_output() {
     }
 }
 
-#[test]
 fn a_slow_worker_keeps_its_assignment_and_resumes_after_the_delay() {
     let mut world = faults::workers(302, 1, false);
     faults::worker_fault(&mut world, 0, Fault::Slow { by: Duration::from_secs(1) });
@@ -80,7 +77,6 @@ fn a_slow_worker_keeps_its_assignment_and_resumes_after_the_delay() {
     assert_eq!(worker.answer_acks, 1);
 }
 
-#[test]
 fn a_worker_back_after_its_stop_bound_replays_a_parked_answer() {
     let mut world = faults::workers(303, 1, false);
     faults::worker_fault(&mut world, 0, Fault::DropChannel { for_: Duration::from_secs(1) });
@@ -92,7 +88,6 @@ fn a_worker_back_after_its_stop_bound_replays_a_parked_answer() {
     assert_eq!(world.peers.as_ref().expect("peers").workers[0].seen.len(), 2);
 }
 
-#[test]
 fn a_worker_returning_past_grace_cannot_charge_or_finish_its_old_attempt() {
     let mut world = faults::workers(304, 1, false);
     faults::worker_fault(&mut world, 0, Fault::DropChannel { for_: Duration::from_secs(7) });
@@ -106,7 +101,6 @@ fn a_worker_returning_past_grace_cannot_charge_or_finish_its_old_attempt() {
     assert!(worker.answer_acks >= 1, "the stale parked answer is fenced and acknowledged");
 }
 
-#[test]
 fn a_vanished_worker_is_lost_and_another_worker_takes_the_retry() {
     let mut world = faults::workers(305, 2, false);
     let owner = world
@@ -126,7 +120,6 @@ fn a_vanished_worker_is_lost_and_another_worker_takes_the_retry() {
     assert_eq!(peers.workers[owner].seen.len(), 1);
 }
 
-#[test]
 fn a_cold_restart_retries_a_party_request_and_retained_host_traffic() {
     let mut world = faults::workers(306, 1, false);
     let cut = Cut::Durable(world.store.applied + 1);
@@ -148,7 +141,6 @@ fn a_cold_restart_retries_a_party_request_and_retained_host_traffic() {
     );
 }
 
-#[test]
 fn every_startup_sign_in_chat_and_assignment_commit_restarts_on_either_side_of_durability() {
     for engine in [false, true] {
         let reference = faults::workers(307, 1, engine);
@@ -179,4 +171,18 @@ fn every_startup_sign_in_chat_and_assignment_commit_restarts_on_either_side_of_d
             }
         }
     }
+}
+
+// Each scenario keeps its own fresh world and all original assertions.
+// A shared entrypoint avoids one process startup per short scenario.
+#[test]
+fn faults_scenarios() {
+    every_commit_of_a_turn_effect_and_terminal_survives_both_crash_cuts();
+    a_failed_commit_at_every_scenario_boundary_stops_before_any_later_output();
+    a_slow_worker_keeps_its_assignment_and_resumes_after_the_delay();
+    a_worker_back_after_its_stop_bound_replays_a_parked_answer();
+    a_worker_returning_past_grace_cannot_charge_or_finish_its_old_attempt();
+    a_vanished_worker_is_lost_and_another_worker_takes_the_retry();
+    a_cold_restart_retries_a_party_request_and_retained_host_traffic();
+    every_startup_sign_in_chat_and_assignment_commit_restarts_on_either_side_of_durability();
 }

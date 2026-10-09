@@ -5,7 +5,6 @@ use jig_core_world::effects::World;
 use jig_test_connector as connector;
 use jig_test_domain as root;
 
-#[test]
 fn a_procedures_effect_waits_for_another_connectors_verdict_then_is_made() {
     let mut world = World::new(81, true);
     world.delegate();
@@ -22,7 +21,6 @@ fn a_procedures_effect_waits_for_another_connectors_verdict_then_is_made() {
     );
 }
 
-#[test]
 fn a_tool_call_whose_answer_is_lost_with_the_channel_and_the_engine_is_asked_again_after_a_restart_and_answered_from_its_record()
  {
     let mut world = World::new(82, false);
@@ -58,7 +56,6 @@ fn a_tool_call_whose_answer_is_lost_with_the_channel_and_the_engine_is_asked_aga
     assert_eq!(world.spent(), 3, "replay cannot charge the effect twice");
 }
 
-#[test]
 fn an_effect_call_wait_commits_nothing_and_the_same_name_can_be_asked_again() {
     let mut world = World::new(83, true);
     let commits = world.store.applied;
@@ -79,7 +76,6 @@ fn an_effect_call_wait_commits_nothing_and_the_same_name_can_be_asked_again() {
     assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
 }
 
-#[test]
 fn an_effect_answers_committed_and_pending_only_past_its_absolute_deadline() {
     let mut world = World::new(84, false);
     world.hold_writes = true;
@@ -105,7 +101,6 @@ fn an_effect_answers_committed_and_pending_only_past_its_absolute_deadline() {
     assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
 }
 
-#[test]
 fn an_explicit_effect_proposal_is_kept_across_a_restart_and_checked_again_before_acceptance() {
     let mut world = World::new(85, true);
     let proposal = world.propose(1);
@@ -137,7 +132,6 @@ fn an_explicit_effect_proposal_is_kept_across_a_restart_and_checked_again_before
     assert_eq!(world.holder_spent(), 3);
 }
 
-#[test]
 fn rejecting_an_effect_proposal_erases_its_payload_without_making_it() {
     let mut world = World::new(86, false);
     let proposal = world.propose(1);
@@ -151,7 +145,6 @@ fn rejecting_an_effect_proposal_erases_its_payload_without_making_it() {
     );
 }
 
-#[test]
 fn a_full_connector_outbox_is_busy_without_a_record_or_charge_and_can_retry_the_same_name() {
     let mut world = World::with_entries(87, false, 1);
     world.hold_writes = true;
@@ -170,4 +163,17 @@ fn a_full_connector_outbox_is_busy_without_a_record_or_charge_and_can_retry_the_
     ));
     assert_eq!(world.spent(), 6);
     assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
+}
+
+// Each scenario keeps its own fresh world and all original assertions.
+// A shared entrypoint avoids one process startup per short scenario.
+#[test]
+fn effects_scenarios() {
+    a_procedures_effect_waits_for_another_connectors_verdict_then_is_made();
+    a_tool_call_whose_answer_is_lost_with_the_channel_and_the_engine_is_asked_again_after_a_restart_and_answered_from_its_record();
+    an_effect_call_wait_commits_nothing_and_the_same_name_can_be_asked_again();
+    an_effect_answers_committed_and_pending_only_past_its_absolute_deadline();
+    an_explicit_effect_proposal_is_kept_across_a_restart_and_checked_again_before_acceptance();
+    rejecting_an_effect_proposal_erases_its_payload_without_making_it();
+    a_full_connector_outbox_is_busy_without_a_record_or_charge_and_can_retry_the_same_name();
 }

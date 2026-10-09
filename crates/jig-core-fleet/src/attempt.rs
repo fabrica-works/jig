@@ -119,6 +119,8 @@ pub(crate) struct Attempt {
     pub(crate) listed: bool,
     /// The contiguous committed turn prefix, restored atomically on adoption.
     pub(crate) kept: u32,
+    /// Last lost channel, if this engine observed it; restored adoptions do not invent one.
+    pub(crate) lost_host: Option<Token>,
     /// The parent's conversation state references for an assignment.
     pub(crate) assignment: Assignment,
     pub(crate) state: State,
@@ -226,6 +228,28 @@ fn until(at: Where) -> Option<Time> {
     match at {
         Where::On(_) => None,
         Where::Adrift { until } => Some(until),
+    }
+}
+
+/// The observed lost channel whose slot a retained attempt still represents.
+pub(crate) fn lost_host(attempt: &Attempt) -> Option<Token> {
+    match attempt.state {
+        State::Claimed { at: Where::Adrift { .. }, .. }
+        | State::Cancelled { at: Where::Adrift { .. }, .. }
+        | State::Handed { at: Where::Adrift { .. } }
+        | State::Stray { at: Where::Adrift { .. }, .. }
+        | State::Kept { at: Where::Adrift { .. }, .. }
+        | State::Fenced { at: Where::Adrift { .. } }
+        | State::Acknowledged { .. } => attempt.lost_host,
+        State::Waiting { .. }
+        | State::Adopted { .. }
+        | State::Claimed { at: Where::On(_), .. }
+        | State::Cancelled { at: Where::On(_), .. }
+        | State::Handed { at: Where::On(_) }
+        | State::Stray { at: Where::On(_), .. }
+        | State::Kept { at: Where::On(_), .. }
+        | State::Fenced { at: Where::On(_) }
+        | State::Closed => None,
     }
 }
 
@@ -572,8 +596,9 @@ pub(crate) fn answer(
 }
 
 /// Its worker's channel was lost: the attempt `id` is kept until `until`.
-pub(crate) fn adrift(domain: &mut Domain, id: Id<Attempt>, until: Time) {
+pub(crate) fn adrift(domain: &mut Domain, id: Id<Attempt>, channel: Token, until: Time) {
     let entry = domain.attempts.get_mut(id).expect("an attempt on a worker is tracked");
+    entry.lost_host = Some(channel);
     let before = implied(&entry.state);
     let state = mem::replace(&mut entry.state, State::Closed);
     let at = Where::Adrift { until };
@@ -987,7 +1012,9 @@ fn found(
 
 /// Tracks a new attempt in `state`. The entrance checked there is room.
 fn insert(domain: &mut Domain, run: Token, attempt: Token, listed: bool, assignment: Assignment, state: State) {
-    let Ok(id) = domain.attempts.insert(Attempt { run, token: attempt, listed, kept: 0, assignment, state }) else {
+    let Ok(id) =
+        domain.attempts.insert(Attempt { run, token: attempt, listed, kept: 0, lost_host: None, assignment, state })
+    else {
         unreachable!("the entrance checks there is room for an attempt");
     };
     let named = domain.names.insert((run, attempt), id);

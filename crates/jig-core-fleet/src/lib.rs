@@ -57,6 +57,7 @@ mod call;
 mod channel;
 mod domain;
 mod facts;
+mod history;
 mod limits;
 #[cfg(test)]
 mod tests;
@@ -68,4 +69,5 @@ pub use boundary::{
 };
 pub use domain::{Domain, fire, max_out, resume, step};
 pub use facts::Fact;
+pub use history::{HelloRefusal, HelloRefusalRecord};
 pub use limits::{Limits, worst_case};

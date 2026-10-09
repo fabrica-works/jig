@@ -101,7 +101,6 @@ fn verdict(core: &mut core::Core, env: &Env<core::Limits>, judge: authority::Jud
     outputs
 }
 
-#[test]
 fn a_delayed_judge_cannot_keep_or_charge_an_effect_after_its_calling_run_is_cancelled() {
     let world = World::new(129, true);
     let key = world.call_key(1);
@@ -137,7 +136,6 @@ fn a_delayed_judge_cannot_keep_or_charge_an_effect_after_its_calling_run_is_canc
     assert!(!core.pending_calls.contains_key(&key));
 }
 
-#[test]
 fn a_delayed_judge_is_checked_against_the_policy_that_exists_when_it_completes() {
     let world = World::new(130, true);
     let key = world.call_key(1);
@@ -163,7 +161,6 @@ fn a_delayed_judge_is_checked_against_the_policy_that_exists_when_it_completes()
     assert_eq!(core.tasks.task(key.task).expect("live task").numbers, before);
 }
 
-#[test]
 fn a_delayed_judge_cannot_commit_a_step_of_a_cancelled_procedure() {
     let mut world = World::new(132, true);
     world.delegate();
@@ -198,7 +195,6 @@ fn a_delayed_judge_cannot_commit_a_step_of_a_cancelled_procedure() {
     assert_eq!(core.tasks.task(task).expect("closing procedure").numbers, before);
 }
 
-#[test]
 fn every_connector_must_acknowledge_closure_and_duplicates_cannot_replace_a_missing_acknowledgement() {
     let world = World::new(133, false);
     let key = world.call_key(1);
@@ -257,7 +253,6 @@ fn every_connector_must_acknowledge_closure_and_duplicates_cannot_replace_a_miss
     assert_eq!(releases, 2);
 }
 
-#[test]
 fn a_conflicting_late_terminal_cannot_replace_an_already_committed_answer() {
     let mut world = World::new(131, false);
     let key = world.call_key(1);
@@ -309,7 +304,6 @@ fn a_conflicting_late_terminal_cannot_replace_an_already_committed_answer() {
     );
 }
 
-#[test]
 fn late_busy_or_refused_descriptions_cannot_answer_a_cancelled_run() {
     let world = World::new(135, true);
     let key = world.call_key(1);
@@ -349,4 +343,16 @@ fn late_busy_or_refused_descriptions_cannot_answer_a_cancelled_run() {
         }
         assert!(!core.pending_calls.contains_key(&key));
     }
+}
+
+// Each scenario keeps its own fresh world and all original assertions.
+// A shared entrypoint avoids one process startup per short scenario.
+#[test]
+fn effect_fences_scenarios() {
+    a_delayed_judge_cannot_keep_or_charge_an_effect_after_its_calling_run_is_cancelled();
+    a_delayed_judge_is_checked_against_the_policy_that_exists_when_it_completes();
+    a_delayed_judge_cannot_commit_a_step_of_a_cancelled_procedure();
+    every_connector_must_acknowledge_closure_and_duplicates_cannot_replace_a_missing_acknowledgement();
+    a_conflicting_late_terminal_cannot_replace_an_already_committed_answer();
+    late_busy_or_refused_descriptions_cannot_answer_a_cancelled_run();
 }

@@ -6,7 +6,6 @@ use jig_core_world::effects::{World, fixture};
 use jig_test_domain as root;
 use skein_lib::{Queue, ReplyTo, Token};
 
-#[test]
 fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowing_after_restart() {
     let (mut configuration, limits) = fixture(170, true);
     let mut policy = configuration.core.authority.policy(1).expect("fixture policy").clone();
@@ -202,7 +201,6 @@ fn tree_world() -> (World, root::Config) {
     (World::configured(171, false, configuration, limits), restart_configuration)
 }
 
-#[test]
 fn a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_for_its_write() {
     let (mut world, restart_configuration) = tree_world();
     world.end(
@@ -322,4 +320,11 @@ fn settle_tree(world: &mut World, goal: (u64, u64), child: (u64, u64), restart_c
     assert_eq!(projection_rows(world, goal.0), 4, "other connector still owns its last feed");
     world.send(root::Event::Core(core::Event::ProjectionSettled { goal: goal.0, connector: 2 }));
     assert_eq!(projection_rows(world, goal.0), 0, "last settlement releases projection state");
+}
+
+// Each named scenario preserves its own fixture and original assertions.
+#[test]
+fn projections_scenario_family() {
+    projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowing_after_restart();
+    a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_for_its_write();
 }

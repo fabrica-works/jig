@@ -43,6 +43,9 @@ pub struct Limits {
     /// Facts kept until the parent drains them. Beyond them, facts are
     /// dropped and counted.
     pub facts: u32,
+    /// Recent lost channels and refused hellos retained separately from diagnostics,
+    /// at most this many of each. Oldest records are evicted and counted.
+    pub history: u32,
 }
 
 /// The attempts tracked at once under `limits`: the parent's, and the room
@@ -61,6 +64,7 @@ pub(crate) fn tracked(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let count = limits.workers.checked_add(u32::from(limits.engine_slots > 0))?;
+    count.checked_add(limits.history)?;
     let channels = Slab::<Channel>::worst_case(count)?.checked_add(Map::<Token, Id<Channel>>::worst_case(count)?)?;
     // Each worker: the attempts it hosts, and the workstream keys it holds.
     let hosts = Set::<Id<Attempt>>::worst_case(limits.slots)?;
@@ -81,11 +85,16 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.calls).checked_mul(limits.call_name_bytes)?)?;
     let turns = Map::<(Id<Attempt>, u32), Pending>::worst_case(limits.turns)?;
     let facts = Queue::<Fact>::worst_case(limits.facts)?;
+    let views = skein_lib::List::<crate::HostView>::worst_case(count.checked_add(limits.history)?)?
+        .checked_add(skein_lib::List::<crate::AttemptView>::worst_case(tracked)?)?
+        .checked_add(skein_lib::List::<crate::HelloRefusalRecord>::worst_case(limits.history)?)?;
     channels
         .checked_add(workers)?
         .checked_add(engine)?
         .checked_add(attempts)?
         .checked_add(calls)?
         .checked_add(turns)?
-        .checked_add(facts)
+        .checked_add(facts)?
+        .checked_add(crate::history::worst_case(limits.history)?)?
+        .checked_add(views)
 }

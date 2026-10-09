@@ -1,6 +1,5 @@
 use jig_core_world::world::World;
 
-#[test]
 fn a_chats_run_answers_once_and_its_turn_is_acknowledged_after_its_commit() {
     let mut world = World::new(41);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| world.run_chat()));
@@ -10,7 +9,6 @@ fn a_chats_run_answers_once_and_its_turn_is_acknowledged_after_its_commit() {
     assert_eq!(world.results, 1);
 }
 
-#[test]
 fn a_person_sets_a_goal_a_procedure_carries_out_and_hears_its_result() {
     let mut world = World::goal(42);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| world.run_goal()));
@@ -19,7 +17,6 @@ fn a_person_sets_a_goal_a_procedure_carries_out_and_hears_its_result() {
     assert!(world.procedure.is_some());
 }
 
-#[test]
 fn a_batch_beyond_the_limits_is_refused_whole_and_the_party_told_why() {
     let mut world = World::batch(43);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| world.run_batch()));
@@ -33,4 +30,12 @@ fn a_batch_beyond_the_limits_is_refused_whole_and_the_party_told_why() {
         )),
         "the batch left no child row"
     );
+}
+
+// Each named scenario preserves its own fixture and original assertions.
+#[test]
+fn simulation_scenario_family() {
+    a_chats_run_answers_once_and_its_turn_is_acknowledged_after_its_commit();
+    a_person_sets_a_goal_a_procedure_carries_out_and_hears_its_result();
+    a_batch_beyond_the_limits_is_refused_whole_and_the_party_told_why();
 }
