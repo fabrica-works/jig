@@ -198,6 +198,7 @@ pub struct Observer {
     roles: BTreeMap<(u32, u32), r::Scope>,
     decisions_by_role: BTreeMap<(u32, u32), u8>,
     applied: u64,
+    activity: BTreeMap<(u64, u64), tasks::ActivityLine>,
     effects: [usize; 2],
     reads: [usize; 2],
     requests: BTreeMap<u64, (u64, [u8; 16])>,
@@ -298,6 +299,7 @@ impl Observer {
             roles,
             decisions_by_role,
             applied: 0,
+            activity: BTreeMap::new(),
             effects: [0; 2],
             reads: [0; 2],
             requests: BTreeMap::new(),
@@ -565,6 +567,10 @@ impl Observer {
                         }
                     }
                 }
+                root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(value))) => {
+                    let kept = self.activity.entry((value.task, value.position)).or_insert_with(|| value.clone());
+                    assert_eq!(kept, value, "immutable activity row changed");
+                }
                 root::Record::Core(core::Record::Tasks(tasks::Stored::History(value))) => {
                     if value.change == tasks::Change::ProposalAccepted
                         && let Some(proposal) = &value.proposal
@@ -749,6 +755,13 @@ impl Observer {
                     snapshot.acceptances.insert((connector, decision.key), r::Acceptance { proposal, by: holder });
                 }
             }
+        }
+        for ((task, position), kept) in &self.activity {
+            let key = root::Key::Core(core::Key::Tasks(tasks::Key::Activity { task: *task, position: *position }));
+            assert!(
+                matches!(store.rows.get(&key), Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(row)))) if row == kept),
+                "immutable activity row disappeared"
+            );
         }
         self.observe(now, r::Observed::Durable { number: store.applied, snapshot });
         self.applied = store.applied;
@@ -950,6 +963,46 @@ impl Heap {
         r::Observed::Heap {
             held: self.meter.held().checked_add(self.configuration).expect("world heap fits"),
             maximum: self.maximum,
+        }
+    }
+}
+
+#[cfg(test)]
+mod activity_tests {
+    use super::*;
+
+    #[test]
+    fn activity_referee_rejects_changed_or_erased_lines() {
+        for erased in [false, true] {
+            let configuration = crate::effects::fixture(507, false).0;
+            let mut observer = Observer::new(&configuration);
+            let mut store = Store::new();
+            let row = root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+                task: 1,
+                position: 1,
+                at: skein_lib::Wall::EPOCH,
+                line: tasks::Line::Milestone { position: 1 },
+            })));
+            let key = row.key();
+            store.rows.insert(key.clone(), row);
+            store.applied = 1;
+            observer.durable(0, &store);
+            if erased {
+                store.rows.remove(&key);
+            } else {
+                store.rows.insert(
+                    key,
+                    root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+                        task: 1,
+                        position: 1,
+                        at: skein_lib::Wall::EPOCH,
+                        line: tasks::Line::Milestone { position: 2 },
+                    }))),
+                );
+            }
+            store.applied = 2;
+            let rejected = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| observer.durable(1, &store)));
+            assert!(rejected.is_err(), "referee must reject an immutable row changing or disappearing");
         }
     }
 }
