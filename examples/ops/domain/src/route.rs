@@ -1168,9 +1168,6 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         core::Now::RestoreRefused => {
             let _request = domain.core.restart_refuse();
         }
-        core::Now::EscalationInspection { waiter, context } => {
-            now(domain, Output::Now(core::Now::EscalationInspection { waiter, context }));
-        }
         core::Now::Call { to, run, attempt, call } => {
             crate::assemble::call(domain, env, to, run, attempt, call, work);
         }
@@ -1216,9 +1213,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         | core::Now::RunText { .. }
         | core::Now::NotesIndexed { .. }
         | core::Now::NotesRecalled { .. }
-        | core::Now::NotesRefused { .. }
-        | core::Now::EscalationReply { .. }
-        | core::Now::EscalationRefused { .. }) => now(domain, Output::Now(other)),
+        | core::Now::NotesRefused { .. }) => now(domain, Output::Now(other)),
     }
 }
 

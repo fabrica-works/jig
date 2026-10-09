@@ -1135,9 +1135,6 @@ pub(super) fn tag_tasks(
                 }
                 continue;
             }
-            tasks::Request::EscalationInspected { reply_to, context } => {
-                Request::Now(Box::new(Now::EscalationInspection { waiter: reply_to.into_token(), context }))
-            }
             tasks::Request::EscalationDecided { .. } => {
                 unreachable!("named and person escalation terminals are routed in the core")
             }

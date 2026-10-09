@@ -9,6 +9,7 @@ pub(crate) mod application_routes;
 use crate::{CallKey, CallPart, Core, RoutedCall};
 use alloc::boxed::Box;
 use children::{route_account, route_brief, route_fleet, route_projection_settled, tag_account, tag_brief, tag_fleet};
+use historical::{route_historical_escalation, route_historical_proposal};
 use jig_core_accounts as accounts;
 use jig_core_authority as authority;
 use jig_core_brief as brief;
@@ -20,7 +21,6 @@ use jig_core_views as views;
 use note_routes::route_notes;
 use parties::route_holdings;
 use people_routes::{route_people, sign_in};
-use reads::{route_escalation_read, route_historical_escalation, route_historical_proposal};
 use run_delegation::{
     delegate_holdings, delegate_input_failed, delegate_validated, procedure_holdings, procedure_step, route_period,
     route_start_recurring,
@@ -47,6 +47,7 @@ pub use vocabulary::{
 pub(crate) use watch_marks::finish_watches;
 
 mod children;
+mod historical;
 #[path = "notes.rs"]
 mod note_routes;
 mod parties;
@@ -54,7 +55,6 @@ mod party_controls;
 mod party_decisions;
 #[path = "people.rs"]
 mod people_routes;
-mod reads;
 pub(crate) mod refusals;
 mod run_delegation;
 mod run_preparation;
@@ -347,7 +347,6 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::PreparedAgent { .. }
         | Event::HistoricalProposal { .. }
         | Event::HistoricalEscalation { .. }
-        | Event::EscalationRead { .. }
         | Event::NamedAnswer { .. }
         | Event::NamedAction { .. }
         | Event::DelegateValidated { .. }
@@ -471,7 +470,6 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::HistoricalEscalation { request, person, project, task, revision, row, busy } => {
             route_historical_escalation(core, env, work, request, person, project, task, revision, row, busy)
         }
-        Event::EscalationRead { to, person, task, context } => route_escalation_read(core, to, person, task, context),
         Event::NamedAnswer { to, key, part } => route_named_answer(core, to, key, part),
         Event::NamedAction { to, key, action } => named_action(core, env, work, to, key, action),
         Event::DelegateValidated { to, key, batch, stubs } => delegate_validated(core, env, to, key, batch, stubs),

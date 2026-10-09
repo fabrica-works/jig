@@ -146,7 +146,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         }
     }
     for capacity in [
-        limits.load_slots,         // reads
         limits.tasks.tasks,        // dependency results
         limits.people.pending,     // made
         limits.people.pending,     // application continuations

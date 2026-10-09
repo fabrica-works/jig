@@ -191,7 +191,7 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
     if !rows::scope_allowed(core, party, &scope) {
         return terminal(reply, Answer::None(Why::Unknown));
     }
-    if core.reads.len().checked_add(core.reading_results.len()).expect("bounded read slots") >= env.limits.load_slots {
+    if core.reads.len() >= env.limits.load_slots {
         return terminal(reply, Answer::None(Why::Busy));
     }
     let range = Range {

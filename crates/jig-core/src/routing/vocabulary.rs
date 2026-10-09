@@ -250,12 +250,6 @@ pub enum Now {
     },
     /// Load one held-chat decision that has left live task memory.
     HistoricalEscalation { request: Token, person: u64, project: u32, task: u64, revision: u64 },
-    /// Translate a task inspection through the root's authenticated read slot.
-    EscalationInspection { waiter: Token, context: Option<Box<tasks::EscalationContext>> },
-    /// Return a visible held chat to its authenticated reader.
-    EscalationReply { to: ReplyTo, person: u64, context: Box<tasks::EscalationContext> },
-    /// Refuse an authenticated held-chat read.
-    EscalationRefused { to: ReplyTo, why: people::Refusal },
     /// The first child admitted from a connector procedure's batch, if any.
     ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// A restored task row was refused; the root must fail startup.
@@ -447,8 +441,6 @@ pub enum Event {
         row: Option<EscalationDecisionRecord>,
         busy: bool,
     },
-    /// The root's authenticated held-chat reader and the task inspection.
-    EscalationRead { to: ReplyTo, person: u64, task: u64, context: Option<Box<tasks::EscalationContext>> },
     /// One root-translated named-call answer that needs a durable core decision.
     NamedAnswer { to: ReplyTo, key: CallKey, part: CallPart },
     /// One generic named-call action translated from the root's host vocabulary.

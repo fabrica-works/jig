@@ -485,7 +485,6 @@ fn route_now(
         }
         core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalEscalation { .. }
-        | core::Now::EscalationInspection { .. }
         | core::Now::CompleteBrief { .. }
         | core::Now::ProcedureDelegateOutcome { .. }
         | core::Now::RestoreRefused => {
@@ -502,9 +501,7 @@ fn route_now(
         | core::Now::NotesIndexed { .. }
         | core::Now::NotesRecalled { .. }
         | core::Now::NotesRefused { .. }
-        | core::Now::NoteBusy { .. }
-        | core::Now::EscalationReply { .. }
-        | core::Now::EscalationRefused { .. }) => domain.now.push(other),
+        | core::Now::NoteBusy { .. }) => domain.now.push(other),
     }
 }
 

@@ -1,36 +1,11 @@
-//! Historical proposal and escalation answers and party read reservations
-//! routed back to authenticated parties (`domain/engine.md`, sections 5.3 and 4.4).
+//! Historical decision-race answers routed back to authenticated parties
+//! (`domain/people.md`, section 5.1). These complete keyed decisions, not reads.
 
-use crate::{Core, EscalationDecisionRecord, Event, Limits, Now, Request, Requests};
-use alloc::boxed::Box;
+use crate::{Core, EscalationDecisionRecord, Event, Limits, Request, Requests};
 use jig_core_authority as authority;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
-use skein_lib::{Env, Queue, ReplyTo, Token};
-
-pub(super) fn route_escalation_read(
-    core: &mut Core,
-    to: ReplyTo,
-    person: u64,
-    task: u64,
-    context: Option<Box<tasks::EscalationContext>>,
-) -> Requests {
-    let answer = match context {
-        Some(context) => {
-            let role = core.people.role(person, context.project);
-            if context.task == task && core.escalation_visible(&context, person, role) {
-                Now::EscalationReply { to, person, context }
-            } else {
-                Now::EscalationRefused { to, why: people::Refusal::Unknown }
-            }
-        }
-        None => Now::EscalationRefused { to, why: people::Refusal::Unknown },
-    };
-    let mut out = Queue::with_capacity(2);
-    out.push(Request::Now(Box::new(answer)));
-    out.push(Request::Decided);
-    Requests::Out(out)
-}
+use skein_lib::{Env, Queue, Token};
 
 #[expect(clippy::too_many_arguments, reason = "the route retains its event fields")]
 pub(super) fn route_historical_escalation(
@@ -150,30 +125,4 @@ pub(super) fn route_historical_proposal(
     let mut out = Queue::with_capacity(1);
     out.push(Request::Decided);
     Requests::Out(out)
-}
-
-impl Core {
-    /// Whether this party already owns a historical result or inbox read.
-    #[must_use]
-    pub fn reading_result(&self, person: u64) -> bool {
-        self.reading_results.contains_key(&person)
-    }
-
-    /// Reserve one root store read for an authenticated party.
-    #[must_use]
-    pub fn reserve_result_read(&mut self, person: u64, waiter: Token) -> bool {
-        self.reading_results.insert(person, waiter) == Ok(None)
-    }
-
-    /// Release a completed or failed historical read.
-    #[must_use]
-    pub fn release_result_read(&mut self, person: u64, waiter: Token) -> bool {
-        self.reading_results.remove(&person) == Some(waiter)
-    }
-
-    /// Advance the committed inbox cursor after the root assembled its final page.
-    #[must_use]
-    pub fn advance_inbox_read(&mut self, person: u64, high: u64) -> Option<people::Stored> {
-        self.people.advance_read_position(person, high)
-    }
 }

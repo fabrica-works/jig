@@ -225,8 +225,6 @@ pub struct Core {
     pub(crate) view_names: skein_lib::Slab<WatchedSubject>,
     pub(crate) changed_views: skein_lib::Set<skein_lib::Id<WatchedSubject>>,
     pub(crate) reads: skein_lib::Slab<reads::Pending>,
-    /// Historical result reads in flight.
-    pub reading_results: Map<u64, Token>,
     /// Historical dependency results held for preparation.
     pub dependency_results: Map<u64, Box<[HistoricalResult]>>,
     /// Numbered task creation flights.
@@ -493,7 +491,6 @@ impl Core {
             view_names: skein_lib::Slab::with_capacity(limits.views.watchers),
             changed_views: skein_lib::Set::with_capacity(limits.views.watchers),
             reads: skein_lib::Slab::with_capacity(limits.load_slots),
-            reading_results: Map::with_capacity(limits.load_slots),
             dependency_results: Map::with_capacity(limits.tasks.tasks),
             made: Map::with_capacity(limits.people.pending),
             goal_routes: Map::with_capacity(limits.people.pending),
@@ -590,7 +587,7 @@ impl Core {
     #[must_use]
     pub fn quiescent(&self, journal_idle: bool) -> bool {
         self.counters.quiescent(journal_idle)
-            && self.reading_results.is_empty()
+            && self.reads.is_empty()
             && self.dependency_results.is_empty()
             && self.pending_calls.is_empty()
             && self.effect_flights.is_empty()

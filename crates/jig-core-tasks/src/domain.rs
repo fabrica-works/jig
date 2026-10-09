@@ -507,9 +507,6 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             out.push(Request::EscalationsRechecked { reply_to, result });
             return;
         }
-        Event::InspectEscalation { reply_to, task } => {
-            out.push(Request::EscalationInspected { reply_to, context: crate::escalation::context(domain, task) });
-        }
         Event::RoutedEscalation { task, revision, holder, entry } => {
             crate::escalation::routed(domain, env, task, revision, holder, entry, out);
         }

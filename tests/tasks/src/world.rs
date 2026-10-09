@@ -329,7 +329,6 @@ impl World {
             | Request::EscalationsInspected { .. }
             | Request::EscalationsRechecked { .. }
             | Request::EscalationNeeded { .. }
-            | Request::EscalationInspected { .. }
             | Request::EscalationDecided { .. }
             | Request::ProposalDecided { .. }
             | Request::PersonProposed { .. }
@@ -404,7 +403,6 @@ impl World {
             | Event::Restored
             | Event::InspectEscalations { .. }
             | Event::RecheckEscalations { .. }
-            | Event::InspectEscalation { .. }
             | Event::RoutedEscalation { .. }
             | Event::DecideEscalation { .. }
             | Event::Message { .. }
@@ -468,7 +466,6 @@ impl World {
             | Event::Restored
             | Event::InspectEscalations { .. }
             | Event::RecheckEscalations { .. }
-            | Event::InspectEscalation { .. }
             | Event::RoutedEscalation { .. }
             | Event::DecideEscalation { .. }
             | Event::Introduce { .. }
@@ -554,10 +551,6 @@ impl World {
 
     /// Commit state and requester results together before executor delivery
     /// (domain/tasks.md, 5; domain/engine.md, 7).
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one durable parent decision keeps writes and referee observations together"
-    )]
     pub fn durable(&mut self) {
         self.commit += 1;
         let mut terminals = Vec::new();
@@ -594,7 +587,6 @@ impl World {
                 | Request::EscalationNeeded { .. }
                 | Request::EscalationsInspected { .. }
                 | Request::EscalationsRechecked { .. }
-                | Request::EscalationInspected { .. }
                 | Request::EscalationDecided { .. }
                 | Request::ProposalDecided { .. }
                 | Request::PersonProposed { .. }
@@ -720,7 +712,6 @@ impl World {
                 Request::RestoreRefused { problem } => panic!("world store corrupted: {problem:?}"),
                 Request::EscalationsInspected { .. }
                 | Request::EscalationsRechecked { .. }
-                | Request::EscalationInspected { .. }
                 | Request::EscalationDecided { .. } => {
                     panic!("this child world sends no escalation decisions")
                 }

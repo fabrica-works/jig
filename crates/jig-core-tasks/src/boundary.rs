@@ -1169,14 +1169,6 @@ pub enum Event {
         /// Same preflight project; rejected/currently unheld tasks stay inert
         project: u32,
     },
-    /// Root queries one bounded held view for named reads/decisions;
-    /// returns one `EscalationInspected`, including absent.
-    InspectEscalation {
-        /// Root-owned synchronous correlation, echoed once.
-        reply_to: ReplyTo,
-        /// Named task; this query mutates nothing.
-        task: u64,
-    },
     /// Root resolves the just-created routing obligation before commitment;
     /// stale notification changes nothing.
     RoutedEscalation {
@@ -1437,13 +1429,6 @@ pub enum Request {
     EscalationNeeded {
         /// Bounded held context; root drops it after routing
         context: Box<crate::EscalationContext>,
-    },
-    /// Terminal for one `InspectEscalation`; query owns no durable task copy
-    EscalationInspected {
-        /// Echoed root correlation, consumed once.
-        reply_to: ReplyTo,
-        /// Owned bounded view, or absent/non-person/non-held task
-        context: Option<Box<crate::EscalationContext>>,
     },
     /// One semantic decision terminal; root commits accepted child writes,
     /// its history and people's keyed answer together.
