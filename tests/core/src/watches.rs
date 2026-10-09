@@ -234,7 +234,17 @@ impl Parties {
                         number: owner,
                         subject: jig_test_connector::ClientSubject::Object { object: watched, .. },
                     } => *owner == *number && *watched == *object,
-                    Watched::Jig(_) => false,
+                    Watched::Application {
+                        subject:
+                            jig_test_connector::ClientSubject::Panel { .. }
+                            | jig_test_connector::ClientSubject::Result { .. }
+                            | jig_test_connector::ClientSubject::Effect { .. }
+                            | jig_test_connector::ClientSubject::Hold { .. }
+                            | jig_test_connector::ClientSubject::Project { .. }
+                            | jig_test_connector::ClientSubject::Deployment,
+                        ..
+                    }
+                    | Watched::Jig(_) => false,
                 },
 
                 root::Write::Save(_) | root::Write::Erase(_) => false,
@@ -250,7 +260,7 @@ impl Parties {
             root::Delivery::ApplicationDocument { watcher, number, document } => {
                 let consumer = self.consumers.get_mut(&watcher.raw()).expect("admitted application watch");
                 consumer.fence.delivered(durable).expect("application watch's durable prerequisite");
-                self.application_deliveries.push((watcher.raw(), durable, *number, **document));
+                self.application_deliveries.push((watcher.raw(), durable, *number, document.as_ref().clone()));
             }
             root::Delivery::Core(core::Held::Delivery { watcher, document }) => {
                 let consumer = self.consumers.get_mut(&watcher.raw()).expect("admitted party watch");
@@ -415,6 +425,23 @@ pub fn world(seed: u64, automatic: bool) -> crate::effects::World {
         open(&mut world, watcher, subject);
     }
     world
+}
+
+pub fn application(
+    world: &mut crate::effects::World,
+    watcher: u64,
+    scope: core::documents::ApplicationScope,
+    number: u16,
+    subject: jig_test_connector::ClientSubject,
+) {
+    world.send(root::Event::WatchApplication {
+        watcher: Token::new(watcher),
+        sign_in: world.sign_in.expect("signed in"),
+        scope,
+        number,
+        subject,
+        window: core::documents::Window { rows: 16, after: None },
+    });
 }
 
 pub fn open(world: &mut crate::effects::World, watcher: u64, subject: Subject) {

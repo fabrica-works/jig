@@ -356,6 +356,23 @@ pub fn ask(world: &mut World, number: u64, read: reads::Read) {
     }));
 }
 
+pub fn application(
+    world: &mut World,
+    number: u64,
+    scope: jig_core::documents::ApplicationScope,
+    connector: u16,
+    subject: jig_test_connector::ClientSubject,
+) {
+    world.reads.as_mut().expect("read parties").queued.push_back(20_000 + number);
+    world.send(root::Event::ReadApplication {
+        reply: ReplyTo::new(Token::new(20_000 + number)),
+        sign_in: world.sign_in.expect("signed in"),
+        scope,
+        number: connector,
+        subject,
+    });
+}
+
 #[must_use]
 pub fn latest(world: &World) -> &reads::Answer {
     &world.reads.as_ref().expect("read parties").receipts.last().expect("one terminal answer").2

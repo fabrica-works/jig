@@ -7,8 +7,8 @@ use crate::{
     ResourceRole, ResourceSpec, SystemEvent,
 };
 
-/// Four pending judges plus a fact change, drift and a procedure save fit.
-pub const MAX_OUT: u32 = 8;
+/// Four judges, a fact change, drift, a procedure save and one client mark fit.
+pub const MAX_OUT: u32 = 9;
 
 /// A connector's live working set and records.
 #[derive(Debug)]
@@ -161,9 +161,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.client_subjects.remove(&subject);
         }
         Event::Document { watcher, scope, subject, party } => {
-            crate::client_documents::document(domain, watcher, scope, subject, party, out);
+            crate::client_documents::document(domain, &env.limits, watcher, scope, subject, party, out);
         }
-        Event::ReadDocument { scope, read, party } => crate::client_documents::read(domain, scope, read, party, out),
+        Event::ReadDocument { scope, read, party } => {
+            crate::client_documents::read(domain, &env.limits, scope, read, party, out);
+        }
         Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value),
         Event::ApplicationDrop { owner } => domain.application.drop(owner),
         Event::Application { request, token, owner, person, project, role, retention } => {
@@ -220,6 +222,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     }
     restart_complete(domain, out);
     close_complete(domain, out);
+    crate::client_marks::collect(domain, env, out);
 }
 
 /// A closing task can withdraw an unsent entry or finish its acknowledgement.
@@ -279,6 +282,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "parent reserved the connector's maximum output");
     crate::outbox::fire(domain, env, out);
     restart_complete(domain, out);
+    crate::client_marks::collect(domain, env, out);
 }
 
 pub(crate) fn valid_path(path: &Path, limits: &Limits) -> bool {

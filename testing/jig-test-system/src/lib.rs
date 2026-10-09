@@ -186,6 +186,11 @@ impl System {
         self.values.insert(Name::from_path(path), Value { state, owner: None });
     }
 
+    /// Another hand removes a resource independently of connector events.
+    pub fn remove(&mut self, path: &Path) {
+        self.values.remove(&Name::from_path(path));
+    }
+
     /// State now visible at one resource.
     #[must_use]
     pub fn state(&self, path: &Path) -> Option<u64> {

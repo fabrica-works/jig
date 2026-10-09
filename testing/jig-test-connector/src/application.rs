@@ -183,7 +183,6 @@ fn changed(domain: &mut Domain, env: &Env<Limits>, request: Token, pending: Pend
     assert!(domain.application.objects.insert(value.object, now).is_ok(), "configured object capacity");
     out.push(Request::Save { record: Record::ApplicationObject { object: value.object, now } });
     finish(domain, env, request, pending, ApplicationOutcome::Changed { object: value.object, now }, out);
-    crate::client_documents::changed(domain, env, value.object, out);
 }
 
 fn finish(

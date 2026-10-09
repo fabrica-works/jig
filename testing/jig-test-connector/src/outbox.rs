@@ -32,7 +32,7 @@ pub(crate) struct Runtime {
 pub(crate) struct Outbox {
     staged: Map<Token, Effect>,
     pub(crate) proposals: Map<u64, (u64, Effect)>,
-    entries: Map<u64, OutboxEntry>,
+    pub(crate) entries: Map<u64, OutboxEntry>,
     runtime: Map<u64, Runtime>,
     made: Map<Key, Made>,
 }
