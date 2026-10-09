@@ -947,3 +947,5 @@ fn retry_observations_distinguish_attempt_failures_from_preparation_refusals_and
     assert_eq!(h.domain.task(2).unwrap().retry_notice, refused);
     assert_eq!(h.domain.task(2).unwrap().phase_since, Wall::from_nanos(23));
 }
+
+mod chat;

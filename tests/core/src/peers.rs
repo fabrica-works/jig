@@ -196,6 +196,22 @@ impl Peers {
                     parties::Ask::Release { task, revision, again } => {
                         people::Ask::Release { project, task: task_number(task), revision, again }
                     }
+                    parties::Ask::Close { task, disposals } => {
+                        let mut values =
+                            skein_lib::List::with_capacity(u32::try_from(disposals.len()).expect("scripted disposals"));
+                        for disposal in disposals {
+                            values
+                                .push(people::Disposal {
+                                    task: task_number(disposal.task),
+                                    keep: match disposal.keep {
+                                        parties::Keep::Cancel => people::Keep::Cancel,
+                                        parties::Keep::MakeMine => people::Keep::MakeMine,
+                                    },
+                                })
+                                .expect("scripted bounded list");
+                        }
+                        people::Ask::Close { project, chat: task_number(task), disposals: values }
+                    }
                     parties::Ask::Take { task } => people::Ask::TakePerson { project, task: task_number(task) },
                     parties::Ask::Choose { task, revision, code, words } => people::Ask::AnswerPerson {
                         project,
@@ -350,6 +366,9 @@ fn party_reply(reply: people::Reply, sign_in: Option<u64>) -> parties::Reply {
             parties::Reply::Said { task, message, released }
         }
         people::Reply::Outcome(people::Outcome::GoalProposed { proposal }) => parties::Reply::Proposed { proposal },
+        people::Reply::Outcome(people::Outcome::Closing { chat, cancelled, kept }) => {
+            parties::Reply::Closed { chat, cancelled, kept }
+        }
         people::Reply::Outcome(people::Outcome::Stopped { task } | people::Outcome::Released { task }) => {
             parties::Reply::Changed { task }
         }
@@ -546,6 +565,14 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         people::Refusal::Limit { which } => parties::Refusal::Limit { which: party_limit(which) },
         people::Refusal::Moved { now } => parties::Refusal::Moved { now: party_moved(now) },
         people::Refusal::Ended { how } => parties::Refusal::Ended { how: party_ending(how) },
+        people::Refusal::Disposal { task, issue } => parties::Refusal::Disposal {
+            task,
+            issue: match issue {
+                people::DisposalIssue::Missing => parties::DisposalIssue::Missing,
+                people::DisposalIssue::Unknown => parties::DisposalIssue::Unknown,
+                people::DisposalIssue::Repeated => parties::DisposalIssue::Repeated,
+            },
+        },
         people::Refusal::Taken { by } => parties::Refusal::Taken { by },
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,

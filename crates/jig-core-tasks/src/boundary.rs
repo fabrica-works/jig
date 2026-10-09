@@ -753,6 +753,8 @@ pub struct PersonStallNotice {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent durable lifecycle facts are explicit")]
 pub struct TaskRecord {
+    /// A person requested this chat to finish by this durable deadline.
+    pub chat_close: Option<crate::chat::Grace>,
     /// Independent revisions retained in live and ended records.
     pub revisions: Revisions,
     /// Injected creation time used to order active person tasks in derived inboxes.
@@ -1078,6 +1080,18 @@ pub enum Accepted {
 /// notifications have no reply destination and may be ignored if stale. (domain/tasks.md, sections 4–5).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// One root-authorized chat close, with all direct delegate disposals and a durable grace.
+    CloseChat {
+        reply_to: ReplyTo,
+        task: u64,
+        person: u64,
+        message: u64,
+        until: Wall,
+        disposals: skein_lib::List<crate::chat::Disposal>,
+        period: u64,
+        pool_budget: u64,
+        period_budget: u64,
+    },
     /// Latest connector admission rule for this individual resource.
     Resource { name: Name, hold: HoldKind },
     /// Current adoption access for a named resource in one project.

@@ -386,6 +386,7 @@ impl World {
             | Event::StalledProposal { .. }
             | Event::Amend { .. }
             | Event::Prioritise { .. }
+            | Event::CloseChat { .. }
             | Event::Move { .. }
             | Event::CarvePool { .. }
             | Event::ResizePool { .. }
@@ -443,6 +444,7 @@ impl World {
             | Event::AnswerPerson { .. }
             | Event::Control { .. }
             | Event::Prioritise { .. }
+            | Event::CloseChat { .. }
             | Event::Move { .. }
             | Event::Propose { .. }
             | Event::ProposePerson { .. }

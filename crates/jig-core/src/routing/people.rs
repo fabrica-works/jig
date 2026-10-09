@@ -135,6 +135,7 @@ pub(super) fn tag_people(
                     | people::Outcome::Adopted { .. }
                     | people::Outcome::GoalStarted { .. }
                     | people::Outcome::GoalProposed { .. }
+                    | people::Outcome::Closing { .. }
                     | people::Outcome::Stopped { .. }
                     | people::Outcome::Cancelled { .. }
                     | people::Outcome::Released { .. }
@@ -270,6 +271,9 @@ pub(super) fn tag_people(
                     }
                     people::Ask::Prioritise { goals, .. } => {
                         prioritise_request(core, env, work, request, person, project, role, goals);
+                    }
+                    people::Ask::Close { chat, disposals, .. } => {
+                        crate::chats::route(core, env, work, request, person, project, role, chat, disposals);
                     }
                     people::Ask::Move { task, reason, .. } => {
                         move_request(core, env, work, request, person, project, role, task, reason);

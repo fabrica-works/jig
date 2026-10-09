@@ -8,7 +8,7 @@
 mod tests;
 
 mod facts;
-pub use facts::{Again, Ending, EndingParty, FailureClass, HoldReason, Lack, LimitKind, Moved, Refusal};
+pub use facts::{Again, DisposalIssue, Ending, EndingParty, FailureClass, HoldReason, Lack, LimitKind, Moved, Refusal};
 
 use skein_lib::{Duration, Rng, Time, Wall};
 use std::collections::VecDeque;
@@ -37,31 +37,81 @@ pub enum Task {
     Waiting,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Keep {
+    Cancel,
+    MakeMine,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Disposal {
+    pub task: Task,
+    pub keep: Keep,
+}
+
 /// Requests in the client's independent vocabulary.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
+    Close {
+        task: Task,
+        disposals: Box<[Disposal]>,
+    },
     /// Mark results read through one committed position.
-    SeeResults { through: u64 },
+    SeeResults {
+        through: u64,
+    },
     /// Mark one chat's replies read without affecting another chat.
-    SeeChat { task: Task, through: u64 },
+    SeeChat {
+        task: Task,
+        through: u64,
+    },
     /// Start one chat.
-    Chat { words: Box<[u8]> },
+    Chat {
+        words: Box<[u8]>,
+    },
     /// Ask for tracked work.
-    Goal { words: Box<[u8]>, budget: u64, priority: u32, deadline: Option<Wall> },
+    Goal {
+        words: Box<[u8]>,
+        budget: u64,
+        priority: u32,
+        deadline: Option<Wall>,
+    },
     /// Add words to a task.
-    Say { task: Task, words: Box<[u8]>, release: bool },
+    Say {
+        task: Task,
+        words: Box<[u8]>,
+        release: bool,
+    },
     /// Stop a current run.
-    Stop { task: Task },
+    Stop {
+        task: Task,
+    },
     /// Release a held task.
-    Release { task: Task, revision: u64, again: Option<bool> },
+    Release {
+        task: Task,
+        revision: u64,
+        again: Option<bool>,
+    },
     /// Claim visible role-addressed work.
-    Take { task: Task },
+    Take {
+        task: Task,
+    },
     /// Answer one visible report choice.
-    Choose { task: Task, revision: u64, code: u32, words: Box<[u8]> },
+    Choose {
+        task: Task,
+        revision: u64,
+        code: u32,
+        words: Box<[u8]>,
+    },
     /// Decide the visible proposal.
-    Decide { accept: bool },
+    Decide {
+        accept: bool,
+    },
     /// A resolved proposal retained with the keyed request for later duplicates.
-    Decision { proposer: u64, proposal: u64, accept: bool },
+    Decision {
+        proposer: u64,
+        proposal: u64,
+        accept: bool,
+    },
 }
 
 /// One action of a client's scenario.
@@ -93,18 +143,36 @@ pub enum Waiting {
 /// A reply a client can see, translated by the world.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Reply {
+    Closed {
+        chat: u64,
+        cancelled: u32,
+        kept: u32,
+    },
     /// Authentication established a party and a sign-in.
-    SignedIn { person: u64, sign_in: u64 },
+    SignedIn {
+        person: u64,
+        sign_in: u64,
+    },
     /// A new chat or goal was made.
-    Started { task: u64 },
+    Started {
+        task: u64,
+    },
     /// A goal request awaits another party.
-    Proposed { proposal: u64 },
+    Proposed {
+        proposal: u64,
+    },
     /// A stop or release was kept.
-    Changed { task: u64 },
+    Changed {
+        task: u64,
+    },
     /// The numbered request finished.
     Done,
     /// Words admitted under their numbered message, possibly with the stop lifted.
-    Said { task: u64, message: u64, released: bool },
+    Said {
+        task: u64,
+        message: u64,
+        released: bool,
+    },
     /// A final refusal retains its facts.
     Refused(Refusal),
     /// No decision was kept; retry the same key and payload.
@@ -112,9 +180,21 @@ pub enum Reply {
     /// The authentication session ended.
     SignedOut,
     /// The proposal was decided first by this party at this wall time.
-    ProposalDecided { proposer: u64, proposal: u64, by: u64, at: Wall, choice: Choice },
+    ProposalDecided {
+        proposer: u64,
+        proposal: u64,
+        by: u64,
+        at: Wall,
+        choice: Choice,
+    },
     /// The escalation was decided first by this party at this wall time.
-    EscalationDecided { task: u64, revision: u64, by: u64, at: Wall, choice: Choice },
+    EscalationDecided {
+        task: u64,
+        revision: u64,
+        by: u64,
+        at: Wall,
+        choice: Choice,
+    },
 }
 
 /// A completed decision's independently presented choice.
@@ -207,7 +287,8 @@ impl Party {
             Reply::SignedOut => {
                 self.sign_in = None;
             }
-            Reply::Proposed { .. }
+            Reply::Closed { .. }
+            | Reply::Proposed { .. }
             | Reply::Done
             | Reply::Said { .. }
             | Reply::Refused(_)
@@ -305,6 +386,13 @@ impl Party {
 
     fn resolve(&self, ask: Ask) -> Option<Ask> {
         Some(match ask {
+            Ask::Close { task, disposals } => {
+                let mut resolved = Vec::with_capacity(disposals.len());
+                for disposal in disposals {
+                    resolved.push(Disposal { task: self.task(disposal.task)?, keep: disposal.keep });
+                }
+                Ask::Close { task: self.task(task)?, disposals: resolved.into_boxed_slice() }
+            }
             Ask::Say { task, words, release, .. } => Ask::Say { task: self.task(task)?, words, release },
             Ask::SeeChat { task, through } => Ask::SeeChat { task: self.task(task)?, through },
             Ask::Stop { task } => Ask::Stop { task: self.task(task)? },

@@ -486,7 +486,8 @@ impl World {
                         Ask::MarkSeen { .. } | Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => {
                             RouteKind::Control
                         }
-                        Ask::EditNote { .. }
+                        Ask::Close { .. }
+                        | Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
                         | Ask::Cancel { .. }
@@ -704,6 +705,7 @@ impl World {
                                         | Ask::AnswerPerson { .. } => Outcome::Refused(Refusal::NotWaiting),
                                         Ask::MarkSeen { .. }
                                         | Ask::Application { .. }
+                                        | Ask::Close { .. }
                                         | Ask::EditNote { .. }
                                         | Ask::MakeService { .. }
                                         | Ask::Adopt { .. }
@@ -732,7 +734,8 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::EditNote { .. }
+                            Ask::Close { .. }
+                            | Ask::EditNote { .. }
                             | Ask::Adopt { .. }
                             | Ask::Stop { .. }
                             | Ask::Cancel { .. }

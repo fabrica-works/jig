@@ -22,6 +22,7 @@ pub mod documents;
 mod effects;
 mod escalation;
 pub use effects::{EffectKey, EffectOrigin, EffectPurpose, effect_worst_case};
+mod chats;
 mod goals;
 mod historical;
 mod inbox;
@@ -102,6 +103,8 @@ pub struct Config {
 /// Immutable policy and run settings used by core decisions.
 #[derive(Debug)]
 pub struct Settings {
+    /// Time a chat has to finish after its whole close decision.
+    pub close_grace: skein_lib::Duration,
     /// Provider number for the application's services.
     pub deployment_provider: u16,
     /// Agent charter selected for chats.

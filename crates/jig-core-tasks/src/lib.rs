@@ -65,6 +65,7 @@ mod admission;
 mod batch;
 mod boundary;
 mod capacity;
+mod chat;
 mod closing;
 mod control;
 mod domain;
@@ -104,6 +105,7 @@ pub use boundary::{
     WriterSlot,
 };
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
+pub use chat::{Disposal, Grace, Keep};
 pub use control::{Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings};
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};
 pub use escalation::{Escalation, EscalationContext, EscalationDecision, EscalationHolder, EscalationOutcome};

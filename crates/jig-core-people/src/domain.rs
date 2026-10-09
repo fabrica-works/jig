@@ -863,6 +863,7 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::Adopted { .. }
         | Outcome::GoalStarted { .. }
         | Outcome::GoalProposed { .. }
+        | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
@@ -914,6 +915,7 @@ fn apply_roles(
     let project = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::SetRoles { project, .. } => *project,
         Ask::MarkSeen { .. }
+        | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::MakeService { .. }
         | Ask::EditNote { .. }
@@ -958,6 +960,7 @@ fn apply_roles(
             holdings.clone()
         }
         Ask::MarkSeen { .. }
+        | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::MakeService { .. }
         | Ask::EditNote { .. }
@@ -1062,6 +1065,7 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
     let (project, name, service_role) = match flight.part.as_ref().unwrap_or(&flight.ask) {
         Ask::MakeService { project, name, role } => (*project, name.clone(), *role),
         Ask::MarkSeen { .. }
+        | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
@@ -1254,7 +1258,8 @@ fn end_signin(domain: &mut Domain, number: u64, out: &mut Queue<Request>) {
 fn project(ask: &Ask) -> u32 {
     match ask {
         Ask::MarkSeen { .. } => 0,
-        Ask::Application { project, .. }
+        Ask::Close { project, .. }
+        | Ask::Application { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
@@ -1349,8 +1354,21 @@ fn valid_note(limits: &Limits, name: u64, scope: &crate::NoteScope, change: &cra
     }
 }
 
+fn valid_close(limits: &Limits, chat: u64, disposals: &List<crate::Disposal>) -> bool {
+    if chat == 0 || disposals.capacity() > crate::disposal_capacity(limits) {
+        return false;
+    }
+    for disposal in disposals {
+        if disposal.task == 0 {
+            return false;
+        }
+    }
+    true
+}
+
 fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
     match ask {
+        Ask::Close { chat, disposals, .. } => valid_close(limits, *chat, disposals),
         Ask::MarkSeen { seen } => match seen {
             Seen::Results { .. } => true,
             Seen::Chat { task, .. } => *task != 0,
@@ -1448,6 +1466,18 @@ fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
 // Admission identifies the bounded payload before any keyed flight is made.
 fn invalid_ask(ask: &Ask) -> Refusal {
     let which = match ask {
+        Ask::Close { chat, disposals, .. } => {
+            let mut unknown = *chat == 0;
+            for disposal in disposals {
+                if disposal.task == 0 {
+                    unknown = true;
+                }
+            }
+            if unknown {
+                return Refusal::Unknown;
+            }
+            LimitKind::LiveDelegates
+        }
         Ask::EditNote { name, .. } => {
             if *name == 0 {
                 return Refusal::Unknown;
@@ -1529,6 +1559,7 @@ fn invalid_ask(ask: &Ask) -> Refusal {
 fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     #[derive(PartialEq, Eq)]
     enum Expected {
+        Close(u64, u32, u32),
         MarkSeen(Seen),
         Application(u16),
         Note(u64),
@@ -1555,6 +1586,17 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     }
 
     let expected = match ask {
+        Ask::Close { chat, disposals, .. } => {
+            let mut cancelled = 0_u32;
+            let mut kept = 0_u32;
+            for disposal in disposals {
+                match disposal.keep {
+                    crate::Keep::Cancel => cancelled = cancelled.checked_add(1).expect("bounded list"),
+                    crate::Keep::MakeMine => kept = kept.checked_add(1).expect("bounded list"),
+                }
+            }
+            Expected::Close(*chat, cancelled, kept)
+        }
         Ask::MarkSeen { seen } => Expected::MarkSeen(*seen),
         Ask::Application { connector, .. } => Expected::Application(*connector),
         Ask::EditNote { name, .. } => Expected::Note(*name),
@@ -1594,6 +1636,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     };
 
     match outcome {
+        Outcome::Closing { chat, cancelled, kept } => expected == Expected::Close(chat, cancelled, kept),
         Outcome::MarkedSeen { seen } => expected == Expected::MarkSeen(seen),
         Outcome::Applied { connector, token } => expected == Expected::Application(connector) && token.raw() != 0,
         Outcome::NoteEdited { name } => expected == Expected::Note(name),
@@ -1780,6 +1823,7 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
         | Outcome::Amended { .. }
         | Outcome::AmendProposed { .. }
         | Outcome::Moved { .. }
+        | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
@@ -1813,6 +1857,7 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
         | Outcome::Amended { .. }
         | Outcome::AmendProposed { .. }
         | Outcome::Moved { .. }
+        | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
@@ -1962,6 +2007,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     }
                 }
                 Ask::MarkSeen { .. }
+                | Ask::Close { .. }
                 | Ask::Application { .. }
                 | Ask::EditNote { .. }
                 | Ask::MakeService { .. }
@@ -2002,6 +2048,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::PersonTaken { .. }
             | Outcome::PersonHandedBack { .. }
             | Outcome::PersonAnswered { .. }
+            | Outcome::Closing { .. }
             | Outcome::Stopped { .. }
             | Outcome::Cancelled { .. }
             | Outcome::Released { .. }
@@ -2050,7 +2097,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     let flight = domain.pending.get(id).ok_or(Outcome::Refused(Refusal::Unknown))?;
     let application_project = match &flight.ask {
         Ask::Application { project, .. } => *project,
-        Ask::MarkSeen { .. }
+        Ask::Close { .. }
+        | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
@@ -2075,7 +2123,8 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     };
     match &ask {
         Ask::Application { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
-        Ask::MarkSeen { .. }
+        Ask::Close { .. }
+        | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
@@ -2159,7 +2208,7 @@ fn admission(domain: &Domain, person: u64, project: u32, role: Option<Role>, ask
             Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
             Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
         },
-        Ask::Say { .. } | Ask::AnswerQuestion { .. } => match role {
+        Ask::Close { .. } | Ask::Say { .. } | Ask::AnswerQuestion { .. } => match role {
             Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
             Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
         },

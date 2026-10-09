@@ -1479,3 +1479,5 @@ fn a_goal_deadline_is_retained_under_its_key() {
         Ask::SetGoal { project, spec, charter, budget, priority, deadline: Some(Wall::from_nanos(2_000_000_000)) };
     assert_eq!(reply(&test.request(10, 1, changed)), Reply::Refused(Refusal::KeyConflict));
 }
+
+mod closing_chat;

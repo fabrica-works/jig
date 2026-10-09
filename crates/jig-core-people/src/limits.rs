@@ -73,7 +73,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.waiters == 0 || limits.sign_in_lifetime == Duration::ZERO || limits.request_retention == Duration::ZERO {
         return None;
     }
-    let ask_bytes = u64::from(limits.words)
+    let ask_bytes = List::<crate::Disposal>::worst_case(disposal_capacity(limits))?
+        .max(u64::from(limits.words))
         .max(u64::from(limits.amendment_bytes))
         .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?)
         .max(u64::from(limits.goals).checked_mul(u64::try_from(size_of::<(u64, u32)>()).ok()?)?);
@@ -134,4 +135,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<(Wall, u32), crate::CapacityRefusal>::worst_case(refusal_views)?)?
         .checked_add(List::<crate::CapacityRefusal>::worst_case(refusal_views)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)
+}
+
+/// Close disposals share the existing whole-amendment byte bound, including their list allocation.
+#[must_use]
+pub fn disposal_capacity(limits: &Limits) -> u32 {
+    limits
+        .amendment_bytes
+        .checked_div(u32::try_from(size_of::<crate::Disposal>()).expect("fixed disposal size fits"))
+        .expect("nonzero disposal size")
 }

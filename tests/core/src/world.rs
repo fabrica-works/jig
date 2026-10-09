@@ -290,6 +290,7 @@ pub fn config(seed: u64) -> root::Config {
             },
             connectors: Box::new([1, 2]),
             settings: core::Settings {
+                close_grace: Duration::from_secs(5),
                 deployment_provider: 3,
                 recurring_connector: 1,
                 charter: 1,

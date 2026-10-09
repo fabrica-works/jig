@@ -254,6 +254,7 @@ fn a_request_sent_twice_creates_one_chat_and_replays_the_same_answer() {
             | parties::Reply::Again(_)
             | parties::Reply::SignedOut
             | parties::Reply::ProposalDecided { .. }
+            | parties::Reply::Closed { .. }
             | parties::Reply::EscalationDecided { .. } => None,
         })
         .collect();
@@ -298,6 +299,7 @@ fn a_worker_reconnects_and_resends_retained_turns_after_hello() {
 // A shared entrypoint avoids one process startup per short scenario.
 #[test]
 fn peers_scenarios() {
+    jig_core_world::stories::closing_chat::disposals_and_finish_grace();
     a_scripted_worker_takes_turns_answers_calls_and_finishes_with_acknowledgements();
     three_workers_and_the_engines_own_slot_use_the_same_host_scripts();
     a_members_chat_proposes_a_goal_it_cannot_fund_and_a_maintainer_accepts_it_as_their_own();

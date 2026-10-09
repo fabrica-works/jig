@@ -167,6 +167,7 @@ impl Core {
                 | people::Outcome::Adopted { .. }
                 | people::Outcome::GoalStarted { .. }
                 | people::Outcome::GoalProposed { .. }
+                | people::Outcome::Closing { .. }
                 | people::Outcome::Stopped { .. }
                 | people::Outcome::Cancelled { .. }
                 | people::Outcome::Released { .. }

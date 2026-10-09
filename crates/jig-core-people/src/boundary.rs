@@ -5,7 +5,7 @@
 
 use crate::Refusal;
 use alloc::boxed::Box;
-use skein_lib::{ReplyTo, Token, Wall};
+use skein_lib::{List, ReplyTo, Token, Wall};
 
 /// A task-derived recipient, retained only as a bounded inbox reference.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -214,10 +214,25 @@ pub enum NoteChange {
     Delete { recalled: u32 },
 }
 
+/// One direct live delegate's requested disposal (domain/people.md, section 7).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Disposal {
+    pub task: u64,
+    pub keep: Keep,
+}
+/// Whether a closing chat's delegate is cancelled or made the party's.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Keep {
+    Cancel,
+    MakeMine,
+}
+
 /// Authenticated keyed requests admitted by the people child and routed by
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ask {
+    /// Dispose of every live delegate and ask this chat to finish within its configured grace.
+    Close { project: u32, chat: u64, disposals: List<Disposal> },
     /// Mark results or one chat's replies seen under this party's key.
     MarkSeen { seen: Seen },
     /// Application-owned request metadata; the root carries the value, and the protocol supplies its digest.
@@ -348,6 +363,8 @@ pub enum EscalationChoice {
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
+    /// The whole chat-close decision was kept.
+    Closing { chat: u64, cancelled: u32, kept: u32 },
     /// The named read position was accepted; it never moves backwards.
     MarkedSeen { seen: Seen },
     /// Connector-owned durable outcome named by token; the root asks its owner for the value.

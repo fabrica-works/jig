@@ -9,6 +9,7 @@ use skein_lib::Wall;
 /// The refused operation's kind and existing object identity, without its payload.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum CapacityAction {
+    Close,
     Application { connector: u16 },
     Note { name: u64 },
     Service,
@@ -56,6 +57,7 @@ pub struct CapacityRefusal {
 
 pub(crate) fn action(ask: &Ask) -> CapacityAction {
     match ask {
+        Ask::Close { .. } => CapacityAction::Close,
         Ask::Application { connector, .. } => CapacityAction::Application { connector: *connector },
         Ask::EditNote { name, .. } => CapacityAction::Note { name: *name },
         Ask::MakeService { .. } => CapacityAction::Service,
@@ -86,7 +88,8 @@ pub(crate) fn action(ask: &Ask) -> CapacityAction {
 
 pub(crate) fn project(ask: &Ask) -> Option<u32> {
     match ask {
-        Ask::Application { project, .. }
+        Ask::Close { project, .. }
+        | Ask::Application { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
@@ -123,6 +126,7 @@ pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
         | Outcome::Adopted { .. }
         | Outcome::GoalStarted { .. }
         | Outcome::GoalProposed { .. }
+        | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
@@ -187,6 +191,7 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
         Refusal::Role { .. }
         | Refusal::Authority { .. }
         | Refusal::Moved { .. }
+        | Refusal::Disposal { .. }
         | Refusal::Taken { .. }
         | Refusal::Ended { .. }
         | Refusal::NotWaiting

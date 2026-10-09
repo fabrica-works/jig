@@ -480,6 +480,9 @@ pub(super) fn tag_tasks(
                 let token = reply_to.into_token();
                 if let Some(route) = core.person_tasks.remove(&token) {
                     let outcome = match route {
+                        PersonTaskRoute::Close { chat, cancelled, kept } => {
+                            people::Outcome::Closing { chat, cancelled, kept }
+                        }
                         PersonTaskRoute::Take(task) => people::Outcome::PersonTaken { task },
                         PersonTaskRoute::PoolSet { project, person } => people::Outcome::PoolSet { project, person },
                         PersonTaskRoute::HandBack(task) => people::Outcome::PersonHandedBack { task },

@@ -208,6 +208,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(u64::from(limits.hold_bytes))?,
     )?;
     Slab::<Task>::worst_case(limits.tasks)?
+        .checked_add(Deadlines::<u64>::worst_case(limits.tasks)?)?
+        .checked_add(List::<crate::moving::Plan>::worst_case(limits.delegates)?)?
+        .checked_add(u64::from(limits.delegates).checked_mul(List::<u64>::worst_case(limits.tasks)?)?)?
         .checked_add(u64::from(limits.tasks).checked_mul(u64::from(limits.result_bytes).checked_mul(2)?)?)?
         .checked_add(Map::<crate::Funder, crate::FundingRecord>::worst_case(limits.funders)?)?
         .checked_add(Map::<u64, Id<Task>>::worst_case(limits.tasks)?)?

@@ -14,6 +14,7 @@ pub(crate) fn number(ask: &people::Ask) -> u64 {
         | people::Ask::HandBackPerson { task, .. }
         | people::Ask::AnswerPerson { task, .. } => *task,
         people::Ask::MarkSeen { .. }
+        | people::Ask::Close { .. }
         | people::Ask::Application { .. }
         | people::Ask::Move { .. }
         | people::Ask::DecideProposal { .. }
@@ -111,6 +112,7 @@ impl Core {
                             people::Ask::AnswerPerson { .. } => true,
                             people::Ask::TakePerson { .. } | people::Ask::HandBackPerson { .. } => false,
                             people::Ask::MarkSeen { .. }
+                            | people::Ask::Close { .. }
                             | people::Ask::Application { .. }
                             | people::Ask::Move { .. }
                             | people::Ask::DecideProposal { .. }
@@ -137,6 +139,7 @@ impl Core {
                         people::Ask::HandBackPerson { .. } => true,
                         people::Ask::TakePerson { .. } | people::Ask::AnswerPerson { .. } => false,
                         people::Ask::MarkSeen { .. }
+                        | people::Ask::Close { .. }
                         | people::Ask::Application { .. }
                         | people::Ask::Move { .. }
                         | people::Ask::DecideProposal { .. }
@@ -199,6 +202,7 @@ impl Core {
                 )
             }
             people::Ask::MarkSeen { .. }
+            | people::Ask::Close { .. }
             | people::Ask::Application { .. }
             | people::Ask::Move { .. }
             | people::Ask::DecideProposal { .. }

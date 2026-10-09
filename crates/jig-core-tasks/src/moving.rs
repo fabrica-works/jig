@@ -5,7 +5,7 @@ use crate::domain::{Domain, entrance, publish, record, refused, task_mut};
 use crate::{Change, Funder, Limits, Numbers, Party, Phase, Refusal, Request, Was};
 use skein_lib::{Env, List, Queue, ReplyTo};
 
-fn descendant(domain: &Domain, number: u64, ancestor: u64, bound: u32) -> bool {
+pub(crate) fn descendant(domain: &Domain, number: u64, ancestor: u64, bound: u32) -> bool {
     let mut at = Some(number);
     for _ in 0..bound {
         let Some(current) = at else { return false };
@@ -30,11 +30,24 @@ fn mutable(phase: &Phase) -> bool {
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one authenticated person move carries its target, funding period and reason"
-)]
-#[expect(clippy::too_many_lines, reason = "one move preflights and updates its requester and funding cohort")]
+#[derive(Debug)]
+pub(crate) struct Plan {
+    number: u64,
+    person: u64,
+    pool_budget: u64,
+    period_budget: u64,
+    previous_root: u64,
+    previous_depth: u32,
+    source: Funder,
+    spent: u64,
+    left: u64,
+    destination: Funder,
+    period_source: Funder,
+    subtree: List<u64>,
+    old_parent: Option<u64>,
+}
+
+#[expect(clippy::too_many_arguments, reason = "the existing move carries its person funding and reason")]
 pub(crate) fn apply(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -47,19 +60,52 @@ pub(crate) fn apply(
     reason: &[u8],
     out: &mut Queue<Request>,
 ) {
-    let to = match entrance(domain, to, number) {
-        Ok(to) => to,
-        Err((to, why)) => return refused(to, Some(number), why, out),
+    let plan = match check(domain, env, number, person, period, pool_budget, period_budget, reason) {
+        Ok(plan) => plan,
+        Err(problem) => return refuse(domain, env, to, problem, out),
     };
+    make(domain, env, plan, reason, out);
+    reroute(domain, env, out);
+    out.push(Request::Done { reply_to: to });
+}
+
+pub(crate) fn refuse(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    to: ReplyTo,
+    problem: crate::Problem,
+    out: &mut Queue<Request>,
+) {
+    match problem.capacity {
+        Some(capacity) => crate::capacity::refuse(domain, env, to, problem.task, problem.why, capacity, out),
+        None => refused(to, problem.task, problem.why, out),
+    }
+}
+
+#[expect(clippy::too_many_arguments, reason = "a pure move preflight checks its authentic funding context")]
+#[expect(clippy::too_many_lines, reason = "the full existing move preflight remains together")]
+pub(crate) fn check(
+    domain: &Domain,
+    env: &Env<Limits>,
+    number: u64,
+    person: u64,
+    period: u64,
+    pool_budget: u64,
+    period_budget: u64,
+    reason: &[u8],
+) -> Result<Plan, crate::Problem> {
+    if let Err((_, why)) = entrance(domain, ReplyTo::new(skein_lib::Token::new(0)), number) {
+        return Err(crate::Problem::new(Some(number), why));
+    }
     let old = record(domain, number).expect("entrance named live task");
     if person == 0 || old.requester == Party::Person(person) {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(crate::Problem::new(Some(number), Refusal::State));
     }
     if !mutable(&old.phase) {
-        return refused(to, Some(number), Refusal::State, out);
+        return Err(crate::Problem::new(Some(number), Refusal::State));
     }
     if reason.len() > usize::try_from(env.limits.message_bytes).expect("bounded reason size") {
-        return refused(to, Some(number), Refusal::Read, out);
+        return Err(crate::Problem::new(Some(number), Refusal::Read));
     }
     let project = old.project;
     let from = old.requester;
@@ -67,10 +113,10 @@ pub(crate) fn apply(
     let previous_depth = old.depth;
     let source = old.funder;
     let Some(spent) = crate::funders::total(old.numbers) else {
-        return refused(to, Some(number), Refusal::Funding, out);
+        return Err(crate::Problem::new(Some(number), Refusal::Funding));
     };
     let Some(left) = crate::funders::remaining(old.numbers) else {
-        return refused(to, Some(number), Refusal::Funding, out);
+        return Err(crate::Problem::new(Some(number), Refusal::Funding));
     };
     let destination = Funder::Pool { project, person, period };
     let period_source = Funder::Period { project, period };
@@ -93,7 +139,7 @@ pub(crate) fn apply(
             None => false,
         };
         if exhausted_escalation || exhausted_proposal {
-            return refused(to, Some(*task), Refusal::State, out);
+            return Err(crate::Problem::new(Some(*task), Refusal::State));
         }
     }
     let mut subtree = List::with_capacity(env.limits.tasks);
@@ -105,7 +151,7 @@ pub(crate) fn apply(
                 || row.root != previous_root
                 || row.depth < previous_depth
             {
-                return refused(to, Some(*child), Refusal::State, out);
+                return Err(crate::Problem::new(Some(*child), Refusal::State));
             }
             subtree.push(*child).expect("live task bound");
         }
@@ -113,12 +159,17 @@ pub(crate) fn apply(
     let old_parent = match from {
         Party::Task(parent) => {
             let Some(parent_row) = record(domain, parent) else {
-                return refused(to, Some(number), Refusal::Reference, out);
+                return Err(crate::Problem::new(Some(number), Refusal::Reference));
             };
             if !parent_row.references.contains(&number)
                 && parent_row.references.len() >= usize::try_from(env.limits.references).expect("reference bound")
             {
-                return refused(to, Some(number), Refusal::Reference, out);
+                return Err(crate::Problem::new(Some(number), Refusal::Reference));
+            }
+            if !old.references.contains(&parent)
+                && old.references.len() >= usize::try_from(env.limits.references).expect("reference bound")
+            {
+                return Err(crate::Problem::new(Some(number), Refusal::Reference));
             }
             Some(parent)
         }
@@ -128,52 +179,52 @@ pub(crate) fn apply(
         let source_numbers = match source {
             Funder::Task(parent) => match record(domain, parent) {
                 Some(parent) => parent.numbers,
-                None => return refused(to, Some(number), Refusal::Funding, out),
+                None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
             },
             Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => match domain.funding.get(&source)
             {
                 Some(ledger) => ledger.numbers,
-                None => return refused(to, Some(number), Refusal::Funding, out),
+                None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
             },
         };
         if source_numbers.reserved.checked_sub(old.numbers.budget).is_none()
             || source_numbers.spent_below.checked_add(spent).is_none()
         {
-            return refused(to, Some(number), Refusal::Funding, out);
+            return Err(crate::Problem::new(Some(number), Refusal::Funding));
         }
         let mut after = match domain.funding.get(&destination) {
             Some(pool) if !pool.closed => pool.numbers,
-            Some(_) => return refused(to, Some(number), Refusal::Funding, out),
+            Some(_) => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
             None => Numbers { budget: pool_budget, spent: 0, spent_below: 0, reserved: 0 },
         };
         after.reserved = match after.reserved.checked_add(left) {
             Some(reserved) => reserved,
-            None => return refused(to, Some(number), Refusal::Funding, out),
+            None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
         };
         if crate::funders::available(after).is_none() {
-            return refused(to, Some(number), Refusal::Funding, out);
+            return Err(crate::Problem::new(Some(number), Refusal::Funding));
         }
         let normalized = Numbers { budget: left, spent: 0, spent_below: 0, reserved: old.numbers.reserved };
         if crate::funders::available(normalized).is_none() {
-            return refused(to, Some(number), Refusal::Funding, out);
+            return Err(crate::Problem::new(Some(number), Refusal::Funding));
         }
     }
     let create_pool = domain.funding.get(&destination).is_none();
     let create_period = domain.funding.get(&period_source).is_none();
     if create_period && !create_pool {
-        return refused(to, Some(number), Refusal::Funding, out);
+        return Err(crate::Problem::new(Some(number), Refusal::Funding));
     }
     if create_pool {
         let period_numbers = match domain.funding.get(&period_source) {
             Some(ledger) if !ledger.closed => ledger.numbers,
-            Some(_) => return refused(to, Some(number), Refusal::Funding, out),
+            Some(_) => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
             None => {
                 for (funder, _) in &domain.funding {
                     match *funder {
                         Funder::Period { project: old_project, period: old_period }
                             if old_project == project && old_period >= period =>
                         {
-                            return refused(to, Some(number), Refusal::Funding, out);
+                            return Err(crate::Problem::new(Some(number), Refusal::Funding));
                         }
                         Funder::Task(_) | Funder::Pool { .. } | Funder::Recurring { .. } | Funder::Period { .. } => {}
                     }
@@ -184,21 +235,17 @@ pub(crate) fn apply(
         let mut after = period_numbers;
         after.reserved = match after.reserved.checked_add(pool_budget) {
             Some(reserved) => reserved,
-            None => return refused(to, Some(number), Refusal::Funding, out),
+            None => return Err(crate::Problem::new(Some(number), Refusal::Funding)),
         };
         if crate::funders::available(after).is_none() {
-            return refused(to, Some(number), Refusal::Funding, out);
+            return Err(crate::Problem::new(Some(number), Refusal::Funding));
         }
         let needed = if create_period { 2 } else { 1 };
         if match domain.funding.len().checked_add(needed) {
             Some(count) => count > domain.funding.capacity(),
             None => true,
         } {
-            let project = old.project;
-            return crate::capacity::refuse(
-                domain,
-                env,
-                to,
+            return Err(crate::Problem::capacity(
                 Some(number),
                 Refusal::Busy,
                 crate::Capacity {
@@ -207,10 +254,45 @@ pub(crate) fn apply(
                     action: crate::CapacityAction::Move,
                     cause: crate::CapacityCause::Funders { limit: env.limits.funders },
                 },
-                out,
-            );
+            ));
         }
     }
+    Ok(Plan {
+        number,
+        person,
+        pool_budget,
+        period_budget,
+        previous_root,
+        previous_depth,
+        source,
+        spent,
+        left,
+        destination,
+        period_source,
+        subtree,
+        old_parent,
+    })
+}
+
+#[expect(clippy::too_many_lines, reason = "one admitted move rewrites its funding and requester cohort")]
+pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &[u8], out: &mut Queue<Request>) {
+    let Plan {
+        number,
+        person,
+        pool_budget,
+        period_budget,
+        previous_root,
+        previous_depth,
+        source,
+        spent,
+        left,
+        destination,
+        period_source,
+        subtree,
+        old_parent,
+    } = plan;
+    let create_period = domain.funding.get(&period_source).is_none();
+    let create_pool = domain.funding.get(&destination).is_none();
     if create_period {
         let record = crate::FundingRecord {
             funder: period_source,
@@ -282,6 +364,16 @@ pub(crate) fn apply(
     {
         let task = task_mut(domain, number).expect("moving target live");
         task.record.requester = Party::Person(person);
+        if let Some(parent) = old_parent
+            && !task.record.references.contains(&parent)
+        {
+            let mut references = List::with_capacity(env.limits.references);
+            for reference in &task.record.references {
+                references.push(*reference).expect("old references bounded");
+            }
+            references.push(parent).expect("bilateral reference room preflighted");
+            task.record.references = references.into_boxed();
+        }
         if source != destination {
             task.record.funder = destination;
             task.record.numbers.budget = left;
@@ -298,6 +390,9 @@ pub(crate) fn apply(
         crate::control::history(domain, child, env.wall, Party::Person(person), Change::Moved, reason, out);
         publish(domain, env, child, out);
     }
+}
+
+pub(crate) fn reroute(domain: &Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut waiting = List::with_capacity(env.limits.tasks);
     for (task, _) in &domain.names {
         waiting.push(*task).expect("live task bound");
@@ -323,5 +418,4 @@ pub(crate) fn apply(
             }
         }
     }
-    out.push(Request::Done { reply_to: to });
 }

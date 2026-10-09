@@ -339,6 +339,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || !valid_escalation(task, limits)
         || !valid_proposal(task, limits)
         || !valid_followups(task)
+        || !valid_chat_close(task)
         || !valid_person_answer(task)
     {
         return false;
@@ -680,6 +681,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, stored: Stored, ou
                     observed_phase: Some(task.phase.clone()),
                     record: *task,
                     alarm: None,
+                    chat_alarm: None,
                     observed_hold,
                 })
                 .expect("restored task admitted");
@@ -916,6 +918,7 @@ pub(crate) fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<R
     crate::wake::restore(domain, env);
     let numbers = snapshot(domain, env.limits.tasks);
     for number in numbers.into_boxed() {
+        crate::chat::schedule(domain, env, number);
         let phase = record(domain, number).expect("restored name exists").phase.clone();
         match record(domain, number).expect("restored name exists").escalation {
             crate::Escalation::Waiting { .. } => out.push(Request::EscalationNeeded {
@@ -973,4 +976,13 @@ pub(crate) fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<R
             Phase::Ended(_) => unreachable!("ended record not restored into live arena"),
         }
     }
+}
+
+fn valid_chat_close(task: &TaskRecord) -> bool {
+    let Some(grace) = task.chat_close else { return true };
+    grace.by != 0
+        && match task.executor {
+            Executor::Agent { .. } => true,
+            Executor::Procedure { .. } | Executor::Person(_) => false,
+        }
 }

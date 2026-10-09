@@ -170,6 +170,7 @@ pub(super) fn cancel_request(
     let reason = match ask {
         people::Ask::Cancel { reason, .. } => reason,
         people::Ask::MarkSeen { .. }
+        | people::Ask::Close { .. }
         | people::Ask::Application { .. }
         | people::Ask::EditNote { .. }
         | people::Ask::MakeService { .. }
@@ -224,6 +225,7 @@ pub(super) fn release_request(
             let (revision, again) = match ask {
                 people::Ask::Release { revision, again, .. } => (revision, again),
                 people::Ask::MarkSeen { .. }
+                | people::Ask::Close { .. }
                 | people::Ask::Application { .. }
                 | people::Ask::EditNote { .. }
                 | people::Ask::MakeService { .. }
