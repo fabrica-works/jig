@@ -141,3 +141,8 @@ fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words
         }
     }
 }
+
+/// Temporary visits and membership while emitting a retained tree.
+pub(super) fn scratch(rows: u32) -> Option<u64> {
+    Stack::<Visit>::worst_case(rows.checked_mul(2)?)?.checked_add(Set::<u64>::worst_case(rows)?)
+}

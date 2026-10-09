@@ -13,3 +13,7 @@ mod cards_access;
 mod pages;
 
 mod work_pages;
+
+mod turns;
+
+mod page_capacity;

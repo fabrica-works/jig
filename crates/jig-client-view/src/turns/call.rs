@@ -1,0 +1,68 @@
+//! Calls fold only input/result detail; made objects stay live as cards (view.md, 9).
+use crate::{
+    Builder, JigBindings, Role, Run, State, cards,
+    phrases::{Hole, jig::JigPhrase},
+    words::Words,
+};
+use jig_client::{
+    Domain,
+    action::Act,
+    contract::{Call, TurnName},
+    conversation::{CallName, Fold},
+};
+pub(super) fn call(
+    b: &mut Builder,
+    client: &Domain,
+    turn: TurnName,
+    call: &Call,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let name = CallName { attempt: turn.attempt, turn: turn.number, call: call.number };
+    let open = client.conversation().fold(name) == Fold::Open;
+    b.open(Role::Region);
+    b.name(call.tool.bytes());
+    words.text(b, JigPhrase::CallNumber, &[Hole::Number(call.number)]);
+    words.text(b, JigPhrase::Tool, &[crate::words::name(call.tool.bytes())]);
+    words.text(
+        b,
+        if call.failed {
+            JigPhrase::CallFailed
+        } else if call.outcome.is_some() {
+            JigPhrase::CallCompleted
+        } else {
+            JigPhrase::CallPending
+        },
+        &[],
+    );
+    if let Some(summary) = &call.outcome {
+        b.text(Run::Plain, summary.bytes());
+    }
+    let label = words
+        .say(if open { JigPhrase::FoldCall } else { JigPhrase::OpenCall }, &[crate::words::name(call.tool.bytes())]);
+    b.open(Role::Button);
+    b.name(&label);
+    b.text(Run::Plain, &label);
+    if open {
+        b.state(State::Expanded);
+    }
+    b.bind(bindings.insert(crate::JigMeaning::Action(Act::FoldCall { name, open: !open })));
+    b.close();
+    if open {
+        b.text(Run::Code, call.input.bytes());
+        if let Some(result) = &call.outcome {
+            b.text(Run::Plain, result.bytes());
+        }
+    }
+    for object in &call.objects {
+        if let Some(id) = client.objects().find(*object) {
+            cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
+        } else {
+            words.status(b, JigPhrase::LoadingObject, &[]);
+        }
+    }
+    for part in &call.parts {
+        cards::common::part(b, part, words, bindings);
+    }
+    b.close();
+}

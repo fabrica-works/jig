@@ -1,0 +1,186 @@
+//! A chronological log of committed activity and provisional turns (view.md, 9).
+//! Reads the conversation owner's windows, word snapshots and call folds. The
+//! same task/attempt/turn key names live and committed text; no stream facts are
+//! committed by the view. Call objects use shared cards and parts leave slots.
+use crate::{Builder, JigBindings, Key, Owner, Role, Run, phrases::jig::JigPhrase, words::Words};
+use jig_client::{
+    Domain,
+    contract::{Activity, Party, TurnName},
+    conversation::{Conversation, Words as WordState},
+};
+mod activity;
+mod call;
+mod turn;
+/// Show an agent task's activity in its page's already opened section.
+pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    let state = client.conversation();
+    b.open(Role::Log);
+    b.name(&words.say(JigPhrase::ConversationLog, &[]));
+    if state.reading.is_some() {
+        b.state(crate::State::Busy);
+    }
+    // The owner retains newest first; a log reads from oldest to newest.
+    for offset in 0..state.lines.rows.len() {
+        let index = state
+            .lines
+            .rows
+            .len()
+            .checked_sub(1)
+            .expect("line exists")
+            .checked_sub(offset)
+            .expect("reverse line exists");
+        let line = state.lines.rows.get(index).expect("retained line exists");
+        let key = match &line.event {
+            Activity::Turn { name, .. } => turn_key(state.task, *name),
+            Activity::Words { message, .. } => word_key(state, *message),
+            Activity::RunBegan { .. }
+            | Activity::RunEnded { .. }
+            | Activity::Result { .. }
+            | Activity::News { .. }
+            | Activity::Decision { .. } => Key { owner: Owner::Jig, kind: 27, a: state.task, b: line.position },
+        };
+        b.open(Role::Item);
+        b.key(key);
+        b.open(Role::Region);
+        b.name(&words.say(JigPhrase::ConversationLog, &[]));
+        words.wall(b, line.at);
+        activity::activity(b, client, &line.event, words, bindings);
+        b.close();
+        b.close();
+    }
+    pending(b, state, words);
+    for live in &state.live {
+        b.open(Role::Item);
+        b.key(turn_key(state.task, live.name));
+        b.open(Role::Region);
+        b.name(&words.say(JigPhrase::Provisional, &[]));
+        words.status(b, JigPhrase::Provisional, &[]);
+        words.wall(b, live.began);
+        crate::markdown::read(live.text.bytes(), 2, b);
+        if live.cut {
+            words.status(b, JigPhrase::TurnCut, &[]);
+        }
+        if let Some(value) = &live.call {
+            call::call(b, client, live.name, value, words, bindings);
+        }
+        b.close();
+        b.close();
+    }
+    b.close();
+    edges(b, state, words, bindings);
+}
+fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
+    for sent in &state.words.rows {
+        let message = match sent.state {
+            WordState::BeingSent => None,
+            WordState::Sent { message } | WordState::Read { message } => Some(message),
+        };
+        let mut in_activity = false;
+        for line in &state.lines.rows {
+            match line.event {
+                Activity::Words { message: seen, .. } => {
+                    if message == Some(seen) {
+                        in_activity = true;
+                    }
+                }
+                Activity::RunBegan { .. }
+                | Activity::RunEnded { .. }
+                | Activity::Turn { .. }
+                | Activity::Result { .. }
+                | Activity::News { .. }
+                | Activity::Decision { .. } => {}
+            }
+        }
+        if in_activity {
+            continue;
+        }
+        b.open(Role::Item);
+        match sent.request {
+            Some(request) => b.key(Key { owner: Owner::Jig, kind: 26, a: state.task, b: request.raw() }),
+            None => {
+                if let Some(message) = message {
+                    b.key(word_key(state, message));
+                }
+            }
+        }
+        b.open(Role::Region);
+        b.name(&words.say(JigPhrase::Person, &[]));
+        if let Some(by) = &sent.by {
+            party(b, by, words);
+        }
+        b.text(Run::Plain, sent.words.bytes());
+        word_state(b, sent.state, words);
+        b.close();
+        b.close();
+    }
+}
+fn word_key(state: &Conversation, message: u64) -> Key {
+    for sent in &state.words.rows {
+        match sent.state {
+            WordState::Sent { message: number } | WordState::Read { message: number } => {
+                if message == number
+                    && let Some(request) = sent.request
+                {
+                    return Key { owner: Owner::Jig, kind: 26, a: state.task, b: request.raw() };
+                }
+            }
+            WordState::BeingSent => {}
+        }
+    }
+    Key { owner: Owner::Jig, kind: 25, a: state.task, b: message }
+}
+fn turn_key(task: u64, name: TurnName) -> Key {
+    Key {
+        owner: Owner::Jig,
+        kind: 24,
+        a: task,
+        b: u64::from(name.attempt)
+            .checked_mul(4_294_967_296)
+            .expect("u32 attempt fits")
+            .checked_add(u64::from(name.number))
+            .expect("u32 turn fits"),
+    }
+}
+fn party(b: &mut Builder, by: &Party, words: &Words) {
+    words.actor(b, jig_client::contract::Actor::Party(by.number));
+    b.text(Run::Plain, by.name.bytes());
+}
+fn word_state(b: &mut Builder, state: WordState, words: &Words) {
+    let phrase = match state {
+        WordState::BeingSent => JigPhrase::WordsBeingSent,
+        WordState::Sent { .. } => JigPhrase::WordsSent,
+        WordState::Read { .. } => JigPhrase::WordsRead,
+    };
+    words.status(b, phrase, &[]);
+}
+
+fn edges(b: &mut Builder, state: &Conversation, words: &Words, bindings: &mut JigBindings) {
+    use jig_client::{
+        action::{Act, End},
+        windows::Edge,
+    };
+    for (edge, end, phrase) in [
+        (&state.lines.edges.after, End::Before, JigPhrase::ReadEarlier),
+        (&state.lines.edges.before, End::After, JigPhrase::ReadLater),
+    ] {
+        match edge {
+            Edge::End => words.text(
+                b,
+                match end {
+                    End::Before => JigPhrase::WindowStart,
+                    End::After => JigPhrase::WindowEnd,
+                },
+                &[],
+            ),
+            Edge::More(_) => crate::frame::control(
+                b,
+                words,
+                bindings,
+                Role::Button,
+                phrase,
+                &[],
+                Act::More { window: skein_lib::Token::new(jig_client::conversation::ACTIVITY_WINDOW), end },
+            ),
+        }
+    }
+}

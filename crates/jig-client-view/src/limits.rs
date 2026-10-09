@@ -54,18 +54,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(made)?
         .checked_add(maps)?
         .checked_add(children)?
-        .checked_add(ancestry)
+        .checked_add(ancestry)?
+        .checked_add(crate::pages::scratch(limits)?)
 }
 
 impl Limits {
-    /// Largest jig renderer in one enclosing page, with English's phrase
-    /// envelope (256 literal bytes, at most three holes). Pages and connector
-    /// fragments add their counts at the application's view root. Custom
+    /// Whole jig composition in one enclosing page, with English's phrase
+    /// envelope (256 literal bytes, at most three holes). Connector
+    /// fragments and application pages use `compose`. Custom
     /// languages use `of_words` to include their checked saying capacities.
     #[must_use]
     pub fn of(client: &jig_client::Limits) -> Option<Self> {
         let phrase = client.text.max(64).checked_mul(3)?.checked_add(256)?;
-        Self::with_phrase_bytes(client, phrase)
+        Self::with_phrase_bytes(client, phrase, 0, 0, 0)
     }
 
     /// The same renderer envelope using the largest checked saying across
@@ -76,23 +77,49 @@ impl Limits {
         for id in crate::phrases::jig::ALL {
             phrase = phrase.max(words.book.capacity(id.id())?);
         }
-        Self::with_phrase_bytes(client, phrase)
+        Self::with_phrase_bytes(client, phrase, 0, 0, 0)
     }
 
-    fn with_phrase_bytes(client: &jig_client::Limits, phrase: u32) -> Option<Self> {
-        let nodes = crate::card_nodes(client)?
-            .max(crate::frame_nodes(client)?)
-            .max(crate::confirmation_nodes(client)?)
-            .max(crate::notices_nodes(client)?)
+    /// Compose shared siblings around the larger jig or application page.
+    /// `slot_nodes` sums all owners' fragment bounds; `slot_depth` bounds their
+    /// additional nesting. Roots enlarge text/drawing/style bounds for their
+    /// own fragments when those exceed jig's checked saying envelope.
+    #[must_use]
+    pub fn compose(
+        client: &jig_client::Limits,
+        words: &crate::words::Words,
+        application_nodes: u32,
+        slot_nodes: u32,
+        slot_depth: u32,
+    ) -> Option<Self> {
+        let mut phrase = 0;
+        for id in crate::phrases::jig::ALL {
+            phrase = phrase.max(words.book.capacity(id.id())?);
+        }
+        Self::with_phrase_bytes(client, phrase, application_nodes, slot_nodes, slot_depth)
+    }
+    fn with_phrase_bytes(
+        client: &jig_client::Limits,
+        phrase: u32,
+        application_nodes: u32,
+        slot_nodes: u32,
+        slot_depth: u32,
+    ) -> Option<Self> {
+        let nodes = crate::page_nodes(client, 0)?
+            .max(application_nodes)
+            .checked_add(crate::frame_nodes(client)?)?
+            .checked_add(crate::confirmation_nodes(client)?)?
+            .checked_add(crate::notices_nodes(client)?)?
+            .checked_add(slot_nodes)?
             .checked_add(1)?;
         // A field carries a saying as its name and the full domain value.
         // Markdown links may carry both label and external target.
-        let text_per_node = phrase.checked_add(client.text)?.max(client.text.checked_mul(2)?);
+        let text_per_node = phrase.checked_mul(2)?.checked_add(client.text.checked_mul(2)?)?;
         Some(Self {
             nodes,
             // Page, card/input result, verdict proposal, and its deepest
             // Markdown list path. Dependency regions are siblings, not nested.
-            depth: 32,
+            depth: client.rows.checked_add(32)?.checked_add(slot_depth)?,
             text_per_node,
             text_bytes: nodes.checked_mul(text_per_node)?,
             drawing_bytes: 0,

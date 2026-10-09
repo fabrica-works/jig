@@ -768,6 +768,58 @@ pub enum JigPhrase {
     ApprovalExpected,
     /// Pending proposals: (0).
     ProposalsWaiting,
+    /// Conversation.
+    ConversationLog,
+    /// Being sent.
+    WordsBeingSent,
+    /// Sent.
+    WordsSent,
+    /// Read.
+    WordsRead,
+    /// Resumed its conversation.
+    RunResumed,
+    /// Started fresh; may have lost earlier detail. Tail events: (0).
+    RunFreshTail,
+    /// Run finished.
+    RunFinished,
+    /// Run cancelled.
+    RunCancelled,
+    /// Input tokens: (0).
+    TurnInput,
+    /// Output tokens: (0).
+    TurnOutput,
+    /// Cache tokens read: (0).
+    CacheRead,
+    /// Cache tokens written: (0).
+    CacheWritten,
+    /// Turn spent: (0).
+    TurnSpent,
+    /// Provisional.
+    Provisional,
+    /// Some turn content did not fit.
+    TurnCut,
+    /// Uninterpreted block: (0).
+    OpaqueDialect,
+    /// Opaque bytes: (0).
+    OpaqueBytes,
+    /// Call (0).
+    CallNumber,
+    /// Open input and result for (0).
+    OpenCall,
+    /// Fold input and result for (0).
+    FoldCall,
+    /// Call failed.
+    CallFailed,
+    /// Call completed.
+    CallCompleted,
+    /// Call in progress.
+    CallPending,
+    /// News topic (0).
+    NewsTopic,
+    /// Turn (0).
+    TurnNumber,
+    /// Instructions.
+    TurnInstructions,
 }
 impl JigPhrase {
     /// Stable phrase identity within jig's owner.
@@ -1156,6 +1208,32 @@ impl JigPhrase {
             Self::WordsExpected => 374,
             Self::ApprovalExpected => 375,
             Self::ProposalsWaiting => 376,
+            Self::ConversationLog => 377,
+            Self::WordsBeingSent => 378,
+            Self::WordsSent => 379,
+            Self::WordsRead => 380,
+            Self::RunResumed => 381,
+            Self::RunFreshTail => 382,
+            Self::RunFinished => 383,
+            Self::RunCancelled => 384,
+            Self::TurnInput => 385,
+            Self::TurnOutput => 386,
+            Self::CacheRead => 387,
+            Self::CacheWritten => 388,
+            Self::TurnSpent => 389,
+            Self::Provisional => 390,
+            Self::TurnCut => 391,
+            Self::OpaqueDialect => 392,
+            Self::OpaqueBytes => 393,
+            Self::CallNumber => 394,
+            Self::OpenCall => 395,
+            Self::FoldCall => 396,
+            Self::CallFailed => 397,
+            Self::CallCompleted => 398,
+            Self::CallPending => 399,
+            Self::NewsTopic => 400,
+            Self::TurnNumber => 401,
+            Self::TurnInstructions => 402,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -1209,6 +1287,19 @@ impl JigPhrase {
             | Self::ReportExpected
             | Self::WordsExpected
             | Self::ApprovalExpected
+            | Self::ConversationLog
+            | Self::WordsBeingSent
+            | Self::WordsSent
+            | Self::WordsRead
+            | Self::RunResumed
+            | Self::RunFinished
+            | Self::RunCancelled
+            | Self::Provisional
+            | Self::TurnCut
+            | Self::CallFailed
+            | Self::CallCompleted
+            | Self::CallPending
+            | Self::TurnInstructions
             | Self::NeedsYou
             | Self::InboxUpdates
             | Self::AllKinds
@@ -1419,6 +1510,9 @@ impl JigPhrase {
             | Self::ActivePhase
             | Self::ClosingPhase => Box::new([]),
             Self::ResourceScope
+            | Self::OpaqueDialect
+            | Self::OpenCall
+            | Self::FoldCall
             | Self::SignInWith
             | Self::ByNamed
             | Self::SignedIn
@@ -1447,6 +1541,15 @@ impl JigPhrase {
             | Self::TasksLive
             | Self::CapacityLimit
             | Self::ProposalsWaiting
+            | Self::RunFreshTail
+            | Self::TurnInput
+            | Self::TurnOutput
+            | Self::CacheRead
+            | Self::CacheWritten
+            | Self::OpaqueBytes
+            | Self::CallNumber
+            | Self::NewsTopic
+            | Self::TurnNumber
             | Self::OnlyGoal
             | Self::Delegates
             | Self::Needs
@@ -1533,6 +1636,7 @@ impl JigPhrase {
             | Self::PoolLeft
             | Self::Allotment
             | Self::PolicySpend
+            | Self::TurnSpent
             | Self::OwnSpend
             | Self::DelegateSpend
             | Self::Amount
@@ -1577,7 +1681,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 381] = [
+pub const ALL: [JigPhrase; 407] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -1959,11 +2063,37 @@ pub const ALL: [JigPhrase; 381] = [
     JigPhrase::WordsExpected,
     JigPhrase::ApprovalExpected,
     JigPhrase::ProposalsWaiting,
+    JigPhrase::ConversationLog,
+    JigPhrase::WordsBeingSent,
+    JigPhrase::WordsSent,
+    JigPhrase::WordsRead,
+    JigPhrase::RunResumed,
+    JigPhrase::RunFreshTail,
+    JigPhrase::RunFinished,
+    JigPhrase::RunCancelled,
+    JigPhrase::TurnInput,
+    JigPhrase::TurnOutput,
+    JigPhrase::CacheRead,
+    JigPhrase::CacheWritten,
+    JigPhrase::TurnSpent,
+    JigPhrase::Provisional,
+    JigPhrase::TurnCut,
+    JigPhrase::OpaqueDialect,
+    JigPhrase::OpaqueBytes,
+    JigPhrase::CallNumber,
+    JigPhrase::OpenCall,
+    JigPhrase::FoldCall,
+    JigPhrase::CallFailed,
+    JigPhrase::CallCompleted,
+    JigPhrase::CallPending,
+    JigPhrase::NewsTopic,
+    JigPhrase::TurnNumber,
+    JigPhrase::TurnInstructions,
 ];
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(381);
+    let mut rows = List::with_capacity(407);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

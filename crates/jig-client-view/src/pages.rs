@@ -108,3 +108,27 @@ pub fn page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     }
     true
 }
+
+/// Agent activity is the conversation log owned by its current task page.
+pub use crate::turns::conversation;
+/// Compose jig's frame and current page under the root's open page node.
+/// When false, the root builds its application's page, then calls `after_page`.
+pub fn jig(b: &mut Builder, client: &Domain, nav: crate::SlotRef, words: &Words, bindings: &mut JigBindings) -> bool {
+    crate::frame::frame(b, client, nav, words, bindings);
+    let built = page(b, client, words, bindings);
+    if built {
+        after_page(b, client, words, bindings);
+    }
+    built
+}
+/// Finish page composition with the one confirmation and visible notices.
+pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    crate::confirmation::confirmation(b, client, words, bindings);
+    crate::notices::notices(b, client, words, bindings);
+}
+
+pub(crate) fn scratch(limits: &crate::Limits) -> Option<u64> {
+    task::scratch(limits.depth)?
+        .checked_add(skein_lib::List::<jig_client::contract::Part>::worst_case(limits.slots)?)?
+        .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)
+}

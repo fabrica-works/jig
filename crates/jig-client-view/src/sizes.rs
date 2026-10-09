@@ -175,3 +175,9 @@ pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
 pub fn notices_nodes(limits: &Limits) -> Option<u32> {
     outcome(limits)?.checked_add(4)?.checked_mul(limits.notices)?.checked_add(2)
 }
+
+mod pages;
+pub use pages::{
+    conversation_nodes, conversations_nodes, deployment_nodes, inbox_nodes, not_the_work_nodes, page_nodes,
+    project_nodes, task_nodes,
+};

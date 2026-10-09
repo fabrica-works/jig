@@ -10,9 +10,71 @@ use skein_lib::{List, bytes::copy_of};
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "English data matches the closed phrase vocabulary whole")]
 pub fn language() -> Language {
-    let mut phrases = List::with_capacity(381);
+    let mut phrases = List::with_capacity(407);
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::ConversationLog => Box::new([Segment::Text(copy_of(b"Conversation"))]),
+            JigPhrase::WordsBeingSent => Box::new([Segment::Text(copy_of(b"Being sent"))]),
+            JigPhrase::WordsSent => Box::new([Segment::Text(copy_of(b"Sent"))]),
+            JigPhrase::WordsRead => Box::new([Segment::Text(copy_of(b"Read"))]),
+            JigPhrase::RunResumed => Box::new([Segment::Text(copy_of(b"Resumed its conversation"))]),
+            JigPhrase::RunFreshTail => Box::new([
+                Segment::Text(copy_of(b"Started fresh; may have lost earlier detail. Tail events: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::RunFinished => Box::new([Segment::Text(copy_of(b"Run finished"))]),
+            JigPhrase::RunCancelled => Box::new([Segment::Text(copy_of(b"Run cancelled"))]),
+            JigPhrase::TurnInput => Box::new([
+                Segment::Text(copy_of(b"Input tokens: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::TurnOutput => Box::new([
+                Segment::Text(copy_of(b"Output tokens: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::CacheRead => Box::new([
+                Segment::Text(copy_of(b"Cache tokens read: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::CacheWritten => Box::new([
+                Segment::Text(copy_of(b"Cache tokens written: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::TurnSpent => {
+                Box::new([Segment::Text(copy_of(b"Turn spent: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
+            }
+            JigPhrase::Provisional => Box::new([Segment::Text(copy_of(b"Provisional"))]),
+            JigPhrase::TurnCut => Box::new([Segment::Text(copy_of(b"Some turn content did not fit"))]),
+            JigPhrase::OpaqueDialect => Box::new([
+                Segment::Text(copy_of(b"Uninterpreted block: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Name },
+            ]),
+            JigPhrase::OpaqueBytes => Box::new([
+                Segment::Text(copy_of(b"Opaque bytes: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::CallNumber => {
+                Box::new([Segment::Text(copy_of(b"Call ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::OpenCall => Box::new([
+                Segment::Text(copy_of(b"Open input and result for ")),
+                Segment::Hole { index: 0, kind: HoleKind::Name },
+            ]),
+            JigPhrase::FoldCall => Box::new([
+                Segment::Text(copy_of(b"Fold input and result for ")),
+                Segment::Hole { index: 0, kind: HoleKind::Name },
+            ]),
+            JigPhrase::CallFailed => Box::new([Segment::Text(copy_of(b"Call failed"))]),
+            JigPhrase::CallCompleted => Box::new([Segment::Text(copy_of(b"Call completed"))]),
+            JigPhrase::CallPending => Box::new([Segment::Text(copy_of(b"Call in progress"))]),
+            JigPhrase::NewsTopic => {
+                Box::new([Segment::Text(copy_of(b"News topic ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::TurnNumber => {
+                Box::new([Segment::Text(copy_of(b"Turn ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::TurnInstructions => Box::new([Segment::Text(copy_of(b"Instructions"))]),
+
             JigPhrase::ProposalsWaiting => Box::new([
                 Segment::Text(copy_of(b"Pending proposals: ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
@@ -861,6 +923,6 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
     Phrasebook::load(
         shapes(text),
         Box::new([language()]),
-        &PhraseLimits { languages: 1, phrases: 381, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
+        &PhraseLimits { languages: 1, phrases: 407, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
     )
 }

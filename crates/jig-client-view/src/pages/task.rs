@@ -158,7 +158,10 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
 }
 fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
     match doc.chip.executor {
-        Executor::Agent { .. } => super::conversations::runtime(b, client, &doc.runtime, words, bindings),
+        Executor::Agent { .. } => {
+            super::conversations::runtime(b, client, &doc.runtime, words, bindings);
+            crate::turns::conversation(b, client, words, bindings);
+        }
         Executor::Procedure { .. } => slots(b, doc, TaskSection::Activity, words, bindings),
         Executor::Party { .. } | Executor::Role { .. } => {
             if let Some(id) = client.objects().find(ObjectKey::PersonTask(doc.chip.task)) {
@@ -217,4 +220,8 @@ fn result_contract(
             bindings,
         ),
     }
+}
+
+pub(super) fn scratch(rows: u32) -> Option<u64> {
+    plan::scratch(rows)
 }

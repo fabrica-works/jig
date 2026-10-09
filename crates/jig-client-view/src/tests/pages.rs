@@ -16,6 +16,7 @@ use skein_lib::{List, Token};
 pub(super) fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree, JigBindings) {
     let mut limits = super::cards::limits();
     limits.nodes = 2000;
+    limits.depth = 32;
     limits.bindings = 512;
     limits.text_bytes = 200_000;
     let mut b = Builder::new(&limits);
@@ -38,7 +39,7 @@ pub(super) fn deliver(d: &mut Domain, token: Token, document: Delivery) -> Vec<R
 pub(super) fn named_binding(tree: &Tree, name: &[u8]) -> Token {
     tree.nodes().iter().find(|n| n.name.as_deref() == Some(name) && n.binding.is_some()).unwrap().binding.unwrap().token
 }
-fn special_pages(words: &crate::words::Words) {
+pub(super) fn special_pages(words: &crate::words::Words) {
     let (mut d, f) = start();
     assert!(contains(&build(&d, 2, words).0, b"Connecting"));
     deliver(&mut d, f, Delivery::Frame(Box::new(document())));

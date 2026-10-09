@@ -26,6 +26,7 @@ pub(crate) mod chips;
 pub(crate) mod routing;
 pub(crate) mod sending;
 pub mod words;
+pub use routing::ACTIVITY_WINDOW;
 pub use words::{KeptWords, Sent, Words};
 
 /// The page's presentation of one call, independent of committed turn facts.
@@ -427,9 +428,24 @@ impl Conversation {
     pub fn fold(&self, name: CallName) -> Fold {
         if self.opened.contains_key(&name) { Fold::Open } else { Fold::Folded }
     }
+    fn displayed_call(&self, name: CallName) -> bool {
+        if has_call(&self.lines.rows, name) {
+            return true;
+        }
+        for live in &self.live {
+            if live.name.attempt == name.attempt
+                && live.name.number == name.turn
+                && let Some(call) = &live.call
+                && call.number == name.call
+            {
+                return true;
+            }
+        }
+        false
+    }
     /// Opens or closes one displayed call, refusing unknown calls or full fold room.
     pub fn set_fold(&mut self, name: CallName, fold: Fold) -> bool {
-        if !has_call(&self.lines.rows, name) {
+        if !self.displayed_call(name) {
             return false;
         }
         match fold {
@@ -443,7 +459,7 @@ impl Conversation {
     fn prune_folds(&mut self) {
         let mut gone = List::with_capacity(self.opened.capacity());
         for (name, ()) in &self.opened {
-            if !has_call(&self.lines.rows, *name) {
+            if !self.displayed_call(*name) {
                 gone.push(*name).expect("removed folds fit fold capacity");
             }
         }

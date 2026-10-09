@@ -16,7 +16,7 @@ use jig_client::{
     contract::*,
 };
 use skein_lib::{List, Wall};
-fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
+pub(super) fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let values: Vec<_> = values.into_iter().collect();
     let mut rows = List::with_capacity(u32::try_from(values.len()).unwrap());
     for value in values {
@@ -24,18 +24,18 @@ fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     }
     rows
 }
-fn part() -> Part {
+pub(super) fn part() -> Part {
     Part::Panel { connector: 2, task: 8 }
 }
 fn counts() -> PhaseCounts {
     PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
 }
-fn chip(task: u64) -> Chip {
+pub(super) fn chip(task: u64) -> Chip {
     let mut chip = super::cards_objects::task_doc(&[]).chip;
     chip.task = task;
     chip
 }
-fn entered(address: Address) -> (Domain, Vec<Request>) {
+pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     let (mut d, f) = start();
     let mut frame = document();
     frame.projects.get_mut(0).unwrap().goals = list([Charter { number: 2, name: text(b"Guide") }]);
@@ -44,7 +44,7 @@ fn entered(address: Address) -> (Domain, Vec<Request>) {
     let out = drive(&mut d, Event::Went { place: Place::Jig(address) });
     (d, out)
 }
-fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Request>) {
+pub(super) fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Request>) {
     let (mut d, out) = entered(Address::Task { task: 8, section });
     let watch = out
         .iter()
@@ -155,7 +155,7 @@ fn plan_folds(words: &Words) {
     drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
     assert!(d.task_page().plan.nodes.is_empty());
 }
-fn project_doc() -> Project {
+pub(super) fn project_doc() -> Project {
     let doc = super::cards_objects::task_doc(&[]);
     Project {
         period: 3,
@@ -187,7 +187,7 @@ fn project_doc() -> Project {
         acts: list([Offered { act: ActKind::SetGoal, admission: Admission::Allowed }]),
     }
 }
-fn project(section: ProjectSection) -> (Domain, Vec<Request>) {
+pub(super) fn project(section: ProjectSection) -> (Domain, Vec<Request>) {
     let (mut d, out) = entered(Address::Project { project: 4, section });
     let read = out
         .iter()
@@ -266,7 +266,7 @@ fn history(words: &Words) {
             .unwrap();
     }
 }
-fn project_rows(d: &mut Domain, out: &[Request]) {
+pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
     for r in out {
         match r {
             Request::Open { watch, subject: Subject::Goals { .. } } => {
