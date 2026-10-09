@@ -36,6 +36,10 @@ fn counts() -> PhaseCounts {
 pub(super) fn task() -> Task {
     Task {
         chip: chip(8),
+        goal: false,
+        priority: None,
+        lineage_chips: List::with_capacity(0),
+        inputs: List::with_capacity(0),
         project: 1,
         requester: Actor::Party(7),
         lineage: List::with_capacity(0),

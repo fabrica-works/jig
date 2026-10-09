@@ -62,20 +62,27 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
         Card::Deciding { request: Some(Token::new(99)), progress: crate::intents::Progress::InFlight };
     let address = Address::Task { task: 8, section: TaskSection::Activity };
     let moved = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
-    assert_eq!(moved.len(), 7);
+    assert_eq!(moved.len(), 5);
     assert_eq!(moved[0], Request::Close { watch: inbox });
     assert_eq!(moved[1], Request::PartsLeft { generation: 0 });
-    let Request::Open { subject: Subject::Task { task: 8 }, .. } = moved[2] else {
+    let Request::Open { watch: task_watch, subject: Subject::Task { task: 8 }, .. } = moved[2] else {
         panic!("task first");
     };
-    let Request::Open { subject: Subject::Run { task: 8, .. }, .. } = moved[3] else {
-        panic!("run next");
+    assert_eq!(moved[3], Request::Show { address, replace: true });
+    assert_eq!(moved[4], Request::Save { record: crate::store::Record::Place { version: 1, party: 7, address } });
+    let mut document = super::confirmation::task();
+    document.chip.executor = Executor::Agent { charter: 1 };
+    let activity_requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+    );
+    let Request::Open { subject: Subject::Run { task: 8, .. }, .. } = activity_requests[0] else {
+        panic!("agent run after its document");
     };
-    let Request::Read { read, what: Read::Activity { task: 8, before: None } } = moved[4] else {
-        panic!("read next");
+    let Request::Read { read, what: Read::Activity { task: 8, before: None } } = activity_requests[1] else {
+        panic!("activity read after its document");
     };
-    assert_eq!(moved[5], Request::Show { address, replace: true });
-    assert_eq!(moved[6], Request::Save { record: crate::store::Record::Place { version: 1, party: 7, address } });
     assert_eq!(domain.objects.find(ObjectKey::Task(5)), Some(pending));
     assert!(domain.objects.get(pending).unwrap().sources.is_empty());
     let gone = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });

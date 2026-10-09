@@ -72,6 +72,10 @@ pub struct Chip {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Task {
     pub chip: Chip,
+    pub goal: bool,
+    pub priority: Option<u32>,
+    pub lineage_chips: List<Chip>,
+    pub inputs: List<Chip>,
     pub project: u32,
     pub requester: Actor,
     pub lineage: List<u64>,

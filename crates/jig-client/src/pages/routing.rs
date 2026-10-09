@@ -80,6 +80,7 @@ pub(crate) fn navigate(
     domain.reads.abandon(domain.generation);
     out.push(Request::PartsLeft { generation: domain.generation });
     domain.objects.clear();
+    domain.task_page.clear();
     domain.clock.page_times = false;
     domain.inbox.rows.clear();
     domain.inbox.reading = None;
@@ -163,12 +164,11 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         Address::Task { task, section } => {
             open(domain, env, Subject::Task { task }, out);
             match section {
-                TaskSection::Overview | TaskSection::Budget => {}
-                TaskSection::Activity => {
-                    open(domain, env, Subject::Run { task, turn: None, offset: 0 }, out);
-                    read(domain, 1, Read::Activity { task, before: None }, out);
-                }
-                TaskSection::Plan => open(domain, env, Subject::Tree { task, window: env.limits.rows }, out),
+                TaskSection::Overview
+                | TaskSection::Budget
+                | TaskSection::Panels
+                | TaskSection::Activity
+                | TaskSection::Plan => {}
                 TaskSection::History => read(domain, 2, Read::History { task, subtree: false, after: None }, out),
             }
         }
@@ -281,27 +281,28 @@ pub(crate) fn delivery(
     match value {
         Delivery::Frame(_) | Delivery::Run(_) => {}
         Delivery::Task(task) => {
-            parts(domain, env, task.parts.as_slice(), out);
-            parts(domain, env, task.resources.as_slice(), out);
             let key = ObjectKey::Task(task.chip.task);
             one(domain, source, key, Body::Task(task));
+            crate::pages::task::document(domain, env, out);
         }
         Delivery::Tree(tree) => {
+            crate::pages::task::tree(domain, *tree);
             let mut keys = List::with_capacity(env.limits.rows);
-            for node in &tree.nodes {
+            for node in &domain.task_page.plan.nodes {
                 match keys.push(ObjectKey::Task(node.chip.task)) {
                     Ok(()) => {}
                     Err(_) => break,
                 }
             }
             names(domain, env, source, keys, out);
-            for node in tree.nodes.into_boxed() {
+            for node in &domain.task_page.plan.nodes {
                 let key = ObjectKey::Task(node.chip.task);
-                let stored = domain.objects.put(key, Body::Chip(node.chip));
-                if stored {
-                    domain.changed();
+                let stored = domain.objects.put(key, Body::Chip(node.chip.clone()));
+                if !stored {
+                    break;
                 }
             }
+            domain.changed();
         }
         Delivery::Chips(chips) => {
             let mut keys = List::with_capacity(env.limits.rows);
@@ -394,6 +395,33 @@ pub(crate) fn read_result(
     if receipt.abandoned || receipt.generation != domain.generation {
         return;
     }
+    match &receipt.what {
+        Read::History { subtree, .. } => {
+            if *subtree != domain.task_page.subtree_history {
+                return;
+            }
+        }
+        Read::Ended { task, .. } => {
+            if Some(*task) != domain.task_page.ended_task {
+                return;
+            }
+        }
+        Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Activity { .. }
+        | Read::Conversations { .. }
+        | Read::Inbox { .. }
+        | Read::InboxGroup { .. }
+        | Read::Goals { .. }
+        | Read::Notes { .. }
+        | Read::Project { .. }
+        | Read::Deployment => {}
+    }
     match receipt.source {
         Source::Window { number: 10, .. } => {
             if domain.inbox.reading != Some(token) {
@@ -426,11 +454,7 @@ fn read_value(
 ) {
     match value {
         ReadValue::Frame(_) | ReadValue::Notes(_) => {}
-        ReadValue::Task(task) => {
-            parts(domain, env, task.parts.as_slice(), out);
-            let key = ObjectKey::Task(task.chip.task);
-            read_body(domain, key, Body::Task(task));
-        }
+        ReadValue::Task(task) => task_read(domain, env, task, out),
         ReadValue::Proposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::Proposal(proposal));
@@ -495,6 +519,7 @@ fn read_value(
             domain.changed();
         }
         ReadValue::Ended(page) => {
+            crate::pages::task::ended(domain, page.before, page.after);
             let mut keys = List::with_capacity(env.limits.rows);
             for result in &page.rows {
                 match keys.push(ObjectKey::Result(result.task.task)) {
@@ -539,4 +564,10 @@ fn filter_chats(address: Address, rows: &mut List<contract::ConversationLine>) {
         }
     }
     *rows = filtered;
+}
+
+fn task_read(domain: &mut Domain, env: &Env<crate::Limits>, task: Box<contract::Task>, out: &mut Queue<Request>) {
+    let key = ObjectKey::Task(task.chip.task);
+    read_body(domain, key, Body::Task(task));
+    crate::pages::task::document(domain, env, out);
 }

@@ -36,6 +36,8 @@ pub enum TaskSection {
     History,
     /// Budget and authority.
     Budget,
+    /// Connectors with something to say about the task.
+    Panels,
 }
 
 /// A page owned by jig.

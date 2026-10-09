@@ -48,6 +48,12 @@ pub enum Act {
     StartChat { project: u32 },
     /// Open a listed chat and mark its replies through what was displayed.
     OpenChat { task: u64 },
+    /// Select held or live plan rows.
+    FilterPlan { filter: crate::pages::task::PlanFilter },
+    /// Read the task history alone or with its subtree.
+    HistoryScope { subtree: bool },
+    /// Read an ended subtree of the shown plan.
+    OpenEnded { task: u64 },
     /// Choose a sign in provider.
     SignIn { provider: u16 },
 }

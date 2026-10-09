@@ -388,3 +388,243 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
         domain.reclaim();
     }
 }
+
+#[test]
+fn task_sections_and_activity_sources_follow_the_executor() {
+    use crate::{address::TaskSection, pages::task};
+    for executor in [
+        Executor::Agent { charter: 1 },
+        Executor::Procedure { connector: 2, kind: 3 },
+        Executor::Party { party: 7 },
+        Executor::Role { project: 1, role: 1 },
+    ] {
+        let mut document = super::confirmation::task();
+        document.chip.executor = executor;
+        let sections = task::sections(&document);
+        for section in [TaskSection::Overview, TaskSection::Activity, TaskSection::History, TaskSection::Budget] {
+            assert!(task::offered(&sections, section));
+        }
+        assert!(!task::offered(&sections, TaskSection::Plan));
+        let mut domain = Domain::new(&LIMITS, 22);
+        let f = start(&mut domain, List::with_capacity(0));
+        delivered(&mut domain, Time::ZERO, f, frame(7));
+        let opened = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
+        );
+        let watch = open_token(&opened);
+        let requests = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+        );
+        assert!(domain.task_page().header.is_some());
+        match executor {
+            Executor::Agent { .. } => {
+                assert_eq!(requests.len(), 2);
+                let Request::Open { subject: Subject::Run { task: 8, turn: None, offset: 0 }, .. } = requests[0] else {
+                    panic!("agent run watch");
+                };
+                let Request::Read { what: Read::Activity { task: 8, before: None }, .. } = requests[1] else {
+                    panic!("agent activity read");
+                };
+            }
+            Executor::Procedure { connector, .. } => {
+                assert_eq!(
+                    requests.as_ref(),
+                    &[Request::ShowPart { part: Part::Panel { connector, task: 8 }, generation: 1 }]
+                );
+            }
+            Executor::Party { .. } | Executor::Role { .. } => {
+                let Request::Read { what: Read::PersonTask { task: 8 }, .. } = requests[0] else {
+                    panic!("person task card read");
+                };
+                assert_eq!(requests.len(), 1);
+            }
+        }
+    }
+}
+fn tree_node(number: u64, phase: Phase, held: u32) -> TreeNode {
+    let mut chip = super::objects::chip(number);
+    chip.phase = phase;
+    TreeNode {
+        chip,
+        parent: Some(8),
+        dependencies: List::with_capacity(0),
+        proposals: List::with_capacity(0),
+        spend: 0,
+        folded: empty_phase_counts(),
+        held_below: held,
+    }
+}
+#[test]
+fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
+    use crate::pages::task::{self, PlanFilter};
+    let mut limits = LIMITS;
+    limits.rows = 2;
+    let mut domain = Domain::new(&limits, 22);
+    let mut nodes = List::with_capacity(3);
+    nodes.push(tree_node(9, Phase::Done, 3)).unwrap();
+    nodes.push(tree_node(10, Phase::Running, 0)).unwrap();
+    nodes.push(tree_node(11, Phase::Held, 0)).unwrap();
+    task::tree(&mut domain, Tree { task: 8, nodes, folded: empty_phase_counts(), held_below: 4 });
+    let plan = &domain.task_page().plan;
+    assert_eq!(plan.nodes.len(), 2);
+    assert_eq!(plan.folded.held, 1);
+    assert_eq!(plan.held_below, 4);
+    task::filter(&mut domain, PlanFilter::Held);
+    let plan = &domain.task_page().plan;
+    assert!(plan.visible(&plan.nodes.as_slice()[0]));
+    assert!(!plan.visible(&plan.nodes.as_slice()[1]));
+    task::filter(&mut domain, PlanFilter::Live);
+    let plan = &domain.task_page().plan;
+    assert!(!plan.visible(&plan.nodes.as_slice()[0]));
+    assert!(plan.visible(&plan.nodes.as_slice()[1]));
+    task::filter(&mut domain, PlanFilter::All);
+    assert_eq!(domain.task_page().plan.nodes.len(), 2);
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: crate::address::TaskSection::Plan }) },
+    );
+    let watch = open_token(&opened);
+    let tree_open = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(super::confirmation::task()))) },
+    );
+    let tree_watch = open_token(&tree_open);
+    let mut nodes = List::with_capacity(1);
+    nodes.push(tree_node(9, Phase::Done, 3)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch: tree_watch,
+            event: WatchEvent::Delivered(Delivery::Tree(Box::new(Tree {
+                task: 8,
+                nodes,
+                folded: empty_phase_counts(),
+                held_below: 3,
+            }))),
+        },
+    );
+    let asked = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenEnded { task: 9 } });
+    let Request::Read { read, what: Read::Ended { task: 9, after: None } } = asked[0] else {
+        panic!("ended subtree read");
+    };
+    let cursor = Cursor { value: text(b"opaque subtree") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Ended(Box::new(ObjectPage {
+                rows: List::with_capacity(0),
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: crate::action::Act::More {
+                window: skein_lib::Token::new(task::ENDED_WINDOW),
+                end: crate::action::End::After,
+            },
+        },
+    );
+    let Request::Read { what, .. } = &more[0] else {
+        panic!("ended subtree continuation");
+    };
+    assert_eq!(*what, Read::Ended { task: 9, after: Some(cursor) });
+}
+#[test]
+fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
+    use crate::{
+        action::{Act, End},
+        address::TaskSection,
+        pages::task::HISTORY_WINDOW,
+    };
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::History }) },
+    );
+    let Request::Read { read: own, .. } = opened[3] else {
+        panic!("own history read");
+    };
+    let requests = drive(&mut domain, Time::ZERO, Event::Act { act: Act::HistoryScope { subtree: true } });
+    let Request::Read { read, what: Read::History { subtree: true, .. } } = requests[0] else {
+        panic!("subtree read");
+    };
+    let cursor = Cursor { value: text(b"opaque history edge") };
+    let mut rows = List::with_capacity(1);
+    rows.push(HistoryLine {
+        position: 1,
+        task: 9,
+        by: Actor::Party(7),
+        at: skein_lib::Wall::EPOCH,
+        change: HistoryChange::Released,
+    })
+    .unwrap();
+    let page = HistoryPage { rows, before: None, after: Some(cursor.clone()) };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read: own, result: ReadResult::Value(ReadValue::History(Box::new(page.clone()))) },
+    );
+    assert!(domain.history_rows().rows.is_empty());
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::History(Box::new(page))) });
+    assert_eq!(domain.history_rows().rows.len(), 1);
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(HISTORY_WINDOW), end: End::After } },
+    );
+    let Request::Read { what, .. } = &more[0] else {
+        panic!("next history page");
+    };
+    assert_eq!(*what, Read::History { task: 8, subtree: true, after: Some(cursor) });
+}
+#[test]
+fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
+    use crate::address::TaskSection;
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Overview }) },
+    );
+    let watch = open_token(&opened);
+    let mut document = super::confirmation::task();
+    document.resources = List::with_capacity(1);
+    let resource = Part::Resource { connector: 2, path: text(b"resource") };
+    document.resources.push(resource.clone()).unwrap();
+    document.parts = List::with_capacity(1);
+    document.parts.push(Part::Panel { connector: 3, task: 8 }).unwrap();
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+    );
+    assert_eq!(requests.as_ref(), &[Request::ShowPart { part: resource, generation: 1 }]);
+    let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert!(left.contains(&Request::PartsLeft { generation: 1 }));
+    assert!(domain.task_page().header.is_none());
+}
+
+fn empty_phase_counts() -> PhaseCounts {
+    PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+}

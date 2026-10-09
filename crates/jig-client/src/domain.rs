@@ -63,6 +63,7 @@ pub struct Domain {
     pub(crate) link: Link,
     pub(crate) page: Page,
     pub(crate) inbox: crate::pages::inbox::Inbox,
+    pub(crate) task_page: crate::pages::task::TaskPage,
     pub(crate) chats: crate::pages::conversations::State,
     pub(crate) navigation: crate::pages::navigation::Navigation,
     pub(crate) updates_count: u32,
@@ -107,6 +108,7 @@ impl Domain {
             link: Link::Starting,
             page: Page::Starting,
             inbox: crate::pages::inbox::Inbox::new(limits.rows),
+            task_page: crate::pages::task::TaskPage::new(limits.rows),
             chats: crate::pages::conversations::State::new(),
             navigation: crate::pages::navigation::Navigation::new(limits.navigation_entries),
             updates_count: limits.updates_count,
@@ -144,6 +146,11 @@ impl Domain {
     #[must_use]
     pub const fn inbox(&self) -> &crate::pages::inbox::Inbox {
         &self.inbox
+    }
+    /// The task header and its bounded plan and history choices.
+    #[must_use]
+    pub const fn task_page(&self) -> &crate::pages::task::TaskPage {
+        &self.task_page
     }
     /// The new-chat form's request and factual refusal.
     #[must_use]
@@ -567,7 +574,13 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 crate::pages::inbox::Filter { project, kind: Some(group), goal: None },
                 out,
             ),
-            Act::More { window, end } => crate::pages::conversations::more(domain, window, end, out),
+            Act::More { window, end } => {
+                crate::pages::conversations::more(domain, window, end, out);
+                crate::pages::task::more(domain, window, end, out);
+            }
+            Act::FilterPlan { filter } => crate::pages::task::filter(domain, filter),
+            Act::HistoryScope { subtree } => crate::pages::task::history(domain, subtree, out),
+            Act::OpenEnded { task } => crate::pages::task::open_ended(domain, task, out),
             Act::Submit { field: crate::fields::Purpose::NewChat } => {
                 let project = match domain.address {
                     Address::Conversations { project } | Address::Inbox { project } => project,
