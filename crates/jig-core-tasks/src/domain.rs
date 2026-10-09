@@ -189,6 +189,12 @@ impl Domain {
         record(self, number)
     }
 
+    /// Borrow an ended result reference still named by a live task; content is stored history.
+    #[must_use]
+    pub fn stub(&self, number: u64) -> Option<&crate::Stub> {
+        self.stubs.get(&number)
+    }
+
     /// The latest connector report for admission of this individual resource.
     #[must_use]
     pub fn resource_hold(&self, name: &crate::Name) -> Option<crate::HoldKind> {

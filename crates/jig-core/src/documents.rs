@@ -11,6 +11,12 @@
 //! enter its text. Application subjects belong to their connectors.
 
 mod small;
+mod task_tree;
+pub use task_tree::{
+    AuthorityLine, BudgetLine, ContractLine, Ending, EscalationState, FoldedCount, GoalLine, Goals, GrantLine,
+    HoldLine, NoteScope, Parameter, Part, PartKey, PartKind, PatternEnd, PhaseCounts, PriorPhase, ProposalRef,
+    ResourceLine, ResultValue, Task, TaskLink, Tree, TreeRow,
+};
 
 use crate::{Core, Limits};
 use alloc::boxed::Box;
@@ -203,6 +209,12 @@ pub enum Document {
     Chips(List<Chip>),
     /// Current attempt and committed turn.
     Run(Run),
+    /// One task page's current overview.
+    Task(Box<Task>),
+    /// A bounded live subtree with folds.
+    Tree(Tree),
+    /// Live goals in priority order.
+    Goals(Goals),
 }
 
 /// Make the current visible document without changing state or emitting effects.
@@ -233,10 +245,19 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             let run = small::run(core, party, *task)?;
             Ok(Document::Run(run))
         }
-        Subject::Task { .. }
-        | Subject::Tree { .. }
-        | Subject::Inbox { .. }
-        | Subject::Goals { .. }
+        Subject::Task { task } => {
+            let task = task_tree::task(core, limits, party, *task)?;
+            Ok(Document::Task(Box::new(task)))
+        }
+        Subject::Tree { task } => {
+            let tree = task_tree::tree(core, limits, party, *task, window)?;
+            Ok(Document::Tree(tree))
+        }
+        Subject::Goals { project } => {
+            let goals = task_tree::goals(core, limits, party, *project, window)?;
+            Ok(Document::Goals(goals))
+        }
+        Subject::Inbox { .. }
         | Subject::Conversations { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
@@ -268,5 +289,5 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
         .checked_add(List::<OfferedCharter>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(charter)?)?
         .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?;
-    u64::try_from(size_of::<Document>()).ok()?.checked_add(chips.max(frame))
+    u64::try_from(size_of::<Document>()).ok()?.checked_add(chips.max(frame).max(task_tree::worst_case(limits)?))
 }

@@ -432,3 +432,248 @@ fn documents_reject_oversized_whole_requests_and_invalid_bounds() {
     limits.documents.chips = u32::MAX;
     assert_eq!(document_worst_case(&limits.documents), None);
 }
+
+fn tree_core() -> (Core, Limits) {
+    let (old, mut limits) = core();
+    limits.tasks.tasks = 16;
+    limits.tasks.project_tasks = 16;
+    limits.tasks.tree_tasks = 16;
+    limits.tasks.depth = 4;
+    limits.tasks.delegates = 8;
+    limits.tasks.batch = 8;
+    limits.tasks.inbox_messages = 16;
+    limits.tasks.inbox_bytes = 2048;
+    let mut config = config(17);
+    config.settings.chat_authority.delegation.tasks = 16;
+    config.settings.chat_authority.delegation.depth = 4;
+    let mut core = Core::new(config, &limits);
+    core.people = old.people;
+    send_task(&mut core, &limits, tasks::Event::Restored);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::OpenPeriod { reply_to: ReplyTo::new(Token::new(1)), project: 1, period: 1, budget: 1000 },
+    );
+    (core, limits)
+}
+
+fn send_task(core: &mut Core, limits: &Limits, event: tasks::Event) {
+    let mut out = Queue::with_capacity(tasks::max_out(&limits.tasks));
+    tasks::step(&mut core.tasks, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.tasks }, event, &mut out);
+    while let Some(request) = out.pop() {
+        if let tasks::Request::Save { record: tasks::Stored::Live(row) } = request {
+            let mut projections = Queue::with_capacity(room_max(limits).unwrap().writes);
+            projections::save(core, limits, &row, &mut projections);
+        }
+    }
+}
+
+fn new_row(core: &Core, number: u64, funder: tasks::Funder, tracked: Option<u32>) -> tasks::New {
+    let mut authority = task_authority(&core.settings.chat_authority);
+    let budget = match funder {
+        tasks::Funder::Task(_) => 10,
+        tasks::Funder::Pool { .. } | tasks::Funder::Recurring { .. } | tasks::Funder::Period { .. } => 100,
+    };
+    authority.budget.spend = budget;
+    tasks::New {
+        number,
+        project: 1,
+        executor: tasks::Executor::Agent { charter: 1 },
+        spec: tasks::Spec {
+            words: b"Work\nDetailed instructions".as_slice().into(),
+            parameters: Box::new([]),
+            inputs: Box::new([]),
+        },
+        contract: tasks::Contract::Report { words: 64 },
+        authority,
+        numbers: tasks::Numbers { budget, spent: 0, spent_below: 0, reserved: 0 },
+        funder,
+        dependencies: Box::new([]),
+        holdings: Box::new([]),
+        wake: tasks::WakePolicy::DEFAULT,
+        recurring: None,
+        tracked,
+    }
+}
+
+fn make_tree() -> (Core, Limits) {
+    let (mut core, limits) = tree_core();
+    let root = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, Some(4));
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(1)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([root]),
+        },
+    );
+    let children = [
+        new_row(&core, 2, tasks::Funder::Task(1), None),
+        new_row(&core, 3, tasks::Funder::Task(1), None),
+        new_row(&core, 4, tasks::Funder::Task(1), None),
+    ];
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(1)),
+            creator: tasks::Party::Task(1),
+            batch: Box::new(children),
+        },
+    );
+    assert!(core.tasks.task(4).is_some());
+    send_task(&mut core, &limits, tasks::Event::Hold { task: 3, why: tasks::Hold::Budget });
+    (core, limits)
+}
+
+#[test]
+fn documents_tree_folds_every_unshown_phase_and_keeps_held_counts() {
+    let (core, limits) = make_tree();
+    let Document::Tree(tree) = make(&core, &limits, 1, &Subject::Tree { task: 1 }, &window()).unwrap() else {
+        panic!()
+    };
+    assert_eq!(tree.rows.len(), 1);
+    assert_eq!(tree.rows.get(0).unwrap().chip.number, 2);
+    assert_eq!(tree.held_below, 1);
+    assert_eq!(tree.folded.get(0).unwrap().held_below, 1);
+    assert_eq!(tree.folded.get(0).unwrap().phases.held, 1);
+    assert_eq!(tree.folded.get(0).unwrap().phases.starting, 1);
+    assert_eq!(tree.next, Some(Cursor { number: 2 }));
+    let Document::Tree(next) =
+        make(&core, &limits, 1, &Subject::Tree { task: 1 }, &Window { rows: 2, after: tree.next }).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(next.rows.get(0).unwrap().chip.number, 3);
+    assert_eq!(next.rows.get(1).unwrap().chip.number, 4);
+    assert_eq!(next.next, None);
+    assert_eq!(next.held_below, 1);
+}
+
+#[test]
+fn documents_task_carries_overview_lineage_and_the_hold_reason() {
+    let (core, limits) = make_tree();
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 3 }, &window()).unwrap() else {
+        panic!()
+    };
+    assert_eq!(task.words.bytes.as_ref(), b"Work\nDetailed instructions");
+    assert_eq!(task.goal, Some(1));
+    assert_eq!(task.lineage.get(0).unwrap().number, 1);
+    assert_eq!(task.budget.left, 10);
+    assert_eq!(task.budget.funder, tasks::Funder::Task(1));
+    let hold = task.hold.unwrap();
+    assert_eq!(hold.reason, tasks::Hold::Budget);
+    assert_eq!(hold.revision, core.tasks.task(3).unwrap().revisions.hold);
+    assert_eq!(hold.before, PriorPhase::Active(tasks::Active::Due));
+}
+
+#[test]
+fn documents_goal_progress_counts_every_phase_including_ended_plan_rows() {
+    let (mut core, limits) = make_tree();
+    let phases = [
+        tasks::Phase::Waiting,
+        tasks::Phase::Active(tasks::Active::Idle),
+        tasks::Phase::Active(tasks::Active::Due),
+        tasks::Phase::Active(tasks::Active::Running { attempt: 1 }),
+        tasks::Phase::Active(tasks::Active::BackingOff { until: Wall::EPOCH }),
+        tasks::Phase::Closing(tasks::Closing {
+            stage: tasks::Stage::Delegates,
+            ending: tasks::Ending::Failed { reason: Box::new([]) },
+        }),
+        tasks::Phase::Held { was: tasks::Was::Waiting, why: tasks::Hold::Budget },
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: Box::new([]) })),
+        tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::new([]) }),
+        tasks::Phase::Ended(tasks::Ending::Cancelled { reason: Box::new([]), result: None }),
+    ];
+    let mut prototype = core.tasks.task(2).unwrap().clone();
+    let mut out = Queue::with_capacity(room_max(&limits).unwrap().writes);
+    for (index, phase) in phases.into_iter().enumerate() {
+        prototype.number = u64::try_from(index).unwrap() + 2;
+        prototype.phase = phase;
+        projections::save(&mut core, &limits, &prototype, &mut out);
+        while out.pop().is_some() {}
+    }
+    let Document::Goals(goals) = make(&core, &limits, 1, &Subject::Goals { project: 1 }, &window()).unwrap() else {
+        panic!()
+    };
+    let line = goals.lines.get(0).unwrap();
+    assert_eq!(
+        line.phases,
+        PhaseCounts {
+            waiting: 1,
+            idle: 1,
+            starting: 2,
+            running: 1,
+            backing_off: 1,
+            closing: 1,
+            held: 1,
+            done: 1,
+            failed: 1,
+            cancelled: 1
+        }
+    );
+    assert_eq!(line.held_below, 1);
+    assert_eq!(line.budget.numbers.reserved, 30);
+    assert_eq!(line.budget.left, 70);
+}
+
+#[test]
+fn documents_goals_follow_priority_and_resume_at_the_named_cursor() {
+    let (mut core, limits) = make_tree();
+    let goal = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, Some(2));
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(1)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([goal]),
+        },
+    );
+    let Document::Goals(goals) = make(&core, &limits, 1, &Subject::Goals { project: 1 }, &window()).unwrap() else {
+        panic!()
+    };
+    assert_eq!(goals.lines.get(0).unwrap().chip.number, 5);
+    assert_eq!(goals.next, Some(Cursor { number: 5 }));
+    let Document::Goals(next) =
+        make(&core, &limits, 1, &Subject::Goals { project: 1 }, &Window { rows: 1, after: goals.next }).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(next.lines.get(0).unwrap().chip.number, 1);
+    assert_eq!(next.next, None);
+}
+
+#[test]
+fn documents_part_keys_are_preserved_or_refused_whole() {
+    let (mut core, mut limits) = tree_core();
+    let mut row = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
+    row.authority.grants = Box::new([tasks::Grant {
+        connector: 1,
+        kind: 1,
+        pattern: tasks::Pattern {
+            segments: Box::new([b"whole".as_slice().into()]),
+            last: tasks::Last::Exact(b"end".as_slice().into()),
+        },
+    }]);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(1)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
+    limits.documents.text_bytes = 3;
+    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()), Err(Missing::TooLarge));
+    limits.documents.text_bytes = 5;
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap() else {
+        panic!()
+    };
+    assert_eq!(task.authority.grants.get(0).unwrap().segments.get(0).unwrap().as_ref(), b"whole");
+    assert_eq!(task.authority.grants.get(0).unwrap().last, PatternEnd::Exact(b"end".as_slice().into()));
+    assert!(document_worst_case(&limits.documents).is_some());
+    assert!(worst_case(&limits).is_some());
+}
