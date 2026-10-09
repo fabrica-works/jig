@@ -573,6 +573,19 @@ impl<A: App, F: Front<A>> World<A, F> {
         progress
     }
     /// Runs callbacks, people and deadlines until the requested boundary.
+    fn next_time(&self) -> Option<Time> {
+        [
+            self.schedule.next_time(),
+            self.faults.next_time(),
+            self.front.next_due(),
+            self.referee.next_deadline(),
+            self.clients.iter().filter_map(|c| A::next_deadline(&c.root)).min(),
+            self.people.iter().filter(|p| !p.done).filter_map(|p| p.wake).min(),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
+    }
     pub fn run(&mut self, until: Until) -> Outcome {
         let mut iterations = 0;
         for _ in 0..self.settings.iterations {
@@ -628,17 +641,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 self.now = self.now.saturating_add(Duration::from_nanos(1));
                 continue;
             }
-            let next = [
-                self.schedule.next_time(),
-                self.faults.next_time(),
-                self.front.next_due(),
-                self.referee.next_deadline(),
-                self.clients.iter().filter_map(|c| A::next_deadline(&c.root)).min(),
-                self.people.iter().filter(|p| !p.done).filter_map(|p| p.wake).min(),
-            ]
-            .into_iter()
-            .flatten()
-            .min();
+            let next = self.next_time();
             self.now = next.map_or(self.now.saturating_add(Duration::from_millis(1)), |at| {
                 at.max(self.now.saturating_add(Duration::from_nanos(1)))
             });

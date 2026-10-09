@@ -259,7 +259,10 @@ impl Rules {
         let left: Vec<_> =
             self.visible.keys().filter(|(c, _)| *c == client).filter(|key| !cards.contains(*key)).cloned().collect();
         for key in left {
-            judge.check(self.reasoned.remove(&key), "a card leaves for a reason: waiting card disappeared");
+            judge.check(
+                self.reasoned.remove(&key),
+                format!("a card leaves for a reason: waiting card {key:?} disappeared"),
+            );
             self.visible.remove(&key);
         }
     }

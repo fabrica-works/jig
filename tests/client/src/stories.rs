@@ -317,10 +317,17 @@ pub fn proposal() -> Proposal {
 /// The same proposal appears in its lead chat and the authoritative inbox.
 #[must_use]
 pub fn proposal_world(seed: u64) -> World<Test, Scripted> {
+    proposal_fixture(seed, false)
+}
+fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
     let mut world = chat_ready(seed);
     let p = proposal();
     let mut lead = task();
     lead.proposals = list([p.key]);
+    if delegate_chip {
+        lead.delegates = list([LiveDelegate { chip: incident_delegate().chip, takeover_budget: 1 }]);
+        lead.impact.tasks.running = 1;
+    }
     for change in [
         jig_scripted_engine::Change::Object {
             project: 1,
@@ -360,7 +367,11 @@ pub fn proposal_world(seed: u64) -> World<Test, Scripted> {
                 input: text(b"Resolve incident"),
                 outcome: Some(text(b"Delegate ten")),
                 failed: false,
-                objects: list([ObjectKey::Proposal(p.key)]),
+                objects: if delegate_chip {
+                    list([ObjectKey::Task(10), ObjectKey::Proposal(p.key)])
+                } else {
+                    list([ObjectKey::Proposal(p.key)])
+                },
                 parts: list([]),
             })]),
         }]),
@@ -386,9 +397,18 @@ pub fn proposal_world(seed: u64) -> World<Test, Scripted> {
             }),
         )
         .expect("delegation turn fits");
+    accepted_proposal(&mut world, &p);
+    world
+}
+fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
     let mut decided = p.clone();
     decided.ending = Some(Ending::Decided { by: frame(7).party, how: Decision::Accepted, at: Wall::EPOCH });
-    let mut lead = task();
+    let ReadValue::Task(lead) =
+        world.front().engine.truth().objects.get(&ObjectKey::Task(9)).expect("lead task exists")
+    else {
+        unreachable!()
+    };
+    let mut lead = lead.as_ref().clone();
     lead.activity = 2;
     let before = world
         .front()
@@ -397,7 +417,7 @@ pub fn proposal_world(seed: u64) -> World<Test, Scripted> {
         .sources
         .iter()
         .find(|s| matches!(s.read, Read::Activity { task: 9, .. }))
-        .unwrap()
+        .expect("fixture truth is present")
         .clone();
     let mut after = before;
     if let jig_scripted_engine::Rows::Activity(rows) = &mut after.rows {
@@ -438,8 +458,8 @@ pub fn proposal_world(seed: u64) -> World<Test, Scripted> {
             ],
         })
         .expect("accepted activity rule fits");
-    world
 }
+
 /// A held chat with the engine's release offer and independent hold revision.
 #[must_use]
 pub fn held_chat(seed: u64) -> World<Test, Scripted> {
@@ -534,10 +554,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
     world
 }
 
-/// Lead task, delegate and connector parts behind the incident journey.
-#[must_use]
-pub fn incident_world(seed: u64) -> World<Test, Scripted> {
-    let mut world = proposal_world(seed);
+fn incident_delegate() -> Task {
     let mut delegate = task();
     delegate.chip.task = 10;
     delegate.chip.title = text(b"Delegate ten");
@@ -546,6 +563,14 @@ pub fn incident_world(seed: u64) -> World<Test, Scripted> {
     delegate.requester = Actor::Task(9);
     delegate.parts = list([Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 }]);
     delegate.proposals = list([proposal().key]);
+    delegate
+}
+/// Lead task, delegate and connector parts behind the incident journey.
+#[must_use]
+pub fn incident_world(seed: u64) -> World<Test, Scripted> {
+    use jig_test_client_domain::family as f;
+    let mut world = proposal_fixture(seed, true);
+    let delegate = incident_delegate();
     let mut lead = task();
     lead.delegates = list([LiveDelegate { chip: delegate.chip.clone(), takeover_budget: 1 }]);
     lead.impact.tasks.running = 1;
@@ -590,7 +615,6 @@ pub fn incident_world(seed: u64) -> World<Test, Scripted> {
         world.front().engine.act(skein_lib::Time::ZERO, Wall::EPOCH, change).expect("incident task facts fit");
     }
     let mut family = world.front().engine.application().clone();
-    use jig_test_client_domain::family as f;
     let item = f::Subject { scope: f::Scope::Project(1), kind: f::Kind::Item(1) };
     family.documents.insert(
         item,

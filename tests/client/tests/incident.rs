@@ -20,7 +20,10 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
     let now = w.now();
     let mut state = w.front().engine.application().clone();
     let subject = family::Subject { scope: family::Scope::Project(1), kind: family::Kind::Item(1) };
-    let family::Document::Item(item) = state.documents.get_mut(&subject).unwrap() else { unreachable!() };
+    let family::Document::Item(item) = state.documents.get_mut(&subject).expect("incident fixture fits and exists")
+    else {
+        unreachable!()
+    };
     item.state = family::ItemState::Ended;
     item.revision.value += 1;
     let mut delegate = stories::task();
@@ -72,6 +75,7 @@ fn an_incident_delegates_accepts_on_the_leads_plan_and_resolves_with_its_report(
                 see(b"Chat nine"),
                 Step::Go { address: stories::chat() },
                 see(b"delegate"),
+                Step::See { find: Find::named(Role::Link, b"Delegate ten"), within: WITHIN },
                 Step::Go { address: RootAddress::Jig(Address::Task { task: 9, section: TaskSection::Plan }) },
                 see(b"Delegate ten"),
                 see(b"Resolve the incident"),
@@ -87,10 +91,16 @@ fn an_incident_delegates_accepts_on_the_leads_plan_and_resolves_with_its_report(
         let now = w.now();
         let mut state = w.front().engine.application().clone();
         let panel = family::Subject { scope: family::Scope::Project(1), kind: family::Kind::Panel(10) };
-        let family::Document::Part(part) = state.documents.get_mut(&panel).unwrap() else { unreachable!() };
+        let family::Document::Part(part) = state.documents.get_mut(&panel).expect("incident fixture fits and exists")
+        else {
+            unreachable!()
+        };
         part.revision.value += 1;
         part.value = 32;
-        w.front().engine.act_application(now, Wall::EPOCH, jig_test_client_domain::FIRST, 1, state, vec![]).unwrap();
+        w.front()
+            .engine
+            .act_application(now, Wall::EPOCH, jig_test_client_domain::FIRST, 1, state, vec![])
+            .expect("incident fixture fits and exists");
         w.person(c, vec![see(b"Value: 32")]);
         w.run(Until::Done);
         finish(&mut w, false);

@@ -431,10 +431,13 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
         }
         Delivery::Tree(tree) => {
             for node in &tree.nodes {
-                if key == ObjectKey::Task(node.chip.task)
-                    || node.proposals.as_slice().iter().any(|proposal| key == ObjectKey::Proposal(*proposal))
-                {
+                if key == ObjectKey::Task(node.chip.task) {
                     return Some(true);
+                }
+                for proposal in &node.proposals {
+                    if key == ObjectKey::Proposal(*proposal) {
+                        return Some(true);
+                    }
                 }
             }
             Some(false)
@@ -620,8 +623,10 @@ pub(crate) fn read_card(
         }
     }
     if !leaving {
-        let ending =
-            domain.objects.get(id).expect("terminal card exists").body.as_ref().and_then(Body::ending).cloned();
+        let ending = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
+            Some(body) => body.ending().cloned(),
+            None => None,
+        };
         if let Some(how) = ending {
             let until = domain.now.saturating_add(domain.linger);
             domain.objects.get_mut(id).expect("terminal card exists").card =

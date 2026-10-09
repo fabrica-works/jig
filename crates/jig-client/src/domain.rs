@@ -603,7 +603,10 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 if requests == 1 {
                     domain.kept_requests.remove(&scope);
                 } else {
-                    domain.kept_requests.insert(scope, requests - 1).expect("existing scope retains its capacity");
+                    domain
+                        .kept_requests
+                        .insert(scope, requests.checked_sub(1).expect("counted request remains"))
+                        .expect("existing scope retains its capacity");
                 }
                 refresh_kept_page(domain, env, out);
             }
@@ -909,7 +912,6 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
     let Some(watch) = domain.watches.get(id) else {
         return;
     };
-    let owner = watch.owner;
     match &watch.subject {
         Subject::Run { task, .. } => {
             if *task == domain.conversation.task {
@@ -952,66 +954,7 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
             }
         }
         WatchEnd::Unknown | WatchEnd::NotAllowed | WatchEnd::SubjectEnded => {
-            let task_subject = match &watch.subject {
-                Subject::Task { .. } => true,
-                Subject::Frame
-                | Subject::Tree { .. }
-                | Subject::Chips { .. }
-                | Subject::Inbox { .. }
-                | Subject::Tasks { .. }
-                | Subject::Goals { .. }
-                | Subject::Conversations
-                | Subject::Run { .. }
-                | Subject::Deployment => false,
-            };
-            if end == WatchEnd::SubjectEnded {
-                if let (Owner::Page { generation }, Subject::Task { task }) = (owner, &watch.subject) {
-                    if generation == domain.generation {
-                        let key = crate::contract::ObjectKey::Task(*task);
-                        let what = crate::contract::Read::Task { task: *task };
-                        let source = crate::objects::Source::Window { generation, number: 23 };
-                        // Transfer this source's slot before admission, so a
-                        // one-source limit can still read the terminal facts.
-                        if let Some(object) = domain.objects.find(key).and_then(|id| domain.objects.get_mut(id)) {
-                            object.sources.remove(&crate::objects::Source::Watch(id));
-                        }
-                        if domain.objects.name(key, source).is_none() {
-                            crate::pages::routing::refuse(domain, Limit::Objects);
-                        } else if !domain.reads.pending(&what)
-                            && domain.reads.ask(generation, source, what, out).is_none()
-                        {
-                            crate::pages::routing::refuse(domain, Limit::Reads);
-                        }
-                    }
-                }
-            }
-            domain.retire(id);
-            match owner {
-                Owner::Frame => domain.set_link(Link::Offline, out),
-                Owner::Application { .. } => {}
-                Owner::Page { generation } => {
-                    if generation == domain.generation && task_subject {
-                        match domain.address {
-                            Address::Task { .. } => match end {
-                                WatchEnd::Unknown | WatchEnd::NotAllowed => {
-                                    domain.page = Page::Missing;
-                                    domain.changed();
-                                }
-                                WatchEnd::SubjectEnded
-                                | WatchEnd::Closed
-                                | WatchEnd::Dropped
-                                | WatchEnd::Busy
-                                | WatchEnd::Stopping
-                                | WatchEnd::SignedOut => {}
-                            },
-                            Address::Inbox { .. }
-                            | Address::Conversations { .. }
-                            | Address::Project { .. }
-                            | Address::Deployment => {}
-                        }
-                    }
-                }
-            }
+            terminal_watch(domain, id, end, out);
         }
         WatchEnd::SignedOut => {
             domain.retire(id);
@@ -1019,6 +962,88 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
         }
     }
     crate::signin::returned(domain, env, out);
+}
+fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Queue<Request>) {
+    let Some(watch) = domain.watches.get(id) else {
+        return;
+    };
+    let owner = watch.owner;
+    let task_subject = match &watch.subject {
+        Subject::Task { .. } => true,
+        Subject::Frame
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Tasks { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations
+        | Subject::Run { .. }
+        | Subject::Deployment => false,
+    };
+    let final_task = match (&watch.subject, owner) {
+        (Subject::Task { task }, Owner::Page { generation }) => Some((*task, generation)),
+        (Subject::Task { .. }, Owner::Frame | Owner::Application { .. })
+        | (
+            Subject::Frame
+            | Subject::Tree { .. }
+            | Subject::Chips { .. }
+            | Subject::Inbox { .. }
+            | Subject::Tasks { .. }
+            | Subject::Goals { .. }
+            | Subject::Conversations
+            | Subject::Run { .. }
+            | Subject::Deployment,
+            _,
+        ) => None,
+    };
+    if end == WatchEnd::SubjectEnded
+        && let Some((task, generation)) = final_task
+        && generation == domain.generation
+    {
+        read_final_task(domain, id, task, generation, out);
+    }
+    domain.retire(id);
+    match owner {
+        Owner::Frame => domain.set_link(Link::Offline, out),
+        Owner::Application { .. } => {}
+        Owner::Page { generation } => {
+            if generation == domain.generation && task_subject {
+                match domain.address {
+                    Address::Task { .. } => match end {
+                        WatchEnd::Unknown | WatchEnd::NotAllowed => {
+                            domain.page = Page::Missing;
+                            domain.changed();
+                        }
+                        WatchEnd::SubjectEnded
+                        | WatchEnd::Closed
+                        | WatchEnd::Dropped
+                        | WatchEnd::Busy
+                        | WatchEnd::Stopping
+                        | WatchEnd::SignedOut => {}
+                    },
+                    Address::Inbox { .. }
+                    | Address::Conversations { .. }
+                    | Address::Project { .. }
+                    | Address::Deployment => {}
+                }
+            }
+        }
+    }
+}
+// A watch terminal ends its obligation, while its final task remains readable.
+fn read_final_task(domain: &mut Domain, watch: Id<Watch>, task: u64, generation: u32, out: &mut Queue<Request>) {
+    let key = crate::contract::ObjectKey::Task(task);
+    let what = crate::contract::Read::Task { task };
+    let source = crate::objects::Source::Window { generation, number: 23 };
+    // Transfer this source's slot, including at a one-source limit.
+    if let Some(id) = domain.objects.find(key) {
+        domain.objects.get_mut(id).expect("named task exists").sources.remove(&crate::objects::Source::Watch(watch));
+    }
+    if domain.objects.name(key, source).is_none() {
+        crate::pages::routing::refuse(domain, Limit::Objects);
+    } else if !domain.reads.pending(&what) && domain.reads.ask(generation, source, what, out).is_none() {
+        crate::pages::routing::refuse(domain, Limit::Reads);
+    }
 }
 pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
     crate::signin::signed_out(domain, out);

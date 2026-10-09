@@ -127,9 +127,11 @@ pub(crate) fn navigate(
 }
 /// Opens only what the selected work page shows; services have no page.
 pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
-    if domain.confirmed.is_none()
-        || domain.confirmed.is_some_and(|party| crate::domain::foreign_kept_requests(domain, party))
-    {
+    let hidden = match domain.confirmed {
+        Some(party) => crate::domain::foreign_kept_requests(domain, party),
+        None => true,
+    };
+    if hidden {
         domain.page = Page::SomeoneElse;
         domain.changed();
         return;

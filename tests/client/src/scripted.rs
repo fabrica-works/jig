@@ -127,13 +127,9 @@ fn scope(value: family::Scope) -> engine::ApplicationScope {
         family::Scope::Deployment => engine::ApplicationScope::Deployment,
     }
 }
-impl Front<Test> for Scripted {
-    fn bind(&mut self, client: ClientId, party: u64) {
-        self.parties.insert(client, party);
-    }
-    fn wire(&mut self, client: ClientId, now: Time, wall: Wall, request: Request) {
-        let party = self.parties[&client];
-        let request = match request {
+impl Scripted {
+    fn routed(&mut self, client: ClientId, request: Request) -> Request {
+        match request {
             Request::Send { attempt, key, ask } => {
                 let first = matches!(&ask, Ask::First(_));
                 Request::Send { attempt: self.transport(client, attempt, first, true), key, ask }
@@ -166,7 +162,17 @@ impl Front<Test> for Scripted {
             | Request::Fact { .. }
             | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
             | Request::First(first::Out::Fact { .. }) => request,
-        };
+        }
+    }
+}
+
+impl Front<Test> for Scripted {
+    fn bind(&mut self, client: ClientId, party: u64) {
+        self.parties.insert(client, party);
+    }
+    fn wire(&mut self, client: ClientId, now: Time, wall: Wall, request: Request) {
+        let party = self.parties[&client];
+        let request = self.routed(client, request);
         match request {
             Request::Send { attempt, key, ask } => {
                 self.last_attempt = Some(attempt);

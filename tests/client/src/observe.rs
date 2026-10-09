@@ -222,7 +222,8 @@ pub fn seen(tree: &Tree) -> Vec<Seen> {
             continue;
         };
         let end = at + usize::try_from(node.size).expect("subtree");
-        if card_key(k) {
+        // Plan tree items reuse object identity, but only Item nodes are cards.
+        if card_key(k) && (k.owner != Owner::Jig || node.role == Role::Item) {
             let deciding = contains(tree, at, end, Role::Status, b"In flight")
                 || contains(tree, at, end, Role::Status, b"Retrying")
                 || contains(tree, at, end, Role::Status, b"Parked")

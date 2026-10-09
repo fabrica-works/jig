@@ -669,7 +669,16 @@ fn restored_foreign_scope_counts_are_routed_without_root_page_policy() {
     assert_eq!(root.first().party(), Some(8));
     assert!(taken(&mut root).is_empty());
     confirm(&mut root, watch, 7);
-    assert_eq!(taken(&mut root).iter().filter(|r| matches!(r, Request::Send { .. })).count(), 2);
+    assert_eq!(
+        taken(&mut root)
+            .iter()
+            .filter(|r| match r {
+                Request::Send { .. } => true,
+                _ => false,
+            })
+            .count(),
+        2
+    );
 }
 
 #[test]
@@ -677,7 +686,7 @@ fn restored_own_scope_sends_and_retires_each_final_request_once() {
     let mut root = new(&limits(), 32);
     let watch = start(&mut root, restored_requests(2));
     confirm(&mut root, watch, 7);
-    assert!(matches!(root.jig().page(), jig_client::pages::Page::Work { .. }));
+    assert!(work_page(root.jig().page()));
     let sends: Vec<_> = taken(&mut root)
         .into_iter()
         .filter_map(|row| match row {
@@ -698,7 +707,7 @@ fn restored_own_scope_sends_and_retires_each_final_request_once() {
         assert!(out.contains(&Request::Fact { fact: crate::Fact::KeptAnswered }));
     }
     confirm(&mut root, watch, 8);
-    assert!(matches!(root.jig().page(), jig_client::pages::Page::Work { .. }));
+    assert!(work_page(root.jig().page()));
 }
 
 #[test]
@@ -714,5 +723,17 @@ fn retention_unknown_retires_the_last_foreign_scope_and_clears_its_warning() {
     // Only the table expiry is relevant; the frame remains a public confirmed fact.
     root.table.fire(future.now, future.wall);
     take(&mut root, &future, &mut out);
-    assert!(matches!(root.jig().page(), jig_client::pages::Page::Work { .. }));
+    assert!(work_page(root.jig().page()));
+}
+
+fn work_page(page: &jig_client::pages::Page) -> bool {
+    match page {
+        jig_client::pages::Page::Work { .. } => true,
+        jig_client::pages::Page::Starting
+        | jig_client::pages::Page::Elsewhere
+        | jig_client::pages::Page::SigningIn
+        | jig_client::pages::Page::Missing
+        | jig_client::pages::Page::OutOfDate
+        | jig_client::pages::Page::SomeoneElse => false,
+    }
 }

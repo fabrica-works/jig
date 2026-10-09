@@ -341,7 +341,7 @@ fn the_last_foreign_kept_request_retiring_restores_the_work_page() {
     drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
     assert_eq!(domain.page(), &Page::SomeoneElse);
     drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 9 });
-    assert!(matches!(domain.page(), Page::Work { .. }));
+    assert!(work_page(&domain));
     assert!(drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 9 }).is_empty());
 }
 
@@ -351,9 +351,9 @@ fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
     let watch = start(&mut domain, List::with_capacity(0));
     drive(&mut domain, Time::ZERO, Event::Kept { scope: 7, requests: 2 });
     delivered(&mut domain, Time::ZERO, watch, frame(7));
-    assert!(matches!(domain.page(), Page::Work { .. }));
+    assert!(work_page(&domain));
     drive(&mut domain, Time::ZERO, Event::KeptGone { scope: 7 });
-    assert!(matches!(domain.page(), Page::Work { .. }));
+    assert!(work_page(&domain));
 
     let mut guarded = Domain::new(&LIMITS, 24);
     let mut kept = List::with_capacity(1);
@@ -370,4 +370,13 @@ fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
     delivered(&mut guarded, Time::ZERO, watch, frame(7));
     drive(&mut guarded, Time::ZERO, Event::KeptGone { scope: 7 });
     assert_eq!(guarded.page(), &Page::SomeoneElse);
+}
+
+fn work_page(domain: &Domain) -> bool {
+    match domain.page() {
+        Page::Work { .. } => true,
+        Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
+            false
+        }
+    }
 }

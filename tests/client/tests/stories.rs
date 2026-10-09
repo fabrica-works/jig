@@ -227,7 +227,7 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
             matches!(requests[0], jig_client::contract::Ask::SetGoal { budget: 2, spec, .. } if spec.bytes() == b"Resolve incident")
         );
         assert!(matches!(
-            commits.iter().find(|c| c.key.is_some()).unwrap().answer,
+            commits.iter().find(|c| c.key.is_some()).expect("incident fixture fits and exists").answer,
             Some(jig_client::contract::Answer::Done(jig_client::contract::Outcome::Proposed { .. }))
         ));
     }

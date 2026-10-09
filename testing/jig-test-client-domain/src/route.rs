@@ -43,7 +43,12 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                         {
                             out.push(Request::Fact { fact: Fact::InvalidRecord });
                         } else {
-                            let requests = scopes.get(&scope).copied().unwrap_or(0) + 1;
+                            let requests = scopes
+                                .get(&scope)
+                                .copied()
+                                .unwrap_or(0)
+                                .checked_add(1)
+                                .expect("restored request count is bounded");
                             scopes.insert(scope, requests).expect("one scope per admitted restored request");
                         }
                     }
