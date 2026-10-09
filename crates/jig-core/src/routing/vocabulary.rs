@@ -261,6 +261,8 @@ pub struct Limits {
     pub accounts: accounts::Limits,
     /// Scoped notes and their pages.
     pub notes: notes::Limits,
+    /// Typed document construction bounds and served versions.
+    pub documents: crate::documents::DocumentLimits,
     /// Live view streams.
     pub views: views::Limits,
 }

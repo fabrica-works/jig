@@ -1,0 +1,272 @@
+//! Typed live documents, made on demand from the core's committed vocabulary
+//! (`client/domain/contract.md`, sections 5 and 7; `domain/engine.md`, 11).
+//! No document is retained here, and this module neither delivers nor decides.
+//! `make` authenticates visibility from a supplied party number and copies only
+//! bounded text and lists. Its caller holds the answer until durable.
+//!
+//! Frame counts describe the people's bounded caches; cross-project exact needs
+//! and read positions belong to the inbox work. Object acts belong to the acts
+//! work. Activity positions belong to the activity work. Run writing status,
+//! provisional text and calls belong to the watch stream; committed turns never
+//! enter its text. Application subjects belong to their connectors.
+
+mod small;
+
+use crate::{Core, Limits};
+use alloc::boxed::Box;
+use jig_core_people as people;
+use jig_core_tasks as tasks;
+use skein_lib::{Duration, List, Wall};
+
+/// One bounded opaque text value, with loss stated separately.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Text {
+    pub bytes: Box<[u8]>,
+    pub cut: bool,
+}
+
+/// Versions of jig's contract served by this configured deployment.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Versions {
+    pub minimum: u32,
+    pub maximum: u32,
+}
+
+/// Bounds of one constructed document and its configured served versions.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct DocumentLimits {
+    pub rows: u32,
+    pub text_bytes: u32,
+    pub chips: u32,
+    pub lines: u32,
+    pub versions: Versions,
+}
+
+/// Continuation position in a subject's stable numbered list.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Cursor {
+    pub number: u64,
+}
+
+/// The bounded slice requested by a watch or read.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Window {
+    pub rows: u32,
+    pub after: Option<Cursor>,
+}
+
+/// Identity of the immutable proposal's maker.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Proposer {
+    /// A task's proposal.
+    Task(u64),
+    /// A party's proposed goal.
+    Party(u64),
+}
+
+/// One subject whose current document a party may read or watch.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Subject {
+    /// The authenticated party's frame.
+    Frame { party: u64 },
+    /// A task's overview and controls.
+    Task { task: u64 },
+    /// A task's live requester subtree.
+    Tree { task: u64 },
+    /// Each named task's compact live status.
+    Chips { tasks: List<u64> },
+    /// The party's waiting objects and unread updates.
+    Inbox { party: u64 },
+    /// A project's live goals.
+    Goals { project: u32 },
+    /// The party's live chats.
+    Conversations { party: u64 },
+    /// A task's current attempt.
+    Run { task: u64 },
+    /// Hosts, accounts and capacity.
+    Deployment,
+    /// An immutable pending proposal.
+    Proposal { proposer: Proposer, number: u64 },
+    /// A held task's escalation.
+    Escalation { task: u64 },
+    /// An unanswered question.
+    Question { task: u64, message: u64 },
+    /// A task addressed to a person or role.
+    PersonTask { task: u64 },
+    /// A result still named by the live engine.
+    Result { task: u64 },
+    /// A project's resources, policy and funding.
+    Project { project: u32 },
+    /// A note retained by its owning child.
+    Note { note: u64 },
+}
+
+/// Why no live document is available.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Missing {
+    /// No visible subject is known by this name.
+    Unknown,
+    /// The supplied party may not see this subject.
+    NotAllowed,
+    /// The subject belongs to stored history.
+    Ended,
+    /// The requested whole value exceeds construction bounds.
+    TooLarge,
+}
+
+/// A bounded count, with saturation stated.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Count {
+    /// Every currently known entry was counted.
+    Known(u32),
+    /// The bounded cache may omit older entries.
+    AtLeast(u32),
+}
+
+/// A task's executor kind; its detail lives on the task document.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ExecutorKind {
+    /// An agent with a configured charter.
+    Agent,
+    /// A connector-owned procedure.
+    Procedure,
+    /// A party or project role.
+    Person,
+}
+
+/// A compact typed phase and its immediate waiting facts.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum PhaseLine {
+    /// Waiting for live dependencies or resource holdings.
+    Waiting { dependencies: List<u64>, more: bool, holds: bool },
+    /// Current activation state of an agent or procedure.
+    Active(tasks::Active),
+    /// Waiting for the addressed party or role.
+    Person { address: tasks::PersonAddress, taken_by: Option<u64>, since: Wall },
+    /// Closing through its ordered obligations.
+    Closing(tasks::Stage),
+    /// Held for this reason at this independent revision.
+    Held { reason: tasks::Hold, revision: u64 },
+    /// Ended outside the live arena.
+    Ended,
+}
+
+/// A task named in passing, with its bounded first-line title.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Chip {
+    pub number: u64,
+    pub title: Text,
+    pub executor: ExecutorKind,
+    pub phase: PhaseLine,
+}
+
+/// A project's charter numbers offered for chats and goals.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct OfferedCharter {
+    pub project: u32,
+    pub chat: u32,
+    pub goals: List<u32>,
+    pub cut: bool,
+}
+
+/// Party identity, current roles, bounded counts and contract configuration.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Frame {
+    pub party: u64,
+    pub kind: people::Kind,
+    pub login: Text,
+    pub name: Text,
+    pub projects: List<people::ProjectRole>,
+    pub needs: u32,
+    pub updates: Count,
+    pub retention: Duration,
+    pub charters: List<OfferedCharter>,
+    pub versions: Versions,
+    pub cut: bool,
+}
+
+/// A live attempt's committed progress; provisional writing is supplied by watches.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Run {
+    pub task: u64,
+    pub attempt: u64,
+    pub committed_turn: u32,
+    pub writing: Option<bool>,
+}
+
+/// One whole typed document, within its configured limits.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Document {
+    /// The party's frame.
+    Frame(Frame),
+    /// Compact status of each named task.
+    Chips(List<Chip>),
+    /// Current attempt and committed turn.
+    Run(Run),
+}
+
+/// Make the current visible document without changing state or emitting effects.
+pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window: &Window) -> Result<Document, Missing> {
+    if document_worst_case(&limits.documents).is_none() || window.rows > limits.documents.rows {
+        return Err(Missing::TooLarge);
+    }
+    core.people.identity(party).ok_or(Missing::Unknown)?;
+    match subject {
+        Subject::Frame { party: owner } => {
+            if *owner != party {
+                return Err(Missing::NotAllowed);
+            }
+            let frame = small::frame(core, limits, party)?;
+            Ok(Document::Frame(frame))
+        }
+        Subject::Chips { tasks: named } => {
+            if named.len() > limits.documents.chips {
+                return Err(Missing::TooLarge);
+            }
+            let mut chips = List::with_capacity(named.len());
+            for number in named {
+                chips.push(small::chip(core, limits, party, *number)?).expect("named chips fit");
+            }
+            Ok(Document::Chips(chips))
+        }
+        Subject::Run { task } => {
+            let run = small::run(core, party, *task)?;
+            Ok(Document::Run(run))
+        }
+        Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => Err(Missing::Unknown),
+    }
+}
+
+/// Checked allocation bound for one document; parents price each retained delivery separately.
+#[must_use]
+pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
+    if limits.rows == 0
+        || limits.text_bytes == 0
+        || limits.chips == 0
+        || limits.lines == 0
+        || limits.versions.minimum == 0
+        || limits.versions.minimum > limits.versions.maximum
+    {
+        return None;
+    }
+    let chip = u64::from(limits.text_bytes).checked_add(List::<u64>::worst_case(limits.lines)?)?;
+    let chips = List::<Chip>::worst_case(limits.chips)?.checked_add(u64::from(limits.chips).checked_mul(chip)?)?;
+    let charter = List::<u32>::worst_case(limits.lines)?;
+    let frame = List::<people::ProjectRole>::worst_case(limits.lines)?
+        .checked_add(List::<OfferedCharter>::worst_case(limits.lines)?)?
+        .checked_add(u64::from(limits.lines).checked_mul(charter)?)?
+        .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?;
+    u64::try_from(size_of::<Document>()).ok()?.checked_add(chips.max(frame))
+}

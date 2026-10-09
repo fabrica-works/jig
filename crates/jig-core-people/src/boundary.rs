@@ -708,3 +708,10 @@ pub enum Request {
         refusal: Refusal,
     },
 }
+
+/// One party's membership in one project, borrowed through a bounded read.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ProjectRole {
+    pub project: u32,
+    pub role: Role,
+}

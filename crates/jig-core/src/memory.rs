@@ -110,6 +110,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?)?;
     let mut total = crate::effect_worst_case(limits)?
         .checked_add(crate::conversation_worst_case(limits)?)?
+        .checked_add(crate::documents::document_worst_case(&limits.documents)?)?
+        .checked_add(List::<people::ProjectRole>::worst_case(limits.people.projects)?)?
         .checked_add(pending)?
         .checked_add(roles)?;
     for child in children {

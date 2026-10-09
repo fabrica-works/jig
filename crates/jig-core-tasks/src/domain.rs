@@ -151,6 +151,12 @@ impl Domain {
         }
     }
 
+    /// Borrow the configured charter numbers admitted by this task hub.
+    #[must_use]
+    pub fn charters(&self) -> &[u32] {
+        &self.charters
+    }
+
     /// Pure borrowed lookup of authentic period/pool accounting for root policy checks; returns
     /// `None` when absent. The table is bounded by `Limits::funders`; no readiness transition,
     /// allocation or output occurs and the root must not persist a second mutable ledger.

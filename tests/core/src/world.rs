@@ -102,6 +102,13 @@ pub fn limits() -> root::Limits {
         routes: 200,
         connector: jig_test_connector_world::LIMITS,
         core: core::Limits {
+            documents: core::documents::DocumentLimits {
+                rows: 32,
+                text_bytes: 256,
+                chips: 32,
+                lines: 32,
+                versions: core::documents::Versions { minimum: 1, maximum: 1 },
+            },
             connectors: 2,
             resume_bytes: 256,
             run_bytes: 256,

@@ -17,6 +17,7 @@ pub mod connector;
 mod delegation;
 pub use amendments::TaskAmendDenied;
 pub use delegation::{Delegate, Dependency, ProcedureAction, resolved_delegate_authority, symbolic_grants};
+pub mod documents;
 mod effects;
 mod escalation;
 pub use effects::{EffectKey, EffectOrigin, EffectPurpose, effect_worst_case};
@@ -643,3 +644,6 @@ fn valid_proof(proof: &RunProof, expected: &RestoringProof, result_bytes: u32) -
         None => spent == expected.run_spent && expected.last_answer != Some(proof.attempt),
     }
 }
+
+#[cfg(test)]
+mod tests;

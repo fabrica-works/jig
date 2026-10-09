@@ -4,8 +4,8 @@
 //! and durability; this child never performs IO or retains credential secrets.
 
 use crate::{
-    Ask, Entry, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, Limits, Outcome, Refusal, Reply,
-    Request, RequestKey, ResultRef, Role, Seed, Stored, Whom,
+    Ask, Entry, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, Limits, Outcome, ProjectRole,
+    Refusal, Reply, Request, RequestKey, ResultRef, Role, Seed, Stored, Whom,
 };
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Env, Id, List, Map, Queue, ReplyTo, Slab, Time, Token, Wall};
@@ -170,6 +170,37 @@ impl Domain {
     #[must_use]
     pub fn role(&self, person: u64, project: u32) -> Option<Role> {
         role(self, person, project)
+    }
+
+    /// Borrow one retained authenticated party's display identity; no secret is known.
+    #[must_use]
+    pub fn identity(&self, party: u64) -> Option<&Identity> {
+        if !self.ready() {
+            return None;
+        }
+        self.people.get(&party)
+    }
+
+    /// Classify a retained party by its authenticated provider.
+    #[must_use]
+    pub fn kind(&self, party: u64) -> Option<Kind> {
+        let identity = self.identity(party)?;
+        Some(if identity.key.provider == self.deployment_provider { Kind::Service } else { Kind::Person })
+    }
+
+    /// Project roles of a retained party, bounded by the role table; no admission changes.
+    #[must_use]
+    pub fn project_roles(&self, party: u64) -> Option<List<ProjectRole>> {
+        self.identity(party)?;
+        let mut result = List::with_capacity(self.roles.capacity());
+        for (project, holdings) in &self.roles {
+            for holding in holdings {
+                if holding.person == party {
+                    result.push(ProjectRole { project: *project, role: holding.role }).expect("one role per project");
+                }
+            }
+        }
+        Some(result)
     }
 
     /// Resolve a provider-authenticated collaborator to this project's role.
