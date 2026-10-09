@@ -16,7 +16,7 @@ fn showing(domain: &Domain) -> bool {
         }
     }
     if domain.clock.page_times
-        || !domain.turn_rows.rows.is_empty()
+        || !domain.turn_rows().rows.is_empty()
         || !domain.history_rows.rows.is_empty()
         || !domain.conversation_rows.rows.is_empty()
     {

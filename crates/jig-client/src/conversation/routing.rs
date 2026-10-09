@@ -1,0 +1,137 @@
+//! Routes task activity, stream cursors and page folds into the conversation.
+//! Reads use the page generation's activity source; stale terminals stay outside
+//! this module. The root only carries the resulting reads, names and parts.
+//! See client/domain/client.md, 10, and contract.md, 6 and 7.3.
+use crate::{
+    Domain, Request,
+    action::End,
+    contract::{ActivityPage, Executor, Limit, Read, RunText, Runtime, Subject, Task},
+    objects::Source,
+    watches::Watch,
+};
+use skein_lib::{Env, Id, Queue, Token};
+/// The activity window binding, independent of a watch's slab token.
+pub const ACTIVITY_WINDOW: u64 = 1;
+fn ask(domain: &mut Domain, what: Option<Read>, out: &mut Queue<Request>) {
+    let Some(what) = what else {
+        return;
+    };
+    if domain.reads.pending(&what) {
+        return;
+    }
+    let source = Source::Window { generation: domain.generation, number: 1 };
+    if domain.reads.ask(domain.generation, source, what, out).is_none() {
+        domain.conversation.failed();
+        crate::pages::routing::refuse(domain, Limit::Reads);
+    }
+}
+/// A task document moves only the activity belonging to the current conversation.
+pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request>) {
+    match domain.address {
+        crate::address::Address::Task { section: crate::address::TaskSection::Activity, .. } => {}
+        crate::address::Address::Task { .. }
+        | crate::address::Address::Inbox { .. }
+        | crate::address::Address::Conversations { .. }
+        | crate::address::Address::Project { .. }
+        | crate::address::Address::Deployment => return,
+    }
+    if domain.conversation.task != task.chip.task {
+        return;
+    }
+    match task.chip.executor {
+        Executor::Agent { .. } => {}
+        Executor::Procedure { .. } | Executor::Party { .. } | Executor::Role { .. } => return,
+    }
+    domain.conversation.run_finished = match &task.runtime {
+        Runtime::Running { .. } | Runtime::WaitingForWords { .. } => false,
+        Runtime::Waiting { .. }
+        | Runtime::Idle
+        | Runtime::Starting
+        | Runtime::BackingOff { .. }
+        | Runtime::Procedure { .. }
+        | Runtime::Person { .. }
+        | Runtime::Closing(_)
+        | Runtime::Held
+        | Runtime::Ended => true,
+    };
+    let what = domain.conversation.moved(task.activity);
+    ask(domain, what, out);
+    finish(domain);
+}
+/// Takes an activity terminal and names its live cards and connector slots.
+pub(crate) fn page(domain: &mut Domain, env: &Env<crate::Limits>, page: ActivityPage, out: &mut Queue<Request>) {
+    if domain.conversation.reading.is_none() {
+        domain.conversation.reading = Some(super::Reading::Latest { known: domain.conversation.loaded });
+    }
+    let next = domain.conversation.accept(page);
+    let keys = domain.conversation.names(env.limits.objects);
+    let source = Source::Window { generation: domain.generation, number: 1 };
+    crate::pages::routing::names(domain, env, source, keys, out);
+    let parts = domain.conversation.parts(env.limits.parts);
+    crate::pages::routing::parts(domain, env, parts.as_slice(), out);
+    ask(domain, next, out);
+    finish(domain);
+    domain.changed();
+}
+fn finish(domain: &mut Domain) {
+    if domain.conversation.run_finished && domain.conversation.loaded >= domain.conversation.committed {
+        domain.conversation.end_run();
+    }
+}
+/// Applies provisional text then acknowledges the retained turn's own cursor.
+pub(crate) fn stream(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    watch: Id<Watch>,
+    value: RunText,
+    out: &mut Queue<Request>,
+) {
+    let Some(following) = domain.watches.get(watch) else {
+        return;
+    };
+    match &following.subject {
+        Subject::Run { task, .. } => {
+            if *task != domain.conversation.task {
+                return;
+            }
+        }
+        Subject::Frame
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations
+        | Subject::Deployment => return,
+    }
+    let accepted = domain.conversation.stream(value, env.limits.text);
+    if !accepted {
+        crate::pages::routing::refuse(domain, Limit::Objects);
+    }
+    let subject = Subject::Run {
+        task: domain.conversation.task,
+        turn: domain.conversation.current,
+        offset: domain.conversation.offset(),
+    };
+    out.push(Request::Continue { watch: watch.token(), subject });
+    domain.changed();
+}
+/// The person's scroll uses the supplied opaque cursor at the requested end.
+pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue<Request>) {
+    if window != Token::new(ACTIVITY_WINDOW) {
+        return;
+    }
+    let what = match end {
+        End::Before => domain.conversation.older(),
+        End::After => domain.conversation.newer(),
+    };
+    ask(domain, what, out);
+}
+
+/// A fold changes page presentation without changing committed call facts.
+pub(crate) fn fold(domain: &mut Domain, name: super::CallName, open: bool) {
+    let fold = if open { super::Fold::Open } else { super::Fold::Folded };
+    if domain.conversation.set_fold(name, fold) {
+        domain.changed();
+    }
+}

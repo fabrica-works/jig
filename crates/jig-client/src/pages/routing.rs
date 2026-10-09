@@ -92,8 +92,8 @@ pub(crate) fn navigate(
     domain.object_rows.edges = blank_edges();
     domain.conversation_rows.rows.clear();
     domain.conversation_rows.edges = blank_edges();
-    domain.turn_rows.rows.clear();
-    domain.turn_rows.edges = blank_edges();
+    let rows = domain.conversation.lines.rows.capacity();
+    domain.conversation = crate::conversation::Conversation::new(0, rows);
     domain.history_rows.rows.clear();
     domain.history_rows.edges = blank_edges();
     domain.generation = generation;
@@ -162,6 +162,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
             read(domain, 11, Read::Conversations { project, after: None }, out);
         }
         Address::Task { task, section } => {
+            domain.conversation.task = task;
             open(domain, env, Subject::Task { task }, out);
             match section {
                 TaskSection::Overview
@@ -207,7 +208,7 @@ fn document_read(key: ObjectKey) -> Read {
         }
     }
 }
-fn names(
+pub(crate) fn names(
     domain: &mut Domain,
     env: &Env<crate::Limits>,
     source: Source,
@@ -243,7 +244,7 @@ fn names(
     // The page's names are bounded even when the incoming document has more rows.
     assert!(domain.object_rows.rows.len() <= env.limits.rows, "page rows fit their window");
 }
-fn parts(domain: &mut Domain, env: &Env<crate::Limits>, values: &[Part], out: &mut Queue<Request>) {
+pub(crate) fn parts(domain: &mut Domain, env: &Env<crate::Limits>, values: &[Part], out: &mut Queue<Request>) {
     let mut count = 0_u32;
     for part in values {
         if count == env.limits.parts {
@@ -279,8 +280,10 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Frame(_) | Delivery::Run(_) => {}
+        Delivery::Frame(_) => {}
+        Delivery::Run(value) => crate::conversation::routing::stream(domain, env, watch, *value, out),
         Delivery::Task(task) => {
+            crate::conversation::routing::document(domain, &task, out);
             let key = ObjectKey::Task(task.chip.task);
             one(domain, source, key, Body::Task(task));
             crate::pages::task::document(domain, env, out);
@@ -432,16 +435,22 @@ pub(crate) fn read_result(
         Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
     }
     match result {
-        ReadResult::None(why) => match why {
-            contract::ReadNone::Unknown | contract::ReadNone::Gone | contract::ReadNone::Refused => {
-                domain.page = Page::Missing;
-                domain.changed();
+        ReadResult::None(why) => {
+            match receipt.source {
+                Source::Window { number: 1, .. } => domain.conversation.failed(),
+                Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
             }
-            contract::ReadNone::Busy | contract::ReadNone::Unreachable => {
-                refuse(domain, Limit::Reads);
+            match why {
+                contract::ReadNone::Unknown | contract::ReadNone::Gone | contract::ReadNone::Refused => {
+                    domain.page = Page::Missing;
+                    domain.changed();
+                }
+                contract::ReadNone::Busy | contract::ReadNone::Unreachable => {
+                    refuse(domain, Limit::Reads);
+                }
+                contract::ReadNone::SignedOut => crate::domain::signed_out(domain, out),
             }
-            contract::ReadNone::SignedOut => crate::domain::signed_out(domain, out),
-        },
+        }
         ReadResult::Value(value) => read_value(domain, env, receipt.source, value, out),
     }
 }
@@ -475,14 +484,7 @@ fn read_value(
             let key = ObjectKey::Result(result.task.task);
             read_body(domain, key, Body::Result(result));
         }
-        ReadValue::Activity(page) => {
-            let edges = page_edges(page.before, page.after);
-            let dropped = domain.turn_rows.slide(page.rows, edges, End::Before);
-            if dropped > 0 {
-                domain.changed();
-            }
-            domain.changed();
-        }
+        ReadValue::Activity(page) => crate::conversation::routing::page(domain, env, *page, out),
         ReadValue::History(page) => {
             let edges = page_edges(page.before, page.after);
             let dropped = domain.history_rows.slide(page.rows, edges, End::After);
@@ -567,6 +569,7 @@ fn filter_chats(address: Address, rows: &mut List<contract::ConversationLine>) {
 }
 
 fn task_read(domain: &mut Domain, env: &Env<crate::Limits>, task: Box<contract::Task>, out: &mut Queue<Request>) {
+    crate::conversation::routing::document(domain, &task, out);
     let key = ObjectKey::Task(task.chip.task);
     read_body(domain, key, Body::Task(task));
     crate::pages::task::document(domain, env, out);

@@ -1,7 +1,7 @@
 use crate::{
     contract::{
-        Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, Read, RunBeginning, Speaker,
-        Text, Turn, TurnName, Usage,
+        Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, Read, RunBeginning, RunText,
+        Speaker, Text, Turn, TurnName, Usage,
     },
     conversation::{CallName, Conversation, Fold},
     objects::{Objects, Source},
@@ -144,4 +144,211 @@ fn calls_fold_on_the_page_and_engine_objects_share_one_live_card() {
     assert_eq!(objects.len(), 1);
     assert_eq!(objects.find(ObjectKey::Task(44)), Some(id));
     assert!(objects.named(ObjectKey::Task(44), source));
+}
+
+fn stream(number: u32, from: u32, through: u32, bytes: &[u8], cut: bool) -> RunText {
+    RunText {
+        attempt: 1,
+        began: Wall::EPOCH,
+        turn: TurnName { attempt: 1, number },
+        from,
+        through,
+        text: text(bytes),
+        cut,
+        call: None,
+    }
+}
+#[test]
+fn provisional_turns_append_by_offset_and_commit_only_replaces_the_same_name() {
+    let mut c = Conversation::new(9, 4);
+    assert!(c.stream(stream(1, 0, 3, b"one", false), 10));
+    assert!(c.stream(stream(1, 3, 5, b"++", false), 10));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one++");
+    assert!(c.stream(stream(1, 3, 5, b"++", false), 10));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one++");
+    assert!(!c.stream(stream(1, 7, 8, b"x", false), 10));
+    assert!(c.stream(stream(2, 0, 3, b"two", false), 10));
+    assert_eq!(c.live.len(), 2);
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one++");
+    assert_eq!(c.offset(), 3);
+    assert!(c.moved(1).is_some());
+    let mut rows = List::with_capacity(1);
+    rows.push(calls(1, 1)).unwrap();
+    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.live.len(), 1);
+    assert_eq!(c.live.get(0).unwrap().name.number, 2);
+    assert!(c.stream(stream(1, 0, 3, b"old", false), 10));
+    assert_eq!(c.live.len(), 1);
+    c.end_run();
+    assert!(c.live.is_empty());
+    assert_eq!(c.current, None);
+    routed_conversation();
+}
+#[test]
+fn provisional_text_keeps_its_cut_mark_and_recovery_replaces_uncommitted_text() {
+    let mut c = Conversation::new(9, 2);
+    assert!(c.stream(stream(1, 0, 3, b"abc", false), 4));
+    assert!(c.stream(stream(1, 3, 6, b"def", false), 4));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"cdef");
+    assert!(c.live.get(0).unwrap().cut);
+    assert!(c.stream(stream(1, 10, 12, b"xy", true), 4));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"xy");
+    assert_eq!(c.offset(), 12);
+    c.interrupted();
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"xy");
+    assert!(c.stream(stream(1, 0, 3, b"new", false), 4));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"new");
+    assert!(!c.live.get(0).unwrap().cut);
+    assert!(c.stream(stream(2, 0, 1, b"x", false), 4));
+    assert!(!c.stream(stream(3, 0, 1, b"y", false), 4));
+    assert_eq!(c.live.len(), 2);
+    c.end_run();
+    assert!(c.stream(stream(3, 0, 1, b"y", false), 4));
+    assert_eq!(c.current, Some(TurnName { attempt: 1, number: 3 }));
+}
+
+fn activity_read(requests: &[crate::Request]) -> skein_lib::Token {
+    for request in requests {
+        if let crate::Request::Read { read, what: Read::Activity { .. } } = request {
+            return *read;
+        }
+    }
+    unreachable!("activity read requested")
+}
+fn routed_conversation() {
+    use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
+    use crate::{
+        Domain, Event, Request,
+        address::{Address, Place, TaskSection},
+        contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent},
+    };
+    use skein_lib::Time;
+    let mut domain = Domain::new(&LIMITS, 21);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
+    );
+    let task_watch = open_token(&opened);
+    let mut document = super::confirmation::task();
+    document.chip.executor = crate::contract::Executor::Agent { charter: 1 };
+    document.runtime = Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: None };
+    document.activity = 1;
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document.clone()))) },
+    );
+    let run_watch = open_token(&requests);
+    let read = activity_read(&requests);
+    let first = page(&[1], Some(b"older"), None);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read, result: ReadResult::Value(ReadValue::Activity(Box::new(first))) },
+    );
+    assert_eq!(domain.turn_rows().rows.len(), 1);
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch: run_watch,
+            event: WatchEvent::Delivered(Delivery::Run(Box::new(stream(1, 0, 3, b"one", false)))),
+        },
+    );
+    let mut continued = false;
+    for request in &requests {
+        if let Request::Continue {
+            watch,
+            subject: crate::contract::Subject::Run { turn: Some(TurnName { attempt: 1, number: 1 }), offset: 3, .. },
+        } = request
+        {
+            continued = *watch == run_watch;
+        }
+    }
+    assert!(continued);
+    document.activity = 2;
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document.clone()))) },
+    );
+    let read = activity_read(&requests);
+    for request in &requests {
+        if let Request::Open { .. } = request {
+            unreachable!("one run watch follows each page");
+        }
+    }
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch: run_watch,
+            event: WatchEvent::Delivered(Delivery::Run(Box::new(stream(2, 0, 3, b"two", false)))),
+        },
+    );
+    let mut rows = List::with_capacity(2);
+    rows.push(calls(2, 1)).unwrap();
+    rows.push(row(1)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                rows,
+                before: Some(cursor(b"older")),
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation().live.len(), 1);
+    assert_eq!(domain.conversation().live.get(0).unwrap().name.number, 2);
+    routed_scroll_and_end(&mut domain, document, task_watch);
+}
+fn routed_scroll_and_end(
+    domain: &mut crate::Domain,
+    mut document: crate::contract::Task,
+    task_watch: skein_lib::Token,
+) {
+    use super::spine::drive;
+    use crate::{
+        Event, Request,
+        action::Act,
+        contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent},
+    };
+    use skein_lib::{Time, Token};
+    let name = CallName { attempt: 1, turn: 1, call: 7 };
+    drive(domain, Time::ZERO, Event::Act { act: Act::FoldCall { name, open: true } });
+    assert_eq!(domain.conversation().fold(name), Fold::Open);
+    let requests = drive(
+        domain,
+        Time::ZERO,
+        Event::Act { act: Act::More { window: Token::new(1), end: crate::action::End::Before } },
+    );
+    let read = activity_read(&requests);
+    let mut continued = false;
+    for request in &requests {
+        if let Request::Read { what: Read::Activity { before: Some(_), .. }, .. } = request {
+            continued = true;
+        }
+    }
+    assert!(continued);
+    drive(
+        domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Activity(Box::new(page(&[0], None, Some(b"newer"))))),
+        },
+    );
+    document.runtime = Runtime::Idle;
+    drive(
+        domain,
+        Time::ZERO,
+        Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+    );
+    assert!(domain.conversation().live.is_empty());
 }

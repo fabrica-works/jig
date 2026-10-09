@@ -55,6 +55,8 @@ pub enum Request {
     Read { read: Token, what: Read },
     /// Open a live watch without a key.
     Open { watch: Token, subject: Subject },
+    /// Continue a run watch from the conversation's retained turn and offset.
+    Continue { watch: Token, subject: Subject },
     /// Close a watch and await its terminal.
     Close { watch: Token },
     /// Show a jig address in history.

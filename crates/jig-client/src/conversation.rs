@@ -15,11 +15,14 @@
 //! | any read | failed | idle | nothing |
 use crate::{
     action::End,
-    contract::{Activity, ActivityLine, ActivityPage, Block, Cursor, ObjectKey, Read, TurnName},
+    contract::{
+        Activity, ActivityLine, ActivityPage, Block, Call, Cursor, ObjectKey, Part, Read, RunText, Text, TurnName,
+    },
     objects::{Objects, Source},
     windows::{Edge, Edges, TurnWindow},
 };
-use skein_lib::{List, Map};
+use skein_lib::{List, Map, Wall, Writer};
+pub(crate) mod routing;
 
 /// The page's presentation of one call, independent of committed turn facts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -46,6 +49,16 @@ pub enum Reading {
     /// Activity nearer the present, after scrolling into history.
     Newer,
 }
+/// One turn's text is provisional until its committed turn is read.
+#[derive(Debug)]
+pub struct LiveTurn {
+    pub name: TurnName,
+    pub began: Wall,
+    pub text: Text,
+    pub offset: u32,
+    pub cut: bool,
+    pub call: Option<Call>,
+}
 /// Committed lines and page state for one task conversation.
 #[derive(Debug)]
 pub struct Conversation {
@@ -60,6 +73,18 @@ pub struct Conversation {
     pub fresh: TurnWindow,
     /// The displayed calls whose details the person opened.
     pub opened: Map<CallName, ()>,
+    /// Earlier provisional turns survive deliveries of a later turn.
+    pub live: List<LiveTurn>,
+    /// The name and offset to request on the run watch.
+    pub current: Option<TurnName>,
+    /// The current watch cursor survives replacement by a committed turn.
+    pub stream_offset: u32,
+    /// The latest committed turn read, fencing stale stream deliveries.
+    pub committed_turn: Option<TurnName>,
+    /// An interrupted connection replaces its provisional text on recovery.
+    pub replacing: bool,
+    /// The task ended its run; unread committed activity is taken before cleanup.
+    pub run_finished: bool,
 }
 impl Conversation {
     /// Allocates the activity window and equally bounded staging and fold state.
@@ -73,6 +98,12 @@ impl Conversation {
             reading: None,
             fresh: TurnWindow::new(rows),
             opened: Map::with_capacity(rows),
+            live: List::with_capacity(rows),
+            current: None,
+            stream_offset: 0,
+            committed_turn: None,
+            replacing: false,
+            run_finished: false,
         }
     }
     /// Reads a newer committed tail once, leaving a historical window in place.
@@ -114,6 +145,17 @@ impl Conversation {
     /// The owner has validated its row and payload bounds before this call.
     pub fn accept(&mut self, page: ActivityPage) -> Option<Read> {
         let reading = self.reading.take()?;
+        for row in &page.rows {
+            match &row.event {
+                Activity::Turn { name, .. } => self.committed(*name),
+                Activity::Words { .. }
+                | Activity::RunBegan { .. }
+                | Activity::RunEnded { .. }
+                | Activity::Result { .. }
+                | Activity::News { .. }
+                | Activity::Decision { .. } => {}
+            }
+        }
         let edges = page_edges(page.after, page.before);
         match reading {
             Reading::Latest { known } => {
@@ -137,7 +179,7 @@ impl Conversation {
                     // would skip its rows if only part of it fitted the window.
                     reached = false;
                 }
-                if fits && !reached && self.fresh.rows.len() < self.fresh.rows.capacity() {
+                if known > 0 && fits && !reached && self.fresh.rows.len() < self.fresh.rows.capacity() {
                     match &self.fresh.edges.after {
                         Edge::More(cursor) => {
                             let cursor = cursor.clone();
@@ -195,6 +237,174 @@ impl Conversation {
         self.reading = None;
         self.fresh.rows.clear();
     }
+    /// Appends one valid offset delivery, retaining other provisional turn names.
+    /// A gap needs an explicit cut; overlap and duplicate text are absorbed once.
+    pub fn stream(&mut self, value: RunText, text_limit: u32) -> bool {
+        if value.attempt != value.turn.attempt
+            || value.through.checked_sub(value.from) != u32::try_from(value.text.bytes().len()).ok()
+        {
+            return false;
+        }
+        if let Some(committed) = self.committed_turn
+            && !later(value.turn, committed)
+        {
+            return true;
+        }
+        if self.replacing {
+            self.live.clear();
+            self.current = None;
+            self.stream_offset = 0;
+            self.replacing = false;
+        }
+        let mut index = None;
+        for at in 0..self.live.len() {
+            if self.live.get(at).expect("live row exists").name == value.turn {
+                index = Some(at);
+                break;
+            }
+        }
+        match index {
+            Some(at) => {
+                let live = self.live.get_mut(at).expect("live row exists");
+                if value.through <= live.offset {
+                    if value.through == live.offset {
+                        live.call = value.call;
+                    }
+                    return true;
+                }
+                if value.from > live.offset && !value.cut {
+                    return false;
+                }
+                let skip = live.offset.saturating_sub(value.from);
+                let skip = usize::try_from(skip).expect("offset fits usize");
+                let Some(text) = value.text.bytes().get(skip..) else {
+                    return false;
+                };
+                let old = if value.from > live.offset { &[] } else { live.text.bytes() };
+                let combined = old.len().saturating_add(text.len());
+                live.text = tail(old, text, text_limit);
+                live.offset = value.through;
+                live.cut =
+                    live.cut || value.cut || combined > usize::try_from(text_limit).expect("text bound fits usize");
+                live.call = value.call;
+            }
+            None => {
+                if self.live.len() == self.live.capacity() {
+                    return false;
+                }
+                let cut = value.cut || value.from > 0 || !value.text.fits(text_limit);
+                let text = tail(&[], value.text.bytes(), text_limit);
+                let live = LiveTurn {
+                    name: value.turn,
+                    began: value.began,
+                    text,
+                    offset: value.through,
+                    cut,
+                    call: value.call,
+                };
+                self.live.push(live).expect("live turn room checked");
+            }
+        }
+        match self.current {
+            Some(current) => {
+                if later(value.turn, current) || value.turn == current {
+                    self.current = Some(value.turn);
+                    self.stream_offset = value.through;
+                }
+            }
+            None => {
+                self.current = Some(value.turn);
+                self.stream_offset = value.through;
+            }
+        }
+        true
+    }
+    /// Keeps text during a brief offline interval, replacing it on the next delivery.
+    pub fn interrupted(&mut self) {
+        self.replacing = true;
+    }
+    /// Drops provisional text that a completed run never committed.
+    pub fn end_run(&mut self) {
+        self.live.clear();
+        self.current = None;
+        self.stream_offset = 0;
+        self.replacing = false;
+    }
+    /// The stream cursor follows the current name, never another turn's offset.
+    #[must_use]
+    pub const fn offset(&self) -> u32 {
+        self.stream_offset
+    }
+    fn committed(&mut self, name: TurnName) {
+        match self.committed_turn {
+            Some(old) => {
+                if later(name, old) {
+                    self.committed_turn = Some(name);
+                }
+            }
+            None => self.committed_turn = Some(name),
+        }
+        let mut kept = List::with_capacity(self.live.capacity());
+        let live = core::mem::replace(&mut self.live, List::with_capacity(0));
+        for turn in live.into_boxed() {
+            if turn.name != name {
+                kept.push(turn).expect("removal keeps bounded live turns");
+            }
+        }
+        self.live = kept;
+    }
+    /// Connector-owned parts carried by calls, results or news, requested by the root.
+    #[must_use]
+    pub fn parts(&self, capacity: u32) -> List<Part> {
+        let mut parts = List::with_capacity(capacity);
+        for line in &self.lines.rows {
+            match &line.event {
+                Activity::Turn { turn, .. } => {
+                    for message in &turn.messages {
+                        for block in &message.blocks {
+                            match block {
+                                Block::Call(call) => {
+                                    for part in &call.parts {
+                                        add_part(&mut parts, part);
+                                    }
+                                }
+                                Block::Text(_) | Block::Result { .. } => {}
+                            }
+                        }
+                    }
+                }
+                Activity::News { part, .. } => {
+                    if let Some(part) = part {
+                        add_part(&mut parts, part);
+                    }
+                }
+                Activity::Result { result } => {
+                    if let Some(value) = &result.value {
+                        match value {
+                            crate::contract::ResultValue::Connector { part, .. } => add_part(&mut parts, part),
+                            crate::contract::ResultValue::Report(_)
+                            | crate::contract::ResultValue::Verdict { .. }
+                            | crate::contract::ResultValue::Choice { .. }
+                            | crate::contract::ResultValue::Approval { .. }
+                            | crate::contract::ResultValue::Words(_) => {}
+                        }
+                    }
+                }
+                Activity::Words { .. }
+                | Activity::RunBegan { .. }
+                | Activity::RunEnded { .. }
+                | Activity::Decision { .. } => {}
+            }
+        }
+        for live in &self.live {
+            if let Some(call) = &live.call {
+                for part in &call.parts {
+                    add_part(&mut parts, part);
+                }
+            }
+        }
+        parts
+    }
     /// Default folds are implicit; only opened calls consume page fold room.
     #[must_use]
     pub fn fold(&self, name: CallName) -> Fold {
@@ -250,6 +460,13 @@ impl Conversation {
                 | Activity::RunBegan { .. }
                 | Activity::RunEnded { .. }
                 | Activity::News { .. } => {}
+            }
+        }
+        for live in &self.live {
+            if let Some(call) = &live.call {
+                for key in &call.objects {
+                    add_name(&mut names, *key);
+                }
             }
         }
         names
@@ -324,8 +541,38 @@ fn has_call(rows: &List<ActivityLine>, name: CallName) -> bool {
 /// Conversation fold/staging allocations beyond the shared activity window.
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
-    Map::<CallName, ()>::worst_case(limits.rows)?
+    List::<LiveTurn>::worst_case(limits.rows)?
+        .checked_mul(2)?
+        .checked_add(
+            u64::from(limits.rows)
+                .checked_mul(u64::from(limits.text).checked_add(limits.document_bytes)?)?
+                .checked_mul(2)?,
+        )?
+        .checked_add(u64::from(limits.text).checked_mul(2)?)?
+        .checked_add(Map::<CallName, ()>::worst_case(limits.rows)?)?
         .checked_add(List::<CallName>::worst_case(limits.rows)?)?
         .checked_add(List::<ActivityLine>::worst_case(limits.rows)?.checked_mul(3)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(4)?)
+}
+
+fn later(name: TurnName, other: TurnName) -> bool {
+    name.attempt > other.attempt || (name.attempt == other.attempt && name.number > other.number)
+}
+fn tail(old: &[u8], incoming: &[u8], limit: u32) -> Text {
+    let length = old.len().checked_add(incoming.len()).expect("validated text lengths fit usize");
+    let kept = length.min(usize::try_from(limit).expect("text limit fits usize"));
+    let dropped = length.saturating_sub(kept);
+    let old_from = dropped.min(old.len());
+    let new_from = dropped.saturating_sub(old.len());
+    let mut writer = Writer::new(kept);
+    writer.put(old.get(old_from..).expect("old tail starts within text")).expect("old tail fits allocation");
+    writer.put(incoming.get(new_from..).expect("new tail starts within text")).expect("new tail fits allocation");
+    Text::new(writer.finish(), limit).expect("tail respects its byte bound")
+}
+fn add_part(parts: &mut List<Part>, part: &Part) {
+    if !parts.as_slice().contains(part) {
+        match parts.push(part.clone()) {
+            Ok(()) | Err(_) => {}
+        }
+    }
 }

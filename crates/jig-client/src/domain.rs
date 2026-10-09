@@ -82,7 +82,7 @@ pub struct Domain {
     pub(crate) reads: crate::reads::Reads,
     pub(crate) object_rows: crate::windows::ObjectWindow,
     pub(crate) conversation_rows: crate::windows::ConversationWindow,
-    pub(crate) turn_rows: crate::windows::TurnWindow,
+    pub(crate) conversation: crate::conversation::Conversation,
     pub(crate) history_rows: crate::windows::HistoryWindow,
 }
 impl Domain {
@@ -127,7 +127,7 @@ impl Domain {
             reads: crate::reads::Reads::new(limits.reads),
             object_rows: crate::windows::ObjectWindow::new(limits.rows),
             conversation_rows: crate::windows::ConversationWindow::new(limits.rows),
-            turn_rows: crate::windows::TurnWindow::new(limits.rows),
+            conversation: crate::conversation::Conversation::new(0, limits.rows),
             history_rows: crate::windows::HistoryWindow::new(limits.rows),
         }
     }
@@ -313,10 +313,15 @@ impl Domain {
     pub const fn object_rows(&self) -> &crate::windows::ObjectWindow {
         &self.object_rows
     }
+    /// The current task's activity, provisional turns and page-owned folds.
+    #[must_use]
+    pub const fn conversation(&self) -> &crate::conversation::Conversation {
+        &self.conversation
+    }
     /// Activity including turns in the current window.
     #[must_use]
     pub const fn turn_rows(&self) -> &crate::windows::TurnWindow {
-        &self.turn_rows
+        &self.conversation.lines
     }
     /// Conversations in the current bounded window.
     #[must_use]
@@ -574,7 +579,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 crate::pages::inbox::Filter { project, kind: Some(group), goal: None },
                 out,
             ),
+            Act::FoldCall { name, open } => crate::conversation::routing::fold(domain, name, open),
             Act::More { window, end } => {
+                crate::conversation::routing::more(domain, window, end, out);
                 crate::pages::conversations::more(domain, window, end, out);
                 crate::pages::task::more(domain, window, end, out);
             }
@@ -787,6 +794,21 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
         return;
     };
     let owner = watch.owner;
+    match &watch.subject {
+        Subject::Run { task, .. } => {
+            if *task == domain.conversation.task {
+                domain.conversation.interrupted();
+            }
+        }
+        Subject::Frame
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations
+        | Subject::Deployment => {}
+    }
     let recovering = match watch.state {
         Following::Reopening { waiting: true, .. } => true,
         Following::Reopening { waiting: false, .. } => return,

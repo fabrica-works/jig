@@ -36,6 +36,8 @@ pub enum Act {
     Dismiss,
     /// Open or fold an object.
     Fold { object: Token, open: bool },
+    /// Open or fold the details of a committed turn call.
+    FoldCall { name: crate::conversation::CallName, open: bool },
     /// Filter an inbox group.
     Filter { group: InboxGroup, project: Option<u32> },
     /// Read more at a window end.
