@@ -52,7 +52,12 @@ pub(crate) fn request(
         // Full draft judges are called by their request routes. Constructing
         // receiving-bound facts here would make a document's display limits
         // decide otherwise valid engine requests.
-        people::Ask::Amend { .. } => return standing::role(core, project, role, Act::Amend),
+        people::Ask::Amend { task, .. } => {
+            standing::role(core, project, role, Act::Amend)?;
+            super::bounds::amend_preflight(core, limits, person, *task, role)?;
+            let row = core.tasks.task(*task).expect("amend preflight found the task");
+            return super::objects::mutable(row);
+        }
         people::Ask::Stop { task, .. } => (Act::Stop, documents::Subject::Task { task: *task }),
         people::Ask::Cancel { task, .. } => (Act::Cancel, documents::Subject::Task { task: *task }),
         people::Ask::Close { chat, .. } => (Act::Close, documents::Subject::Task { task: *chat }),

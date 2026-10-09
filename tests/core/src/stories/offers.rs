@@ -90,7 +90,7 @@ pub fn goal(budget: u64) -> people::Ask {
 
 #[must_use]
 pub fn project(world: &World) -> &core::documents::Document {
-    let core::reads::Answer::Document(value) = jig_core_world::reads::latest(world) else {
+    let core::reads::Answer::Document(value) = crate::reads::latest(world) else {
         panic!("project read");
     };
     value

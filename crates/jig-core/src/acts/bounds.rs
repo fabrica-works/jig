@@ -80,10 +80,14 @@ pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
     }
 }
 
-pub(super) fn amend(core: &Core, limits: &Limits, party: u64, task: u64, held: Option<people::Role>) -> Admission {
-    let Some(row) = core.tasks.task(task) else {
-        return Admission::Refused(people::Refusal::Unknown);
-    };
+pub(super) fn amend_preflight(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    task: u64,
+    held: Option<people::Role>,
+) -> Result<(), people::Refusal> {
+    let row = core.tasks.task(task).ok_or(people::Refusal::Unknown)?;
     let empty = tasks::Amendment {
         spec: None,
         wake: None,
@@ -92,7 +96,15 @@ pub(super) fn amend(core: &Core, limits: &Limits, party: u64, task: u64, held: O
         release: None,
         reason: Box::new([]),
     };
-    if let Err(why) = core.amend_admit(party, held, row.project, task, &empty, limits.tasks.depth, &limits.tasks) {
+    core.amend_admit(party, held, row.project, task, &empty, limits.tasks.depth, &limits.tasks)?;
+    Ok(())
+}
+
+pub(super) fn amend(core: &Core, limits: &Limits, party: u64, task: u64, held: Option<people::Role>) -> Admission {
+    let Some(row) = core.tasks.task(task) else {
+        return Admission::Refused(people::Refusal::Unknown);
+    };
+    if let Err(why) = amend_preflight(core, limits, party, task, held) {
         return Admission::Refused(why);
     }
     let held = held.expect("amend admission found role");
