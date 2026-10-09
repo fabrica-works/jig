@@ -338,6 +338,7 @@ impl World {
                         }
                         self.commits.push(rows.clone());
                         self.store.submit(number, crate::store_writes(rows), self.store_delay);
+                        self.observer.submitted(self.wall, &self.store);
                         if self.cut == Some(Cut::Submitted(number)) {
                             self.reached_cut = self.cut.take();
                             return;

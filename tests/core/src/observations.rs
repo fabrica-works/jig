@@ -198,6 +198,7 @@ pub struct Observer {
     roles: BTreeMap<(u32, u32), r::Scope>,
     decisions_by_role: BTreeMap<(u32, u32), u8>,
     applied: u64,
+    application_requests: bool,
     activity: BTreeMap<(u64, u64), tasks::ActivityLine>,
     effects: [usize; 2],
     reads: [usize; 2],
@@ -299,6 +300,7 @@ impl Observer {
             roles,
             decisions_by_role,
             applied: 0,
+            application_requests: false,
             activity: BTreeMap::new(),
             effects: [0; 2],
             reads: [0; 2],
@@ -379,8 +381,13 @@ impl Observer {
                     self.observe(now, r::Observed::Uncertain { connector: *number, key: key.into() });
                 }
             }
-            root::Event::Application { .. }
-            | root::Event::RestartBegin
+            root::Event::Application { .. } => {
+                if let Some(observed) = crate::application_observations::requested(store, event) {
+                    self.application_requests = true;
+                    self.observe(now, observed);
+                }
+            }
+            root::Event::RestartBegin
             | root::Event::RestartDone(_)
             | root::Event::Timer(_)
             | root::Event::Core(_)
@@ -512,6 +519,16 @@ impl Observer {
         }
         for (task, (spent, lost_bound)) in totals {
             self.observe(now, r::Observed::Spend { task, spent, lost_bound });
+        }
+    }
+
+    /// Observe the application records the fake store has just received.
+    pub fn submitted(&mut self, now: u64, store: &Store) {
+        if !self.application_requests {
+            return;
+        }
+        for observed in crate::application_observations::submitted(store) {
+            self.observe(now, observed);
         }
     }
 
@@ -837,8 +854,17 @@ impl Observer {
             root::Delivery::LostRead { task, attempt, .. } => {
                 requires.push(r::Receipt::Terminal(*task, *attempt));
             }
-            root::Delivery::Application { .. }
-            | root::Delivery::Restart(_)
+            root::Delivery::Application { to, number, outcome } => {
+                self.observe(
+                    now,
+                    r::Observed::ApplicationAnswered {
+                        reply: destination(to),
+                        connector: *number,
+                        outcome: crate::application_observations::encoded(outcome),
+                    },
+                );
+            }
+            root::Delivery::Restart(_)
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)
             | root::Delivery::Projection { .. }
@@ -848,7 +874,7 @@ impl Observer {
     }
 }
 
-fn destination(to: &mut skein_lib::ReplyTo) -> u64 {
+pub(crate) fn destination(to: &mut skein_lib::ReplyTo) -> u64 {
     let token = std::mem::replace(to, skein_lib::ReplyTo::new(skein_lib::Token::new(0))).into_token();
     *to = skein_lib::ReplyTo::new(token);
     token.raw()

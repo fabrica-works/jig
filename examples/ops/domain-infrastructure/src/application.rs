@@ -62,14 +62,26 @@ impl State {
             refresh.insert(Resource::Environment(environment.clone()), false).expect("saved end resources fit");
         }
     }
-    pub(crate) fn reconcile(&self, environment: &Environment, fact: Option<EnvironmentFact>, out: &mut Queue<Request>) {
-        if let (Some((created_by, now)), Some(fact)) = (self.ends.get(environment), fact)
-            && *created_by == fact.created_by
-            && now.until != fact.until
-        {
+    pub(crate) fn reconcile(
+        &mut self,
+        environment: &Environment,
+        fact: Option<EnvironmentFact>,
+        out: &mut Queue<Request>,
+    ) {
+        let Some(stored) = self.ends.get(environment).copied() else { return };
+        let Some(fact) = fact else { return };
+        let (created_by, now) = stored;
+        if created_by != fact.created_by {
+            let Some(revision) = now.revision.checked_add(1) else { return };
+            let now = EnvironmentEnd { revision, until: fact.until };
+            self.ends.insert(environment.clone(), (fact.created_by, now)).expect("existing end revision fits");
+            out.push(Request::Save {
+                record: Record::EnvironmentEnd { environment: environment.clone(), created_by: fact.created_by, now },
+            });
+        } else if now.until != fact.until {
             out.push(Request::System(SystemRequest::MoveEnd {
                 environment: environment.clone(),
-                created_by: *created_by,
+                created_by,
                 revision: now.revision,
                 until: now.until,
             }));
@@ -136,7 +148,7 @@ pub(crate) fn decide(
                     .unwrap_or((fact.created_by, EnvironmentEnd { revision: 0, until: fact.until }));
                 let (created_by, now) = now;
                 if created_by != fact.created_by {
-                    return keep(domain, env, request, token, retention, ApplicationOutcome::Unknown, out);
+                    return keep(domain, env, request, token, retention, ApplicationOutcome::Exhausted, out);
                 }
                 if now.revision != value.revision {
                     ApplicationOutcome::Moved { environment: value.environment, now }

@@ -609,6 +609,9 @@ impl Application for Testing {
         events
     }
 
+    fn submitted(peers: &mut Neighbours, store: &Store, clock: Clock) {
+        peers.observer.submitted(clock.now, store);
+    }
     fn observed(
         peers: &mut Neighbours,
         systems: &[System; 2],

@@ -4,6 +4,7 @@
 
 pub mod world;
 
+mod application_observations;
 pub mod effects;
 pub mod peers;
 

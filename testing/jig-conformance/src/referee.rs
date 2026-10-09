@@ -3,6 +3,9 @@
 //! store, and fakes supply arrivals, reads and expenses. Scenario policy is
 //! captured before constructing the root; it is never inferred from its live
 //! state (`domain/core.md`, 11; `domain/testing.md`, 6).
+mod application;
+pub use application::{ApplicationAnswer, ApplicationKey};
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use jig_test_system::{Observed as EffectObserved, SystemKey};
@@ -254,6 +257,12 @@ pub struct Policy {
 /// A neighbour or store observation, in the referee's vocabulary.
 #[derive(Clone, Debug)]
 pub enum Observed {
+    /// An application's independently encoded request reached the root.
+    ApplicationRequested { reply: u64, key: ApplicationKey, connector: u16, digest: [u8; 32] },
+    /// The fake store received the connector terminal and the shared key metadata.
+    ApplicationSubmitted { commit: u64, answer: ApplicationAnswer },
+    /// The party received the owner's encoded terminal.
+    ApplicationAnswered { reply: u64, connector: u16, outcome: Box<[u8]> },
     /// The fake store applied one whole commit.
     Durable { number: u64, snapshot: Snapshot },
     /// A delivery reached a host, party, or system.
@@ -325,6 +334,7 @@ pub struct Violation {
 /// Persistent observer state; restart clears none of its evidence or deadlines.
 #[derive(Debug)]
 pub struct Referee {
+    applications: application::Applications,
     pub policy: Policy,
     last: Snapshot,
     commit: u64,
@@ -354,6 +364,7 @@ impl Referee {
     #[must_use]
     pub fn new(policy: Policy) -> Self {
         Self {
+            applications: application::Applications::default(),
             policy,
             last: Snapshot::default(),
             commit: 0,
@@ -832,7 +843,17 @@ impl Referee {
     #[expect(clippy::too_many_lines, reason = "one total dispatch owns the referee's outside observations")]
     pub fn observe(&mut self, now: u64, observed: Observed) -> Result<(), Violation> {
         match observed {
-            Observed::Durable { number, snapshot } => self.durable(number, snapshot, now)?,
+            Observed::ApplicationRequested { reply, key, connector, digest } => {
+                self.applications.offered(reply, key, connector, digest);
+            }
+            Observed::ApplicationSubmitted { commit, answer } => self.applications.submitted(commit, answer),
+            Observed::ApplicationAnswered { reply, connector, outcome } => {
+                self.applications.answered(reply, connector, &outcome)?;
+            }
+            Observed::Durable { number, snapshot } => {
+                self.durable(number, snapshot, now)?;
+                self.applications.durable(number, now)?;
+            }
             Observed::Released { requires } => {
                 for receipt in requires {
                     require(
@@ -962,7 +983,10 @@ impl Referee {
                 require(position == self.restart_position, Promise::Order, "root performed a cold load out of order")?;
                 self.restart_position += 1;
             }
-            Observed::Restart => self.restart_position = 0,
+            Observed::Restart => {
+                self.restart_position = 0;
+                self.applications.restart();
+            }
             Observed::Tick => {
                 self.steps += 1;
                 require(

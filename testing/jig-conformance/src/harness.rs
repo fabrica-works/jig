@@ -99,6 +99,8 @@ pub trait Application {
         clock: Clock,
         ready: bool,
     ) -> Vec<Input<Self::Event, Self::Record>>;
+    /// Observe the concrete transaction the fake store has just received.
+    fn submitted(_peers: &mut Self::Peers, _store: &Store<Self::Key, Self::Record>, _clock: Clock) {}
     /// Map new system, host and durable-store evidence in arrival order.
     fn observed(
         peers: &mut Self::Peers,
@@ -264,7 +266,10 @@ impl<A: Application> Harness<A> {
         for output in std::mem::take(&mut self.outputs) {
             self.trace.push(format!("output {output:?}"));
             match output {
-                Output::Commit { number, writes } => self.store.submit(number, writes, 0),
+                Output::Commit { number, writes } => {
+                    self.store.submit(number, writes, 0);
+                    A::submitted(&mut self.peers, &self.store, self.clock);
+                }
                 Output::Deliver(delivery) => {
                     self.events.extend(A::deliver(
                         &mut self.peers,

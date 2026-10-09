@@ -1,4 +1,5 @@
 //! Ops's two proof-of-concept stories on jig's independent conformance loop.
+mod application;
 mod config;
 mod observations;
 mod scripts;
@@ -39,6 +40,13 @@ impl Config {
     pub fn new(seed: u64, story: Story) -> Self {
         Self { seed, story, limits: config::root(seed).1 }
     }
+
+    /// Bound the retained connector answers for an application-request story.
+    #[must_use]
+    pub fn application_answers(mut self, count: u32) -> Self {
+        self.limits.infrastructure.proposals = count;
+        self
+    }
 }
 
 /// Outside party state and evidence survive domain crashes.
@@ -46,6 +54,8 @@ pub struct Peers {
     policy: r::Policy,
     applied: u64,
     observed: Vec<r::Observed>,
+    application_observed: Vec<r::Observed>,
+    application_requests: bool,
     pub sign_in: Option<u64>,
     account_ready: bool,
     asked_sign_in: bool,
@@ -86,8 +96,8 @@ impl Application for Ops {
     type Delivery = Delivery;
 
     fn build(config: &Config) -> root::Domain {
-        let (configuration, limits) = config::root(config.seed);
-        root::Domain::new(configuration, &limits)
+        let configuration = config::root(config.seed).0;
+        root::Domain::new(configuration, &config.limits)
     }
     fn systems(_: &Config, _: u64) -> Systems {
         let mut production = production::Production::new(0, production::Backend::Fake);
@@ -100,6 +110,8 @@ impl Application for Ops {
             policy: observations::policy(config.seed),
             applied: 0,
             observed: Vec::new(),
+            application_observed: Vec::new(),
+            application_requests: false,
             sign_in: None,
             account_ready: false,
             asked_sign_in: false,
@@ -209,7 +221,12 @@ impl Application for Ops {
         }
         outputs
     }
-    fn inbound(_: &mut Peers, _: &Store, _: Clock, _: &mut root::Event) {}
+    fn inbound(peers: &mut Peers, store: &Store, _: Clock, event: &mut root::Event) {
+        if let Some(observed) = application::requested(store, event) {
+            peers.application_requests = true;
+            peers.application_observed.push(observed);
+        }
+    }
 
     #[expect(clippy::too_many_lines, reason = "each outside output has an exhaustive adapter")]
     fn deliver(
@@ -229,7 +246,12 @@ impl Application for Ops {
             }
         };
         match delivery {
-            root::Output::Application { outcome, .. } => {
+            root::Output::Application { to, outcome } => {
+                peers.application_observed.push(r::Observed::ApplicationAnswered {
+                    reply: to.into_token().raw(),
+                    connector: 2,
+                    outcome: application::encoded(&outcome),
+                });
                 peers.application_answers.push(outcome);
                 Vec::new()
             }
@@ -494,8 +516,13 @@ impl Application for Ops {
         }
         events
     }
+    fn submitted(peers: &mut Peers, store: &Store, _: Clock) {
+        if peers.application_requests {
+            peers.application_observed.extend(application::submitted(store));
+        }
+    }
     fn observed(peers: &mut Peers, _: &Systems, store: &Store, _: Clock) -> Vec<r::Observed> {
-        let mut observed = Vec::new();
+        let mut observed = std::mem::take(&mut peers.application_observed);
         if peers.applied != store.applied {
             let snapshot = observations::snapshot(store);
             for row in store.rows.values() {

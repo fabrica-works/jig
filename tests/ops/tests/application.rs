@@ -60,7 +60,8 @@ fn an_application_request_reaches_infrastructure_and_waits_for_its_commit() {
 #[test]
 fn moving_an_environments_end_is_durable_revision_checked_and_replayed_after_restart() {
     use jig_ops_fake_production as production;
-    let mut world = Harness::<Ops>::new(Config::new(714, Story::Night), 714);
+    let config = Config::new(714, Story::Night).application_answers(8);
+    let mut world = Harness::<Ops>::new(config, 714);
     world.drain().expect("ops startup");
     let sign_in = world.peers.sign_in.expect("signed in owner");
     let environment = infrastructure::Environment::new(b"pool".as_slice().into(), b"preview".as_slice().into());
@@ -115,4 +116,44 @@ fn moving_an_environments_end_is_durable_revision_checked_and_replayed_after_res
     assert_eq!(world.store.applied, writes, "replay makes no decision");
     assert_eq!(world.systems.production.end_changes.iter().filter(|change| change.applied).count(), made);
     assert_eq!(world.systems.production.read_environment(&name).expect("replay preserves newer end").until, 150);
+    replacement(&mut world, sign_in, environment, &name, created_by);
+}
+
+fn replacement(
+    world: &mut Harness<Ops>,
+    sign_in: u64,
+    environment: infrastructure::Environment,
+    name: &jig_ops_fake_production::EnvironmentName,
+    created_by: jig_ops_fake_production::Key,
+) {
+    use jig_ops_fake_production as production;
+    assert_eq!(world.systems.production.tear_down(name, created_by), production::ResultValue::Made);
+    let replacement = production::Key::procedure([7; 16], 90, 2);
+    assert_eq!(
+        world.systems.production.create_environment(name.clone(), replacement, 250, 2),
+        production::ResultValue::Made
+    );
+    let fact =
+        world.systems.infrastructure(infrastructure::SystemRequest::Environment { environment: environment.clone() });
+    world.send(root::Event::Infrastructure(infrastructure::Event::System(fact)));
+    world.drain().expect("replacement advances the connector's own revision");
+    let now = infrastructure::EnvironmentEnd { revision: 3, until: 250 };
+    let value = infrastructure::ApplicationRequest { environment: environment.clone(), revision: 2, until: 300 };
+    world.send(ask(sign_in, 10, value.clone()));
+    world.drain().expect("old creation's revision refused");
+    assert_eq!(
+        world.peers.application_answers.last(),
+        Some(&infrastructure::ApplicationOutcome::Moved { environment: environment.clone(), now })
+    );
+    world.send(ask(sign_in, 11, infrastructure::ApplicationRequest { revision: 3, ..value }));
+    world.drain().expect("current creation's end moves");
+    assert_eq!(
+        world.peers.application_answers.last(),
+        Some(&infrastructure::ApplicationOutcome::MovedEnd {
+            environment,
+            now: infrastructure::EnvironmentEnd { revision: 4, until: 300 }
+        })
+    );
+    world.systems.production.move_environment_end(name, created_by, 2, 150);
+    assert_eq!(world.systems.production.read_environment(name).expect("late old creation call is fenced").until, 300);
 }
