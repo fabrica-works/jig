@@ -47,3 +47,125 @@ pub fn number(bytes: &[u8]) -> Option<u64> {
     }
     Some(value)
 }
+
+/// A typed meaning belonging to jig's last built tree.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum JigMeaning {
+    /// Pressing, submitting or toggling asks this already typed action.
+    Action(jig_client::action::Act),
+    /// Whole text edits a domain field; submit names that same field.
+    Field(jig_client::fields::Purpose),
+    /// Digits are kept in the view and submitting goes to that task.
+    TaskNumber,
+}
+#[derive(Debug)]
+struct Entry {
+    token: Token,
+    meaning: JigMeaning,
+}
+/// Bounded meanings for one tree; rebuilding retires every old token.
+/// Empty + begin -> building; insert -> issued; decode -> typed action or drop.
+/// The next token never resets, so a token from any earlier tree stays stale.
+#[derive(Debug)]
+pub struct JigBindings {
+    entries: skein_lib::List<Entry>,
+    next: u64,
+    text_limit: u32,
+    task: Option<u64>,
+}
+impl JigBindings {
+    /// Allocate the most meanings that a tree may carry.
+    #[must_use]
+    pub fn new(capacity: u32, text_limit: u32) -> Self {
+        Self { entries: skein_lib::List::with_capacity(capacity), next: 0, text_limit, task: None }
+    }
+    /// Retire the prior tree's meanings before building its replacement.
+    pub fn begin(&mut self) {
+        self.entries.clear();
+    }
+    /// Issue one token; exceeding the derived capacity is a view bug.
+    pub fn insert(&mut self, meaning: JigMeaning) -> Binding {
+        self.next = self.next.checked_add(1).expect("view token space remains");
+        let token = Token::new(self.next);
+        self.entries.push(Entry { token, meaning }).expect("bindings fit their derived capacity");
+        Binding { owner: Owner::Jig, token }
+    }
+    /// A link's typed address for the platform's address translation.
+    #[must_use]
+    pub fn address(&self, token: Token) -> Option<jig_client::address::Address> {
+        for entry in &self.entries {
+            if entry.token == token {
+                match &entry.meaning {
+                    JigMeaning::Action(action) => match action {
+                        jig_client::action::Act::Go { address } => return Some(*address),
+                        jig_client::action::Act::Edit { .. }
+                        | jig_client::action::Act::Submit { .. }
+                        | jig_client::action::Act::Intend { .. }
+                        | jig_client::action::Act::Choose { .. }
+                        | jig_client::action::Act::CannotDo
+                        | jig_client::action::Act::Again { .. }
+                        | jig_client::action::Act::Dispose { .. }
+                        | jig_client::action::Act::Change { .. }
+                        | jig_client::action::Act::WriteRelease { .. }
+                        | jig_client::action::Act::Priority { .. }
+                        | jig_client::action::Act::ChatAbout { .. }
+                        | jig_client::action::Act::LookAgain { .. }
+                        | jig_client::action::Act::Confirm
+                        | jig_client::action::Act::Dismiss
+                        | jig_client::action::Act::Fold { .. }
+                        | jig_client::action::Act::FoldCall { .. }
+                        | jig_client::action::Act::Filter { .. }
+                        | jig_client::action::Act::More { .. }
+                        | jig_client::action::Act::FilterInbox { .. }
+                        | jig_client::action::Act::OpenUpdates
+                        | jig_client::action::Act::StartChat { .. }
+                        | jig_client::action::Act::OpenChat { .. }
+                        | jig_client::action::Act::GoalForm { .. }
+                        | jig_client::action::Act::FilterTasks { .. }
+                        | jig_client::action::Act::FilterNotes { .. }
+                        | jig_client::action::Act::FilterPlan { .. }
+                        | jig_client::action::Act::HistoryScope { .. }
+                        | jig_client::action::Act::OpenEnded { .. }
+                        | jig_client::action::Act::SignIn { .. } => return None,
+                    },
+                    JigMeaning::Field(_) | JigMeaning::TaskNumber => return None,
+                }
+            }
+        }
+        None
+    }
+}
+/// Decode an act only through a token issued for the last tree.
+/// Numeric input is retained here until submit; no navigation happens while typing.
+#[must_use]
+pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_client::action::Act> {
+    for entry in &view.entries {
+        if entry.token == token {
+            return match &entry.meaning {
+                JigMeaning::Action(action) => match act {
+                    Act::Press | Act::Submit | Act::Toggle => Some(action.clone()),
+                    Act::Input { .. } => None,
+                },
+                JigMeaning::Field(field) => match act {
+                    Act::Input { value } => {
+                        let text = jig_client::contract::Text::new(value, view.text_limit).ok()?;
+                        Some(jig_client::action::Act::Edit { field: *field, text })
+                    }
+                    Act::Submit => Some(jig_client::action::Act::Submit { field: *field }),
+                    Act::Press | Act::Toggle => None,
+                },
+                JigMeaning::TaskNumber => match act {
+                    Act::Input { value } => {
+                        view.task = number(&value);
+                        None
+                    }
+                    Act::Submit => {
+                        Some(jig_client::action::Act::Go { address: jig_client::address::Address::task(view.task?) })
+                    }
+                    Act::Press | Act::Toggle => None,
+                },
+            };
+        }
+    }
+    None
+}

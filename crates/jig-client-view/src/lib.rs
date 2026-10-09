@@ -11,14 +11,17 @@ extern crate alloc;
 
 mod binding;
 mod builder;
+pub mod cards;
 mod diff;
+pub mod frame;
 mod limits;
 pub mod markdown;
 pub mod phrases;
 mod render;
 mod tree;
+pub mod words;
 
-pub use binding::{Act, Binding, BoundAct, number};
+pub use binding::{Act, Binding, BoundAct, JigBindings, JigMeaning, decode, number};
 pub use builder::{Builder, Slot, SlotId};
 pub use diff::{Attribute, Made, Patch, diff};
 pub use limits::{Limits, worst_case};

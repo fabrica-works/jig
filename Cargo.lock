@@ -124,6 +124,7 @@ dependencies = [
 name = "jig-client-view"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "skein-lib",
 ]
 
