@@ -168,6 +168,16 @@ pub struct EnvironmentFacts {
     pub price: u64,
 }
 
+/// An independently observed lease update, including stale and repeated copies.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EndChange {
+    pub environment: EnvironmentName,
+    pub created_by: Key,
+    pub revision: u64,
+    pub until: u64,
+    pub applied: bool,
+}
+
 /// What an API call did or why it could not do it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResultValue {
@@ -225,6 +235,9 @@ pub struct Production {
     services: BTreeMap<ServiceName, Service>,
     pools: BTreeMap<String, Pool>,
     environments: BTreeMap<EnvironmentName, EnvironmentFacts>,
+    end_revisions: BTreeMap<Key, u64>,
+    /// Calls to move an environment's end, observed outside the connector.
+    pub end_changes: Vec<EndChange>,
     created: BTreeMap<Key, EnvironmentName>,
     operations: BTreeMap<u64, ServiceName>,
     rules: BTreeMap<String, ServiceName>,
@@ -249,6 +262,8 @@ impl Production {
             services: BTreeMap::new(),
             pools: BTreeMap::new(),
             environments: BTreeMap::new(),
+            end_revisions: BTreeMap::new(),
+            end_changes: Vec::new(),
             created: BTreeMap::new(),
             operations: BTreeMap::new(),
             rules: BTreeMap::new(),
@@ -501,6 +516,21 @@ impl Production {
     pub fn read_environment(&mut self, name: &EnvironmentName) -> Option<EnvironmentFacts> {
         self.count_call();
         self.environments.get(name).cloned()
+    }
+
+    /// Set this creation's end once per connector revision; late copies are harmless.
+    pub fn move_environment_end(&mut self, name: &EnvironmentName, created_by: Key, revision: u64, until: u64) {
+        self.count_call();
+        let mut applied = false;
+        if let Some(fact) = self.environments.get_mut(name)
+            && fact.key == created_by
+            && revision > self.end_revisions.get(&created_by).copied().unwrap_or(0)
+        {
+            fact.until = until;
+            self.end_revisions.insert(created_by, revision);
+            applied = true;
+        }
+        self.end_changes.push(EndChange { environment: name.clone(), created_by, revision, until, applied });
     }
 
     /// Finds which creation key made a deletion, when this system made it.

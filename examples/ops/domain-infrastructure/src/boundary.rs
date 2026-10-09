@@ -402,7 +402,7 @@ pub enum RecordKey {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Record {
     /// Current desired end and revision.
-    EnvironmentEnd { environment: Environment, now: crate::EnvironmentEnd },
+    EnvironmentEnd { environment: Environment, created_by: Key, now: crate::EnvironmentEnd },
     /// Own outcome retained for the people child's token.
     ApplicationAnswer { token: Token, until: skein_lib::Wall, outcome: crate::ApplicationOutcome },
     /// Resources a task relies on.
@@ -497,6 +497,8 @@ pub enum SystemRequest {
     Service { service: Service },
     /// Read one environment afresh.
     Environment { environment: Environment },
+    /// Set a saved end for this creation; late copies cannot replace a newer revision.
+    MoveEnd { environment: Environment, created_by: Key, revision: u64, until: u64 },
     /// Read a pool's current capacity.
     Pool { pool: Pool },
     /// Apply an outbox attempt.

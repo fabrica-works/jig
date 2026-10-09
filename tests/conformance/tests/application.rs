@@ -82,3 +82,58 @@ fn admitted_application_routes_and_its_core_part_share_the_commit_barrier() {
         }))
     )));
 }
+
+#[test]
+fn application_replay_after_a_durable_restart_does_not_repeat_a_decision() {
+    let mut world = World::new(715, false);
+    let sign_in = world.sign_in.expect("signed in owner");
+    let value = connector::ApplicationRequest { object: 1, revision: 0, value: 14, release: None };
+    let commit = world.store.applied + 1;
+    world.cut = Some(Cut::Durable(commit));
+    world.send(ask(sign_in, 11, value));
+    assert_eq!(world.reached_cut, Some(Cut::Durable(commit)));
+    assert!(world.application_answers.is_empty(), "durability alone has not delivered the completion");
+    world.restart(715, false);
+    let writes = world.store.applied;
+    world.send(ask(sign_in, 11, value));
+    let now = connector::ApplicationObject { revision: 1, value: 14 };
+    assert_eq!(
+        world.application_answers.last().expect("retained terminal").2,
+        connector::ApplicationOutcome::Changed { object: 1, now }
+    );
+    assert_eq!(world.store.applied, writes, "restored replay decides nothing");
+
+    let task = world.assigned.as_ref().expect("first person's task").task;
+    world.send(root::Event::Core(core::Event::SignIn {
+        reply_to: ReplyTo::new(Token::new(901)),
+        identity: people::Identity {
+            key: people::IdentityKey { provider: 0, subject: Box::from([8]) },
+            login: Box::from(&b"other"[..]),
+            name: Box::from(&b"Other"[..]),
+        },
+    }));
+    let other_sign_in = world.sign_in.expect("signed in second party");
+    assert_ne!(other_sign_in, sign_in);
+    world.send(root::Event::Core(core::Event::People(people::Event::Roles {
+        project: 1,
+        holdings: Box::new([
+            people::Holding { person: 1, role: people::Role::Owner },
+            people::Holding { person: 2, role: people::Role::Member },
+        ]),
+    })));
+    world.send(ask(
+        other_sign_in,
+        12,
+        connector::ApplicationRequest {
+            object: 1,
+            revision: 1,
+            value: 90,
+            release: Some(connector::ApplicationRelease { task, revision: 1, again: None }),
+        },
+    ));
+    assert_eq!(
+        world.application_answers.last().expect("whole refusal").2,
+        connector::ApplicationOutcome::CoreRefused { why: connector::application_core::Refusal::Unknown }
+    );
+    assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Connector { number: 2, record: connector::Record::ApplicationObject { object: 1, now: saved } } if *saved == now)), "an unauthorized core part changes no own object");
+}

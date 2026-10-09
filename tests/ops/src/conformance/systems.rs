@@ -103,6 +103,11 @@ impl Systems {
                 });
                 infra::SystemEvent::Environment { environment, fact, other_hand }
             }
+            infra::SystemRequest::MoveEnd { environment, created_by, revision, until } => {
+                let name = environment_name(&environment);
+                self.production.move_environment_end(&name, production_key(created_by), revision, until);
+                self.infrastructure(infra::SystemRequest::Environment { environment })
+            }
             infra::SystemRequest::Pool { pool } => {
                 let name = std::str::from_utf8(&pool.0).expect("world pool is UTF-8");
                 let (quota, used) = self.production.read_pool(name).expect("world pool exists");

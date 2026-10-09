@@ -43,7 +43,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let name = u64::from(limits.name_bytes);
-    let refresh = limits.tasks.checked_mul(limits.resources_per_task)?.checked_add(limits.procedures)?;
+    let refresh = limits
+        .tasks
+        .checked_mul(limits.resources_per_task)?
+        .checked_add(limits.procedures)?
+        .checked_add(limits.environments)?;
     crate::application::worst_case(limits)?
         .checked_add(Map::<Service, ServiceFact>::worst_case(limits.services)?)?
         .checked_add(Map::<u64, bool>::worst_case(

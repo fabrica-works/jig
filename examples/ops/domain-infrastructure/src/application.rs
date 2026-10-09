@@ -1,7 +1,7 @@
 //! Infrastructure-owned keyed requests (examples.md, section 8;
 //! domain/connectors.md, section 5.5).
 
-use crate::{Domain, Environment, Limits, Record, RecordKey, Request};
+use crate::{Domain, Environment, EnvironmentFact, Key, Limits, Record, RecordKey, Request, Resource, SystemRequest};
 use skein_lib::{Duration, Env, Map, Queue, Token, Wall};
 
 /// Move an environment's end, naming this connector's revision.
@@ -33,7 +33,7 @@ pub enum ApplicationOutcome {
 #[derive(Debug)]
 pub(crate) struct State {
     prepared: Map<Token, ApplicationRequest>,
-    ends: Map<Environment, EnvironmentEnd>,
+    ends: Map<Environment, (Key, EnvironmentEnd)>,
     answers: Map<Token, (Wall, ApplicationOutcome)>,
 }
 
@@ -46,7 +46,7 @@ impl State {
         }
     }
     pub(crate) fn prepare(&mut self, owner: Token, value: ApplicationRequest, limits: &Limits) {
-        if !super::domain::resource_valid(&crate::Resource::Environment(value.environment.clone()), limits) {
+        if !super::domain::resource_valid(&Resource::Environment(value.environment.clone()), limits) {
             return;
         }
         let _prepared = self.prepared.insert(owner, value);
@@ -54,8 +54,26 @@ impl State {
     pub(crate) fn drop(&mut self, owner: Token) {
         self.prepared.remove(&owner);
     }
-    pub(crate) fn restore_end(&mut self, environment: Environment, now: EnvironmentEnd) {
-        assert!(self.ends.insert(environment, now).is_ok(), "restored environment end fits");
+    pub(crate) fn restore_end(&mut self, environment: Environment, created_by: Key, now: EnvironmentEnd) {
+        assert!(self.ends.insert(environment, (created_by, now)).is_ok(), "restored environment end fits");
+    }
+    pub(crate) fn read_afresh(&self, refresh: &mut Map<Resource, bool>) {
+        for (environment, _) in &self.ends {
+            refresh.insert(Resource::Environment(environment.clone()), false).expect("saved end resources fit");
+        }
+    }
+    pub(crate) fn reconcile(&self, environment: &Environment, fact: Option<EnvironmentFact>, out: &mut Queue<Request>) {
+        if let (Some((created_by, now)), Some(fact)) = (self.ends.get(environment), fact)
+            && *created_by == fact.created_by
+            && now.until != fact.until
+        {
+            out.push(Request::System(SystemRequest::MoveEnd {
+                environment: environment.clone(),
+                created_by: *created_by,
+                revision: now.revision,
+                until: now.until,
+            }));
+        }
     }
     pub(crate) fn restore_answer(&mut self, token: Token, until: Wall, outcome: ApplicationOutcome) {
         assert!(
@@ -115,7 +133,11 @@ pub(crate) fn decide(
                     .ends
                     .get(&value.environment)
                     .copied()
-                    .unwrap_or(EnvironmentEnd { revision: 0, until: fact.until });
+                    .unwrap_or((fact.created_by, EnvironmentEnd { revision: 0, until: fact.until }));
+                let (created_by, now) = now;
+                if created_by != fact.created_by {
+                    return keep(domain, env, request, token, retention, ApplicationOutcome::Unknown, out);
+                }
                 if now.revision != value.revision {
                     ApplicationOutcome::Moved { environment: value.environment, now }
                 } else if value.until <= env.wall.as_nanos() / 1_000_000_000 {
@@ -127,18 +149,36 @@ pub(crate) fn decide(
                         revision: now.revision.checked_add(1).expect("end revision preflight"),
                         until: value.until,
                     };
-                    if domain.application.ends.insert(value.environment.clone(), now).is_err() {
+                    if domain.application.ends.insert(value.environment.clone(), (created_by, now)).is_err() {
                         return busy(request, out);
                     }
                     out.push(Request::Save {
-                        record: Record::EnvironmentEnd { environment: value.environment.clone(), now },
+                        record: Record::EnvironmentEnd { environment: value.environment.clone(), created_by, now },
                     });
+                    out.push(Request::System(SystemRequest::MoveEnd {
+                        environment: value.environment.clone(),
+                        created_by,
+                        revision: now.revision,
+                        until: now.until,
+                    }));
                     ApplicationOutcome::MovedEnd { environment: value.environment, now }
                 }
             }
             Some(None) | None => ApplicationOutcome::Unknown,
         }
     };
+    keep(domain, env, request, token, retention, outcome, out);
+}
+
+fn keep(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    request: Token,
+    token: Token,
+    retention: Duration,
+    outcome: ApplicationOutcome,
+    out: &mut Queue<Request>,
+) {
     let until = Wall::from_nanos(env.wall.as_nanos().saturating_add(retention.as_nanos()));
     assert!(domain.application.answers.insert(token, (until, outcome.clone())).is_ok(), "reserved outcome capacity");
     out.push(Request::Save { record: Record::ApplicationAnswer { token, until, outcome } });
@@ -152,7 +192,7 @@ fn busy(request: Token, out: &mut Queue<Request>) {
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let names = u64::from(limits.name_bytes).checked_mul(2)?;
     Map::<Token, ApplicationRequest>::worst_case(limits.staged)?
-        .checked_add(Map::<Environment, EnvironmentEnd>::worst_case(limits.environments)?)?
+        .checked_add(Map::<Environment, (Key, EnvironmentEnd)>::worst_case(limits.environments)?)?
         .checked_add(Map::<Token, (Wall, ApplicationOutcome)>::worst_case(limits.proposals)?)?
         .checked_add(
             u64::from(limits.staged.checked_add(limits.environments)?.checked_add(limits.proposals)?)

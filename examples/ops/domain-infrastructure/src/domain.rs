@@ -55,7 +55,9 @@ impl Domain {
                     .checked_mul(limits.resources_per_task)
                     .expect("live resources")
                     .checked_add(limits.procedures)
-                    .expect("procedure resources"),
+                    .expect("procedure resources")
+                    .checked_add(limits.environments)
+                    .expect("saved environment ends"),
             ),
             backend,
             services: Map::with_capacity(limits.services),
@@ -264,6 +266,7 @@ fn fresh_environment(
     {
         return;
     }
+    domain.application.reconcile(&environment, fact, out);
     domain.refresh.remove(&Resource::Environment(environment.clone()));
     let old = domain.environments.insert(environment.clone(), fact).expect("environment capacity checked");
     if old != Some(fact) {
@@ -291,7 +294,9 @@ fn fresh_pool(domain: &mut Domain, env: &Env<Limits>, pool: Pool, quota: u32, us
 
 fn restore(domain: &mut Domain, record: Record) {
     match record {
-        Record::EnvironmentEnd { environment, now } => domain.application.restore_end(environment, now),
+        Record::EnvironmentEnd { environment, created_by, now } => {
+            domain.application.restore_end(environment, created_by, now);
+        }
         Record::ApplicationAnswer { token, until, outcome } => domain.application.restore_answer(token, until, outcome),
         Record::Rely { task, project, resources } => {
             domain.reliance.insert(task, (project, resources)).expect("restored task fits");
@@ -857,6 +862,7 @@ pub fn next_deadline(domain: &Domain) -> Option<Time> {
 
 fn read_afresh(domain: &mut Domain) {
     domain.restart = Some(crate::RestartStage::ReadAfresh);
+    domain.application.read_afresh(&mut domain.refresh);
     for (_, (_, resources)) in &domain.reliance {
         for named in resources {
             domain.refresh.insert(named.resource.clone(), false).expect("restored live resources fit");
