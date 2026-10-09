@@ -13,6 +13,7 @@ members = [
     "testing/jig-test-client-view",
     "testing/jig-conformance",
     "tests/conformance",
+    "tests/client",
     "testing/jig-fake-store",
     "testing/jig-fake-workers",
     "testing/jig-fake-parties",
@@ -54,6 +55,7 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-client-world = { path = "tests/client" }
 jig-client = { path = "crates/jig-client" }
 jig-client-transcript = { path = "crates/jig-client-transcript" }
 jig-client-view = { path = "crates/jig-client-view" }

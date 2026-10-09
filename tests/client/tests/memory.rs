@@ -1,0 +1,122 @@
+use jig_client_world::{Settings, Until, stories};
+use skein_lib::{Time, Wall};
+use skein_world::domain::heap::Counting;
+#[global_allocator]
+static HEAP: Counting = Counting;
+#[test]
+fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() {
+    let mut w = stories::configured(Settings { memory: true, seed: 5, ..Settings::default() });
+    let mut task = stories::task();
+    task.chip.title = stories::text(&[b't'; 32]);
+    task.lineage = jig_client_world::test::list([8, 7]);
+    task.wake.topics = jig_client_world::test::list([1, 2]);
+    task.parts = jig_client_world::test::list(
+        (1..=8).map(|n| jig_client::contract::Part::Panel { connector: jig_test_client_domain::FIRST, task: n }),
+    );
+    task.resources = jig_client_world::test::list(
+        (1..=8).map(|n| jig_client::contract::Part::Panel { connector: jig_test_client_domain::SECOND, task: n }),
+    );
+    task.spec = stories::text(&[b's'; 32]);
+    task.instructions = stories::text(&[b'i'; 32]);
+    task.dependencies = jig_client_world::test::list([task.chip.clone(), task.chip.clone()]);
+    task.references = task.dependencies.clone();
+    task.inputs = task.dependencies.clone();
+    task.lineage_chips = task.dependencies.clone();
+    w.front()
+        .engine
+        .act(
+            Time::ZERO,
+            Wall::EPOCH,
+            jig_scripted_engine::Change::Object {
+                project: 1,
+                key: jig_client::contract::ObjectKey::Task(9),
+                value: jig_client::contract::ReadValue::Task(Box::new(task)),
+            },
+        )
+        .expect("full task fits");
+    let mut frame = stories::frame(7);
+    frame.party.name = stories::text(&[b'p'; 32]);
+    let mut project = frame.projects.iter().next().expect("project exists").clone();
+    project.name = stories::text(&[b'p'; 32]);
+    project.roles = jig_client_world::test::list([1, 2]);
+    project.chats = jig_client_world::test::list([
+        jig_client::contract::Charter { number: 1, name: stories::text(&[b'c'; 32]) },
+        jig_client::contract::Charter { number: 2, name: stories::text(&[b'c'; 32]) },
+    ]);
+    project.goals = project.chats.clone();
+    let mut other = project.clone();
+    other.project = 2;
+    frame.projects = jig_client_world::test::list([project, other]);
+    w.front().engine.act(Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Frame(frame)).expect("full frame fits");
+    let mut family = jig_client_world::scripted::Family::default();
+    for n in 1..=8 {
+        let subject = jig_test_client_domain::family::Subject {
+            scope: jig_test_client_domain::family::Scope::Project(1),
+            kind: jig_test_client_domain::family::Kind::Panel(n),
+        };
+        family.documents.insert(
+            subject,
+            jig_test_client_domain::family::Document::Part(jig_test_client_domain::family::PartDocument {
+                subject,
+                revision: jig_client::contract::Revision { value: 1 },
+                value: n,
+                parameters: None,
+            }),
+        );
+    }
+    let subject = jig_test_client_domain::family::Subject {
+        scope: jig_test_client_domain::family::Scope::Project(1),
+        kind: jig_test_client_domain::family::Kind::Item(1),
+    };
+    family.documents.insert(
+        subject,
+        jig_test_client_domain::family::Document::Item(jig_test_client_domain::family::Item {
+            project: 1,
+            key: 1,
+            revision: jig_client::contract::Revision { value: 1 },
+            state: jig_test_client_domain::family::ItemState::Ready,
+            value: 1,
+            task: 9,
+            proposals: jig_client_world::test::list([]),
+            touchable: true,
+        }),
+    );
+    w.front()
+        .engine
+        .act_application(Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, family, vec![])
+        .expect("full family fits");
+    let c = w.client(7, stories::inbox());
+    let _tab = w.tab(c);
+    w.run(Until::Time(Time::from_nanos(50_000_000)));
+    for address in [
+        stories::conversation(),
+        stories::chat(),
+        jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
+            project: 1,
+            section: jig_client::address::ProjectSection::Overview,
+        }),
+        jig_test_client_domain::Address::Jig(jig_client::address::Address::Deployment),
+        jig_test_client_domain::Address::First(jig_test_client_domain::first::Address { project: 1, item: 1 }),
+    ] {
+        w.go(c, address);
+        w.run(Until::Time(w.now().saturating_add(skein_lib::Duration::from_millis(100))));
+    }
+    // Each field reaches its text envelope, then one more proves refusal is bounded.
+    for field in [
+        jig_client::fields::Purpose::NewChat,
+        jig_client::fields::Purpose::Answer,
+        jig_client::fields::Purpose::Reason,
+        jig_client::fields::Purpose::Amendment,
+        jig_client::fields::Purpose::Instructions,
+    ] {
+        w.event(
+            c,
+            jig_test_client_domain::Event::Jig(jig_client::Event::Act {
+                act: jig_client::action::Act::Edit { field, text: stories::text(&[b'f'; 32]) },
+            }),
+        );
+    }
+    let result = w.run(Until::Steps(2));
+    assert!(result.heap_peak > 0, "counted every iteration");
+    assert!(result.heap_peak <= result.heap_bound, "composed root, view and shell model envelope");
+}

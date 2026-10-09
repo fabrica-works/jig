@@ -573,3 +573,27 @@ fn test_client_view_links_only_client_children_and_foundation() {
     assert!(source.contains("cfg_attr(not(test), no_std)"), "the view root is step code");
     assert!(source.contains("forbid(unsafe_code)"), "the view root forbids unsafe code");
 }
+
+#[test]
+fn client_world_joins_only_the_client_and_test_roles() {
+    let worlds: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-client-world")).collect();
+    assert_eq!(worlds.len(), 1, "one shared client world");
+    for manifest in worlds {
+        assert!(
+            manifest.dependencies.iter().all(|d| [
+                "skein-lib",
+                "skein-world",
+                "jig-client",
+                "jig-client-view",
+                "jig-test-client-domain",
+                "jig-test-client-view",
+                "jig-fake-person",
+                "jig-scripted-engine",
+                "sha2"
+            ]
+            .contains(&d.as_str())),
+            "{}",
+            manifest.path.display()
+        );
+    }
+}

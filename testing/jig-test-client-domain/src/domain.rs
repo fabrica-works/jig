@@ -144,3 +144,8 @@ pub(crate) fn ask_size(limits: &Limits, ask: &Ask) -> u64 {
         Ask::First(_) => u64::try_from(size_of::<first::Ask>()).expect("ask size fits"),
     }
 }
+
+/// Installs application-configured provider words before Start (client.md, 12).
+pub fn provider(root: &mut Domain, provider: jig_client::signin::Provider) -> Result<(), jig_client::signin::Provider> {
+    root.jig.provider(provider)
+}
