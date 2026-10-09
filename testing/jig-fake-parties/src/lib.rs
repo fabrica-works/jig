@@ -7,7 +7,10 @@
 #[cfg(test)]
 mod tests;
 
-use skein_lib::{Duration, Rng, Time};
+mod facts;
+pub use facts::{Again, Ending, EndingParty, FailureClass, HoldReason, Lack, LimitKind, Moved, Refusal};
+
+use skein_lib::{Duration, Rng, Time, Wall};
 use std::collections::VecDeque;
 
 /// The role under which a random script acts.
@@ -96,8 +99,33 @@ pub enum Reply {
     Changed { task: u64 },
     /// The numbered request finished.
     Done,
-    /// The request was refused.
-    Refused,
+    /// A final refusal retains its facts.
+    Refused(Refusal),
+    /// No decision was kept; retry the same key and payload.
+    Again(Again),
+    /// The authentication session ended.
+    SignedOut,
+    /// The proposal was decided first by this party at this wall time.
+    ProposalDecided { proposer: u64, proposal: u64, by: u64, at: Wall, choice: Choice },
+    /// The escalation was decided first by this party at this wall time.
+    EscalationDecided { task: u64, revision: u64, by: u64, at: Wall, choice: Choice },
+}
+
+/// A completed decision's independently presented choice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Choice {
+    /// The proposal was accepted.
+    Accepted,
+    /// The escalation was released.
+    Released,
+    /// The request was rejected.
+    Rejected,
+    /// The request was passed up.
+    Passed,
+    /// The proposer withdrew its request.
+    Withdrawn,
+    /// The proposal no longer applies.
+    Stale,
 }
 
 /// One request at the party's independent client face.
@@ -160,7 +188,24 @@ impl Party {
                 self.sign_in = Some(*sign_in);
             }
             Reply::Started { task } | Reply::Changed { task } => self.last_task = Some(*task),
-            Reply::Proposed { .. } | Reply::Done | Reply::Refused => {}
+            Reply::Again(_) => {
+                let next = match self.last.as_ref().expect("sent request retained") {
+                    Up::SignIn { provider, subject, .. } => {
+                        Act::SignIn { provider: *provider, subject: subject.clone() }
+                    }
+                    Up::Request { .. } => Act::Twice,
+                };
+                self.script.push_front(next);
+                self.script.push_front(Act::Pause { for_: Duration::from_millis(1) });
+            }
+            Reply::SignedOut => {
+                self.sign_in = None;
+            }
+            Reply::Proposed { .. }
+            | Reply::Done
+            | Reply::Refused(_)
+            | Reply::ProposalDecided { .. }
+            | Reply::EscalationDecided { .. } => {}
         }
         self.replies.push((to, reply));
     }

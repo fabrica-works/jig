@@ -338,10 +338,45 @@ fn party_reply(reply: people::Reply, sign_in: Option<u64>) -> parties::Reply {
         people::Reply::Outcome(people::Outcome::Stopped { task } | people::Outcome::Released { task }) => {
             parties::Reply::Changed { task }
         }
-        people::Reply::Again(_) | people::Reply::Refused(_) | people::Reply::Outcome(people::Outcome::Refused(_)) => {
-            parties::Reply::Refused
+        people::Reply::Again(again) | people::Reply::Outcome(people::Outcome::Again(again)) => {
+            parties::Reply::Again(match again {
+                people::Again::Busy => parties::Again::Busy,
+                people::Again::NotReady => parties::Again::NotReady,
+            })
         }
-        people::Reply::SignedOut | people::Reply::Outcome(_) => parties::Reply::Done,
+        people::Reply::Refused(why) | people::Reply::Outcome(people::Outcome::Refused(why)) => {
+            parties::Reply::Refused(party_refusal(why))
+        }
+        people::Reply::SignedOut | people::Reply::Outcome(people::Outcome::SignedOut) => parties::Reply::SignedOut,
+        people::Reply::Outcome(people::Outcome::ProposalDecided { proposer, proposal, by, at, choice }) => {
+            parties::Reply::ProposalDecided {
+                proposer,
+                proposal,
+                by,
+                at,
+                choice: match choice {
+                    people::ProposalChoice::Accepted => parties::Choice::Accepted,
+                    people::ProposalChoice::Rejected => parties::Choice::Rejected,
+                    people::ProposalChoice::Passed => parties::Choice::Passed,
+                    people::ProposalChoice::Withdrawn => parties::Choice::Withdrawn,
+                    people::ProposalChoice::Stale => parties::Choice::Stale,
+                },
+            }
+        }
+        people::Reply::Outcome(people::Outcome::EscalationDecided { task, revision, by, at, choice }) => {
+            parties::Reply::EscalationDecided {
+                task,
+                revision,
+                by,
+                at,
+                choice: match choice {
+                    people::EscalationChoice::Released => parties::Choice::Released,
+                    people::EscalationChoice::Rejected => parties::Choice::Rejected,
+                    people::EscalationChoice::Passed => parties::Choice::Passed,
+                },
+            }
+        }
+        people::Reply::Outcome(_) => parties::Reply::Done,
     }
 }
 
@@ -487,4 +522,141 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     assert_eq!(out.pop(), Some(policy::PolicyFact::Added { project: 1 }));
     configuration.core.authority = checked;
     (configuration, limits)
+}
+
+fn party_refusal(why: people::Refusal) -> parties::Refusal {
+    match why {
+        people::Refusal::Role { held } => parties::Refusal::Role { held: held.map(people::Role::number) },
+        people::Refusal::Authority { lacking } => parties::Refusal::Authority { lacking: party_lack(lacking) },
+        people::Refusal::Limit { which } => parties::Refusal::Limit { which: party_limit(which) },
+        people::Refusal::Moved { now } => parties::Refusal::Moved { now: party_moved(now) },
+        people::Refusal::Ended { how } => parties::Refusal::Ended { how: party_ending(how) },
+        people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
+        people::Refusal::NoFurther => parties::Refusal::NoFurther,
+        people::Refusal::Unknown => parties::Refusal::Unknown,
+        people::Refusal::NotOffered => parties::Refusal::NotOffered,
+        people::Refusal::KeyConflict => parties::Refusal::KeyConflict,
+    }
+}
+
+fn party_lack(value: people::Lack) -> parties::Lack {
+    match value {
+        people::Lack::Budget { needs, left } => parties::Lack::Budget { needs, left },
+        people::Lack::Grant { kind } => parties::Lack::Grant { kind },
+        people::Lack::Funding => parties::Lack::Funding,
+        people::Lack::TaskKind => parties::Lack::TaskKind,
+        people::Lack::Depth { most } => parties::Lack::Depth { most },
+        people::Lack::Deadline => parties::Lack::Deadline,
+        people::Lack::Tasks { left } => parties::Lack::Tasks { left },
+        people::Lack::Tool => parties::Lack::Tool,
+        people::Lack::Scope => parties::Lack::Scope,
+        people::Lack::Reference => parties::Lack::Reference,
+        people::Lack::ResourceAccess => parties::Lack::ResourceAccess,
+        people::Lack::ResourceUnavailable => parties::Lack::ResourceUnavailable,
+        people::Lack::Shape => parties::Lack::Shape,
+        people::Lack::Account => parties::Lack::Account,
+        people::Lack::Writer => parties::Lack::Writer,
+        people::Lack::Required { connector, kind } => parties::Lack::Required { connector, kind },
+        people::Lack::Failed { connector, kind } => parties::Lack::Failed { connector, kind },
+        people::Lack::Unguarded { connector, kind } => parties::Lack::Unguarded { connector, kind },
+    }
+}
+
+fn party_limit(value: people::LimitKind) -> parties::LimitKind {
+    match value {
+        people::LimitKind::Words => parties::LimitKind::Words,
+        people::LimitKind::Identity => parties::LimitKind::Identity,
+        people::LimitKind::Roles => parties::LimitKind::Roles,
+        people::LimitKind::Arithmetic => parties::LimitKind::Arithmetic,
+        people::LimitKind::Duplicate => parties::LimitKind::Duplicate,
+        people::LimitKind::Empty => parties::LimitKind::Empty,
+        people::LimitKind::Batch => parties::LimitKind::Batch,
+        people::LimitKind::ProjectLiveTasks => parties::LimitKind::ProjectLiveTasks,
+        people::LimitKind::LiveTasks => parties::LimitKind::LiveTasks,
+        people::LimitKind::Tree => parties::LimitKind::Tree,
+        people::LimitKind::Depth => parties::LimitKind::Depth,
+        people::LimitKind::Delegates => parties::LimitKind::Delegates,
+        people::LimitKind::Subscription => parties::LimitKind::Subscription,
+        people::LimitKind::Dependencies => parties::LimitKind::Dependencies,
+        people::LimitKind::Cycle => parties::LimitKind::Cycle,
+        people::LimitKind::Spec => parties::LimitKind::Spec,
+        people::LimitKind::Contract => parties::LimitKind::Contract,
+        people::LimitKind::Authority => parties::LimitKind::Authority,
+        people::LimitKind::Inputs => parties::LimitKind::Inputs,
+        people::LimitKind::Attempts => parties::LimitKind::Attempts,
+        people::LimitKind::LiveDelegates => parties::LimitKind::LiveDelegates,
+        people::LimitKind::Restore => parties::LimitKind::Restore,
+        people::LimitKind::Read => parties::LimitKind::Read,
+        people::LimitKind::Turn => parties::LimitKind::Turn,
+        people::LimitKind::HoldKind => parties::LimitKind::HoldKind,
+        people::LimitKind::HoldTaken => parties::LimitKind::HoldTaken,
+        people::LimitKind::Holds => parties::LimitKind::Holds,
+        people::LimitKind::InboxFull => parties::LimitKind::InboxFull,
+        people::LimitKind::Notes => parties::LimitKind::Notes,
+        people::LimitKind::Revision => parties::LimitKind::Revision,
+        people::LimitKind::Question => parties::LimitKind::Question,
+        people::LimitKind::Priority => parties::LimitKind::Priority,
+        people::LimitKind::Policy => parties::LimitKind::Policy,
+        people::LimitKind::Resource => parties::LimitKind::Resource,
+        people::LimitKind::Service => parties::LimitKind::Service,
+    }
+}
+
+fn party_moved(value: people::Moved) -> parties::Moved {
+    match value {
+        people::Moved::Hold { revision, reason } => parties::Moved::Hold { revision, reason: party_hold(reason) },
+        people::Moved::Spec { revision } => parties::Moved::Spec { revision },
+        people::Moved::Person { revision } => parties::Moved::Person { revision },
+        people::Moved::Note { revision } => parties::Moved::Note { revision },
+    }
+}
+
+fn party_hold(value: people::HoldReason) -> parties::HoldReason {
+    match value {
+        people::HoldReason::Failures { class } => parties::HoldReason::Failures { class: party_failure(class) },
+        people::HoldReason::Stalled => parties::HoldReason::Stalled,
+        people::HoldReason::Dependency { task } => parties::HoldReason::Dependency { task },
+        people::HoldReason::Stopped => parties::HoldReason::Stopped,
+        people::HoldReason::StoppedBy { party } => parties::HoldReason::StoppedBy { party },
+        people::HoldReason::Drift => parties::HoldReason::Drift,
+        people::HoldReason::Effects => parties::HoldReason::Effects,
+        people::HoldReason::EffectFailed => parties::HoldReason::EffectFailed,
+        people::HoldReason::Uncertain { entry } => parties::HoldReason::Uncertain { entry },
+        people::HoldReason::Budget => parties::HoldReason::Budget,
+        people::HoldReason::Deadline => parties::HoldReason::Deadline,
+        people::HoldReason::HoldsWaited => parties::HoldReason::HoldsWaited,
+        people::HoldReason::ResourceUnavailable => parties::HoldReason::ResourceUnavailable,
+        people::HoldReason::ResourceAccess => parties::HoldReason::ResourceAccess,
+        people::HoldReason::PoolLost { pool } => parties::HoldReason::PoolLost { pool },
+        people::HoldReason::Procedure => parties::HoldReason::Procedure,
+    }
+}
+
+fn party_failure(value: people::FailureClass) -> parties::FailureClass {
+    match value {
+        people::FailureClass::Transient => parties::FailureClass::Transient,
+        people::FailureClass::Permanent => parties::FailureClass::Permanent,
+        people::FailureClass::Run => parties::FailureClass::Run,
+        people::FailureClass::Agent => parties::FailureClass::Agent,
+        people::FailureClass::Lost => parties::FailureClass::Lost,
+        people::FailureClass::Invalid => parties::FailureClass::Invalid,
+    }
+}
+
+fn party_ending(value: people::Ending) -> parties::Ending {
+    match value {
+        people::Ending::Done => parties::Ending::Done,
+        people::Ending::Failed => parties::Ending::Failed,
+        people::Ending::Cancelled { by, at } => parties::Ending::Cancelled { by: party_ending_party(by), at },
+        people::Ending::Decided { by, at } => parties::Ending::Decided { by, at },
+        people::Ending::Deleted => parties::Ending::Deleted,
+    }
+}
+
+fn party_ending_party(value: people::Party) -> parties::EndingParty {
+    match value {
+        people::Party::Person(person) => parties::EndingParty::Person(person),
+        people::Party::Task(task) => parties::EndingParty::Task(task),
+        people::Party::Deployment { project } => parties::EndingParty::Deployment { project },
+    }
 }

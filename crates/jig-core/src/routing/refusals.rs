@@ -23,8 +23,9 @@ pub(super) fn person_message_refusal(core: &Core, task: Option<u64>, why: tasks:
 fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::Outcome {
     let refusal = match why {
         tasks::Refusal::Busy => return people::Outcome::Again(people::Again::Busy),
-        tasks::Refusal::NotReady | tasks::Refusal::ResourceUnavailable => {
-            return people::Outcome::Again(people::Again::NotReady);
+        tasks::Refusal::NotReady => return people::Outcome::Again(people::Again::NotReady),
+        tasks::Refusal::ResourceUnavailable => {
+            people::Refusal::Authority { lacking: people::Lack::ResourceUnavailable }
         }
         tasks::Refusal::Unknown => people::Refusal::Unknown,
         tasks::Refusal::State => match current_task(core, task) {

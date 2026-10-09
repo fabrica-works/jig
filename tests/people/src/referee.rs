@@ -1,5 +1,5 @@
 //! Expectations over client replies and durable task creations, never state.
-use jig_core_people::{RequestKey, Role};
+use jig_core_people::{Ending, HoldReason, Lack, Moved, Party, Refusal, RequestKey, Role};
 use skein_lib::Duration;
 use skein_world::domain::{Expectations, Judge};
 use std::collections::BTreeSet;
@@ -11,6 +11,7 @@ pub enum RouteKind {
     Service,
     Proposal,
     TakePerson,
+    Control,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -23,6 +24,7 @@ pub enum Seen {
     Durable { commit: u64 },
     Created { key: RequestKey },
     Replied { call: u64, after: u64 },
+    Refused { why: Refusal },
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -66,7 +68,8 @@ impl Expectations for People {
                 | RouteKind::Goal
                 | RouteKind::Service
                 | RouteKind::Proposal
-                | RouteKind::TakePerson => {}
+                | RouteKind::TakePerson
+                | RouteKind::Control => {}
             },
             Seen::RoleWaitingOpened { task, both_present } => {
                 if !both_present || !self.role_waiting.insert(task) {
@@ -76,6 +79,11 @@ impl Expectations for People {
             Seen::RoleWaitingResolved { task, both_absent } => {
                 if !both_absent || !self.role_waiting.remove(&task) {
                     judge.fail("acted role request remained in a holder inbox");
+                }
+            }
+            Seen::Refused { why } => {
+                if !filled(why) {
+                    judge.fail("refusal facts are inconsistent or unnamed");
                 }
             }
             Seen::Durable { commit } => self.durable = commit,
@@ -94,5 +102,70 @@ impl Expectations for People {
                 judge.meet(&Name::Reply(call));
             }
         }
+    }
+}
+
+fn filled(why: Refusal) -> bool {
+    match why {
+        Refusal::Role { held } => match held {
+            Some(Role::Policy { role }) => role > 3,
+            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Observer) | None => true,
+        },
+        Refusal::Authority { lacking } => match lacking {
+            Lack::Budget { needs, left } => needs > left,
+            Lack::Grant { .. }
+            | Lack::Funding
+            | Lack::TaskKind
+            | Lack::Depth { .. }
+            | Lack::Deadline
+            | Lack::Tasks { .. }
+            | Lack::Tool
+            | Lack::Scope
+            | Lack::Reference
+            | Lack::ResourceAccess
+            | Lack::ResourceUnavailable
+            | Lack::Shape
+            | Lack::Account
+            | Lack::Writer
+            | Lack::Required { .. }
+            | Lack::Failed { .. }
+            | Lack::Unguarded { .. } => true,
+        },
+        Refusal::Moved { now } => match now {
+            Moved::Hold { reason, .. } => match reason {
+                HoldReason::Dependency { task } => task != 0,
+                HoldReason::StoppedBy { party } => party != 0,
+                HoldReason::Uncertain { entry } => entry != 0,
+                HoldReason::PoolLost { pool } => pool != 0,
+                HoldReason::Failures { .. }
+                | HoldReason::Stalled
+                | HoldReason::Stopped
+                | HoldReason::Drift
+                | HoldReason::Effects
+                | HoldReason::EffectFailed
+                | HoldReason::Budget
+                | HoldReason::Deadline
+                | HoldReason::HoldsWaited
+                | HoldReason::ResourceUnavailable
+                | HoldReason::ResourceAccess
+                | HoldReason::Procedure => true,
+            },
+            Moved::Spec { .. } | Moved::Person { .. } => true,
+            Moved::Note { revision } => revision != 0,
+        },
+        Refusal::Ended { how } => match how {
+            Ending::Cancelled { by, .. } => match by {
+                Party::Person(number) | Party::Task(number) => number != 0,
+                Party::Deployment { project } => project != 0,
+            },
+            Ending::Decided { by, .. } => by != 0,
+            Ending::Done | Ending::Failed | Ending::Deleted => true,
+        },
+        Refusal::Limit { .. }
+        | Refusal::NotWaiting
+        | Refusal::NoFurther
+        | Refusal::Unknown
+        | Refusal::NotOffered
+        | Refusal::KeyConflict => true,
     }
 }

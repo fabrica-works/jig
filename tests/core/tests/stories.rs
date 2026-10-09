@@ -1005,3 +1005,67 @@ fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
         })))
     );
 }
+
+#[test]
+fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
+    let (mut configuration, limits) = jig_core_world::faults::plan_fixture(160);
+    let kinds = Box::new([authority::Executor::Charter(1), authority::Executor::Role(0)]);
+    configuration.core.settings.chat_authority.delegation.kinds = kinds.clone();
+    let mut rules = configuration.core.authority.rules().clone();
+    rules.ceiling.delegation.kinds = kinds.clone();
+    let mut policy = configuration.core.authority.policy(1).expect("plan policy").clone();
+    policy.ceiling.delegation.kinds = kinds.clone();
+    policy.roles[0].authority.delegation.kinds = kinds;
+    let mut domain = authority::Domain::new(rules, limits.core.authority).expect("bounded person-task policy");
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    configuration.core.authority = domain;
+    let mut world = World::configured(160, false, configuration, limits);
+    let parent = world.assignments[0];
+    let mut input = member(&world, tasks::Executor::Agent { charter: 1 }, b"input report");
+    input.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    let input = delegate(&mut world, parent, 1, input);
+    let input_run = running(&world, input);
+    let mut choice = member(&world, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"answer with the input");
+    choice.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    choice.dependencies = Box::new([core::Dependency::Existing(input)]);
+    let choice = delegate(&mut world, parent, 2, choice);
+    let revision = live_row(&world, choice).revisions.person;
+    finish(&mut world, input_run, b"input arrived");
+    let now = live_row(&world, choice).revisions.person;
+    assert_eq!(now, revision + 1);
+    ask(
+        &mut world,
+        62,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task: choice,
+            revision,
+            result: people::PersonResult::Report { words: b"old observation".as_slice().into() },
+        },
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Moved {
+            now: people::Moved::Person { revision: now },
+        })))
+    );
+    assert!(!world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(choice)))));
+    ask(&mut world, 63, people::Ask::TakePerson { project: 1, task: choice });
+    ask(
+        &mut world,
+        64,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task: choice,
+            revision: now,
+            result: people::PersonResult::Report { words: b"current observation".as_slice().into() },
+        },
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::PersonAnswered { task: choice }))
+    );
+    assert!(world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(choice)))));
+}

@@ -240,7 +240,11 @@ fn a_request_sent_twice_creates_one_chat_and_replays_the_same_answer() {
             | parties::Reply::Proposed { .. }
             | parties::Reply::Changed { .. }
             | parties::Reply::Done
-            | parties::Reply::Refused => None,
+            | parties::Reply::Refused(_)
+            | parties::Reply::Again(_)
+            | parties::Reply::SignedOut
+            | parties::Reply::ProposalDecided { .. }
+            | parties::Reply::EscalationDecided { .. } => None,
         })
         .collect();
     assert_eq!(replies.len(), 2);

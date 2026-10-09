@@ -64,3 +64,30 @@ fn random_scripts_replay_and_respect_each_roles_actions() {
         }
     }
 }
+
+#[test]
+fn a_retry_preserves_the_observed_revision_key_and_payload() {
+    let mut party = Party::new(
+        1,
+        Role::Maintainer,
+        100,
+        Box::new([Act::AnswerWaiting { code: 2, words: b"choice".as_slice().into() }]),
+    );
+    party.sign_in = Some(1);
+    party.waiting(Some(Waiting::Choice { task: 7, revision: 3 }));
+    let first = party.tick(Time::ZERO).expect("first answer");
+    party.reply(100, Reply::Again(Again::Busy));
+    party.waiting(Some(Waiting::Choice { task: 7, revision: 4 }));
+    assert!(party.tick(Time::ZERO).is_none());
+    let again = party.tick(Time::from_nanos(1_000_000)).expect("retry after pressure");
+    let (
+        Up::Request { sign_in, project, key, ask, .. },
+        Up::Request { sign_in: second, project: second_project, key: second_key, ask: second_ask, .. },
+    ) = (first, again)
+    else {
+        panic!("two requests")
+    };
+    assert_eq!((sign_in, project, key, ask), (second, second_project, second_key, second_ask));
+    party.reply(101, Reply::Refused(Refusal::Moved { now: Moved::Person { revision: 4 } }));
+    assert!(party.quiescent());
+}

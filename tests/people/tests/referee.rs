@@ -54,3 +54,16 @@ fn a_missing_reply_fails_its_deadline() {
     referee.fire(Time::from_nanos(11_000_000_000), &mut Vec::new());
     assert!(matches!(referee.verdict(), Verdict::Failed(_)));
 }
+
+#[test]
+fn rejects_refusals_with_inconsistent_or_unnamed_facts() {
+    use jig_core_people::{Ending, Lack, Moved, Party, Refusal};
+    for why in [
+        Refusal::Authority { lacking: Lack::Budget { needs: 3, left: 4 } },
+        Refusal::Role { held: Some(Role::Policy { role: 1 }) },
+        Refusal::Moved { now: Moved::Note { revision: 0 } },
+        Refusal::Ended { how: Ending::Cancelled { by: Party::Person(0), at: skein_lib::Wall::EPOCH } },
+    ] {
+        fails(&[Seen::Refused { why }]);
+    }
+}

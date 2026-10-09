@@ -120,6 +120,8 @@ pub struct World {
     records: BTreeMap<Key, Stored>,
     durable_tasks: BTreeMap<RequestKey, u64>,
     proposals: BTreeMap<(u64, u64), Winner>,
+    holds: BTreeMap<u64, (u64, people::HoldReason)>,
+    specs: BTreeMap<u64, u64>,
     commits: VecDeque<Commit>,
     held: VecDeque<Held>,
     calls: BTreeSet<u64>,
@@ -163,6 +165,8 @@ impl World {
             records: BTreeMap::new(),
             durable_tasks: BTreeMap::new(),
             proposals: BTreeMap::new(),
+            holds: BTreeMap::new(),
+            specs: BTreeMap::new(),
             commits: VecDeque::new(),
             held: VecDeque::new(),
             calls: BTreeSet::new(),
@@ -195,6 +199,16 @@ impl World {
     #[must_use]
     pub fn reply(&self, call: u64) -> Option<Reply> {
         self.replies.get(&call).copied()
+    }
+
+    /// Present the scripted owner's current hold snapshot.
+    pub fn held_task(&mut self, task: u64, revision: u64, reason: people::HoldReason) {
+        self.holds.insert(task, (revision, reason));
+    }
+
+    /// Present the scripted owner's current spec snapshot.
+    pub fn amended_task(&mut self, task: u64, revision: u64) {
+        self.specs.insert(task, revision);
     }
 
     #[must_use]
@@ -371,19 +385,18 @@ impl World {
                         Ask::MakeService { .. } => RouteKind::Service,
                         Ask::DecideProposal { .. } => RouteKind::Proposal,
                         Ask::TakePerson { .. } => RouteKind::TakePerson,
+                        Ask::Release { .. } | Ask::Amend { .. } => RouteKind::Control,
                         Ask::Watch { .. }
                         | Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
                         | Ask::Cancel { .. }
-                        | Ask::Release { .. }
                         | Ask::HandBackPerson { .. }
                         | Ask::AnswerPerson { .. }
                         | Ask::Move { .. }
                         | Ask::Say { .. }
                         | Ask::AnswerQuestion { .. }
                         | Ask::Prioritise { .. }
-                        | Ask::Amend { .. }
                         | Ask::SetRoles { .. }
                         | Ask::ChangePolicy { .. }
                         | Ask::SetPool { .. }
@@ -456,6 +469,36 @@ impl World {
                                     &mut self.out,
                                 );
                             }
+                            Ask::Release { task, revision, .. } => {
+                                let outcome = match self.holds.get(&task) {
+                                    Some(&(now, reason)) if revision != now => Outcome::Refused(Refusal::Moved {
+                                        now: people::Moved::Hold { revision: now, reason },
+                                    }),
+                                    Some(_) => Outcome::Released { task },
+                                    None => Outcome::Refused(Refusal::Unknown),
+                                };
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome },
+                                    &mut self.out,
+                                );
+                            }
+                            Ask::Amend { task, revision, .. } => {
+                                let outcome = match self.specs.get(&task) {
+                                    Some(&now) if revision != now => {
+                                        Outcome::Refused(Refusal::Moved { now: people::Moved::Spec { revision: now } })
+                                    }
+                                    Some(_) => Outcome::Amended { task },
+                                    None => Outcome::Refused(Refusal::Unknown),
+                                };
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome },
+                                    &mut self.out,
+                                );
+                            }
                             Ask::TakePerson { task, .. } => {
                                 let outcome = Outcome::PersonTaken { task };
                                 cleared_waiting.push(task);
@@ -471,14 +514,12 @@ impl World {
                             | Ask::Adopt { .. }
                             | Ask::Stop { .. }
                             | Ask::Cancel { .. }
-                            | Ask::Release { .. }
                             | Ask::HandBackPerson { .. }
                             | Ask::AnswerPerson { .. }
                             | Ask::Move { .. }
                             | Ask::Say { .. }
                             | Ask::AnswerQuestion { .. }
                             | Ask::Prioritise { .. }
-                            | Ask::Amend { .. }
                             | Ask::SetRoles { .. }
                             | Ask::ChangePolicy { .. }
                             | Ask::SetPool { .. }
@@ -549,6 +590,10 @@ impl World {
         while self.held.front().is_some_and(|reply| reply.commit <= self.durable) {
             let held = self.held.pop_front().expect("front present");
             assert!(self.calls.remove(&held.call), "one reply per live call");
+            match held.reply {
+                Reply::Refused(why) | Reply::Outcome(Outcome::Refused(why)) => self.observe(Seen::Refused { why }),
+                Reply::SignedIn { .. } | Reply::SignedOut | Reply::Outcome(_) | Reply::Again(_) => {}
+            }
             assert!(self.replies.insert(held.call, held.reply).is_none());
             self.stats.replies += 1;
             self.observe(Seen::Replied { call: held.call, after: held.commit });

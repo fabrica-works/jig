@@ -309,3 +309,60 @@ fn facts_change_nothing_and_a_seed_replays() {
     many.run();
     assert_eq!(none.trace(), many.trace());
 }
+
+#[test]
+fn a_release_naming_an_old_hold_is_refused_as_moved_saying_what_holds_it_now() {
+    let mut world = World::new(Settings::calm(90));
+    member(&mut world);
+    world.held_task(7, 2, jig_core_people::HoldReason::Budget);
+    let ask = Ask::Release { project: 1, task: 7, revision: 1 };
+    let call = world.request(10, [7; 16], ask.clone());
+    assert!(world.reply(call).is_none());
+    world.commit_all();
+    let expected = Some(Reply::Outcome(Outcome::Refused(Refusal::Moved {
+        now: jig_core_people::Moved::Hold { revision: 2, reason: jig_core_people::HoldReason::Budget },
+    })));
+    assert_eq!(world.reply(call), expected);
+    world.held_task(7, 3, jig_core_people::HoldReason::Deadline);
+    world.restart();
+    let routes = world.stats().routes;
+    let replay = world.request(10, [7; 16], ask);
+    assert_eq!(world.reply(replay), expected);
+    assert_eq!(world.stats().routes, routes);
+    world.assert_settled();
+}
+
+#[test]
+fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
+    let mut world = World::new(Settings::calm(91));
+    member(&mut world);
+    world.amended_task(7, 2);
+    let ask = Ask::Amend {
+        project: 1,
+        task: 7,
+        revision: 1,
+        amendment: jig_core_people::Amendment {
+            spec: Some(jig_core_people::Spec {
+                words: b"new words".as_slice().into(),
+                parameters: Box::new([]),
+                inputs: Box::new([]),
+            }),
+            wake: None,
+            dependencies: None,
+            authority: None,
+            reason: b"new evidence".as_slice().into(),
+        },
+    };
+    let call = world.request(10, [8; 16], ask.clone());
+    world.commit_all();
+    let expected =
+        Some(Reply::Outcome(Outcome::Refused(Refusal::Moved { now: jig_core_people::Moved::Spec { revision: 2 } })));
+    assert_eq!(world.reply(call), expected);
+    world.amended_task(7, 3);
+    world.restart();
+    let routes = world.stats().routes;
+    let replay = world.request(10, [8; 16], ask);
+    assert_eq!(world.reply(replay), expected);
+    assert_eq!(world.stats().routes, routes);
+    world.assert_settled();
+}
