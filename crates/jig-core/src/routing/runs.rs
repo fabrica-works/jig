@@ -150,6 +150,7 @@ pub(super) fn named_proposal_accept(
                 stop_run: false,
                 amendment: tasks::Amendment {
                     release: None,
+                    instructions: None,
                     spec: None,
                     wake: None,
                     dependencies: None,
@@ -480,30 +481,31 @@ pub(super) fn named_action(
             }));
         }
         NamedAction::Amend { target, amendment } => {
-            let stop_run = match core.task_amend_admit(key.task, target, &amendment, env.limits.tasks.depth) {
-                Ok(stop_run) => stop_run,
-                Err(crate::TaskAmendDenied::Refused { task, why }) => {
-                    call_decision(
-                        core,
-                        &mut out,
-                        ReplyTo::new(token),
-                        key,
-                        CallPart::ControlRefused(tasks::Problem {
-                            task: Some(task),
-                            why,
-                            blocked_by: None,
-                            capacity: None,
-                        }),
-                    );
-                    out.push(Request::Decided);
-                    return Requests::Out(out);
-                }
-                Err(crate::TaskAmendDenied::Denied(answer)) => {
-                    call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::ControlDenied { answer });
-                    out.push(Request::Decided);
-                    return Requests::Out(out);
-                }
-            };
+            let stop_run =
+                match core.task_amend_admit(key.task, target, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
+                    Ok(stop_run) => stop_run,
+                    Err(crate::TaskAmendDenied::Refused { task, why }) => {
+                        call_decision(
+                            core,
+                            &mut out,
+                            ReplyTo::new(token),
+                            key,
+                            CallPart::ControlRefused(tasks::Problem {
+                                task: Some(task),
+                                why,
+                                blocked_by: None,
+                                capacity: None,
+                            }),
+                        );
+                        out.push(Request::Decided);
+                        return Requests::Out(out);
+                    }
+                    Err(crate::TaskAmendDenied::Denied(answer)) => {
+                        call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::ControlDenied { answer });
+                        out.push(Request::Decided);
+                        return Requests::Out(out);
+                    }
+                };
             let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
                 call_decision(
                     core,

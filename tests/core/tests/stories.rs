@@ -95,6 +95,7 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
             target: report,
             amendment: tasks::Amendment {
                 release: None,
+                instructions: None,
                 spec: Some(tasks::Spec {
                     words: b"revised report".as_slice().into(),
                     parameters: Box::new([]),
@@ -896,6 +897,7 @@ fn live_row(world: &World, task: u64) -> &tasks::TaskRecord {
 
 fn amendment(words: &[u8]) -> people::Amendment {
     people::Amendment {
+        instructions: None,
         spec: Some(people::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
         wake: None,
         dependencies: None,

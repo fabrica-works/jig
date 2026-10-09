@@ -775,6 +775,8 @@ pub struct ReplyHint {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent durable lifecycle facts are explicit")]
 pub struct TaskRecord {
+    /// Agent instruction replacement; absent uses the configured charter default.
+    pub instructions: Option<Box<[u8]>>,
     /// A person requested this chat to finish by this durable deadline.
     pub chat_close: Option<crate::chat::Grace>,
     /// Independent revisions retained in live and ended records.

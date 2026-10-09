@@ -1133,7 +1133,14 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
             project: 1,
             task: 7,
             revision: 1,
-            amendment: Amendment { spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([]) },
+            amendment: Amendment {
+                instructions: None,
+                spec: None,
+                wake: None,
+                dependencies: None,
+                authority: None,
+                reason: Box::new([]),
+            },
         },
     ];
     let facts = [
@@ -1385,7 +1392,14 @@ fn a_role_need_leaves_every_holders_count_when_one_acts() {
 fn an_amendment_answer_keeps_the_release_fact_and_named_hold_in_its_key() {
     let mut test = Test::new(LIMITS);
     test.member();
-    let change = Amendment { spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([]) };
+    let change = Amendment {
+        instructions: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: Box::new([]),
+    };
     let ask = Ask::Amend { project: 1, task: 7, revision: 1, amendment: change.clone(), release: Some(2) };
     let request = route(&test.request(10, 1, ask.clone()));
     let outcome = Outcome::Amended { task: 7, released: true };

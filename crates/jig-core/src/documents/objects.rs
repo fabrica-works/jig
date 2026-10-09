@@ -38,6 +38,8 @@ pub struct ProposedTask {
 /// The relevant task fields before and after one proposed amendment.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AmendmentState {
+    /// Exact retained override; absent denotes the configured charter default.
+    pub instructions: Option<Text>,
     pub spec: SpecLine,
     pub authority: AuthorityLine,
     pub wake: tasks::WakePolicy,
@@ -198,6 +200,7 @@ pub enum RetainedAction {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AmendmentChange {
+    pub instructions: Option<Text>,
     pub release: Option<u64>,
     pub spec: Option<SpecLine>,
     pub authority: Option<AuthorityLine>,
@@ -304,6 +307,16 @@ fn amendment(
         ),
     };
     Ok(AmendmentState {
+        instructions: match change {
+            Some(change) => match change.instructions.as_ref().or(row.instructions.as_ref()) {
+                Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
+                None => None,
+            },
+            None => match &row.instructions {
+                Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
+                None => None,
+            },
+        },
         spec: spec(limits, description),
         authority: super::task_tree::authority(limits, authority)?,
         wake,
@@ -791,6 +804,10 @@ pub fn retained_action(limits: &Limits, number: u64, value: &tasks::ProposalActi
         tasks::ProposalAction::Amend { task, amendment: change } => RetainedAction::Amend {
             task: *task,
             change: Box::new(AmendmentChange {
+                instructions: match &change.instructions {
+                    Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
+                    None => None,
+                },
                 release: change.release,
                 spec: match &change.spec {
                     Some(value) => Some(spec(limits, value)),
@@ -851,6 +868,10 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Result<M
 
 fn settings(limits: &Limits, row: &tasks::Settings) -> Result<AmendmentState, Missing> {
     Ok(AmendmentState {
+        instructions: match &row.instructions {
+            Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
+            None => None,
+        },
         spec: spec(limits, &row.spec),
         authority: super::task_tree::authority(limits, &row.authority)?,
         wake: row.wake,

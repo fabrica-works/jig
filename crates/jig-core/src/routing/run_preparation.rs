@@ -120,6 +120,9 @@ pub(super) fn workspace_prepared(
         after = Some(key);
     }
     let mut policy = core.settings.run.clone();
+    if let Some(instructions) = &core.tasks.task(task).expect("prepared task is live").instructions {
+        policy.instructions = instructions.clone();
+    }
     policy.resume = resume;
     let run = RunCharter {
         policy,

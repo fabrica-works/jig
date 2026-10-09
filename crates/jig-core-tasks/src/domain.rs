@@ -1117,6 +1117,7 @@ pub(crate) fn make_admitted(
             published: None,
             procedure_offered: None,
             record: TaskRecord {
+                instructions: None,
                 chat_close: None,
                 created_at: env.wall,
                 changed: env.wall,

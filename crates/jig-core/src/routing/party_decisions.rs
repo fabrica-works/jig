@@ -270,6 +270,7 @@ pub(super) fn person_proposal_accept(
                 stop_run: false,
                 amendment: tasks::Amendment {
                     release: None,
+                    instructions: None,
                     spec: None,
                     wake: None,
                     dependencies: None,

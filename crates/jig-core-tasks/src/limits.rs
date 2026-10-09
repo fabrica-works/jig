@@ -132,6 +132,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(u64::from(limits.authority_segments))?
         .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
     let payload = u64::from(limits.spec_bytes)
+        .checked_add(u64::from(limits.message_bytes))?
         .checked_add(u64::from(limits.inbox_bytes))?
         .checked_add(u64::from(limits.message_bytes).checked_mul(2)?)?
         .checked_add(u64::try_from(size_of::<crate::Word>()).ok()?)?
@@ -210,6 +211,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.contract_choices).checked_mul(u64::try_from(size_of::<Verdict>()).ok()?)?)?;
     let proposal_payload = u64::try_from(size_of::<crate::Proposal>())
         .ok()?
+        .checked_add(u64::from(limits.message_bytes))?
         .checked_add(u64::from(limits.message_bytes).checked_mul(2)?)?
         .checked_add(u64::from(limits.batch).checked_mul(proposed_member)?)?;
     // The writer map owns both its opaque key and a durable slot row with a

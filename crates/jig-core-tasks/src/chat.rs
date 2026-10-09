@@ -178,6 +178,7 @@ pub(crate) fn close(
         false,
         crate::Amendment {
             release: None,
+            instructions: None,
             spec: None,
             wake: None,
             dependencies: None,

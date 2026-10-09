@@ -824,6 +824,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
             task: 2,
             amendment: tasks::Amendment {
                 release: Some(1),
+                instructions: None,
                 spec: Some(changed),
                 wake: None,
                 dependencies: None,

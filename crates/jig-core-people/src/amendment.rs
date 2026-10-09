@@ -8,6 +8,8 @@ use skein_lib::{Duration, Wall};
 /// A person's whole optional task edit and bounded explanation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Amendment {
+    /// Replace the agent task's instructions; an empty value clears them.
+    pub instructions: Option<Box<[u8]>>,
     pub spec: Option<Spec>,
     pub wake: Option<WakePolicy>,
     pub dependencies: Option<Box<[u64]>>,
@@ -120,6 +122,9 @@ pub enum Executor {
 #[must_use]
 pub fn amendment_bytes(amendment: &Amendment) -> Option<u64> {
     let mut total = u64::try_from(amendment.reason.len()).ok()?;
+    if let Some(instructions) = &amendment.instructions {
+        total = total.checked_add(u64::try_from(instructions.len()).ok()?)?;
+    }
     if let Some(spec) = &amendment.spec {
         total = total.checked_add(u64::try_from(spec.words.len()).ok()?)?;
         total = total.checked_add(

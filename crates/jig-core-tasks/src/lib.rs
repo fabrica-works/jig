@@ -109,7 +109,7 @@ pub use boundary::{
 };
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
 pub use chat::{Disposal, Grace, Keep};
-pub use control::{Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings};
+pub use control::{Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, instruction_admit};
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};
 pub use escalation::{Escalation, EscalationContext, EscalationDecision, EscalationHolder, EscalationOutcome};
 pub use facts::Fact;

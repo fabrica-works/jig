@@ -203,7 +203,15 @@ impl Harness {
 }
 
 fn amendment() -> Amendment {
-    Amendment { release: None, spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([1]) }
+    Amendment {
+        release: None,
+        instructions: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: Box::new([1]),
+    }
 }
 
 #[test]

@@ -15,6 +15,7 @@ impl Core {
         target: u64,
         amendment: &tasks::Amendment,
         depth: u32,
+        limits: &tasks::Limits,
     ) -> Result<bool, TaskAmendDenied> {
         if amendment.release.is_some() {
             return Err(TaskAmendDenied::Refused { task: target, why: tasks::Refusal::Read });
@@ -40,6 +41,10 @@ impl Core {
         }
         if target == caller || current.project != holder.project || !descendant {
             return Err(TaskAmendDenied::Refused { task: target, why: tasks::Refusal::Reference });
+        }
+        let row = self.tasks.task(target).expect("delegation found target");
+        if let Err(why) = tasks::instruction_admit(limits, row.executor, &amendment.instructions) {
+            return Err(TaskAmendDenied::Refused { task: target, why });
         }
         let Some(after) = &amendment.authority else { return Ok(false) };
         let before = translate::authority_value(&current.authority);
@@ -199,6 +204,7 @@ fn granted(value: people::Authority, limits: &tasks::Limits) -> Option<tasks::Au
 pub(crate) fn translate(value: people::Amendment, limits: &tasks::Limits) -> Option<tasks::Amendment> {
     Some(tasks::Amendment {
         release: None,
+        instructions: value.instructions,
         spec: match value.spec {
             Some(specification) => Some(spec(specification, limits)?),
             None => None,

@@ -540,7 +540,12 @@ pub(crate) mod nested {
             Some(value) => Some(authority(value)?),
             None => None,
         };
+        let instructions = match value.field(b"instructions")? {
+            Some(value) => Some(value.text()?),
+            None => None,
+        };
         Ok(tasks::Amendment {
+            instructions,
             release: None,
             spec,
             wake,

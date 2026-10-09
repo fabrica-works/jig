@@ -239,6 +239,9 @@ fn proposal_bytes(proposal: &Proposal) -> Option<u64> {
         }
         ProposalAction::Amend { amendment, .. } => {
             total = total.checked_add(bytes(amendment.reason.len())?)?;
+            if let Some(instructions) = &amendment.instructions {
+                total = total.checked_add(bytes(instructions.len())?)?;
+            }
             if let Some(spec) = &amendment.spec {
                 total = total.checked_add(spec_bytes(spec)?)?;
             }
@@ -290,6 +293,10 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
             None => 0,
         })?
         .checked_add(spec_bytes(&task.spec)?)?
+        .checked_add(match &task.instructions {
+            Some(instructions) => bytes(instructions.len())?,
+            None => 0,
+        })?
         .checked_add(authority_bytes(&task.authority)?)?
         .checked_add(contract_bytes(&task.contract)?)?
         .checked_add(phase_bytes(&task.phase)?)?
@@ -318,6 +325,10 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
 
 fn settings_bytes(value: &crate::Settings) -> Option<u64> {
     spec_bytes(&value.spec)?
+        .checked_add(match &value.instructions {
+            Some(instructions) => bytes(instructions.len())?,
+            None => 0,
+        })?
         .checked_add(authority_bytes(&value.authority)?)?
         .checked_add(bytes(size_of_val(&*value.dependencies))?)
 }

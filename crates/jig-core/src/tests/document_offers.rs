@@ -77,6 +77,7 @@ fn complete_policy_recipients_and_authority_refuse_a_shortened_receiving_form() 
         task: 2,
         revision: core.tasks.task(2).unwrap().revisions.spec,
         amendment: people::Amendment {
+            instructions: None,
             spec: None,
             wake: None,
             dependencies: None,

@@ -89,6 +89,7 @@ pub(super) fn amend_preflight(
 ) -> Result<(), people::Refusal> {
     let row = core.tasks.task(task).ok_or(people::Refusal::Unknown)?;
     let empty = tasks::Amendment {
+        instructions: None,
         spec: None,
         wake: None,
         dependencies: None,
@@ -265,6 +266,13 @@ pub(crate) fn amendment_admit(
     };
     if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
         return Err(people::Refusal::Role { held: Some(role) });
+    }
+    let row = core.tasks.task(task).expect("delegation found task");
+    if let Err(why) = tasks::instruction_admit(limits, row.executor, &amendment.instructions) {
+        let people::Outcome::Refused(why) = crate::routing::refusals::person_task_refusal(core, Some(task), why) else {
+            unreachable!("instruction shape refusal is permanent");
+        };
+        return Err(why);
     }
     let Some(after) = &amendment.authority else { return Ok((false, false)) };
     if !tasks::valid_authority(limits, after) {

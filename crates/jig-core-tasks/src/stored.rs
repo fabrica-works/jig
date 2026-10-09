@@ -192,6 +192,12 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
         }
         crate::ProposalAction::Amend { task: target, amendment } => {
             *target != 0
+                && match &amendment.instructions {
+                    Some(instructions) => {
+                        instructions.len() <= usize::try_from(limits.message_bytes).expect("u32 fits usize")
+                    }
+                    None => true,
+                }
                 && amendment.reason.len() <= usize::try_from(limits.message_bytes).expect("u32 fits usize")
                 && match &amendment.spec {
                     Some(spec) => crate::batch::valid_spec(limits, spec) && spec.inputs.is_empty(),
@@ -335,6 +341,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         return false;
     }
     if !crate::batch::valid_spec(limits, &task.spec)
+        || crate::control::instruction_admit(limits, task.executor, &task.instructions).is_err()
         || !crate::wake::valid(&task.wake)
         || !crate::batch::valid_contract(limits, &task.contract)
         || !crate::batch::valid_authority(limits, &task.authority)

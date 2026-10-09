@@ -20,6 +20,8 @@ pub enum Control {
 /// Whole optional task changes; root checks any widening against its holder.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Amendment {
+    /// Replace the charter's instructions, delivered whole as this amendment's message.
+    pub instructions: Option<Box<[u8]>>,
     /// Release this exact hold with the change; a later hold remains in place.
     pub release: Option<u64>,
     pub spec: Option<Spec>,
@@ -27,6 +29,26 @@ pub struct Amendment {
     pub dependencies: Option<Box<[u64]>>,
     pub authority: Option<Authority>,
     pub reason: Box<[u8]>,
+}
+
+/// Instruction replacements belong only to agents and must fit one whole amendment message.
+pub fn instruction_admit(
+    limits: &Limits,
+    executor: crate::Executor,
+    instructions: &Option<Box<[u8]>>,
+) -> Result<(), Refusal> {
+    match instructions {
+        None => Ok(()),
+        Some(instructions) => {
+            if instructions.len() > usize::try_from(limits.message_bytes).expect("u32 fits usize") {
+                return Err(Refusal::Read);
+            }
+            match executor {
+                crate::Executor::Agent { .. } => Ok(()),
+                crate::Executor::Procedure { .. } | crate::Executor::Person(_) => Err(Refusal::Executor),
+            }
+        }
+    }
 }
 
 /// A committed plan revision, kept outside the live arena for later reads.
@@ -45,6 +67,8 @@ pub struct History {
 /// Immutable settings before and after an admitted amendment.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Settings {
+    /// Exact task-owned override; absent means the configured charter default.
+    pub instructions: Option<Box<[u8]>>,
     pub spec: Spec,
     pub wake: WakePolicy,
     pub dependencies: Box<[u64]>,
@@ -59,6 +83,7 @@ pub struct AmendmentHistory {
 
 fn settings(task: &crate::TaskRecord) -> Settings {
     Settings {
+        instructions: task.instructions.clone(),
         spec: task.spec.clone(),
         wake: task.wake,
         dependencies: task.dependencies.clone(),
@@ -166,6 +191,9 @@ pub(crate) fn amend(
     if amendment.reason.len() > usize::try_from(env.limits.message_bytes).expect("u32 fits usize") {
         return refused(to, Some(number), Refusal::Read, out);
     }
+    if let Err(why) = instruction_admit(&env.limits, old.executor, &amendment.instructions) {
+        return refused(to, Some(number), why, out);
+    }
     if let Some(spec) = &amendment.spec
         && (!crate::batch::valid_spec(&env.limits, spec) || !spec.inputs.is_empty())
     {
@@ -217,6 +245,10 @@ pub(crate) fn amend(
         None => false,
     };
     let changed = spec_changed
+        || match &amendment.instructions {
+            Some(instructions) => old.instructions.as_ref() != Some(instructions),
+            None => false,
+        }
         || dependencies_changed
         || match &amendment.wake {
             Some(wake) => *wake != old.wake,
@@ -239,7 +271,10 @@ pub(crate) fn amend(
         number: message,
         from: by,
         kind: MessageKind::Amendment { revision: next_revision },
-        words: amendment.reason.clone(),
+        words: match &amendment.instructions {
+            Some(instructions) => instructions.clone(),
+            None => amendment.reason.clone(),
+        },
         at: env.wall,
         hits: 1,
         eligible: true,
@@ -253,6 +288,9 @@ pub(crate) fn amend(
         crate::funders::resize(domain, env, number, authority.budget.spend, out);
     }
     let task = task_mut(domain, number).expect("amendment task live");
+    if let Some(instructions) = amendment.instructions {
+        task.record.instructions = Some(instructions);
+    }
     if let Some(spec) = amendment.spec {
         task.record.spec = spec;
     }
