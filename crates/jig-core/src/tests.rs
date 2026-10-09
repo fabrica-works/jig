@@ -2593,7 +2593,7 @@ fn goal_deadlines_are_checked_against_the_role_and_policy() {
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(
         core.goal_start(1, 1, people::Role::Owner, 1, 10, Some(later), 2).expect_err("beyond policy"),
-        people::Refusal::Authority { lacking: people::Lack::Deadline }
+        people::Refusal::Authority { proposable: None, lacking: people::Lack::Deadline }
     );
 }
 
@@ -2655,6 +2655,6 @@ fn deployment_capacity_carries_direct_batch_refusals_and_task_history_cut() {
 mod application_documents;
 
 mod chip_phase;
-
 mod hold_origin;
 mod live_delegates;
+mod acts;

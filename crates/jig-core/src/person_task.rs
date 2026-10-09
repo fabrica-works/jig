@@ -91,94 +91,50 @@ impl Core {
         people::Outcome::Refused(refusal)
     }
 
-    #[expect(clippy::too_many_lines, reason = "one exhaustive route handles all person task requests")]
     pub fn person_task(
         &mut self,
         request: Token,
         person: u64,
         project: u32,
-        role: Option<people::Role>,
+        _role: Option<people::Role>,
         ask: people::Ask,
     ) -> Result<tasks::Event, people::Refusal> {
         let task = number(&ask);
-        let Some(context) = self.tasks.delegation(task) else {
+        if self.tasks.task(task).ok_or(people::Refusal::Unknown)?.project != project {
             return Err(people::Refusal::Unknown);
+        }
+        let act = match &ask {
+            people::Ask::TakePerson { .. } => crate::acts::Act::Take,
+            people::Ask::HandBackPerson { .. } => crate::acts::Act::HandBack,
+            people::Ask::AnswerPerson { .. } => crate::acts::Act::Answer,
+            people::Ask::MarkSeen { .. }
+            | people::Ask::Close { .. }
+            | people::Ask::Application { .. }
+            | people::Ask::Move { .. }
+            | people::Ask::DecideProposal { .. }
+            | people::Ask::Say { .. }
+            | people::Ask::AnswerQuestion { .. }
+            | people::Ask::Prioritise { .. }
+            | people::Ask::Amend { .. }
+            | people::Ask::EditNote { .. }
+            | people::Ask::MakeService { .. }
+            | people::Ask::SetRoles { .. }
+            | people::Ask::Adopt { .. }
+            | people::Ask::ChangePolicy { .. }
+            | people::Ask::SetPool { .. }
+            | people::Ask::DecideEscalation { .. }
+            | people::Ask::StartChat { .. }
+            | people::Ask::Stop { .. }
+            | people::Ask::Cancel { .. }
+            | people::Ask::Release { .. }
+            | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
         };
-        let allowed = context.project == project
-            && match self.tasks.executor(task).expect("live task has executor") {
-                tasks::Executor::Person(tasks::PersonAddress::Person(address)) => {
-                    address == person
-                        && match &ask {
-                            people::Ask::AnswerPerson { .. } => true,
-                            people::Ask::TakePerson { .. } | people::Ask::HandBackPerson { .. } => false,
-                            people::Ask::MarkSeen { .. }
-                            | people::Ask::Close { .. }
-                            | people::Ask::Application { .. }
-                            | people::Ask::Move { .. }
-                            | people::Ask::DecideProposal { .. }
-                            | people::Ask::Say { .. }
-                            | people::Ask::AnswerQuestion { .. }
-                            | people::Ask::Prioritise { .. }
-                            | people::Ask::Amend { .. }
-                            | people::Ask::EditNote { .. }
-                            | people::Ask::MakeService { .. }
-                            | people::Ask::SetRoles { .. }
-                            | people::Ask::Adopt { .. }
-                            | people::Ask::ChangePolicy { .. }
-                            | people::Ask::SetPool { .. }
-                            | people::Ask::DecideEscalation { .. }
-                            | people::Ask::StartChat { .. }
-                            | people::Ask::Stop { .. }
-                            | people::Ask::Cancel { .. }
-                            | people::Ask::Release { .. }
-                            | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
-                        }
-                }
-                tasks::Executor::Person(tasks::PersonAddress::Role(address)) => {
-                    let handing_back = match &ask {
-                        people::Ask::HandBackPerson { .. } => true,
-                        people::Ask::TakePerson { .. } | people::Ask::AnswerPerson { .. } => false,
-                        people::Ask::MarkSeen { .. }
-                        | people::Ask::Close { .. }
-                        | people::Ask::Application { .. }
-                        | people::Ask::Move { .. }
-                        | people::Ask::DecideProposal { .. }
-                        | people::Ask::Say { .. }
-                        | people::Ask::AnswerQuestion { .. }
-                        | people::Ask::Prioritise { .. }
-                        | people::Ask::Amend { .. }
-                        | people::Ask::EditNote { .. }
-                        | people::Ask::MakeService { .. }
-                        | people::Ask::SetRoles { .. }
-                        | people::Ask::Adopt { .. }
-                        | people::Ask::ChangePolicy { .. }
-                        | people::Ask::SetPool { .. }
-                        | people::Ask::DecideEscalation { .. }
-                        | people::Ask::StartChat { .. }
-                        | people::Ask::Stop { .. }
-                        | people::Ask::Cancel { .. }
-                        | people::Ask::Release { .. }
-                        | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
-                    };
-                    handing_back
-                        || match role {
-                            Some(holding) => holding.number() == address,
-                            None => false,
-                        }
-                }
-                tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => false,
-            };
-        if !allowed {
-            return Err(people::Refusal::Unknown);
-        }
-        let row = self.tasks.task(task).expect("live person task");
-        if let Some(answer) = row.person_answer {
-            return Err(people::Refusal::Ended { how: people::Ending::Decided { by: answer.by, at: answer.at } });
-        }
-        if let Some(by) = row.taken_by
-            && by != person
-        {
-            return Err(people::Refusal::Taken { by });
+        match crate::acts::person(self, person, act, task) {
+            Ok(()) => {}
+            // The task owner supplies its exact capacity observation.
+            Err(people::Refusal::Limit { which: people::LimitKind::LiveDelegates })
+                if act == crate::acts::Act::Answer => {}
+            Err(why) => return Err(why),
         }
         let (route, event) = match ask {
             people::Ask::TakePerson { .. } => (

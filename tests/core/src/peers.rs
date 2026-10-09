@@ -563,7 +563,9 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
 fn party_refusal(why: people::Refusal) -> parties::Refusal {
     match why {
         people::Refusal::Role { held } => parties::Refusal::Role { held: held.map(people::Role::number) },
-        people::Refusal::Authority { lacking } => parties::Refusal::Authority { lacking: party_lack(lacking) },
+        people::Refusal::Authority { proposable, lacking } => {
+            parties::Refusal::Authority { proposable, lacking: party_lack(lacking) }
+        }
         people::Refusal::Limit { which } => parties::Refusal::Limit { which: party_limit(which) },
         people::Refusal::Moved { now } => parties::Refusal::Moved { now: party_moved(now) },
         people::Refusal::Ended { how } => parties::Refusal::Ended { how: party_ending(how) },
@@ -586,6 +588,7 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
 
 fn party_lack(value: people::Lack) -> parties::Lack {
     match value {
+        people::Lack::Approver => parties::Lack::Approver,
         people::Lack::Budget { needs, left } => parties::Lack::Budget { needs, left },
         people::Lack::Grant { kind } => parties::Lack::Grant { kind },
         people::Lack::Funding => parties::Lack::Funding,

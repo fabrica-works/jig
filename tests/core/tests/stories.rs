@@ -1014,6 +1014,7 @@ fn a_party_short_of_budget_hears_what_the_request_needs_and_what_is_left() {
     let mut world = World::new(153, false);
     ask(&mut world, 57, people::Ask::StartChat { project: 1, words: b"next".as_slice().into() });
     let expected = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
+        proposable: None,
         lacking: people::Lack::Budget { needs: 300, left: 200 },
     }));
     assert_eq!(world.people_answers.last(), Some(&expected));
@@ -1403,3 +1404,6 @@ fn a_goal_with_a_deadline_is_held_past_it() {
         live_row(&world, goal).phase
     );
 }
+
+#[path = "stories/offers.rs"]
+mod offers;

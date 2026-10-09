@@ -11,7 +11,6 @@ fn refuse(work: &mut Queue<Event>, request: Token, why: people::Refusal) {
 }
 
 #[expect(clippy::too_many_arguments, reason = "one authenticated close carries its keyed party and whole disposals")]
-#[expect(clippy::too_many_lines, reason = "all standing and disposal checks precede the one child event")]
 pub(crate) fn route(
     core: &mut Core,
     env: &Env<Limits>,
@@ -24,22 +23,11 @@ pub(crate) fn route(
     disposals: List<people::Disposal>,
 ) {
     let Some(row) = core.tasks.task(chat) else { return refuse(work, request, people::Refusal::Unknown) };
-    if row.project != project || role.is_none() || core.chat_requester(row) != Some(person) {
+    if row.project != project {
         return refuse(work, request, people::Refusal::Unknown);
     }
-    if row.chat_close.is_some() {
-        return refuse(work, request, people::Refusal::NotWaiting);
-    }
-    let mutable = match &row.phase {
-        tasks::Phase::Waiting
-        | tasks::Phase::Active(_)
-        | tasks::Phase::Held { was: tasks::Was::Waiting | tasks::Was::Active(_), .. } => true,
-        tasks::Phase::Closing(_) | tasks::Phase::Held { was: tasks::Was::Closing(_), .. } | tasks::Phase::Ended(_) => {
-            false
-        }
-    };
-    if !mutable {
-        return refuse(work, request, people::Refusal::NotWaiting);
+    if let Err(why) = crate::acts::close(core, person, row) {
+        return refuse(work, request, why);
     }
     for (at, disposal) in disposals.iter().enumerate() {
         if !row.delegates.contains(&disposal.task) {
@@ -101,9 +89,6 @@ pub(crate) fn route(
         if children.push(tasks::Disposal { task: disposal.task, keep }).is_err() {
             return refuse(work, request, people::Refusal::Limit { which: people::LimitKind::LiveDelegates });
         }
-    }
-    if core.settings.close_grace == skein_lib::Duration::ZERO {
-        return refuse(work, request, people::Refusal::NotOffered);
     }
     let Some(until) = env.wall.as_nanos().checked_add(core.settings.close_grace.as_nanos()) else {
         return refuse(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });

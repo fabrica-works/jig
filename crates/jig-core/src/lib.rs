@@ -10,6 +10,7 @@
 
 extern crate alloc;
 
+pub mod acts;
 mod amendments;
 mod authority_facts;
 mod brief_text;

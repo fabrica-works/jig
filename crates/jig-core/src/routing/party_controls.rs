@@ -48,7 +48,7 @@ pub(super) fn amend_route(
                 pool_refused(
                     work,
                     request,
-                    people::Refusal::Authority { lacking: people::Lack::Again { required: true } },
+                    people::Refusal::Authority { proposable: None, lacking: people::Lack::Again { required: true } },
                 );
                 return;
             }
@@ -261,7 +261,11 @@ pub(super) fn release_request(
                 | tasks::Phase::Ended(_) => false,
             };
             if required != again.is_some() {
-                pool_refused(work, request, people::Refusal::Authority { lacking: people::Lack::Again { required } });
+                pool_refused(
+                    work,
+                    request,
+                    people::Refusal::Authority { proposable: None, lacking: people::Lack::Again { required } },
+                );
                 return;
             }
             let message = if again == Some(false) {
@@ -299,16 +303,10 @@ pub(super) fn say_request(
     words: Box<[u8]>,
     release: bool,
 ) {
-    match core.person_message(crate::PersonMessage {
-        request,
-        person,
-        project,
-        task,
-        question: None,
-        release,
-        words,
-        at: env.wall,
-    }) {
+    match core.person_message(
+        &env.limits,
+        crate::PersonMessage { request, person, project, task, question: None, release, words, at: env.wall },
+    ) {
         Ok(event) => work.push(Event::Tasks(event)),
         Err(why) => {
             work.push(Event::People(people::Event::Decided { request, outcome: people::Outcome::Refused(why) }));
@@ -328,16 +326,19 @@ pub(super) fn answer_question_request(
     question: u64,
     words: Box<[u8]>,
 ) {
-    match core.person_message(crate::PersonMessage {
-        request,
-        person,
-        project,
-        task,
-        question: Some(question),
-        release: false,
-        words,
-        at: env.wall,
-    }) {
+    match core.person_message(
+        &env.limits,
+        crate::PersonMessage {
+            request,
+            person,
+            project,
+            task,
+            question: Some(question),
+            release: false,
+            words,
+            at: env.wall,
+        },
+    ) {
         Ok(event) => work.push(Event::Tasks(event)),
         Err(why) => {
             work.push(Event::People(people::Event::Decided { request, outcome: people::Outcome::Refused(why) }));

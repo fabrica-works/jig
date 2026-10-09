@@ -19,7 +19,9 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
                 None => None,
             },
         },
-        people::Refusal::Authority { lacking } => application::Refusal::Authority { lacking: lack(lacking) },
+        people::Refusal::Authority { proposable, lacking } => {
+            application::Refusal::Authority { proposable, lacking: lack(lacking) }
+        }
         people::Refusal::Limit { which } => application::Refusal::Limit { which: limit_kind(which) },
         people::Refusal::Moved { now } => application::Refusal::Moved { now: moved(now) },
         people::Refusal::Ended { how } => application::Refusal::Ended { how: ending(how) },
@@ -34,6 +36,7 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
 
 pub(super) fn lack(value: people::Lack) -> application::Lack {
     match value {
+        people::Lack::Approver => application::Lack::Approver,
         people::Lack::Again { required } => application::Lack::Again { required },
         people::Lack::Budget { needs, left } => application::Lack::Budget { needs, left },
         people::Lack::Grant { kind } => application::Lack::Grant { kind },

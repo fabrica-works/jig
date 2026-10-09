@@ -38,11 +38,13 @@ impl Core {
         let Some(policy) = self.authority.policy(project) else { unreachable!("configured policy") };
         if self.settings.period_budget > policy.period_spend {
             return Err(people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget { needs: self.settings.period_budget, left: policy.period_spend },
             });
         }
         if self.settings.person_budget > role_policy.period_spend {
             return Err(people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget { needs: self.settings.person_budget, left: role_policy.period_spend },
             });
         }
@@ -102,11 +104,13 @@ impl Core {
         }
         if self.settings.period_budget > policy.period_spend {
             return Err(people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget { needs: self.settings.period_budget, left: policy.period_spend },
             });
         }
         if self.settings.person_budget > role_policy.period_spend {
             return Err(people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget { needs: self.settings.person_budget, left: role_policy.period_spend },
             });
         }
@@ -225,7 +229,7 @@ impl Core {
 
     /// Check an authenticated party's authority and bounded goal list for
     /// one priority change.
-    fn priorities_allowed(
+    pub(crate) fn priorities_allowed(
         &self,
         project: u32,
         role: Option<people::Role>,
@@ -312,7 +316,7 @@ impl Core {
                 }
             }
             let Some(holder) = self.escalation_recipient(limits, context, role) else {
-                return Err(people::Refusal::Authority { lacking: people::Lack::Shape });
+                return Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape });
             };
             match context.escalation {
                 tasks::Escalation::Waiting { holder: old, .. } => {
@@ -330,9 +334,7 @@ impl Core {
 
     /// Admit an owner asking to change current role policy.
     pub fn role_allowed(&self, person: u64, project: u32, tasks_left: u32) -> Result<(), people::Refusal> {
-        if self.people.role(person, project) != Some(people::Role::Owner) {
-            return Err(people::Refusal::Role { held: self.people.role(person, project) });
-        }
+        crate::acts::role(self, project, self.people.role(person, project), crate::acts::Act::ChangePolicy)?;
         if self.authority.policy(project).is_none() {
             return Err(people::Refusal::Unknown);
         }

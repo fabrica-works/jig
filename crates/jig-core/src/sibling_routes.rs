@@ -51,8 +51,16 @@ pub struct PersonMessage {
 impl Core {
     /// Number an authenticated person's word and route it to the task hub,
     /// retaining the keyed reply correlation until admission completes.
-    pub fn person_message(&mut self, message: PersonMessage) -> Result<tasks::Event, people::Refusal> {
+    pub fn person_message(&mut self, limits: &Limits, message: PersonMessage) -> Result<tasks::Event, people::Refusal> {
         let PersonMessage { request, person, project, task, question, release, words, at } = message;
+        let row = self.tasks.task(task).ok_or(people::Refusal::Unknown)?;
+        if row.project != project {
+            return Err(people::Refusal::Unknown);
+        }
+        match question {
+            Some(number) => crate::acts::question(self, limits, person, crate::acts::Act::Answer, task, number)?,
+            None => crate::acts::write(self, limits, person, task)?,
+        }
         let Some(message) = fresh(&mut self.counters, Family::Message) else {
             return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
@@ -61,21 +69,39 @@ impl Core {
             None => tasks::MessageKind::Words,
         };
         assert!(self.saying.insert(request, (task, question)) == Ok(None), "one person message flight");
-        Ok(tasks::Event::Message {
-            reply_to: skein_lib::ReplyTo::new(request),
-            project,
-            task,
-            word: tasks::Word {
-                number: message,
-                from: tasks::Party::Person(person),
-                kind,
-                words,
-                at,
-                hits: 1,
-                eligible: false,
+        let event = match question {
+            Some(_) => tasks::Event::Message {
+                reply_to: skein_lib::ReplyTo::new(request),
+                project,
+                task,
+                word: tasks::Word {
+                    number: message,
+                    from: tasks::Party::Person(person),
+                    kind,
+                    words,
+                    at,
+                    hits: 1,
+                    eligible: false,
+                },
+                release,
             },
-            release,
-        })
+            None => tasks::Event::AuthorizedMessage {
+                reply_to: skein_lib::ReplyTo::new(request),
+                project,
+                task,
+                word: tasks::Word {
+                    number: message,
+                    from: tasks::Party::Person(person),
+                    kind,
+                    words,
+                    at,
+                    hits: 1,
+                    eligible: false,
+                },
+                release,
+            },
+        };
+        Ok(event)
     }
 
     /// Project a person's durable goal proposal into the party inbox.

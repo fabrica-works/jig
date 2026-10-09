@@ -113,9 +113,10 @@ fn filled(why: Refusal) -> bool {
             Some(Role::Policy { role }) => role > 3,
             Some(Role::Owner | Role::Maintainer | Role::Member | Role::Observer) | None => true,
         },
-        Refusal::Authority { lacking } => match lacking {
+        Refusal::Authority { lacking, .. } => match lacking {
             Lack::Budget { needs, left } => needs > left,
-            Lack::Grant { .. }
+            Lack::Approver
+            | Lack::Grant { .. }
             | Lack::Funding
             | Lack::TaskKind
             | Lack::Depth { .. }

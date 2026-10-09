@@ -55,7 +55,10 @@ pub(super) fn pool_route(
         pool_refused(
             work,
             request,
-            people::Refusal::Authority { lacking: people::Lack::Budget { needs: budget, left: allowed.period_spend } },
+            people::Refusal::Authority {
+                proposable: None,
+                lacking: people::Lack::Budget { needs: budget, left: allowed.period_spend },
+            },
         );
         return;
     }
@@ -68,6 +71,7 @@ pub(super) fn pool_route(
             work,
             request,
             people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget { needs: core.settings.period_budget, left: policy.period_spend },
             },
         );
@@ -86,6 +90,7 @@ pub(super) fn pool_route(
             work,
             request,
             people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget { needs: budget, left: core.settings.period_budget },
             },
         );

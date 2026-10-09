@@ -3,7 +3,7 @@
 use jig_core_authority as authority;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
-use skein_lib::{List, Queue};
+use skein_lib::List;
 
 use crate::{Core, translate};
 
@@ -83,69 +83,7 @@ impl Core {
         depth: u32,
         limits: &tasks::Limits,
     ) -> Result<(bool, bool), people::Refusal> {
-        let Some(context) = self.tasks.delegation(task) else { return Err(people::Refusal::Unknown) };
-        let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };
-        let any_task = match role {
-            people::Role::Owner | people::Role::Maintainer => true,
-            people::Role::Member | people::Role::Observer => false,
-            people::Role::Policy { .. } => match self.authority.role(project, role.number()) {
-                Some(policy) => policy.requests.allows(authority::RequestKind::Amend),
-                None => false,
-            },
-        };
-        let standing = self.person_tree(person, task, depth);
-        if context.project != project || !any_task && !standing {
-            return Err(people::Refusal::Unknown);
-        }
-        let Some(role_policy) = self.authority.role(project, role.number()) else {
-            return Err(people::Refusal::Role { held: Some(role) });
-        };
-        if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
-            return Err(people::Refusal::Role { held: Some(role) });
-        }
-        let Some(after) = &amendment.authority else { return Ok((false, false)) };
-        if !tasks::valid_authority(limits, after) {
-            return Err(people::Refusal::Limit { which: people::LimitKind::Authority });
-        }
-        let before = translate::authority_value(&context.authority);
-        let after = translate::authority_value(after);
-        let implies = &self.authority.rules().implies;
-        let stop_run = !authority::at_most(&before, &after, implies);
-        if authority::at_most(&after, &before, implies) {
-            return Ok((stop_run, false));
-        }
-        let pool = tasks::Funder::Pool { project, person, period: self.settings.period };
-        let numbers = match self.tasks.funding(pool) {
-            Some(row) => row.numbers,
-            None => tasks::Numbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
-        };
-        let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority bound"));
-        let ask = authority::PersonAsk {
-            project,
-            role: role.number(),
-            pool: translate::authority_numbers(numbers),
-            tasks_left: context.tasks_left,
-            request: authority::PersonRequest::Amend(after),
-        };
-        let checked = authority::check_request_with_standing(&self.authority, &ask, standing, &mut findings);
-        let role_shortage = if findings.len() == 1 {
-            match findings.iter().next() {
-                Some(authority::Finding::Authority { source: authority::Source::Role, .. }) => true,
-                Some(_) | None => false,
-            }
-        } else {
-            false
-        };
-        let answer = if checked.answer == authority::Answer::Refuse && role_shortage {
-            authority::Answer::Propose
-        } else {
-            checked.answer
-        };
-        match answer {
-            authority::Answer::Allow => Ok((stop_run, false)),
-            authority::Answer::Propose => Ok((stop_run, true)),
-            authority::Answer::Wait | authority::Answer::Refuse => Err(self.request_refusal(&ask, &mut findings)),
-        }
+        crate::acts::bounds::amendment_admit(self, person, role, project, task, amendment, depth, limits)
     }
 }
 

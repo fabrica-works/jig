@@ -1128,9 +1128,10 @@ fn accept_refused(
             outcome: if why == authority::Answer::Wait {
                 jig_core_people::Outcome::Again(jig_core_people::Again::Busy)
             } else {
-                jig_core_people::Outcome::Refused(
-                    refusal.unwrap_or(jig_core_people::Refusal::Authority { lacking: jig_core_people::Lack::Shape }),
-                )
+                jig_core_people::Outcome::Refused(refusal.unwrap_or(jig_core_people::Refusal::Authority {
+                    proposable: None,
+                    lacking: jig_core_people::Lack::Shape,
+                }))
             },
         })),
     }

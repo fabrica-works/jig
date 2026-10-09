@@ -36,10 +36,12 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
     test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
     let ask = Ask::Application { project: 1, connector: 7, digest: [8; 32] };
     let request = route(&test.request(10, 1, ask.clone()));
+    let observer_part = Ask::SetPool { project: 1, person: 1, budget: 20 };
     assert_eq!(
-        application_part(&mut test.d, &test.env, request, Ask::SetPool { project: 1, person: 1, budget: 20 }),
-        Err(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
+        application_part(&mut test.d, &test.env, request, observer_part.clone()),
+        Ok(Request::Route { request, person: 1, project: 1, role: Some(Role::Observer), ask: Box::new(observer_part) })
     );
+    application_part_done(&mut test.d, request);
     assert_eq!(
         application_part(&mut test.d, &test.env, request, Ask::SetPool { project: 2, person: 1, budget: 20 }),
         Err(Outcome::Refused(Refusal::Unknown))
@@ -382,22 +384,34 @@ fn provider_and_subject_identify_a_party_independent_of_display_fields() {
 }
 
 #[test]
-fn all_roles_are_checked_and_refusals_are_saved() {
+fn all_roles_route_to_the_core_and_its_refusals_are_saved() {
     for role in [Role::Owner, Role::Maintainer, Role::Member, Role::Observer, Role::Policy { role: 4 }] {
         let mut test = Test::new(LIMITS);
         test.member();
         test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role }]) });
         let rows = test.request(10, 1, ask(1));
-        if role == Role::Observer {
-            assert_eq!(reply(&rows), Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) })));
-            assert!(rows.iter().any(is_answer));
+        let request = route(&rows);
+        assert!(rows.iter().any(|row| if let Request::Route { role: Some(held), .. } = row {
+            *held == role
         } else {
-            route(&rows);
+            false
+        }));
+        if role == Role::Observer {
+            let refused =
+                test.send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Role { held: Some(role) }) });
+            assert_eq!(reply(&refused), Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(role) })));
+            assert!(refused.iter().any(is_answer));
+            assert_eq!(
+                reply(&test.request(10, 1, ask(1))),
+                Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(role) }))
+            );
         }
     }
     let mut test = Test::new(LIMITS);
     test.member();
-    assert_eq!(reply(&test.request(10, 1, ask(2))), Reply::Outcome(Outcome::Refused(Refusal::Role { held: None })));
+    let request = route(&test.request(10, 1, ask(2)));
+    let out = test.send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Role { held: None }) });
+    assert_eq!(reply(&out), Reply::Outcome(Outcome::Refused(Refusal::Role { held: None })));
 }
 
 #[test]
@@ -442,7 +456,7 @@ fn policy_role_receives_shared_waiting_and_replays_its_key_after_restart() {
 }
 
 #[test]
-fn a_note_edit_checks_membership_then_retains_the_refusal() {
+fn a_note_edit_routes_its_membership_and_retains_the_core_refusal() {
     let ask = Ask::EditNote {
         project: 1,
         name: 9,
@@ -459,6 +473,11 @@ fn a_note_edit_checks_membership_then_retains_the_refusal() {
     let mut observer = Test::new(LIMITS);
     observer.member();
     observer.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
+    let request = route(&observer.request(10, 14, ask.clone()));
+    let refused = observer
+        .send(Event::Decided { request, outcome: Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }) });
+    assert_eq!(reply(&refused), Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) })));
+    assert!(refused.iter().any(is_answer));
     assert_eq!(
         reply(&observer.request(10, 14, ask)),
         Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
@@ -682,8 +701,15 @@ fn role_success_restores_before_identities_and_replays_after_roster_changes() {
     assert_eq!(reply(replayed.as_slice()), Reply::Outcome(outcome));
     assert_eq!(cold.d.role(1, 1), Some(Role::Observer));
     assert_eq!(cold.d.role(2, 1), None);
+    let request = route(cold.request_bounded(30, 8, ask).as_slice());
     assert_eq!(
-        reply(cold.request_bounded(30, 8, ask).as_slice()),
+        reply(
+            cold.send_bounded(Event::Decided {
+                request,
+                outcome: Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }),
+            })
+            .as_slice()
+        ),
         Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
     );
 }
@@ -809,8 +835,8 @@ fn refused_role_requests_restore_invalid_rosters_and_unknown_targets_for_replay(
         live.send_bounded(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role }]) });
         let ask = Ask::SetRoles { project, holdings };
         let mut rows = live.request_bounded(10, 7, ask.clone());
+        let request = route(rows.as_slice());
         if role == Role::Owner && project == 1 {
-            let request = route(rows.as_slice());
             let reply_token = live.to().into_token();
             assert_eq!(
                 live.send_bounded(Event::ApplyRoles { reply_to: ReplyTo::new(reply_token), request }).as_slice(),
@@ -820,8 +846,8 @@ fn refused_role_requests_restore_invalid_rosters_and_unknown_targets_for_replay(
                     result: Err(Outcome::Refused(refusal))
                 }]
             );
-            rows = live.send_bounded(Event::Decided { request, outcome: Outcome::Refused(refusal) });
         }
+        rows = live.send_bounded(Event::Decided { request, outcome: Outcome::Refused(refusal) });
         assert_eq!(reply(rows.as_slice()), Reply::Outcome(Outcome::Refused(refusal)));
         let mut cold = Test::new(LIMITS);
         cold.d = Domain::new(&LIMITS, Box::new([]), 2);
@@ -858,8 +884,14 @@ fn initial_owners_bootstrap_all_projects_atomically_and_never_regrant() {
     test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 2, role: Role::Observer }]) });
     let again = test.signin(3, 11, identity(0, 1));
     assert!(!again.iter().any(is_roles));
+    let request = route(&test.request(11, 1, ask(1)));
     assert_eq!(
-        reply(&test.request(11, 1, ask(1))),
+        reply(
+            &test.send(Event::Decided {
+                request,
+                outcome: Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }),
+            })
+        ),
         Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))
     );
 }
@@ -953,7 +985,7 @@ fn pending_capacity_refuses_before_routing_and_the_key_can_retry() {
     assert_eq!(test.d.capacity_refusals().get(0).expect("pending pressure").cause, CapacityCause::Pending { limit: 1 });
     test.send(Event::Decided {
         request: first,
-        outcome: Outcome::Refused(Refusal::Authority { lacking: Lack::Shape }),
+        outcome: Outcome::Refused(Refusal::Authority { proposable: None, lacking: Lack::Shape }),
     });
     route(&test.request(10, 2, ask(1)));
 }
@@ -1133,12 +1165,13 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
 fn every_final_refusal_keeps_its_facts_under_the_key_when_roles_and_time_change() {
     for refusal in [
         Refusal::Role { held: Some(Role::Member) },
-        Refusal::Authority { lacking: Lack::Budget { needs: 30, left: 11 } },
-        Refusal::Authority { lacking: Lack::Grant { kind: 5 } },
-        Refusal::Authority { lacking: Lack::TaskKind },
-        Refusal::Authority { lacking: Lack::Depth { most: 2 } },
-        Refusal::Authority { lacking: Lack::Deadline },
-        Refusal::Authority { lacking: Lack::Tasks { left: 3 } },
+        Refusal::Authority { proposable: None, lacking: Lack::Budget { needs: 30, left: 11 } },
+        Refusal::Authority { proposable: None, lacking: Lack::Grant { kind: 5 } },
+        Refusal::Authority { proposable: None, lacking: Lack::TaskKind },
+        Refusal::Authority { proposable: Some(false), lacking: Lack::Approver },
+        Refusal::Authority { proposable: None, lacking: Lack::Depth { most: 2 } },
+        Refusal::Authority { proposable: None, lacking: Lack::Deadline },
+        Refusal::Authority { proposable: None, lacking: Lack::Tasks { left: 3 } },
         Refusal::Limit { which: LimitKind::ProjectLiveTasks },
         Refusal::Limit { which: LimitKind::InboxFull },
         Refusal::Limit { which: LimitKind::Words },

@@ -535,6 +535,7 @@ fn an_uncertain_release_keeps_the_missing_choice_facts_on_replay() {
     assert_eq!(
         world.reply(call),
         Some(Reply::Outcome(Outcome::Refused(Refusal::Authority {
+            proposable: None,
             lacking: jig_core_people::Lack::Again { required: true }
         })))
     );

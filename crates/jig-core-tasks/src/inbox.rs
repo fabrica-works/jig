@@ -171,6 +171,7 @@ pub(crate) fn message(
     number: u64,
     word: Word,
     release: bool,
+    authorized: bool,
     out: &mut Queue<Request>,
 ) {
     if !domain.ready() {
@@ -180,7 +181,7 @@ pub(crate) fn message(
         return refused(to, Some(number), Refusal::Unknown, out);
     };
     let requester = match word.from {
-        Party::Person(person) => task.requester == Party::Person(person),
+        Party::Person(person) => task.requester == Party::Person(person) || authorized && person != 0,
         Party::Task(source) => crate::refs::allows(domain, source, number),
         Party::Deployment { .. } => false,
     };

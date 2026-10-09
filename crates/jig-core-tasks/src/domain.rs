@@ -559,7 +559,10 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             make_result_followups(domain, env, reply_to, proposer, proposal, batch, out);
         }
         Event::Message { reply_to, project, task, word, release, .. } => {
-            crate::inbox::message(domain, env, reply_to, project, task, word, release, out);
+            crate::inbox::message(domain, env, reply_to, project, task, word, release, false, out);
+        }
+        Event::AuthorizedMessage { reply_to, project, task, word, release } => {
+            crate::inbox::message(domain, env, reply_to, project, task, word, release, true, out);
         }
         Event::DelegateResult { task, word } => {
             crate::inbox::delegate_result(domain, env, task, word, out);

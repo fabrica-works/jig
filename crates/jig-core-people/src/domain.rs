@@ -1807,7 +1807,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     Ok(Request::Route { request, person, project: application_project, role, ask: Box::new(ask) })
 }
 
-fn admission(domain: &Domain, person: u64, project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
+fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
     match ask {
         Ask::Application { .. } => {
             if role.is_some() {
@@ -1816,54 +1816,26 @@ fn admission(domain: &Domain, person: u64, project: u32, role: Option<Role>, ask
                 Some(Refusal::Role { held: None })
             }
         }
-        Ask::EditNote { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::MakeService { .. }
-        | Ask::Adopt { .. }
-        | Ask::SetRoles { .. }
-        | Ask::ChangePolicy { .. }
-        | Ask::SetPool { .. } => {
-            if !domain.roles.contains_key(&project) {
-                Some(Refusal::Unknown)
-            } else if role == Some(Role::Owner) {
-                None
-            } else {
-                Some(Refusal::Role { held: role })
-            }
-        }
         Ask::StartChat { .. } => {
             let service = match domain.people.get(&person) {
                 Some(party) => party.key.provider == domain.deployment_provider,
                 None => false,
             };
-            if service {
-                Some(Refusal::Role { held: role })
-            } else {
-                match role {
-                    Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-                    Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-                }
-            }
+            if service { Some(Refusal::Role { held: role }) } else { None }
         }
-        Ask::SetGoal { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::Close { .. } | Ask::Say { .. } | Ask::AnswerQuestion { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::Prioritise { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Policy { .. }) => None,
-            Some(Role::Member | Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::Amend { .. } => match role {
-            Some(Role::Owner | Role::Maintainer | Role::Member | Role::Policy { .. }) => None,
-            Some(Role::Observer) | None => Some(Refusal::Role { held: role }),
-        },
-        Ask::MarkSeen { .. }
+        Ask::EditNote { .. }
+        | Ask::MakeService { .. }
+        | Ask::Adopt { .. }
+        | Ask::SetRoles { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetPool { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Close { .. }
+        | Ask::Say { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::Prioritise { .. }
+        | Ask::Amend { .. }
+        | Ask::MarkSeen { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
         | Ask::Move { .. }

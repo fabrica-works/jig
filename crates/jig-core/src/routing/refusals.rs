@@ -25,7 +25,7 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
         tasks::Refusal::Busy => return people::Outcome::Again(people::Again::Busy),
         tasks::Refusal::NotReady => return people::Outcome::Again(people::Again::NotReady),
         tasks::Refusal::ResourceUnavailable => {
-            people::Refusal::Authority { lacking: people::Lack::ResourceUnavailable }
+            people::Refusal::Authority { proposable: None, lacking: people::Lack::ResourceUnavailable }
         }
         tasks::Refusal::Unknown => people::Refusal::Unknown,
         tasks::Refusal::State => match current_task(core, task) {
@@ -38,10 +38,10 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
             },
             None => people::Refusal::Unknown,
         },
-        tasks::Refusal::Executor => people::Refusal::Authority { lacking: people::Lack::TaskKind },
-        tasks::Refusal::Reference => people::Refusal::Authority { lacking: people::Lack::Reference },
-        tasks::Refusal::Funding => people::Refusal::Authority { lacking: people::Lack::Funding },
-        tasks::Refusal::AuthorityShape => people::Refusal::Authority { lacking: people::Lack::Shape },
+        tasks::Refusal::Executor => people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind },
+        tasks::Refusal::Reference => people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference },
+        tasks::Refusal::Funding => people::Refusal::Authority { proposable: None, lacking: people::Lack::Funding },
+        tasks::Refusal::AuthorityShape => people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape },
         tasks::Refusal::Duplicate => people::Refusal::Limit { which: people::LimitKind::Duplicate },
         tasks::Refusal::Empty => people::Refusal::Limit { which: people::LimitKind::Empty },
         tasks::Refusal::Batch => people::Refusal::Limit { which: people::LimitKind::Batch },

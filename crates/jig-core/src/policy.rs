@@ -342,7 +342,9 @@ impl Core {
                 assert!(self.permission_roles.insert(project, permissions).is_ok(), "admitted permission policy");
                 Ok(snapshot)
             }
-            authority::PolicyFact::Refused { .. } => Err(people::Refusal::Authority { lacking: people::Lack::Shape }),
+            authority::PolicyFact::Refused { .. } => {
+                Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape })
+            }
             authority::PolicyFact::Added { .. } | authority::PolicyFact::Dropped { .. } => {
                 unreachable!("existing project policy replacement")
             }

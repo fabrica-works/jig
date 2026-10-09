@@ -186,7 +186,10 @@ pub(super) fn edit_note_request(
     } else {
         work.push(Event::People(people::Event::Decided {
             request,
-            outcome: people::Outcome::Refused(people::Refusal::Authority { lacking: people::Lack::Shape }),
+            outcome: people::Outcome::Refused(people::Refusal::Authority {
+                proposable: None,
+                lacking: people::Lack::Shape,
+            }),
         }));
     }
 }

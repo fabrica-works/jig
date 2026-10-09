@@ -167,6 +167,13 @@ pub(super) fn tag_people(
                 Request::Now(Box::new(Now::RestoreRefused))
             }
             people::Request::Route { request, person, project, role, ask } => {
+                if let Err(why) = crate::acts::request(core, &env.limits, person, project, role, &ask) {
+                    work.push(Event::People(people::Event::Decided {
+                        request,
+                        outcome: people::Outcome::Refused(why),
+                    }));
+                    continue;
+                }
                 match *ask {
                     people::Ask::Application { connector, .. } => {
                         super::application_routes::admitted(

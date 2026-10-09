@@ -11,7 +11,12 @@ pub enum Refusal {
     /// The held role does not permit this request here.
     Role { held: Option<Role> },
     /// The request lacks the stated authority.
-    Authority { lacking: Lack },
+    Authority {
+        lacking: Lack,
+        /// Whether this refusal determines that a proposal could be accepted.
+        /// None preserves refusals that make no claim about a proposal.
+        proposable: Option<bool>,
+    },
     /// The stated admission bound was reached.
     Limit { which: LimitKind },
     /// The decided subject changed since it was observed.
@@ -35,6 +40,8 @@ pub enum Refusal {
 /// Authority missing from a party's request.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Lack {
+    /// No policy role may accept this kind of party proposal.
+    Approver,
     /// Requested spend exceeds what this source can supply.
     Budget { needs: u64, left: u64 },
     /// No grant covers this operation kind.

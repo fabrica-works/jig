@@ -427,3 +427,8 @@ pub fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<Chip, M
 pub fn budget_from_row(row: &tasks::TaskRecord) -> BudgetLine {
     task_tree::budget(row)
 }
+
+/// Complete bounded authority facts used when judging draft controls.
+pub(crate) fn act_authority(limits: &Limits, value: &tasks::Authority) -> Result<AuthorityLine, Missing> {
+    task_tree::authority(limits, value)
+}

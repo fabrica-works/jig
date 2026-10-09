@@ -8,6 +8,7 @@ use jig_core_people as people;
 use skein_lib::Queue;
 
 impl Core {
+    #[expect(clippy::too_many_lines, reason = "one exhaustive finding translation retains each authority fact")]
     pub(crate) fn request_refusal(
         &self,
         ask: &authority::PersonAsk,
@@ -23,7 +24,7 @@ impl Core {
             authority::Finding::Oversized => people::Refusal::Limit { which: people::LimitKind::Authority },
             authority::Finding::Arithmetic => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
             authority::Finding::ResourceUnavailable => {
-                people::Refusal::Authority { lacking: people::Lack::ResourceUnavailable }
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::ResourceUnavailable }
             }
             authority::Finding::Authority { source, lacks } => {
                 let cap = self.source_cap(ask, source);
@@ -46,11 +47,12 @@ impl Core {
                 } else {
                     unreachable!("authority deficit has a component")
                 };
-                people::Refusal::Authority { lacking }
+                people::Refusal::Authority { proposable: None, lacking }
             }
             authority::Finding::Spend { source } | authority::Finding::Price { source } => {
                 let cap = self.source_cap(ask, source);
                 people::Refusal::Authority {
+                    proposable: None,
                     lacking: people::Lack::Budget {
                         needs: request_spend(&ask.request),
                         left: source_spend(ask, source, cap),
@@ -58,39 +60,60 @@ impl Core {
                 }
             }
             authority::Finding::Tasks { source } => people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Tasks {
                     left: source_tasks(ask, source, self.source_cap(ask, source).delegation.tasks),
                 },
             },
-            authority::Finding::Executor { .. } => people::Refusal::Authority { lacking: people::Lack::TaskKind },
+            authority::Finding::Executor { .. } => {
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind }
+            }
             authority::Finding::Grant { source } => people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Grant {
                     kind: request_grant(&ask.request, self.source_cap(ask, source), &self.authority.rules().implies),
                 },
             },
             authority::Finding::RunBudget | authority::Finding::RunCap => people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget {
                     needs: request_spend(&ask.request),
                     left: available(ask.pool).min(self.authority.rules().maximum_run_spend),
                 },
             },
-            authority::Finding::Deadline => people::Refusal::Authority { lacking: people::Lack::Deadline },
-            authority::Finding::Account => people::Refusal::Authority { lacking: people::Lack::Account },
-            authority::Finding::Writer => people::Refusal::Authority { lacking: people::Lack::Writer },
-            authority::Finding::Tool => people::Refusal::Authority { lacking: people::Lack::Tool },
-            authority::Finding::Scope { .. } => people::Refusal::Authority { lacking: people::Lack::Scope },
-            authority::Finding::ResourceAccess => people::Refusal::Authority { lacking: people::Lack::ResourceAccess },
-            authority::Finding::Reference => people::Refusal::Authority { lacking: people::Lack::Reference },
+            authority::Finding::Deadline => {
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::Deadline }
+            }
+            authority::Finding::Account => {
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::Account }
+            }
+            authority::Finding::Writer => {
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::Writer }
+            }
+            authority::Finding::Tool => people::Refusal::Authority { proposable: None, lacking: people::Lack::Tool },
+            authority::Finding::Scope { .. } => {
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::Scope }
+            }
+            authority::Finding::ResourceAccess => {
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::ResourceAccess }
+            }
+            authority::Finding::Reference => {
+                people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference }
+            }
             authority::Finding::Required { judge } => people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Required { connector: judge.connector, kind: judge.requirement },
             },
             authority::Finding::Failed { judge } => people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Failed { connector: judge.connector, kind: judge.requirement },
             },
             authority::Finding::Unguarded { judge } => people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Unguarded { connector: judge.connector, kind: judge.requirement },
             },
             authority::Finding::PeriodSpend => people::Refusal::Authority {
+                proposable: None,
                 lacking: people::Lack::Budget {
                     needs: ask.pool.budget,
                     left: self.authority.role(ask.project, ask.role).expect("checked role").period_spend,

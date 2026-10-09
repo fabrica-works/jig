@@ -220,6 +220,7 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
+            proposable: None,
             lacking: people::Lack::Again { required: true }
         })))
     );

@@ -19,7 +19,7 @@ pub(super) fn goal_decide(
     work: &mut Queue<Event>,
     request: Token,
     person: u64,
-    role: Option<people::Role>,
+    _role: Option<people::Role>,
     project: u32,
     proposer: u64,
     number: u64,
@@ -29,29 +29,24 @@ pub(super) fn goal_decide(
         pool_refused(work, request, people::Refusal::Unknown);
         return;
     };
-    if let Err(why) = core.goal_standing(&proposal, project, role) {
+    if proposal.project != project {
+        pool_refused(work, request, people::Refusal::Unknown);
+        return;
+    }
+    if let Err(why) = crate::acts::proposal(
+        core,
+        &env.limits,
+        person,
+        proposal_act(&choice),
+        crate::documents::Proposer::Party(proposer),
+        number,
+    ) {
         pool_refused(work, request, why);
         return;
     }
     let event = match choice {
         people::ProposalDecision::Accept => {
-            if core.projections.len() >= env.limits.tasks.tasks {
-                pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::LiveTasks });
-                return;
-            }
-            let source = match core.goal_accept_allowed(
-                &proposal,
-                project,
-                person,
-                role.expect("checked standing"),
-                env.limits.tasks.tree_tasks,
-            ) {
-                Ok(source) => source,
-                Err(why) => {
-                    pool_refused(work, request, why);
-                    return;
-                }
-            };
+            let (source, _) = core.goal_pool(project, person);
             let (period, pool) = core.goal_open_pool(project, person);
             if let Some(event) = period {
                 work.push(Event::Tasks(event));
@@ -108,7 +103,7 @@ pub(super) fn person_proposal_decide(
     work: &mut Queue<Event>,
     request: Token,
     person: u64,
-    role: Option<people::Role>,
+    _role: Option<people::Role>,
     project: u32,
     proposer: u64,
     number: u64,
@@ -122,43 +117,25 @@ pub(super) fn person_proposal_decide(
         pool_refused(work, request, people::Refusal::Unknown);
         return;
     }
+    if let Err(why) = crate::acts::proposal(
+        core,
+        &env.limits,
+        person,
+        proposal_act(&choice),
+        crate::documents::Proposer::Task(proposer),
+        number,
+    ) {
+        pool_refused(work, request, why);
+        return;
+    }
     let current = match proposal.state {
         tasks::ProposalState::Pending { holder, .. } => holder,
         tasks::ProposalState::Accepted { .. }
         | tasks::ProposalState::Rejected { .. }
-        | tasks::ProposalState::Withdrawn => {
-            pool_refused(work, request, people::Refusal::Unknown);
-            return;
-        }
+        | tasks::ProposalState::Withdrawn => unreachable!("common judgment checked pending holder"),
     };
-    let (_, proposal_kind) = Core::proposal_kind(&proposal.action);
-    let standing = match current {
-        tasks::ProposalHolder::Person(holder) => holder == person,
-        tasks::ProposalHolder::Policy { project: named, .. } => {
-            named == project && core.proposal_policy_standing(person, project, proposal_kind)
-        }
-        tasks::ProposalHolder::Task(_) => false,
-    };
-    if !standing || role.is_none() {
-        pool_refused(work, request, people::Refusal::NotWaiting);
-        return;
-    }
     let next = match choice {
         people::ProposalDecision::Accept => {
-            let Some(action) = Core::proposal_action_for_check(&proposal.action) else {
-                pool_refused(work, request, people::Refusal::Authority { lacking: people::Lack::Shape });
-                return;
-            };
-            if let Err(why) = core.proposal_person_admit(
-                person,
-                project,
-                role.expect("checked role"),
-                action,
-                env.limits.tasks.tree_tasks,
-            ) {
-                pool_refused(work, request, why);
-                return;
-            }
             person_proposal_accept(core, work, request, person, proposal);
             return;
         }
@@ -335,7 +312,7 @@ pub(super) fn person_escalation_decide(
     work: &mut Queue<Event>,
     request: Token,
     person: u64,
-    role: Option<people::Role>,
+    _role: Option<people::Role>,
     project: u32,
     task: u64,
     revision: u64,
@@ -351,7 +328,7 @@ pub(super) fn person_escalation_decide(
         pool_refused(work, request, people::Refusal::Unknown);
         return;
     };
-    if context.project != project || !core.escalation_visible(&context, person, role) {
+    if context.project != project {
         pool_refused(work, request, people::Refusal::Unknown);
         return;
     }
@@ -365,22 +342,17 @@ pub(super) fn person_escalation_decide(
         pool_refused(work, request, people::Refusal::Unknown);
         return;
     }
-    if !Core::escalation_standing(&context, person, role) {
-        pool_refused(work, request, people::Refusal::NotWaiting);
+    let act = match &decision {
+        people::EscalationDecision::Release => crate::acts::Act::Release,
+        people::EscalationDecision::Reject { .. } => crate::acts::Act::LeaveHeld,
+        people::EscalationDecision::Pass => crate::acts::Act::PassUp,
+    };
+    if let Err(why) = crate::acts::escalation(core, &env.limits, person, act, task) {
+        pool_refused(work, request, why);
         return;
     }
     let semantic = match &decision {
-        people::EscalationDecision::Release => {
-            if !core.escalation_covers(&env.limits, &context, person, role) {
-                pool_refused(work, request, people::Refusal::Role { held: role });
-                return;
-            }
-            if let Err(why) = core.escalation_release_allowed(&context, person, role, env.limits.tasks.tree_tasks) {
-                pool_refused(work, request, why);
-                return;
-            }
-            tasks::EscalationDecision::Release
-        }
+        people::EscalationDecision::Release => tasks::EscalationDecision::Release,
         people::EscalationDecision::Reject { reason } => tasks::EscalationDecision::Reject { reason: reason.clone() },
         people::EscalationDecision::Pass => {
             let Some(holder) = core.escalation_fallback(project) else {
@@ -491,4 +463,12 @@ pub(super) fn escalation_request(
         return;
     }
     out.push(Request::Now(Box::new(Now::HistoricalEscalation { request, person, project, task, revision })));
+}
+
+fn proposal_act(choice: &people::ProposalDecision) -> crate::acts::Act {
+    match choice {
+        people::ProposalDecision::Accept => crate::acts::Act::Accept,
+        people::ProposalDecision::Reject { .. } => crate::acts::Act::Reject,
+        people::ProposalDecision::Pass => crate::acts::Act::PassUp,
+    }
 }

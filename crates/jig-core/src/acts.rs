@@ -1,0 +1,151 @@
+//! Party acts judged from current engine facts (`client/domain/contract.md`,
+//! sections 3.2 and 5.3; `domain/people.md`, section 5.1).
+//! No state, drafts, keys or document cache is retained. A request and a
+//! document use the same judgments. Draft-dependent acts carry numerical and
+//! listed bounds; the client compares its form with these engine facts.
+
+pub(crate) mod bounds;
+mod objects;
+mod requests;
+mod standing;
+use crate::{Core, Limits, documents};
+use alloc::boxed::Box;
+use jig_core_people as people;
+pub(crate) use objects::{close, escalation, person, proposal, question, write};
+pub(crate) use requests::request;
+use skein_lib::{List, Wall};
+pub(crate) use standing::role;
+
+/// An act in the client's closed order, translated between vocabularies by the wire.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Act {
+    /// Write to an agent.
+    Write,
+    /// Answer a question or person task.
+    Answer,
+    /// Take a role task.
+    Take,
+    /// Hand a task back.
+    HandBack,
+    /// Accept a proposal.
+    Accept,
+    /// Reject a proposal.
+    Reject,
+    /// Pass a decision up.
+    PassUp,
+    /// Release a held task.
+    Release,
+    /// Leave a task held.
+    LeaveHeld,
+    /// Amend a specification.
+    Amend,
+    /// Amend and release together.
+    AmendRelease,
+    /// Stop a live run.
+    Stop,
+    /// Cancel a subtree.
+    Cancel,
+    /// Close a chat.
+    Close,
+    /// Become a requester.
+    TakeOver,
+    /// Set a goal.
+    SetGoal,
+    /// Reorder goals.
+    Prioritise,
+    /// Mark updates read.
+    MarkSeen,
+    /// Edit a note.
+    EditNote,
+    /// Delete a note.
+    DeleteNote,
+    /// Adopt a resource.
+    Adopt,
+    /// Change policy.
+    ChangePolicy,
+    /// Change roles.
+    SetRoles,
+    /// Make a service.
+    MakeService,
+    /// Set a pool.
+    SetPool,
+}
+
+/// What a current engine judgment says about an act.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Admission {
+    /// The act is made directly.
+    Allowed,
+    /// The act becomes a proposal waiting at this holder.
+    Proposed { to: Recipient },
+    /// The act is refused with the same facts as its request.
+    Refused(people::Refusal),
+    /// The draft is compared with supplied engine facts before confirmation.
+    Bounded { within: Bounds, beyond: Beyond },
+}
+
+/// A draft's numerical and listed bounds, supplied by the engine.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Bounds {
+    /// A goal's direct funding, executor and deadline choices.
+    Goal {
+        pool_left: u64,
+        charters: List<u32>,
+        latest: Option<Wall>,
+        budget: u64,
+        maximum_budget: u64,
+        maximum_deadline: Option<Wall>,
+    },
+    /// Authority the party may add to the task's current authority.
+    Amend {
+        budget_left: u64,
+        grants: List<documents::GrantLine>,
+        authority: Box<documents::AuthorityLine>,
+        ceiling: Box<documents::AuthorityLine>,
+    },
+}
+
+/// The result when a supported draft exceeds the direct bounds.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Beyond {
+    /// The draft becomes a proposal for this holder.
+    Proposed { to: Recipient },
+    /// The draft is refused with these engine facts.
+    Refused(people::Refusal),
+}
+
+/// A holder named by current routing policy.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Recipient {
+    /// A task above.
+    Task(u64),
+    /// A named party.
+    Party(u64),
+    /// A role in a project.
+    Role { project: u32, role: u32 },
+}
+
+/// One act and its current engine judgment.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Offered {
+    pub act: Act,
+    pub admission: Admission,
+}
+
+/// Judge an act using the same current facts as its authenticated request.
+#[must_use]
+pub fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: &documents::Subject) -> Admission {
+    objects::admit(core, limits, party, act, object)
+}
+
+fn allowed(value: Result<(), people::Refusal>) -> Admission {
+    match value {
+        Ok(()) => Admission::Allowed,
+        Err(why) => Admission::Refused(why),
+    }
+}
+
+/// Transient judgment facts and their authority translations; no result is retained.
+pub(crate) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
+    documents::document_worst_case(&limits.documents)?.checked_mul(4)
+}

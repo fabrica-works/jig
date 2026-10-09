@@ -452,7 +452,7 @@ impl World {
 
     fn send_decision(&mut self, request: Token, key: RequestKey, task: u64) {
         let outcome = if self.settings.authority_refuses {
-            Outcome::Refused(Refusal::Authority { lacking: Lack::Shape })
+            Outcome::Refused(Refusal::Authority { proposable: None, lacking: Lack::Shape })
         } else {
             Outcome::Started { task }
         };
@@ -574,7 +574,7 @@ impl World {
                             Ask::StartChat { .. } | Ask::SetGoal { .. } => {
                                 let goal = kind == RouteKind::Goal;
                                 let outcome = if self.settings.authority_refuses {
-                                    Outcome::Refused(Refusal::Authority { lacking: Lack::Shape })
+                                    Outcome::Refused(Refusal::Authority { proposable: None, lacking: Lack::Shape })
                                 } else {
                                     let number = self.name();
                                     tasks.push((key, number));
@@ -647,7 +647,10 @@ impl World {
                                             }
                                             Outcome::Released { task }
                                         } else {
-                                            Outcome::Refused(Refusal::Authority { lacking: Lack::Again { required } })
+                                            Outcome::Refused(Refusal::Authority {
+                                                proposable: None,
+                                                lacking: Lack::Again { required },
+                                            })
                                         }
                                     }
                                     None => Outcome::Refused(Refusal::Unknown),
@@ -678,6 +681,7 @@ impl World {
                                             })
                                         {
                                             Outcome::Refused(Refusal::Authority {
+                                                proposable: None,
                                                 lacking: Lack::Again { required: true },
                                             })
                                         } else if amendment.authority.is_some() && self.settings.authority_refuses {

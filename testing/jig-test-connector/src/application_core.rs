@@ -15,6 +15,7 @@ pub enum Refusal {
     /// The request lacks the stated authority.
     Authority {
         lacking: Lack,
+        proposable: Option<bool>,
     },
     /// The stated admission bound was reached.
     Limit {
@@ -47,6 +48,8 @@ pub enum Refusal {
 /// Authority missing from a party's request.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Lack {
+    /// No policy role may accept this kind of party proposal.
+    Approver,
     /// Uncertain effect recovery needs an explicit repeat/skip choice.
     Again { required: bool },
     /// Requested spend exceeds what this source can supply.
