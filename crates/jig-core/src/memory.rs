@@ -54,6 +54,7 @@ fn task_carrier(limits: &Limits) -> Option<u64> {
     .checked_add(bytes(task.authority_grants, sizeof(size_of::<tasks::ResourceScope>())?)?)?;
     sizeof(size_of::<tasks::New>())?
         .checked_add(u64::from(task.spec_bytes))?
+        .checked_add(u64::from(task.message_bytes))?
         .checked_add(bytes(task.parameters, sizeof(size_of::<tasks::Parameter>())?)?)?
         .checked_add(bytes(task.inputs, sizeof(size_of::<u64>())?)?)?
         .checked_add(bytes(task.dependencies, sizeof(size_of::<u64>())?)?)?
@@ -260,6 +261,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(task.message_bytes.max(task.result_bytes)))?
         .checked_add(limits.policy_bytes)?
         .checked_add(u64::from(limits.run_bytes))?
+        .checked_add(u64::from(task.message_bytes))?
         .checked_add(u64::from(limits.brief.brief_bytes))?
         .checked_add(u64::from(limits.resume_bytes))?
         .checked_add(u64::from(limits.people.amendment_bytes))?

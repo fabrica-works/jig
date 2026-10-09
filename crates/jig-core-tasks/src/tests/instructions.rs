@@ -8,7 +8,13 @@
 )]
 use super::revisions::{Harness, LIMITS, task, to};
 use crate::{Amendment, Event, Executor, Key, Party, Refusal, Request, Revisions, Stored};
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
+
+fn oversized() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.resize(usize::try_from(LIMITS.message_bytes).unwrap().checked_add(1).unwrap(), 1);
+    bytes
+}
 
 fn change(instructions: &[u8]) -> Amendment {
     Amendment {
@@ -35,7 +41,7 @@ fn amend(h: &mut Harness, change: Amendment) -> Vec<Request> {
 #[test]
 fn an_instruction_amendment_is_heard_whole_and_keeps_immutable_settings_across_restart() {
     let mut h = Harness::new();
-    h.make(vec![task(1, &[])]);
+    h.make(Vec::from([task(1, &[])]));
     h.send(Event::Prepare { reply_to: to(), task: 1 });
     h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
     h.send(Event::Started { task: 1, attempt: 1 });
@@ -81,10 +87,10 @@ fn unsupported_and_oversized_instruction_edits_leave_the_task_unchanged() {
         let mut h = Harness::new();
         let mut member = task(1, &[]);
         member.executor = executor;
-        h.make(vec![member]);
+        h.make(Vec::from([member]));
         let before = h.domain.task(1).unwrap().clone();
         let edit = match executor {
-            Executor::Agent { .. } => change(&vec![1; usize::try_from(LIMITS.message_bytes).unwrap() + 1]),
+            Executor::Agent { .. } => change(&oversized()),
             Executor::Procedure { .. } | Executor::Person(_) => change(b"agent only"),
         };
         let out = amend(&mut h, edit);
@@ -101,7 +107,7 @@ fn unsupported_and_oversized_instruction_edits_leave_the_task_unchanged() {
             _ => false,
         }));
         let mut corrupt = before;
-        corrupt.instructions = Some(vec![1; usize::try_from(LIMITS.message_bytes).unwrap() + 1].into_boxed_slice());
+        corrupt.instructions = Some(oversized().into_boxed_slice());
         let mut fresh = Harness::new();
         let out = fresh.send(Event::Restore { record: Stored::Live(Box::new(corrupt)) });
         assert!(out.iter().any(|r| match r {

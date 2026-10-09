@@ -83,17 +83,20 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.host.accounts).checked_mul(64)?)?
         .checked_add(skein_lib::List::<jig_core_tasks::Word>::worst_case(limits.core.tasks.inbox_messages)?)?
         .checked_add(u64::from(limits.core.tasks.inbox_bytes))?;
-    let value = assignment
-        .checked_add(limits.core.policy_bytes)?
-        .checked_add(u64::from(limits.core.tasks.batch).checked_mul(u64::from(limits.core.run_bytes))?)?
-        .checked_add(limits.host.turn_bytes)?
-        .checked_add(limits.host.outcome_bytes)?
-        .checked_add(u64::from(limits.observability.answer_bytes))?
-        .checked_add(65_536)?
-        .max(core::reads::answer_worst_case(&limits.core)?)
-        .max(infrastructure::document_worst_case(&limits.infrastructure)?)
-        .max(observability::document_worst_case(&limits.observability)?)
-        .max(u64::from(limits.core.views.text_bytes).checked_mul(2)?);
+    let value =
+        assignment
+            .checked_add(limits.core.policy_bytes)?
+            .checked_add(u64::from(limits.core.tasks.batch).checked_mul(
+                u64::from(limits.core.run_bytes).checked_add(u64::from(limits.core.tasks.message_bytes))?,
+            )?)?
+            .checked_add(limits.host.turn_bytes)?
+            .checked_add(limits.host.outcome_bytes)?
+            .checked_add(u64::from(limits.observability.answer_bytes))?
+            .checked_add(65_536)?
+            .max(core::reads::answer_worst_case(&limits.core)?)
+            .max(infrastructure::document_worst_case(&limits.infrastructure)?)
+            .max(observability::document_worst_case(&limits.observability)?)
+            .max(u64::from(limits.core.views.text_bytes).checked_mul(2)?);
     let envelopes = u64::from(limits.core.call_records.checked_add(limits.observability.reads)?.checked_add(calls)?)
         .checked_mul(limits.core.fleet.call_name_bytes.checked_add(32)?)?;
     let owned = u64::from(limits.core.tasks.tasks)
