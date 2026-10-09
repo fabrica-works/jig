@@ -37,7 +37,9 @@ impl Config {
             engine,
             workers,
             scenario,
-            limits: jig_core_world::peers::fixture(seed, u32::from(engine)).1,
+            // root() below derives the exact scenario limits. Its input does
+            // not use this field, so constructing a second fixture adds nothing.
+            limits: jig_core_world::world::limits(),
             fault: negative::Fault::None,
         };
         config.limits = config.root().1;

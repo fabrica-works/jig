@@ -160,7 +160,9 @@ impl World {
     /// A story may configure its programs, policy and worker capacity.
     #[must_use]
     pub fn configured(seed: u64, requirement: bool, configuration: root::Config, limits: root::Limits) -> World {
-        let mut bootstrap = fixture(seed, requirement).0;
+        // This domain only journals roles before the exact effect configuration
+        // is installed and restored below; its bootstrap needs no effect grants.
+        let mut bootstrap = crate::world::config(seed);
         if *bootstrap.core.authority.limits() != limits.core.authority {
             let rules = bootstrap.core.authority.rules().clone();
             let policy = bootstrap.core.authority.policy(1).expect("bootstrap policy").clone();
