@@ -102,9 +102,10 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
         Some(Body::PersonTask(value)) => (None, Some(value.task.title.clone())),
         Some(Body::Result(value)) => (None, Some(value.task.title.clone())),
         Some(Body::Proposal(value)) => (Some(value.project), Some(value.why.clone())),
+        Some(Body::Note { project, document }) => (Some(*project), Some(document.description.clone())),
         None => (None, None),
     };
-    let mut project = project;
+    let mut project = project.or(object.project);
     if project.is_none() {
         for entry in &domain.inbox.rows {
             if entry.object == key {

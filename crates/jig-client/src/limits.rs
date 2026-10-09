@@ -32,6 +32,8 @@ pub struct Limits {
     pub sources: u32,
     pub reads: u32,
     pub parts: u32,
+    /// Live delegates that one close confirmation may dispose of.
+    pub delegates: u32,
     /// Whole payload budget enforced by the decoding owner: boxes (including
     /// the root box), list capacities, texts and nested documents.
     pub document_bytes: u64,
@@ -79,6 +81,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(crate::intents::worst_case(limits)?)?;
     total = total.checked_add(crate::notices::worst_case(limits)?)?;
     total = total.checked_add(crate::fields::worst_case(limits)?)?;
+    total = total.checked_add(crate::confirm::worst_case(limits)?)?;
+    total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows)?)?;
     total = total.checked_add(crate::signin::worst_case(limits)?)?;
     total = total.checked_add(crate::objects::worst_case(limits)?)?;
     total = total.checked_add(Slab::<crate::reads::Reading>::worst_case(limits.reads)?)?;

@@ -33,4 +33,6 @@ mod lifecycle;
 mod time;
 
 mod objects;
+
+mod confirmation;
 mod pages;

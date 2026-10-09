@@ -4,7 +4,7 @@
 //! asks the keyed table to mark the newest displayed position once per opening.
 //! See client/domain/pages.md, 3, and contract.md, 3.2 and 6–7.
 use crate::{
-    address::Address,
+    address::{Address, ProjectSection},
     contract::{Count, Cursor, InboxEntry, InboxGroup, Needs, ObjectKey},
 };
 use skein_lib::List;
@@ -105,6 +105,7 @@ pub const fn address(key: ObjectKey) -> Address {
         | ObjectKey::Result(task)
         | ObjectKey::Question { task, .. } => task,
         ObjectKey::Proposal(proposal) => proposal.proposer,
+        ObjectKey::Note { project, .. } => return Address::Project { project, section: ProjectSection::Notes },
     };
     Address::task(task)
 }

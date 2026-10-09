@@ -8,12 +8,18 @@ pub enum Purpose {
     NewChat,
     /// Words for a task.
     Composer { task: u64 },
+    /// The open answer form words.
+    Answer,
     /// The open confirmation reason.
     Reason,
     /// Amendment words.
     Amendment,
     /// Amended instructions.
     Instructions,
+    /// The description of the note being corrected.
+    NoteDescription,
+    /// The whole body of the note being corrected.
+    NoteBody,
     /// A new goal specification.
     NewGoal,
 }

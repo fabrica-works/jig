@@ -53,6 +53,8 @@ pub enum Body {
     PersonTask(Box<PersonTask>),
     /// A result.
     Result(Box<Result>),
+    /// A note and the routing project of its page.
+    Note { project: u32, document: Box<crate::contract::Note> },
 }
 /// Why a card leaves, with durable facts preserved for its view.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -75,7 +77,7 @@ pub enum Card {
     /// Available for an offered act.
     Open,
     /// Asked, with the root table's progress.
-    Deciding { request: Token, progress: Progress },
+    Deciding { request: Option<Token>, progress: Progress },
     /// Refused, with facts kept on its card.
     Refused { refusal: Refusal },
     /// Ended and still shown until its linger expires.
@@ -85,6 +87,7 @@ pub enum Card {
 #[derive(Debug)]
 pub struct Object {
     pub key: ObjectKey,
+    pub project: Option<u32>,
     pub body: Option<Body>,
     pub sources: Set<Source>,
     pub card: Card,
@@ -177,7 +180,7 @@ impl Objects {
             Ok(_) => {}
             Err(_) => return None,
         }
-        let object = Object { key, body: None, sources, card: Card::Open, shown: true, reply: None };
+        let object = Object { key, project: None, body: None, sources, card: Card::Open, shown: true, reply: None };
         let Ok(id) = self.slab.insert(object) else {
             return None;
         };
@@ -194,6 +197,12 @@ impl Objects {
             return false;
         };
         let object = self.slab.get_mut(id).expect("indexed object exists");
+        match &body {
+            Body::Task(task) => object.project = Some(task.project),
+            Body::Proposal(proposal) => object.project = Some(proposal.project),
+            Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {}
+            Body::Note { project, .. } => object.project = Some(*project),
+        }
         match body {
             Body::Chip(chip) => match &mut object.body {
                 Some(Body::Task(task)) => task.chip = chip,
@@ -203,7 +212,8 @@ impl Objects {
                     | Body::Escalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
-                    | Body::Result(_),
+                    | Body::Result(_)
+                    | Body::Note { .. },
                 )
                 | None => object.body = Some(Body::Chip(chip)),
             },
@@ -212,7 +222,8 @@ impl Objects {
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
-            | Body::Result(_) => object.body = Some(body),
+            | Body::Result(_)
+            | Body::Note { .. } => object.body = Some(body),
         }
         true
     }
@@ -311,6 +322,14 @@ impl Objects {
             }
         }
     }
+    /// Holds a note from its bounded page as a card with its own recalled revision.
+    pub fn note(&mut self, project: u32, source: Source, document: crate::contract::Note) -> Option<Id<Object>> {
+        let key = ObjectKey::Note { project, note: document.number };
+        let id = self.name(key, source)?;
+        let stored = self.put(key, Body::Note { project, document: Box::new(document) });
+        assert!(stored, "the named note accepts its own document");
+        Some(id)
+    }
     /// Attaches a chat's reply navigation without replacing its task facts or card.
     pub fn reply(&mut self, source: Source, line: crate::contract::ConversationLine) -> Option<Id<Object>> {
         let reply = result::Reply::from_line(line)?;
@@ -355,7 +374,7 @@ pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
             | ObjectKey::Escalation(_)
             | ObjectKey::Question { .. }
             | ObjectKey::PersonTask(_) => true,
-            ObjectKey::Task(_) | ObjectKey::Result(_) => false,
+            ObjectKey::Task(_) | ObjectKey::Result(_) | ObjectKey::Note { .. } => false,
         },
     }
 }
@@ -423,6 +442,9 @@ fn document_read(key: ObjectKey) -> crate::contract::Read {
         ObjectKey::Question { task, message } => Read::Question { task, message },
         ObjectKey::PersonTask(task) => Read::PersonTask { task },
         ObjectKey::Result(task) => Read::Result { task },
+        ObjectKey::Note { project, .. } => {
+            Read::Notes { scope: crate::contract::NoteScope::Project(project), description: None, after: None }
+        }
     }
 }
 /// Requests terminal facts for leaving cards, without inventing an ending.
@@ -592,6 +614,7 @@ impl Body {
             Self::Question(question) => ObjectKey::Question { task: question.task.task, message: question.message },
             Self::PersonTask(task) => ObjectKey::PersonTask(task.task.task),
             Self::Result(result) => ObjectKey::Result(result.task.task),
+            Self::Note { project, document } => ObjectKey::Note { project: *project, note: document.number },
         }
     }
     /// The ending a terminal document supplies, never inferred from its phase.
@@ -607,7 +630,43 @@ impl Body {
             Self::PersonTask(task) => task.ending.as_ref(),
             Self::Result(result) => Some(&result.ending),
             Self::Escalation(escalation) => escalation.ending.as_ref(),
-            Self::Chip(_) => None,
+            Self::Chip(_) | Self::Note { .. } => None,
+        }
+    }
+}
+
+/// An object's routing context, independent of its immutable display facts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Context {
+    pub object: ObjectKey,
+    pub project: u32,
+}
+/// Copies bounded inbox routing facts before its delivery is consumed.
+pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List<Context> {
+    let mut rows = List::with_capacity(capacity);
+    match value {
+        crate::contract::Delivery::Inbox(inbox) => {
+            for entry in &inbox.entries {
+                if rows.push(Context { object: entry.object, project: entry.project }).is_err() {
+                    break;
+                }
+            }
+        }
+        crate::contract::Delivery::Frame(_)
+        | crate::contract::Delivery::Task(_)
+        | crate::contract::Delivery::Tree(_)
+        | crate::contract::Delivery::Chips(_)
+        | crate::contract::Delivery::Goals(_)
+        | crate::contract::Delivery::Conversations(_)
+        | crate::contract::Delivery::Run(_)
+        | crate::contract::Delivery::Deployment(_) => {}
+    }
+    rows
+}
+pub(crate) fn apply_contexts(domain: &mut crate::Domain, rows: List<Context>) {
+    for row in rows.into_boxed() {
+        if let Some(id) = domain.objects.find(row.object) {
+            domain.objects.get_mut(id).expect("indexed object exists").project = Some(row.project);
         }
     }
 }

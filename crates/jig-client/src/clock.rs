@@ -32,7 +32,8 @@ fn showing(domain: &Domain) -> bool {
                     | Body::Escalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
-                    | Body::Result(_),
+                    | Body::Result(_)
+                    | Body::Note { .. },
                 ) => return true,
                 Some(Body::Chip(_)) | None => {}
             }

@@ -59,7 +59,7 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
     let source = Source::Window { generation: 0, number: 0 };
     let pending = domain.objects.name(ObjectKey::Task(5), source).unwrap();
     domain.objects.get_mut(pending).unwrap().card =
-        Card::Deciding { request: Token::new(99), progress: crate::intents::Progress::InFlight };
+        Card::Deciding { request: Some(Token::new(99)), progress: crate::intents::Progress::InFlight };
     let address = Address::Task { task: 8, section: TaskSection::Activity };
     let moved = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
     assert_eq!(moved.len(), 7);

@@ -60,6 +60,8 @@ pub enum ObjectKey {
     PersonTask(u64),
     /// A task result.
     Result(u64),
+    /// A note in its project's page.
+    Note { project: u32, note: u64 },
 }
 
 /// Whether a party has a person at its client.

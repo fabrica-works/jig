@@ -202,6 +202,9 @@ fn document_read(key: ObjectKey) -> Read {
         ObjectKey::Question { task, message } => Read::Question { task, message },
         ObjectKey::PersonTask(task) => Read::PersonTask { task },
         ObjectKey::Result(task) => Read::Result { task },
+        ObjectKey::Note { project, .. } => {
+            Read::Notes { scope: contract::NoteScope::Project(project), description: None, after: None }
+        }
     }
 }
 fn names(

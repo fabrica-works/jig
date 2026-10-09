@@ -6,13 +6,13 @@ use crate::{
     objects::{self, Card, Left, Source},
 };
 use skein_lib::{List, Queue, Time, Token, Wall};
-fn text(bytes: &[u8]) -> Text {
+pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(Box::from(bytes), 32).unwrap()
 }
-fn chip(task: u64) -> Chip {
+pub(super) fn chip(task: u64) -> Chip {
     Chip { task, title: text(b"title"), executor: Executor::Party { party: 7 }, phase: Phase::Held }
 }
-fn authority() -> Authority {
+pub(super) fn authority() -> Authority {
     Authority {
         budget: 10,
         grants: List::with_capacity(0),
@@ -24,7 +24,7 @@ fn authority() -> Authority {
         note_scopes: List::with_capacity(0),
     }
 }
-fn proposal() -> Proposal {
+pub(super) fn proposal() -> Proposal {
     Proposal {
         key: ProposalKey { proposer: 8, number: 1 },
         project: 1,
@@ -40,7 +40,7 @@ fn proposal() -> Proposal {
         ending: None,
     }
 }
-fn question() -> Question {
+pub(super) fn question() -> Question {
     Question {
         task: chip(8),
         message: 1,
@@ -50,7 +50,7 @@ fn question() -> Question {
         ending: None,
     }
 }
-fn escalation() -> Escalation {
+pub(super) fn escalation() -> Escalation {
     Escalation {
         task: chip(8),
         hold: Hold {
@@ -66,7 +66,7 @@ fn escalation() -> Escalation {
         ending: None,
     }
 }
-fn person() -> PersonTask {
+pub(super) fn person() -> PersonTask {
     PersonTask {
         task: chip(8),
         revision: Revision { value: 4 },
@@ -81,7 +81,7 @@ fn person() -> PersonTask {
         ending: None,
     }
 }
-fn result() -> Result {
+pub(super) fn result() -> Result {
     Result {
         task: chip(8),
         ending: Ending::Done,
@@ -116,7 +116,7 @@ fn inbox(keys: &[ObjectKey]) -> Delivery {
         more: false,
     }))
 }
-fn live() -> (Domain, Token) {
+pub(super) fn live() -> (Domain, Token) {
     let mut domain = Domain::new(&LIMITS, 10);
     let f = start(&mut domain, List::with_capacity(0));
     let page = open_token(&delivered(&mut domain, Time::ZERO, f, frame(7)));
@@ -222,7 +222,10 @@ fn a_deciding_card_survives_a_drop_until_its_durable_answer_then_lingers() {
     assert_eq!(drain(out).len(), 1);
     let id = domain.objects.find(key).unwrap();
     assert!(watched(&mut domain, page, &[]).is_empty());
-    assert_eq!(domain.objects.get(id).unwrap().card, Card::Deciding { request, progress: Progress::InFlight });
+    assert_eq!(
+        domain.objects.get(id).unwrap().card,
+        Card::Deciding { request: Some(request), progress: Progress::InFlight }
+    );
     assert!(domain.notices().ids().is_empty());
     let outcome = Outcome::DecidedFirst { by: frame(9).party, how: Decision::Accepted, at: Wall::EPOCH };
     drive(&mut domain, Time::from_nanos(20), Event::Answered { request, answer: Answer::Done(outcome.clone()) });

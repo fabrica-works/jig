@@ -7,6 +7,8 @@ use skein_lib::Token;
 /// What the root table says about an intent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Progress {
+    /// The person is reviewing the one confirmation; no request exists yet.
+    Confirming,
     /// One attempt is waiting for its answer.
     InFlight,
     /// Waiting to send again.
@@ -143,7 +145,7 @@ pub fn send_card(
         Some(id) => {
             let progress = domain.intents.get(id).expect("joined intent exists").progress;
             domain.objects.get_mut(object_id).expect("named card exists").card =
-                crate::objects::Card::Deciding { request: id.token(), progress };
+                crate::objects::Card::Deciding { request: Some(id.token()), progress };
             domain.changed();
             Some(id.token())
         }
@@ -179,7 +181,7 @@ pub(crate) fn progress(domain: &mut crate::Domain, request: Token, progress: Pro
         Origin::Card { object, .. } => {
             if let Some(id) = domain.objects.find(object) {
                 domain.objects.get_mut(id).expect("named card exists").card =
-                    crate::objects::Card::Deciding { request, progress };
+                    crate::objects::Card::Deciding { request: Some(request), progress };
                 domain.changed();
             }
         }

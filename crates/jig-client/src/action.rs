@@ -5,6 +5,7 @@ use crate::{
     contract::{ActKind, InboxGroup, Text},
     fields::Purpose,
 };
+use alloc::boxed::Box;
 use skein_lib::Token;
 /// A person action already decoded from the semantic tree.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -19,6 +20,14 @@ pub enum Act {
     Intend { object: Token, act: ActKind },
     /// Choose an option in the confirmation.
     Choose { option: u16 },
+    /// Answer that a person task cannot be done.
+    CannotDo,
+    /// Choose whether to repeat an uncertain effect on release.
+    Again { again: bool },
+    /// Choose a live delegate's disposal when closing a chat.
+    Dispose { task: u64, take_over: bool },
+    /// Supply the task amendment in the open confirmation.
+    Change { change: Box<crate::contract::Amendment> },
     /// Confirm the open act.
     Confirm,
     /// Dismiss the confirmation or notice.

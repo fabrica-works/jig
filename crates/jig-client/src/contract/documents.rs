@@ -98,6 +98,7 @@ pub struct Task {
     pub result: Option<Result>,
     pub runtime: Runtime,
     pub impact: Impact,
+    pub delegates: List<LiveDelegate>,
     pub writer_slots: List<WriterSlot>,
 }
 
@@ -746,4 +747,11 @@ pub struct WriterSlot {
     pub resource: Part,
     pub task: u64,
     pub attempt: Option<u32>,
+}
+
+/// A live chat delegate and the funding a takeover would reserve.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LiveDelegate {
+    pub chip: Chip,
+    pub takeover_budget: u64,
 }

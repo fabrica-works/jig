@@ -23,6 +23,7 @@ pub(super) const LIMITS: Limits = Limits {
     sources: 8,
     reads: 4,
     parts: 8,
+    delegates: 2,
     document_bytes: 65536,
     records: 2,
     projects: 2,

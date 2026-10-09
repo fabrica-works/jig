@@ -50,7 +50,10 @@ fn intents_join_progress_and_one_terminal_and_refuse_past_the_limit() {
         Request::Answered { asked: Token::new(41), answer: Answer::Refused(Refusal::Limit { which: Limit::Requests }) }
     );
     assert!(drive(&mut domain, Time::ZERO, Event::Progress { request, progress: Progress::Parked }).is_empty());
-    assert_eq!(domain.objects.get(id).unwrap().card, Card::Deciding { request, progress: Progress::Parked });
+    assert_eq!(
+        domain.objects.get(id).unwrap().card,
+        Card::Deciding { request: Some(request), progress: Progress::Parked }
+    );
     let answer = Answer::Refused(Refusal::NotOffered);
     assert!(drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() }).is_empty());
     assert_eq!(domain.intents().get(Id::from_token(request)).unwrap().answer, Some(answer.clone()));

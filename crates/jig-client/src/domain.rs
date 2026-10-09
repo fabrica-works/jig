@@ -47,6 +47,7 @@ pub enum Timer {
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) started: bool,
+    pub(crate) confirming: Option<crate::confirm::Confirmation>,
     pub(crate) now: Time,
     pub(crate) clock: crate::clock::State,
     pub(crate) notices: crate::notices::Notices,
@@ -90,6 +91,7 @@ impl Domain {
         assert!(crate::limits::worst_case(limits).is_some(), "client limits are valid");
         Self {
             started: false,
+            confirming: None,
             now: Time::ZERO,
             clock: crate::clock::State { page_times: false, armed: false },
             notices: crate::notices::Notices::new(limits.notices, limits.notice_life),
@@ -170,7 +172,8 @@ impl Domain {
                             | crate::objects::Body::Escalation(_)
                             | crate::objects::Body::Question(_)
                             | crate::objects::Body::PersonTask(_)
-                            | crate::objects::Body::Result(_),
+                            | crate::objects::Body::Result(_)
+                            | crate::objects::Body::Note { .. },
                         )
                         | None => {}
                     }
@@ -236,6 +239,11 @@ impl Domain {
         self.timers.arm(Timer::Linger(id), until).expect("one linger deadline per object fits");
         self.changed();
         true
+    }
+    /// The one object confirmation, including its observed revision and choices.
+    #[must_use]
+    pub const fn confirmation(&self) -> Option<&crate::confirm::Confirmation> {
+        self.confirming.as_ref()
     }
     /// Provider names for the sign-in page.
     #[must_use]
@@ -526,9 +534,15 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Frame { asked } => frame_answer(domain, asked, out),
         Event::Watch { watch, event } => watch_event(domain, env, Id::from_token(watch), event, out),
         Event::Ended { watch, end } => watch_end(domain, env, Id::from_token(watch), end, out),
-        Event::Went { place } => crate::pages::routing::navigate(domain, env, place, true, out),
+        Event::Went { place } => {
+            crate::confirm::close(domain);
+            crate::pages::routing::navigate(domain, env, place, true, out);
+        }
         Event::Act { act } => match act {
-            Act::Go { address } => crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out),
+            Act::Go { address } => {
+                crate::confirm::close(domain);
+                crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out);
+            }
             Act::Edit { field, text } => match domain.fields.edit(field, text) {
                 Ok(()) => domain.changed(),
                 Err(which) => {
@@ -536,7 +550,13 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                     out.push(Request::Fact { fact: Fact::Refused { which } });
                 }
             },
-            Act::Dismiss => crate::notices::dismiss_first(domain),
+            Act::Dismiss => {
+                if domain.confirming.is_some() {
+                    crate::confirm::close(domain);
+                } else {
+                    crate::notices::dismiss_first(domain);
+                }
+            }
             Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
             Act::StartChat { project } => crate::pages::conversations::start(domain, env, project, out),
             Act::OpenChat { task } => crate::pages::conversations::open_chat(domain, env, task, out),
@@ -558,7 +578,14 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                     crate::pages::conversations::start(domain, env, project, out);
                 }
             }
-            Act::Submit { .. } | Act::Intend { .. } | Act::Choose { .. } | Act::Confirm | Act::Fold { .. } => {}
+            Act::Intend { object, act } => crate::confirm::open(domain, env, Id::from_token(object), act),
+            Act::Choose { option } => crate::confirm::choose(domain, option),
+            Act::CannotDo => crate::confirm::cannot(domain),
+            Act::Again { again } => crate::confirm::again(domain, again),
+            Act::Dispose { task, take_over } => crate::confirm::dispose(domain, task, take_over),
+            Act::Change { change } => crate::confirm::change(domain, *change),
+            Act::Confirm => crate::confirm::send(domain, out),
+            Act::Submit { .. } | Act::Fold { .. } => {}
         },
         Event::Start { .. } => {}
         Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
@@ -573,6 +600,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
         }
     }
+    crate::confirm::sync(domain);
     crate::signin::returned(domain, env, out);
     crate::clock::sync(domain);
 }
@@ -637,8 +665,10 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 },
                 Owner::Page { generation } => {
                     if generation == domain.generation {
+                        let contexts = crate::objects::contexts(&delivery, env.limits.rows);
                         crate::objects::dropping(domain, id, &delivery);
                         crate::pages::routing::delivery(domain, env, id, delivery, out);
+                        crate::objects::apply_contexts(domain, contexts);
                         crate::objects::read_dropped(domain, out);
                     }
                 }
