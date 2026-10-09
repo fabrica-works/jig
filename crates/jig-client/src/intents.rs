@@ -80,6 +80,22 @@ impl Intents {
     pub fn get(&self, id: Id<Intent>) -> Option<&Intent> {
         self.slab.get(id)
     }
+    /// Pending registrations, excluding retired terminals.
+    #[must_use]
+    pub const fn ids(&self) -> &Map<Id<Intent>, ()> {
+        &self.ids
+    }
+    /// The original request joined by another press under the same owner.
+    #[must_use]
+    pub fn joined(&self, scope: u64, origin: Origin) -> Option<Id<Intent>> {
+        for (id, ()) in &self.ids {
+            let intent = self.slab.get(*id).expect("registered intent exists");
+            if intent.scope == scope && intent.origin == origin {
+                return Some(*id);
+            }
+        }
+        None
+    }
     /// Joins a pending act or emits one new send under its intent token.
     pub fn ask(&mut self, scope: u64, origin: Origin, ask: Box<Ask>, out: &mut Queue<Request>) -> Option<Id<Intent>> {
         for (id, ()) in &self.ids {
@@ -162,15 +178,17 @@ pub fn send_card(
     let scope = domain.confirmed?;
     let object_id = domain.objects.find(object)?;
     let origin = Origin::Card { object, act };
-    let mut joined = false;
-    for (id, ()) in &domain.intents.ids {
-        let intent = domain.intents.slab.get(*id).expect("registered intent exists");
-        if intent.scope == scope && intent.origin == origin {
-            joined = true;
-        }
+    let joined = domain.intents.joined(scope, origin).is_some();
+    if !joined && let Some(which) = crate::conversation::sending::admission(domain, scope, &ask) {
+        domain.objects.get_mut(object_id).expect("named card exists").card =
+            crate::objects::Card::Refused { refusal: crate::contract::Refusal::Limit { which } };
+        out.push(Request::Fact { fact: Fact::Refused { which } });
+        domain.changed();
+        return None;
     }
     match domain.intents.ask(scope, origin, ask, out) {
         Some(id) => {
+            crate::conversation::sending::pending(domain, id);
             if act == ActKind::Write && !joined {
                 let task = match object {
                     ObjectKey::Task(task) => Some(task),
@@ -213,11 +231,21 @@ pub(crate) fn by_value(domain: &mut crate::Domain, value: ByValue, out: &mut Que
         return;
     }
     let origin = Origin::Program { asked: value.asked };
-    if domain.intents.ask(value.scope, origin, value.ask, out).is_none() {
+    if domain.intents.joined(value.scope, origin).is_none()
+        && let Some(which) = crate::conversation::sending::admission(domain, value.scope, &value.ask)
+    {
         out.push(Request::Answered {
             asked: value.asked,
-            answer: Answer::Refused(crate::contract::Refusal::Limit { which: Limit::Requests }),
+            answer: Answer::Refused(crate::contract::Refusal::Limit { which }),
         });
+        return;
+    }
+    match domain.intents.ask(value.scope, origin, value.ask, out) {
+        Some(id) => crate::conversation::sending::pending(domain, id),
+        None => out.push(Request::Answered {
+            asked: value.asked,
+            answer: Answer::Refused(crate::contract::Refusal::Limit { which: Limit::Requests }),
+        }),
     }
 }
 pub(crate) fn progress(domain: &mut crate::Domain, request: Token, progress: Progress, out: &mut Queue<Request>) {
@@ -250,6 +278,7 @@ pub(crate) fn answered(
     let Some(receipt) = domain.intents.terminal(request, answer) else {
         return;
     };
+    crate::conversation::sending::answered(domain, request, &receipt.answer);
     match receipt.origin {
         Origin::Program { asked } => out.push(Request::Answered { asked, answer: receipt.answer }),
         Origin::Page { generation, purpose } => {
@@ -283,6 +312,7 @@ fn unknown(domain: &mut crate::Domain, request: Token, out: &mut Queue<Request>)
     let Some(origin) = domain.intents.unknown(request) else {
         return;
     };
+    domain.conversation.words.refused(request);
     match origin {
         Origin::Card { object, act } => crate::objects::answer::unknown(domain, object, act),
         Origin::Program { asked } => out.push(Request::Unknown { asked }),

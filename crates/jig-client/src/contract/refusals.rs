@@ -28,6 +28,8 @@ pub enum Limit {
     Inbox { task: u64, limit: u32 },
     /// The words byte limit.
     Words { limit: u32 },
+    /// The client's unread conversation word snapshots.
+    ConversationWords { limit: u32 },
     /// The client field limit.
     Fields,
     /// The client record limit.

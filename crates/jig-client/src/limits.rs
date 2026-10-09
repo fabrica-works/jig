@@ -45,6 +45,8 @@ pub struct Limits {
     pub charters: u32,
     pub text: u32,
     pub rows: u32,
+    /// Whole pending or sent word snapshots kept for the displayed conversation.
+    pub conversation_words: u32,
     /// Maximum configured navigation destinations.
     pub navigation_entries: u32,
     /// The largest unread update count displayed without a lower-bound mark.
@@ -75,7 +77,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(16)?;
     limits.objects.checked_mul(2)?;
     let timer_capacity = timers(limits)?;
-    if limits.sources == 0 {
+    if limits.sources == 0 || limits.conversation_words < limits.intents {
         return None;
     }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;

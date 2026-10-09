@@ -22,7 +22,11 @@ use crate::{
     windows::{Edge, Edges, TurnWindow},
 };
 use skein_lib::{List, Map, Wall, Writer};
+pub(crate) mod chips;
 pub(crate) mod routing;
+pub(crate) mod sending;
+pub mod words;
+pub use words::{KeptWords, Sent, Words};
 
 /// The page's presentation of one call, independent of committed turn facts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -85,6 +89,14 @@ pub struct Conversation {
     pub replacing: bool,
     /// The task ended its run; unread committed activity is taken before cleanup.
     pub run_finished: bool,
+    /// Pending snapshots and durable words retained until the agent read them.
+    pub words: KeptWords,
+    /// One live chips source for tasks named by calls in this window.
+    pub chips_watch: Option<skein_lib::Id<crate::watches::Watch>>,
+    /// Task membership shared by all displayed engine calls.
+    pub chips: List<u64>,
+    /// Membership is waiting for the old watch terminal or available watch room.
+    pub chips_pending: bool,
 }
 impl Conversation {
     /// Allocates the activity window and equally bounded staging and fold state.
@@ -104,6 +116,10 @@ impl Conversation {
             committed_turn: None,
             replacing: false,
             run_finished: false,
+            words: KeptWords::new(rows),
+            chips_watch: None,
+            chips: List::with_capacity(rows),
+            chips_pending: false,
         }
     }
     /// Reads a newer committed tail once, leaving a historical window in place.
@@ -145,6 +161,7 @@ impl Conversation {
     /// The owner has validated its row and payload bounds before this call.
     pub fn accept(&mut self, page: ActivityPage) -> Option<Read> {
         let reading = self.reading.take()?;
+        self.words.observe(&page);
         for row in &page.rows {
             match &row.event {
                 Activity::Turn { name, .. } => self.committed(*name),
@@ -541,7 +558,8 @@ fn has_call(rows: &List<ActivityLine>, name: CallName) -> bool {
 /// Conversation fold/staging allocations beyond the shared activity window.
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
-    List::<LiveTurn>::worst_case(limits.rows)?
+    words::worst_case(limits)?
+        .checked_add(List::<LiveTurn>::worst_case(limits.rows)?)?
         .checked_mul(2)?
         .checked_add(
             u64::from(limits.rows)
@@ -551,6 +569,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(u64::from(limits.text).checked_mul(2)?)?
         .checked_add(Map::<CallName, ()>::worst_case(limits.rows)?)?
         .checked_add(List::<CallName>::worst_case(limits.rows)?)?
+        .checked_add(List::<u64>::worst_case(limits.rows)?.checked_mul(2)?)?
         .checked_add(List::<ActivityLine>::worst_case(limits.rows)?.checked_mul(3)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(4)?)
 }

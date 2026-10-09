@@ -91,6 +91,8 @@ impl Domain {
     #[must_use]
     pub fn new(limits: &Limits, seed: u64) -> Self {
         assert!(crate::limits::worst_case(limits).is_some(), "client limits are valid");
+        let mut conversation = crate::conversation::Conversation::new(0, limits.rows);
+        conversation.words = crate::conversation::KeptWords::new(limits.conversation_words);
         Self {
             started: false,
             drafts: crate::drafts::Drafts::new(limits.drafts),
@@ -129,7 +131,7 @@ impl Domain {
             reads: crate::reads::Reads::new(limits.reads),
             object_rows: crate::windows::ObjectWindow::new(limits.rows),
             conversation_rows: crate::windows::ConversationWindow::new(limits.rows),
-            conversation: crate::conversation::Conversation::new(0, limits.rows),
+            conversation,
             history_rows: crate::windows::HistoryWindow::new(limits.rows),
         }
     }
@@ -505,7 +507,7 @@ impl Domain {
     }
 }
 
-fn close_watch(watch: &mut Watch, id: Id<Watch>, timers: &mut Deadlines<Timer>, out: &mut Queue<Request>) {
+pub(crate) fn close_watch(watch: &mut Watch, id: Id<Watch>, timers: &mut Deadlines<Timer>, out: &mut Queue<Request>) {
     timers.cancel(Timer::Silent(id));
     timers.cancel(Timer::Reopen(id));
     watch.state = match watch.state {
@@ -575,6 +577,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     crate::drafts::sync(domain, out);
     crate::confirm::sync(domain);
     crate::signin::returned(domain, env, out);
+    crate::conversation::sending::restore(domain);
+    crate::conversation::chips::sync(domain, env, out);
     crate::clock::sync(domain);
 }
 fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<Request>) {

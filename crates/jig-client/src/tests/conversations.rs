@@ -95,21 +95,22 @@ fn activity_document_movement_reads_only_new_lines_and_bridges_small_pages() {
     assert_eq!(positions(&c).as_ref(), &[11, 10]);
     assert_eq!(c.lines.edges.after, Edge::More(cursor(b"remaining")));
 }
-fn calls(position: u64, number: u32) -> ActivityLine {
+fn engine_call() -> Call {
     let mut objects = List::with_capacity(2);
     objects.push(ObjectKey::Task(44)).unwrap();
+    Call {
+        number: 7,
+        tool: text(b"delegate"),
+        input: text(b"words"),
+        outcome: Some(text(b"made")),
+        failed: false,
+        objects,
+        parts: List::with_capacity(0),
+    }
+}
+fn calls(position: u64, number: u32) -> ActivityLine {
     let mut blocks = List::with_capacity(2);
-    blocks
-        .push(Block::Call(Call {
-            number: 7,
-            tool: text(b"delegate"),
-            input: text(b"words"),
-            outcome: Some(text(b"made")),
-            failed: false,
-            objects,
-            parts: List::with_capacity(0),
-        }))
-        .unwrap();
+    blocks.push(Block::Call(engine_call())).unwrap();
     let mut messages = List::with_capacity(1);
     messages.push(Message { speaker: Speaker::Assistant, blocks }).unwrap();
     ActivityLine {
@@ -250,13 +251,12 @@ fn routed_conversation() {
         Event::Read { read, result: ReadResult::Value(ReadValue::Activity(Box::new(first))) },
     );
     assert_eq!(domain.turn_rows().rows.len(), 1);
+    let mut live_call = stream(1, 0, 3, b"one", false);
+    live_call.call = Some(engine_call());
     let requests = drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch {
-            watch: run_watch,
-            event: WatchEvent::Delivered(Delivery::Run(Box::new(stream(1, 0, 3, b"one", false)))),
-        },
+        Event::Watch { watch: run_watch, event: WatchEvent::Delivered(Delivery::Run(Box::new(live_call))) },
     );
     let mut continued = false;
     for request in &requests {
@@ -269,6 +269,7 @@ fn routed_conversation() {
         }
     }
     assert!(continued);
+    assert!(domain.objects.find(ObjectKey::Task(44)).is_some());
     document.activity = 2;
     let requests = drive(
         &mut domain,
@@ -351,4 +352,343 @@ fn routed_scroll_and_end(
         Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
     );
     assert!(domain.conversation().live.is_empty());
+}
+
+#[test]
+fn words_keep_the_submitted_snapshot_and_restore_sent_messages_until_read() {
+    use crate::conversation::{KeptWords, Words};
+    use skein_lib::Token;
+    let mut words = KeptWords::new(2);
+    let a = Token::new(11);
+    let b = Token::new(12);
+    assert!(words.begin(a, None, text(b"first")));
+    assert!(words.begin(a, None, text(b"later edit")));
+    assert_eq!(words.rows.get(0).unwrap().words, text(b"first"));
+    assert_eq!(words.rows.get(0).unwrap().state, Words::BeingSent);
+    assert!(words.begin(b, None, text(b"second")));
+    assert!(!words.begin(Token::new(13), None, text(b"full")));
+    words.read(1);
+    assert!(words.sent(a, 1));
+    assert!(words.sent(b, 2));
+    assert_eq!(words.rows.get(0).unwrap().state, Words::Read { message: 1 });
+    assert_eq!(words.rows.get(1).unwrap().state, Words::Sent { message: 2 });
+    words.read(2);
+    assert_eq!(words.rows.get(1).unwrap().state, Words::Read { message: 2 });
+    assert!(words.admits());
+    assert_eq!(words.rows.len(), 0);
+    words.bind(Some(7));
+    assert!(words.begin(a, None, text(b"private pending")));
+    words.bind(Some(8));
+    assert!(words.rows.is_empty());
+    let mut joined = KeptWords::new(2);
+    assert!(joined.begin(a, None, text(b"original")));
+    assert!(joined.restore(super::spine::frame(7).party, 3, text(b"activity copy")));
+    assert!(joined.sent(a, 3));
+    assert_eq!(joined.rows.len(), 1);
+    assert_eq!(joined.rows.get(0).unwrap().words, text(b"original"));
+    let mut reload = Conversation::new(8, 3);
+    assert!(reload.moved(2).is_some());
+    assert_eq!(reload.accept(words_page()), None);
+    assert_eq!(reload.words.rows.len(), 2);
+    assert_eq!(reload.words.rows.get(0).unwrap().request, None);
+    assert_eq!(reload.words.rows.get(0).unwrap().state, Words::Sent { message: 2 });
+    assert!(reload.moved(3).is_some());
+    let mut committed = calls(3, 1);
+    if let Activity::Turn { turn, .. } = &mut committed.event {
+        turn.read_through = Some(3);
+    }
+    let mut rows = List::with_capacity(1);
+    rows.push(committed).unwrap();
+    assert_eq!(reload.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(reload.words.rows.get(0).unwrap().state, Words::Read { message: 2 });
+    assert_eq!(reload.words.rows.get(1).unwrap().state, Words::Read { message: 1 });
+    assert_eq!(reload.words.rows.get(1).unwrap().words, text(b"first"));
+}
+fn words_page() -> ActivityPage {
+    let mut rows = List::with_capacity(2);
+    for (message, words) in [(2, b"second".as_slice()), (1, b"first".as_slice())] {
+        rows.push(ActivityLine {
+            position: message,
+            at: Wall::EPOCH,
+            event: Activity::Words { by: super::spine::frame(7).party, message, words: text(words) },
+        })
+        .unwrap();
+    }
+    ActivityPage { rows, before: None, after: None }
+}
+
+#[test]
+fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
+    use super::spine::{LIMITS, drain, drive};
+    use crate::{
+        Event,
+        address::{Address, Place, TaskSection},
+        contract::*,
+        fields::Purpose,
+    };
+    use skein_lib::{Queue, Time, Token};
+    let (mut domain, _) = super::objects::live();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
+    );
+    let id =
+        domain.objects.name(ObjectKey::Task(8), Source::Window { generation: domain.generation, number: 4 }).unwrap();
+    let mut document = super::confirmation::task();
+    document.acts = List::with_capacity(1);
+    document.acts.push(Offered { act: ActKind::Write, admission: Admission::Allowed }).unwrap();
+    assert!(domain.objects.put(ObjectKey::Task(8), crate::objects::Body::Task(Box::new(document))));
+    domain.objects.get_mut(id).unwrap().project = Some(1);
+    let submitted = submit_words(&mut domain, b"first");
+    let field = Purpose::Composer { task: 8 };
+    let writes = domain.fields.get(field).unwrap().writes;
+    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::BeingSent);
+    assert!(domain.conversation.words.begin(Token::new(999), None, text(b"other pending")));
+    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
+    assert_eq!(
+        crate::intents::send_card(
+            &mut domain,
+            ObjectKey::Task(8),
+            ActKind::Write,
+            Box::new(Ask::Write { project: 1, task: 8, words: text(b"changed"), release: false }),
+            &mut out
+        ),
+        Some(submitted)
+    );
+    assert!(drain(out).is_empty());
+    assert_eq!(domain.conversation().words.rows.get(0).unwrap().words, text(b"first"));
+    domain.conversation.words.refused(Token::new(999));
+    let answer = Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 4 } });
+    drive(&mut domain, Time::ZERO, Event::Answered { request: submitted, answer: answer.clone() });
+    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::Sent { message: 4 });
+    assert_eq!(domain.fields.get(field).unwrap().text.bytes(), b"");
+    assert_eq!(domain.fields.get(field).unwrap().writes, writes + 1);
+    drive(&mut domain, Time::ZERO, Event::Answered { request: submitted, answer });
+    assert_eq!(domain.fields.get(field).unwrap().writes, writes + 1);
+    domain.intents.reclaim();
+    routed_later_words(&mut domain);
+}
+fn submit_words(domain: &mut crate::Domain, words: &[u8]) -> skein_lib::Token {
+    use super::spine::drive;
+    use crate::{Event, Request, action::Act, fields::Purpose};
+    use skein_lib::Time;
+    let field = Purpose::Composer { task: 8 };
+    drive(domain, Time::ZERO, Event::Act { act: Act::Edit { field, text: text(words) } });
+    drive(domain, Time::ZERO, Event::Act { act: Act::Submit { field } });
+    for request in &drive(domain, Time::ZERO, Event::Act { act: Act::Confirm }) {
+        if let Request::Send { request, .. } = request {
+            return *request;
+        }
+    }
+    unreachable!("confirmed words send once")
+}
+fn routed_later_words(domain: &mut crate::Domain) {
+    use super::spine::drive;
+    use crate::{Event, action::Act, contract::*, fields::Purpose};
+    use skein_lib::Time;
+    let request = submit_words(domain, b"second");
+    let field = Purpose::Composer { task: 8 };
+    drive(domain, Time::ZERO, Event::Act { act: Act::Edit { field, text: text(b"later") } });
+    let writes = domain.fields.get(field).unwrap().writes;
+    drive(
+        domain,
+        Time::ZERO,
+        Event::Answered { request, answer: Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 5 } }) },
+    );
+    assert_eq!(domain.fields.get(field).unwrap().text.bytes(), b"later");
+    assert_eq!(domain.fields.get(field).unwrap().writes, writes);
+    let refused = program_words(domain);
+    assert_eq!(
+        refused.as_ref(),
+        &[crate::Request::Answered {
+            asked: skein_lib::Token::new(77),
+            answer: Answer::Refused(Refusal::Limit { which: Limit::ConversationWords { limit: 2 } })
+        }]
+    );
+    domain.conversation.words.read(5);
+    assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::Read { message: 4 });
+    assert_eq!(domain.conversation().words.rows.get(1).unwrap().state, crate::conversation::Words::Read { message: 5 });
+    routed_pending_restore(domain);
+}
+fn program_words(domain: &mut crate::Domain) -> Box<[crate::Request]> {
+    super::spine::drive(
+        domain,
+        skein_lib::Time::ZERO,
+        crate::Event::Ask {
+            ask: crate::intents::ByValue {
+                asked: skein_lib::Token::new(77),
+                scope: 7,
+                ask: Box::new(crate::contract::Ask::Write {
+                    project: 1,
+                    task: 8,
+                    words: text(b"program"),
+                    release: false,
+                }),
+            },
+        },
+    )
+}
+fn routed_pending_restore(domain: &mut crate::Domain) {
+    use super::spine::drive;
+    use crate::{
+        Event, Request,
+        address::{Address, Place, TaskSection},
+        intents::Progress,
+    };
+    use skein_lib::Time;
+    let mut sent = None;
+    for request in &program_words(domain) {
+        if let Request::Send { request, .. } = request {
+            sent = Some(*request);
+        }
+    }
+    let sent = sent.unwrap();
+    drive(domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Inbox { project: None }) });
+    assert!(domain.conversation().words.rows.is_empty());
+    drive(
+        domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
+    );
+    assert_eq!(domain.conversation().words.rows.len(), 1);
+    let row = domain.conversation().words.rows.get(0).unwrap();
+    assert_eq!(row.request, Some(sent));
+    assert_eq!(row.words, text(b"program"));
+    assert_eq!(row.state, crate::conversation::Words::BeingSent);
+    drive(domain, Time::ZERO, Event::Progress { request: sent, progress: Progress::Unknown });
+    assert!(domain.conversation().words.rows.is_empty());
+    assert_eq!(domain.fields.get(crate::fields::Purpose::Composer { task: 8 }).unwrap().text.bytes(), b"later");
+}
+
+#[test]
+fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
+    use super::spine::{LIMITS, drive, open_token};
+    use crate::{
+        Event, Request,
+        address::{Address, Place, TaskSection},
+        contract::*,
+    };
+    use skein_lib::{Time, Token};
+    let (mut domain, inbox) = super::objects::live();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
+    );
+    drive(&mut domain, Time::ZERO, Event::Ended { watch: inbox, end: WatchEnd::Closed });
+    domain.reclaim();
+    let mut rows = List::with_capacity(2);
+    rows.push(calls(2, 2)).unwrap();
+    rows.push(calls(1, 1)).unwrap();
+    let page = ActivityPage { rows, before: None, after: None };
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    let read = domain
+        .reads
+        .ask(
+            domain.generation,
+            Source::Window { generation: domain.generation, number: 1 },
+            Read::Activity { task: 8, before: None },
+            &mut out,
+        )
+        .unwrap()
+        .token();
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read, result: ReadResult::Value(ReadValue::Activity(Box::new(page))) },
+    );
+    let watch = open_token(&requests);
+    let mut count = 0_u32;
+    for request in &requests {
+        if let Request::Open { subject: Subject::Chips { tasks }, .. } = request {
+            assert_eq!(tasks.as_slice(), &[44]);
+            count += 1;
+        }
+    }
+    assert_eq!(count, 1);
+    let id = domain.objects.find(ObjectKey::Task(44)).unwrap();
+    for phase in [Phase::Running, Phase::Held] {
+        let mut chips = List::with_capacity(1);
+        let mut chip = super::objects::chip(44);
+        chip.phase = phase;
+        chips.push(chip).unwrap();
+        let requests = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Chips(chips)) },
+        );
+        for request in &requests {
+            if let Request::Open { .. } = request {
+                unreachable!("repeated names share their watch");
+            }
+        }
+        assert_eq!(domain.objects.find(ObjectKey::Task(44)), Some(id));
+        if let Some(crate::objects::Body::Chip(chip)) = &domain.objects.get(id).unwrap().body {
+            assert_eq!(chip.phase, phase);
+        } else {
+            unreachable!("chips update the shared task facts");
+        }
+    }
+    let watch = changed_chip_membership(&mut domain, watch);
+    drive(&mut domain, Time::ZERO, Event::Ended { watch, end: WatchEnd::Unknown });
+    domain.reclaim();
+    let requests = drive(&mut domain, Time::ZERO, Event::Frame { asked: Token::new(99) });
+    for request in &requests {
+        if let Request::Open { .. } = request {
+            unreachable!("a final unavailable subject waits for different names");
+        }
+    }
+}
+fn changed_chip_membership(domain: &mut crate::Domain, old: skein_lib::Token) -> skein_lib::Token {
+    use super::spine::{LIMITS, drive};
+    use crate::{Event, Request, contract::*};
+    use skein_lib::{Queue, Time, Token};
+    let mut rows = List::with_capacity(2);
+    for position in [4_u32, 3] {
+        let mut row = calls(u64::from(position), position);
+        if let Activity::Turn { turn, .. } = &mut row.event
+            && let Block::Call(call) = turn.messages.get_mut(0).unwrap().blocks.get_mut(0).unwrap()
+        {
+            call.objects.clear();
+            call.objects.push(ObjectKey::Task(55)).unwrap();
+        }
+        rows.push(row).unwrap();
+    }
+    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
+    let read = domain
+        .reads
+        .ask(
+            domain.generation,
+            Source::Window { generation: domain.generation, number: 1 },
+            domain.conversation.moved(4).unwrap(),
+            &mut out,
+        )
+        .unwrap()
+        .token();
+    let requests = drive(
+        domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage { rows, before: None, after: None }))),
+        },
+    );
+    let mut closed = false;
+    for request in &requests {
+        if let Request::Open { .. } = request {
+            unreachable!("the old watch must end first");
+        }
+        if let Request::Close { watch } = request {
+            closed = *watch == old;
+        }
+    }
+    assert!(closed);
+    drive(domain, Time::ZERO, Event::Ended { watch: old, end: WatchEnd::Closed });
+    domain.reclaim();
+    drive(domain, Time::ZERO, Event::Frame { asked: Token::new(98) });
+    let watch = domain.conversation().chips_watch.unwrap();
+    assert_ne!(watch.token(), old);
+    assert_eq!(domain.conversation().chips.as_slice(), &[55]);
+    watch.token()
 }

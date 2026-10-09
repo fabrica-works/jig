@@ -64,14 +64,17 @@ pub(crate) fn page(domain: &mut Domain, env: &Env<crate::Limits>, page: Activity
         domain.conversation.reading = Some(super::Reading::Latest { known: domain.conversation.loaded });
     }
     let next = domain.conversation.accept(page);
+    working_set(domain, env, out);
+    ask(domain, next, out);
+    finish(domain);
+    domain.changed();
+}
+fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
     let keys = domain.conversation.names(env.limits.objects);
     let source = Source::Window { generation: domain.generation, number: 1 };
     crate::pages::routing::names(domain, env, source, keys, out);
     let parts = domain.conversation.parts(env.limits.parts);
     crate::pages::routing::parts(domain, env, parts.as_slice(), out);
-    ask(domain, next, out);
-    finish(domain);
-    domain.changed();
 }
 fn finish(domain: &mut Domain) {
     if domain.conversation.run_finished && domain.conversation.loaded >= domain.conversation.committed {
@@ -105,7 +108,9 @@ pub(crate) fn stream(
         | Subject::Deployment => return,
     }
     let accepted = domain.conversation.stream(value, env.limits.text);
-    if !accepted {
+    if accepted {
+        working_set(domain, env, out);
+    } else {
         crate::pages::routing::refuse(domain, Limit::Objects);
     }
     let subject = Subject::Run {

@@ -93,7 +93,9 @@ pub(crate) fn navigate(
     domain.conversation_rows.rows.clear();
     domain.conversation_rows.edges = blank_edges();
     let rows = domain.conversation.lines.rows.capacity();
+    let words = domain.conversation.words.rows.capacity();
     domain.conversation = crate::conversation::Conversation::new(0, rows);
+    domain.conversation.words = crate::conversation::KeptWords::new(words);
     domain.history_rows.rows.clear();
     domain.history_rows.edges = blank_edges();
     domain.generation = generation;
