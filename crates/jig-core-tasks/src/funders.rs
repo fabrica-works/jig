@@ -365,6 +365,8 @@ pub(crate) fn links(domain: &Domain, bound: u32) -> bool {
 /// (domain/authority.md, section 7).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct FundingRecord {
+    /// Actual opening wall and supplied next boundary, only for project periods.
+    pub period: Option<crate::PeriodTimes>,
     /// Durable period/pool identity; task sources use live `TaskRecord` counters instead of a
     /// separate ledger.
     pub funder: Funder,
@@ -432,6 +434,7 @@ pub(crate) fn open(
     let record = FundingRecord {
         funder,
         parent: None,
+        period: Some(crate::PeriodTimes { began: env.wall, next: None }),
         numbers: Numbers { budget, spent: 0, spent_below: 0, reserved: 0 },
         made: 0,
         closed: false,
@@ -494,6 +497,7 @@ pub(crate) fn carve(
     let record = FundingRecord {
         funder,
         parent: Some(parent),
+        period: None,
         numbers: Numbers { budget, spent: 0, spent_below: 0, reserved: 0 },
         made: 0,
         closed: false,
@@ -575,6 +579,7 @@ pub(crate) fn carve_recurring(
     let record = FundingRecord {
         funder,
         parent: Some(parent),
+        period: None,
         numbers: Numbers { budget, spent: 0, spent_below: 0, reserved: 0 },
         made: 1,
         closed: false,
@@ -599,9 +604,11 @@ pub(crate) fn restore_funding(domain: &mut Domain, ledger: FundingRecord) -> boo
     }
     let valid = match ledger.funder {
         Funder::Task(_) => false,
-        Funder::Period { .. } => ledger.parent.is_none() && (!ledger.closed || ledger.numbers.reserved == 0),
+        Funder::Period { .. } => {
+            ledger.period.is_some() && ledger.parent.is_none() && (!ledger.closed || ledger.numbers.reserved == 0)
+        }
         Funder::Pool { project, period, .. } | Funder::Recurring { project, period, .. } => {
-            ledger.parent == Some(Funder::Period { project, period })
+            ledger.period.is_none() && ledger.parent == Some(Funder::Period { project, period })
         }
     };
     if !valid {

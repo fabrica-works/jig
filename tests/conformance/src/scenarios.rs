@@ -355,7 +355,7 @@ impl ScenarioApplication for Testing {
                 check(ended(world, task), "standing batch did not finish")?;
                 let before = world.peers.assignments.len();
                 for _ in 0..2 {
-                    world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 1000 }));
+                    world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 1000, next: None }));
                     world.drain()?;
                 }
                 if world.peers.assignments.len() == before {

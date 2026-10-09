@@ -1259,6 +1259,9 @@ pub enum Event {
         /// Bounded authorized release/reject/pass choice.
         decision: crate::EscalationDecision,
     },
+    /// The period source supplied a next boundary; no cadence is inferred.
+    /// Update its current ledger, preserve the original opening wall, and ignore stale notices.
+    PeriodNext { project: u32, period: u64, next: Option<Wall> },
     /// `Open` one finite monotonic project period after root authorization; emits ledger `Save`
     /// plus `Done`, or one `Refused` with no mutation.
     OpenPeriod {

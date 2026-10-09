@@ -10,7 +10,7 @@ use jig_core_notes as notes;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 use jig_core_views as views;
-use skein_lib::{List, Queue, ReplyTo, Token};
+use skein_lib::{List, Queue, ReplyTo, Token, Wall};
 
 /// A request from the core to its application root. Its variant fixes the
 /// commit relationship before the root translates or wraps it.
@@ -396,7 +396,7 @@ pub enum Event {
         holdings: Box<[tasks::Holding]>,
     },
     /// A new deployment funding period, checked against core policy.
-    Period { project: u32, period: u64, budget: u64 },
+    Period { project: u32, period: u64, budget: u64, next: Option<Wall> },
     /// A required preparation read or connector section could not be assembled.
     PreparationFailed { task: u64 },
     /// A task continuation for a person's pending proposal.

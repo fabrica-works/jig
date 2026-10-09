@@ -444,7 +444,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::ConnectorRepair { seed, executor, spec, contract, holdings } => {
             route_connector_repair(work, seed, executor, spec, contract, holdings)
         }
-        Event::Period { project, period, budget } => route_period(core, work, project, period, budget),
+        Event::Period { project, period, budget, next } => route_period(core, work, project, period, budget, next),
         Event::PreparationFailed { task } => route_preparation_failed(core, work, task),
         Event::PersonProposal(event) => route_person_proposal(core, env, event),
         Event::TaskEscalation(event) => route_task_escalation(core, env, event),

@@ -300,6 +300,7 @@ pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &
         let record = crate::FundingRecord {
             funder: period_source,
             parent: None,
+            period: Some(crate::PeriodTimes { began: env.wall, next: None }),
             numbers: Numbers { budget: period_budget, spent: 0, spent_below: 0, reserved: 0 },
             made: 0,
             closed: false,
@@ -314,6 +315,7 @@ pub(crate) fn make(domain: &mut Domain, env: &Env<Limits>, plan: Plan, reason: &
         let record = crate::FundingRecord {
             funder: destination,
             parent: Some(period_source),
+            period: None,
             numbers: Numbers { budget: pool_budget, spent: 0, spent_below: 0, reserved: 0 },
             made: 0,
             closed: false,

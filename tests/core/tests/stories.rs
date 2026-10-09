@@ -182,14 +182,14 @@ fn a_recurring_task_creates_one_batch_per_period_after_the_reset() {
     let first = *world.assignments.last().expect("first period run");
     assert_ne!(first.0, world.assignments[0].0);
     finish(&mut world, first, b"first period done");
-    world.send(root::Event::Core(core::Event::Period { project: 1, period: 2, budget: 1000 }));
+    world.send(root::Event::Core(core::Event::Period { project: 1, period: 2, budget: 1000, next: None }));
     let second = *world.assignments.last().expect("second period run");
     assert_ne!(second.0, first.0);
     assert!(
         matches!(world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(second.0)))), Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) if matches!(row.funder, tasks::Funder::Recurring { period: 2, .. }))
     );
     let count = world.assignments.len();
-    world.send(root::Event::Core(core::Event::Period { project: 1, period: 2, budget: 1000 }));
+    world.send(root::Event::Core(core::Event::Period { project: 1, period: 2, budget: 1000, next: None }));
     assert_eq!(world.assignments.len(), count);
 }
 

@@ -552,6 +552,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::DecideEscalation { reply_to, task, revision, by, entry, decision } => {
             crate::escalation::decide(domain, env, reply_to, task, revision, by, entry, decision, out);
         }
+        Event::PeriodNext { project, period, next } => crate::periods::observe(domain, project, period, next, out),
         Event::OpenPeriod { reply_to, project, period, budget } => {
             crate::funders::open(domain, env, reply_to, project, period, budget, out);
         }

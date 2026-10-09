@@ -632,6 +632,7 @@ pub(super) fn route_period(
     project: u32,
     period: u64,
     budget: u64,
+    next: Option<skein_lib::Wall>,
 ) -> Requests {
     let allowed = match core.authority.policy(project) {
         Some(policy) => budget <= policy.period_spend,
@@ -648,6 +649,7 @@ pub(super) fn route_period(
                 budget,
             }));
         }
+        work.push(Event::Tasks(tasks::Event::PeriodNext { project, period, next }));
         for task in core.tasks.recurring_tasks(project) {
             work.push(Event::Tasks(tasks::Event::TickRecurring { task, period }));
         }

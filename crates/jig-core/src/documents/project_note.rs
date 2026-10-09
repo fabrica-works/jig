@@ -69,6 +69,8 @@ pub struct Ledger {
     pub numbers: tasks::Numbers,
     pub left: u64,
     pub closed: bool,
+    pub began: Option<Wall>,
+    pub next: Option<Wall>,
 }
 /// A live root's expense against its authentic allotment, largest first.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -77,8 +79,7 @@ pub struct SpendLine {
     pub funder: tasks::Funder,
     pub numbers: tasks::Numbers,
 }
-/// A recurring template in period-number terms. Wall schedule belongs to its
-/// period owner; the engine retains the last period and the pending one only.
+/// A recurring template with authentic retained period and supplied boundary facts.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Recurring {
     pub chip: Chip,
@@ -86,6 +87,9 @@ pub struct Recurring {
     pub batch: List<ProposedTask>,
     pub budget: u64,
     pub overlap: tasks::RecurringOverlap,
+    pub current_period: u64,
+    pub began: Option<Wall>,
+    pub next: Option<Wall>,
     pub last_period: u64,
     pub pending_period: Option<u64>,
     pub last_batch: List<u64>,
@@ -241,6 +245,7 @@ fn policy(limits: &Limits, value: &authority::Policy) -> Result<Policy, Missing>
             || value.projections.len() > bound(limits),
     })
 }
+#[expect(clippy::manual_map, reason = "step code matches options without closures")]
 fn ledger(value: &tasks::FundingRecord) -> Ledger {
     Ledger {
         source: value.funder,
@@ -248,6 +253,14 @@ fn ledger(value: &tasks::FundingRecord) -> Ledger {
         numbers: value.numbers,
         left: super::objects::left(value.numbers),
         closed: value.closed,
+        began: match value.period {
+            Some(times) => Some(times.began),
+            None => None,
+        },
+        next: match value.period {
+            Some(times) => times.next,
+            None => None,
+        },
     }
 }
 #[expect(
@@ -364,6 +377,15 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
                     batch,
                     budget: row.authority.budget.spend,
                     overlap: state.template.overlap,
+                    current_period: current_number,
+                    began: match current_period {
+                        Some(value) => value.began,
+                        None => None,
+                    },
+                    next: match current_period {
+                        Some(value) => value.next,
+                        None => None,
+                    },
                     last_period: state.last_period,
                     pending_period: state.pending_period,
                     last_batch,

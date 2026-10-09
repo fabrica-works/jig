@@ -157,7 +157,7 @@ fn random_period_budgets_reset_before_a_standing_template_creates_its_next_batch
             for period in 2..=3 {
                 let count = world.assignments.len();
                 world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
-                world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 140 }));
+                world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 140, next: None }));
                 assert_eq!(world.assignments.len(), count, "a new batch waits for the reset commit");
                 world.release_commits();
                 assert_eq!(world.assignments.len(), count + 1);
@@ -165,7 +165,7 @@ fn random_period_budgets_reset_before_a_standing_template_creates_its_next_batch
                 assert!(matches!(world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))),
                     Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))))
                         if matches!(row.funder, tasks::Funder::Recurring { period: funded, .. } if funded == period)));
-                world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 140 }));
+                world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 140, next: None }));
                 assert_eq!(world.assignments.len(), count + 1);
                 finish(&mut world, task);
             }

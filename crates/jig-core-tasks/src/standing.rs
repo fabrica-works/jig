@@ -73,6 +73,7 @@ pub(crate) fn renew(domain: &mut Domain, env: &Env<Limits>, number: u64, period:
     let ledger = FundingRecord {
         funder: archived,
         parent: Some(old),
+        period: None,
         numbers: Numbers { budget, spent: 0, spent_below: spent, reserved },
         made,
         closed: false,

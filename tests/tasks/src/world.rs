@@ -369,6 +369,7 @@ impl World {
             | Event::EffectInFlight { .. }
             | Event::EffectSettled { .. }
             | Event::OpenPeriod { .. }
+            | Event::PeriodNext { .. }
             | Event::TickRecurring { .. }
             | Event::RenewStanding { .. }
             | Event::RecurringBatch { .. }
@@ -439,6 +440,7 @@ impl World {
             | Event::EffectInFlight { .. }
             | Event::EffectSettled { .. }
             | Event::OpenPeriod { .. }
+            | Event::PeriodNext { .. }
             | Event::TickRecurring { .. }
             | Event::RenewStanding { .. }
             | Event::RecurringBatch { .. }
