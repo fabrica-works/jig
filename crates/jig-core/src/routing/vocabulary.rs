@@ -103,6 +103,8 @@ pub enum Write {
 /// Core output that must follow the decision's commit.
 #[derive(Debug)]
 pub enum Held {
+    /// Load an owner range only after every preceding commit is durable.
+    ReadLoad { load: Token, range: Box<crate::reads::Range> },
     /// One authenticated read answer after every preceding commit is durable.
     Read { reply: ReplyTo, answer: crate::reads::Answer },
     /// The root assembles the outcome retained by its numbered connector.
@@ -273,8 +275,10 @@ pub struct Limits {
     pub policy_bytes: u64,
     /// Bound on an archived person escalation rejection reason.
     pub escalation_reason_bytes: u32,
-    /// Historical result load slots.
+    /// Concurrent authenticated read loads, including historical result reads.
     pub load_slots: u32,
+    /// Maximum owned bytes brought by one authenticated store read.
+    pub load_bytes: u64,
     /// Named call replay and in-flight route slots.
     pub call_records: u32,
     /// Total bytes of a retained opaque call name, tool name and settled answer.
@@ -317,6 +321,8 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// Exactly one terminal for a previously admitted read load.
+    ReadLoaded { load: Token, result: crate::reads::Loaded },
     /// An unkeyed one-shot read on the supplied live sign-in.
     Read { reply: ReplyTo, sign_in: u64, read: crate::reads::Read },
     /// Admit an application request by metadata; its owner retains the value.

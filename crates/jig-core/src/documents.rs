@@ -37,7 +37,7 @@ pub use objects::{
     AmendmentChange, AmendmentState, EndedDelegate, Escalation, FundingOffer, HistoryLine, MilestoneLine,
     MilestonePhase, PersonTask, Proposal, ProposalAction, ProposalHistory, ProposalHistoryState, ProposalWaiting,
     ProposedTask, Question, ResultDoc, RetainedAction, ShownResult, SpecLine, ended_delegate_from_row,
-    history_from_row, milestone_from_row, result_from_row, retained_action,
+    history_from_row, milestone_from_row, person_from_row, result_from_row, retained_action,
 };
 pub use project_note::{
     Ledger, Member, Note, NoteLocation, Policy, PolicyRole, Project, ProjectResource, Recurring, Requirement,
@@ -47,7 +47,7 @@ mod task_tree;
 pub use task_tree::{
     AuthorityLine, BudgetLine, ContractLine, Ending, EscalationState, FoldedCount, GoalLine, Goals, GrantLine,
     HoldLine, NoteScope, Parameter, Part, PartKey, PartKind, PatternEnd, PhaseCounts, PriorPhase, ProposalRef,
-    ResourceLine, ResultValue, Task, TaskLink, Tree, TreeRow,
+    ResourceLine, ResultValue, Task, TaskLink, Tree, TreeRow, task_from_row,
 };
 
 use crate::{Core, Limits};
@@ -379,4 +379,16 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
 /// accessors copy bounded shallow facts only; documents themselves are separate.
 pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
     inbox_deployment::scratch_worst_case(limits)
+}
+
+/// A compact task identity made from a loaded row, without restoring it.
+#[must_use]
+pub fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Chip {
+    small::chip_from_row(limits, row)
+}
+
+/// Funding numbers copied from their retained owner row.
+#[must_use]
+pub fn budget_from_row(row: &tasks::TaskRecord) -> BudgetLine {
+    task_tree::budget(row)
 }

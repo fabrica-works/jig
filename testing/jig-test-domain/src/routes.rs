@@ -68,7 +68,8 @@ pub(super) fn route_core(
                     };
                     hold(decision, Delivery::Message { channel, task: run.raw(), attempt: attempt.raw(), word: line });
                 }
-                other @ (core::Held::Read { .. }
+                other @ (core::Held::ReadLoad { .. }
+                | core::Held::Read { .. }
                 | core::Held::Delivery { .. }
                 | core::Held::WatchEnded { .. }
                 | core::Held::Relay { .. }

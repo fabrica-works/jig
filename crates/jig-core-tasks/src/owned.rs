@@ -242,7 +242,9 @@ fn proposal_bytes(proposal: &Proposal) -> Option<u64> {
     Some(total)
 }
 
-fn task_bytes(task: &TaskRecord) -> Option<u64> {
+/// Borrowed complete heap footprint of one task record, including its boxed carrier.
+#[must_use]
+pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
     let mut inbox_bytes = bytes(size_of_val(&*task.inbox))?;
     for word in &task.inbox {
         inbox_bytes = inbox_bytes.checked_add(bytes(word.words.len())?)?;

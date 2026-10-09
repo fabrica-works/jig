@@ -121,6 +121,8 @@ pub enum Ending {
 /// One task reference, including a historical result still named by live work.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TaskLink {
+    /// An ended task whose stored owner row supplied its identity and wall time.
+    Retained { chip: Chip, at: Option<Wall> },
     /// The referenced task is live and visible.
     Live(Chip),
     /// Its title and complete result belong to a stored task row.
@@ -547,9 +549,18 @@ fn proposal(row: &tasks::TaskRecord) -> Option<ProposalRef> {
     }
 }
 
-#[expect(clippy::too_many_lines, reason = "the task page gathers one bounded overview without changing child state")]
 pub(super) fn task(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<Task, Missing> {
     let row = super::small::visible(core, party, number)?;
+    task_from_row(core, limits, party, row)
+}
+
+/// Construct a visible task from its retained owner row, without restoring it.
+#[expect(clippy::too_many_lines, reason = "the task page gathers one bounded overview without changing child state")]
+pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::TaskRecord) -> Result<Task, Missing> {
+    if core.people.role(party, row.project).is_none() {
+        return Err(Missing::NotAllowed);
+    }
+    let number = row.number;
     let mut lineage = List::with_capacity(limits.documents.lines);
     let mut ancestor = row.requester;
     let mut cut = false;
@@ -557,7 +568,14 @@ pub(super) fn task(core: &Core, limits: &Limits, party: u64, number: u64) -> Res
     for _ in 0..limits.tasks.depth {
         match ancestor {
             tasks::Party::Task(parent) => {
-                let parent_row = super::small::visible(core, party, parent)?;
+                let parent_row = match super::small::visible(core, party, parent) {
+                    Ok(row) => row,
+                    Err(Missing::Unknown | Missing::Ended) => {
+                        cut = true;
+                        break;
+                    }
+                    Err(why @ (Missing::NotAllowed | Missing::TooLarge)) => return Err(why),
+                };
                 if parent_row.tracked.is_some() {
                     goal = Some(parent);
                 }
@@ -641,10 +659,11 @@ pub(super) fn task(core: &Core, limits: &Limits, party: u64, number: u64) -> Res
             tasks::Was::Closing(closing) => Some(ending(limits, &closing.ending)),
             tasks::Was::Waiting | tasks::Was::Active(_) => None,
         },
-        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Ended(_) => None,
+        tasks::Phase::Ended(value) => Some(ending(limits, value)),
+        tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
     Ok(Task {
-        chip: super::small::chip(core, limits, party, number)?,
+        chip: super::small::chip_from_row(limits, row),
         project: row.project,
         goal,
         priority: row.tracked,

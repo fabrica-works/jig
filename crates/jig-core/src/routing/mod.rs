@@ -310,6 +310,7 @@ pub fn room_max(limits: &Limits) -> Option<JournalRoom> {
 pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
+        Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: 1 }),
         Event::Application { .. }
         | Event::ApplicationPart { .. }
         | Event::ApplicationFinished { .. }
@@ -317,7 +318,6 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::EffectConnector(_)
         | Event::EffectDeadline
         | Event::SignIn { .. }
-        | Event::Read { .. }
         | Event::Watch { .. }
         | Event::Unwatch { .. }
         | Event::Delivered { .. }
@@ -413,6 +413,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::EffectConnector(event) => crate::effects::connector(core, env, work, event),
         Event::EffectDeadline => crate::effects::deadline(core, env),
         Event::SignIn { reply_to, identity } => sign_in(core, work, reply_to, identity),
+        Event::ReadLoaded { load, result } => crate::reads::loaded(core, env, load, result),
         Event::Read { reply, sign_in, read } => crate::reads::start(core, env, reply, sign_in, read),
         Event::Watch { watcher, sign_in, subject, window } => open(core, env, watcher, sign_in, subject, window),
         Event::Unwatch { watcher } => route_view(core, env, views::Event::Unwatch { watcher }),

@@ -224,6 +224,7 @@ pub struct Core {
     pub(crate) view_subjects: Map<Token, WatchBinding>,
     pub(crate) view_names: skein_lib::Slab<WatchedSubject>,
     pub(crate) changed_views: skein_lib::Set<skein_lib::Id<WatchedSubject>>,
+    pub(crate) reads: skein_lib::Slab<reads::Pending>,
     /// Historical result reads in flight.
     pub reading_results: Map<u64, Token>,
     /// Historical dependency results held for preparation.
@@ -491,6 +492,7 @@ impl Core {
             view_subjects: Map::with_capacity(limits.views.watchers),
             view_names: skein_lib::Slab::with_capacity(limits.views.watchers),
             changed_views: skein_lib::Set::with_capacity(limits.views.watchers),
+            reads: skein_lib::Slab::with_capacity(limits.load_slots),
             reading_results: Map::with_capacity(limits.load_slots),
             dependency_results: Map::with_capacity(limits.tasks.tasks),
             made: Map::with_capacity(limits.people.pending),
@@ -562,6 +564,7 @@ impl Core {
         self.fleet.reclaim();
         self.views.reclaim();
         self.view_names.reclaim();
+        self.reads.reclaim();
     }
 
     /// Discard expendable child observations without changing a decision.

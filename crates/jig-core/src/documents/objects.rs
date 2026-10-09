@@ -450,7 +450,7 @@ pub(super) fn proposal(
         }
         ProposalAction::Amend { task, .. } | ProposalAction::Widen { task, .. } => {
             let task = match task {
-                TaskLink::Live(chip) => chip.number,
+                TaskLink::Live(chip) | TaskLink::Retained { chip, .. } => chip.number,
                 TaskLink::Stored { number, .. } => *number,
             };
             let row = core.tasks.task(task).ok_or(Missing::Ended)?;
@@ -536,6 +536,19 @@ pub(super) fn question(
 }
 pub(super) fn person(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<PersonTask, Missing> {
     let row = super::small::visible(core, party, number)?;
+    person_from_row(core, limits, party, row)
+}
+
+/// Construct a person form from its retained task row.
+pub fn person_from_row(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    row: &tasks::TaskRecord,
+) -> Result<PersonTask, Missing> {
+    if core.people.role(party, row.project).is_none() {
+        return Err(Missing::NotAllowed);
+    }
     let address = match row.executor {
         tasks::Executor::Person(address) => address,
         tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => return Err(Missing::Unknown),
@@ -558,7 +571,7 @@ pub(super) fn person(core: &Core, limits: &Limits, party: u64, number: u64) -> R
             .expect("bounded dependency results");
     }
     Ok(PersonTask {
-        task: super::small::chip(core, limits, party, number)?,
+        task: super::small::chip_from_row(limits, row),
         revision: row.revisions.person,
         requester: row.requester,
         spec: spec(limits, &row.spec),

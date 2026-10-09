@@ -119,6 +119,7 @@ pub fn limits() -> root::Limits {
             policy_bytes: 8192,
             escalation_reason_bytes: 128,
             load_slots: 2,
+            load_bytes: 65_536,
             call_records: 2,
             call_answer_bytes: 256,
             tasks,

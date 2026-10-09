@@ -121,6 +121,7 @@ fn limits() -> Limits {
         policy_bytes: 8192,
         escalation_reason_bytes: 128,
         load_slots: 2,
+        load_bytes: 65_536,
         call_records: 2,
         call_answer_bytes: 256,
         tasks,
@@ -1028,7 +1029,7 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
             assert_eq!(*number, 99);
             assert_eq!(*status, None);
         }
-        TaskLink::Live(_) => panic!(),
+        TaskLink::Live(_) | TaskLink::Retained { .. } => panic!(),
     }
     let mut limited = limits;
     limited.documents.lines = 1;
@@ -2047,7 +2048,7 @@ fn an_expired_run_signin_receives_no_next_provisional_suffix() {
     assert_eq!(out.len(), 1);
 }
 
-fn read_answer(core: &mut Core, limits: &Limits, sign_in: u64, read: reads::Read) -> Held {
+fn read_start(core: &mut Core, limits: &Limits, sign_in: u64, read: reads::Read) -> Held {
     let outputs = watch_outputs(core, limits, Event::Read { reply: ReplyTo::new(Token::new(90)), sign_in, read });
     let mut held = None;
     for output in outputs {
@@ -2061,6 +2062,310 @@ fn read_answer(core: &mut Core, limits: &Limits, sign_in: u64, read: reads::Read
         }
     }
     held.expect("one terminal answer")
+}
+
+fn loaded_answer(core: &mut Core, limits: &Limits, load: Token, result: reads::Loaded) -> Option<reads::Answer> {
+    let mut answer = None;
+    for output in watch_outputs(core, limits, Event::ReadLoaded { load, result }) {
+        match output {
+            Request::Held(held) => {
+                let Held::Read { answer: value, .. } = *held else { panic!("one held terminal") };
+                assert!(answer.is_none());
+                answer = Some(value);
+            }
+            Request::Decided => {}
+            Request::Write(_) | Request::Ask { .. } | Request::Now(_) => panic!("read decides nothing"),
+        }
+    }
+    answer
+}
+
+fn read_answer(core: &mut Core, limits: &Limits, sign_in: u64, read: reads::Read) -> Held {
+    let held = read_start(core, limits, sign_in, read);
+    if let Held::ReadLoad { load, .. } = held {
+        return Held::Read {
+            reply: ReplyTo::new(Token::new(90)),
+            answer: loaded_answer(core, limits, load, reads::Loaded::Page { rows: Box::new([]), next: None }).unwrap(),
+        };
+    }
+    held
+}
+
+#[expect(clippy::manual_map, reason = "the test helper follows the exhaustive option style")]
+fn stored_row(value: Record, owner: Option<tasks::TaskRecord>) -> reads::Row {
+    reads::Row {
+        value,
+        owner: match owner {
+            Some(value) => Some(Box::new(value)),
+            None => None,
+        },
+        ancestors: Box::new([]),
+        related: None,
+        linked: Box::new([]),
+        inbox: None,
+    }
+}
+
+#[test]
+fn stored_activity_pages_follow_committed_positions_with_exact_continuations() {
+    let (mut core, mut limits) = watch_core();
+    limits.documents.rows = 2;
+    let owner = core.tasks.task(1).unwrap().clone();
+    let line = |position, at| tasks::ActivityLine {
+        task: 1,
+        position,
+        at: Wall::from_nanos(at),
+        line: tasks::Line::Words {
+            message: position,
+            by: tasks::Party::Person(1),
+            kind: tasks::MessageKind::Words,
+            words: Box::new(*b"whole original words"),
+        },
+    };
+    let Held::ReadLoad { load, range } =
+        read_start(&mut core, &limits, 10, reads::Read::Activity { task: 1, before: None })
+    else {
+        panic!()
+    };
+    assert!(range.backwards);
+    assert_eq!(range.rows, 2);
+    let rows = Box::new([
+        stored_row(Record::Tasks(tasks::Stored::Activity(line(3, 10))), Some(owner.clone())),
+        stored_row(Record::Tasks(tasks::Stored::Activity(line(2, 30))), Some(owner.clone())),
+    ]);
+    let next = reads::row_key(&rows[1]).unwrap();
+    let reads::Answer::Page(page) =
+        loaded_answer(&mut core, &limits, load, reads::Loaded::Page { rows, next: Some(next.clone()) }).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(page.rows.len(), 2);
+    let reads::PageRow::Activity(first) = page.rows.get(0).unwrap() else { panic!() };
+    assert_eq!(first.position, 3);
+    core.reclaim();
+    let Held::ReadLoad { load, range } =
+        read_start(&mut core, &limits, 10, reads::Read::Activity { task: 1, before: page.next })
+    else {
+        panic!()
+    };
+    assert_eq!(range.after, Some(next));
+    let reads::Answer::Page(last) = loaded_answer(
+        &mut core,
+        &limits,
+        load,
+        reads::Loaded::Page {
+            rows: Box::new([stored_row(Record::Tasks(tasks::Stored::Activity(line(1, 20))), Some(owner))]),
+            next: None,
+        },
+    )
+    .unwrap() else {
+        panic!()
+    };
+    assert_eq!(last.rows.len(), 1);
+    assert_eq!(last.next, None);
+    assert!(loaded_answer(&mut core, &limits, load, reads::Loaded::Gone).is_none());
+}
+
+#[test]
+fn store_load_admission_is_bounded_and_each_terminal_consumes_its_slot() {
+    let (mut core, mut limits) = watch_core();
+    limits.load_slots = 1;
+    // Reconstruct with the chosen capacity; authentication is restored below.
+    core.reads = skein_lib::Slab::with_capacity(1);
+    let Held::ReadLoad { load, .. } = read_start(&mut core, &limits, 10, reads::Read::Task { task: 100 }) else {
+        panic!()
+    };
+    let Held::Read { answer, .. } = read_start(&mut core, &limits, 10, reads::Read::Task { task: 101 }) else {
+        panic!()
+    };
+    assert_eq!(answer, reads::Answer::None(reads::Why::Busy));
+    assert_eq!(core.reads.len(), 1);
+    assert_eq!(
+        loaded_answer(&mut core, &limits, load, reads::Loaded::Busy),
+        Some(reads::Answer::None(reads::Why::Busy))
+    );
+    core.reclaim();
+    let Held::ReadLoad { load: fresh, .. } = read_start(&mut core, &limits, 10, reads::Read::Task { task: 101 }) else {
+        panic!()
+    };
+    assert_ne!(fresh, load);
+    assert!(loaded_answer(&mut core, &limits, load, reads::Loaded::Gone).is_none());
+    assert_eq!(
+        loaded_answer(&mut core, &limits, fresh, reads::Loaded::Gone),
+        Some(reads::Answer::None(reads::Why::Gone))
+    );
+}
+
+#[test]
+fn stored_read_refuses_rows_over_either_bound_and_cursors_from_another_query() {
+    let (mut core, mut limits) = watch_core();
+    limits.documents.rows = 1;
+    limits.load_bytes = 1;
+    let owner = core.tasks.task(1).unwrap().clone();
+    let Held::ReadLoad { load, .. } =
+        read_start(&mut core, &limits, 10, reads::Read::Activity { task: 1, before: None })
+    else {
+        panic!()
+    };
+    assert_eq!(
+        loaded_answer(
+            &mut core,
+            &limits,
+            load,
+            reads::Loaded::Page {
+                rows: Box::new([stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(owner))), None)]),
+                next: None
+            }
+        ),
+        Some(reads::Answer::None(reads::Why::Busy))
+    );
+    let Held::Read { answer, .. } = read_start(
+        &mut core,
+        &limits,
+        10,
+        reads::Read::Activity {
+            task: 1,
+            before: Some(reads::Cursor::Store { scope: reads::Scope::Activity { task: 2 }, after: None }),
+        },
+    ) else {
+        panic!()
+    };
+    assert_eq!(answer, reads::Answer::None(reads::Why::Unknown));
+}
+
+#[test]
+fn retained_task_read_keeps_cancellation_actor_time_and_full_spec() {
+    let (mut core, limits) = watch_core();
+    let mut owner = core.tasks.task(1).unwrap().clone();
+    owner.number = 99;
+    owner.phase = tasks::Phase::Ended(tasks::Ending::Cancelled {
+        by: tasks::Party::Person(1),
+        at: Wall::from_nanos(12),
+        reason: Box::new(*b"released"),
+        result: None,
+    });
+    owner.ended_at = Some(Wall::from_nanos(13));
+    let expected = owner.spec.clone();
+    let Held::ReadLoad { load, .. } = read_start(&mut core, &limits, 10, reads::Read::Task { task: 99 }) else {
+        panic!()
+    };
+    let reads::Answer::Historical(value) = loaded_answer(
+        &mut core,
+        &limits,
+        load,
+        reads::Loaded::Page {
+            rows: Box::new([stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(owner))), None)]),
+            next: None,
+        },
+    )
+    .unwrap() else {
+        panic!()
+    };
+    assert_eq!(value.by, Some(tasks::Party::Person(1)));
+    assert_eq!(value.at, Some(Wall::from_nanos(13)));
+    let reads::Past::Task { document, result } = value.value else { panic!() };
+    assert_eq!(document.chip.number, 99);
+    assert_eq!(document.words.bytes, expected.words);
+    let Ending::Cancelled { by, at, .. } = result.ending else { panic!() };
+    assert_eq!(by, tasks::Party::Person(1));
+    assert_eq!(at, Wall::from_nanos(12));
+}
+
+#[test]
+fn stored_reply_reads_exact_child_activity_and_preserves_original_word_facts() {
+    let (mut core, limits) = watch_core();
+    let owner = core.tasks.task(1).unwrap().clone();
+    let word = tasks::Word {
+        number: 801,
+        from: tasks::Party::Task(1),
+        kind: tasks::MessageKind::Words,
+        words: Box::new(*b"exact original reply"),
+        at: Wall::from_nanos(17),
+        hits: 2,
+        eligible: true,
+    };
+    let line = tasks::ActivityLine {
+        task: 1,
+        position: 8,
+        at: word.at,
+        line: tasks::Line::Notified { recipient: tasks::Party::Person(1), word: word.clone() },
+    };
+    let Held::ReadLoad { load, .. } = read_start(&mut core, &limits, 10, reads::Read::Reply { task: 1, activity: 8 })
+    else {
+        panic!()
+    };
+    let reads::Answer::Historical(value) = loaded_answer(
+        &mut core,
+        &limits,
+        load,
+        reads::Loaded::Page {
+            rows: Box::new([stored_row(Record::Tasks(tasks::Stored::Activity(line)), Some(owner))]),
+            next: None,
+        },
+    )
+    .unwrap() else {
+        panic!()
+    };
+    assert_eq!(value.value, reads::Past::Reply(word));
+}
+
+#[test]
+fn stored_person_forms_load_dependency_results_and_retained_links() {
+    let (mut core, limits) = watch_core();
+    let mut owner = core.tasks.task(1).unwrap().clone();
+    owner.number = 100;
+    owner.executor = tasks::Executor::Person(tasks::PersonAddress::Person(1));
+    owner.spec.inputs = Box::new([99]);
+    owner.phase = tasks::Phase::Ended(tasks::Ending::Cancelled {
+        by: tasks::Party::Person(1),
+        at: Wall::from_nanos(8),
+        reason: Box::new([]),
+        result: None,
+    });
+    let mut dependency = owner.clone();
+    dependency.number = 99;
+    dependency.spec.inputs = Box::new([]);
+    dependency.ended_at = Some(Wall::from_nanos(8));
+    let mut row = stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(owner))), None);
+    row.linked = Box::new([Box::new(dependency)]);
+    let Held::ReadLoad { load, .. } = read_start(&mut core, &limits, 10, reads::Read::PersonTask { task: 100 }) else {
+        panic!()
+    };
+    let reads::Answer::Historical(value) =
+        loaded_answer(&mut core, &limits, load, reads::Loaded::Page { rows: Box::new([row]), next: None }).unwrap()
+    else {
+        panic!()
+    };
+    let reads::Past::PersonTask { document, .. } = value.value else { panic!() };
+    let shown = document.results.get(0).unwrap();
+    assert!(shown.result.is_some());
+    let TaskLink::Retained { chip, at } = &shown.task else { panic!() };
+    assert_eq!(chip.number, 99);
+    assert_eq!(*at, Some(Wall::from_nanos(8)));
+}
+
+#[test]
+fn a_load_completion_rechecks_current_project_visibility() {
+    let (mut core, limits) = watch_core();
+    let owner = core.tasks.task(1).unwrap().clone();
+    let Held::ReadLoad { load, .. } =
+        read_start(&mut core, &limits, 10, reads::Read::Activity { task: 1, before: None })
+    else {
+        panic!()
+    };
+    restore_document_party(&mut core, &limits, &[]);
+    assert_eq!(
+        loaded_answer(
+            &mut core,
+            &limits,
+            load,
+            reads::Loaded::Page {
+                rows: Box::new([stored_row(Record::Tasks(tasks::Stored::Live(Box::new(owner))), None)]),
+                next: None
+            }
+        ),
+        Some(reads::Answer::None(reads::Why::Unknown))
+    );
 }
 
 #[test]

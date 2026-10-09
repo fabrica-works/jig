@@ -27,6 +27,8 @@ pub struct InboxEntry {
     pub task: TaskLink,
     pub project: Option<u32>,
     pub object: InboxObject,
+    /// Exact child activity to load for a reply; independent of its global message position.
+    pub activity: Option<u64>,
     pub at: Option<Wall>,
     pub unread: Option<bool>,
     pub cursor: Cursor,
@@ -235,6 +237,21 @@ fn result_time(core: &Core, task: u64) -> Option<Wall> {
     }
     None
 }
+fn reply_activity(core: &Core, task: u64, object: InboxObject) -> Option<u64> {
+    match object {
+        InboxObject::Reply { message } => {
+            let row = core.tasks.task(task)?;
+            let notice = row.person_wait?.notice?;
+            if notice.message == message { Some(notice.activity) } else { None }
+        }
+        InboxObject::Question { .. }
+        | InboxObject::Proposal { .. }
+        | InboxObject::Escalation { .. }
+        | InboxObject::PersonTask
+        | InboxObject::Result { .. } => None,
+    }
+}
+
 pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -> Result<Inbox, Missing> {
     let entries = core.people.cached_waiting(&limits.people, party).ok_or(Missing::Unknown)?;
     let results = core.people.cached_results(party).ok_or(Missing::Unknown)?;
@@ -292,6 +309,7 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
             task: super::task_tree::link(core, limits, party, *task)?,
             project: *project,
             object: *object,
+            activity: reply_activity(core, *task, *object),
             at: *at,
             unread: *unread,
             cursor: *cursor,
