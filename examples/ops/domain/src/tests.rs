@@ -1,5 +1,5 @@
 //! Entry-point checks for the reference journal and routes.
-use crate::{Config, Domain, Event, Limits, Numbers, Output, Released, Store, release, step};
+use crate::{Config, Domain, Event, Limits, Output, Released, Store, release, step};
 use alloc::boxed::Box;
 use jig_core as core;
 use jig_host as host;
@@ -61,7 +61,6 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         .unwrap();
     let config = Config {
         core: jig_core_world::world::config(17).core,
-        numbers: Numbers { observability: 1, infrastructure: 2 },
         triage_templates: Box::new([]),
         backend: infrastructure::Backend::OperationIds,
         endpoints: Box::new([smith_domain_run::charter::Endpoint(1)]),
@@ -650,4 +649,18 @@ fn assert_service_document(document: crate::ClientDocument) {
     let crate::ClientDocument::Observability(value) = document else { panic!("observability owns the document") };
     let observability::ClientDocument::Service { fact, .. } = *value else { panic!("service document") };
     assert_eq!(fact.healthy_replicas, 2);
+}
+
+#[test]
+fn an_unknown_connector_refuses_the_restart_without_loading_a_child() {
+    for connector in [0, 3, u16::MAX] {
+        let (mut domain, env) = fixture();
+        step(&mut domain, &env, Event::Released(Released::Restart(core::RestartStep::RestoreConnector { connector })));
+        match take(&mut domain, &env).as_ref() {
+            [Output::Stop] => {}
+            other => panic!("unknown owner stops without a child load: {other:?}"),
+        }
+        assert_eq!(domain.core.restart_failure(), Some(core::RestartStep::LoadCore));
+        assert!(!domain.core.restart_ready(), "unknown owner cannot open decisions");
+    }
 }

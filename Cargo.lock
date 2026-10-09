@@ -359,6 +359,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-ops-connectors"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-ops-domain"
 version = "0.0.0"
 dependencies = [
@@ -375,6 +382,7 @@ dependencies = [
  "jig-core-world",
  "jig-host",
  "jig-inline-agent",
+ "jig-ops-connectors",
  "jig-ops-domain-infrastructure",
  "jig-ops-domain-observability",
  "jig-ops-world",
@@ -424,6 +432,7 @@ dependencies = [
  "jig-fake-store",
  "jig-host",
  "jig-inline-agent",
+ "jig-ops-connectors",
  "jig-ops-domain",
  "jig-ops-domain-infrastructure",
  "jig-ops-domain-observability",

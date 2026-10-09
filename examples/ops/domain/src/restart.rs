@@ -6,6 +6,7 @@ use jig_core as core;
 use jig_core_notes as notes;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
+use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Decision, Env, Queue};
@@ -23,13 +24,13 @@ pub(crate) fn route(
             core::RestartStep::LoadCore => held(decision, Output::Load { step, range: Range::Core }),
             core::RestartStep::LoadInbox => held(decision, Output::Load { step, range: Range::Inbox }),
             core::RestartStep::RestoreConnector { connector } => {
-                let range = if connector == domain.numbers.infrastructure {
-                    Range::Infrastructure
-                } else if connector == domain.numbers.observability {
-                    Range::Observability
-                } else {
-                    let _request = domain.core.restart_refuse();
-                    return;
+                let range = match jig_ops_connectors::connector(connector) {
+                    Some(Connector::Infrastructure) => Range::Infrastructure,
+                    Some(Connector::Observability) => Range::Observability,
+                    None => {
+                        let _request = domain.core.restart_refuse();
+                        return;
+                    }
                 };
                 held(decision, Output::Load { step, range });
             }
@@ -37,24 +38,28 @@ pub(crate) fn route(
                 work.push(Work::Core(core::Event::Tasks(tasks::Event::Restored)));
                 work.push(Work::AdoptClaims);
             }
-            core::RestartStep::ReadAfresh { connector } => {
-                if connector == domain.numbers.infrastructure {
+            core::RestartStep::ReadAfresh { connector } => match jig_ops_connectors::connector(connector) {
+                Some(Connector::Infrastructure) => {
                     work.push(Work::Infrastructure(infrastructure::Event::ReadAfresh));
-                } else if connector == domain.numbers.observability {
+                }
+                Some(Connector::Observability) => {
                     work.push(Work::Observability(observability::Event::ReadAfresh));
-                } else {
+                }
+                None => {
                     let _request = domain.core.restart_refuse();
                 }
-            }
-            core::RestartStep::SettleOutbox { connector } => {
-                if connector == domain.numbers.infrastructure {
+            },
+            core::RestartStep::SettleOutbox { connector } => match jig_ops_connectors::connector(connector) {
+                Some(Connector::Infrastructure) => {
                     work.push(Work::Infrastructure(infrastructure::Event::Restart));
-                } else if connector == domain.numbers.observability {
+                }
+                Some(Connector::Observability) => {
                     work.push(Work::Observability(observability::Event::Restart));
-                } else {
+                }
+                None => {
                     let _request = domain.core.restart_refuse();
                 }
-            }
+            },
             core::RestartStep::Open => {
                 let _request = domain.core.restart_done(step);
             }
@@ -179,7 +184,10 @@ fn restore_roles(domain: &mut Domain, env: &Env<Limits>, record: &infrastructure
                 valid &= domain.core.restore_resource_role(
                     &Env { now: env.now, wall: env.wall, limits: env.limits.core },
                     *project,
-                    tasks::Name { connector: domain.numbers.infrastructure, path: named.resource.segments() },
+                    tasks::Name {
+                        connector: jig_ops_connectors::number(Connector::Infrastructure),
+                        path: named.resource.segments(),
+                    },
                     crate::translate::resource_role(named.role),
                 );
             }

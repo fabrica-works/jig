@@ -186,20 +186,17 @@ pub(crate) fn procedure(code: u32, spec: &tasks::Spec) -> Option<infrastructure:
         _ => None,
     }
 }
-pub(crate) fn holdings(
-    number: u16,
-    infrastructure: u16,
-    executor: tasks::Executor,
-    spec: &tasks::Spec,
-) -> Option<Box<[tasks::Holding]>> {
-    if number != infrastructure {
-        return Some(Box::new([]));
+pub(crate) fn holdings(number: u16, executor: tasks::Executor, spec: &tasks::Spec) -> Option<Box<[tasks::Holding]>> {
+    match jig_ops_connectors::connector(number) {
+        Some(jig_ops_connectors::Connector::Infrastructure) => {}
+        Some(jig_ops_connectors::Connector::Observability) | None => return Some(Box::new([])),
     }
     match executor {
-        tasks::Executor::Procedure { connector, .. } if connector == infrastructure => {}
-        tasks::Executor::Procedure { .. } | tasks::Executor::Agent { .. } | tasks::Executor::Person(_) => {
-            return Some(Box::new([]));
-        }
+        tasks::Executor::Procedure { connector, .. } => match jig_ops_connectors::connector(connector) {
+            Some(jig_ops_connectors::Connector::Infrastructure) => {}
+            Some(jig_ops_connectors::Connector::Observability) | None => return Some(Box::new([])),
+        },
+        tasks::Executor::Agent { .. } | tasks::Executor::Person(_) => return Some(Box::new([])),
     }
     match spec_service(spec) {
         Some(service) => Some(Box::new([tasks::Holding::Write {

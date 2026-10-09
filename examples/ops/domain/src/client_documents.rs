@@ -5,28 +5,33 @@ use crate::{ClientDocument, ClientMissing, ClientSubject, Domain, Limits, Output
 use alloc::boxed::Box;
 use jig_core as core;
 use jig_core_views as views;
+use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Decision, Env, Queue, ReplyTo, Token};
 
-pub(crate) fn prepare(domain: &Domain, token: Token, subject: ClientSubject, work: &mut Queue<Work>) -> u16 {
+pub(crate) fn prepare(_domain: &Domain, token: Token, subject: ClientSubject, work: &mut Queue<Work>) -> u16 {
     match subject {
         ClientSubject::Infrastructure(subject) => {
             work.push(Work::Infrastructure(infrastructure::Event::DocumentPrepare { token, subject }));
-            domain.numbers.infrastructure
+            jig_ops_connectors::number(Connector::Infrastructure)
         }
         ClientSubject::Observability(subject) => {
             work.push(Work::Observability(observability::Event::DocumentPrepare { token, subject }));
-            domain.numbers.observability
+            jig_ops_connectors::number(Connector::Observability)
         }
     }
 }
 
-pub(crate) fn forget(domain: &Domain, number: u16, subject: Token, work: &mut Queue<Work>) {
-    if number == domain.numbers.infrastructure {
-        work.push(Work::Infrastructure(infrastructure::Event::DocumentForget { subject }));
-    } else if number == domain.numbers.observability {
-        work.push(Work::Observability(observability::Event::DocumentForget { subject }));
+pub(crate) fn forget(_domain: &Domain, number: u16, subject: Token, work: &mut Queue<Work>) {
+    match jig_ops_connectors::connector(number) {
+        Some(Connector::Infrastructure) => {
+            work.push(Work::Infrastructure(infrastructure::Event::DocumentForget { subject }));
+        }
+        Some(Connector::Observability) => {
+            work.push(Work::Observability(observability::Event::DocumentForget { subject }));
+        }
+        None => {}
     }
 }
 
@@ -44,7 +49,7 @@ fn observability_scope(scope: core::documents::ApplicationScope) -> observabilit
 }
 
 pub(crate) fn ask_document(
-    domain: &Domain,
+    _domain: &Domain,
     number: u16,
     watcher: Token,
     scope: core::documents::ApplicationScope,
@@ -52,22 +57,26 @@ pub(crate) fn ask_document(
     party: u64,
     work: &mut Queue<Work>,
 ) {
-    if number == domain.numbers.infrastructure {
-        work.push(Work::Infrastructure(infrastructure::Event::Document {
-            watcher,
-            scope: infrastructure_scope(scope),
-            subject,
-            party,
-        }));
-    } else if number == domain.numbers.observability {
-        work.push(Work::Observability(observability::Event::Document {
-            watcher,
-            scope: observability_scope(scope),
-            subject,
-            party,
-        }));
-    } else {
-        unreachable!("core admits configured connectors only");
+    match jig_ops_connectors::connector(number) {
+        Some(Connector::Infrastructure) => {
+            work.push(Work::Infrastructure(infrastructure::Event::Document {
+                watcher,
+                scope: infrastructure_scope(scope),
+                subject,
+                party,
+            }));
+        }
+        Some(Connector::Observability) => {
+            work.push(Work::Observability(observability::Event::Document {
+                watcher,
+                scope: observability_scope(scope),
+                subject,
+                party,
+            }));
+        }
+        None => {
+            unreachable!("core admits configured connectors only");
+        }
     }
 }
 
@@ -166,108 +175,112 @@ pub(crate) fn read(
     work: &mut Queue<Work>,
 ) {
     let mut reply = Some(reply);
-    if number == domain.numbers.infrastructure {
-        let mut out = Queue::with_capacity(infrastructure::MAX_OUT);
-        infrastructure::step(
-            &mut domain.infrastructure,
-            &Env { now: env.now, wall: env.wall, limits: env.limits.infrastructure },
-            infrastructure::Event::ReadDocument { scope: infrastructure_scope(scope), read, party },
-            &mut out,
-        );
-        for _ in 0..out.len() {
-            let request = out.pop().expect("client read completion count");
-            match request {
-                infrastructure::Request::ReadAnswered { read: named, answer } => {
-                    assert!(read == named, "the connector echoes its read name");
-                    let answer = match answer {
-                        Ok(document) => Ok(ClientDocument::Infrastructure(Box::new(document))),
-                        Err(why) => Err(match why {
-                            infrastructure::DocumentMissing::Unknown => ClientMissing::Unknown,
-                            infrastructure::DocumentMissing::NotAllowed => ClientMissing::NotAllowed,
-                        }),
-                    };
-                    held(
-                        decision,
-                        Output::ApplicationRead { reply: reply.take().expect("one client read terminal"), answer },
-                    );
-                }
-                request @ (infrastructure::Request::Document { .. }
-                | infrastructure::Request::Marked { .. }
-                | infrastructure::Request::ApplicationDone { .. }
-                | infrastructure::Request::ApplicationBusy { .. }
-                | infrastructure::Request::Closed { .. }
-                | infrastructure::Request::Released { .. }
-                | infrastructure::Request::Restarted { .. }
-                | infrastructure::Request::Named { .. }
-                | infrastructure::Request::Slots { .. }
-                | infrastructure::Request::Drift { .. }
-                | infrastructure::Request::Changed { .. }
-                | infrastructure::Request::Described { .. }
-                | infrastructure::Request::Refused { .. }
-                | infrastructure::Request::Make { .. }
-                | infrastructure::Request::Outcome { .. }
-                | infrastructure::Request::Step { .. }
-                | infrastructure::Request::Save { .. }
-                | infrastructure::Request::Erase { .. }
-                | infrastructure::Request::System(_)) => {
-                    let mut requests = Queue::with_capacity(1);
-                    requests.push(request);
-                    infrastructure_out(domain, env, decision, &mut requests, work);
-                }
-            }
-        }
-    } else if number == domain.numbers.observability {
-        let mut out = Queue::with_capacity(observability::MAX_OUT);
-        observability::step(
-            &mut domain.observability,
-            &Env { now: env.now, wall: env.wall, limits: env.limits.observability },
-            observability::Event::ReadDocument { scope: observability_scope(scope), read, party },
-            &mut out,
-        );
-        for _ in 0..out.len() {
-            let request = out.pop().expect("client read completion count");
-            match request {
-                observability::Request::ReadAnswered { read: named, answer } => {
-                    assert!(read == named, "the connector echoes its read name");
-                    let answer = match answer {
-                        Ok(document) => Ok(ClientDocument::Observability(Box::new(document))),
-                        Err(why) => Err(match why {
-                            observability::DocumentMissing::Unknown => ClientMissing::Unknown,
-                            observability::DocumentMissing::NotAllowed => ClientMissing::NotAllowed,
-                        }),
-                    };
-                    held(
-                        decision,
-                        Output::ApplicationRead { reply: reply.take().expect("one client read terminal"), answer },
-                    );
-                }
-                request @ (observability::Request::Document { .. }
-                | observability::Request::Marked { .. }
-                | observability::Request::WatchInterest { .. }
-                | observability::Request::Closed { .. }
-                | observability::Request::Released { .. }
-                | observability::Request::Restarted { .. }
-                | observability::Request::Verdict { .. }
-                | observability::Request::Answer { .. }
-                | observability::Request::News { .. }
-                | observability::Request::Health { .. }
-                | observability::Request::Triage { .. }
-                | observability::Request::Described { .. }
-                | observability::Request::Refused { .. }
-                | observability::Request::Make { .. }
-                | observability::Request::Outcome { .. }
-                | observability::Request::Save { .. }
-                | observability::Request::Erase { .. }
-                | observability::Request::System(_)
-                | observability::Request::Changed { .. }) => {
-                    let mut requests = Queue::with_capacity(1);
-                    requests.push(request);
-                    observability_out(domain, env, decision, &mut requests, work);
+    match jig_ops_connectors::connector(number) {
+        Some(Connector::Infrastructure) => {
+            let mut out = Queue::with_capacity(infrastructure::MAX_OUT);
+            infrastructure::step(
+                &mut domain.infrastructure,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.infrastructure },
+                infrastructure::Event::ReadDocument { scope: infrastructure_scope(scope), read, party },
+                &mut out,
+            );
+            for _ in 0..out.len() {
+                let request = out.pop().expect("client read completion count");
+                match request {
+                    infrastructure::Request::ReadAnswered { read: named, answer } => {
+                        assert!(read == named, "the connector echoes its read name");
+                        let answer = match answer {
+                            Ok(document) => Ok(ClientDocument::Infrastructure(Box::new(document))),
+                            Err(why) => Err(match why {
+                                infrastructure::DocumentMissing::Unknown => ClientMissing::Unknown,
+                                infrastructure::DocumentMissing::NotAllowed => ClientMissing::NotAllowed,
+                            }),
+                        };
+                        held(
+                            decision,
+                            Output::ApplicationRead { reply: reply.take().expect("one client read terminal"), answer },
+                        );
+                    }
+                    request @ (infrastructure::Request::Document { .. }
+                    | infrastructure::Request::Marked { .. }
+                    | infrastructure::Request::ApplicationDone { .. }
+                    | infrastructure::Request::ApplicationBusy { .. }
+                    | infrastructure::Request::Closed { .. }
+                    | infrastructure::Request::Released { .. }
+                    | infrastructure::Request::Restarted { .. }
+                    | infrastructure::Request::Named { .. }
+                    | infrastructure::Request::Slots { .. }
+                    | infrastructure::Request::Drift { .. }
+                    | infrastructure::Request::Changed { .. }
+                    | infrastructure::Request::Described { .. }
+                    | infrastructure::Request::Refused { .. }
+                    | infrastructure::Request::Make { .. }
+                    | infrastructure::Request::Outcome { .. }
+                    | infrastructure::Request::Step { .. }
+                    | infrastructure::Request::Save { .. }
+                    | infrastructure::Request::Erase { .. }
+                    | infrastructure::Request::System(_)) => {
+                        let mut requests = Queue::with_capacity(1);
+                        requests.push(request);
+                        infrastructure_out(domain, env, decision, &mut requests, work);
+                    }
                 }
             }
         }
-    } else {
-        unreachable!("core admits configured read owners only");
+        Some(Connector::Observability) => {
+            let mut out = Queue::with_capacity(observability::MAX_OUT);
+            observability::step(
+                &mut domain.observability,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.observability },
+                observability::Event::ReadDocument { scope: observability_scope(scope), read, party },
+                &mut out,
+            );
+            for _ in 0..out.len() {
+                let request = out.pop().expect("client read completion count");
+                match request {
+                    observability::Request::ReadAnswered { read: named, answer } => {
+                        assert!(read == named, "the connector echoes its read name");
+                        let answer = match answer {
+                            Ok(document) => Ok(ClientDocument::Observability(Box::new(document))),
+                            Err(why) => Err(match why {
+                                observability::DocumentMissing::Unknown => ClientMissing::Unknown,
+                                observability::DocumentMissing::NotAllowed => ClientMissing::NotAllowed,
+                            }),
+                        };
+                        held(
+                            decision,
+                            Output::ApplicationRead { reply: reply.take().expect("one client read terminal"), answer },
+                        );
+                    }
+                    request @ (observability::Request::Document { .. }
+                    | observability::Request::Marked { .. }
+                    | observability::Request::WatchInterest { .. }
+                    | observability::Request::Closed { .. }
+                    | observability::Request::Released { .. }
+                    | observability::Request::Restarted { .. }
+                    | observability::Request::Verdict { .. }
+                    | observability::Request::Answer { .. }
+                    | observability::Request::News { .. }
+                    | observability::Request::Health { .. }
+                    | observability::Request::Triage { .. }
+                    | observability::Request::Described { .. }
+                    | observability::Request::Refused { .. }
+                    | observability::Request::Make { .. }
+                    | observability::Request::Outcome { .. }
+                    | observability::Request::Save { .. }
+                    | observability::Request::Erase { .. }
+                    | observability::Request::System(_)
+                    | observability::Request::Changed { .. }) => {
+                        let mut requests = Queue::with_capacity(1);
+                        requests.push(request);
+                        observability_out(domain, env, decision, &mut requests, work);
+                    }
+                }
+            }
+        }
+        None => {
+            unreachable!("core admits configured read owners only");
+        }
     }
     assert!(reply.is_none(), "the connector answers within the decision");
 }

@@ -597,3 +597,13 @@ fn client_world_joins_only_the_client_and_test_roles() {
         );
     }
 }
+
+#[test]
+fn ops_connector_identities_link_only_the_foundation() {
+    let roots: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-connectors")).collect();
+    assert_eq!(roots.len(), 1, "one Ops connector vocabulary");
+    assert_eq!(roots[0].dependencies, ["skein-lib"]);
+    let source = fs::read_to_string(kit_root().join("examples/ops/connectors/src/lib.rs")).expect("connector source");
+    assert!(source.contains("cfg_attr(not(test), no_std)"), "connector identities are step code");
+    assert!(source.contains("forbid(unsafe_code)"), "connector identities forbid unsafe");
+}

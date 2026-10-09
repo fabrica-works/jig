@@ -1,6 +1,6 @@
 //! Finite story configuration, reconstructed unchanged on every cold start.
 use jig_host as host;
-use jig_ops_domain::{Config, Limits, Numbers};
+use jig_ops_domain::{Config, Limits};
 use jig_ops_domain_infrastructure as infrastructure;
 use skein_lib::{Duration, JournalLimits, List};
 
@@ -99,7 +99,6 @@ pub fn root(seed: u64) -> (Config, Limits) {
         .expect("one endpoint fits");
     let mut config = Config {
         core: jig_core_world::world::config(seed).core,
-        numbers: Numbers { observability: 1, infrastructure: 2 },
         triage_templates: Box::new([jig_ops_domain_observability::TriageTemplate {
             number: 1,
             delegate: super::scripts::triage(),
@@ -148,14 +147,14 @@ pub fn authority(spend: u64, person: bool) -> authority::Authority {
     let mut grants = Vec::new();
     for kind in [1, 2] {
         grants.push(authority::Grant {
-            connector: 2,
+            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure),
             kind,
             pattern: pattern(if person { None } else { Some(b"staging") }),
         });
     }
     for kind in [2, 3, 4] {
         grants.push(authority::Grant {
-            connector: 1,
+            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
             kind,
             pattern: authority::Pattern { segments: Box::new([]), last: authority::Last::Open(Box::new([])) },
         });
@@ -181,18 +180,26 @@ pub fn authority(spend: u64, person: bool) -> authority::Authority {
 fn policy_domain(limits: &authority::Limits) -> authority::Domain {
     let requirements: Box<[_]> = [
         authority::Requirement {
-            connector: 2,
+            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure),
             kind: 1,
             pattern: pattern(None),
-            judge: authority::Judge { connector: 1, requirement: 1, parameters: 0 },
+            judge: authority::Judge {
+                connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+                requirement: 1,
+                parameters: 0,
+            },
             guard: authority::Guard::Observed { freshness: Duration::from_secs(30) },
             must_be_guarded: false,
         },
         authority::Requirement {
-            connector: 2,
+            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure),
             kind: 2,
             pattern: pattern(None),
-            judge: authority::Judge { connector: 1, requirement: 2, parameters: 0 },
+            judge: authority::Judge {
+                connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+                requirement: 2,
+                parameters: 0,
+            },
             guard: authority::Guard::Observed { freshness: Duration::from_secs(30) },
             must_be_guarded: false,
         },

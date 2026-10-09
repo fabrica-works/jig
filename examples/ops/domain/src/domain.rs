@@ -8,6 +8,7 @@ use jig_core_authority as authority;
 use jig_core_fleet as fleet;
 use jig_host as host;
 use jig_inline_agent as agent;
+use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Decision, Env, Journal, Map, Queue, Token};
@@ -36,22 +37,11 @@ pub(crate) struct HostCall {
     pub(crate) delivery: Token,
 }
 
-/// Child labels are routing configuration, never policy.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Numbers {
-    /// Number assigned to observability in the core's configuration.
-    pub observability: u16,
-    /// Number assigned to infrastructure in the core's configuration.
-    pub infrastructure: u16,
-}
-
 /// Configuration is handed to the child that owns each value.
 #[derive(Debug)]
 pub struct Config {
     /// Core rules and its children.
     pub core: core::Config,
-    /// Connector labels used by the same core configuration.
-    pub numbers: Numbers,
     /// Observability owns the standing watches' delegate templates.
     pub triage_templates: Box<[observability::TriageTemplate]>,
     /// The infrastructure backend's available recovery promise.
@@ -78,7 +68,6 @@ pub struct Domain {
     pub(crate) host: host::Domain,
     pub(crate) agents: agent::Agent,
     pub(crate) journal: Journal<Write, Output>,
-    pub(crate) numbers: Numbers,
     pub(crate) charter_endpoints: Box<[jig_charter::EndpointName]>,
     pub(crate) assignments: Map<u64, Assignment>,
     pub(crate) briefs: Map<u64, Box<[jig_charter::Section]>>,
@@ -107,7 +96,6 @@ impl Domain {
     pub fn new(config: Config, limits: &Limits) -> Self {
         let room = crate::limits::room(limits).expect("finite root route");
         assert!(room.writes <= limits.journal.writes && room.held <= limits.journal.held, "admit the complete route");
-        assert!(config.numbers.observability != config.numbers.infrastructure, "distinct child labels");
         assert!(limits.routes > 0 && limits.journal.now > 0, "nonempty route and door");
         assert!(
             limits.host.slots == limits.agent.slots && limits.host.slots == limits.core.fleet.engine_slots,
@@ -133,8 +121,8 @@ impl Domain {
             &mut core.tasks,
             &Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: limits.core.tasks },
             jig_core_tasks::Event::Kinds {
-                connector: config.numbers.infrastructure,
-                kinds: crate::translate::hold_kinds(config.numbers.infrastructure),
+                connector: jig_ops_connectors::number(Connector::Infrastructure),
+                kinds: crate::translate::hold_kinds(jig_ops_connectors::number(Connector::Infrastructure)),
             },
             &mut configured,
         );
@@ -146,7 +134,6 @@ impl Domain {
             host: host::Domain::new(&limits.host),
             agents: agent::Agent::new(&limits.agent, config.endpoints, config.endpoint_names, config.seed),
             journal: Journal::new(&limits.journal),
-            numbers: config.numbers,
             charter_endpoints: config.charter_endpoints,
             assignments: Map::with_capacity(limits.core.tasks.tasks),
             briefs: Map::with_capacity(limits.core.tasks.tasks),

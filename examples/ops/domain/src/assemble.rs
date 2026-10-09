@@ -10,6 +10,7 @@ use jig_core_accounts as accounts;
 use jig_core_brief as brief;
 use jig_core_tasks as tasks;
 use jig_host as host;
+use jig_ops_connectors::Connector;
 use skein_lib::{Decimal, Env, List, Queue, Reader, ReplyTo, Token, Writer};
 
 pub(crate) fn brief(order: Box<[brief::GatherPlaced]>) -> Box<[charter::Section]> {
@@ -455,7 +456,8 @@ pub(crate) fn call(
         let binding = crate::domain::ReadCall { to: to.into_token(), name: call.name, tool: call.tool.clone() };
         match crate::translate::decode(&call.tool, &call.input) {
             Ok(crate::translate::Decoded::Read(read)) => {
-                let description = crate::translate::read_description(domain.numbers.observability, &read);
+                let description =
+                    crate::translate::read_description(jig_ops_connectors::number(Connector::Observability), &read);
                 let mut findings = Queue::with_capacity(
                     jig_core_authority::max_out(&env.limits.core.authority).expect("authority findings"),
                 );
