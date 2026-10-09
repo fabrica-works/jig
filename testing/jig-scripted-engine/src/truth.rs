@@ -24,6 +24,8 @@ pub struct Truth {
 /// One whole-document replacement made atomically with its story's decision.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Change {
+    /// A jig request on an application requester's behalf; only application decisions may use this.
+    Request(Ask),
     /// Replace a party's authoritative frame, including roles, versions and retention.
     Frame(Frame),
     /// Confirm a numbered sign-in for a party.
@@ -52,6 +54,7 @@ pub enum Change {
 impl Change {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
         let fits = match self {
+            Self::Request(ask) => payload::fits(ask, bounds),
             Self::Source(value) => {
                 return value.validate(bounds);
             }
@@ -118,6 +121,7 @@ impl Truth {
     }
     pub(crate) fn apply(&mut self, change: &Change) -> core::result::Result<(), Invalid> {
         match change {
+            Change::Request(_) => return Err(Invalid::Script),
             Change::Source(source) => {
                 self.sources.retain(|old| old.party != source.party || old.read != source.read);
                 self.sources.push(source.clone());
@@ -200,6 +204,9 @@ impl Rule {
             return Err(Invalid::Payload);
         }
         for change in &self.changes {
+            if matches!(change, Change::Request(_)) {
+                return Err(Invalid::Script);
+            }
             change.validate(bounds)?;
         }
         Ok(())

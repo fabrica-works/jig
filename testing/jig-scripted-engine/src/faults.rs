@@ -1,7 +1,7 @@
 //! Faults at a world's chosen clock instant; client/domain/testing.md, 7.
 //! Busy/not-ready arm one unmade attempt; loss preserves the key; restart drops
 //! undurable snapshots and provisional text, retaining durable answers by key.
-use crate::{Application, ApplicationEvent, Engine, Envelope, Up};
+use crate::{Application, Engine, Envelope, Up};
 use jig_client::contract::{ReadNone, ReadResult, VersionRange, WatchEnd, WatchEvent};
 use skein_lib::{Duration, Time, Token, Wall};
 
@@ -10,83 +10,80 @@ use skein_lib::{Duration, Time, Token, Wall};
 pub enum Fault {
     Busy,
     NotReady,
-    Lost,
-    Drop {
+    Lose {
+        attempt: Token,
+    },
+    DropWatch {
         watch: Token,
     },
     /// Delay queued output and future responses until a zero delay clears it.
     Slow {
-        by: Duration,
+        span: Duration,
     },
     Restart {
         offline: Duration,
     },
-    SignedOut {
+    SignOut {
         sign_in: u64,
     },
-    /// The engine's supported frame versions exclude the client's version one.
-    Versions,
+    /// Replace each frame's supported versions; the world chooses the mismatching range.
+    Versions(VersionRange),
 }
 impl<A: Application> Engine<A> {
     /// Applies the fault at this instant; `poll` supplies its envelopes and terminals.
-    pub fn fault(&mut self, now: Time, wall: Wall, fault: Fault) {
+    pub fn fault(&mut self, now: Time, fault: Fault) {
         self.clock = self.clock.max(now);
         match fault {
             Fault::Busy | Fault::NotReady => {
                 self.request_fault = Some(Envelope::Again);
             }
-            Fault::Lost => {
-                let mut changed = false;
+            Fault::Lose { attempt } => {
                 for due in &mut self.due {
-                    match &mut due.up {
-                        Up::Answer { envelope, answer, .. } => {
-                            *envelope = Envelope::Lost;
-                            *answer = None;
-                            changed = true;
-                        }
-                        Up::ApplicationAnswer { envelope, answer, .. } => {
-                            *envelope = Envelope::Lost;
-                            *answer = None;
-                            changed = true;
-                        }
-                        Up::Read { .. }
-                        | Up::ApplicationRead { .. }
-                        | Up::Watch { .. }
-                        | Up::ApplicationWatch { .. }
-                        | Up::Ended { .. } => {}
+                    if due.commit == 0 {
+                        continue;
                     }
-                }
-                if !changed {
-                    self.request_fault = Some(Envelope::Lost);
-                }
-            }
-            Fault::Drop { watch } => {
-                self.end_watch(now, watch, WatchEnd::Dropped, 0);
-                self.end_application_watch(now, watch, WatchEnd::Dropped, 0);
-            }
-            Fault::Slow { by } => {
-                self.slow = by;
-                let delayed: std::collections::BTreeSet<_> = self
-                    .due
-                    .iter()
-                    .filter_map(|due| match due.up {
-                        Up::Watch { token, event: WatchEvent::Delivered(_), .. }
-                        | Up::ApplicationWatch { token, event: ApplicationEvent::Delivered(_), .. } => Some(token),
+                    match &mut due.up {
+                        Up::Answer { attempt: id, envelope, answer } if *id == attempt => {
+                            *envelope = Envelope::Lost;
+                            *answer = None;
+                        }
+                        Up::ApplicationAnswer { attempt: id, envelope, answer } if *id == attempt => {
+                            *envelope = Envelope::Lost;
+                            *answer = None;
+                        }
                         Up::Answer { .. }
                         | Up::ApplicationAnswer { .. }
                         | Up::Read { .. }
                         | Up::ApplicationRead { .. }
                         | Up::Watch { .. }
-                        | Up::ApplicationWatch { .. }
+                        | Up::App { .. }
+                        | Up::Ended { .. } => {}
+                    }
+                }
+            }
+            Fault::DropWatch { watch } => {
+                self.end_watch(now, watch, WatchEnd::Dropped, 0);
+                self.end_application_watch(now, watch, WatchEnd::Dropped, 0);
+            }
+            Fault::Slow { span: by } => {
+                self.slow = by;
+                let delayed: std::collections::BTreeSet<_> = self
+                    .due
+                    .iter()
+                    .filter_map(|due| match due.up {
+                        Up::Watch { token, event: WatchEvent::Delivered(_), .. } | Up::App { watch: token, .. } => {
+                            Some(token)
+                        }
+                        Up::Answer { .. }
+                        | Up::ApplicationAnswer { .. }
+                        | Up::Read { .. }
+                        | Up::ApplicationRead { .. }
+                        | Up::Watch { .. }
                         | Up::Ended { .. } => None,
                     })
                     .collect();
                 self.due.retain(|due| {
-                    !matches!(
-                        due.up,
-                        Up::Watch { event: WatchEvent::Delivered(_), .. }
-                            | Up::ApplicationWatch { event: ApplicationEvent::Delivered(_), .. }
-                    )
+                    !matches!(due.up, Up::Watch { event: WatchEvent::Delivered(_), .. } | Up::App { .. })
                 });
                 for due in &mut self.due {
                     due.at = now.max(due.at).saturating_add(by);
@@ -107,16 +104,16 @@ impl<A: Application> Engine<A> {
                 }
             }
             Fault::Restart { offline } => self.restart(now, offline),
-            Fault::SignedOut { sign_in } => self.sign_out(now, sign_in),
-            Fault::Versions => {
+            Fault::SignOut { sign_in } => self.sign_out(now, sign_in),
+            Fault::Versions(range) => {
                 let frames: Vec<_> = self.truth.frames.values().cloned().collect();
                 let mut changes = Vec::new();
                 for mut frame in frames {
-                    frame.versions = VersionRange { first: 2, last: 2 };
+                    frame.versions = range;
                     self.truth.frames.insert(frame.party.number, frame.clone());
                     changes.push(crate::Change::Frame(frame));
                 }
-                self.commit(now, wall, None, None, None, None, changes);
+                self.commit(now, Wall::EPOCH, None, None, None, None, changes);
             }
         }
     }
@@ -143,7 +140,7 @@ impl<A: Application> Engine<A> {
                     Some(Up::ApplicationRead { token, terminal: Err(ReadNone::Unreachable) })
                 }
                 Up::Ended { token, why } => Some(Up::Ended { token, why }),
-                Up::Watch { .. } | Up::ApplicationWatch { .. } => None,
+                Up::Watch { .. } | Up::App { .. } => None,
             };
             if let Some(up) = failed {
                 self.due.push(crate::Due { at: now, commit: 0, up });
@@ -192,7 +189,7 @@ impl<A: Application> Engine<A> {
                 | Up::Read { .. }
                 | Up::ApplicationRead { .. }
                 | Up::Watch { .. }
-                | Up::ApplicationWatch { .. }
+                | Up::App { .. }
                 | Up::Ended { .. } => {}
             }
         }

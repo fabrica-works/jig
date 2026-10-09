@@ -13,89 +13,68 @@ pub enum ApplicationScope {
     Project(u32),
     Deployment,
 }
-/// Facts visible to one application operation.
-#[derive(Clone, Copy, Debug)]
-pub struct Context<'a> {
-    pub party: u64,
-    pub owner: u16,
-    pub scope: ApplicationScope,
-    pub number: u64,
-    pub at: Wall,
-    pub bounds: Bounds,
-    pub truth: &'a Truth,
-}
 /// All typed values crossing an application's protocol boundary.
+/// State validates each retained document, not the sum of the world's truth.
 #[derive(Debug)]
 pub enum ApplicationValue<'a, A: Application> {
     Ask(&'a A::Ask),
     Answer(&'a A::Answer),
-    Read(&'a A::Read),
     Subject(&'a A::Subject),
-    Delivery(&'a A::Delivery),
-    Change(&'a A::Change),
+    Document(&'a A::Document),
+    State(&'a A),
 }
-/// A decision's own answer and atomic changes in both vocabularies.
+/// The connector's answer and the jig requests it makes on the party's behalf.
+/// Core requests use `Change::Request`; whole document replacements belong to
+/// the story's `act` interface and cannot bypass party admission from this hook.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ApplicationDecision<T, C> {
+pub struct Decision<T> {
     pub answer: T,
-    pub changes: Vec<C>,
-    pub jig: Vec<Change>,
+    pub changes: Vec<Change>,
 }
 /// Ordinary Rust hooks implemented by an application's client world.
-/// `fits` must walk the whole decoded value, including nested text, lists and
-/// unused capacities. Refusals make no changes. `apply` runs on a staged clone;
-/// restart restores the last durable clone, together with jig's truth.
+/// `decide` runs on a staged clone; refusal of a jig request discards that clone.
+/// `fits` walks the whole decoded value, including nested text and capacities.
+/// `document` serves both reads and watches; `marks` reports stale subjects.
+/// Subjects name their project or deployment scope. The world carries that
+/// scope at admission, and `document` checks its own subject and party visibility.
 pub trait Application: Clone + Debug + PartialEq + Eq {
     type Ask: Clone + Debug + PartialEq + Eq;
     type Answer: Clone + Debug + PartialEq + Eq;
-    type Read: Clone + Debug + PartialEq + Eq;
-    type Subject: Clone + Debug + PartialEq + Eq;
-    type Delivery: Clone + Debug + PartialEq + Eq;
-    type Change: Clone + Debug + PartialEq + Eq;
+    type Subject: Clone + Debug + Ord;
+    type Document: Clone + Debug + PartialEq + Eq;
+    fn decide(&mut self, truth: &Truth, party: u64, ask: &Self::Ask, wall: Wall) -> Decision<Self::Answer>;
+    fn document(&self, truth: &Truth, party: u64, subject: &Self::Subject) -> Option<Self::Document>;
+    fn marks(&self, change: &Change) -> Vec<Self::Subject>;
     fn fits(&self, value: ApplicationValue<'_, Self>, bounds: &Bounds) -> bool;
-    fn decide(
-        &self,
-        context: Context<'_>,
-        ask: &Self::Ask,
-    ) -> Result<ApplicationDecision<Self::Answer, Self::Change>, Refusal>;
-    fn read(&self, context: Context<'_>, read: &Self::Read) -> Result<Self::Delivery, ReadNone>;
-    fn watch(&self, context: Context<'_>, subject: &Self::Subject) -> Result<Option<Self::Delivery>, WatchEnd>;
-    fn apply(&mut self, change: &Self::Change) -> Result<(), Invalid>;
 }
 /// No application payload can be constructed for the jig-only kit.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Never {}
-/// The default kit contains only jig documents and requests.
+/// The default engine's empty application model; all its protocol types are uninhabited.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NoApplication;
 impl Application for NoApplication {
     type Ask = Never;
     type Answer = Never;
-    type Read = Never;
     type Subject = Never;
-    type Delivery = Never;
-    type Change = Never;
+    type Document = Never;
+    fn decide(&mut self, _: &Truth, _: u64, ask: &Never, _: Wall) -> Decision<Never> {
+        match *ask {}
+    }
+    fn document(&self, _: &Truth, _: u64, subject: &Never) -> Option<Never> {
+        match *subject {}
+    }
+    fn marks(&self, _: &Change) -> Vec<Never> {
+        vec![]
+    }
     fn fits(&self, value: ApplicationValue<'_, Self>, _: &Bounds) -> bool {
         match value {
             ApplicationValue::Ask(v)
             | ApplicationValue::Answer(v)
-            | ApplicationValue::Read(v)
             | ApplicationValue::Subject(v)
-            | ApplicationValue::Delivery(v)
-            | ApplicationValue::Change(v) => match *v {},
+            | ApplicationValue::Document(v) => match *v {},
+            ApplicationValue::State(_) => true,
         }
-    }
-    fn decide(&self, _: Context<'_>, ask: &Never) -> Result<ApplicationDecision<Never, Never>, Refusal> {
-        match *ask {}
-    }
-    fn read(&self, _: Context<'_>, read: &Never) -> Result<Never, ReadNone> {
-        match *read {}
-    }
-    fn watch(&self, _: Context<'_>, subject: &Never) -> Result<Option<Never>, WatchEnd> {
-        match *subject {}
-    }
-    fn apply(&mut self, change: &Never) -> Result<(), Invalid> {
-        match *change {}
     }
 }
 /// The application portion of the referee's numbered ledger.
@@ -106,22 +85,15 @@ pub struct ApplicationCommit<A: Application> {
     pub digest: Option<[u8; 32]>,
     pub ask: Option<A::Ask>,
     pub answer: Option<Result<A::Answer, Refusal>>,
-    pub changes: Vec<A::Change>,
-}
-/// A nonterminal application watch event, sharing jig's terminal channel.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ApplicationEvent<T> {
-    Opened,
-    Delivered(T),
-    Alive,
+    pub requests: Vec<jig_client::contract::Ask>,
+    pub state: A,
 }
 #[derive(Debug)]
 pub(crate) struct Open<A: Application> {
     pub(crate) sign_in: u64,
     pub(crate) party: u64,
-    owner: u16,
     scope: ApplicationScope,
-    subject: A::Subject,
+    pub(crate) subject: A::Subject,
     pub(crate) dirty: bool,
     pub(crate) in_flight: bool,
     pub(crate) heard: Time,
@@ -132,12 +104,6 @@ impl<A: Application> Engine<A> {
     #[must_use]
     pub fn application(&self) -> &A {
         &self.application
-    }
-    fn context(&self, party: u64, owner: u16, project: u32, at: Wall) -> Context<'_> {
-        self.scoped_context(party, owner, ApplicationScope::Project(project), at)
-    }
-    fn scoped_context(&self, party: u64, owner: u16, scope: ApplicationScope, at: Wall) -> Context<'_> {
-        Context { party, owner, scope, number: self.next_commit, at, bounds: self.bounds, truth: &self.truth }
     }
     fn scope_visible(&self, party: u64, scope: ApplicationScope) -> bool {
         match scope {
@@ -196,39 +162,39 @@ impl<A: Application> Engine<A> {
             self.application_answer(now, commit, attempt, answer);
             return Ok(());
         }
-        let decision = if self.truth.visible(party, project) {
-            self.application.decide(self.context(party, owner, project, wall), &ask)
-        } else {
-            Err(Refusal::Unknown)
-        };
-        let (answer, changes, jig) = match decision {
-            Ok(decision) => {
-                if !self.application.fits(ApplicationValue::Answer(&decision.answer), &self.bounds) {
-                    self.attempts.remove(&attempt);
-                    return Err(Invalid::Payload);
+        let (answer, requests, changes) = if self.truth.visible(party, project) {
+            let mut application = self.application.clone();
+            let decision = application.decide(&self.truth, party, &ask, wall);
+            if !application.fits(ApplicationValue::Answer(&decision.answer), &self.bounds)
+                || !application.fits(ApplicationValue::State(&application), &self.bounds)
+            {
+                self.attempts.remove(&attempt);
+                return Err(Invalid::Payload);
+            }
+            match self.judge_application(party, wall, &decision.changes) {
+                Ok((requests, changes)) => {
+                    self.application = application;
+                    self.mark_application(now);
+                    (Ok(decision.answer), requests, changes)
                 }
-                if let Err(error) = self.stage_application(&decision.changes, &decision.jig) {
+                Err(crate::application::Judged::Refused(refusal)) => (Err(refusal), vec![], vec![]),
+                Err(crate::application::Judged::Invalid(error)) => {
                     self.attempts.remove(&attempt);
                     return Err(error);
                 }
-                (Ok(decision.answer), decision.changes, decision.jig)
             }
-            Err(refusal) => {
-                if !crate::payload::fits(&refusal, &self.bounds) {
-                    self.attempts.remove(&attempt);
-                    return Err(Invalid::Payload);
-                }
-                (Err(refusal), vec![], vec![])
-            }
+        } else {
+            (Err(Refusal::Unknown), vec![], vec![])
         };
-        let commit = self.commit(now, wall, Some(party), Some(key), None, None, jig);
+        let commit = self.commit(now, wall, Some(party), Some(key), None, None, changes);
         self.pending.last_mut().expect("created commit").commit.application = Some(ApplicationCommit {
             owner,
             scope: ApplicationScope::Project(project),
             digest: Some(digest),
             ask: Some(ask),
             answer: Some(answer.clone()),
-            changes,
+            requests,
+            state: self.application.clone(),
         });
         self.keys.insert(
             (party, key),
@@ -254,52 +220,96 @@ impl<A: Application> Engine<A> {
             },
         );
     }
-    fn stage_application(&mut self, changes: &[A::Change], jig: &[Change]) -> Result<(), Invalid> {
-        let mut application = self.application.clone();
-        let mut truth = self.truth.clone();
-        for change in changes {
-            if !application.fits(ApplicationValue::Change(change), &self.bounds) {
-                return Err(Invalid::Payload);
+    fn mark_application(&mut self, now: Time) {
+        for watch in self.application_watches.values_mut() {
+            if !watch.dirty {
+                watch.ready = now.saturating_add(self.slow);
             }
-            application.apply(change)?;
+            watch.dirty = true;
         }
-        for change in jig {
-            change.validate(&self.bounds)?;
-            truth.apply(change)?;
-        }
-        self.application = application;
-        self.truth = truth;
-        Ok(())
     }
-    /// Moves the application's story through the same durability barrier as jig.
+    fn judge_application(
+        &mut self,
+        party: u64,
+        wall: Wall,
+        changes: &[Change],
+    ) -> Result<(Vec<jig_client::contract::Ask>, Vec<Change>), Judged> {
+        let original = self.truth.clone();
+        let mut requests = Vec::new();
+        let mut effects = Vec::new();
+        for change in changes {
+            let Change::Request(ask) = change else {
+                self.truth = original;
+                return Err(Judged::Refused(Refusal::NotOffered));
+            };
+            if !crate::payload::fits(ask, &self.bounds) {
+                self.truth = original;
+                return Err(Judged::Invalid(Invalid::Payload));
+            }
+            let result = self.decide(party, ask, wall);
+            match result {
+                Ok((jig_client::contract::Answer::Done(_), changes)) => {
+                    requests.push(ask.clone());
+                    effects.extend(changes);
+                }
+                Ok((jig_client::contract::Answer::Refused(refusal), _)) => {
+                    self.truth = original;
+                    return Err(Judged::Refused(refusal));
+                }
+                Err(error) => {
+                    self.truth = original;
+                    return Err(Judged::Invalid(error));
+                }
+            }
+        }
+        Ok((requests, effects))
+    }
+    /// Replaces the world's application model together with jig story changes.
     pub fn act_application(
         &mut self,
         now: Time,
         wall: Wall,
         owner: u16,
         project: u32,
-        changes: Vec<A::Change>,
+        application: A,
         jig: Vec<Change>,
     ) -> Result<u64, Invalid> {
-        self.act_scoped_application(now, wall, owner, ApplicationScope::Project(project), changes, jig)
+        self.act_scoped_application(now, wall, owner, ApplicationScope::Project(project), application, jig)
     }
-    /// Moves project or deployment part facts through the shared ledger.
+    /// Moves project or deployment part facts through the same durability barrier.
     pub fn act_scoped_application(
         &mut self,
         now: Time,
         wall: Wall,
         owner: u16,
         scope: ApplicationScope,
-        changes: Vec<A::Change>,
+        application: A,
         jig: Vec<Change>,
     ) -> Result<u64, Invalid> {
         if !self.online(now) {
             return Err(Invalid::Offline);
         }
-        self.stage_application(&changes, &jig)?;
+        if !application.fits(ApplicationValue::State(&application), &self.bounds) {
+            return Err(Invalid::Payload);
+        }
+        let mut truth = self.truth.clone();
+        for change in &jig {
+            change.validate(&self.bounds)?;
+            truth.apply(change)?;
+        }
+        self.truth = truth;
+        self.application = application;
+        self.mark_application(now);
         let commit = self.commit(now, wall, None, None, None, None, jig);
-        self.pending.last_mut().expect("created commit").commit.application =
-            Some(ApplicationCommit { owner, scope, digest: None, ask: None, answer: None, changes });
+        self.pending.last_mut().expect("created commit").commit.application = Some(ApplicationCommit {
+            owner,
+            scope,
+            digest: None,
+            ask: None,
+            answer: None,
+            requests: vec![],
+            state: self.application.clone(),
+        });
         Ok(commit)
     }
     /// Captures one application document behind the latest shared commit.
@@ -310,7 +320,7 @@ impl<A: Application> Engine<A> {
         token: Token,
         owner: u16,
         project: u32,
-        read: &A::Read,
+        read: &A::Subject,
     ) -> Result<(), Invalid> {
         self.read_scoped_application(now, sign_in, token, owner, ApplicationScope::Project(project), read)
     }
@@ -320,11 +330,11 @@ impl<A: Application> Engine<A> {
         now: Time,
         sign_in: u64,
         token: Token,
-        owner: u16,
+        _owner: u16,
         scope: ApplicationScope,
-        read: &A::Read,
+        read: &A::Subject,
     ) -> Result<(), Invalid> {
-        if !self.application.fits(ApplicationValue::Read(read), &self.bounds) {
+        if !self.application.fits(ApplicationValue::Subject(read), &self.bounds) {
             return Err(Invalid::Payload);
         }
         if !self.read_tokens.insert(token) {
@@ -335,7 +345,7 @@ impl<A: Application> Engine<A> {
             Err(ReadNone::Unreachable)
         } else if let Some(party) = self.truth.sign_ins.get(&sign_in).copied() {
             if self.scope_visible(party, scope) {
-                self.application.read(self.scoped_context(party, owner, scope, Wall::EPOCH), read)
+                self.application.document(&self.truth, party, read).ok_or(ReadNone::Unknown)
             } else {
                 Err(ReadNone::Unknown)
             }
@@ -343,7 +353,7 @@ impl<A: Application> Engine<A> {
             Err(ReadNone::SignedOut)
         };
         let terminal = if let Ok(value) = terminal {
-            if self.application.fits(ApplicationValue::Delivery(&value), &self.bounds) {
+            if self.application.fits(ApplicationValue::Document(&value), &self.bounds) {
                 Ok(value)
             } else {
                 Err(ReadNone::Busy)
@@ -372,7 +382,7 @@ impl<A: Application> Engine<A> {
         now: Time,
         sign_in: u64,
         token: Token,
-        owner: u16,
+        _owner: u16,
         scope: ApplicationScope,
         subject: A::Subject,
     ) -> Result<(), Invalid> {
@@ -397,7 +407,7 @@ impl<A: Application> Engine<A> {
         {
             Some(WatchEnd::Busy)
         } else {
-            self.application.watch(self.scoped_context(party, owner, scope, Wall::EPOCH), &subject).err()
+            self.application.document(&self.truth, party, &subject).is_none().then_some(WatchEnd::Unknown)
         };
         if let Some(why) = why {
             self.queue(now, self.next_commit - 1, Up::Ended { token, why });
@@ -408,7 +418,6 @@ impl<A: Application> Engine<A> {
             Open {
                 sign_in,
                 party,
-                owner,
                 scope,
                 subject,
                 dirty: true,
@@ -417,12 +426,12 @@ impl<A: Application> Engine<A> {
                 ready: now.saturating_add(self.slow),
             },
         );
-        self.queue(now, 0, Up::ApplicationWatch { token, event: ApplicationEvent::Opened });
+        self.queue(now, 0, Up::Watch { token, event: jig_client::contract::WatchEvent::Opened });
         Ok(())
     }
     pub(crate) fn end_application_watch(&mut self, now: Time, token: Token, why: WatchEnd, commit: u64) {
         if self.application_watches.remove(&token).is_some() {
-            self.due.retain(|due| !matches!(due.up,Up::ApplicationWatch { token:id,.. } if id == token));
+            self.due.retain(|due| !matches!(due.up,Up::App { watch:id,.. } | Up::Watch { token:id,.. } if id == token));
             self.queue(now, commit, Up::Ended { token, why });
         }
     }
@@ -444,31 +453,21 @@ impl<A: Application> Engine<A> {
                 continue;
             }
             if watch.dirty && !watch.in_flight && now >= watch.ready && durable == self.next_commit - 1 {
-                match self
-                    .application
-                    .watch(self.scoped_context(watch.party, watch.owner, watch.scope, Wall::EPOCH), &watch.subject)
-                {
-                    Ok(Some(value)) if self.application.fits(ApplicationValue::Delivery(&value), &self.bounds) => {
+                match self.application.document(&self.truth, watch.party, &watch.subject) {
+                    Some(document) if self.application.fits(ApplicationValue::Document(&document), &self.bounds) => {
                         watch.dirty = false;
                         watch.in_flight = true;
                         watch.heard = now;
-                        self.queue(
-                            now,
-                            durable,
-                            Up::ApplicationWatch { token, event: ApplicationEvent::Delivered(value) },
-                        );
+                        self.queue(now, durable, Up::App { watch: token, document });
                     }
-                    Ok(None) => {
-                        watch.dirty = false;
-                    }
-                    Ok(Some(_)) => {
+                    Some(_) => {
                         self.application_watches.insert(token, watch);
                         self.end_application_watch(now, token, WatchEnd::Busy, durable);
                         continue;
                     }
-                    Err(why) => {
+                    None => {
                         self.application_watches.insert(token, watch);
-                        self.end_application_watch(now, token, why, durable);
+                        self.end_application_watch(now, token, WatchEnd::SubjectEnded, durable);
                         continue;
                     }
                 }
@@ -476,9 +475,9 @@ impl<A: Application> Engine<A> {
             if now >= watch.heard.saturating_add(self.bounds.heartbeat) {
                 watch.heard = now;
                 if !self.due.iter().any(
-                    |due| matches!(due.up,Up::ApplicationWatch { token:id,event:ApplicationEvent::Alive } if id==token),
+                    |due| matches!(due.up,Up::Watch { token:id,event:jig_client::contract::WatchEvent::Alive } if id==token),
                 ) {
-                    self.queue(now, 0, Up::ApplicationWatch { token, event: ApplicationEvent::Alive });
+                    self.queue(now, 0, Up::Watch { token,event:jig_client::contract::WatchEvent::Alive });
                 }
             }
             self.application_watches.insert(token, watch);
@@ -494,4 +493,10 @@ impl<A: Application> Engine<A> {
             }
         })
     }
+}
+
+#[derive(Debug)]
+enum Judged {
+    Refused(Refusal),
+    Invalid(Invalid),
 }

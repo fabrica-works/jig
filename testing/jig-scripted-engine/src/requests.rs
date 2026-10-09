@@ -75,7 +75,7 @@ impl<A: crate::Application> Engine<A> {
         clippy::too_many_lines,
         reason = "one exhaustive decision checks all revision and offered-act variants before changing truth"
     )]
-    fn decide(
+    pub(crate) fn decide(
         &mut self,
         party: u64,
         ask: &Ask,

@@ -15,8 +15,7 @@ mod application;
 mod faults;
 mod payload;
 pub use application::{
-    Application, ApplicationCommit, ApplicationDecision, ApplicationEvent, ApplicationScope, ApplicationValue, Context,
-    Never, NoApplication,
+    Application, ApplicationCommit, ApplicationScope, ApplicationValue, Decision, Never, NoApplication,
 };
 pub use faults::Fault;
 mod reads;
@@ -104,11 +103,11 @@ pub enum Up<A: Application = NoApplication> {
     },
     ApplicationRead {
         token: Token,
-        terminal: Result<A::Delivery, jig_client::contract::ReadNone>,
+        terminal: Result<A::Document, jig_client::contract::ReadNone>,
     },
-    ApplicationWatch {
-        token: Token,
-        event: ApplicationEvent<A::Delivery>,
+    App {
+        watch: Token,
+        document: A::Document,
     },
     Ended {
         token: Token,
@@ -200,6 +199,9 @@ impl<A: Application> Engine<A> {
     /// Checks every decoded/program-supplied document before retaining the script.
     pub fn with_application(script: Script, seed: u64, application: A) -> Result<Self, Invalid> {
         script.validate()?;
+        if !application.fits(ApplicationValue::State(&application), &script.bounds) {
+            return Err(Invalid::Payload);
+        }
         Ok(Self {
             durable_application: application.clone(),
             application,
@@ -289,11 +291,14 @@ impl<A: Application> Engine<A> {
             }
             watch.dirty = true;
         }
+        let subjects: Vec<_> = changes.iter().flat_map(|change| self.application.marks(change)).collect();
         for watch in self.application_watches.values_mut() {
-            if !watch.dirty {
-                watch.ready = now.saturating_add(self.slow);
+            if subjects.contains(&watch.subject) {
+                if !watch.dirty {
+                    watch.ready = now.saturating_add(self.slow);
+                }
+                watch.dirty = true;
             }
-            watch.dirty = true;
         }
         let number = self.next_commit;
         self.next_commit = number.checked_add(1).expect("a scenario fits the commit number space");
@@ -360,7 +365,7 @@ impl<A: Application> Engine<A> {
                     Up::Read { token, .. } | Up::ApplicationRead { token, .. } => {
                         self.reads.remove(token);
                     }
-                    Up::Watch { .. } | Up::ApplicationWatch { .. } | Up::Ended { .. } => {}
+                    Up::Watch { .. } | Up::App { .. } | Up::Ended { .. } => {}
                 }
                 out.push(due.up);
             } else {
@@ -400,11 +405,7 @@ impl<A: Application> Engine<A> {
         }
     }
     fn queue(&mut self, now: Time, commit: u64, up: Up<A>) {
-        let direct = matches!(
-            up,
-            Up::Watch { event: WatchEvent::Delivered(_), .. }
-                | Up::ApplicationWatch { event: ApplicationEvent::Delivered(_), .. }
-        );
+        let direct = matches!(up, Up::Watch { event: WatchEvent::Delivered(_), .. } | Up::App { .. });
         self.clock = self.clock.max(now);
         self.due.push(Due { at: if direct { now } else { now.saturating_add(self.slow) }, commit, up });
     }
