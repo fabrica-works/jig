@@ -540,3 +540,21 @@ fn scripted_engine_links_only_the_client_and_foundation() {
         );
     }
 }
+
+#[test]
+fn test_client_domain_links_only_its_child_and_foundation() {
+    let roots: Vec<_> =
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-test-client-domain")).collect();
+    assert_eq!(roots.len(), 1, "one test application client domain");
+    let mut dependencies = roots[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(
+        dependencies,
+        ["jig-client", "skein-lib"],
+        "the client root depends only on its client child and foundation"
+    );
+    let source = fs::read_to_string(kit_root().join("testing/jig-test-client-domain/src/lib.rs"))
+        .expect("root source is readable");
+    assert!(source.contains("cfg_attr(not(test), no_std)"), "the client root is step code");
+    assert!(source.contains("forbid(unsafe_code)"), "the client root forbids unsafe code");
+}

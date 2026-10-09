@@ -454,6 +454,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-test-client-domain"
+version = "0.0.0"
+dependencies = [
+ "jig-client",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-test-connector"
 version = "0.0.0"
 dependencies = [
