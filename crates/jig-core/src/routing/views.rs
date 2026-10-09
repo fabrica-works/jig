@@ -13,7 +13,10 @@ pub(super) fn route_view(core: &mut Core, env: &Env<Limits>, event: views::Event
         views::Event::Delivered { watcher } => {
             core.view_documents.remove(watcher);
         }
-        views::Event::Watch { .. }
+        views::Event::StreamDelivered { .. }
+        | views::Event::Text { .. }
+        | views::Event::RunEnded { .. }
+        | views::Event::Watch { .. }
         | views::Event::Changed { .. }
         | views::Event::Made { .. }
         | views::Event::Unwatch { .. }
@@ -88,6 +91,7 @@ fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<views::Requ
             }
             request @ (views::Request::Watching { .. }
             | views::Request::Refused { .. }
+            | views::Request::Stream { .. }
             | views::Request::Deliver { .. }) => ready.push(request),
             request @ views::Request::Ended { watcher, .. } => {
                 core.view_subjects.remove(&watcher);
@@ -108,6 +112,7 @@ fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<views::Requ
             }
             views::Request::Watching { .. }
             | views::Request::Make { .. }
+            | views::Request::Stream { .. }
             | views::Request::Deliver { .. }
             | views::Request::Refused { .. } => {}
         }
@@ -122,6 +127,7 @@ pub(super) fn tag_view(mut child: Queue<views::Request>, room: u32) -> Requests 
             views::Request::Make { .. } => unreachable!("construction is resolved by the parent route"),
             request @ (views::Request::Watching { .. }
             | views::Request::Refused { .. }
+            | views::Request::Stream { .. }
             | views::Request::Deliver { .. }
             | views::Request::Ended { .. }) => Request::Now(Box::new(Now::View(request))),
         };
@@ -269,6 +275,14 @@ pub(super) fn open(
                                     party: Token::new(person),
                                     subject: watcher,
                                     window: views::Window { rows: env.limits.documents.rows, after: None },
+                                    follow: match subject {
+                                        crate::ViewSubject::Run { task, .. } => {
+                                            Some(views::Follow { run: task, turn: None, offset: 0 })
+                                        }
+                                        crate::ViewSubject::Tree { .. }
+                                        | crate::ViewSubject::Goals { .. }
+                                        | crate::ViewSubject::Inbox { .. } => None,
+                                    },
                                 },
                                 &mut views_out,
                             );
@@ -297,7 +311,7 @@ pub(super) fn open(
                                             ))));
                                         }
                                     }
-                                    request @ views::Request::Deliver { .. } => {
+                                    request @ (views::Request::Deliver { .. } | views::Request::Stream { .. }) => {
                                         out.push(Request::Now(Box::new(Now::View(request))));
                                     }
                                     views::Request::Refused { refusal, .. } => {

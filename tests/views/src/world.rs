@@ -55,6 +55,7 @@ impl World {
             party: Token::new(1),
             subject: Token::new(subject),
             window: Window { rows: 10, after: None },
+            follow: None,
         })
     }
     pub fn changed(&mut self, subject: u64) -> Vec<Request> {

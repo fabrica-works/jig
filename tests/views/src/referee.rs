@@ -22,6 +22,7 @@ impl Referee {
                 Request::Watching { watcher } => {
                     assert!(self.open.insert(*watcher, false).is_none(), "unique admission");
                 }
+                Request::Stream { .. } => {}
                 Request::Make { watcher, .. } => {
                     assert_eq!(self.open.get(watcher), Some(&false), "construction follows delivery terminal");
                 }

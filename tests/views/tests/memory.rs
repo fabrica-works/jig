@@ -20,6 +20,7 @@ fn full_watches_fit_the_declared_worst_case() {
                 party: Token::new(1),
                 subject: Token::new(7),
                 window: Window { rows: 10, after: None },
+                follow: None,
             },
             &mut out,
         );

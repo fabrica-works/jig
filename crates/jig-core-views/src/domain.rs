@@ -9,6 +9,7 @@ use skein_lib::{Env, Id, Map, Queue, Slab, Time, Token};
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) watchers: Slab<Watcher>,
+    pub(crate) runs: Map<Token, crate::text::Run>,
     pub(crate) names: Map<Token, Id<Watcher>>,
     pub(crate) facts: Facts,
 }
@@ -17,6 +18,7 @@ impl Domain {
     #[must_use]
     pub fn new(limits: &Limits) -> Self {
         Self {
+            runs: Map::with_capacity(limits.runs),
             watchers: Slab::with_capacity(crate::limits::slots(limits).expect("valid watch capacities")),
             names: Map::with_capacity(limits.watchers),
             facts: Facts::new(limits.facts),
@@ -27,10 +29,10 @@ impl Domain {
     pub fn watchers(&self) -> u32 {
         self.watchers.len()
     }
-    /// No run text is retained by document pacing.
+    /// Opaque runs followed by admitted watches.
     #[must_use]
-    pub const fn runs(&self) -> u32 {
-        0
+    pub fn runs(&self) -> u32 {
+        self.runs.len()
     }
     /// Watches have no timers.
     #[must_use]
@@ -64,12 +66,17 @@ pub const fn max_out(limits: &Limits) -> u32 {
 /// Apply one parent event with `max_out` room reserved.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Watch { watcher, party, subject, window } => {
-            watch::open(domain, &env.limits, watcher, party, subject, window, out);
+        Event::Watch { watcher, party, subject, window, follow } => {
+            watch::open(domain, &env.limits, watcher, party, subject, window, follow, out);
         }
         Event::Changed { subjects } => watch::changed(domain, &env.limits, &subjects, out),
         Event::Made { watcher, outcome } => watch::made(domain, watcher, outcome, out),
         Event::Delivered { watcher } => watch::delivered(domain, watcher, out),
+        Event::StreamDelivered { watcher } => crate::text::delivered(domain, watcher, out),
+        Event::Text { run, turn, offset, text, call } => {
+            crate::text::written(domain, &env.limits, run, turn, offset, &text, call, out);
+        }
+        Event::RunEnded { run } => crate::text::ended(domain, run),
         Event::Unwatch { watcher } => watch::close(domain, watcher, crate::End::Unwatched, out),
         Event::Gone { subject, why } => watch::gone(domain, subject, why, out),
     }

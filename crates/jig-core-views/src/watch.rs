@@ -17,28 +17,34 @@
 //! Making      close         ClosingMake      none
 //! ClosingMake made          closed           Ended
 //! Sending     close         ClosingDelivery  none
-//! ClosingDelivery delivered closed           Ended
+//! ClosingDelivery delivered closed           Ended, or wait for stream
+//! ClosingStream stream taken closed           Ended
 //! ```
-use crate::{Domain, End, Fact, Limits, Made, Refusal, Request, Window};
+use crate::{Domain, End, Fact, Follow, Limits, Made, Refusal, Request, Window};
 use skein_lib::{Id, List, Queue, Token};
 
 #[derive(Debug)]
 pub(crate) struct Watcher {
-    token: Token,
+    pub(crate) token: Token,
     party: Token,
     subject: Token,
     window: Window,
-    state: State,
+    pub(crate) state: State,
+    pub(crate) follow: Option<Follow>,
+    pub(crate) flight: Option<crate::text::Flight>,
+    pub(crate) revision: Option<u64>,
 }
 #[derive(Clone, Copy, Debug)]
-enum State {
+pub(crate) enum State {
     Idle,
     Making { changed: bool },
     Sending { changed: bool },
     ClosingMake { end: End },
+    ClosingStream { end: End },
     ClosingDelivery { end: End },
 }
 
+#[expect(clippy::too_many_arguments, reason = "one admitted watch carries its optional stream binding")]
 pub(crate) fn open(
     domain: &mut Domain,
     limits: &Limits,
@@ -46,6 +52,7 @@ pub(crate) fn open(
     party: Token,
     subject: Token,
     window: Window,
+    follow: Option<Follow>,
     out: &mut Queue<Request>,
 ) {
     assert!(!domain.names.contains_key(&token), "unique open watcher tokens");
@@ -55,17 +62,32 @@ pub(crate) fn open(
             count = count.checked_add(1).expect("bounded watches");
         }
     }
-    if domain.names.len() >= limits.watchers || count >= limits.watchers_per_party || domain.watchers.is_full() {
+    if domain.names.len() >= limits.watchers
+        || count >= limits.watchers_per_party
+        || domain.watchers.is_full()
+        || crate::text::full(domain, limits, follow)
+    {
         domain.facts.push(Fact::Refused { refusal: Refusal::Busy });
         out.push(Request::Refused { watcher: token, refusal: Refusal::Busy });
         return;
     }
-    let watch = Watcher { token, party, subject, window, state: State::Making { changed: false } };
+    crate::text::attach(domain, limits, follow);
+    let watch = Watcher {
+        token,
+        party,
+        subject,
+        window,
+        state: State::Making { changed: false },
+        follow,
+        flight: None,
+        revision: None,
+    };
     let id = domain.watchers.insert(watch).expect("admission checked");
     domain.names.insert(token, id).expect("one name per watch");
     domain.facts.push(Fact::Watching);
     out.push(Request::Watching { watcher: token });
     make(domain.watchers.get(id).expect("inserted"), &mut domain.facts, out);
+    crate::text::offer_one(domain, id, out);
 }
 fn make(watch: &Watcher, facts: &mut crate::facts::Facts, out: &mut Queue<Request>) {
     facts.push(Fact::Making);
@@ -88,6 +110,7 @@ pub(crate) fn changed(domain: &mut Domain, limits: &Limits, subjects: &List<Toke
             State::Making { .. } => State::Making { changed: true },
             State::Sending { .. } => State::Sending { changed: true },
             State::ClosingMake { end } => State::ClosingMake { end },
+            State::ClosingStream { end } => State::ClosingStream { end },
             State::ClosingDelivery { end } => State::ClosingDelivery { end },
         };
     }
@@ -108,7 +131,7 @@ pub(crate) fn made(domain: &mut Domain, token: Token, outcome: Made, out: &mut Q
             Made::Gone { why } => finish(domain, id, why, out),
         },
         State::ClosingMake { end } => finish(domain, id, end, out),
-        State::Idle | State::Sending { .. } | State::ClosingDelivery { .. } => {}
+        State::Idle | State::Sending { .. } | State::ClosingDelivery { .. } | State::ClosingStream { .. } => {}
     }
 }
 pub(crate) fn delivered(domain: &mut Domain, token: Token, out: &mut Queue<Request>) {
@@ -126,7 +149,7 @@ pub(crate) fn delivered(domain: &mut Domain, token: Token, out: &mut Queue<Reque
             };
         }
         State::ClosingDelivery { end } => finish(domain, id, end, out),
-        State::Idle | State::Making { .. } | State::ClosingMake { .. } => {}
+        State::Idle | State::Making { .. } | State::ClosingMake { .. } | State::ClosingStream { .. } => {}
     }
 }
 pub(crate) fn close(domain: &mut Domain, token: Token, why: End, out: &mut Queue<Request>) {
@@ -138,7 +161,7 @@ pub(crate) fn close(domain: &mut Domain, token: Token, why: End, out: &mut Queue
         State::Idle => finish(domain, id, why, out),
         State::Making { .. } => watch.state = State::ClosingMake { end: why },
         State::Sending { .. } => watch.state = State::ClosingDelivery { end: why },
-        State::ClosingMake { .. } | State::ClosingDelivery { .. } => {}
+        State::ClosingMake { .. } | State::ClosingDelivery { .. } | State::ClosingStream { .. } => {}
     }
 }
 pub(crate) fn gone(domain: &mut Domain, subject: Token, why: End, out: &mut Queue<Request>) {
@@ -152,8 +175,15 @@ pub(crate) fn gone(domain: &mut Domain, subject: Token, why: End, out: &mut Queu
         close(domain, *token, why, out);
     }
 }
-fn finish(domain: &mut Domain, id: Id<Watcher>, end: End, out: &mut Queue<Request>) {
-    let token = domain.watchers.get(id).expect("ending watch").token;
+pub(crate) fn finish(domain: &mut Domain, id: Id<Watcher>, end: End, out: &mut Queue<Request>) {
+    let watch = domain.watchers.get_mut(id).expect("ending watch");
+    if watch.flight.is_some() {
+        watch.state = State::ClosingStream { end };
+        return;
+    }
+    let token = watch.token;
+    let follow = watch.follow;
+    crate::text::detach(domain, follow);
     domain.names.remove(&token);
     domain.watchers.retire(id);
     domain.facts.push(Fact::Ended { end });

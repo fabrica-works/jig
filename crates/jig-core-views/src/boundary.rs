@@ -1,6 +1,7 @@
 //! Opaque subjects and pacing requests (`domain/engine.md`, 11).
 //! The parent owns documents, authorization and each subject's meaning.
 
+use alloc::boxed::Box;
 use skein_lib::{List, Token};
 
 /// A bounded slice of a subject's document, interpreted only by its owner.
@@ -41,17 +42,47 @@ pub enum Made {
     Gone { why: End },
 }
 
+/// A provisional turn, fenced by its attempt and number within that attempt.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct TurnName {
+    pub attempt: u64,
+    pub turn: u32,
+}
+
+/// A tool call being made, within the configured provisional byte bound.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Call {
+    pub number: u64,
+    pub tool: Box<[u8]>,
+    pub input: Box<[u8]>,
+    pub cut: bool,
+}
+
+/// An opaque followed run and the client's acknowledged provisional position.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Follow {
+    pub run: Token,
+    pub turn: Option<TurnName>,
+    pub offset: u32,
+}
+
 /// Events from the parent.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
     /// Admit an opaque subject and party under a unique watcher token.
-    Watch { watcher: Token, party: Token, subject: Token, window: Window },
+    Watch { watcher: Token, party: Token, subject: Token, window: Window, follow: Option<Follow> },
     /// The parent finished changing these subjects.
     Changed { subjects: List<Token> },
     /// The parent made the requested document.
     Made { watcher: Token, outcome: Made },
     /// A delivery was consumed or dropped.
     Delivered { watcher: Token },
+    /// A provisional stream delivery was consumed or dropped.
+    StreamDelivered { watcher: Token },
+    /// A live host wrote text starting at this turn's absolute offset.
+    Text { run: Token, turn: TurnName, offset: u32, text: Box<[u8]>, call: Option<Call> },
+    /// The run ended; discard its provisional writing, leaving its watches open.
+    RunEnded { run: Token },
     /// The watcher left.
     Unwatch { watcher: Token },
     /// A subject ended or became invisible.
@@ -67,6 +98,8 @@ pub enum Request {
     Make { watcher: Token, subject: Token, window: Window },
     /// Deliver the document the parent holds until durable.
     Deliver { watcher: Token },
+    /// Deliver a provisional suffix; its turn and absolute positions never mix.
+    Stream { watcher: Token, turn: TurnName, from: u32, to: u32, text: Box<[u8]>, cut: bool, call: Option<Call> },
     /// Admission found no capacity.
     Refused { watcher: Token, refusal: Refusal },
     /// The watch has released its last outstanding request.

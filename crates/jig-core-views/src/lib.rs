@@ -10,8 +10,9 @@ mod facts;
 mod limits;
 #[cfg(test)]
 mod tests;
+mod text;
 mod watch;
-pub use boundary::{End, Event, Made, Refusal, Request, Window};
+pub use boundary::{Call, End, Event, Follow, Made, Refusal, Request, TurnName, Window};
 pub use domain::{Domain, fire, max_out, step};
 pub use facts::Fact;
 pub use limits::{Limits, worst_case};
