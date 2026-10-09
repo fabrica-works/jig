@@ -98,7 +98,7 @@ fn whole_turn_preserves_blocks_and_joins_results_to_calls() {
         ),
     ]);
     let turn = decode(&limits(), &encode(&source)).unwrap();
-    assert_eq!(turn.used, Usage { input: 11, output: 12, cached: 27 });
+    assert_eq!(turn.used, Usage { input: 11, output: 12, cached: 13, cache_written: 14 });
     assert_eq!(turn.spent, 15);
     assert_eq!(turn.read_through, None);
     assert!(!turn.cut);
@@ -321,10 +321,6 @@ fn admission_errors_are_explicit_and_whole_records_are_required() {
     let role_at = bytes.len() - usize::try_from(source.messages().get(0).unwrap().measure()).unwrap();
     bytes[role_at] = 255;
     assert_eq!(decode(&limits(), &bytes), Err(Undecodable::Unknown));
-    let mut parts = source.into_parts();
-    parts.usage =
-        smith::Usage::new(&CEILINGS, UsageParts { input: 0, output: 0, cache_read: u64::MAX, cache_write: 1 }).unwrap();
-    assert_eq!(decode(&limits(), &encode(&smith::Turn::new(&CEILINGS, parts).unwrap())), Err(Undecodable::Malformed));
 }
 
 #[test]
@@ -368,4 +364,43 @@ fn receiving_limits_cut_without_growing_or_losing_call_outcomes() {
     assert!(turn.cut);
     assert!(turn.messages.is_empty());
     assert_eq!(turn.spent, 15);
+}
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
+fn smith_smallest_golden_decodes_at_its_whole_length() {
+    let bytes = include_bytes!("../tests/data/record_turn_smallest.bin");
+    assert_eq!(bytes.len(), 58);
+    let value = decode(&limits(), bytes).unwrap();
+    assert_eq!(
+        value,
+        Turn {
+            messages: List::with_capacity(0),
+            used: Usage { input: 0, output: 0, cached: 0, cache_written: 0 },
+            spent: 0,
+            read_through: None,
+            cut: false
+        }
+    );
+}
+
+#[test]
+#[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
+fn smith_full_golden_preserves_maximum_usage_at_its_whole_length() {
+    let bytes = include_bytes!("../tests/data/record_turn_full.bin");
+    assert_eq!(bytes.len(), 92);
+    let mut blocks = List::with_capacity(1);
+    blocks.push(Block::Text(Text::new(Box::from(&b"abc"[..]), 3).unwrap())).unwrap();
+    let mut messages = List::with_capacity(1);
+    messages.push(Message { speaker: Speaker::Person, blocks }).unwrap();
+    assert_eq!(
+        decode(&limits(), bytes).unwrap(),
+        Turn {
+            messages,
+            used: Usage { input: u64::MAX, output: u64::MAX, cached: u64::MAX, cache_written: u64::MAX },
+            spent: u64::MAX,
+            read_through: None,
+            cut: false
+        }
+    );
 }

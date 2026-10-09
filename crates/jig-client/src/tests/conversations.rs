@@ -120,7 +120,7 @@ fn calls(position: u64, number: u32) -> ActivityLine {
             name: TurnName { attempt: 1, number },
             turn: Turn {
                 messages,
-                used: Usage { input: 1, output: 2, cached: 0 },
+                used: Usage { input: 1, output: 2, cached: 0, cache_written: 0 },
                 spent: 3,
                 read_through: None,
                 cut: false,

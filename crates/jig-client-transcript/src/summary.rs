@@ -1,8 +1,8 @@
 //! Bounded tool-outcome summaries; tool names and inputs remain on their calls.
 //! Provider text results remain verbatim; opaque payloads never enter a summary.
 use alloc::boxed::Box;
-use skein_lib::Intake;
 use skein_lib::stream::Read;
+use skein_lib::{Decimal, Intake};
 use smith_transcript::v2 as smith;
 
 #[derive(Debug)]
@@ -59,19 +59,8 @@ impl Builder {
     fn put(&mut self, bytes: &[u8]) {
         self.bytes.append(bytes).expect("fixed summary words and numeric fields fit 256 bytes");
     }
-    fn number(&mut self, mut value: u64) {
-        let mut digits = [0_u8; 20];
-        let mut start = 20_usize;
-        for _ in 0_u32..20 {
-            start = start.checked_sub(1).expect("one place per decimal digit");
-            *digits.get_mut(start).expect("twenty digit buffer") =
-                u8::try_from(value % 10).expect("decimal digit").checked_add(b'0').expect("ascii digit");
-            value /= 10;
-            if value == 0 {
-                break;
-            }
-        }
-        self.put(digits.get(start..).expect("decimal suffix"));
+    fn number(&mut self, value: u64) {
+        self.put(Decimal::of(value).as_bytes());
     }
     fn outcome(&mut self, outcome: &smith::Outcome) {
         match outcome {

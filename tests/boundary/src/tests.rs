@@ -480,3 +480,32 @@ fn client_roles_cover_step_crates_and_exclude_the_world() {
     assert!(!client_step("jig-fake-person"));
     assert!(!client_step("jig-scripted-engine"));
 }
+
+/// Only the below-domain transcript translator links Smith (client/domain/README.md, 2).
+#[test]
+fn client_transcript_is_the_client_only_smith_link() {
+    let clients: Vec<_> =
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref().is_some_and(client_step)).collect();
+    let mut decoders = 0_u32;
+    let mut failures = Vec::new();
+    for manifest in clients {
+        let decoder = manifest.name.as_deref() == Some("jig-client-transcript");
+        if decoder {
+            decoders += 1;
+            let mut dependencies = manifest.dependencies.clone();
+            dependencies.sort();
+            assert_eq!(
+                dependencies,
+                ["jig-client", "skein-lib", "smith-transcript"],
+                "transcript links only its three roles"
+            );
+        }
+        for dependency in &manifest.dependencies {
+            if dependency.starts_with("smith-") && !(decoder && dependency == "smith-transcript") {
+                failures.push(format!("{}: {dependency}", manifest.path.display()));
+            }
+        }
+    }
+    assert_eq!(decoders, 1, "one transcript translator owns the Smith boundary");
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

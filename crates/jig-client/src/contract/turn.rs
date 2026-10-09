@@ -19,7 +19,10 @@ pub struct Turn {
 pub struct Usage {
     pub input: u64,
     pub output: u64,
+    /// Tokens read from the cache.
     pub cached: u64,
+    /// Tokens written to the cache.
+    pub cache_written: u64,
 }
 
 /// A speaker and its blocks.

@@ -33,7 +33,7 @@ pub struct Limits {
 pub enum Undecodable {
     /// The record has an unsupported version.
     Version { found: u16 },
-    /// Broken fields, trailing bytes or overflowing usage.
+    /// Broken fields or trailing bytes.
     Malformed,
     /// The wire turn exceeds admission bounds.
     TooLarge,
@@ -54,7 +54,7 @@ pub fn decode(limits: &Limits, bytes: &[u8]) -> Result<Turn, Undecodable> {
         Ok(turn) => turn,
         Err(problem) => return Err(classify(problem)),
     };
-    translate(limits.turn, &source)
+    Ok(translate(limits.turn, &source))
 }
 
 // Smith's codec reason type is intentionally not a client dependency. Obtain
@@ -73,7 +73,7 @@ fn classify(problem: smith::Problem) -> Undecodable {
     }
 }
 
-fn translate(limits: TurnLimits, source: &smith::Turn) -> Result<Turn, Undecodable> {
+fn translate(limits: TurnLimits, source: &smith::Turn) -> Turn {
     let mut budget = Budget { left: limits.text, cut: false };
     let mut messages = List::with_capacity(limits.messages.min(source.messages().len()));
     for message in source.messages() {
@@ -97,17 +97,18 @@ fn translate(limits: TurnLimits, source: &smith::Turn) -> Result<Turn, Undecodab
         messages.push(Message { speaker, blocks }).expect("receiving message capacity checked");
     }
     let usage = source.usage();
-    Ok(Turn {
+    Turn {
         messages,
         used: Usage {
             input: usage.input(),
             output: usage.output(),
-            cached: usage.cache_read().checked_add(usage.cache_write()).ok_or(Undecodable::Malformed)?,
+            cached: usage.cache_read(),
+            cache_written: usage.cache_write(),
         },
         spent: source.spent(),
         read_through: None,
         cut: budget.cut,
-    })
+    }
 }
 
 fn translate_block(source: &smith::Turn, block: &smith::Block, budget: &mut Budget) -> Block {
