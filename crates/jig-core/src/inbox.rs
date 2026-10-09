@@ -43,6 +43,7 @@ fn question_answered(row: &tasks::TaskRecord, question: u64) -> bool {
             tasks::MessageKind::Answer { question: answered } if answered == question => return true,
             tasks::MessageKind::Answer { .. }
             | tasks::MessageKind::Question
+            | tasks::MessageKind::EffectNotMade { .. }
             | tasks::MessageKind::Words
             | tasks::MessageKind::Amendment { .. }
             | tasks::MessageKind::Proposal { .. }
@@ -93,6 +94,7 @@ impl Core {
                         ),
                         tasks::MessageKind::ProposalDecision { .. }
                         | tasks::MessageKind::Proposal { .. }
+                        | tasks::MessageKind::EffectNotMade { .. }
                         | tasks::MessageKind::Words
                         | tasks::MessageKind::Amendment { .. }
                         | tasks::MessageKind::Notice { .. }

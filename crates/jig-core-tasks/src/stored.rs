@@ -364,6 +364,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             crate::MessageKind::Escalation { .. }
             | crate::MessageKind::Proposal { .. }
             | crate::MessageKind::ProposalDecision { .. }
+            | crate::MessageKind::EffectNotMade { .. }
             | crate::MessageKind::Words
             | crate::MessageKind::Question
             | crate::MessageKind::Answer { .. }
@@ -400,7 +401,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                     Party::Deployment { .. } => false,
                 }
             }
-            crate::MessageKind::Amendment { .. } => match word.from {
+            crate::MessageKind::EffectNotMade { .. } | crate::MessageKind::Amendment { .. } => match word.from {
                 Party::Task(_) | Party::Person(_) => true,
                 Party::Deployment { .. } => false,
             },
@@ -429,7 +430,8 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             crate::MessageKind::Notice { .. } | crate::MessageKind::News { .. } => {
                 limits.result_bytes.max(limits.message_bytes)
             }
-            crate::MessageKind::Proposal { .. }
+            crate::MessageKind::EffectNotMade { .. }
+            | crate::MessageKind::Proposal { .. }
             | crate::MessageKind::Escalation { .. }
             | crate::MessageKind::PersonStalled { .. }
             | crate::MessageKind::Timer { .. } => 0,
@@ -440,6 +442,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 crate::MessageKind::Words | crate::MessageKind::Question | crate::MessageKind::Answer { .. } => {
                     word.words.is_empty()
                 }
+                crate::MessageKind::EffectNotMade { entry } => *entry == 0,
                 crate::MessageKind::Proposal { .. }
                 | crate::MessageKind::Escalation { .. }
                 | crate::MessageKind::PersonStalled { .. }
@@ -801,7 +804,8 @@ fn links(domain: &Domain, env: &Env<Limits>, task: &TaskRecord) -> bool {
     for word in &task.inbox {
         match word.kind {
             crate::MessageKind::Amendment { .. } => amendments = amendments.checked_add(1).expect("bounded amendments"),
-            crate::MessageKind::Words
+            crate::MessageKind::EffectNotMade { .. }
+            | crate::MessageKind::Words
             | crate::MessageKind::PersonStalled { .. }
             | crate::MessageKind::Proposal { .. }
             | crate::MessageKind::Escalation { .. }

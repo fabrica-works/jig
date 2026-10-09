@@ -283,3 +283,56 @@ fn idle_system_calls_do_not_grow_with_preloaded_history() {
     assert_eq!(small.system.calls(), 0);
     assert_eq!(small.trace(), large.trace());
 }
+
+#[test]
+fn a_persons_retry_preserves_the_previous_attempt_deadline_across_restart() {
+    let mut world = World::new(35);
+    drop(keep(&mut world, 1, 4, 10, 7, None));
+    let prepared = world.event(Event::Make { entry: 1 });
+    let Request::Save { record: Record::Outbox(entry) } = &prepared[0] else {
+        panic!("attempt saved before write");
+    };
+    let mut deadline = entry.attempt.expect("saved attempt").deadline;
+    for attempt in 1..=3 {
+        world.event(Event::System(SystemEvent::Applied {
+            entry: 1,
+            attempt,
+            result: if attempt == 3 {
+                jig_test_connector::ApplyResult::Uncertain
+            } else {
+                jig_test_connector::ApplyResult::Transient
+            },
+        }));
+        if attempt < 3 {
+            world.wall = deadline.as_nanos();
+            let next = world.fire();
+            let Request::Save { record: Record::Outbox(entry) } = &next[0] else {
+                panic!("automatic attempt committed");
+            };
+            deadline = entry.attempt.expect("saved next attempt").deadline;
+        }
+    }
+    let retry = world.event(Event::Resolve { entry: 1, repeat: true });
+    assert!(
+        matches!(retry.as_slice(), [Request::Save { record: Record::Outbox(entry) }] if entry.attempt.expect("saved retry attempt").deadline == deadline)
+    );
+    assert!(
+        world
+            .event(Event::System(SystemEvent::Applied {
+                entry: 1,
+                attempt: 3,
+                result: jig_test_connector::ApplyResult::Uncertain,
+            }))
+            .is_empty(),
+        "a late copy does not revoke the committed retry choice"
+    );
+    world.wall = deadline.as_nanos() - 1;
+    world.cold_restart();
+    world.settle_restart(&mut VecDeque::new());
+    assert!(world.system.observed().is_empty());
+    world.wall = deadline.as_nanos();
+    let due = world.fire();
+    assert!(matches!(due.as_slice(), [Request::Save { .. }, Request::System(SystemRequest::Apply { attempt: 4, .. })]));
+    world.release(&due, &mut VecDeque::new());
+    assert_eq!(made(&world, 1), 1);
+}

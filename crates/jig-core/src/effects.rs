@@ -1185,7 +1185,10 @@ fn settled(
         assert!(core.call_parts.insert(key, part.clone()).is_ok(), "retained call row");
         save(core, out, key, part.clone());
         match outcome {
-            connector::OutboxOutcome::Made | connector::OutboxOutcome::Failed | connector::OutboxOutcome::Withdrawn => {
+            connector::OutboxOutcome::Made
+            | connector::OutboxOutcome::Failed
+            | connector::OutboxOutcome::Withdrawn
+            | connector::OutboxOutcome::NotMade => {
                 if let Some(reply) = core.effect_replies.remove(&entry)
                     && claim_current(core, reply.key)
                 {
@@ -1196,7 +1199,10 @@ fn settled(
         }
     }
     match outcome {
-        connector::OutboxOutcome::Made | connector::OutboxOutcome::Failed | connector::OutboxOutcome::Withdrawn => {
+        connector::OutboxOutcome::Made
+        | connector::OutboxOutcome::Failed
+        | connector::OutboxOutcome::Withdrawn
+        | connector::OutboxOutcome::NotMade => {
             for resource in core.tasks.effect_writers(entry) {
                 work.push(Event::Tasks(tasks::Event::EffectSettled { resource, entry }));
             }

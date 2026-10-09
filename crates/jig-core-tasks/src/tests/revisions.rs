@@ -237,7 +237,12 @@ fn a_hold_changes_revision_for_a_new_hold_or_reason_but_not_a_pass() {
     }));
     assert_eq!(test.revisions(1), Revisions { hold: 2, ..first });
     test.route(1, EscalationHolder::Person(9), 3);
-    test.send(Event::Control { reply_to: to(), by: Party::Person(9), task: 1, control: Control::Release });
+    test.send(Event::Control {
+        reply_to: to(),
+        by: Party::Person(9),
+        task: 1,
+        control: Control::Release { again: None, message: None },
+    });
     assert_eq!(test.revisions(1), Revisions { hold: 2, ..first });
     test.send(Event::Hold { task: 1, why: Hold::Budget });
     assert_eq!(test.revisions(1), Revisions { hold: 3, ..first });
@@ -422,6 +427,7 @@ fn write(test: &mut Harness, number: u64, message: u64) {
             hits: 1,
             eligible: true,
         },
+        release: false,
     });
 }
 
@@ -546,4 +552,149 @@ fn activity_keeps_each_news_admission_before_the_unread_hints_merge() {
     assert_eq!(messages[0].at, Wall::from_nanos(1));
     assert_eq!(messages[1].at, Wall::from_nanos(2));
     assert_eq!(messages[1].hits, 1);
+}
+
+#[test]
+fn words_and_a_stop_release_preflight_together() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    test.send(Event::Hold { task: 1, why: Hold::StoppedBy { party: 9 } });
+    let word = crate::Word {
+        number: 1,
+        from: Party::Person(9),
+        kind: MessageKind::Words,
+        words: Box::new([1]),
+        at: Wall::EPOCH,
+        hits: 1,
+        eligible: false,
+    };
+    let out = test.send(Event::Message { reply_to: to(), project: 1, task: 1, word: word.clone(), release: true });
+    assert!(out.iter().any(|request| match request {
+        Request::Sent { released: true, .. } => true,
+        _ => false,
+    }));
+    assert!(!match test.domain.task(1).unwrap().phase {
+        crate::Phase::Held { .. } => true,
+        _ => false,
+    });
+    test.send(Event::Hold { task: 1, why: Hold::Budget });
+    let out = test.send(Event::Message {
+        reply_to: to(),
+        project: 1,
+        task: 1,
+        word: crate::Word { number: 2, ..word },
+        release: true,
+    });
+    assert!(out.iter().any(|request| match request {
+        Request::Sent { released: false, .. } => true,
+        _ => false,
+    }));
+    assert!(match test.domain.task(1).unwrap().phase {
+        crate::Phase::Held { why: Hold::Budget, .. } => true,
+        _ => false,
+    });
+}
+
+#[test]
+fn an_uncertain_release_needs_exactly_one_repeat_choice() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    test.send(Event::Hold { task: 1, why: Hold::Uncertain { entry: 6 } });
+    let before = test.domain.task(1).unwrap().clone();
+    let refused = test.send(Event::Control {
+        reply_to: to(),
+        task: 1,
+        by: Party::Person(9),
+        control: Control::Release { again: None, message: None },
+    });
+    assert!(refused.iter().any(|request| match request {
+        Request::Refused { .. } => true,
+        _ => false,
+    }));
+    assert_eq!(test.domain.task(1).unwrap(), &before);
+    let out = test.send(Event::Control {
+        reply_to: to(),
+        task: 1,
+        by: Party::Person(9),
+        control: Control::Release { again: Some(false), message: Some(2) },
+    });
+    assert!(out.iter().any(|request| match request {
+        Request::ResolveUncertain { task: 1, entry: 6, again: false } => true,
+        _ => false,
+    }));
+}
+
+#[test]
+fn words_release_a_stop_before_its_cancelled_run_answers() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    test.send(Event::Prepare { reply_to: to(), task: 1 });
+    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    test.send(Event::Started { task: 1, attempt: 1 });
+    test.send(Event::Hold { task: 1, why: Hold::StoppedBy { party: 9 } });
+    let out = test.send(Event::Message {
+        reply_to: to(),
+        project: 1,
+        task: 1,
+        word: crate::Word {
+            number: 1,
+            from: Party::Person(9),
+            kind: MessageKind::Words,
+            words: Box::new([1]),
+            at: Wall::EPOCH,
+            hits: 1,
+            eligible: false,
+        },
+        release: true,
+    });
+    assert!(out.iter().any(|request| match request {
+        Request::Sent { released: true, .. } => true,
+        _ => false,
+    }));
+    assert!(match test.domain.task(1).unwrap().phase {
+        crate::Phase::Active(crate::Active::Running { attempt: 1 }) => true,
+        _ => false,
+    });
+    assert!(test.domain.task(1).unwrap().narrowing, "retain the cancelled attempt until its terminal");
+    let out = test.send(Event::Activation {
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        end: crate::End::Parked,
+        cause: crate::Cause::Unpriced,
+        saved: None,
+    });
+    assert!(out.iter().any(|request| match request {
+        Request::Activate { .. } => true,
+        _ => false,
+    }));
+    assert_eq!(test.domain.task(1).unwrap().due_reason, crate::Why::Released);
+    test.restart();
+    assert_eq!(test.domain.task(1).unwrap().due_reason, crate::Why::Released);
+    test.send(Event::Prepare { reply_to: to(), task: 1 });
+    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 2, resumed: false, budget: 10, writes: Box::new([]) });
+    test.send(Event::Started { task: 1, attempt: 2 });
+    let mut change = amendment();
+    let mut authority = test.domain.task(1).unwrap().authority.clone();
+    authority.budget.spend = 90;
+    change.authority = Some(authority);
+    test.send(Event::Amend {
+        reply_to: to(),
+        by: Party::Person(9),
+        task: 1,
+        message: 2,
+        stop_run: true,
+        amendment: change,
+    });
+    assert!(test.domain.task(1).unwrap().narrowing);
+    assert_eq!(test.domain.task(1).unwrap().due_reason, crate::Why::Narrowed);
+    test.send(Event::Activation {
+        reply_to: to(),
+        task: 1,
+        attempt: 2,
+        end: crate::End::Parked,
+        cause: crate::Cause::Unpriced,
+        saved: None,
+    });
+    assert_eq!(test.domain.task(1).unwrap().due_reason, crate::Why::Narrowed);
 }

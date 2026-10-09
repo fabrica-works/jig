@@ -216,6 +216,8 @@ pub enum Outcome {
     Failed,
     /// A person must settle an uncertain outcome.
     Uncertain,
+    /// A person settled it as not made.
+    Skipped,
 }
 
 /// Result of a system apply call.
@@ -452,6 +454,8 @@ pub enum Event {
     Make { key: Key },
     /// Make the entry named by the core after its commit.
     MakeEntry { entry: u64 },
+    /// Resolve a held entry as another attempt or as not made.
+    ResolveEntry { entry: u64, repeat: bool },
     /// Restore one committed record.
     Restore { record: Record },
     /// Refresh the resources restored by the preceding live load.

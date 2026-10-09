@@ -466,7 +466,7 @@ fn a_delegate_failing_past_its_tries_is_held_and_released_finishes() {
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         by: Party::Task(1),
         task: 2,
-        control: jig_core_tasks::Control::Release,
+        control: jig_core_tasks::Control::Release { again: None, message: None },
     });
     assert_eq!(w.replies[&call], Reply::Done);
     assert_eq!(w.record(2).tries, jig_core_tasks::Tries::NONE);
@@ -503,7 +503,10 @@ fn hold_reasons_survive_restart_and_release_without_losing_task_state() {
             reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
             by: Party::Person(1),
             task: 1,
-            control: jig_core_tasks::Control::Release,
+            control: jig_core_tasks::Control::Release {
+                again: if matches!(reason, Hold::Uncertain { .. }) { Some(true) } else { None },
+                message: None,
+            },
         });
         assert_eq!(w.replies[&call], Reply::Done);
         assert_eq!(w.record(1).phase, Phase::Active(Active::Due));
@@ -525,7 +528,7 @@ fn releasing_a_held_closing_task_retries_its_unsettled_effects() {
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         by: Party::Person(1),
         task: 1,
-        control: jig_core_tasks::Control::Release,
+        control: jig_core_tasks::Control::Release { again: None, message: None },
     });
     assert_eq!(w.replies[&call], Reply::Done);
     assert!(matches!(w.record(1).phase, Phase::Closing(jig_core_tasks::Closing { stage: Stage::Effects, .. })));
@@ -731,7 +734,12 @@ fn lifecycle_history_has_independent_positions_and_restore_does_not_repeat_a_pha
     world.restart();
     assert_eq!(world.record(1).milestone, held, "restoration keeps the immutable history position");
     let reply_to = world.to();
-    world.send(Event::Control { reply_to, by: Party::Person(1), task: 1, control: jig_core_tasks::Control::Release });
+    world.send(Event::Control {
+        reply_to,
+        by: Party::Person(1),
+        task: 1,
+        control: jig_core_tasks::Control::Release { again: None, message: None },
+    });
     assert_eq!(world.record(1).milestone, held + 1);
     assert_eq!(world.record(1).revision, revision + 1, "release also has its semantic history row");
     assert!(

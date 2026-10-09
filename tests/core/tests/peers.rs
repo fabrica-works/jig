@@ -108,7 +108,7 @@ fn three_workers_and_the_engines_own_slot_use_the_same_host_scripts() {
         .enumerate()
         .map(|(index, task)| Act::Request {
             key: [u8::try_from(index).expect("four tasks") + 10; 16],
-            ask: Ask::Say { task: Task::Number(task), words: Box::from(&b"finish"[..]) },
+            ask: Ask::Say { task: Task::Number(task), words: Box::from(&b"finish"[..]), release: false },
         })
         .collect();
     acts(&mut world, 0, words);
@@ -193,7 +193,7 @@ fn a_person_chooses_between_two_reports_and_the_result_reaches_its_requester() {
 }
 
 #[test]
-fn a_person_stops_a_scripted_run_and_releases_it_for_a_new_attempt() {
+fn a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt() {
     let mut world = scripted(
         205,
         vec![Box::new([Script::Wait]), Box::new([Script::Finish { report: Box::from(&b"after release"[..]) }])],
@@ -203,19 +203,34 @@ fn a_person_stops_a_scripted_run_and_releases_it_for_a_new_attempt() {
     acts(&mut world, 2, Box::new([Act::Request { key: [7; 16], ask: Ask::Stop { task: Task::Last } }]));
     assert_eq!(world.cancellations.len(), 1);
     let task = world.peers.as_ref().expect("peers").parties[2].last_task.expect("started task");
-    let revision = world
-        .store
-        .rows
-        .values()
-        .find_map(|row| match row {
-            root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if row.number == task => {
-                Some(row.revisions.hold)
-            }
-            root::Record::Core(_) | root::Record::Connector { .. } => None,
-        })
-        .expect("visible held task row");
-    acts(&mut world, 2, Box::new([Act::Request { key: [8; 16], ask: Ask::Release { task: Task::Last, revision } }]));
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    acts(
+        &mut world,
+        2,
+        Box::new([
+            Act::Request {
+                key: [8; 16],
+                ask: Ask::Say { task: Task::Last, words: Box::from(&b"continue"[..]), release: true },
+            },
+            Act::Twice,
+        ]),
+    );
+    assert!(world.store.rows.values().any(|row| matches!(row,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if row.number == task
+        && !matches!(row.phase, tasks::Phase::Held { .. })
+        && row.inbox.iter().any(|word| word.words.as_ref() == b"continue")
+    )));
+    assert!(
+        !world.peers.as_ref().expect("peers").parties[2]
+            .replies
+            .iter()
+            .any(|(_, reply)| matches!(reply, parties::Reply::Said { .. }))
+    );
+    world.release_commits();
     let peers = world.peers.as_ref().expect("peers");
+    assert!(peers.parties[2].replies.iter().any(
+        |(_, reply)| matches!(reply, parties::Reply::Said { task: number, released: true, .. } if *number == task)
+    ));
     assert_eq!(peers.workers[0].seen.len(), 2);
     assert!(peers.workers[0].seen[1].attempt > peers.workers[0].seen[0].attempt);
     assert!(peers.quiescent(), "{:?}", world.trace);
@@ -239,6 +254,7 @@ fn a_request_sent_twice_creates_one_chat_and_replays_the_same_answer() {
             parties::Reply::SignedIn { .. }
             | parties::Reply::Proposed { .. }
             | parties::Reply::Changed { .. }
+            | parties::Reply::Said { .. }
             | parties::Reply::Done
             | parties::Reply::Refused(_)
             | parties::Reply::Again(_)

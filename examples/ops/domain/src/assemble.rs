@@ -185,6 +185,7 @@ pub(crate) fn inbox_words(word: &tasks::Word) -> Box<[u8]> {
             (if accepted { b"Proposal accepted ".as_slice() } else { b"Proposal rejected ".as_slice() }, proposal)
         }
         tasks::MessageKind::PersonStalled { task } => (b"Person task past its waiting deadline ".as_slice(), task),
+        tasks::MessageKind::EffectNotMade { entry } => (b"Effect not made ".as_slice(), entry),
         tasks::MessageKind::Words
         | tasks::MessageKind::Question
         | tasks::MessageKind::Answer { .. }

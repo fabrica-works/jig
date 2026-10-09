@@ -182,3 +182,48 @@ fn a_procedure_waits_for_current_facts_and_never_asks_for_two_effects() {
     let mut second = repeated;
     assert_eq!(second.pop(), Some(Request::Step { task: 7, decision: StepDecision::Wait { until: 100 } }));
 }
+
+#[test]
+fn a_committed_person_retry_opens_restart_but_waits_for_the_old_deadline() {
+    let mut domain = Domain::new(Backend::NoOperationIds, &limits());
+    let row = Entry {
+        number: 1,
+        key: key(),
+        effect: Effect::Restart { service: service(), operation: 9 },
+        attempt: 1,
+        deadline: 30,
+        phase: Phase::Held,
+    };
+    assert!(event(&mut domain, 2, Event::Restore { record: Record::Outbox(row) }).is_empty());
+    let mut choice = event(&mut domain, 2, Event::ResolveEntry { entry: 1, repeat: true });
+    let Some(Request::Save { record: Record::Outbox(row) }) = choice.pop() else {
+        panic!("retry choice saved");
+    };
+    assert_eq!(row.deadline, 30);
+    assert_eq!(row.attempt, 1);
+    assert_eq!(row.phase, Phase::Kept);
+    assert!(choice.is_empty());
+    let mut late = event(
+        &mut domain,
+        3,
+        Event::System(SystemEvent::Applied { key: key(), attempt: 1, result: ApplyResult::Made }),
+    );
+    assert_eq!(late.pop(), Some(Request::Erase { key: RecordKey::Outbox(key()) }));
+    assert_eq!(late.pop(), Some(Request::Outcome { entry: 1, key: key(), outcome: Outcome::Made }));
+    let mut restored = Domain::new(Backend::NoOperationIds, &limits());
+    event(&mut restored, 3, Event::Restore { record: Record::Outbox(row) });
+    let mut restart = event(&mut restored, 3, Event::Restart);
+    assert_eq!(restart.pop(), Some(Request::Make { key: key() }));
+    assert_eq!(restart.pop(), Some(Request::Restarted { stage: RestartStage::Outbox }));
+    assert!(event(&mut restored, 3, Event::Make { key: key() }).is_empty());
+    let mut out = Queue::with_capacity(MAX_OUT);
+    fire(&mut restored, &Env { now: Time::ZERO, wall: Wall::from_nanos(30_000_000_000), limits: limits() }, &mut out);
+    let Some(Request::Save { record: Record::Outbox(row) }) = out.pop() else {
+        panic!("new attempt saved before write");
+    };
+    assert_eq!(row.attempt, 2);
+    let Some(Request::System(SystemRequest::Apply { attempt, .. })) = out.pop() else {
+        panic!("new attempt released");
+    };
+    assert_eq!(attempt, 2);
+}

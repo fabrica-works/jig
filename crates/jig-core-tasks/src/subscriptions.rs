@@ -14,7 +14,8 @@ fn hint_of(kind: MessageKind) -> Option<u64> {
         MessageKind::Notice { subscription, .. }
         | MessageKind::Timer { subscription }
         | MessageKind::News { subscription, .. } => Some(subscription),
-        MessageKind::Words
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Words
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::ProposalDecision { .. }
@@ -214,7 +215,8 @@ pub(crate) fn notice(domain: &mut Domain, env: &Env<Limits>, number: u64, word: 
             SubscriptionKind::Topic { .. } => class != NewsClass::Dropped,
             SubscriptionKind::Task { .. } | SubscriptionKind::Timer { .. } => false,
         },
-        MessageKind::Words
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Words
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::ProposalDecision { .. }

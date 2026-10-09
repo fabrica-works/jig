@@ -612,13 +612,15 @@ pub(super) fn route_connector(
                     connector::Outcome::Made { .. } => true,
                     connector::Outcome::Failed
                     | connector::Outcome::Uncertain
+                    | connector::Outcome::Skipped
                     | connector::Outcome::Withdrawn
                     | connector::Outcome::Held => false,
                 };
                 let settled = match outcome {
-                    connector::Outcome::Made { .. } | connector::Outcome::Failed | connector::Outcome::Withdrawn => {
-                        true
-                    }
+                    connector::Outcome::Made { .. }
+                    | connector::Outcome::Failed
+                    | connector::Outcome::Skipped
+                    | connector::Outcome::Withdrawn => true,
                     connector::Outcome::Uncertain | connector::Outcome::Held => false,
                 };
                 match domain.outbox_procedures.get(&entry) {
@@ -638,6 +640,7 @@ pub(super) fn route_connector(
                     connector::Outcome::Uncertain => core::connector::OutboxOutcome::Uncertain,
                     connector::Outcome::Held => core::connector::OutboxOutcome::Held { entry },
                     connector::Outcome::Withdrawn => core::connector::OutboxOutcome::Withdrawn,
+                    connector::Outcome::Skipped => core::connector::OutboxOutcome::NotMade,
                 };
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Outbox {
                     entry,
@@ -672,6 +675,7 @@ pub(super) fn route_connector(
 /// Translate the core's choice without choosing a judge or admitting a write.
 fn route_effect_ask(domain: &mut Domain, number: u16, ask: core::connector::Ask, work: &mut Queue<Work>) {
     let event = match ask {
+        core::connector::Ask::ResolveUncertain { entry, again } => connector::Event::Resolve { entry, repeat: again },
         core::connector::Ask::Describe { owner } => connector::Event::Describe {
             token: owner,
             effect: domain.effects.remove(&owner).expect("connector-owned decoded effect"),

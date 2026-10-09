@@ -487,6 +487,7 @@ pub(super) fn question(
         match word.kind {
             tasks::MessageKind::Answer { question } if question == message => return Err(Missing::Ended),
             tasks::MessageKind::Answer { .. }
+            | tasks::MessageKind::EffectNotMade { .. }
             | tasks::MessageKind::Words
             | tasks::MessageKind::Question
             | tasks::MessageKind::Amendment { .. }
@@ -518,6 +519,7 @@ pub(super) fn question(
                 });
             }
             tasks::MessageKind::Answer { .. }
+            | tasks::MessageKind::EffectNotMade { .. }
             | tasks::MessageKind::Words
             | tasks::MessageKind::Amendment { .. }
             | tasks::MessageKind::Proposal { .. }

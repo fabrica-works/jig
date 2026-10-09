@@ -43,6 +43,7 @@ pub struct PersonMessage {
     pub project: u32,
     pub task: u64,
     pub question: Option<u64>,
+    pub release: bool,
     pub words: Box<[u8]>,
     pub at: Wall,
 }
@@ -51,7 +52,7 @@ impl Core {
     /// Number an authenticated person's word and route it to the task hub,
     /// retaining the keyed reply correlation until admission completes.
     pub fn person_message(&mut self, message: PersonMessage) -> Result<tasks::Event, people::Refusal> {
-        let PersonMessage { request, person, project, task, question, words, at } = message;
+        let PersonMessage { request, person, project, task, question, release, words, at } = message;
         let Some(message) = fresh(&mut self.counters, Family::Message) else {
             return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
@@ -73,6 +74,7 @@ impl Core {
                 hits: 1,
                 eligible: false,
             },
+            release,
         })
     }
 
@@ -347,6 +349,7 @@ impl Core {
         request: Token,
         task: u64,
         word: &tasks::Word,
+        released: bool,
         inbox_messages: u32,
         tasks: u32,
     ) -> SentRoute {
@@ -378,7 +381,9 @@ impl Core {
             None => {
                 let route = self.saying.remove(&request);
                 let outcome = match route {
-                    Some((named, None)) if named == task => people::Outcome::Said { task, message: word.number },
+                    Some((named, None)) if named == task => {
+                        people::Outcome::Said { task, message: word.number, released }
+                    }
                     Some((named, Some(question))) if named == task => {
                         people::Outcome::QuestionAnswered { task, question, message: word.number }
                     }
@@ -402,6 +407,7 @@ impl Core {
                 }
             }
             tasks::MessageKind::ProposalDecision { .. }
+            | tasks::MessageKind::EffectNotMade { .. }
             | tasks::MessageKind::Words
             | tasks::MessageKind::Amendment { .. }
             | tasks::MessageKind::Question

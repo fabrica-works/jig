@@ -310,6 +310,7 @@ fn restore(domain: &mut Domain, record: Record) {
 fn make(domain: &mut Domain, env: &Env<Limits>, key: Key, out: &mut Queue<Request>) {
     if let Some(entry) = domain.effects.get_mut(&key)
         && entry.phase == Phase::Kept
+        && (entry.attempt == 0 || wall_seconds(env) >= entry.deadline)
     {
         entry.phase = Phase::Sent;
         entry.attempt = entry.attempt.checked_add(1).expect("attempt fits");
@@ -344,7 +345,7 @@ fn applied(domain: &mut Domain, key: Key, attempt: u32, result: ApplyResult, out
     let Some(entry) = domain.effects.get_mut(&key) else {
         return;
     };
-    if attempt > entry.attempt || entry.phase == Phase::Kept || entry.phase == Phase::Held {
+    if attempt > entry.attempt || (entry.phase == Phase::Kept && entry.attempt == 0) || entry.phase == Phase::Held {
         return;
     }
     match result {
@@ -741,6 +742,25 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Drop { token } => {
             domain.staged.remove(&token);
         }
+        Event::ResolveEntry { entry: number, repeat } => {
+            let mut found = None;
+            for (key, entry) in &domain.effects {
+                if entry.number == number && entry.phase == Phase::Held {
+                    found = Some(*key);
+                    break;
+                }
+            }
+            if let Some(key) = found {
+                if repeat {
+                    let entry = domain.effects.get_mut(&key).expect("held entry found");
+                    entry.phase = Phase::Kept;
+                    out.push(Request::Save { record: Record::Outbox(entry.clone()) });
+                    make(domain, env, key, out);
+                } else {
+                    settled(domain, key, Outcome::Skipped, out);
+                }
+            }
+        }
         Event::Make { key } => make(domain, env, key, out),
         Event::MakeEntry { entry: number } => {
             let mut key = None;
@@ -787,8 +807,21 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "the root reserves MAX_OUT slots");
     for (key, entry) in &domain.effects {
-        if entry.phase == Phase::Uncertain && wall_seconds(env) >= entry.deadline {
+        if wall_seconds(env) >= entry.deadline && entry.phase == Phase::Uncertain {
             out.push(Request::System(SystemRequest::Look { key: *key, effect: entry.effect.clone() }));
+        }
+    }
+    for _ in 0..env.limits.effects {
+        let mut retry = None;
+        for (key, entry) in &domain.effects {
+            if entry.phase == Phase::Kept && entry.attempt > 0 && wall_seconds(env) >= entry.deadline {
+                retry = Some(*key);
+                break;
+            }
+        }
+        match retry {
+            Some(key) => make(domain, env, key, out),
+            None => break,
         }
     }
 }
@@ -799,7 +832,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 pub fn next_deadline(domain: &Domain) -> Option<Time> {
     let mut soonest = None;
     for (_, entry) in &domain.effects {
-        if entry.phase == Phase::Uncertain {
+        if entry.phase == Phase::Uncertain || (entry.phase == Phase::Kept && entry.attempt > 0) {
             let at = entry.deadline.checked_mul(1_000_000_000)?;
             soonest = Some(match soonest {
                 Some(earlier) if earlier < at => earlier,
@@ -857,7 +890,12 @@ fn restart_complete(domain: &mut Domain, out: &mut Queue<Request>) {
             for (_, entry) in &domain.effects {
                 match entry.phase {
                     Phase::Held => {}
-                    Phase::Kept | Phase::Sent | Phase::Uncertain => settled = false,
+                    Phase::Kept => {
+                        if entry.attempt == 0 {
+                            settled = false;
+                        }
+                    }
+                    Phase::Sent | Phase::Uncertain => settled = false,
                 }
             }
             settled

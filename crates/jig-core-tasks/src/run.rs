@@ -389,9 +389,6 @@ pub(crate) fn activation(
     task.record.run_reserved = 0;
     task.record.last_answer = Some(attempt);
     task.record.narrowing = false;
-    if narrowed {
-        task.record.due_reason = crate::Why::Narrowed;
-    }
     let spent = task.record.run_spent;
     crate::activity::append(&mut task.record, env.wall, crate::Line::RunEnded { attempt, end: end_kind, spent }, out);
     if let Some(tags) = saved {

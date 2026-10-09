@@ -631,7 +631,7 @@ impl Observer {
                 root::Record::Core(core::Record::People(people::Stored::Answer { key, ask, outcome, .. })) => {
                     snapshot.receipts.insert(r::Receipt::Party(key.person, key.key));
                     if let people::Ask::Say { task, .. } = ask.as_ref()
-                        && let people::Outcome::Said { task: answered, message } = outcome
+                        && let people::Outcome::Said { task: answered, message, released: false } = outcome
                     {
                         assert_eq!(task, answered, "party's words answered for another task");
                         if self.words.insert((*task, *message)) {

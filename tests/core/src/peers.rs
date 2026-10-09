@@ -183,10 +183,12 @@ impl Peers {
                     parties::Ask::Goal { words, budget, priority } => {
                         people::Ask::SetGoal { project, spec: words, charter: 1, budget, priority }
                     }
-                    parties::Ask::Say { task, words } => people::Ask::Say { project, task: task_number(task), words },
+                    parties::Ask::Say { task, words, release, .. } => {
+                        people::Ask::Say { project, task: task_number(task), words, release }
+                    }
                     parties::Ask::Stop { task } => people::Ask::Stop { project, task: task_number(task) },
-                    parties::Ask::Release { task, revision } => {
-                        people::Ask::Release { project, task: task_number(task), revision }
+                    parties::Ask::Release { task, revision, again } => {
+                        people::Ask::Release { project, task: task_number(task), revision, again }
                     }
                     parties::Ask::Take { task } => people::Ask::TakePerson { project, task: task_number(task) },
                     parties::Ask::Choose { task, revision, code, words } => people::Ask::AnswerPerson {
@@ -336,6 +338,9 @@ fn party_reply(reply: people::Reply, sign_in: Option<u64>) -> parties::Reply {
         }
         people::Reply::Outcome(people::Outcome::Started { task } | people::Outcome::GoalStarted { task }) => {
             parties::Reply::Started { task }
+        }
+        people::Reply::Outcome(people::Outcome::Said { task, message, released }) => {
+            parties::Reply::Said { task, message, released }
         }
         people::Reply::Outcome(people::Outcome::GoalProposed { proposal }) => parties::Reply::Proposed { proposal },
         people::Reply::Outcome(people::Outcome::Stopped { task } | people::Outcome::Released { task }) => {
@@ -557,6 +562,7 @@ fn party_lack(value: people::Lack) -> parties::Lack {
         people::Lack::ResourceAccess => parties::Lack::ResourceAccess,
         people::Lack::ResourceUnavailable => parties::Lack::ResourceUnavailable,
         people::Lack::Shape => parties::Lack::Shape,
+        people::Lack::Again { required } => parties::Lack::Again { required },
         people::Lack::Account => parties::Lack::Account,
         people::Lack::Writer => parties::Lack::Writer,
         people::Lack::Required { connector, kind } => parties::Lack::Required { connector, kind },

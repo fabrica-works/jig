@@ -28,6 +28,7 @@ fn write(world: &mut World, number: u64, words: &[u8]) {
         reply_to,
         project: 1,
         task: 1,
+        release: false,
         word: Word {
             number,
             from: Party::Person(9),

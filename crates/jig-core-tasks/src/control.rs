@@ -14,7 +14,7 @@ pub enum Control {
     /// Close a whole subtree with a common bounded reason.
     Cancel { reason: Box<[u8]> },
     /// Lift a hold and reset the failure counts it exhausted.
-    Release,
+    Release { again: Option<bool>, message: Option<u64> },
 }
 
 /// Whole optional task changes; root checks any widening against its holder.
@@ -267,6 +267,7 @@ pub(crate) fn amend(
     crate::activity::message(&mut task.record, &prepared.activity_word, out);
     if attempt.is_some() {
         task.record.narrowing = true;
+        task.record.due_reason = crate::Why::Narrowed;
     }
     let after = settings(&task.record);
     save_history(
@@ -412,51 +413,111 @@ pub(crate) fn apply(
             crate::closing::cancel_tree(domain, env, number, by, &reason, out);
             out.push(Request::Done { reply_to: to });
         }
-        Control::Release => {
-            let task = record(domain, number).expect("entrance found live task");
-            if task.revision == u64::MAX {
-                return refused(to, Some(number), Refusal::State, out);
-            }
-            if crate::run::run_attempt(&task.phase).is_some() {
-                return refused(to, Some(number), Refusal::State, out);
-            }
-            let next = match &task.phase {
-                Phase::Held { was: Was::Waiting, .. } => Phase::Waiting,
-                Phase::Held {
-                    was: Was::Active(Active::Idle | Active::Due | Active::Preparing | Active::BackingOff { .. }),
-                    ..
-                } => Phase::Active(Active::Due),
-                Phase::Held { was: Was::Closing(closing), .. } => Phase::Closing(closing.clone()),
-                Phase::Held { was: Was::Active(Active::Claimed { .. } | Active::Running { .. }), .. } => {
-                    unreachable!("live run refused above")
-                }
-                Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {
-                    return refused(to, Some(number), Refusal::State, out);
-                }
-            };
-            let task = task_mut(domain, number).expect("entrance found live task");
-            task.record.phase = next;
-            task.record.due_reason = crate::Why::Released;
-            if task.record.phase == Phase::Waiting {
-                task.record.hold_wait_since = None;
-            }
-            task.record.tries = Tries::NONE;
-            task.record.refusals = 0;
-            history(domain, number, env.wall, by, Change::Released, &[], out);
-            publish(domain, env, number, out);
-            if record(domain, number).expect("released task live").phase == Phase::Active(Active::Due) {
-                crate::domain::activate(domain, number, out);
-            }
-            if let Phase::Closing(closing) = &record(domain, number).expect("released task live").phase {
-                match closing.stage {
-                    crate::Stage::Effects => out.push(Request::Close { task: number, ending: closing.ending.clone() }),
-                    crate::Stage::Releases => {
-                        out.push(Request::Release { task: number, ending: closing.ending.clone() });
-                    }
-                    crate::Stage::Run { .. } | crate::Stage::Delegates | crate::Stage::Settled => {}
-                }
+        Control::Release { again, message } => {
+            if let Err(why) = release(domain, env, number, by, again, message, out) {
+                return refused(to, Some(number), why, out);
             }
             out.push(Request::Done { reply_to: to });
         }
     }
+}
+
+/// Lift a fully preflighted hold in the current decision.
+pub(crate) fn release(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    number: u64,
+    by: Party,
+    again: Option<bool>,
+    message: Option<u64>,
+    out: &mut Queue<Request>,
+) -> Result<(), Refusal> {
+    let task = record(domain, number).expect("entrance found live task");
+    if task.revision == u64::MAX {
+        return Err(Refusal::State);
+    }
+    let entry = match task.phase {
+        Phase::Held { why: crate::Hold::Uncertain { entry }, .. } => Some(entry),
+        Phase::Held { .. } | Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => None,
+    };
+    if entry.is_some() != again.is_some() {
+        return Err(Refusal::AuthorityShape);
+    }
+    let notice = if again == Some(false) {
+        let Some(message) = message else { return Err(Refusal::AuthorityShape) };
+        if message == 0 || message <= task.last_message {
+            return Err(Refusal::Read);
+        }
+        let word = Word {
+            number: message,
+            from: by,
+            kind: MessageKind::EffectNotMade { entry: entry.expect("uncertain choice preflighted") },
+            words: Box::new([]),
+            at: env.wall,
+            hits: 1,
+            eligible: false,
+        };
+        let Some(prepared) =
+            crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::Refusable)
+        else {
+            return Err(Refusal::Busy);
+        };
+        Some(prepared)
+    } else {
+        if message.is_some() {
+            return Err(Refusal::AuthorityShape);
+        }
+        None
+    };
+    let next = match &task.phase {
+        Phase::Held { was: Was::Waiting, .. } => Phase::Waiting,
+        Phase::Held {
+            was: Was::Active(Active::Idle | Active::Due | Active::Preparing | Active::BackingOff { .. }),
+            ..
+        } => Phase::Active(Active::Due),
+        Phase::Held { was: Was::Closing(closing), .. } => Phase::Closing(closing.clone()),
+        Phase::Held { was: Was::Active(active @ (Active::Claimed { .. } | Active::Running { .. })), .. } => {
+            Phase::Active(*active)
+        }
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {
+            return Err(Refusal::State);
+        }
+    };
+    if let Some(entry) = entry {
+        out.push(Request::ResolveUncertain {
+            task: number,
+            entry,
+            again: again.expect("uncertain choice preflighted"),
+        });
+    }
+    let task = task_mut(domain, number).expect("entrance found live task");
+    if let Some(notice) = notice {
+        task.record.last_message = notice.word.number;
+        task.record.inbox = notice.inbox;
+        crate::activity::message(&mut task.record, &notice.activity_word, out);
+    }
+    task.record.narrowing |= crate::run::run_attempt(&next).is_some();
+    task.record.phase = next;
+    task.record.due_reason = crate::Why::Released;
+    if task.record.phase == Phase::Waiting {
+        task.record.hold_wait_since = None;
+    }
+    task.record.tries = Tries::NONE;
+    task.record.refusals = 0;
+    history(domain, number, env.wall, by, Change::Released, &[], out);
+    publish(domain, env, number, out);
+    if record(domain, number).expect("released task live").phase == Phase::Active(Active::Due) {
+        crate::domain::activate(domain, number, out);
+    }
+    match &record(domain, number).expect("released task live").phase {
+        Phase::Closing(closing) => match closing.stage {
+            crate::Stage::Effects => out.push(Request::Close { task: number, ending: closing.ending.clone() }),
+            crate::Stage::Releases => {
+                out.push(Request::Release { task: number, ending: closing.ending.clone() });
+            }
+            crate::Stage::Run { .. } | crate::Stage::Delegates | crate::Stage::Settled => {}
+        },
+        Phase::Waiting | Phase::Active(_) | Phase::Held { .. } | Phase::Ended(_) => {}
+    }
+    Ok(())
 }

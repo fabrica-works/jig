@@ -161,7 +161,7 @@ pub(super) fn named_proposal_accept(
             reply_to: ReplyTo::new(token),
             by: tasks::Party::Task(key.task),
             task,
-            control: tasks::Control::Release,
+            control: tasks::Control::Release { again: None, message: None },
         },
     };
     assert!(core.pending_calls.insert(key, true).is_ok(), "proposal acceptance room reserved");
@@ -416,6 +416,7 @@ pub(super) fn named_action(
                     hits: 1,
                     eligible: false,
                 },
+                release: false,
             }));
         }
         NamedAction::Introduce { left, right } => {

@@ -45,11 +45,11 @@ pub enum Ask {
     /// Ask for tracked work.
     Goal { words: Box<[u8]>, budget: u64, priority: u32 },
     /// Add words to a task.
-    Say { task: Task, words: Box<[u8]> },
+    Say { task: Task, words: Box<[u8]>, release: bool },
     /// Stop a current run.
     Stop { task: Task },
     /// Release a held task.
-    Release { task: Task, revision: u64 },
+    Release { task: Task, revision: u64, again: Option<bool> },
     /// Claim visible role-addressed work.
     Take { task: Task },
     /// Answer one visible report choice.
@@ -99,6 +99,8 @@ pub enum Reply {
     Changed { task: u64 },
     /// The numbered request finished.
     Done,
+    /// Words admitted under their numbered message, possibly with the stop lifted.
+    Said { task: u64, message: u64, released: bool },
     /// A final refusal retains its facts.
     Refused(Refusal),
     /// No decision was kept; retry the same key and payload.
@@ -203,6 +205,7 @@ impl Party {
             }
             Reply::Proposed { .. }
             | Reply::Done
+            | Reply::Said { .. }
             | Reply::Refused(_)
             | Reply::ProposalDecided { .. }
             | Reply::EscalationDecided { .. } => {}
@@ -298,9 +301,9 @@ impl Party {
 
     fn resolve(&self, ask: Ask) -> Option<Ask> {
         Some(match ask {
-            Ask::Say { task, words } => Ask::Say { task: self.task(task)?, words },
+            Ask::Say { task, words, release, .. } => Ask::Say { task: self.task(task)?, words, release },
             Ask::Stop { task } => Ask::Stop { task: self.task(task)? },
-            Ask::Release { task, revision } => Ask::Release { task: self.task(task)?, revision },
+            Ask::Release { task, revision, again } => Ask::Release { task: self.task(task)?, revision, again },
             Ask::Take { task } => Ask::Take { task: self.task(task)? },
             Ask::Choose { task, revision, code, words } => {
                 Ask::Choose { task: self.task(task)?, revision, code, words }

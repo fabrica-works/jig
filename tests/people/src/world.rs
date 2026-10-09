@@ -95,6 +95,8 @@ struct Commit {
     tasks: Vec<(RequestKey, u64)>,
     proposals: Vec<((u64, u64), Winner)>,
     cleared_waiting: Vec<u64>,
+    sayings: Vec<(u64, u64, Box<[u8]>, bool)>,
+    resolved: Vec<(u64, bool)>,
 }
 
 #[derive(Debug)]
@@ -121,6 +123,8 @@ pub struct World {
     durable_tasks: BTreeMap<RequestKey, u64>,
     proposals: BTreeMap<(u64, u64), Winner>,
     holds: BTreeMap<u64, (u64, people::HoldReason)>,
+    pub sayings: BTreeMap<u64, (u64, Box<[u8]>, bool)>,
+    pub executor_outcomes: Vec<(u64, bool)>,
     specs: BTreeMap<u64, u64>,
     commits: VecDeque<Commit>,
     held: VecDeque<Held>,
@@ -166,6 +170,8 @@ impl World {
             durable_tasks: BTreeMap::new(),
             proposals: BTreeMap::new(),
             holds: BTreeMap::new(),
+            sayings: BTreeMap::new(),
+            executor_outcomes: Vec::new(),
             specs: BTreeMap::new(),
             commits: VecDeque::new(),
             held: VecDeque::new(),
@@ -362,6 +368,8 @@ impl World {
         let mut tasks = Vec::new();
         let mut proposals = Vec::new();
         let mut cleared_waiting = Vec::new();
+        let mut sayings = Vec::new();
+        let mut resolved = Vec::new();
         if !self.settings.authority_refuses {
             tasks.extend(task);
         }
@@ -386,7 +394,7 @@ impl World {
                         Ask::MakeService { .. } => RouteKind::Service,
                         Ask::DecideProposal { .. } => RouteKind::Proposal,
                         Ask::TakePerson { .. } => RouteKind::TakePerson,
-                        Ask::Release { .. } | Ask::Amend { .. } => RouteKind::Control,
+                        Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => RouteKind::Control,
                         Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
@@ -394,7 +402,6 @@ impl World {
                         | Ask::HandBackPerson { .. }
                         | Ask::AnswerPerson { .. }
                         | Ask::Move { .. }
-                        | Ask::Say { .. }
                         | Ask::AnswerQuestion { .. }
                         | Ask::Prioritise { .. }
                         | Ask::SetRoles { .. }
@@ -478,12 +485,34 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Release { task, revision, .. } => {
+                            Ask::Say { task, words, release, .. } => {
+                                let released = release
+                                    && matches!(self.holds.get(&task), Some((_, people::HoldReason::StoppedBy { party })) if *party == person);
+                                let message = self.name();
+                                sayings.push((task, message, words, released));
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome: Outcome::Said { task, message, released } },
+                                    &mut self.out,
+                                );
+                            }
+                            Ask::Release { task, revision, again, .. } => {
                                 let outcome = match self.holds.get(&task) {
                                     Some(&(now, reason)) if revision != now => Outcome::Refused(Refusal::Moved {
                                         now: people::Moved::Hold { revision: now, reason },
                                     }),
-                                    Some(_) => Outcome::Released { task },
+                                    Some(&(_, reason)) => {
+                                        let required = matches!(reason, people::HoldReason::Uncertain { .. });
+                                        if required == again.is_some() {
+                                            if let people::HoldReason::Uncertain { entry } = reason {
+                                                resolved.push((entry, again.expect("required choice")));
+                                            }
+                                            Outcome::Released { task }
+                                        } else {
+                                            Outcome::Refused(Refusal::Authority { lacking: Lack::Again { required } })
+                                        }
+                                    }
                                     None => Outcome::Refused(Refusal::Unknown),
                                 };
                                 people::step(
@@ -525,7 +554,6 @@ impl World {
                             | Ask::HandBackPerson { .. }
                             | Ask::AnswerPerson { .. }
                             | Ask::Move { .. }
-                            | Ask::Say { .. }
                             | Ask::AnswerQuestion { .. }
                             | Ask::Prioritise { .. }
                             | Ask::SetRoles { .. }
@@ -546,7 +574,15 @@ impl World {
         }
         if !changes.is_empty() || !tasks.is_empty() || !proposals.is_empty() || !cleared_waiting.is_empty() {
             self.issued += 1;
-            self.commits.push_back(Commit { number: self.issued, changes, tasks, proposals, cleared_waiting });
+            self.commits.push_back(Commit {
+                number: self.issued,
+                changes,
+                tasks,
+                proposals,
+                cleared_waiting,
+                sayings,
+                resolved,
+            });
         }
         for (call, reply) in replies {
             self.held.push_back(Held { commit: self.issued, call, reply });
@@ -579,6 +615,13 @@ impl World {
             }
             for (name, winner) in commit.proposals {
                 assert!(self.proposals.insert(name, winner).is_none(), "first proposal decision wins");
+            }
+            self.executor_outcomes.extend(commit.resolved);
+            for (task, message, words, released) in commit.sayings {
+                assert!(self.sayings.insert(message, (task, words, released)).is_none());
+                if released {
+                    self.holds.remove(&task);
+                }
             }
             for task in commit.cleared_waiting {
                 self.waiting(task, Box::new([]));

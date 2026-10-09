@@ -57,7 +57,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
             reply_to: ReplyTo::new(Token::new(9100 + u64::from(number))),
             sign_in: world.sign_in.expect("signed in party"),
             key: [number; 16],
-            ask: people::Ask::Say { project: 1, task: goal, words: Box::from(&b"waiting words"[..]) },
+            ask: people::Ask::Say { project: 1, task: goal, words: Box::from(&b"waiting words"[..]), release: false },
         })));
     }
     world.send(root::Event::ProjectionEffect { goal, number: 1, effect: World::effect() });

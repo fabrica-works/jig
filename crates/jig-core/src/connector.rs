@@ -167,6 +167,8 @@ pub enum OutboxOutcome {
     Made,
     Failed,
     Withdrawn,
+    /// A person settled an uncertain effect as not made.
+    NotMade,
     Uncertain,
     /// The connector cannot safely retry this entry; a person must resolve it.
     Held {
@@ -243,6 +245,11 @@ pub enum Ask {
     },
     Make {
         entry: u64,
+    },
+    /// Settle a held entry as not made, or prepare a new attempt, within the release decision.
+    ResolveUncertain {
+        entry: u64,
+        again: bool,
     },
     Judge {
         owner: Token,
@@ -479,10 +486,16 @@ impl Core {
             OutboxOutcome::Withdrawn if !cancelling && !procedure => {
                 Some(tasks::Event::Hold { task, why: tasks::Hold::EffectFailed })
             }
-            OutboxOutcome::Made | OutboxOutcome::Failed | OutboxOutcome::Withdrawn if procedure => {
+            OutboxOutcome::Made | OutboxOutcome::Failed | OutboxOutcome::Withdrawn | OutboxOutcome::NotMade
+                if procedure =>
+            {
                 Some(tasks::Event::WakeProcedure { task })
             }
-            OutboxOutcome::Made | OutboxOutcome::Failed | OutboxOutcome::Withdrawn | OutboxOutcome::Uncertain => None,
+            OutboxOutcome::Made
+            | OutboxOutcome::Failed
+            | OutboxOutcome::Withdrawn
+            | OutboxOutcome::NotMade
+            | OutboxOutcome::Uncertain => None,
         }
     }
 

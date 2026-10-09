@@ -300,7 +300,7 @@ pub(super) fn person_proposal_accept(
             reply_to: ReplyTo::new(request),
             by: tasks::Party::Person(person),
             task,
-            control: tasks::Control::Release,
+            control: tasks::Control::Release { again: None, message: None },
         },
     };
     let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {

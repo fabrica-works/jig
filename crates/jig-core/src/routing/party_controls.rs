@@ -183,8 +183,8 @@ pub(super) fn release_request(
 ) {
     match core.control_admit(&ask, person, project, role, env.limits.tasks.depth, env.limits.tasks.result_bytes) {
         Ok(task) => {
-            let revision = match ask {
-                people::Ask::Release { revision, .. } => revision,
+            let (revision, again) = match ask {
+                people::Ask::Release { revision, again, .. } => (revision, again),
                 people::Ask::Application { .. }
                 | people::Ask::EditNote { .. }
                 | people::Ask::MakeService { .. }
@@ -211,12 +211,33 @@ pub(super) fn release_request(
                 pool_refused(work, request, why);
                 return;
             }
+            let required = match core.tasks.task(task).expect("release task admitted").phase {
+                tasks::Phase::Held { why: tasks::Hold::Uncertain { .. }, .. } => true,
+                tasks::Phase::Held { .. }
+                | tasks::Phase::Waiting
+                | tasks::Phase::Active(_)
+                | tasks::Phase::Closing(_)
+                | tasks::Phase::Ended(_) => false,
+            };
+            if required != again.is_some() {
+                pool_refused(work, request, people::Refusal::Authority { lacking: people::Lack::Again { required } });
+                return;
+            }
+            let message = if again == Some(false) {
+                let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
+                    pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
+                    return;
+                };
+                Some(message)
+            } else {
+                None
+            };
             assert!(core.person_tasks.insert(request, PersonTaskRoute::Release(task)) == Ok(None), "one release route");
             work.push(Event::Tasks(tasks::Event::Control {
                 reply_to: ReplyTo::new(request),
                 by: tasks::Party::Person(person),
                 task,
-                control: tasks::Control::Release,
+                control: tasks::Control::Release { again, message },
             }));
         }
         Err(why) => {
@@ -235,6 +256,7 @@ pub(super) fn say_request(
     project: u32,
     task: u64,
     words: Box<[u8]>,
+    release: bool,
 ) {
     match core.person_message(crate::PersonMessage {
         request,
@@ -242,6 +264,7 @@ pub(super) fn say_request(
         project,
         task,
         question: None,
+        release,
         words,
         at: env.wall,
     }) {
@@ -270,6 +293,7 @@ pub(super) fn answer_question_request(
         project,
         task,
         question: Some(question),
+        release: false,
         words,
         at: env.wall,
     }) {

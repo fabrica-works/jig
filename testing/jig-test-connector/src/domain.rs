@@ -192,6 +192,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::values::drop_value(domain, token);
             domain.judges.remove(&token);
         }
+        Event::Resolve { entry, repeat } => crate::outbox::resolve(domain, env, entry, repeat, out),
         Event::Make { entry } => crate::outbox::make(domain, env, entry, out),
         Event::Withdraw { entry } => crate::outbox::withdraw(domain, entry, out),
         Event::Restore { record } => restore(domain, record, out),

@@ -107,19 +107,6 @@ fn an_uncertain_effect_across_restarts_is_made_before_its_retry_deadline_and_onc
 }
 
 #[test]
-fn an_effect_of_a_kind_that_cannot_be_recovered_is_held_for_a_person_when_uncertain() {
-    let mut world = World::new(114, false);
-    world.recovery = connector::Recovery::Unrecoverable;
-    world.restart(114, false);
-    applied_without_answer(&mut world);
-    world.restart(114, false);
-    assert!(world.domain.ready());
-    assert!(world.store.rows.values().any(|record| matches!(record, root::Record::Connector { record: connector::Record::Outbox(row), .. } if row.phase==connector::EffectPhase::Held)));
-    assert!(world.store.rows.values().any(|record| matches!(record, root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if matches!(row.phase, tasks::Phase::Held { why: tasks::Hold::Uncertain { .. }, .. }))));
-    assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
-}
-
-#[test]
 fn nothing_is_decided_before_every_connector_has_settled_its_outbox() {
     let mut world = World::new(115, false);
     applied_without_answer(&mut world);
@@ -199,4 +186,66 @@ fn an_unfound_uncertain_entry_keeps_its_saved_retry_deadline_across_restarts() {
     world.restart(118, false);
     assert!(world.systems[0].observed().is_empty());
     assert!(world.store.rows.values().any(|record| matches!(record, root::Record::Connector { record: connector::Record::Outbox(row), .. } if row.attempt==Some(attempt))));
+}
+
+#[test]
+fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
+    use jig_core_people as people;
+    use skein_lib::ReplyTo;
+    let mut world = World::new(119, false);
+    world.recovery = connector::Recovery::Unrecoverable;
+    world.restart(119, false);
+    let task = world.call_key(1).task;
+    applied_without_answer(&mut world);
+    world.end(tasks::End::Parked, 0);
+    world.restart(119, false);
+    assert!(world.domain.ready());
+    assert!(world.store.rows.values().any(|record| matches!(record, root::Record::Connector { record: connector::Record::Outbox(row), .. } if row.phase==connector::EffectPhase::Held)));
+    assert!(world.store.rows.values().any(|record| matches!(record, root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if matches!(row.phase, tasks::Phase::Held { why: tasks::Hold::Uncertain { .. }, .. }))));
+    assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))]
+    else {
+        panic!("live held task")
+    };
+    let revision = row.revisions.hold;
+    let sign_in = world.sign_in.expect("restored sign-in");
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(7001)),
+        sign_in,
+        key: [80; 16],
+        ask: people::Ask::Release { project: 1, task, revision, again: None },
+    })));
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
+            lacking: people::Lack::Again { required: true }
+        })))
+    );
+    let made = world.systems[0].observed().iter().filter(|row| row.applied).count();
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    let answers = world.people_answers.len();
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(7002)),
+        sign_in,
+        key: [81; 16],
+        ask: people::Ask::Release { project: 1, task, revision, again: Some(false) },
+    })));
+    assert_eq!(world.people_answers.len(), answers, "release answer waits for the outbox decision");
+    world.release_commits();
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Released { task })));
+    assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), made);
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))]
+    else {
+        panic!("live released task")
+    };
+    assert!(
+        row.inbox.iter().any(|word| matches!(word.kind, tasks::MessageKind::EffectNotMade { .. })),
+        "the resumed executor reads the not-made outcome"
+    );
+    assert!(!world.store.rows.values().any(
+        |row| matches!(row, root::Record::Connector { record: connector::Record::Outbox(row), .. } if row.task == task)
+    ));
+    assert!(world.store.rows.values().any(|row| matches!(row, root::Record::Core(core::Record::Core(core::CoreRecord::Call(row))) if row.key.task == task && matches!(row.part, core::CallPart::Effect { outcome: Some(core::connector::OutboxOutcome::NotMade), .. }))));
 }

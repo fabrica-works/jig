@@ -91,7 +91,8 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, out: &mut Queue<Reques
         MessageKind::Words | MessageKind::Question | MessageKind::Answer { .. } => {
             Line::Words { message: word.number, by: word.from, kind: word.kind, words: word.words.clone() }
         }
-        MessageKind::Escalation { .. }
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Escalation { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Amendment { .. }

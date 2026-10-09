@@ -1036,7 +1036,7 @@ fn authenticated_escalation_decisions_route_without_membership_and_io_pressure_i
 #[expect(clippy::wildcard_enum_match_arm, reason = "the test scripts only three revision-bearing asks")]
 fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
     let asks = [
-        Ask::Release { project: 1, task: 7, revision: 1 },
+        Ask::Release { project: 1, task: 7, revision: 1, again: None },
         Ask::AnswerPerson { project: 1, task: 7, revision: 1, result: PersonResult::Report { words: Box::new([1]) } },
         Ask::Amend {
             project: 1,
@@ -1059,7 +1059,7 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
         assert_eq!(reply(&outputs), Reply::Outcome(outcome));
         assert_eq!(reply(&test.request(10, 14, ask.clone())), Reply::Outcome(outcome));
         let changed = match ask {
-            Ask::Release { project, task, .. } => Ask::Release { project, task, revision: 2 },
+            Ask::Release { project, task, .. } => Ask::Release { project, task, revision: 2, again: None },
             Ask::AnswerPerson { project, task, result, .. } => Ask::AnswerPerson { project, task, revision: 2, result },
             Ask::Amend { project, task, amendment, .. } => Ask::Amend { project, task, revision: 2, amendment },
             _ => panic!("only revision-bearing asks scripted"),
@@ -1224,4 +1224,16 @@ fn restored_application_tokens_must_name_their_connector_and_a_positive_outcome(
         test.send(Event::Restored);
         assert!(!test.d.ready());
     }
+}
+
+#[test]
+fn a_said_answer_keeps_the_release_fact_and_request_choice() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let ask = Ask::Say { project: 1, task: 7, words: Box::new([1]), release: true };
+    let request = route(&test.request(10, 1, ask.clone()));
+    let outcome = Outcome::Said { task: 7, message: 8, released: true };
+    let out = test.send(Event::Decided { request, outcome });
+    assert_eq!(reply(&out), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
 }

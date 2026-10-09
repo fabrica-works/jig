@@ -113,6 +113,8 @@ pub enum EffectPhase {
     Uncertain,
     /// A proven failure waits for its retry deadline.
     Retry,
+    /// A person admitted another attempt, after the previous absolute deadline.
+    Repeat,
     /// An unrecoverable outcome waits for a person.
     Held,
 }
@@ -147,6 +149,8 @@ pub enum Outcome {
     Held,
     /// An unsent effect was cancelled.
     Withdrawn,
+    /// A party settled an uncertain entry without making it again.
+    Skipped,
 }
 
 /// How the fake system answered an apply call.
@@ -529,6 +533,8 @@ pub enum Event {
     Drop { token: Token },
     /// The journal released an entry after its first save committed.
     Make { entry: u64 },
+    /// A party resolves a held unrecoverable entry in the core release decision.
+    Resolve { entry: u64, repeat: bool },
     /// Cancel an entry that has never been sent.
     Withdraw { entry: u64 },
     /// Restore one previously committed record before work resumes.

@@ -214,7 +214,7 @@ pub enum Ask {
     /// Cancel a task and its descendants with a bounded reason.
     Cancel { project: u32, task: u64, reason: Box<[u8]> },
     /// Lift a held task's cause and rejudge it.
-    Release { project: u32, task: u64, revision: u64 },
+    Release { project: u32, task: u64, revision: u64, again: Option<bool> },
     /// Claim one role-addressed person task for this authenticated person.
     TakePerson { project: u32, task: u64 },
     /// Give this person's current role task claim back to its role.
@@ -226,7 +226,7 @@ pub enum Ask {
     /// Authenticated keyed decision for a proposal waiting at this person or a policy role.
     DecideProposal { project: u32, proposer: u64, proposal: u64, decision: ProposalDecision },
     /// Authenticated requester's whole words to an existing chat.
-    Say { project: u32, task: u64, words: Box<[u8]> },
+    Say { project: u32, task: u64, words: Box<[u8]>, release: bool },
     /// Answer a numbered question waiting in a task requested by this person.
     AnswerQuestion { project: u32, task: u64, question: u64, words: Box<[u8]> },
     /// Set the priorities of a bounded set of current project goals together.
@@ -360,7 +360,7 @@ pub enum Outcome {
     /// Keyed answer to one current or historical proposal decision.
     ProposalDecided { proposer: u64, proposal: u64, by: u64, at: Wall, choice: ProposalChoice },
     /// Words were durably admitted under the root-issued message number.
-    Said { task: u64, message: u64 },
+    Said { task: u64, message: u64, released: bool },
     /// A named question was answered with a durable message.
     QuestionAnswered { task: u64, question: u64, message: u64 },
     /// All named goal priorities were durably changed together.

@@ -906,7 +906,7 @@ fn a_release_naming_an_old_hold_is_refused_as_moved_saying_what_holds_it_now() {
     ask(&mut world, 50, people::Ask::Stop { project: 1, task });
     let revision = live_row(&world, task).revisions.hold;
     world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Budget })));
-    ask(&mut world, 51, people::Ask::Release { project: 1, task, revision });
+    ask(&mut world, 51, people::Ask::Release { project: 1, task, revision, again: None });
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Moved {
@@ -916,7 +916,7 @@ fn a_release_naming_an_old_hold_is_refused_as_moved_saying_what_holds_it_now() {
     assert!(matches!(live_row(&world, task).phase, tasks::Phase::Held { why: tasks::Hold::Budget, .. }));
     let refusal = world.people_answers.last().copied();
     world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Deadline })));
-    ask(&mut world, 51, people::Ask::Release { project: 1, task, revision });
+    ask(&mut world, 51, people::Ask::Release { project: 1, task, revision, again: None });
     assert_eq!(world.people_answers.last().copied(), refusal, "replay retains the refused decision's facts");
 }
 
@@ -940,7 +940,7 @@ fn a_release_after_a_pass_up_keeps_the_hold_revision_and_uses_the_partys_tree() 
         }))
     ));
     assert_eq!(live_row(&world, task).revisions.hold, revision);
-    ask(&mut world, 54, people::Ask::Release { project: 1, task, revision });
+    ask(&mut world, 54, people::Ask::Release { project: 1, task, revision, again: None });
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Released { task })));
     assert!(!matches!(live_row(&world, task).phase, tasks::Phase::Held { .. }));
 }
@@ -997,7 +997,7 @@ fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
     };
     let at = *at;
     assert!(at > skein_lib::Wall::EPOCH, "cancellation uses the advanced world clock");
-    ask(&mut world, 59, people::Ask::Release { project: 1, task, revision: 0 });
+    ask(&mut world, 59, people::Ask::Release { project: 1, task, revision: 0, again: None });
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Ended {

@@ -29,7 +29,8 @@ fn merge_key(kind: MessageKind) -> Option<(u8, u64)> {
         | MessageKind::Timer { subscription }
         | MessageKind::News { subscription, .. } => Some((1, subscription)),
         MessageKind::Amendment { .. } => Some((0, 0)),
-        MessageKind::Words
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Words
         | MessageKind::Question
         | MessageKind::Answer { .. }
         | MessageKind::Proposal { .. }
@@ -84,7 +85,8 @@ pub(crate) fn prepare(
                 MessageKind::News { subscription, class: NewsClass::Wakes } => {
                     word.kind = MessageKind::News { subscription, class: NewsClass::Wakes };
                 }
-                MessageKind::Words
+                MessageKind::EffectNotMade { .. }
+                | MessageKind::Words
                 | MessageKind::Question
                 | MessageKind::Answer { .. }
                 | MessageKind::Proposal { .. }
@@ -159,6 +161,7 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
         && total_bytes <= usize::try_from(limits.inbox_bytes).expect("u32 fits usize")
 }
 
+#[expect(clippy::too_many_arguments, reason = "one message entrance carries its atomic release choice")]
 #[expect(clippy::too_many_lines, reason = "one inbox entrance preflights message and answer credits before mutation")]
 pub(crate) fn message(
     domain: &mut Domain,
@@ -167,6 +170,7 @@ pub(crate) fn message(
     project: u32,
     number: u64,
     word: Word,
+    release: bool,
     out: &mut Queue<Request>,
 ) {
     if !domain.ready() {
@@ -182,7 +186,8 @@ pub(crate) fn message(
     };
     let sendable = match word.kind {
         MessageKind::Words | MessageKind::Question | MessageKind::Answer { .. } => true,
-        MessageKind::Proposal { .. }
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::ProposalDecision { .. }
@@ -203,8 +208,11 @@ pub(crate) fn message(
     };
     let person_waiting = match word.from {
         Party::Person(_) => match task.phase {
-            Phase::Active(_) => false,
-            Phase::Waiting | Phase::Closing(_) | Phase::Held { .. } | Phase::Ended(_) => true,
+            Phase::Active(_) | Phase::Held { was: crate::Was::Active(_), .. } => false,
+            Phase::Waiting
+            | Phase::Closing(_)
+            | Phase::Held { was: crate::Was::Waiting | crate::Was::Closing(_), .. }
+            | Phase::Ended(_) => true,
         },
         Party::Task(_) | Party::Deployment { .. } => false,
     };
@@ -255,7 +263,8 @@ pub(crate) fn message(
                 Party::Person(_) | Party::Deployment { .. } => None,
             }
         }
-        MessageKind::Proposal { .. }
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::Amendment { .. }
         | MessageKind::ProposalDecision { .. }
@@ -267,6 +276,18 @@ pub(crate) fn message(
             unreachable!("root hints have reserved entrances")
         }
     };
+    let released = release
+        && match word.from {
+            Party::Person(person) => match task.phase {
+                Phase::Held { why: crate::Hold::StoppedBy { party }, .. } => party == person,
+                Phase::Held { .. } | Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,
+            },
+            Party::Task(_) | Party::Deployment { .. } => false,
+        };
+    if released && task.revision == u64::MAX {
+        return refused(to, Some(number), Refusal::State, out);
+    }
+    let sender = word.from;
     let admission = match answer {
         Some(_) => Admission::RoomKept,
         None => Admission::Refusable,
@@ -296,7 +317,11 @@ pub(crate) fn message(
         }
         task.record.questions = credits.into_boxed();
     }
-    publish(domain, env, number, out);
+    if released {
+        crate::control::release(domain, env, number, sender, None, None, out).expect("release preflight before words");
+    } else {
+        publish(domain, env, number, out);
+    }
     if prepared.word.kind == MessageKind::Question {
         let source = match prepared.word.from {
             Party::Task(source) => source,
@@ -312,7 +337,7 @@ pub(crate) fn message(
         publish(domain, env, source, out);
     }
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word.clone(), out);
-    out.push(Request::Sent { reply_to: to, task: number, word: prepared.word });
+    out.push(Request::Sent { reply_to: to, task: number, word: prepared.word, released });
 }
 
 /// Root's same-decision result handoff after a delegate settled. Its reserved
@@ -329,7 +354,8 @@ pub(crate) fn delegate_result(
     };
     match word.kind {
         MessageKind::Result(_) => {}
-        MessageKind::Words
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Words
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. }
         | MessageKind::ProposalDecision { .. }

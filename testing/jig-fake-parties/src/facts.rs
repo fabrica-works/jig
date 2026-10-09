@@ -55,6 +55,8 @@ pub enum Lack {
     ResourceUnavailable,
     /// The authority value has an invalid shape.
     Shape,
+    /// A repeat decision was required or unexpected.
+    Again { required: bool },
     /// A required model account is unusable.
     Account,
     /// A written resource is held elsewhere.

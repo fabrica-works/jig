@@ -877,6 +877,7 @@ fn documents_question_words_are_whole_or_refused_and_answered_questions_end() {
                 hits: 1,
                 eligible: true,
             },
+            release: false,
         },
     );
     let target = Subject::Question { task: 1, message: 60 };
@@ -902,6 +903,7 @@ fn documents_question_words_are_whole_or_refused_and_answered_questions_end() {
                 hits: 1,
                 eligible: true,
             },
+            release: false,
         },
     );
     assert_eq!(make(&core, &limits, 1, &target, &window()), Err(Missing::Ended));

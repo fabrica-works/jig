@@ -322,6 +322,7 @@ impl World {
             | Request::Waiting { .. }
             | Request::WriterWaiting { .. }
             | Request::EndTopic { .. }
+            | Request::ResolveUncertain { .. }
             | Request::Sent { .. }
             | Request::RecurringDue { .. }
             | Request::Relay { .. }
@@ -553,6 +554,10 @@ impl World {
 
     /// Commit state and requester results together before executor delivery
     /// (domain/tasks.md, 5; domain/engine.md, 7).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one durable parent decision keeps writes and referee observations together"
+    )]
     pub fn durable(&mut self) {
         self.commit += 1;
         let mut terminals = Vec::new();
@@ -597,6 +602,7 @@ impl World {
                 | Request::ProposalRerouteNeeded { .. }
                 | Request::ProposalStalled { .. }
                 | Request::EscalationStalled { .. }
+                | Request::ResolveUncertain { .. }
                 | Request::Sent { .. }
                 | Request::Relay { .. }
                 | Request::PersonStallDue { .. }
@@ -673,6 +679,7 @@ impl World {
                 | Request::ProposalRerouteNeeded { .. }
                 | Request::ProposalStalled { .. }
                 | Request::EscalationStalled { .. }
+                | Request::ResolveUncertain { .. }
                 | Request::Release { .. } => {}
                 Request::EndTopic { task, subscription, connector } => {
                     self.ended_topics.push((task, subscription, connector));

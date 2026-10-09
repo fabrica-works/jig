@@ -252,7 +252,7 @@ pub(crate) fn withdraw(domain: &mut Domain, number: u64, out: &mut Queue<Request
 pub(crate) fn restore_entry(domain: &mut Domain, mut entry: OutboxEntry) {
     match entry.phase {
         EffectPhase::Sent => entry.phase = EffectPhase::Uncertain,
-        EffectPhase::Kept | EffectPhase::Uncertain | EffectPhase::Retry | EffectPhase::Held => {}
+        EffectPhase::Kept | EffectPhase::Uncertain | EffectPhase::Retry | EffectPhase::Repeat | EffectPhase::Held => {}
     }
     let number = entry.number;
     let needs_lookup = entry.phase == EffectPhase::Uncertain;
@@ -316,7 +316,7 @@ fn start_attempt(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut 
         hold_attempt_limit(entry, number, out);
         return;
     };
-    if next > env.limits.max_attempts {
+    if next > env.limits.max_attempts && entry.phase != EffectPhase::Repeat {
         hold_attempt_limit(entry, number, out);
         return;
     }
@@ -338,7 +338,9 @@ fn start_attempt(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut 
 fn hold_attempt_limit(entry: &mut OutboxEntry, number: u64, out: &mut Queue<Request>) {
     let outcome = match entry.phase {
         EffectPhase::Retry => Outcome::Failed,
-        EffectPhase::Kept | EffectPhase::Sent | EffectPhase::Uncertain | EffectPhase::Held => Outcome::Uncertain,
+        EffectPhase::Kept | EffectPhase::Sent | EffectPhase::Uncertain | EffectPhase::Repeat | EffectPhase::Held => {
+            Outcome::Uncertain
+        }
     };
     entry.phase = EffectPhase::Held;
     out.push(Request::Save { record: Record::Outbox(entry.clone()) });
@@ -391,7 +393,7 @@ fn progress(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
             }
             uncertain(domain, number, recovery, out);
         }
-        EffectPhase::Retry => {
+        EffectPhase::Retry | EffectPhase::Repeat => {
             let due = match attempt {
                 Some(attempt) => attempt.deadline <= env.wall,
                 None => true,
@@ -486,7 +488,7 @@ pub(crate) fn applied(domain: &mut Domain, number: u64, attempt: u32, result: Ap
         }
         ApplyResult::Conflict => settle_failed(domain, number, out),
         ApplyResult::Transient => {
-            if attempt != last.number || entry.phase == EffectPhase::Held {
+            if attempt != last.number || entry.phase == EffectPhase::Held || entry.phase == EffectPhase::Repeat {
                 return;
             }
             let entry = domain.outbox.entries.get_mut(&number).expect("entry remains unsettled");
@@ -494,7 +496,7 @@ pub(crate) fn applied(domain: &mut Domain, number: u64, attempt: u32, result: Ap
             out.push(Request::Save { record: Record::Outbox(entry.clone()) });
         }
         ApplyResult::Uncertain => {
-            if attempt != last.number || entry.phase == EffectPhase::Held {
+            if attempt != last.number || entry.phase == EffectPhase::Held || entry.phase == EffectPhase::Repeat {
                 return;
             }
             uncertain(domain, number, recovery, out);
@@ -555,7 +557,7 @@ pub(crate) fn next_deadline(domain: &Domain) -> Option<Wall> {
         }
         let due = match entry.phase {
             EffectPhase::Kept => Some(Wall::EPOCH),
-            EffectPhase::Sent | EffectPhase::Retry | EffectPhase::Uncertain => {
+            EffectPhase::Sent | EffectPhase::Retry | EffectPhase::Repeat | EffectPhase::Uncertain => {
                 if runtime.needs_lookup {
                     Some(Wall::EPOCH)
                 } else {
@@ -588,7 +590,7 @@ pub(crate) fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Reque
         }
         let due = match entry.phase {
             EffectPhase::Kept => true,
-            EffectPhase::Sent | EffectPhase::Retry | EffectPhase::Uncertain => {
+            EffectPhase::Sent | EffectPhase::Retry | EffectPhase::Repeat | EffectPhase::Uncertain => {
                 runtime.needs_lookup
                     || match entry.attempt {
                         Some(attempt) => attempt.deadline <= env.wall,
@@ -614,7 +616,7 @@ pub(crate) fn restart_settled(domain: &Domain) -> bool {
         let runtime = domain.outbox.runtime.get(number).expect("live outbox runtime");
         match entry.phase {
             EffectPhase::Kept | EffectPhase::Sent => return false,
-            EffectPhase::Retry | EffectPhase::Uncertain => {
+            EffectPhase::Retry | EffectPhase::Repeat | EffectPhase::Uncertain => {
                 if runtime.checking || runtime.needs_lookup {
                     return false;
                 }
@@ -623,4 +625,25 @@ pub(crate) fn restart_settled(domain: &Domain) -> bool {
         }
     }
     true
+}
+
+/// Resolve only the matching held entry; unknown entries belong to another connector.
+pub(crate) fn resolve(domain: &mut Domain, env: &Env<Limits>, number: u64, repeat: bool, out: &mut Queue<Request>) {
+    let Some(entry) = domain.outbox.entries.get(&number) else { return };
+    if entry.phase != EffectPhase::Held {
+        return;
+    }
+    if repeat {
+        // Preserve the earlier attempt's absolute deadline before preparing another.
+        let entry = domain.outbox.entries.get_mut(&number).expect("held entry found");
+        entry.phase = EffectPhase::Repeat;
+        out.push(Request::Save { record: Record::Outbox(entry.clone()) });
+        progress(domain, env, number, out);
+    } else {
+        let key = entry.key;
+        domain.outbox.entries.remove(&number);
+        domain.outbox.runtime.remove(&number);
+        out.push(Request::Erase { key: RecordKey::Outbox(key) });
+        out.push(Request::Outcome { entry: number, outcome: Outcome::Skipped });
+    }
 }

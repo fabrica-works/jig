@@ -23,7 +23,8 @@ pub(crate) fn valid(policy: &WakePolicy) -> bool {
 fn category(kind: MessageKind) -> u8 {
     match kind {
         MessageKind::Words => 0,
-        MessageKind::Amendment { .. }
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Amendment { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. } => 7,
@@ -43,7 +44,8 @@ fn rule(domain: &Domain, number: u64, word: &Word) -> WakeRule {
             Party::Person(_) => WakeRule::Immediate,
             Party::Task(_) | Party::Deployment { .. } => task.wake.words,
         },
-        MessageKind::Amendment { .. }
+        MessageKind::EffectNotMade { .. }
+        | MessageKind::Amendment { .. }
         | MessageKind::ProposalDecision { .. }
         | MessageKind::Proposal { .. }
         | MessageKind::Escalation { .. } => WakeRule::Immediate,
@@ -117,7 +119,8 @@ pub(crate) fn after_message(
     let decision = match record(domain, number).expect("message task live").executor {
         crate::Executor::Procedure { .. } => match word.kind {
             MessageKind::News { .. } | MessageKind::PersonStalled { .. } => rule(domain, number, &word),
-            MessageKind::Words
+            MessageKind::EffectNotMade { .. }
+            | MessageKind::Words
             | MessageKind::Amendment { .. }
             | MessageKind::ProposalDecision { .. }
             | MessageKind::Proposal { .. }

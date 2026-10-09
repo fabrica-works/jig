@@ -53,7 +53,7 @@ pub fn workers_at(seed: u64, count: u32, engine: bool, cut: Option<crate::effect
 pub fn say(world: &mut World, key: u8) {
     world.peers.as_mut().expect("scripted peers").parties[0].extend(Box::new([Act::Request {
         key: [key; 16],
-        ask: Ask::Say { task: Task::Last, words: b"continue".as_slice().into() },
+        ask: Ask::Say { task: Task::Last, words: b"continue".as_slice().into(), release: false },
     }]));
     world.drain();
 }

@@ -1292,7 +1292,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         AnswerPerson(u64),
         Move(u64),
         Proposal(u64, u64),
-        Say(u64),
+        Say(u64, bool),
         AnswerQuestion(u64, u64),
         Prioritise(u32),
         Amend(u64),
@@ -1318,7 +1318,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::AnswerPerson { task, .. } => Expected::AnswerPerson(*task),
         Ask::Move { task, .. } => Expected::Move(*task),
         Ask::DecideProposal { proposer, proposal, .. } => Expected::Proposal(*proposer, *proposal),
-        Ask::Say { task, .. } => Expected::Say(*task),
+        Ask::Say { task, release, .. } => Expected::Say(*task, *release),
         Ask::AnswerQuestion { task, question, .. } => Expected::AnswerQuestion(*task, *question),
         Ask::Prioritise { project, .. } => Expected::Prioritise(*project),
         Ask::Amend { task, .. } => Expected::Amend(*task),
@@ -1357,7 +1357,10 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::PersonAnswered { task } => expected == Expected::AnswerPerson(task),
         Outcome::Moved { task } => expected == Expected::Move(task),
         Outcome::ProposalDecided { proposer, proposal, .. } => expected == Expected::Proposal(proposer, proposal),
-        Outcome::Said { task, message } => expected == Expected::Say(task) && message != 0,
+        Outcome::Said { task, message, released } => {
+            (expected == Expected::Say(task, true) || !released && expected == Expected::Say(task, false))
+                && message != 0
+        }
         Outcome::QuestionAnswered { task, question, message } => {
             expected == Expected::AnswerQuestion(task, question) && message != 0
         }

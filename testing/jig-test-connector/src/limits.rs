@@ -41,7 +41,7 @@ pub struct Limits {
     pub made: u32,
     /// Maximum resources in one effect.
     pub resources_per_effect: u32,
-    /// Maximum attempts before an entry is held.
+    /// Maximum automatic attempts before an entry is held; a person may admit another attempt.
     pub max_attempts: u32,
     /// Lifetime of a system write before retry is allowed.
     pub write_lifetime: Duration,

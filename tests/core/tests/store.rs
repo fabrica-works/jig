@@ -138,7 +138,7 @@ fn parties_run_ahead_of_held_completions_but_every_answer_waits() {
             reply_to: ReplyTo::new(Token::new(u64::from(request))),
             sign_in: world.sign_in.expect("signed in"),
             key: [request; 16],
-            ask: jig_core_people::Ask::Say { project: 1, task, words: Box::from([request]) },
+            ask: jig_core_people::Ask::Say { project: 1, task, words: Box::from([request]), release: false },
         })));
     }
     assert!(world.store.held.len() >= 2);

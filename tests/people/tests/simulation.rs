@@ -315,7 +315,7 @@ fn a_release_naming_an_old_hold_is_refused_as_moved_saying_what_holds_it_now() {
     let mut world = World::new(Settings::calm(90));
     member(&mut world);
     world.held_task(7, 2, jig_core_people::HoldReason::Budget);
-    let ask = Ask::Release { project: 1, task: 7, revision: 1 };
+    let ask = Ask::Release { project: 1, task: 7, revision: 1, again: None };
     let call = world.request(10, [7; 16], ask.clone());
     assert!(world.reply(call).is_none());
     world.commit_all();
@@ -403,4 +403,62 @@ fn an_application_request_under_a_used_key_with_another_digest_is_a_conflict() {
     assert_eq!(world.reply(jig_conflict), Some(Reply::Refused(Refusal::KeyConflict)));
     assert_eq!(world.stats().routes, 1);
     world.assert_settled();
+}
+
+#[test]
+fn words_to_a_stopped_chat_release_it_in_one_request() {
+    let mut world = World::new(Settings::calm(93));
+    let person = member(&mut world);
+    world.held_task(7, 1, jig_core_people::HoldReason::StoppedBy { party: person });
+    let ask = Ask::Say { project: 1, task: 7, words: b"continue".as_slice().into(), release: true };
+    let call = world.request(10, [2; 16], ask.clone());
+    assert!(world.reply(call).is_none());
+    assert!(world.sayings.is_empty(), "no parent decision visible ahead of commit");
+    world.commit_all();
+    let Some(Reply::Outcome(Outcome::Said { message, released: true, .. })) = world.reply(call) else {
+        panic!("words must release the person's stop")
+    };
+    assert_eq!(world.sayings[&message], (7, b"continue".as_slice().into(), true));
+    world.restart();
+    let again = world.request(10, [2; 16], ask);
+    assert_eq!(world.reply(again), world.reply(call));
+    assert_eq!(world.sayings.len(), 1, "saved replay never adds another word");
+}
+
+#[test]
+fn an_uncertain_release_keeps_the_missing_choice_facts_on_replay() {
+    let mut world = World::new(Settings::calm(94));
+    member(&mut world);
+    world.held_task(7, 1, jig_core_people::HoldReason::Uncertain { entry: 9 });
+    let ask = Ask::Release { project: 1, task: 7, revision: 1, again: None };
+    let call = world.request(10, [3; 16], ask.clone());
+    world.commit_all();
+    assert_eq!(
+        world.reply(call),
+        Some(Reply::Outcome(Outcome::Refused(Refusal::Authority {
+            lacking: jig_core_people::Lack::Again { required: true }
+        })))
+    );
+    world.held_task(7, 2, jig_core_people::HoldReason::Budget);
+    world.restart();
+    let replay = world.request(10, [3; 16], ask);
+    assert_eq!(world.reply(replay), world.reply(call));
+}
+
+#[test]
+fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
+    let mut world = World::new(Settings::calm(95));
+    member(&mut world);
+    world.held_task(7, 1, jig_core_people::HoldReason::Uncertain { entry: 9 });
+    let ask = Ask::Release { project: 1, task: 7, revision: 1, again: Some(false) };
+    let call = world.request(10, [4; 16], ask.clone());
+    assert!(world.reply(call).is_none());
+    assert!(world.executor_outcomes.is_empty());
+    world.commit_all();
+    assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::Released { task: 7 })));
+    assert_eq!(world.executor_outcomes, [(9, false)]);
+    world.restart();
+    let replay = world.request(10, [4; 16], ask);
+    assert_eq!(world.reply(replay), world.reply(call));
+    assert_eq!(world.executor_outcomes, [(9, false)]);
 }

@@ -148,7 +148,7 @@ fn a_persons_wait_starts_after_dependencies_and_notifies_its_requester_once_acro
             reply_to,
             by: Party::Task(1),
             task: 2,
-            control: tasks::Control::Release,
+            control: tasks::Control::Release { again: None, message: None },
         }),
         Reply::Done
     );
@@ -211,6 +211,7 @@ fn person_stall_news_and_the_result_keep_room_before_ordinary_words() {
             hits: 1,
             eligible: true,
         },
+        release: false,
     });
     assert!(matches!(got, Reply::Refused(tasks::Problem { why: tasks::Refusal::Busy, .. })));
     world.elapse(skein_lib::Duration::from_secs(1));

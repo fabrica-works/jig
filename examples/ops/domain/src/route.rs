@@ -432,6 +432,7 @@ fn core_ask(
                                 tasks::MessageKind::Escalation { .. }
                                 | tasks::MessageKind::Proposal { .. }
                                 | tasks::MessageKind::ProposalDecision { .. }
+                                | tasks::MessageKind::EffectNotMade { .. }
                                 | tasks::MessageKind::Words
                                 | tasks::MessageKind::Amendment { .. }
                                 | tasks::MessageKind::Question
@@ -631,6 +632,11 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
                 }))),
             }
         }
+        core::connector::Ask::ResolveUncertain { entry, again } => {
+            if number == domain.numbers.infrastructure {
+                work.push(Work::Infrastructure(infrastructure::Event::ResolveEntry { entry, repeat: again }));
+            }
+        }
         core::connector::Ask::Make { entry } => {
             if number == domain.numbers.infrastructure {
                 work.push(Work::Infrastructure(infrastructure::Event::MakeEntry { entry }));
@@ -729,7 +735,9 @@ fn infrastructure_out(
                             task: key.task,
                             signal: match outcome {
                                 infrastructure::Outcome::Made => infrastructure::ProcedureSignal::EffectMade,
-                                infrastructure::Outcome::Failed => infrastructure::ProcedureSignal::EffectFailed,
+                                infrastructure::Outcome::Failed | infrastructure::Outcome::Skipped => {
+                                    infrastructure::ProcedureSignal::EffectFailed
+                                }
                                 infrastructure::Outcome::Uncertain => infrastructure::ProcedureSignal::Step,
                             },
                         }));

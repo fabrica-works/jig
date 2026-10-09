@@ -103,6 +103,7 @@ pub(crate) const fn infrastructure_outcome(value: infrastructure::Outcome) -> co
     match value {
         infrastructure::Outcome::Made => core::connector::OutboxOutcome::Made,
         infrastructure::Outcome::Failed => core::connector::OutboxOutcome::Failed,
+        infrastructure::Outcome::Skipped => core::connector::OutboxOutcome::NotMade,
         infrastructure::Outcome::Uncertain => core::connector::OutboxOutcome::Uncertain,
     }
 }
@@ -862,7 +863,7 @@ pub(crate) fn decode(tool: &[u8], input: &[u8]) -> Result<Decoded, Problem> {
         },
         b"release" => core::NamedAction::Control {
             target: value.required(b"target")?.number()?,
-            control: tasks::Control::Release,
+            control: tasks::Control::Release { again: None, message: None },
         },
         b"introduce" => core::NamedAction::Introduce {
             left: value.required(b"left")?.number()?,
