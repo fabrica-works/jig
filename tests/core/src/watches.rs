@@ -239,6 +239,7 @@ impl Parties {
                             jig_test_connector::ClientSubject::Panel { .. }
                             | jig_test_connector::ClientSubject::Result { .. }
                             | jig_test_connector::ClientSubject::Effect { .. }
+                            | jig_test_connector::ClientSubject::Outbox { .. }
                             | jig_test_connector::ClientSubject::Hold { .. }
                             | jig_test_connector::ClientSubject::Project { .. }
                             | jig_test_connector::ClientSubject::Deployment,

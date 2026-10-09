@@ -16,6 +16,7 @@ pub enum ClientSubject {
     Panel { project: u32, task: u64 },
     Result { project: u32, task: u64 },
     Effect { project: u32, proposal: u64 },
+    Outbox { project: u32, entry: u64 },
     Hold { project: u32, task: u64 },
     Project { project: u32 },
     Deployment,
@@ -58,6 +59,10 @@ pub enum ClientDocument {
         proposal: u64,
         task: u64,
         effect: crate::Effect,
+        description: crate::Description,
+    },
+    Outbox {
+        entry: crate::OutboxEntry,
         description: crate::Description,
     },
     Hold {
@@ -134,6 +139,28 @@ fn effects(domain: &Domain, limits: &Limits, task: Option<u64>) -> List<crate::O
     effects
 }
 
+fn description(domain: &Domain, effect: &crate::Effect) -> Result<crate::Description, DocumentMissing> {
+    let mut kind = None;
+    for configured in &domain.config.kinds {
+        if configured.kind == effect.kind {
+            kind = Some(configured);
+            break;
+        }
+    }
+    let kind = kind.ok_or(DocumentMissing::Unknown)?;
+    let description = crate::Description {
+        kind: effect.kind,
+        resources: effect.resources.clone(),
+        purpose: effect.purpose,
+        condition: effect.condition.is_some(),
+        form: kind.form,
+        recovery: kind.recovery,
+        price: kind.price,
+        state: effect.state,
+    };
+    Ok(description)
+}
+
 fn make(
     domain: &Domain,
     limits: &Limits,
@@ -181,25 +208,21 @@ fn make(
             scoped(scope, *project)?;
             let (number, effect) = domain.outbox.proposals.get(proposal).ok_or(DocumentMissing::Unknown)?;
             task(domain, *project, *number)?;
-            let mut kind = None;
-            for configured in &domain.config.kinds {
-                if configured.kind == effect.kind {
-                    kind = Some(configured);
-                    break;
+            let description = description(domain, effect)?;
+            Ok(ClientDocument::Effect { proposal: *proposal, task: *number, effect: effect.clone(), description })
+        }
+        ClientSubject::Outbox { project, entry: number } => {
+            scoped(scope, *project)?;
+            for (_, entry) in &domain.outbox.entries {
+                if entry.number == *number {
+                    task(domain, *project, entry.task)?;
+                    return Ok(ClientDocument::Outbox {
+                        entry: entry.clone(),
+                        description: description(domain, &entry.effect)?,
+                    });
                 }
             }
-            let kind = kind.ok_or(DocumentMissing::Unknown)?;
-            let description = crate::Description {
-                kind: effect.kind,
-                resources: effect.resources.clone(),
-                purpose: effect.purpose,
-                condition: effect.condition.is_some(),
-                form: kind.form,
-                recovery: kind.recovery,
-                price: kind.price,
-                state: effect.state,
-            };
-            Ok(ClientDocument::Effect { proposal: *proposal, task: *number, effect: effect.clone(), description })
+            Err(DocumentMissing::Unknown)
         }
         ClientSubject::Hold { project, task: number } => {
             scoped(scope, *project)?;

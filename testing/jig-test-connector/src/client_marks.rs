@@ -8,6 +8,7 @@ fn panel(subject: &Subject, task: u64) -> bool {
         Subject::Object { .. }
         | Subject::Result { .. }
         | Subject::Effect { .. }
+        | Subject::Outbox { .. }
         | Subject::Hold { .. }
         | Subject::Project { .. }
         | Subject::Deployment => false,
@@ -19,6 +20,7 @@ fn result(subject: &Subject, task: u64) -> bool {
         Subject::Panel { task: named, .. } | Subject::Result { task: named, .. } => *named == task,
         Subject::Object { .. }
         | Subject::Effect { .. }
+        | Subject::Outbox { .. }
         | Subject::Hold { .. }
         | Subject::Project { .. }
         | Subject::Deployment => false,
@@ -33,6 +35,7 @@ fn task(domain: &Domain, subject: &Subject, number: u64) -> bool {
             None => false,
         },
         Subject::Object { .. } | Subject::Project { .. } | Subject::Deployment => false,
+        Subject::Outbox { .. } => true,
     }
 }
 
@@ -42,6 +45,7 @@ fn object(subject: &Subject, number: u64) -> bool {
         Subject::Panel { .. }
         | Subject::Result { .. }
         | Subject::Effect { .. }
+        | Subject::Outbox { .. }
         | Subject::Hold { .. }
         | Subject::Project { .. }
         | Subject::Deployment => false,
@@ -55,6 +59,7 @@ fn proposal(subject: &Subject, number: u64) -> bool {
         | Subject::Panel { .. }
         | Subject::Result { .. }
         | Subject::Hold { .. }
+        | Subject::Outbox { .. }
         | Subject::Project { .. }
         | Subject::Deployment => false,
     }
@@ -63,7 +68,7 @@ fn proposal(subject: &Subject, number: u64) -> bool {
 fn outbox(subject: &Subject, task: u64) -> bool {
     match subject {
         Subject::Panel { task: named, .. } | Subject::Hold { task: named, .. } => *named == task,
-        Subject::Deployment => true,
+        Subject::Deployment | Subject::Outbox { .. } => true,
         Subject::Object { .. } | Subject::Result { .. } | Subject::Effect { .. } | Subject::Project { .. } => false,
     }
 }
@@ -102,7 +107,7 @@ fn resource(domain: &Domain, subject: &Subject, owner: Option<u32>, path: &crate
             Some(owner) => owner == *project,
             None => domain.resource_role(*project, path).is_some(),
         },
-        Subject::Result { .. } | Subject::Effect { .. } | Subject::Deployment => false,
+        Subject::Result { .. } | Subject::Effect { .. } | Subject::Outbox { .. } | Subject::Deployment => false,
     }
 }
 

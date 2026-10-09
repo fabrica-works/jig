@@ -253,3 +253,39 @@ fn every_part_is_owned_scoped_and_read_without_mutating_its_records() {
         assert_eq!(document(&mut world, Token::new(token)), Err(connector::DocumentMissing::Unknown));
     }
 }
+
+#[test]
+fn an_outbox_part_uses_the_retained_entry_and_marks_its_removal() {
+    let mut world = world(85);
+    world.event(Event::Names { task: 4, project: 1, resources: Box::new([path(85, 1)]) });
+    let subject = prepare(&mut world, 1, ClientSubject::Outbox { project: 1, entry: 3 });
+    let effect = connector::Effect {
+        kind: kind(85, 1),
+        resources: Box::new([path(85, 1)]),
+        purpose: 7,
+        condition: None,
+        target: 5,
+        state: 5,
+    };
+    world.event(Event::Describe { token: Token::new(80), effect: effect.clone() });
+    let key = world.key(4, 7);
+    let kept = world.event(Event::Keep { token: Token::new(80), entry: 3, task: 4, key });
+    assert!(marked(&kept, subject));
+    let records = world.records.clone();
+    let ClientDocument::Outbox { entry, description } = document(&mut world, subject).expect("retained entry") else {
+        panic!("outbox")
+    };
+    assert_eq!((entry.number, entry.task, entry.key), (3, 4, key));
+    assert_eq!(entry.effect, effect);
+    assert_eq!(description.price, Some(3));
+    assert_eq!(world.records, records, "description does not stage an effect");
+    let wrong = prepare(&mut world, 2, ClientSubject::Outbox { project: 2, entry: 3 });
+    let read = world.event(Event::ReadDocument { scope: ClientScope::Project(2), read: wrong, party: 1 });
+    assert!(matches!(
+        read.as_slice(),
+        [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
+    ));
+    let settled = world.release(&kept, &mut std::collections::VecDeque::new());
+    assert!(marked(&settled, subject));
+    assert_eq!(document(&mut world, subject), Err(connector::DocumentMissing::Unknown));
+}
