@@ -946,6 +946,8 @@ fn fact_kind(fact: Fact) -> &'static str {
         Fact::Admitted { .. } => "admitted",
         Fact::Prepared { .. } => "prepared",
         Fact::Started { .. } => "started",
+        Fact::Waiting { .. } => "waiting",
+        Fact::Resumed { .. } => "resumed",
         Fact::Parked { .. } => "parked",
         Fact::Ended { .. } => "ended",
         Fact::Failed { .. } => "failed",

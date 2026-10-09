@@ -121,6 +121,7 @@ pub(crate) struct Attempt {
     pub(crate) kept: u32,
     /// Last lost channel, if this engine observed it; restored adoptions do not invent one.
     pub(crate) lost_host: Option<Token>,
+    pub(crate) progress: Option<crate::Observation>,
     /// The parent's conversation state references for an assignment.
     pub(crate) assignment: Assignment,
     pub(crate) state: State,
@@ -1012,9 +1013,16 @@ fn found(
 
 /// Tracks a new attempt in `state`. The entrance checked there is room.
 fn insert(domain: &mut Domain, run: Token, attempt: Token, listed: bool, assignment: Assignment, state: State) {
-    let Ok(id) =
-        domain.attempts.insert(Attempt { run, token: attempt, listed, kept: 0, lost_host: None, assignment, state })
-    else {
+    let Ok(id) = domain.attempts.insert(Attempt {
+        run,
+        token: attempt,
+        listed,
+        kept: 0,
+        lost_host: None,
+        progress: None,
+        assignment,
+        state,
+    }) else {
         unreachable!("the entrance checks there is room for an attempt");
     };
     let named = domain.names.insert((run, attempt), id);

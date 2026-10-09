@@ -17,6 +17,7 @@ const LIMITS: Limits = Limits {
     attempts: 6,
     calls: 2,
     call_name_bytes: 64,
+    progress_bytes: 64,
     turns: 0,
     grace: Duration::from_secs(10),
     facts: 64,
@@ -1263,3 +1264,5 @@ fn host_call(name: Token, body: Token) -> Call {
         deadline: Duration::ZERO,
     }
 }
+
+mod progress;

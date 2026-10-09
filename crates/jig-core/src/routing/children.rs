@@ -168,6 +168,11 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 }
                 continue;
             }
+            fleet::Request::Observed { run, attempt: _ } => {
+                core.touch_deployment();
+                super::view_routes::touch_number(core, &env.limits, run.raw());
+                continue;
+            }
             fleet::Request::Placed { run, attempt } => {
                 if core.unreported_restored.get(&run.raw()) == Some(&attempt.raw()) {
                     let _: Option<u64> = core.unreported_restored.remove(&run.raw());
@@ -368,7 +373,8 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, event: fleet::Even
         | fleet::Event::TurnKept { .. }
         | fleet::Event::TurnBusy { .. }
         | fleet::Event::Bounced { .. }
-        | fleet::Event::Told { .. } => false,
+        | fleet::Event::Told { .. }
+        | fleet::Event::Observe { .. } => false,
     };
     if touched {
         core.touch_deployment();

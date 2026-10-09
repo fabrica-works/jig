@@ -20,6 +20,7 @@ const LIMITS: Limits = Limits {
     attempts: 12,
     calls: 4,
     call_name_bytes: 64,
+    progress_bytes: 64,
     turns: 0,
     grace: Duration::from_secs(10),
     facts: 16,
@@ -155,6 +156,17 @@ fn fill(limits: Limits) -> (Measured, Vec<(Token, Token, Token)>, Vec<ReplyTo>) 
     }
     let placed = placed(&fleet.settle());
     assert_eq!(u32::try_from(placed.len()).expect("a few"), limits.workers * limits.slots, "every slot taken");
+    for &(channel, run, attempt) in &placed {
+        fleet.step(Event::Observe {
+            channel,
+            run,
+            attempt,
+            report: jig_core_fleet::Report::Activity(jig_core_fleet::Activity::Tool {
+                call: vec![1; usize::try_from(limits.call_name_bytes).expect("fits")].into_boxed_slice(),
+                tool: vec![2; usize::try_from(limits.progress_bytes).expect("fits")].into_boxed_slice(),
+            }),
+        });
+    }
     let mut calls = Vec::new();
     for (nth, &(channel, run, attempt)) in placed.iter().enumerate().take(limits.calls as usize) {
         let call = Token::new(nth as u64);

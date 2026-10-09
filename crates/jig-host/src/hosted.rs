@@ -271,7 +271,12 @@ fn inbound_named(
             hold(&mut held, message, run, attempt, out);
             State::Starting { reply_to, workspace, held }
         }
-        State::Active { reply_to, workspace, agent } | State::Waiting { reply_to, workspace, agent } => {
+        State::Active { reply_to, workspace, agent } => {
+            deliver_message(agent, message, out);
+            State::Active { reply_to, workspace, agent }
+        }
+        State::Waiting { reply_to, workspace, agent } => {
+            domain.facts.push(Fact::Resumed { run, attempt });
             deliver_message(agent, message, out);
             State::Active { reply_to, workspace, agent }
         }
@@ -539,13 +544,18 @@ fn called_named(
     ask: Ask,
     out: &mut Queue<Request>,
 ) {
-    let Domain { hosted, calls, .. } = domain;
+    let Domain { hosted, calls, facts, .. } = domain;
     let id = Id::<Hosted>::from_token(owner);
     let entry = hosted.get_mut(id).expect("a run lives until its agent has gone");
     let state = mem::replace(&mut entry.state, State::Closed);
     entry.state = match state {
         // A run that calls is at work, whatever it said before.
-        State::Active { reply_to, workspace, agent } | State::Waiting { reply_to, workspace, agent } => {
+        State::Active { reply_to, workspace, agent } => {
+            serve(entry, calls, id, workspace, agent, call, ask, &env.limits, out);
+            State::Active { reply_to, workspace, agent }
+        }
+        State::Waiting { reply_to, workspace, agent } => {
+            facts.push(Fact::Resumed { run: entry.run, attempt: entry.attempt });
             serve(entry, calls, id, workspace, agent, call, ask, &env.limits, out);
             State::Active { reply_to, workspace, agent }
         }
@@ -609,9 +619,11 @@ pub(crate) fn yielded(domain: &mut Domain, owner: Token, out: &mut Queue<Request
     let entry = domain.hosted.get_mut(id).expect("a run lives until its agent has gone");
     let state = mem::replace(&mut entry.state, State::Closed);
     entry.state = match state {
-        State::Active { reply_to, workspace, agent } | State::Waiting { reply_to, workspace, agent } => {
+        State::Active { reply_to, workspace, agent } => {
+            domain.facts.push(Fact::Waiting { run: entry.run, attempt: entry.attempt });
             State::Waiting { reply_to, workspace, agent }
         }
+        State::Waiting { reply_to, workspace, agent } => State::Waiting { reply_to, workspace, agent },
         state @ State::Stopping { .. } => state,
         State::Preparing { .. }
         | State::Cancelling { .. }

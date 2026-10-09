@@ -24,6 +24,10 @@ pub enum Fact {
     Prepared { run: Token, attempt: Token },
     /// Its agent started.
     Started { run: Token, attempt: Token },
+    /// The live agent yielded while retaining its host slot.
+    Waiting { run: Token, attempt: Token },
+    /// An inbound event or call moved it from waiting back to active.
+    Resumed { run: Token, attempt: Token },
     /// It answered: parked.
     Parked { run: Token, attempt: Token },
     /// It answered: ended with an outcome.

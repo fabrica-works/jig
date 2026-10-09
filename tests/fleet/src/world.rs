@@ -26,6 +26,7 @@ pub const LIMITS: Limits = Limits {
     attempts: 16,
     calls: 8,
     call_name_bytes: 64,
+    progress_bytes: 64,
     turns: 0,
     grace: Duration::from_secs(20),
     facts: 64,
@@ -930,6 +931,7 @@ impl World {
 
     // The fleet's requests.
 
+    #[expect(clippy::too_many_lines, reason = "one exhaustive route for the fleet boundary requests")]
     fn request(&mut self, request: Request) {
         match request {
             Request::Turned { .. } | Request::AcknowledgeTurn { .. } | Request::TurnBusy { .. } => {
@@ -1016,6 +1018,7 @@ impl World {
                 let epoch = self.epoch;
                 self.after(self.settings.serve, Delivery::Reply { epoch, reply_to: ReplyTo::new(token) });
             }
+            Request::Observed { .. } => self.end("observed"),
             Request::Bounced { .. } => self.end("bounced"),
             Request::Undelivered { message, undelivered, .. } => {
                 assert_eq!(self.payloads.end(message.words.raw()), Payload::Inbound, "an undelivered event comes back");
@@ -1310,6 +1313,7 @@ fn describe(event: &Event) -> String {
         | Event::Relay { .. }
         | Event::Bounced { .. }
         | Event::Told { .. }
+        | Event::Observe { .. }
         | Event::Acknowledge { .. }
         | Event::Loaded => format!("{event:?}"),
     }

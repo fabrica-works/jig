@@ -404,3 +404,5 @@ mod fixtures {
         Token::new(Reader::new(name).u64().expect("encoded callback"))
     }
 }
+
+mod progress;

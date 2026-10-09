@@ -263,6 +263,13 @@ pub enum Event {
         name: Token,
         bounce: Bounce,
     },
+    /// Best-effort typed activity from the current hosting channel.
+    Observe {
+        channel: Token,
+        run: Token,
+        attempt: Token,
+        report: crate::Report,
+    },
     /// From a worker: a fact the run told, best effort.
     Told {
         channel: Token,
@@ -275,6 +282,11 @@ pub enum Event {
 /// fleet -> parent
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    /// An owned live observation changed; this grants no reply right.
+    Observed {
+        run: Token,
+        attempt: Token,
+    },
     /// Place the attempt with its conversation state.
     Assign {
         channel: Token,

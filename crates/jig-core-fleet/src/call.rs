@@ -76,7 +76,7 @@ fn named(domain: &Domain, run: Token, attempt: Token) -> Option<Id<Attempt>> {
 }
 
 /// Only the worker currently hosting the live claim may originate inputs.
-fn owned(domain: &Domain, channel: Token, run: Token, attempt: Token) -> Option<Id<Attempt>> {
+pub(crate) fn owned(domain: &Domain, channel: Token, run: Token, attempt: Token) -> Option<Id<Attempt>> {
     let id = named(domain, run, attempt)?;
     match live(domain, id) {
         Live::On(held) if held == channel => Some(id),

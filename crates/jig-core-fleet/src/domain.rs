@@ -199,6 +199,13 @@ impl Domain {
     pub const fn hello_history_lost(&self) -> u64 {
         self.hello_history_lost
     }
+    /// Last best-effort observation of this current claim and channel, borrowed
+    /// without cloning its bounded names. None after loss, replacement or answer.
+    #[must_use]
+    pub fn observation(&self, run: Token, attempt: Token) -> Option<&crate::Observation> {
+        crate::progress::observed(self, run, attempt)
+    }
+
     /// Copy bounded current attempt facts, without exposing outstanding replies.
     #[must_use]
     pub fn attempt_views(&self) -> List<crate::AttemptView> {
@@ -343,6 +350,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::TurnBusy { run, attempt, turn } => turn::busy(domain, run, attempt, turn, out),
         Event::Bounced { channel, run, attempt, name, bounce } => {
             call::bounced(domain, channel, run, attempt, name, bounce, out);
+        }
+        Event::Observe { channel, run, attempt, report } => {
+            crate::progress::received(domain, env, channel, run, attempt, report, out);
         }
         Event::Told { channel, run, attempt, fact } => call::told(domain, channel, run, attempt, fact, out),
     }

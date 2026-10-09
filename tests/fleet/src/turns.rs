@@ -263,6 +263,7 @@ impl World {
                 | Request::Withdrawn { .. }
                 | Request::Refused { .. }
                 | Request::Bounced { .. }
+                | Request::Observed { .. }
                 | Request::Told { .. } => panic!("unexpected turn-world request: {request:?}"),
             }
         }

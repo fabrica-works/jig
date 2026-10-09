@@ -59,6 +59,7 @@ mod domain;
 mod facts;
 mod history;
 mod limits;
+mod progress;
 #[cfg(test)]
 mod tests;
 mod turn;
@@ -71,3 +72,4 @@ pub use domain::{Domain, fire, max_out, resume, step};
 pub use facts::Fact;
 pub use history::{HelloRefusal, HelloRefusalRecord};
 pub use limits::{Limits, worst_case};
+pub use progress::{Activity, Observation, Report};
