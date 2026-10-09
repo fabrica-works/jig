@@ -135,7 +135,7 @@ fn a_lost_silence_answer_is_found_once_after_restart() {
 #[test]
 fn a_watch_keeps_its_last_batch_across_a_restart() {
     let mut world = World::new(0);
-    world.event(obs::Event::StartWatch { task: 8, services: Box::from([service()]), template: 2 });
+    world.event(obs::Event::StartWatch { project: 1, task: 8, services: Box::from([service()]), template: 2 });
     let wake = obs::Event::WakeWatch { task: 8, batch: 9, alerts: Box::from([3, 4]) };
     let first = world.event(wake.clone());
     assert!(first.contains(&obs::Request::Triage {
@@ -152,7 +152,8 @@ fn a_watch_keeps_its_last_batch_across_a_restart() {
 #[test]
 fn a_watch_subscribes_to_its_services_and_cancellation_erases_its_interest() {
     let mut world = World::new(0);
-    let started = world.event(obs::Event::StartWatch { task: 8, services: Box::from([service()]), template: 2 });
+    let started =
+        world.event(obs::Event::StartWatch { project: 1, task: 8, services: Box::from([service()]), template: 2 });
     assert!(started.contains(&obs::Request::Save {
         record: obs::Record::Subscription {
             topic: obs::Topic::Alerts(service()),

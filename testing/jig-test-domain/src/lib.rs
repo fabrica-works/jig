@@ -86,6 +86,14 @@ pub enum Write {
 /// What the journal releases after its commit, or through its read door.
 #[derive(Debug)]
 pub enum Delivery {
+    /// A whole connector-owned document released after every reflected commit.
+    ApplicationDocument { watcher: Token, number: u16, document: Box<connector::ClientDocument> },
+    /// One connector-owned read terminal, held until durable.
+    ApplicationRead {
+        reply: ReplyTo,
+        number: u16,
+        answer: Result<connector::ClientDocument, connector::DocumentMissing>,
+    },
     /// The connector's own terminal, released by the journal after durability.
     Application { to: ReplyTo, number: u16, outcome: connector::ApplicationOutcome },
     /// One committed whole-tree projection handoff.
@@ -154,6 +162,23 @@ pub enum Request {
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "the testing root moves admitted core events by value")]
 pub enum Event {
+    /// Prepare and watch the application's typed subject in the client's declared scope.
+    WatchApplication {
+        watcher: Token,
+        sign_in: u64,
+        scope: core::documents::ApplicationScope,
+        number: u16,
+        subject: connector::ClientSubject,
+        window: core::documents::Window,
+    },
+    /// Prepare and read one typed connector document without a key.
+    ReadApplication {
+        reply: ReplyTo,
+        sign_in: u64,
+        scope: core::documents::ApplicationScope,
+        number: u16,
+        subject: connector::ClientSubject,
+    },
     /// A protocol-decoded application value with its independently computed digest.
     Application {
         reply_to: ReplyTo,
@@ -380,6 +405,21 @@ impl Domain {
 
 #[expect(clippy::large_enum_variant, reason = "the bounded route queue owns complete core events")]
 enum Work {
+    WatchApplication {
+        watcher: Token,
+        sign_in: u64,
+        scope: core::documents::ApplicationScope,
+        number: u16,
+        subject: connector::ClientSubject,
+        window: core::documents::Window,
+    },
+    ReadApplication {
+        reply: ReplyTo,
+        sign_in: u64,
+        scope: core::documents::ApplicationScope,
+        number: u16,
+        subject: connector::ClientSubject,
+    },
     Application {
         reply_to: ReplyTo,
         sign_in: u64,
@@ -501,6 +541,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         }
         Event::Timer(timer) => decide(domain, env, Work::Timer(timer)),
         Event::Core(event) => decide(domain, env, Work::Core(event)),
+        Event::WatchApplication { watcher, sign_in, scope, number, subject, window } => {
+            decide(domain, env, Work::WatchApplication { watcher, sign_in, scope, number, subject, window });
+        }
+        Event::ReadApplication { reply, sign_in, scope, number, subject } => {
+            decide(domain, env, Work::ReadApplication { reply, sign_in, scope, number, subject });
+        }
         Event::ReadAnswer { to, call } => decide(domain, env, Work::ReadAnswer { to, call }),
         Event::Connector { number, event } => decide(domain, env, Work::Connector { number, event }),
         Event::Text { task, attempt, turn, offset, text } => decide(
@@ -528,7 +574,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
 fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
     let core_room = match &first {
         Work::Core(event) => core::room(&env.limits.core, event),
-        Work::Application { .. }
+        Work::WatchApplication { .. }
+        | Work::ReadApplication { .. }
+        | Work::Application { .. }
         | Work::Restart(_)
         | Work::AdoptRestored
         | Work::AdoptDone
@@ -567,6 +615,31 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
             continue;
         };
         match next {
+            Work::WatchApplication { watcher, sign_in, scope, number, subject, window } => {
+                let token = Token::new(domain.next_payload);
+                domain.next_payload = domain.next_payload.checked_add(1).expect("root subject token room");
+                if number == 1 || number == 2 {
+                    work.push(Work::Connector { number, event: connector::Event::DocumentPrepare { token, subject } });
+                }
+                work.push(Work::Core(core::Event::Watch {
+                    watcher,
+                    sign_in,
+                    subject: core::documents::Subject::Application { scope, connector: number, subject: token },
+                    window,
+                }));
+            }
+            Work::ReadApplication { reply, sign_in, scope, number, subject } => {
+                let token = Token::new(domain.next_payload);
+                domain.next_payload = domain.next_payload.checked_add(1).expect("root read token room");
+                if number == 1 || number == 2 {
+                    work.push(Work::Connector { number, event: connector::Event::DocumentPrepare { token, subject } });
+                }
+                work.push(Work::Core(core::Event::Read {
+                    reply,
+                    sign_in,
+                    read: core::reads::Read::Application { scope, connector: number, read: token },
+                }));
+            }
             Work::Application { reply_to, sign_in, key, project, number, digest, value } => {
                 let owner = Token::new(domain.next_payload);
                 domain.next_payload = domain.next_payload.checked_add(1).expect("root token room");
@@ -810,7 +883,9 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
                 let event = relay_message(domain, task, attempt, previous, word);
                 step(domain, env, event);
             }
-            other @ (Delivery::Application { .. }
+            other @ (Delivery::ApplicationDocument { .. }
+            | Delivery::ApplicationRead { .. }
+            | Delivery::Application { .. }
             | Delivery::Projection { .. }
             | Delivery::Message { .. }
             | Delivery::Restart(_)
@@ -889,6 +964,7 @@ fn hold(decision: &mut Decision<Write, Delivery>, value: Delivery) {
 // The translations below are deliberately exhaustive: a new boundary variant
 // must make the testing application say how it crosses its root.
 mod application_facts;
+mod client_documents;
 mod routes;
 use routes::{route_connector, route_core};
 
@@ -1001,7 +1077,10 @@ fn restore_connector(domain: &mut Domain, env: &Env<Limits>, number: u16, record
                     return false;
                 }
             }
-            connector::Request::Closed { .. }
+            connector::Request::Document { .. }
+            | connector::Request::ReadAnswered { .. }
+            | connector::Request::Marked { .. }
+            | connector::Request::Closed { .. }
             | connector::Request::Verdict { .. }
             | connector::Request::Step { .. }
             | connector::Request::Answer { .. }

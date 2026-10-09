@@ -476,6 +476,11 @@ impl World {
             }
         }
         match delivery {
+            root::Delivery::ApplicationRead { reply, number, answer } => {
+                if let Some(reads) = &mut self.reads {
+                    reads.application_replied(reply, number, answer, &self.store);
+                }
+            }
             root::Delivery::Core(core::Held::Read { reply, answer }) => {
                 if let Some(reads) = &mut self.reads {
                     reads.replied(reply, answer, &self.store);
@@ -486,7 +491,11 @@ impl World {
                     self.events.extend(reads.load(load, *range, &self.store));
                 }
             }
-            root::Delivery::Core(core::Held::Applied { .. }) => {
+            root::Delivery::Core(
+                core::Held::Applied { .. }
+                | core::Held::ApplicationDelivery { .. }
+                | core::Held::ApplicationWatchEnded { .. },
+            ) => {
                 panic!("root assembles connector outcomes before journaling")
             }
             root::Delivery::Application { to, number, outcome } => {
@@ -611,7 +620,8 @@ impl World {
                 }
             }
             root::Delivery::Core(core::Held::PeopleReply { reply, .. }) => self.people_answers.push(reply),
-            root::Delivery::Core(
+            root::Delivery::ApplicationDocument { .. }
+            | root::Delivery::Core(
                 core::Held::Delivery { .. }
                 | core::Held::WatchEnded { .. }
                 | core::Held::SettledCall { .. }

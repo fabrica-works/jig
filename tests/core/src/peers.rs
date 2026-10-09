@@ -288,6 +288,8 @@ impl Peers {
             | root::Delivery::Restart(_)
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)
+            | root::Delivery::ApplicationDocument { .. }
+            | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Projection { .. }
             | root::Delivery::System { .. }
             | root::Delivery::Procedure { .. } => {}

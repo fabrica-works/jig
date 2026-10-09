@@ -8,6 +8,10 @@ use jig_ops_domain_observability as observability;
 use skein_lib::{Duration, Env, JournalLimits, List, Queue, Time, Token, Wall};
 
 fn fixture() -> (Domain, Env<Limits>) {
+    fixture_with_commits(1)
+}
+
+fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
     let mut smith = smith_agent_world::Settings::calm(17).limits;
     smith.run.budget.spend = 100;
     smith.session.spend = 100;
@@ -48,7 +52,7 @@ fn fixture() -> (Domain, Env<Limits>) {
             transcript: smith_transcript::v2::CEILINGS,
             cancel_grace: Duration::from_secs(2),
         },
-        journal: JournalLimits { commits: 1, writes: 20000, held: 20000, now: 128, release: 128 },
+        journal: JournalLimits { commits, writes: 20000, held: 20000, now: 128, release: 128 },
         routes: 256,
     };
     let mut endpoints = List::with_capacity(1);
@@ -211,6 +215,8 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::ApplicationDocument { .. }
+            | Output::ApplicationRead { .. }
             | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
@@ -244,6 +250,8 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                 | Output::Now(_)
                 | Output::Observability(_)
                 | Output::Infrastructure(_)
+                | Output::ApplicationDocument { .. }
+                | Output::ApplicationRead { .. }
                 | Output::Application { .. }
                 | Output::Read { .. }
                 | Output::Llm { .. }
@@ -298,6 +306,8 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
                 | Output::Now(_)
                 | Output::Observability(_)
                 | Output::Infrastructure(_)
+                | Output::ApplicationDocument { .. }
+                | Output::ApplicationRead { .. }
                 | Output::Application { .. }
                 | Output::Read { .. }
                 | Output::Llm { .. }
@@ -349,6 +359,8 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::ApplicationDocument { .. }
+            | Output::ApplicationRead { .. }
             | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
@@ -380,6 +392,8 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::ApplicationDocument { .. }
+            | Output::ApplicationRead { .. }
             | Output::Application { .. }
             | Output::Read { .. }
             | Output::ToChild(_)
@@ -449,6 +463,8 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::ApplicationDocument { .. }
+            | Output::ApplicationRead { .. }
             | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
@@ -475,6 +491,8 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::Now(_)
             | Output::Observability(_)
             | Output::Infrastructure(_)
+            | Output::ApplicationDocument { .. }
+            | Output::ApplicationRead { .. }
             | Output::Application { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
@@ -484,4 +502,151 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
         }
     }
     assert!(answered, "the hub receives the reply after this transaction commits");
+}
+
+#[test]
+#[expect(clippy::too_many_lines, reason = "a complete journal scenario also checks admitted wrong-scope refusal")]
+fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
+    use jig_core_people as people;
+    use skein_lib::ReplyTo;
+    let (mut domain, env) = fixture_with_commits(2);
+    let identity = people::Identity {
+        key: people::IdentityKey { provider: 0, subject: Box::from(*b"party") },
+        login: Box::from(*b"party"),
+        name: Box::from(*b"Party"),
+    };
+    for record in [
+        people::Stored::Person { number: 1, identity },
+        people::Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(Duration::from_secs(60).as_nanos()) },
+        people::Stored::Roles {
+            project: 1,
+            holdings: Box::new([people::Holding { person: 1, role: people::Role::Observer }]),
+        },
+    ] {
+        step(&mut domain, &env, Event::Core(core::Event::People(people::Event::Restore { record })));
+        let initial = settle(&mut domain, &env);
+        assert!(initial.is_empty(), "restore outputs: {initial:?}");
+    }
+    step(&mut domain, &env, Event::Core(core::Event::People(people::Event::Restored)));
+    assert!(take(&mut domain, &env).is_empty());
+    let service = jig_ops_world::service();
+    step(
+        &mut domain,
+        &env,
+        Event::Observability(observability::Event::System(observability::SystemEvent::Fact {
+            service: service.clone(),
+            fact: observability::Fact {
+                observed: 0,
+                healthy_replicas: 2,
+                errors: 0,
+                error_rate_percent: 0,
+                load_percent: 10,
+                load: Box::new([]),
+            },
+        })),
+    );
+    assert!(take(&mut domain, &env).is_empty());
+    step(
+        &mut domain,
+        &env,
+        Event::Observability(observability::Event::StartWatch {
+            task: 7,
+            project: 1,
+            services: Box::new([service.clone()]),
+            template: 1,
+        }),
+    );
+    let pending = take(&mut domain, &env);
+    let [Output::Commit { number, .. }] = pending.as_ref() else {
+        panic!("watch ownership is committed first: {pending:?}")
+    };
+    let number = *number;
+    let subject = crate::ClientSubject::Observability(observability::ClientSubject::Service {
+        project: 1,
+        service: service.clone(),
+    });
+    step(
+        &mut domain,
+        &env,
+        Event::WatchApplication {
+            watcher: Token::new(501),
+            sign_in: 10,
+            scope: core::documents::ApplicationScope::Project(1),
+            subject: subject.clone(),
+            window: core::documents::Window { rows: 1, after: None },
+        },
+    );
+    assert!(take(&mut domain, &env).is_empty(), "assembled document stays behind the connector commit");
+    step(
+        &mut domain,
+        &env,
+        Event::ReadApplication {
+            reply: ReplyTo::new(Token::new(502)),
+            sign_in: 10,
+            scope: core::documents::ApplicationScope::Project(1),
+            subject,
+        },
+    );
+    assert!(take(&mut domain, &env).is_empty(), "assembled read stays behind the same commit");
+    step(&mut domain, &env, Event::Store(Store::Committed { number }));
+    let released = take(&mut domain, &env);
+    let mut documents = 0_u32;
+    let mut answers = 0_u32;
+    for output in released {
+        match output {
+            Output::ApplicationDocument { watcher, document } => {
+                assert_eq!(watcher, Token::new(501));
+                assert_service_document(document);
+                documents = documents.checked_add(1).unwrap();
+            }
+            Output::ApplicationRead { reply, answer } => {
+                assert_eq!(reply.into_token(), Token::new(502));
+                assert_service_document(answer.unwrap());
+                answers = answers.checked_add(1).unwrap();
+            }
+            Output::Commit { .. }
+            | Output::Load { .. }
+            | Output::CoreLoad(_)
+            | Output::Core(_)
+            | Output::Now(_)
+            | Output::Observability(_)
+            | Output::Infrastructure(_)
+            | Output::Application { .. }
+            | Output::Read { .. }
+            | Output::Llm { .. }
+            | Output::ToChild(_)
+            | Output::Busy
+            | Output::Stop => {}
+        }
+    }
+    assert_eq!((documents, answers), (1, 1));
+    step(
+        &mut domain,
+        &env,
+        Event::WatchApplication {
+            watcher: Token::new(503),
+            sign_in: 10,
+            scope: core::documents::ApplicationScope::Project(1),
+            subject: crate::ClientSubject::Observability(observability::ClientSubject::Service { project: 2, service }),
+            window: core::documents::Window { rows: 1, after: None },
+        },
+    );
+    let refused = take(&mut domain, &env);
+    let mut ended = false;
+    for output in refused {
+        if let Output::Core(core::Held::WatchEnded { watcher, why }) = output {
+            assert_eq!(watcher, Token::new(503));
+            assert_eq!(why, jig_core_views::End::Gone);
+            ended = true;
+        } else if let Output::ApplicationDocument { .. } = output {
+            panic!("the wrong subject scope produces no document");
+        }
+    }
+    assert!(ended, "role admission does not grant the wrong subject scope");
+}
+
+fn assert_service_document(document: crate::ClientDocument) {
+    let crate::ClientDocument::Observability(value) = document else { panic!("observability owns the document") };
+    let observability::ClientDocument::Service { fact, .. } = *value;
+    assert_eq!(fact.healthy_replicas, 2);
 }

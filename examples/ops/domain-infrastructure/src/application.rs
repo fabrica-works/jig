@@ -38,6 +38,9 @@ pub(crate) struct State {
 }
 
 impl State {
+    pub(crate) fn end(&self, environment: &Environment) -> Option<EnvironmentEnd> {
+        Some(self.ends.get(environment)?.1)
+    }
     pub(crate) fn new(limits: &Limits) -> Self {
         Self {
             prepared: Map::with_capacity(limits.staged),
@@ -191,6 +194,16 @@ fn keep(
     outcome: ApplicationOutcome,
     out: &mut Queue<Request>,
 ) {
+    match &outcome {
+        ApplicationOutcome::MovedEnd { environment, .. } => {
+            crate::client_documents::changed(domain, env, environment, out);
+        }
+        ApplicationOutcome::Moved { .. }
+        | ApplicationOutcome::Role { .. }
+        | ApplicationOutcome::Unknown
+        | ApplicationOutcome::Past
+        | ApplicationOutcome::Exhausted => {}
+    }
     let until = Wall::from_nanos(env.wall.as_nanos().saturating_add(retention.as_nanos()));
     assert!(domain.application.answers.insert(token, (until, outcome.clone())).is_ok(), "reserved outcome capacity");
     out.push(Request::Save { record: Record::ApplicationAnswer { token, until, outcome } });

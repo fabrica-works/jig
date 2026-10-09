@@ -83,6 +83,8 @@ pub enum Cursor {
 /// One document or bounded page, without a request key.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Read {
+    /// A connector-owned document within the client's stated role scope.
+    Application { scope: documents::ApplicationScope, connector: u16, read: skein_lib::Token },
     /// The authenticated party's frame.
     Frame,
     /// A task overview, live or ended.

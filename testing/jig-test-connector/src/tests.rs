@@ -430,6 +430,9 @@ fn restored_records_rebuild_adoptions_names_topics_and_pool_slots() {
                 | Request::Section { .. }
                 | Request::Workspace { .. }
                 | Request::DriftResource { .. }
+                | Request::Document { .. }
+                | Request::ReadAnswered { .. }
+                | Request::Marked { .. }
                 | Request::Changed { .. }
                 | Request::RestartDone
                 | Request::ApplicationDone { .. }
@@ -461,4 +464,38 @@ fn restored_records_rebuild_adoptions_names_topics_and_pool_slots() {
         run(&mut cold, Event::System(SystemEvent::News { topic: 7, importance: 3, origin: Origin::Other })),
         Box::from([Request::News { topic: 7, subscribers: Box::from([Classed { task: 1, class: Class::Keep }]) }])
     );
+}
+
+#[test]
+fn a_prepared_client_subject_checks_its_actual_scope_and_echoes_only_its_owner_name() {
+    use crate::{ClientDocument, ClientScope, ClientSubject, DocumentMissing};
+    use skein_lib::Token;
+    let mut domain = domain();
+    run(&mut domain, Event::Adopt { project: 1, resource: service(), role: ResourceRole::Owned });
+    let subject = Token::new(100);
+    run(
+        &mut domain,
+        Event::DocumentPrepare { token: subject, subject: ClientSubject::Object { project: 1, object: 1 } },
+    );
+    let out = run(
+        &mut domain,
+        Event::Document { watcher: Token::new(101), scope: ClientScope::Project(2), subject, party: 7 },
+    );
+    let [Request::Document { subject: named, document: Err(DocumentMissing::Unknown), .. }] = out.as_ref() else {
+        panic!("wrong scope is unknown")
+    };
+    assert_eq!(*named, subject);
+    let out = run(
+        &mut domain,
+        Event::Document { watcher: Token::new(101), scope: ClientScope::Project(1), subject, party: 7 },
+    );
+    let [Request::Document { document: Ok(ClientDocument::Object { object: 1, now }), .. }] = out.as_ref() else {
+        panic!("the prepared owner constructs its object")
+    };
+    assert_eq!((now.revision, now.value), (0, 0));
+    run(&mut domain, Event::DocumentForget { subject });
+    let out = run(&mut domain, Event::ReadDocument { scope: ClientScope::Project(1), read: subject, party: 7 });
+    let [Request::ReadAnswered { answer: Err(DocumentMissing::Unknown), .. }] = out.as_ref() else {
+        panic!("forgotten name is unknown")
+    };
 }

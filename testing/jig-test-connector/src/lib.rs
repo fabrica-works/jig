@@ -28,6 +28,8 @@
 extern crate alloc;
 
 mod application;
+mod client_documents;
+pub use client_documents::{ClientDocument, ClientScope, ClientSubject, DocumentMissing, document_worst_case};
 pub mod application_core;
 pub use application::{
     ApplicationCoreAnswer, ApplicationObject, ApplicationOutcome, ApplicationRelease, ApplicationRequest,

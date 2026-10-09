@@ -49,6 +49,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(limits.procedures)?
         .checked_add(limits.environments)?;
     crate::application::worst_case(limits)?
+        .checked_add(Map::<skein_lib::Token, crate::ClientSubject>::worst_case(limits.proposals)?)?
+        .checked_add(List::<skein_lib::Token>::worst_case(limits.proposals)?)?
+        .checked_add(u64::from(limits.proposals).checked_mul(name.checked_mul(2)?)?)?
         .checked_add(Map::<Service, ServiceFact>::worst_case(limits.services)?)?
         .checked_add(Map::<u64, bool>::worst_case(
             limits.tasks.checked_add(limits.procedures)?.checked_add(limits.effects)?,

@@ -91,6 +91,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.observability.answer_bytes))?
         .checked_add(65_536)?
         .max(core::reads::answer_worst_case(&limits.core)?)
+        .max(infrastructure::document_worst_case(&limits.infrastructure)?)
+        .max(observability::document_worst_case(&limits.observability)?)
         .max(u64::from(limits.core.views.text_bytes).checked_mul(2)?);
     let envelopes = u64::from(limits.core.call_records.checked_add(limits.observability.reads)?.checked_add(calls)?)
         .checked_mul(limits.core.fleet.call_name_bytes.checked_add(32)?)?;

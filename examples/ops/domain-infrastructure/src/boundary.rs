@@ -436,6 +436,14 @@ impl Record {
 /// Root-to-connector events.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// Retain this root-minted name in the application's own vocabulary.
+    DocumentPrepare { token: Token, subject: crate::ClientSubject },
+    /// The paced watch ended; forget its owner binding.
+    DocumentForget { subject: Token },
+    /// Make the current whole document for one due delivery.
+    Document { watcher: Token, scope: crate::ClientScope, subject: Token, party: u64 },
+    /// Answer one admitted client read in the same decision.
+    ReadDocument { scope: crate::ClientScope, read: Token, party: u64 },
     /// Decoded request retained by its owner before keyed admission.
     ApplicationPrepare { owner: Token, value: crate::ApplicationRequest },
     /// Admission consumed or rejected the prepared value.
@@ -525,6 +533,12 @@ pub enum SystemEvent {
 /// Requests to the root and its journal.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// Complete a due delivery from this owner's current state.
+    Document { watcher: Token, subject: Token, document: Result<crate::ClientDocument, crate::DocumentMissing> },
+    /// One client read answer; the root holds it until durable.
+    ReadAnswered { read: Token, answer: Result<crate::ClientDocument, crate::DocumentMissing> },
+    /// These prepared subjects changed in this decision.
+    Marked { subjects: skein_lib::List<Token> },
     /// The outcome was saved in this decision.
     ApplicationDone { request: Token, token: Token },
     /// No application decision was made; retry the key.

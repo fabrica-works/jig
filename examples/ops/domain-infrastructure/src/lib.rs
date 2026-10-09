@@ -30,6 +30,8 @@ extern crate alloc;
 
 mod application;
 pub use application::{ApplicationOutcome, ApplicationRequest, EnvironmentEnd};
+mod client_documents;
+pub use client_documents::{ClientDocument, ClientScope, ClientSubject, DocumentMissing, document_worst_case};
 mod boundary;
 mod domain;
 mod limits;

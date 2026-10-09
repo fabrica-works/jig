@@ -206,7 +206,9 @@ impl Application for Ops {
                     }
                 }
                 root::Output::Stop => outputs.push(Output::Stop),
-                other @ (root::Output::Application { .. }
+                other @ (root::Output::ApplicationDocument { .. }
+                | root::Output::ApplicationRead { .. }
+                | root::Output::Application { .. }
                 | root::Output::Load { .. }
                 | root::Output::CoreLoad(_)
                 | root::Output::Core(_)
@@ -444,7 +446,9 @@ impl Application for Ops {
                     done: true,
                 }))]
             }
-            root::Output::Read { .. }
+            root::Output::ApplicationDocument { .. }
+            | root::Output::ApplicationRead { .. }
+            | root::Output::Read { .. }
             | root::Output::Core(_)
             | root::Output::Now(_)
             | root::Output::CoreLoad(_)

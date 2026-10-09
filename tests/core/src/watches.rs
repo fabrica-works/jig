@@ -76,8 +76,14 @@ impl Fence {
 }
 
 #[derive(Debug)]
+enum Watched {
+    Jig(Subject),
+    Application { number: u16, subject: jig_test_connector::ClientSubject },
+}
+
+#[derive(Debug)]
 struct Consumer {
-    subject: Subject,
+    subject: Watched,
     fence: Fence,
     automatic: bool,
     queued: bool,
@@ -92,6 +98,7 @@ pub struct Parties {
     automatic: bool,
     consumers: BTreeMap<u64, Consumer>,
     pub deliveries: Vec<(u64, u64, Document)>,
+    pub application_deliveries: Vec<(u64, u64, u16, jig_test_connector::ClientDocument)>,
     pub endings: Vec<(u64, views::End)>,
     pub streams: Vec<Stream>,
 }
@@ -105,6 +112,7 @@ impl Parties {
             automatic,
             consumers: BTreeMap::new(),
             deliveries: Vec::new(),
+            application_deliveries: Vec::new(),
             endings: Vec::new(),
             streams: Vec::new(),
         }
@@ -116,13 +124,29 @@ impl Parties {
 
     pub fn inbound(&mut self, event: &root::Event) {
         match event {
+            root::Event::WatchApplication { watcher, number, subject, .. } => {
+                assert!(
+                    self.consumers
+                        .insert(
+                            watcher.raw(),
+                            Consumer {
+                                subject: Watched::Application { number: *number, subject: *subject },
+                                fence: Fence::opened(self.made),
+                                automatic: self.automatic,
+                                queued: false
+                            }
+                        )
+                        .is_none(),
+                    "independent application watch admission"
+                );
+            }
             root::Event::Core(core::Event::Watch { watcher, subject, .. }) => {
                 assert!(
                     self.consumers
                         .insert(
                             watcher.raw(),
                             Consumer {
-                                subject: subject.clone(),
+                                subject: Watched::Jig(subject.clone()),
                                 fence: Fence::opened(self.made),
                                 automatic: self.automatic,
                                 queued: false,
@@ -139,6 +163,7 @@ impl Parties {
                 }
             }
             root::Event::Core(_)
+            | root::Event::ReadApplication { .. }
             | root::Event::Application { .. }
             | root::Event::Turn { .. }
             | root::Event::Text { .. }
@@ -180,6 +205,16 @@ impl Parties {
                 root::Write::Save(root::Record::Core(core::Record::People(people::Stored::Roles {
                     holdings, ..
                 }))) => holdings.iter().any(|holding| party_subject(&consumer.subject, holding.person)),
+                root::Write::Save(root::Record::Connector {
+                    number,
+                    record: jig_test_connector::Record::ApplicationObject { object, .. },
+                }) => match &consumer.subject {
+                    Watched::Application {
+                        number: owner,
+                        subject: jig_test_connector::ClientSubject::Object { object: watched, .. },
+                    } => *owner == *number && *watched == *object,
+                    Watched::Jig(_) => false,
+                },
                 root::Write::Save(_) | root::Write::Erase(_) => false,
             });
             if touched {
@@ -190,6 +225,11 @@ impl Parties {
 
     pub fn released(&mut self, delivery: &root::Delivery, durable: u64) {
         match delivery {
+            root::Delivery::ApplicationDocument { watcher, number, document } => {
+                let consumer = self.consumers.get_mut(&watcher.raw()).expect("admitted application watch");
+                consumer.fence.delivered(durable).expect("application watch's durable prerequisite");
+                self.application_deliveries.push((watcher.raw(), durable, *number, **document));
+            }
             root::Delivery::Core(core::Held::Delivery { watcher, document }) => {
                 let consumer = self.consumers.get_mut(&watcher.raw()).expect("admitted party watch");
                 consumer.fence.delivered(durable).expect("watch's durable prerequisite");
@@ -201,6 +241,7 @@ impl Parties {
                 self.endings.push((watcher.raw(), *why));
             }
             root::Delivery::Core(_)
+            | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Application { .. }
             | root::Delivery::Restart(_)
             | root::Delivery::Fleet(_)
@@ -262,7 +303,11 @@ impl Parties {
     }
 }
 
-fn task_subject(subject: &Subject, task: u64) -> bool {
+fn task_subject(watched: &Watched, task: u64) -> bool {
+    let subject = match watched {
+        Watched::Jig(subject) => subject,
+        Watched::Application { .. } => return false,
+    };
     match subject {
         Subject::Task { task: watched } | Subject::Tree { task: watched } | Subject::Run { task: watched } => {
             *watched == task
@@ -279,7 +324,8 @@ fn task_subject(subject: &Subject, task: u64) -> bool {
         | Subject::PersonTask { .. }
         | Subject::Result { .. }
         | Subject::Project { .. }
-        | Subject::Note { .. } => false,
+        | Subject::Note { .. }
+        | Subject::Application { .. } => false,
     }
 }
 
@@ -295,7 +341,11 @@ pub struct Stream {
     pub call: Option<views::Call>,
 }
 
-fn party_subject(subject: &Subject, party: u64) -> bool {
+fn party_subject(watched: &Watched, party: u64) -> bool {
+    let subject = match watched {
+        Watched::Jig(subject) => subject,
+        Watched::Application { .. } => return false,
+    };
     match subject {
         Subject::Frame { party: watched } | Subject::Inbox { party: watched } => *watched == party,
         Subject::Task { .. }
@@ -311,7 +361,8 @@ fn party_subject(subject: &Subject, party: u64) -> bool {
         | Subject::PersonTask { .. }
         | Subject::Result { .. }
         | Subject::Project { .. }
-        | Subject::Note { .. } => false,
+        | Subject::Note { .. }
+        | Subject::Application { .. } => false,
     }
 }
 

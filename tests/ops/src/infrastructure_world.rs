@@ -146,6 +146,9 @@ impl InfrastructureWorld {
                 | infra::Request::Named { .. }
                 | infra::Request::Slots { .. }
                 | infra::Request::Drift { .. }
+                | infra::Request::Document { .. }
+                | infra::Request::ReadAnswered { .. }
+                | infra::Request::Marked { .. }
                 | infra::Request::Changed { .. }
                 | infra::Request::Described { .. }
                 | infra::Request::Refused { .. }
@@ -186,6 +189,9 @@ impl InfrastructureWorld {
                 | infra::Request::Named { .. }
                 | infra::Request::Slots { .. }
                 | infra::Request::Drift { .. }
+                | infra::Request::Document { .. }
+                | infra::Request::ReadAnswered { .. }
+                | infra::Request::Marked { .. }
                 | infra::Request::Changed { .. }
                 | infra::Request::Described { .. }
                 | infra::Request::Refused { .. }

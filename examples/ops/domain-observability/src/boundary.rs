@@ -189,6 +189,8 @@ pub struct Classed {
 /// A standing watch's durable template and last emitted batch.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Watch {
+    /// Project of the owning procedure.
+    pub project: u32,
     /// Procedure task that owns the watch.
     pub task: u64,
     /// Services it watches.
@@ -290,6 +292,14 @@ impl Record {
 /// An event routed to the observability connector.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// Retain this root-minted name in the application's own vocabulary.
+    DocumentPrepare { token: Token, subject: crate::ClientSubject },
+    /// The paced watch ended; forget its owner binding.
+    DocumentForget { subject: Token },
+    /// Make the current whole document for one due delivery.
+    Document { watcher: Token, scope: crate::ClientScope, subject: Token, party: u64 },
+    /// Answer one admitted client read in the same decision.
+    ReadDocument { scope: crate::ClientScope, read: Token, party: u64 },
     /// Settle this task before acknowledging its closing barrier.
     Close { task: u64 },
     /// Release this task's connector-owned live state.
@@ -305,7 +315,7 @@ pub enum Event {
     /// Stop delivering a topic to one task.
     Unsubscribe { task: u64, topic: Topic },
     /// Activate a standing watch subscribed to these services.
-    StartWatch { task: u64, services: Box<[Service]>, template: u16 },
+    StartWatch { task: u64, project: u32, services: Box<[Service]>, template: u16 },
     /// Cancel a standing watch and its alert subscriptions.
     StopWatch { task: u64 },
     /// A batched wake of a standing watch.
@@ -361,6 +371,12 @@ pub enum SystemRequest {
 /// What the connector asks its root to route or commit.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// Complete a due delivery from this owner's current state.
+    Document { watcher: Token, subject: Token, document: Result<crate::ClientDocument, crate::DocumentMissing> },
+    /// One client read answer; the root holds it until durable.
+    ReadAnswered { read: Token, answer: Result<crate::ClientDocument, crate::DocumentMissing> },
+    /// These prepared subjects changed in this decision.
+    Marked { subjects: skein_lib::List<Token> },
     /// A watch's task-scoped topic interest, chosen by its procedure owner.
     WatchInterest { task: u64, subscription: u64, topic: u64 },
     /// This task has no unsettled entries.

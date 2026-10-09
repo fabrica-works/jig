@@ -311,7 +311,8 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
         Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: room.held }),
-        Event::Application { .. }
+        Event::Marked { .. }
+        | Event::Application { .. }
         | Event::ApplicationPart { .. }
         | Event::ApplicationFinished { .. }
         | Event::EffectStart { .. }
@@ -400,6 +401,7 @@ pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
 
 fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<Event>) -> Requests {
     match event {
+        Event::Marked { connector, subjects } => view_routes::marked(core, connector, subjects),
         Event::Application { reply_to, sign_in, key, project, connector, digest, owner } => {
             application_routes::start(core, env, work, reply_to, sign_in, key, project, connector, digest, owner)
         }

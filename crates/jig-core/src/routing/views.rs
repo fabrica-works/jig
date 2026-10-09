@@ -27,9 +27,14 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
     let room = views::max_out(&env.limits.views);
     let mut ready = Queue::with_capacity(room);
     let mut documents = Map::with_capacity(env.limits.views.watchers);
+    let mut out = Queue::with_capacity(room.checked_add(1).expect("view output room"));
     for _ in 0..child.len() {
         match child.pop().expect("view output count") {
             views::Request::Make { watcher, .. } => {
+                if let Some((connector, subject, scope, party)) = application_subject(core, watcher) {
+                    out.push(Request::Ask { connector, ask: crate::Ask::Document { watcher, scope, subject, party } });
+                    continue;
+                }
                 let outcome = match watch_document(core, &env.limits, watcher, env.now, env.wall) {
                     Ok(document) => {
                         let previous = documents.insert(watcher, document).expect("bounded construction scratch");
@@ -52,18 +57,28 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
             | views::Request::Ended { .. }) => ready.push(request),
         }
     }
-    let mut out = Queue::with_capacity(room.checked_add(1).expect("view output room"));
     for _ in 0..ready.len() {
         match ready.pop().expect("made output count") {
             views::Request::Watching { .. } => {}
             views::Request::Make { .. } => unreachable!("construction answered within the step"),
-            views::Request::Deliver { watcher, .. } => {
-                let document = documents.remove(&watcher).expect("delivery follows construction");
-                out.push(Request::Held(Box::new(Held::Delivery { watcher, document: Box::new(document) })));
-            }
+            views::Request::Deliver { watcher, .. } => match application_subject(core, watcher) {
+                Some((connector, subject, _, _)) => {
+                    out.push(Request::Held(Box::new(Held::ApplicationDelivery { watcher, connector, subject })));
+                }
+                None => {
+                    let document = documents.remove(&watcher).expect("delivery follows construction");
+                    out.push(Request::Held(Box::new(Held::Delivery { watcher, document: Box::new(document) })));
+                }
+            },
             views::Request::Ended { watcher, end: why } => {
+                let held = match application_subject(core, watcher) {
+                    Some((connector, subject, _, _)) => {
+                        Held::ApplicationWatchEnded { watcher, connector, subject, why }
+                    }
+                    None => Held::WatchEnded { watcher, why },
+                };
                 forget_watch(core, watcher);
-                out.push(Request::Held(Box::new(Held::WatchEnded { watcher, why })));
+                out.push(Request::Held(Box::new(held)));
             }
             views::Request::Refused { watcher, refusal } => {
                 forget_watch(core, watcher);
@@ -88,6 +103,34 @@ fn refused(watcher: Token, why: WatchRefusal) -> Requests {
     Requests::Out(out)
 }
 
+fn refused_subject(watcher: Token, subject: &Subject, why: WatchRefusal) -> Requests {
+    match subject {
+        Subject::Application { connector, subject, .. } => {
+            let mut out = Queue::with_capacity(3);
+            out.push(Request::Ask { connector: *connector, ask: crate::Ask::DropDocument { subject: *subject } });
+            out.push(Request::Now(Box::new(Now::WatchRefused { watcher, why })));
+            out.push(Request::Decided);
+            Requests::Out(out)
+        }
+        Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Run { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => refused(watcher, why),
+    }
+}
+
 pub(super) fn open(
     core: &mut Core,
     env: &Env<Limits>,
@@ -97,21 +140,16 @@ pub(super) fn open(
     window: Window,
 ) -> Requests {
     let Some(party) = core.people.person(sign_in, env.now, env.wall) else {
-        return refused(watcher, WatchRefusal::SignedOut);
+        return refused_subject(watcher, &subject, WatchRefusal::SignedOut);
     };
     if core.view_subjects.contains_key(&watcher) || core.view_subjects.len() >= env.limits.views.watchers {
-        return refused(watcher, WatchRefusal::Busy);
+        return refused_subject(watcher, &subject, WatchRefusal::Busy);
     }
     if !watch_subject(&subject) {
-        return refused(watcher, WatchRefusal::Unknown);
+        return refused_subject(watcher, &subject, WatchRefusal::Unknown);
     }
-    // Construction checks all named chips, owner-only subjects and deployment
-    // roles. Admission retains no made document and consumes no keyed slot.
-    match documents::make(core, &env.limits, party, &subject, &window) {
-        Ok(_) => {}
-        Err(Missing::NotAllowed) => return refused(watcher, WatchRefusal::NotAllowed),
-        Err(Missing::Unknown | Missing::Ended) => return refused(watcher, WatchRefusal::Unknown),
-        Err(Missing::TooLarge) => return refused(watcher, WatchRefusal::Busy),
+    if let Some(why) = admission(core, env, party, &subject, &window) {
+        return refused_subject(watcher, &subject, why);
     }
     let subject = match subject {
         Subject::Chips { tasks: named } => {
@@ -135,7 +173,8 @@ pub(super) fn open(
         | Subject::PersonTask { .. }
         | Subject::Result { .. }
         | Subject::Project { .. }
-        | Subject::Note { .. }) => subject,
+        | Subject::Note { .. }
+        | Subject::Application { .. }) => subject,
     };
     let follow = match &subject {
         Subject::Run { task } => Some(views::Follow { run: Token::new(*task), turn: None, offset: 0 }),
@@ -153,7 +192,8 @@ pub(super) fn open(
         | Subject::PersonTask { .. }
         | Subject::Result { .. }
         | Subject::Project { .. }
-        | Subject::Note { .. } => None,
+        | Subject::Note { .. }
+        | Subject::Application { .. } => None,
     };
     let mut existing = None;
     for (_, binding) in &core.view_subjects {
@@ -170,7 +210,7 @@ pub(super) fn open(
         }
         None => {
             if core.view_names.is_full() {
-                return refused(watcher, WatchRefusal::Busy);
+                return refused_subject(watcher, &subject, WatchRefusal::Busy);
             }
             core.view_names.insert(WatchedSubject { subject, watchers: 1 }).expect("admitted watched subject")
         }
@@ -188,6 +228,45 @@ pub(super) fn open(
     )
 }
 
+// Construction authenticates jig's named values; connector values remain opaque.
+fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, window: &Window) -> Option<WatchRefusal> {
+    match subject {
+        Subject::Application { scope, connector, .. } => {
+            if !core.connectors.as_ref().contains(connector) {
+                return Some(WatchRefusal::Unknown);
+            }
+            if core.people.role(party, scope.project()).is_none() {
+                return Some(WatchRefusal::NotAllowed);
+            }
+            if window.rows > env.limits.documents.rows {
+                return Some(WatchRefusal::Busy);
+            }
+            None
+        }
+        Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Run { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => match documents::make(core, &env.limits, party, subject, window) {
+            Ok(_) => None,
+            Err(Missing::NotAllowed) => Some(WatchRefusal::NotAllowed),
+            Err(Missing::Unknown | Missing::Ended) => Some(WatchRefusal::Unknown),
+            Err(Missing::TooLarge) => Some(WatchRefusal::Busy),
+        },
+    }
+}
+
 fn watch_subject(subject: &Subject) -> bool {
     match subject {
         Subject::Frame { .. }
@@ -198,7 +277,8 @@ fn watch_subject(subject: &Subject) -> bool {
         | Subject::Goals { .. }
         | Subject::Conversations { .. }
         | Subject::Run { .. }
-        | Subject::Deployment => true,
+        | Subject::Deployment
+        | Subject::Application { .. } => true,
         Subject::Proposal { .. }
         | Subject::Escalation { .. }
         | Subject::Question { .. }
@@ -207,6 +287,64 @@ fn watch_subject(subject: &Subject) -> bool {
         | Subject::Project { .. }
         | Subject::Note { .. } => false,
     }
+}
+
+fn application_subject(core: &Core, watcher: Token) -> Option<(u16, Token, documents::ApplicationScope, u64)> {
+    let binding = core.view_subjects.get(&watcher)?;
+    let subject = &core.view_names.get(binding.subject)?.subject;
+    match subject {
+        Subject::Application { scope, connector, subject } => Some((*connector, *subject, *scope, binding.party)),
+        Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Run { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => None,
+    }
+}
+
+/// Marks are gathered until all of the decision's connector handoffs finish.
+pub(super) fn marked(core: &mut Core, connector: u16, subjects: List<Token>) -> Requests {
+    for (_, binding) in &core.view_subjects {
+        let subject = &core.view_names.get(binding.subject).expect("bound application subject").subject;
+        let touched = match subject {
+            Subject::Application { connector: owner, subject, .. } => {
+                *owner == connector && subjects.as_slice().contains(subject)
+            }
+            Subject::Frame { .. }
+            | Subject::Task { .. }
+            | Subject::Tree { .. }
+            | Subject::Chips { .. }
+            | Subject::Inbox { .. }
+            | Subject::Goals { .. }
+            | Subject::Conversations { .. }
+            | Subject::Run { .. }
+            | Subject::Deployment
+            | Subject::Proposal { .. }
+            | Subject::Escalation { .. }
+            | Subject::Question { .. }
+            | Subject::PersonTask { .. }
+            | Subject::Result { .. }
+            | Subject::Project { .. }
+            | Subject::Note { .. } => false,
+        };
+        if touched {
+            let _new = core.changed_views.insert(binding.subject).expect("bounded connector marks");
+        }
+    }
+    let mut out = Queue::with_capacity(1);
+    out.push(Request::Decided);
+    Requests::Out(out)
 }
 
 fn forget_watch(core: &mut Core, watcher: Token) {
@@ -260,7 +398,8 @@ fn watch_document(
         | Subject::PersonTask { .. }
         | Subject::Result { .. }
         | Subject::Project { .. }
-        | Subject::Note { .. } => None,
+        | Subject::Note { .. }
+        | Subject::Application { .. } => None,
     };
     let subject = match &filtered {
         Some(filtered) => filtered,

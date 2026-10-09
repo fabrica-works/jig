@@ -121,6 +121,9 @@ impl World {
                 | obs::Request::Make { .. }
                 | obs::Request::Outcome { .. }
                 | obs::Request::System(..)
+                | obs::Request::Document { .. }
+                | obs::Request::ReadAnswered { .. }
+                | obs::Request::Marked { .. }
                 | obs::Request::Changed { .. } => {}
             }
         }
@@ -159,6 +162,9 @@ impl World {
                 | obs::Request::Described { .. }
                 | obs::Request::Refused { .. }
                 | obs::Request::Outcome { .. }
+                | obs::Request::Document { .. }
+                | obs::Request::ReadAnswered { .. }
+                | obs::Request::Marked { .. }
                 | obs::Request::Changed { .. } => Vec::new(),
             };
             pending.extend(generated.iter().cloned());

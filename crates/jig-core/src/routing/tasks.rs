@@ -635,7 +635,10 @@ pub(super) fn tag_tasks(
                                 | Ask::RepairRefused { .. }
                                 | Ask::DelegateRefused { .. }
                                 | Ask::StartProcedure { .. }
-                                | Ask::Effect(_) => unreachable!("subscription handoff"),
+                                | Ask::Effect(_)
+                                | Ask::Document { .. }
+                                | Ask::Read { .. }
+                                | Ask::DropDocument { .. } => unreachable!("subscription handoff"),
                             },
                         });
                     }

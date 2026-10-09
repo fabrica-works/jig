@@ -32,7 +32,8 @@ impl Core {
                 | Subject::PersonTask { .. }
                 | Subject::Result { .. }
                 | Subject::Project { .. }
-                | Subject::Note { .. } => false,
+                | Subject::Note { .. }
+                | Subject::Application { .. } => false,
             };
             if touched {
                 let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
@@ -60,7 +61,8 @@ impl Core {
                 | Subject::PersonTask { .. }
                 | Subject::Result { .. }
                 | Subject::Project { .. }
-                | Subject::Note { .. } => false,
+                | Subject::Note { .. }
+                | Subject::Application { .. } => false,
             };
             if touched {
                 let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
@@ -141,7 +143,8 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             | Subject::PersonTask { .. }
             | Subject::Result { .. }
             | Subject::Project { .. }
-            | Subject::Note { .. } => false,
+            | Subject::Note { .. }
+            | Subject::Application { .. } => false,
         };
         if touched {
             let _new = core.changed_views.insert(binding.subject).expect("bounded watched marks");
@@ -253,7 +256,8 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
             | Subject::PersonTask { .. }
             | Subject::Result { .. }
             | Subject::Project { .. }
-            | Subject::Note { .. } => None,
+            | Subject::Note { .. }
+            | Subject::Application { .. } => None,
         };
         let Some(task) = task else { continue };
         let ended = match views::position(&core.views, skein_lib::Token::new(task)) {
@@ -326,6 +330,13 @@ fn append(requests: Requests, out: &mut Queue<Request>) {
 fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::End> {
     let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
     match subject {
+        Subject::Application { scope, .. } => {
+            if core.people.role(binding.party, scope.project()).is_some() {
+                None
+            } else {
+                Some(views::End::NotAllowed)
+            }
+        }
         Subject::Task { task } | Subject::Tree { task } | Subject::Run { task } => {
             let Some(row) = core.tasks.task(*task) else { return Some(views::End::Gone) };
             match row.phase {

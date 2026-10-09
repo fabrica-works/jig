@@ -41,6 +41,8 @@ pub struct Parties {
     pub loads: Vec<(Token, reads::Range)>,
     pub hold_loads: bool,
     pub receipts: Vec<(u64, u64, reads::Answer)>,
+    pub application_receipts:
+        Vec<(u64, u64, u16, Result<jig_test_connector::ClientDocument, jig_test_connector::DocumentMissing>)>,
 }
 
 impl Parties {
@@ -55,12 +57,13 @@ impl Parties {
             loads: Vec::new(),
             hold_loads: false,
             receipts: Vec::new(),
+            application_receipts: Vec::new(),
         }
     }
 
     pub fn inbound(&mut self, event: &root::Event) {
         match event {
-            root::Event::Core(core::Event::Read { .. }) => {
+            root::Event::Core(core::Event::Read { .. }) | root::Event::ReadApplication { .. } => {
                 let reply = self.queued.pop_front().expect("the independent caller issued this read");
                 assert!(self.awaiting.insert(reply, Fence(self.made)).is_none());
                 self.admissions.push_back(reply);
@@ -70,6 +73,7 @@ impl Parties {
                 self.awaiting.get_mut(&reply).expect("admitted read").0 = self.made;
             }
             root::Event::Core(_)
+            | root::Event::WatchApplication { .. }
             | root::Event::Application { .. }
             | root::Event::Turn { .. }
             | root::Event::Text { .. }
@@ -103,6 +107,22 @@ impl Parties {
         self.receipts.push((reply, fence.0, answer));
     }
 
+    pub fn application_replied(
+        &mut self,
+        reply: ReplyTo,
+        number: u16,
+        answer: Result<jig_test_connector::ClientDocument, jig_test_connector::DocumentMissing>,
+        store: &Store,
+    ) {
+        let reply = reply.into_token().raw();
+        let fence = self.awaiting.remove(&reply).expect("one application read terminal");
+        fence.answered(store.applied).expect("application read follows every prior commit");
+        if self.admissions.front() == Some(&reply) {
+            self.admissions.pop_front();
+        }
+        self.application_receipts.push((reply, fence.0, number, answer));
+    }
+
     pub fn load(&mut self, load: Token, range: reads::Range, store: &Store) -> Vec<root::Event> {
         let reply = self.admissions.pop_front().expect("one owner load for an admitted read");
         self.awaiting
@@ -130,6 +150,9 @@ impl Parties {
     pub fn restart(&mut self, durable: u64) {
         for (_, prerequisite, _) in &self.receipts {
             Fence(*prerequisite).restarted(durable).expect("a crash preserves every observed read");
+        }
+        for (_, prerequisite, _, _) in &self.application_receipts {
+            Fence(*prerequisite).restarted(durable).expect("crash preserves every observed connector read");
         }
         self.awaiting.clear();
         self.admissions.clear();

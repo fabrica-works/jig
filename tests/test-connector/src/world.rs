@@ -171,6 +171,9 @@ impl World {
                 | Request::ApplicationDone { .. }
                 | Request::ApplicationAgain { .. }
                 | Request::ApplicationRelease { .. }
+                | Request::Document { .. }
+                | Request::ReadAnswered { .. }
+                | Request::Marked { .. }
                 | Request::Closed { .. } => {}
             }
         }
@@ -251,6 +254,9 @@ impl World {
                 | Request::ApplicationDone { .. }
                 | Request::ApplicationAgain { .. }
                 | Request::ApplicationRelease { .. }
+                | Request::Document { .. }
+                | Request::ReadAnswered { .. }
+                | Request::Marked { .. }
                 | Request::Closed { .. } => Vec::new(),
             };
             pending.extend(generated.iter().cloned());

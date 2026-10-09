@@ -60,7 +60,7 @@ pub(crate) fn scope(read: &Read) -> Option<Scope> {
         Read::Goals { project, .. } => Some(Scope::Goals { project: *project }),
         Read::Notes { project, .. } => Some(Scope::Notes { project: *project }),
         Read::Spend { project, .. } => Some(Scope::Spend { project: *project }),
-        Read::Frame | Read::Project { .. } | Read::Deployment => None,
+        Read::Frame | Read::Project { .. } | Read::Deployment | Read::Application { .. } => None,
     }
 }
 
@@ -84,7 +84,8 @@ fn cursor(read: &Read) -> Option<&Cursor> {
         | Read::Reply { .. }
         | Read::Turn { .. }
         | Read::Project { .. }
-        | Read::Deployment => None,
+        | Read::Deployment
+        | Read::Application { .. } => None,
     }
 }
 
@@ -102,7 +103,8 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
         Read::Inbox { .. } => Some(Subject::Inbox { party }),
         Read::Conversations { .. } => Some(Subject::Conversations { party }),
         Read::Goals { project, .. } => Some(Subject::Goals { project: *project }),
-        Read::EndedDelegates { .. }
+        Read::Application { .. }
+        | Read::EndedDelegates { .. }
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Notes { .. }
@@ -134,10 +136,78 @@ fn backwards(scope: &Scope) -> bool {
     }
 }
 
+fn refused_application(reply: ReplyTo, read: &Read) -> Requests {
+    match read {
+        Read::Application { connector, read, .. } => {
+            let mut out = Queue::with_capacity(3);
+            out.push(Request::Ask { connector: *connector, ask: crate::Ask::DropDocument { subject: *read } });
+            out.push(Request::Held(Box::new(Held::Read { reply, answer: Answer::None(Why::Unknown) })));
+            out.push(Request::Decided);
+            Requests::Out(out)
+        }
+        Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Reply { .. }
+        | Read::Turn { .. }
+        | Read::EndedDelegates { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::Inbox { .. }
+        | Read::Conversations { .. }
+        | Read::Goals { .. }
+        | Read::Notes { .. }
+        | Read::Spend { .. }
+        | Read::Project { .. }
+        | Read::Deployment => terminal(reply, Answer::None(Why::Unknown)),
+    }
+}
+
 pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, read: Read) -> Requests {
     let Some(party) = core.people.person(sign_in, env.now, env.wall) else {
-        return terminal(reply, Answer::None(Why::Unknown));
+        return refused_application(reply, &read);
     };
+    match &read {
+        Read::Application { scope, connector, read: name } => {
+            if core.people.role(party, scope.project()).is_none() || !core.connectors.as_ref().contains(connector) {
+                return refused_application(reply, &read);
+            }
+            let mut out = Queue::with_capacity(2);
+            out.push(Request::Ask {
+                connector: *connector,
+                ask: crate::Ask::Read { reply, scope: *scope, read: *name, party },
+            });
+            out.push(Request::Decided);
+            return Requests::Out(out);
+        }
+        Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Reply { .. }
+        | Read::Turn { .. }
+        | Read::EndedDelegates { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::Inbox { .. }
+        | Read::Conversations { .. }
+        | Read::Goals { .. }
+        | Read::Notes { .. }
+        | Read::Spend { .. }
+        | Read::Project { .. }
+        | Read::Deployment => {}
+    }
+    start_jig(core, env, reply, sign_in, party, read)
+}
+
+fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, party: u64, read: Read) -> Requests {
     let target = scope(&read);
     let mut after_live = None;
     let mut after_store = None;

@@ -109,6 +109,7 @@ pub(crate) fn work(
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "the application input vocabulary is routed exhaustively")]
 fn event_in(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -117,6 +118,25 @@ fn event_in(
     work: &mut Queue<Work>,
 ) {
     match event {
+        Event::WatchApplication { watcher, sign_in, scope, subject, window } => {
+            let token = domain.token();
+            let number = crate::client_documents::prepare(domain, token, subject, work);
+            work.push(Work::Core(core::Event::Watch {
+                watcher,
+                sign_in,
+                subject: core::documents::Subject::Application { scope, connector: number, subject: token },
+                window,
+            }));
+        }
+        Event::ReadApplication { reply, sign_in, scope, subject } => {
+            let token = domain.token();
+            let number = crate::client_documents::prepare(domain, token, subject, work);
+            work.push(Work::Core(core::Event::Read {
+                reply,
+                sign_in,
+                read: core::reads::Read::Application { scope, connector: number, read: token },
+            }));
+        }
         Event::Application { reply_to, sign_in, key, project, digest, value } => {
             let owner = domain.token();
             work.push(Work::Infrastructure(infrastructure::Event::ApplicationPrepare { owner, value }));
@@ -232,6 +252,11 @@ pub(crate) fn core_out(
 #[expect(clippy::too_many_lines, reason = "one dispatcher preserves the full held output vocabulary")]
 fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value: core::Held, work: &mut Queue<Work>) {
     match value {
+        core::Held::ApplicationDelivery { .. } => unreachable!("document assembly owns this synchronous output"),
+        core::Held::ApplicationWatchEnded { watcher, connector, subject, why } => {
+            crate::client_documents::forget(domain, connector, subject, work);
+            held(decision, Output::Core(core::Held::WatchEnded { watcher, why }));
+        }
         core::Held::Applied { to, connector, token } => {
             assert!(connector == domain.numbers.infrastructure, "application request owner");
             let outcome = domain
@@ -365,6 +390,13 @@ fn core_ask(
     work: &mut Queue<Work>,
 ) {
     match ask {
+        core::Ask::DropDocument { subject } => crate::client_documents::forget(domain, number, subject, work),
+        core::Ask::Document { watcher, scope, subject, party } => {
+            crate::client_documents::ask_document(domain, number, watcher, scope, subject, party, work);
+        }
+        core::Ask::Read { reply, scope, read, party } => {
+            crate::client_documents::read(domain, env, decision, number, reply, scope, read, party, work);
+        }
         core::Ask::Application { request, token, owner, person, project, role, retention } => {
             assert!(number == domain.numbers.infrastructure, "application owner");
             work.push(Work::Infrastructure(infrastructure::Event::Application {
@@ -448,6 +480,7 @@ fn core_ask(
                     Some(service) => {
                         work.push(Work::Observability(observability::Event::StartWatch {
                             task,
+                            project: context.project,
                             services: Box::new([observability::Service::new(service.environment, service.name)]),
                             template: u16::try_from(translate::spec_number(&context.spec, 3).unwrap_or(1))
                                 .expect("watch template"),
@@ -725,15 +758,40 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
 }
 
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates this child boundary")]
-fn infrastructure_out(
+pub(crate) fn infrastructure_out(
     domain: &mut Domain,
-    _env: &Env<Limits>,
+    env: &Env<Limits>,
     decision: &mut Decision<Write, Output>,
     out: &mut Queue<infrastructure::Request>,
     work: &mut Queue<Work>,
 ) {
     for _ in 0..out.len() {
         match out.pop().expect("infrastructure requests") {
+            infrastructure::Request::Document { watcher, subject, document } => {
+                let document = match document {
+                    Ok(document) => Ok(crate::ClientDocument::Infrastructure(Box::new(document))),
+                    Err(why) => Err(match why {
+                        infrastructure::DocumentMissing::Unknown => jig_core_views::End::Gone,
+                        infrastructure::DocumentMissing::NotAllowed => jig_core_views::End::NotAllowed,
+                    }),
+                };
+                crate::client_documents::document(
+                    domain,
+                    env,
+                    decision,
+                    domain.numbers.infrastructure,
+                    watcher,
+                    subject,
+                    document,
+                    work,
+                );
+            }
+            infrastructure::Request::ReadAnswered { .. } => {
+                unreachable!("client read completes in its synchronous route")
+            }
+            infrastructure::Request::Marked { subjects } => {
+                work.push(Work::Core(core::Event::Marked { connector: domain.numbers.infrastructure, subjects }));
+            }
             infrastructure::Request::ApplicationDone { request, token } => {
                 work.push(Work::Core(core::Event::ApplicationFinished { request, outcome: Ok(token) }));
             }
@@ -883,7 +941,7 @@ fn infrastructure_out(
     }
 }
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates this child boundary")]
-fn observability_out(
+pub(crate) fn observability_out(
     domain: &mut Domain,
     env: &Env<Limits>,
     decision: &mut Decision<Write, Output>,
@@ -892,6 +950,31 @@ fn observability_out(
 ) {
     for _ in 0..out.len() {
         match out.pop().expect("observability requests") {
+            observability::Request::Document { watcher, subject, document } => {
+                let document = match document {
+                    Ok(document) => Ok(crate::ClientDocument::Observability(Box::new(document))),
+                    Err(why) => Err(match why {
+                        observability::DocumentMissing::Unknown => jig_core_views::End::Gone,
+                        observability::DocumentMissing::NotAllowed => jig_core_views::End::NotAllowed,
+                    }),
+                };
+                crate::client_documents::document(
+                    domain,
+                    env,
+                    decision,
+                    domain.numbers.observability,
+                    watcher,
+                    subject,
+                    document,
+                    work,
+                );
+            }
+            observability::Request::ReadAnswered { .. } => {
+                unreachable!("client read completes in its synchronous route")
+            }
+            observability::Request::Marked { subjects } => {
+                work.push(Work::Core(core::Event::Marked { connector: domain.numbers.observability, subjects }));
+            }
             observability::Request::Closed { task } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Closed {
                     task,

@@ -77,7 +77,7 @@ fn a_fresh_observed_verdict_uses_this_connectors_facts() {
 fn a_watch_emits_one_triage_per_committed_batch() {
     let mut domain = Domain::new(&limits());
     let mut started =
-        event(&mut domain, 1, Event::StartWatch { task: 7, services: Box::from([service()]), template: 3 });
+        event(&mut domain, 1, Event::StartWatch { project: 1, task: 7, services: Box::from([service()]), template: 3 });
     assert_eq!(
         started.pop(),
         Some(Request::Save {
@@ -94,6 +94,7 @@ fn a_watch_emits_one_triage_per_committed_batch() {
         started.pop(),
         Some(Request::Save {
             record: Record::Watch(Watch {
+                project: 1,
                 task: 7,
                 services: Box::from([service()]),
                 template: 3,
@@ -105,7 +106,8 @@ fn a_watch_emits_one_triage_per_committed_batch() {
     assert_eq!(started.pop(), Some(Request::WatchInterest { task: 7, subscription: 7, topic: 7 }));
     assert!(started.is_empty());
     assert!(
-        event(&mut domain, 2, Event::StartWatch { task: 7, services: Box::from([service()]), template: 3 }).is_empty()
+        event(&mut domain, 2, Event::StartWatch { project: 1, task: 7, services: Box::from([service()]), template: 3 })
+            .is_empty()
     );
     let wake = Event::WakeWatch { task: 7, batch: 99, alerts: Box::from([1, 2]) };
     let mut first = event(&mut domain, 2, wake.clone());
@@ -113,6 +115,7 @@ fn a_watch_emits_one_triage_per_committed_batch() {
         first.pop(),
         Some(Request::Save {
             record: Record::Watch(Watch {
+                project: 1,
                 task: 7,
                 services: Box::from([service()]),
                 template: 3,
@@ -266,4 +269,34 @@ fn sustained_load_needs_a_whole_window_and_a_low_starting_sample() {
         event(&mut domain, 40, judge).pop(),
         Some(Request::Verdict { token: Token::new(1), verdict: Verdict::Wait })
     );
+}
+
+#[test]
+fn a_service_document_uses_the_projects_owned_watch_not_the_clients_claim() {
+    let mut domain = Domain::new(&limits());
+    event(&mut domain, 1, Event::StartWatch { project: 1, task: 7, services: Box::from([service()]), template: 3 });
+    event(&mut domain, 1, Event::System(SystemEvent::Fact { service: service(), fact: fact(1, 20) }));
+    let read = Token::new(100);
+    event(
+        &mut domain,
+        1,
+        Event::DocumentPrepare { token: read, subject: ClientSubject::Service { project: 2, service: service() } },
+    );
+    let mut unknown = event(&mut domain, 1, Event::ReadDocument { scope: ClientScope::Project(2), read, party: 7 });
+    assert_eq!(unknown.pop(), Some(Request::ReadAnswered { read, answer: Err(DocumentMissing::Unknown) }));
+    assert!(unknown.is_empty());
+    event(
+        &mut domain,
+        1,
+        Event::DocumentPrepare { token: read, subject: ClientSubject::Service { project: 1, service: service() } },
+    );
+    let mut known = event(&mut domain, 1, Event::ReadDocument { scope: ClientScope::Project(1), read, party: 7 });
+    assert_eq!(
+        known.pop(),
+        Some(Request::ReadAnswered {
+            read,
+            answer: Ok(ClientDocument::Service { service: service(), fact: fact(1, 20) })
+        })
+    );
+    assert!(known.is_empty());
 }

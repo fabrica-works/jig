@@ -19,13 +19,14 @@ struct Question {
 /// Observability's bounded working set.
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) client_subjects: Map<Token, crate::ClientSubject>,
     restart: Option<crate::RestartStage>,
     templates: Map<u16, Box<[u8]>>,
     closing: Map<u64, bool>,
     refresh: Map<Service, bool>,
-    facts: Map<Service, Fact>,
+    pub(crate) facts: Map<Service, Fact>,
     subscriptions: Map<(Topic, u64), (u64, u8, u8)>,
-    watches: Map<u64, Watch>,
+    pub(crate) watches: Map<u64, Watch>,
     staged: Map<Token, Effect>,
     effects: Map<Key, Entry>,
     judges: Map<Token, Question>,
@@ -42,6 +43,7 @@ impl Domain {
             "one step's outputs fit MAX_OUT"
         );
         Self {
+            client_subjects: Map::with_capacity(limits.reads),
             templates: Map::with_capacity(limits.watches),
             restart: None,
             closing: Map::with_capacity(
@@ -89,7 +91,7 @@ fn wall_seconds(env: &Env<Limits>) -> u64 {
     env.wall.as_nanos() / 1_000_000_000
 }
 
-fn service_valid(service: &Service, limits: &Limits) -> bool {
+pub(crate) fn service_valid(service: &Service, limits: &Limits) -> bool {
     !service.environment.is_empty()
         && !service.name.is_empty()
         && u32::try_from(service.environment.len()).unwrap_or(u32::MAX) <= limits.name_bytes
@@ -191,6 +193,7 @@ fn fresh_fact(domain: &mut Domain, env: &Env<Limits>, service: Service, fact: Fa
     let old = domain.facts.insert(service.clone(), fact.clone()).expect("fact capacity checked");
     if old != Some(fact.clone()) {
         out.push(Request::Changed { service: service.clone() });
+        crate::client_documents::changed(domain, env, &service, out);
     }
     let health_changed = match &old {
         Some(prior) => prior.healthy_replicas != fact.healthy_replicas,
@@ -308,6 +311,7 @@ fn start_watch(
     domain: &mut Domain,
     env: &Env<Limits>,
     task: u64,
+    project: u32,
     services: Box<[Service]>,
     template: u16,
     out: &mut Queue<Request>,
@@ -331,7 +335,7 @@ fn start_watch(
     for service in &services {
         subscribe(domain, env, task, Topic::Alerts(service.clone()), 1, 0, out);
     }
-    let watch = Watch { task, services, template, last_batch: None, pending: Box::new([]) };
+    let watch = Watch { task, project, services, template, last_batch: None, pending: Box::new([]) };
     domain.watches.insert(task, watch.clone()).expect("watch fits");
     out.push(Request::Save { record: Record::Watch(watch) });
     out.push(Request::WatchInterest { task, subscription: task, topic: task });
@@ -473,6 +477,16 @@ fn make(domain: &mut Domain, env: &Env<Limits>, key: Key, out: &mut Queue<Reques
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "the root reserves MAX_OUT slots");
     match event {
+        Event::DocumentPrepare { token, subject } => {
+            crate::client_documents::prepare(domain, &env.limits, token, subject);
+        }
+        Event::DocumentForget { subject } => {
+            domain.client_subjects.remove(&subject);
+        }
+        Event::Document { watcher, scope, subject, party } => {
+            crate::client_documents::document(domain, watcher, scope, subject, party, out);
+        }
+        Event::ReadDocument { scope, read, party } => crate::client_documents::read(domain, scope, read, party, out),
         Event::Close { task } => {
             domain.closing.insert(task, true).expect("live owner capacity");
         }
@@ -528,7 +542,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 });
             }
         }
-        Event::StartWatch { task, services, template } => start_watch(domain, env, task, services, template, out),
+        Event::StartWatch { task, project, services, template } => {
+            start_watch(domain, env, task, project, services, template, out);
+        }
         Event::StopWatch { task } => stop_watch(domain, task, out),
         Event::WakeWatch { task, batch, alerts } => wake_watch(domain, env, task, batch, alerts, out),
         Event::Describe { token, effect } => {

@@ -1661,7 +1661,8 @@ fn watch_admission_checks_each_subjects_project_or_owner() {
             | Subject::PersonTask { .. }
             | Subject::Result { .. }
             | Subject::Project { .. }
-            | Subject::Note { .. }) => other,
+            | Subject::Note { .. }
+            | Subject::Application { .. }) => other,
         };
         let mut out = Queue::with_capacity(people::max_out(&limits.people));
         for project in [0, 1] {
@@ -2636,3 +2637,4 @@ fn deployment_capacity_carries_direct_batch_refusals_and_task_history_cut() {
     assert_eq!(fact.request.cause, tasks::CapacityCause::Tasks { limit: 4 });
     assert!(core.tasks.task(7).is_none());
 }
+mod application_documents;

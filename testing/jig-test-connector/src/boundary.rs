@@ -489,6 +489,14 @@ pub enum SystemEvent {
 /// What the root tells the connector for this part of its contract.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// Retain this root-minted name in the application's own vocabulary.
+    DocumentPrepare { token: Token, subject: crate::ClientSubject },
+    /// The paced watch ended; forget its owner binding.
+    DocumentForget { subject: Token },
+    /// Make the current whole document for one due delivery.
+    Document { watcher: Token, scope: crate::ClientScope, subject: Token, party: u64 },
+    /// Answer one admitted client read in the same decision.
+    ReadDocument { scope: crate::ClientScope, read: Token, party: u64 },
     /// The root leaves a decoded application value with this owner before admission.
     ApplicationPrepare { owner: Token, value: crate::ApplicationRequest },
     /// Drop an unconsumed prepared value after keyed admission.
@@ -660,6 +668,12 @@ impl Record {
 /// What the connector asks its root to route or commit.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// Complete a due delivery from this owner's current state.
+    Document { watcher: Token, subject: Token, document: Result<crate::ClientDocument, crate::DocumentMissing> },
+    /// One client read answer; the root holds it until durable.
+    ReadAnswered { read: Token, answer: Result<crate::ClientDocument, crate::DocumentMissing> },
+    /// These prepared subjects changed in this decision.
+    Marked { subjects: List<Token> },
     /// Outcome has been saved in this decision.
     ApplicationDone { request: Token, token: Token },
     /// Nothing changed; retry the same party key.

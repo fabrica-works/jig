@@ -28,6 +28,13 @@ pub(super) fn route_core(
             }
             core::Request::Write(core::Write::Erase(key)) => write(domain, decision, Write::Erase(Key::Core(key))),
             core::Request::Held(held) => match *held {
+                core::Held::ApplicationDelivery { .. } => {
+                    unreachable!("document assembly owns this synchronous output")
+                }
+                core::Held::ApplicationWatchEnded { watcher, connector: number, subject, why } => {
+                    work.push(Work::Connector { number, event: connector::Event::DocumentForget { subject } });
+                    hold(decision, Delivery::Core(core::Held::WatchEnded { watcher, why }));
+                }
                 core::Held::Applied { to, connector: number, token } => {
                     let outcome = crate::numbered(domain, number)
                         .application_outcome(token)
@@ -105,6 +112,26 @@ fn route_ask(
     work: &mut Queue<Work>,
 ) {
     match ask {
+        core::Ask::DropDocument { subject } => {
+            if number == 1 || number == 2 {
+                work.push(Work::Connector { number, event: connector::Event::DocumentForget { subject } });
+            }
+        }
+        core::Ask::Document { watcher, scope, subject, party } => work.push(Work::Connector {
+            number,
+            event: connector::Event::Document { watcher, scope: crate::client_documents::scope(scope), subject, party },
+        }),
+        core::Ask::Read { reply, scope, read, party } => crate::client_documents::read(
+            domain,
+            env,
+            decision,
+            number,
+            reply,
+            crate::client_documents::scope(scope),
+            read,
+            party,
+            work,
+        ),
         core::Ask::Application { request, token, owner, person, project, role, retention } => {
             work.push(Work::Connector {
                 number,
@@ -517,6 +544,13 @@ pub(super) fn route_connector(
 ) {
     for _ in 0..requests.len() {
         match requests.pop().expect("connector request count") {
+            connector::Request::Document { watcher, subject, document } => {
+                crate::client_documents::document(domain, env, decision, number, watcher, subject, document, work);
+            }
+            connector::Request::ReadAnswered { .. } => unreachable!("client read completes in its synchronous route"),
+            connector::Request::Marked { subjects } => {
+                work.push(Work::Core(core::Event::Marked { connector: number, subjects }));
+            }
             connector::Request::ApplicationDone { request, token } => {
                 work.push(Work::Core(core::Event::ApplicationFinished { request, outcome: Ok(token) }));
             }

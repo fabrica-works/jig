@@ -18,13 +18,14 @@
 extern crate alloc;
 mod assemble;
 mod boundary;
+mod client_documents;
 mod domain;
 mod limits;
 mod restart;
 mod route;
 mod store;
 mod translate;
-pub use boundary::{Event, Output, Released, Store, Timer};
+pub use boundary::{ClientDocument, ClientMissing, ClientSubject, Event, Output, Released, Store, Timer};
 pub use domain::{Config, Domain, Numbers, fire, release, step};
 pub use limits::{Limits, worst_case};
 pub use store::{Key, Range, Record, Write};

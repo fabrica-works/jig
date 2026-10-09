@@ -31,6 +31,12 @@ pub enum Request {
 /// A question or retained-section command for a numbered connector.
 #[derive(Debug)]
 pub enum Ask {
+    /// Discard the connector-owned binding of a refused application watch or read.
+    DropDocument { subject: Token },
+    /// Make a connector's current document, then complete the views' Make within this decision.
+    Document { watcher: Token, scope: crate::documents::ApplicationScope, subject: Token, party: u64 },
+    /// Answer an admitted connector read; the root holds its typed answer in this decision.
+    Read { reply: ReplyTo, scope: crate::documents::ApplicationScope, read: Token, party: u64 },
     /// Decide the admitted connector-owned value in this decision and retain its outcome.
     Application {
         request: Token,
@@ -103,6 +109,10 @@ pub enum Write {
 /// Core output that must follow the decision's commit.
 #[derive(Debug)]
 pub enum Held {
+    /// Assemble the connector-owned document prepared for this delivery in the same decision.
+    ApplicationDelivery { watcher: Token, connector: u16, subject: Token },
+    /// Drop the connector-owned subject binding and deliver its paced ending.
+    ApplicationWatchEnded { watcher: Token, connector: u16, subject: Token, why: views::End },
     /// Load an owner range only after every preceding commit is durable.
     ReadLoad { load: Token, range: Box<crate::reads::Range> },
     /// One authenticated read answer after every preceding commit is durable.
@@ -317,6 +327,8 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// A connector's state change names its opaque subjects in this decision.
+    Marked { connector: u16, subjects: List<Token> },
     /// Exactly one terminal for a previously admitted read load.
     ReadLoaded { load: Token, result: crate::reads::Loaded },
     /// An unkeyed one-shot read on the supplied live sign-in.

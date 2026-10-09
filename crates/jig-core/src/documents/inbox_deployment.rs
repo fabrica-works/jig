@@ -710,7 +710,8 @@ pub fn make_with_clock(
         | super::Subject::PersonTask { .. }
         | super::Subject::Result { .. }
         | super::Subject::Project { .. }
-        | super::Subject::Note { .. } => super::make(core, limits, party, subject, window),
+        | super::Subject::Note { .. }
+        | super::Subject::Application { .. } => super::make(core, limits, party, subject, window),
     }
 }
 pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {

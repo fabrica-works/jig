@@ -568,7 +568,9 @@ impl Application for Testing {
                 peers.calls.push(part);
                 Vec::new()
             }
-            root::Delivery::Application { .. }
+            root::Delivery::ApplicationDocument { .. }
+            | root::Delivery::ApplicationRead { .. }
+            | root::Delivery::Application { .. }
             | root::Delivery::Core(_)
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Message { .. } => Vec::new(),

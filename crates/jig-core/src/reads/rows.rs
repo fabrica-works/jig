@@ -106,7 +106,8 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
             | Read::Project { .. }
             | Read::Notes { .. }
             | Read::Spend { .. }
-            | Read::Deployment => false,
+            | Read::Deployment
+            | Read::Application { .. } => false,
         },
         Document::Frame(_)
         | Document::Chips(_)
@@ -181,7 +182,8 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 | Read::Project { .. }
                 | Read::Notes { .. }
                 | Read::Spend { .. }
-                | Read::Deployment => unreachable!("inbox subject comes from inbox read"),
+                | Read::Deployment
+                | Read::Application { .. } => unreachable!("inbox subject comes from inbox read"),
             };
             let needs_done = !value.updates.is_empty();
             let source = match group {
@@ -250,7 +252,8 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 | Read::Project { .. }
                 | Read::Notes { .. }
                 | Read::Spend { .. }
-                | Read::Deployment => unreachable!("goal subject comes from goal read"),
+                | Read::Deployment
+                | Read::Application { .. } => unreachable!("goal subject comes from goal read"),
             };
             for row in value.lines.into_boxed() {
                 rows.push(PageRow::Goal(row)).expect("live goals fit");

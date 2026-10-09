@@ -745,7 +745,9 @@ impl World {
                 assert_eq!(words.as_ref(), b"done");
                 self.results += 1;
             }
-            root::Delivery::Core(core::Held::Delivery { .. } | core::Held::WatchEnded { .. }) => {}
+            root::Delivery::ApplicationDocument { .. }
+            | root::Delivery::ApplicationRead { .. }
+            | root::Delivery::Core(core::Held::Delivery { .. } | core::Held::WatchEnded { .. }) => {}
             other @ (root::Delivery::CallAnswer { .. }
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)

@@ -13,6 +13,7 @@ pub const MAX_OUT: u32 = 8;
 /// A connector's live working set and records.
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) client_subjects: Map<Token, crate::ClientSubject>,
     pub(crate) application: crate::application::State,
     pub(crate) config: Config,
     pub(crate) tasks: Map<u64, Record>,
@@ -107,6 +108,7 @@ impl Domain {
         }
         Domain {
             application: crate::application::State::new(limits),
+            client_subjects: Map::with_capacity(limits.values),
             config,
             closing: Map::with_capacity(limits.tasks),
             tasks: Map::with_capacity(limits.tasks),
@@ -154,6 +156,14 @@ impl Domain {
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "parent reserved the connector's maximum output");
     match event {
+        Event::DocumentPrepare { token, subject } => crate::client_documents::prepare(domain, token, subject),
+        Event::DocumentForget { subject } => {
+            domain.client_subjects.remove(&subject);
+        }
+        Event::Document { watcher, scope, subject, party } => {
+            crate::client_documents::document(domain, watcher, scope, subject, party, out);
+        }
+        Event::ReadDocument { scope, read, party } => crate::client_documents::read(domain, scope, read, party, out),
         Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value),
         Event::ApplicationDrop { owner } => domain.application.drop(owner),
         Event::Application { request, token, owner, person, project, role, retention } => {

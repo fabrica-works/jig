@@ -13,6 +13,7 @@ pub const MAX_OUT: u32 = 40;
 /// Infrastructure's bounded working set and durable records.
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) client_subjects: Map<Token, crate::ClientSubject>,
     pub(crate) application: crate::application::State,
     restart: Option<crate::RestartStage>,
     closing: Map<u64, bool>,
@@ -21,7 +22,7 @@ pub struct Domain {
     services: Map<Service, ServiceFact>,
     pub(crate) environments: Map<Environment, Option<EnvironmentFact>>,
     pools: Map<Pool, (u32, u32)>,
-    reliance: Map<u64, (u32, Box<[Named]>)>,
+    pub(crate) reliance: Map<u64, (u32, Box<[Named]>)>,
     procedures: Map<u64, ProcedureState>,
     staged: Map<Token, Effect>,
     proposals: Map<u64, (u64, Effect)>,
@@ -39,6 +40,7 @@ impl Domain {
             "MAX_OUT covers one step"
         );
         Self {
+            client_subjects: Map::with_capacity(limits.proposals),
             application: crate::application::State::new(limits),
             restart: None,
             closing: Map::with_capacity(
@@ -271,6 +273,7 @@ fn fresh_environment(
     let old = domain.environments.insert(environment.clone(), fact).expect("environment capacity checked");
     if old != Some(fact) {
         out.push(Request::Changed { resource: Resource::Environment(environment.clone()) });
+        crate::client_documents::changed(domain, env, &environment, out);
     }
     if other_hand && fact.is_none() && domain.made.contains_key(&environment) {
         drift(domain, Resource::Environment(environment), out);
@@ -687,6 +690,16 @@ fn stage(domain: &mut Domain, env: &Env<Limits>, token: Token, effect: Effect, o
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "the root reserves MAX_OUT slots");
     match event {
+        Event::DocumentPrepare { token, subject } => {
+            crate::client_documents::prepare(domain, &env.limits, token, subject);
+        }
+        Event::DocumentForget { subject } => {
+            domain.client_subjects.remove(&subject);
+        }
+        Event::Document { watcher, scope, subject, party } => {
+            crate::client_documents::document(domain, watcher, scope, subject, party, out);
+        }
+        Event::ReadDocument { scope, read, party } => crate::client_documents::read(domain, scope, read, party, out),
         Event::ApplicationPrepare { owner, value } => domain.application.prepare(owner, value, &env.limits),
         Event::ApplicationDrop { owner } => domain.application.drop(owner),
         Event::Application { request, token, owner, person, project, role, retention } => {

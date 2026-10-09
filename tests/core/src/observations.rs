@@ -387,7 +387,9 @@ impl Observer {
                     self.observe(now, observed);
                 }
             }
-            root::Event::RestartBegin
+            root::Event::WatchApplication { .. }
+            | root::Event::ReadApplication { .. }
+            | root::Event::RestartBegin
             | root::Event::RestartDone(_)
             | root::Event::Timer(_)
             | root::Event::Core(_)
@@ -867,6 +869,8 @@ impl Observer {
             root::Delivery::Restart(_)
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)
+            | root::Delivery::ApplicationDocument { .. }
+            | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Projection { .. }
             | root::Delivery::System { .. } => {}
         }
@@ -944,6 +948,7 @@ pub fn root_bound(limits: &root::Limits) -> Option<u64> {
         .checked_add(Journal::<root::Write, root::Delivery>::worst_case(&limits.journal)?)?
         .checked_add(
             core::reads::answer_worst_case(&limits.core)?
+                .max(connector::document_worst_case(&limits.connector)?)
                 .checked_mul(u64::from(limits.journal.held).checked_add(u64::from(limits.journal.release))?)?,
         )?
         .checked_add(Queue::<core::Now>::worst_case(limits.journal.now)?)?

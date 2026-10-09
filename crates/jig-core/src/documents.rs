@@ -108,6 +108,8 @@ pub enum Proposer {
 /// One subject whose current document a party may read or watch.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Subject {
+    /// A connector-owned subject within the client's stated role scope.
+    Application { scope: ApplicationScope, connector: u16, subject: skein_lib::Token },
     /// The authenticated party's frame.
     Frame { party: u64 },
     /// A task's overview and controls.
@@ -140,6 +142,26 @@ pub enum Subject {
     Project { project: u32 },
     /// A note retained by its owning child.
     Note { note: u64 },
+}
+
+/// Role scope named by an application's client (`client/domain/contract.md`, 7.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ApplicationScope {
+    /// A party must hold a role in this project.
+    Project(u32),
+    /// A party must hold a deployment role.
+    Deployment,
+}
+
+impl ApplicationScope {
+    /// The people child's project identity for this scope.
+    #[must_use]
+    pub fn project(self) -> u32 {
+        match self {
+            Self::Project(project) => project,
+            Self::Deployment => 0,
+        }
+    }
 }
 
 /// Why no live document is available.
@@ -279,6 +301,7 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
     }
     core.people.identity(party).ok_or(Missing::Unknown)?;
     match subject {
+        Subject::Application { .. } => Err(Missing::Unknown),
         Subject::Frame { party: owner } => {
             if *owner != party {
                 return Err(Missing::NotAllowed);

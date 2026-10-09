@@ -53,6 +53,16 @@ pub enum Released {
 /// Inputs to the reference root; protocol adapters supply typed child values.
 #[derive(Debug)]
 pub enum Event {
+    /// Watch a typed connector subject, named within the client's declared scope.
+    WatchApplication {
+        watcher: Token,
+        sign_in: u64,
+        scope: core::documents::ApplicationScope,
+        subject: ClientSubject,
+        window: core::documents::Window,
+    },
+    /// Read a typed connector document without a key.
+    ReadApplication { reply: ReplyTo, sign_in: u64, scope: core::documents::ApplicationScope, subject: ClientSubject },
     /// A decoded infrastructure request with its protocol encoding's digest.
     Application {
         reply_to: ReplyTo,
@@ -113,6 +123,10 @@ pub enum Timer {
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "the journal owns complete concrete outputs")]
 pub enum Output {
+    /// One whole connector-owned document held behind the journal's barrier.
+    ApplicationDocument { watcher: Token, document: ClientDocument },
+    /// One connector-owned read terminal after all reflected commits are durable.
+    ApplicationRead { reply: ReplyTo, answer: Result<ClientDocument, ClientMissing> },
     /// Infrastructure's own outcome, released only by the commit barrier.
     Application { to: ReplyTo, outcome: infrastructure::ApplicationOutcome },
     /// One atomic transaction, numbered by the journal.
@@ -148,4 +162,25 @@ pub(crate) enum Payload {
     Answer { task: u64, attempt: u64, spent: u64, end: tasks::End },
     Word(tasks::Word),
     Settled(core::SettledCall),
+}
+
+/// Each connector owns its typed client subject; the root reads its variant only.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum ClientSubject {
+    Infrastructure(infrastructure::ClientSubject),
+    Observability(observability::ClientSubject),
+}
+
+/// The journal's owned assembly of either connector's document.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum ClientDocument {
+    Infrastructure(Box<infrastructure::ClientDocument>),
+    Observability(Box<observability::ClientDocument>),
+}
+
+/// A connector-owned read's total refusal translation.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ClientMissing {
+    Unknown,
+    NotAllowed,
 }

@@ -64,6 +64,9 @@ pub(crate) struct State {
 }
 
 impl State {
+    pub(crate) fn object(&self, number: u64) -> ApplicationObject {
+        self.objects.get(&number).copied().unwrap_or(ApplicationObject { revision: 0, value: 0 })
+    }
     pub(crate) fn new(limits: &Limits) -> Self {
         Self {
             prepared: Map::with_capacity(limits.staged),
@@ -180,6 +183,7 @@ fn changed(domain: &mut Domain, env: &Env<Limits>, request: Token, pending: Pend
     assert!(domain.application.objects.insert(value.object, now).is_ok(), "configured object capacity");
     out.push(Request::Save { record: Record::ApplicationObject { object: value.object, now } });
     finish(domain, env, request, pending, ApplicationOutcome::Changed { object: value.object, now }, out);
+    crate::client_documents::changed(domain, env, value.object, out);
 }
 
 fn finish(

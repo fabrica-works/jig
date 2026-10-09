@@ -69,6 +69,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let task_paths =
         u64::from(limits.tasks).checked_mul(u64::from(limits.resources_per_task))?.checked_mul(path_bytes)?;
     crate::application::worst_case(limits)?
+        .checked_add(Map::<Token, crate::ClientSubject>::worst_case(limits.values)?)?
+        .checked_add(List::<Token>::worst_case(limits.values)?)?
         .checked_add(Map::<u64, Record>::worst_case(limits.tasks)?)?
         .checked_add(Map::<u64, ()>::worst_case(limits.tasks)?)?
         .checked_add(Map::<(u32, Path), ResourceRole>::worst_case(limits.adoptions)?)?
