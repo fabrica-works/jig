@@ -92,6 +92,11 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
         .find(|word| word.from == tasks::Party::Task(child.0) && matches!(word.kind, tasks::MessageKind::Result(_)))
         .expect("delivered delegate result")
         .clone();
+    jig_core_world::stories::reads::request(
+        &mut world,
+        61,
+        people::Ask::MarkSeen { seen: people::Seen::Chat { task: parent.0, through: 2 } },
+    );
     world.send(root::Event::Answer {
         channel: Token::new(7),
         task: parent.0,
@@ -112,14 +117,14 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
         semantic,
         vec![
             &tasks::Line::RunBegan { attempt: parent.1, why: tasks::Why::Made, resumed: false },
-            &tasks::Line::Turn { attempt: parent.1, turn: 1, read: None },
+            &tasks::Line::Turn { reply: 1, attempt: parent.1, turn: 1, read: None },
             &tasks::Line::Words {
                 message,
                 by: heard_person(&world),
                 kind: tasks::MessageKind::Words,
                 words: b"the person's complete words".as_slice().into()
             },
-            &tasks::Line::Turn { attempt: parent.1, turn: 2, read: Some(message) },
+            &tasks::Line::Turn { reply: 2, attempt: parent.1, turn: 2, read: Some(message) },
             &tasks::Line::Heard(heard),
             &tasks::Line::RunEnded { attempt: parent.1, end: tasks::EndKind::Finished, spent: 6 },
         ]
@@ -130,7 +135,7 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
             panic!("turn archive")
         };
         assert_eq!(row.transcript.as_ref(), bytes);
-        assert!(world.commits.iter().any(|commit| commit.iter().any(|write| matches!(write, root::Write::Save(root::Record::Core(core::Record::Core(core::CoreRecord::Turn(row)))) if row.task == parent.0 && row.attempt == parent.1 && row.turn == turn)) && commit.iter().any(|write| matches!(write, root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(row)))) if row.task == parent.0 && row.line == (tasks::Line::Turn { attempt: parent.1, turn, read: if turn == 1 { None } else { Some(message) } })) )));
+        assert!(world.commits.iter().any(|commit| commit.iter().any(|write| matches!(write, root::Write::Save(root::Record::Core(core::Record::Core(core::CoreRecord::Turn(row)))) if row.task == parent.0 && row.attempt == parent.1 && row.turn == turn)) && commit.iter().any(|write| matches!(write, root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Activity(row)))) if row.task == parent.0 && row.line == (tasks::Line::Turn { reply: u64::from(turn), attempt: parent.1, turn, read: if turn == 1 { None } else { Some(message) } })) )));
     }
     assert!(world.commits.iter().any(|commit| {
         let terminal = commit.iter().any(|write| match write {
@@ -155,6 +160,7 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
     assert_eq!(ended.activity, activity.last().expect("final activity").position);
     world.restart_with(jig_core_world::faults::plan_fixture(506).0);
     assert_eq!(lines(&world, parent.0), activity);
+    all_replies_read_then_ended_survive_restart_and_forgetting(&mut world, parent.0, &activity);
 }
 
 fn heard_person(world: &World) -> tasks::Party {
@@ -168,4 +174,46 @@ fn heard_person(world: &World) -> tasks::Party {
         })
         .expect("retained sign-in");
     tasks::Party::Person(person)
+}
+
+fn all_replies_read_then_ended_survive_restart_and_forgetting(
+    world: &mut World,
+    task: u64,
+    activity: &[tasks::ActivityLine],
+) {
+    use jig_core_world::reads::{Parties, ask, latest};
+    let read_key = root::Key::Core(core::Key::People(people::Key::ReadChat { party: 1, task }));
+    assert!(matches!(
+        world.store.rows.get(&read_key),
+        Some(root::Record::Core(core::Record::People(people::Stored::ReadChat { through: 2, .. })))
+    ));
+    world.reads = Some(Parties::new(world.store.applied));
+    ask(world, 71, core::reads::Read::Frame);
+    let core::reads::Answer::Document(document) = latest(world) else { panic!("frame") };
+    let core::documents::Document::Frame(frame) = document.as_ref() else { panic!("frame") };
+    assert_eq!(frame.updates, core::documents::Count::Known(1), "only the unread result remains");
+    let reply =
+        activity.iter().find(|line| matches!(line.line, tasks::Line::Turn { reply: 2, .. })).expect("reply activity");
+    ask(world, 72, core::reads::Read::Reply { task, activity: reply.position });
+    assert!(
+        matches!(latest(world), core::reads::Answer::Historical(value) if matches!(&value.value, core::reads::Past::Turn(turn) if turn.turn == 2 && turn.transcript.as_ref() == b"the second committed turn"))
+    );
+    let ended_key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(owner))) = world.store.rows[&ended_key].clone()
+    else {
+        panic!("ended owner")
+    };
+    jig_core_world::stories::reads::request(
+        world,
+        62,
+        people::Ask::MarkSeen { seen: people::Seen::Results { through: owner.result_position } },
+    );
+    world.send(root::Event::Core(core::Event::ForgetChat { row: owner }));
+    assert!(!world.store.rows.contains_key(&ended_key));
+    assert!(!world.store.rows.contains_key(&read_key));
+    assert!(world.commits.iter().any(|writes| writes.contains(&root::Write::Erase(ended_key.clone()))
+        && writes.contains(&root::Write::Erase(read_key.clone()))));
+    world.restart_with(jig_core_world::faults::plan_fixture(506).0);
+    ask(world, 73, core::reads::Read::Reply { task, activity: reply.position });
+    assert_eq!(latest(world), &core::reads::Answer::None(core::reads::Why::Gone));
 }

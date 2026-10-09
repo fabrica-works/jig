@@ -1383,21 +1383,29 @@ fn documents_inbox_keeps_two_projects_groups_order_and_exact_cursor() {
     assert_eq!(make(&core, &limits, 1, &Subject::Inbox { party: 2 }, &window()), Err(Missing::NotAllowed));
 }
 #[test]
-fn documents_cached_inbox_results_preserve_positions_and_unknown_store_metadata() {
+fn documents_cached_inbox_results_preserve_positions_project_and_time() {
     let (mut core, limits) = make_tree();
-    core.people.remember_result(&limits.people, 1, people::ResultRef { task: 100, position: 30 });
-    core.people.remember_result(&limits.people, 1, people::ResultRef { task: 99, position: 31 });
+    core.people.remember_result(
+        &limits.people,
+        1,
+        people::ResultRef { task: 100, project: 1, at: Wall::from_nanos(30), position: 30 },
+    );
+    core.people.remember_result(
+        &limits.people,
+        1,
+        people::ResultRef { task: 99, project: 1, at: Wall::from_nanos(31), position: 31 },
+    );
     let Document::Inbox(inbox) =
         make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }).unwrap()
     else {
         panic!()
     };
     assert_eq!(inbox.updates.get(0).unwrap().object, InboxObject::Result { position: 31 });
-    assert_eq!(inbox.updates.get(0).unwrap().project, None);
-    assert_eq!(inbox.updates.get(0).unwrap().at, None);
+    assert_eq!(inbox.updates.get(0).unwrap().project, Some(1));
+    assert_eq!(inbox.updates.get(0).unwrap().at, Some(Wall::from_nanos(31)));
     assert_eq!(inbox.updates.get(0).unwrap().unread, Some(true));
-    assert!(!inbox.updates_time_complete);
-    assert_eq!(inbox.cached_updates, Count::AtLeast(2));
+    assert!(inbox.updates_time_complete);
+    assert_eq!(inbox.cached_updates, Count::Known(2));
 }
 #[test]
 fn documents_conversations_show_chats_and_exclude_goals() {
@@ -1420,7 +1428,7 @@ fn documents_conversations_show_chats_and_exclude_goals() {
     assert_eq!(conversations.lines.len(), 1);
     assert_eq!(conversations.lines.get(0).unwrap().chip.number, 5);
     assert_eq!(conversations.lines.get(0).unwrap().budget.numbers.budget, 100);
-    assert_eq!(conversations.lines.get(0).unwrap().replies_unread, None);
+    assert_eq!(conversations.lines.get(0).unwrap().replies_unread, Some(Count::Known(0)));
 }
 #[test]
 fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_clock() {

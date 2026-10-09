@@ -1100,6 +1100,8 @@ pub(crate) fn make_admitted(
                 due_reason: crate::Why::Made,
                 narrowing: false,
                 result_position: 0,
+                last_reply: 0,
+                replies: Box::new([]),
                 escalation: crate::Escalation::Unheld { revision: 0 },
                 proposal: None,
                 result_proposal: false,

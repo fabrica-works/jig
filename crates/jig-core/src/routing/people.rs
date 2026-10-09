@@ -25,6 +25,9 @@ pub(super) fn route_people(
     work: &mut Queue<Event>,
     event: people::Event,
 ) -> Requests {
+    if let people::Event::ForgetChat { task, .. } = &event {
+        drop(core.archived_chats.remove(task));
+    }
     let event = match event {
         people::Event::Decided { request, outcome } => {
             if let Some(flight) = core.applications.get_mut(&request)
@@ -36,7 +39,9 @@ pub(super) fn route_people(
             }
             people::Event::Decided { request, outcome }
         }
-        other @ (people::Event::ForgetChat { .. }
+        other @ (people::Event::ChatState { .. }
+        | people::Event::ChatSeen { .. }
+        | people::Event::ForgetChat { .. }
         | people::Event::MakeService { .. }
         | people::Event::Seed { .. }
         | people::Event::Waiting { .. }
@@ -234,24 +239,33 @@ pub(super) fn tag_people(
                         priority,
                         deadline,
                     ),
-                    people::Ask::MarkSeen { seen } => {
-                        let outcome = match seen {
-                            people::Seen::Results { .. } => people::Outcome::MarkedSeen { seen },
-                            people::Seen::Chat { task, .. } => match core.tasks.task(task) {
-                                Some(row) => {
-                                    if core.chat_requester(row) == Some(person) {
-                                        people::Outcome::MarkedSeen { seen }
-                                    } else {
-                                        people::Outcome::Refused(people::Refusal::Role {
+                    people::Ask::MarkSeen { seen } => match seen {
+                        people::Seen::Results { .. } => work.push(Event::People(people::Event::Decided {
+                            request,
+                            outcome: people::Outcome::MarkedSeen { seen },
+                        })),
+                        people::Seen::Chat { task, .. } => match core.tasks.task(task) {
+                            Some(row) => {
+                                if core.chat_requester(row) == Some(person)
+                                    && core.people.role(person, row.project).is_some()
+                                {
+                                    work.push(Event::People(people::Event::ChatSeen {
+                                        project: row.project,
+                                        request,
+                                        last_reply: row.last_reply,
+                                    }));
+                                } else {
+                                    work.push(Event::People(people::Event::Decided {
+                                        request,
+                                        outcome: people::Outcome::Refused(people::Refusal::Role {
                                             held: core.people.role(person, row.project),
-                                        })
-                                    }
+                                        }),
+                                    }));
                                 }
-                                None => people::Outcome::Refused(people::Refusal::Unknown),
-                            },
-                        };
-                        work.push(Event::People(people::Event::Decided { request, outcome }));
-                    }
+                            }
+                            None => out.push(Request::Now(Box::new(Now::SeenChat { request, task }))),
+                        },
+                    },
                     people::Ask::StartChat { words, .. } => begin_chat_creation(
                         core,
                         env,

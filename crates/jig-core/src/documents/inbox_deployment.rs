@@ -21,20 +21,21 @@ pub enum InboxObject {
     Reply { message: u64 },
     Result { position: u64 },
 }
-/// A result's cached reference has no project/time today; a store read fills it.
+/// One owner-supplied inbox reference, with a chat header when it is a reply.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct InboxEntry {
+    pub reply: Option<Box<ConversationLine>>,
     pub task: TaskLink,
     pub project: Option<u32>,
     pub object: InboxObject,
-    /// Exact child activity to load for a reply; independent of its global message position.
+    /// Exact child activity to load, separate from a chat ordinal or notice message number.
     pub activity: Option<u64>,
     pub at: Option<Wall>,
     pub unread: Option<bool>,
     pub cursor: Cursor,
 }
 /// A bounded page across both groups. Needs precede updates. Known-time needs
-/// are oldest first and updates newest first; missing result times are explicit.
+/// are oldest first and updates newest first.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Inbox {
     pub party: u64,
@@ -44,13 +45,17 @@ pub struct Inbox {
     /// Exact needs across every project the party currently holds a role in.
     pub cached_needs: u32,
     pub cached_updates: Count,
+    pub results_seen: u64,
     pub updates_time_complete: bool,
 }
-/// One live directly requested chat, with cache-known replies only.
+/// One directly requested chat, with committed reply positions.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConversationLine {
     pub chip: Chip,
     pub project: u32,
+    pub first_words: super::Text,
+    pub seen: u64,
+    pub last_reply: u64,
     pub replies_unread: Option<Count>,
     pub cached_replies: u32,
     pub delegates: u32,
@@ -166,10 +171,16 @@ pub struct HelloRefusalLine {
 fn line_bound(limits: &Limits) -> usize {
     usize::try_from(limits.documents.lines).expect("line bound fits")
 }
-fn object(task: u64, kind: people::EntryKind) -> InboxObject {
+fn object(core: &Core, task: u64, kind: people::EntryKind) -> InboxObject {
     match kind {
         people::EntryKind::Question { message } => InboxObject::Question { message },
-        people::EntryKind::Proposal { number } => InboxObject::Proposal { proposer: Proposer::Task(task), number },
+        people::EntryKind::Proposal { number } => {
+            let proposer = match core.tasks.person_proposals().get(&number) {
+                Some(row) if row.goal.number == task => Proposer::Party(row.proposer),
+                Some(_) | None => Proposer::Task(task),
+            };
+            InboxObject::Proposal { proposer, number }
+        }
         people::EntryKind::Escalation { revision } => InboxObject::Escalation { revision },
         people::EntryKind::PersonTask => InboxObject::PersonTask,
         people::EntryKind::Reply { message } | people::EntryKind::ChatReply { message } => {
@@ -213,43 +224,17 @@ fn key(cursor: Cursor) -> Result<(bool, u64, u64, u64, InboxObject), Missing> {
         Cursor::Number { .. } => Err(Missing::Unknown),
     }
 }
-fn result_project(core: &Core, task: u64) -> Option<u32> {
-    if let Some(row) = core.tasks.task(task) {
-        return Some(row.project);
-    }
-    for (_, projection) in &core.projections {
-        for row in &projection.plan {
-            if row.number == task {
-                return Some(projection.goal.project);
-            }
-        }
-    }
-    None
-}
-fn result_time(core: &Core, task: u64) -> Option<Wall> {
-    if let Some(row) = core.tasks.task(task) {
-        return row.ended_at;
-    }
-    for (_, projection) in &core.projections {
-        for row in &projection.plan {
-            if row.number == task {
-                match &row.phase {
-                    tasks::Phase::Ended(tasks::Ending::Cancelled { at, .. }) => return Some(*at),
-                    tasks::Phase::Ended(tasks::Ending::Done(_) | tasks::Ending::Failed { .. })
-                    | tasks::Phase::Waiting
-                    | tasks::Phase::Active(_)
-                    | tasks::Phase::Closing(_)
-                    | tasks::Phase::Held { .. } => return None,
-                }
-            }
-        }
-    }
-    None
-}
 fn reply_activity(core: &Core, task: u64, object: InboxObject) -> Option<u64> {
     match object {
         InboxObject::Reply { message } => {
             let row = core.tasks.task(task)?;
+            if core.chat_requester(row).is_some() {
+                for reply in &row.replies {
+                    if reply.number == message {
+                        return Some(reply.activity);
+                    }
+                }
+            }
             let notice = row.person_wait?.notice?;
             if notice.message == message { Some(notice.activity) } else { None }
         }
@@ -261,39 +246,83 @@ fn reply_activity(core: &Core, task: u64, object: InboxObject) -> Option<u64> {
     }
 }
 
+fn archived_conversation(core: &Core, limits: &Limits, party: u64, task: u64) -> Option<ConversationLine> {
+    let archive = core.archived_chats.get(&task)?;
+    if archive.party != party || core.people.role(party, archive.project).is_none() {
+        return None;
+    }
+    let mut line = archive.line.as_ref()?.clone();
+    line.seen = core.people.chat_seen(party, task)?;
+    let unread = line.last_reply.saturating_sub(line.seen);
+    let capped = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("bounded unread");
+    line.replies_unread = Some(if unread > u64::from(limits.people.inbox_entries) {
+        Count::AtLeast(capped)
+    } else {
+        Count::Known(capped)
+    });
+    Some(line)
+}
+
+fn inbox_reply(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    task: u64,
+    chat: bool,
+) -> Result<Option<Box<ConversationLine>>, Missing> {
+    if !chat {
+        return Ok(None);
+    }
+    match core.tasks.task(task) {
+        Some(row) => Ok(Some(Box::new(conversation_from_row(core, limits, party, row)?))),
+        None => match archived_conversation(core, limits, party, task) {
+            Some(line) => Ok(Some(Box::new(line))),
+            None => Ok(None),
+        },
+    }
+}
+
 pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -> Result<Inbox, Missing> {
-    let entries = core.people.cached_waiting(&limits.people, party).ok_or(Missing::Unknown)?;
-    let results = core.people.cached_results(party).ok_or(Missing::Unknown)?;
+    let entries = core.people.inbox_needs(&limits.people, party).ok_or(Missing::Unknown)?;
+    let recent = core.people.cached_updates(&limits.people, party).ok_or(Missing::Unknown)?;
     let mut ordered = Map::with_capacity(limits.people.inbox_entries.checked_mul(2).ok_or(Missing::TooLarge)?);
     let cached_needs = core.people.needs(party).ok_or(Missing::Unknown)?;
-    let mut cached_updates = 0_u32;
-    let mut times = true;
+    let counts = core.people.counts(&limits.people, party).ok_or(Missing::Unknown)?;
     for entry in &entries {
         if core.people.role(party, entry.project).is_none() {
             continue;
         }
-        let value = object(entry.task, entry.kind);
-        if updates(value) {
-            cached_updates = cached_updates.checked_add(1).expect("bounded cache");
-        }
+        let value = object(core, entry.task, entry.kind);
         let cursor = Cursor::Inbox { task: entry.task, object: value, at: Some(entry.at) };
         ordered
-            .insert(key(cursor)?, (entry.task, Some(entry.project), value, Some(entry.at), None, cursor))
-            .expect("two bounded caches");
+            .insert(key(cursor)?, (entry.task, entry.project, value, None, entry.at, false, cursor, false))
+            .expect("bounded need prefix");
     }
-    for entry in results.iter().take(usize::try_from(limits.people.inbox_entries).expect("cache bound fits")) {
-        let project = result_project(core, entry.task);
-        if let Some(project) = project
-            && core.people.role(party, project).is_none()
-        {
+    for update in &recent {
+        let (task, project, value, activity, at, chat) = match *update {
+            people::Update::Result(row) => {
+                (row.task, row.project, InboxObject::Result { position: row.position }, None, row.at, false)
+            }
+            people::Update::Reply(row) => {
+                let value = object(core, row.task, row.kind);
+                (row.task, row.project, value, reply_activity(core, row.task, value), row.at, false)
+            }
+            people::Update::ChatReply(row) => (
+                row.entry.task,
+                row.entry.project,
+                object(core, row.entry.task, row.entry.kind),
+                Some(row.activity),
+                row.entry.at,
+                true,
+            ),
+        };
+        if core.people.role(party, project).is_none() {
             continue;
         }
-        cached_updates = cached_updates.checked_add(1).expect("bounded cache");
-        let at = result_time(core, entry.task);
-        times &= at.is_some();
-        let value = InboxObject::Result { position: entry.position };
-        let cursor = Cursor::Inbox { task: entry.task, object: value, at };
-        ordered.insert(key(cursor)?, (entry.task, project, value, at, Some(true), cursor)).expect("two bounded caches");
+        let cursor = Cursor::Inbox { task, object: value, at: Some(at) };
+        ordered
+            .insert(key(cursor)?, (task, project, value, activity, at, true, cursor, chat))
+            .expect("bounded shared update prefix");
     }
     let after = match window.after {
         Some(cursor) => Some(key(cursor)?),
@@ -304,7 +333,7 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
     let mut used = 0_u32;
     let mut last = None;
     let mut more = false;
-    for (position, (task, project, object, at, unread, cursor)) in &ordered {
+    for (position, (task, project, object, activity, at, unread, cursor, chat)) in &ordered {
         if let Some(after) = after
             && *position <= after
         {
@@ -314,13 +343,25 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
             more = true;
             break;
         }
+        let reply = inbox_reply(core, limits, party, *task, *chat)?;
+        if *chat && reply.is_none() {
+            more = true;
+            break;
+        }
+        let link = match core.archived_chats.get(task) {
+            Some(archive) if archive.party == party => {
+                TaskLink::Retained { chip: archive.chip.clone(), at: archive.at }
+            }
+            Some(_) | None => super::task_tree::link(core, limits, party, *task)?,
+        };
         let entry = InboxEntry {
-            task: super::task_tree::link(core, limits, party, *task)?,
-            project: *project,
+            reply,
+            task: link,
+            project: Some(*project),
             object: *object,
-            activity: reply_activity(core, *task, *object),
-            at: *at,
-            unread: *unread,
+            activity: *activity,
+            at: Some(*at),
+            unread: Some(*unread),
             cursor: *cursor,
         };
         if updates(*object) {
@@ -337,14 +378,41 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
         updates: changes,
         next: if more { last } else { None },
         cached_needs,
-        cached_updates: if cached_updates >= limits.people.inbox_entries {
-            Count::AtLeast(cached_updates)
-        } else {
-            Count::Known(cached_updates)
-        },
-        updates_time_complete: times,
+        cached_updates: if counts.more_unread { Count::AtLeast(counts.unread) } else { Count::Known(counts.unread) },
+        results_seen: core.people.results_seen(party).ok_or(Missing::Unknown)?,
+        updates_time_complete: true,
     })
 }
+/// One authentic chat header, used by both the list and reply inbox entries.
+pub fn conversation_from_row(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    row: &tasks::TaskRecord,
+) -> Result<ConversationLine, Missing> {
+    if core.chat_requester(row) != Some(party) || core.people.role(party, row.project).is_none() {
+        return Err(Missing::NotAllowed);
+    }
+    let seen = core.people.chat_seen(party, row.number).ok_or(Missing::Unknown)?;
+    let unread = row.last_reply.saturating_sub(seen);
+    let count = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("capped replies");
+    Ok(ConversationLine {
+        chip: super::small::chip_from_row(limits, row),
+        project: row.project,
+        first_words: super::small::text(&row.spec.words, limits.documents.text_bytes),
+        seen,
+        last_reply: row.last_reply,
+        replies_unread: Some(if unread > u64::from(limits.people.inbox_entries) {
+            Count::AtLeast(count)
+        } else {
+            Count::Known(count)
+        }),
+        cached_replies: u32::try_from(row.replies.len()).expect("bounded reply hints"),
+        delegates: u32::try_from(row.delegates.len()).expect("bounded delegates"),
+        budget: super::task_tree::budget(row),
+    })
+}
+
 pub(super) fn conversations(
     core: &Core,
     limits: &Limits,
@@ -356,7 +424,6 @@ pub(super) fn conversations(
         Some(Cursor::Inbox { .. }) => return Err(Missing::Unknown),
         None => 0,
     };
-    let waiting = core.people.cached_waiting(&limits.people, party).ok_or(Missing::Unknown)?;
     let mut lines = List::with_capacity(window.rows);
     let mut next = None;
     let mut more = false;
@@ -377,30 +444,7 @@ pub(super) fn conversations(
             more = true;
             break;
         }
-        let mut replies = 0_u32;
-        for entry in &waiting {
-            if entry.task == row.number {
-                match entry.kind {
-                    people::EntryKind::Reply { .. } | people::EntryKind::ChatReply { .. } => {
-                        replies = replies.checked_add(1).expect("bounded replies");
-                    }
-                    people::EntryKind::Question { .. }
-                    | people::EntryKind::Proposal { .. }
-                    | people::EntryKind::Escalation { .. }
-                    | people::EntryKind::PersonTask => {}
-                }
-            }
-        }
-        lines
-            .push(ConversationLine {
-                chip: super::small::chip_from_row(limits, row),
-                project: row.project,
-                replies_unread: None,
-                cached_replies: replies,
-                delegates: u32::try_from(row.delegates.len()).expect("bounded delegates"),
-                budget: super::task_tree::budget(row),
-            })
-            .expect("bounded conversation rows");
+        lines.push(conversation_from_row(core, limits, party, row)?).expect("bounded conversation rows");
         next = Some(Cursor::Number { number: row.number });
     }
     Ok(Conversations { lines, next: if more { next } else { None } })
@@ -753,7 +797,7 @@ pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
     .checked_add(List::<accounts::Fact>::worst_case(limits.accounts.accounts)?)?
     .checked_add(Map::<
         (bool, u64, u64, u64, InboxObject),
-        (u64, Option<u32>, InboxObject, Option<Wall>, Option<bool>, Cursor),
+        (u64, u32, InboxObject, Option<u64>, Wall, bool, Cursor, bool),
     >::worst_case(limits.people.inbox_entries.checked_mul(2)?)?)?
-    .checked_add(List::<people::Entry>::worst_case(limits.people.inbox_entries.checked_mul(3)?)?)
+    .checked_add(List::<people::Entry>::worst_case(limits.people.inbox_entries.checked_mul(5)?)?)
 }

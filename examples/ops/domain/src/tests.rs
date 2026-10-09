@@ -267,6 +267,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
         loads.as_slice(),
         [
             core::RestartStep::LoadCore,
+            core::RestartStep::LoadInbox,
             core::RestartStep::RestoreConnector { connector: 1 },
             core::RestartStep::RestoreConnector { connector: 2 }
         ]

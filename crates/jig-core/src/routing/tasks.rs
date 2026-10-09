@@ -670,7 +670,19 @@ pub(super) fn tag_tasks(
                 }
                 let record = match record {
                     tasks::Stored::Ended(mut task) => {
-                        append_people(core, env, people::Event::ForgetChat { task: task.number }, &mut out);
+                        if task.last_reply == 0 {
+                            append_people(
+                                core,
+                                env,
+                                people::Event::ForgetChat {
+                                    project: task.project,
+                                    task: task.number,
+                                    party: core.chat_requester(&task),
+                                    last_reply: 0,
+                                },
+                                &mut out,
+                            );
+                        }
                         let position = crate::fresh(&mut core.counters, crate::Family::Message)
                             .expect("ending position preflighted before mutation");
                         task.result_position = position;
@@ -681,7 +693,12 @@ pub(super) fn tag_tasks(
                                 core.people.remember_result(
                                     &env.limits.people,
                                     person,
-                                    people::ResultRef { task: task.number, position },
+                                    people::ResultRef {
+                                        task: task.number,
+                                        project: task.project,
+                                        at: task.ended_at.expect("ended row has its durable time"),
+                                        position,
+                                    },
                                 );
                             }
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => {}
@@ -723,6 +740,36 @@ pub(super) fn tag_tasks(
                     | tasks::Stored::PersonProposal(_) => record,
                 };
                 if let tasks::Stored::Live(task) | tasks::Stored::Ended(task) = &record {
+                    if let Some(party) = core.chat_requester(task) {
+                        let live = match &record {
+                            tasks::Stored::Live(_) => true,
+                            tasks::Stored::Ended(_) => false,
+                            tasks::Stored::Activity(_)
+                            | tasks::Stored::Milestone(_)
+                            | tasks::Stored::PersonProposal(_)
+                            | tasks::Stored::History(_)
+                            | tasks::Stored::Stub(_)
+                            | tasks::Stored::Ledger(_)
+                            | tasks::Stored::Writer(_)
+                            | tasks::Stored::Pool(_) => unreachable!("matched task header"),
+                        };
+                        append_people(
+                            core,
+                            env,
+                            people::Event::ChatState {
+                                party,
+                                project: task.project,
+                                task: task.number,
+                                last_reply: task.last_reply,
+                                live,
+                                replies: crate::inbox::reply_refs(&env.limits, task, party),
+                            },
+                            &mut out,
+                        );
+                    }
+                    if let tasks::Stored::Ended(_) = &record {
+                        core.cache_archived_chat(&env.limits, task);
+                    }
                     let stale = match core.contexts.get(&task.number) {
                         Some(context) => {
                             task.phase != tasks::Phase::Active(tasks::Active::Preparing)

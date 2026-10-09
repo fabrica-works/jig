@@ -197,13 +197,19 @@ fn row(store: &Store, value: &core::Record, task: &tasks::TaskRecord) -> reads::
             linked.insert(*number, Box::new(value.clone()));
         }
     }
-    let related = store
-        .rows
-        .get(&root::Key::Core(core::Key::Core(core::CoreKey::Terminal { task: task.number, attempt: task.attempt })))
-        .and_then(|record| match record {
-            root::Record::Core(value) => Some(value.clone()),
-            root::Record::Connector { .. } => None,
-        });
+    let related_key = match value {
+        core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+            line: tasks::Line::Turn { attempt, turn, .. },
+            ..
+        })) => core::CoreKey::Turn { task: task.number, attempt: *attempt, turn: *turn },
+        core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
+            core::CoreKey::Terminal { task: task.number, attempt: task.attempt }
+        }
+    };
+    let related = store.rows.get(&root::Key::Core(core::Key::Core(related_key))).and_then(|record| match record {
+        root::Record::Core(value) => Some(value.clone()),
+        root::Record::Connector { .. } => None,
+    });
     reads::Row {
         value: value.clone(),
         owner: Some(Box::new(task.clone())),
@@ -238,16 +244,41 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
             Some(row(store, value, owner(store, *task)?))
         }
         reads::Scope::Inbox { group: reads::Group::Updates, .. } => {
-            let core::Record::Tasks(tasks::Stored::Ended(task)) = value else { return None };
-            if task.requester != tasks::Party::Person(range.party) || task.result_position == 0 {
-                return None;
-            }
+            let (task, object, at) = match value {
+                core::Record::Tasks(tasks::Stored::Ended(task)) => {
+                    if task.requester != tasks::Party::Person(range.party) || task.result_position == 0 {
+                        return None;
+                    }
+                    (task.as_ref(), documents::InboxObject::Result { position: task.result_position }, task.ended_at)
+                }
+                core::Record::Tasks(tasks::Stored::Activity(line)) => {
+                    let task = owner(store, line.task)?;
+                    let message = match &line.line {
+                        tasks::Line::Turn { reply, .. } if task.requester == tasks::Party::Person(range.party) => {
+                            *reply
+                        }
+                        tasks::Line::Notified { recipient: tasks::Party::Person(party), word }
+                            if *party == range.party =>
+                        {
+                            word.number
+                        }
+                        tasks::Line::Words { .. }
+                        | tasks::Line::Heard(_)
+                        | tasks::Line::Notified { .. }
+                        | tasks::Line::RunBegan { .. }
+                        | tasks::Line::RunEnded { .. }
+                        | tasks::Line::Turn { .. }
+                        | tasks::Line::Decided { .. }
+                        | tasks::Line::Milestone { .. } => return None,
+                    };
+                    (task, documents::InboxObject::Reply { message }, Some(line.at))
+                }
+                core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
+                    return None;
+                }
+            };
             let mut value = row(store, value, task);
-            value.inbox = Some(documents::Cursor::Inbox {
-                task: task.number,
-                object: documents::InboxObject::Result { position: task.result_position },
-                at: task.ended_at,
-            });
+            value.inbox = Some(documents::Cursor::Inbox { task: task.number, object, at });
             Some(value)
         }
         reads::Scope::Turn { task, attempt, turn } => {

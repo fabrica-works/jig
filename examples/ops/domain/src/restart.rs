@@ -21,6 +21,7 @@ pub(crate) fn route(
         core::RestartRequest::Idle | core::RestartRequest::Refused { .. } => {}
         core::RestartRequest::Step(step) => match step {
             core::RestartStep::LoadCore => held(decision, Output::Load { step, range: Range::Core }),
+            core::RestartStep::LoadInbox => held(decision, Output::Load { step, range: Range::Inbox }),
             core::RestartStep::RestoreConnector { connector } => {
                 let range = if connector == domain.numbers.infrastructure {
                     Range::Infrastructure
@@ -97,61 +98,69 @@ pub(crate) fn store(
             }
         }
         Store::Restore(record) => {
-            let valid = match record {
-                Record::Core(core::Record::Core(row)) => match domain.core.restore_core(row, &env.limits.core) {
-                    core::Restored::Deployment { commits } => {
-                        domain.restored_commits = Some(commits);
+            let valid = if domain.core.restart_step() == Some(core::RestartStep::LoadInbox) {
+                if let Record::Core(core::Record::Tasks(row)) = record {
+                    domain.core.restore_inbox_row(&env.limits.core, &row)
+                } else {
+                    false
+                }
+            } else {
+                match record {
+                    Record::Core(core::Record::Core(row)) => match domain.core.restore_core(row, &env.limits.core) {
+                        core::Restored::Deployment { commits } => {
+                            domain.restored_commits = Some(commits);
+                            true
+                        }
+                        core::Restored::Live | core::Restored::Archive => true,
+                        core::Restored::Rejected => false,
+                    },
+                    Record::Core(core::Record::Tasks(tasks::Stored::Milestone(_))) => true,
+                    Record::Core(core::Record::Tasks(row)) => {
+                        if domain.core.restore_task_row(&row) {
+                            let mut out = Queue::with_capacity(tasks::max_out(&env.limits.core.tasks));
+                            tasks::step(
+                                &mut domain.core.tasks,
+                                &Env { now: env.now, wall: env.wall, limits: env.limits.core.tasks },
+                                tasks::Event::Restore { record: row },
+                                &mut out,
+                            );
+                            out.is_empty()
+                        } else {
+                            false
+                        }
+                    }
+                    Record::Core(core::Record::People(people::Stored::Policy { project, value })) => {
+                        domain.core.restore_policy(&env.limits.core, project, value)
+                    }
+                    Record::Core(core::Record::People(row)) => {
+                        if domain.core.restore_people_row(&row) {
+                            let mut out = Queue::with_capacity(people::max_out(&env.limits.core.people));
+                            people::step(
+                                &mut domain.core.people,
+                                &Env { now: env.now, wall: env.wall, limits: env.limits.core.people },
+                                people::Event::Restore { record: row },
+                                &mut out,
+                            );
+                            out.is_empty()
+                        } else {
+                            false
+                        }
+                    }
+                    Record::Core(core::Record::Notes(row)) => {
+                        work.push(Work::Core(core::Event::Notes(notes::Event::Restore { record: row })));
                         true
                     }
-                    core::Restored::Live | core::Restored::Archive => true,
-                    core::Restored::Rejected => false,
-                },
-                Record::Core(core::Record::Tasks(tasks::Stored::Milestone(_))) => true,
-                Record::Core(core::Record::Tasks(row)) => {
-                    if domain.core.restore_task_row(&row) {
-                        let mut out = Queue::with_capacity(tasks::max_out(&env.limits.core.tasks));
-                        tasks::step(
-                            &mut domain.core.tasks,
-                            &Env { now: env.now, wall: env.wall, limits: env.limits.core.tasks },
-                            tasks::Event::Restore { record: row },
-                            &mut out,
-                        );
-                        out.is_empty()
-                    } else {
-                        false
+                    Record::Infrastructure(record) => {
+                        let valid = restore_roles(domain, env, &record);
+                        if valid {
+                            work.push(Work::Infrastructure(infrastructure::Event::Restore { record }));
+                        }
+                        valid
                     }
-                }
-                Record::Core(core::Record::People(people::Stored::Policy { project, value })) => {
-                    domain.core.restore_policy(&env.limits.core, project, value)
-                }
-                Record::Core(core::Record::People(row)) => {
-                    if domain.core.restore_people_row(&row) {
-                        let mut out = Queue::with_capacity(people::max_out(&env.limits.core.people));
-                        people::step(
-                            &mut domain.core.people,
-                            &Env { now: env.now, wall: env.wall, limits: env.limits.core.people },
-                            people::Event::Restore { record: row },
-                            &mut out,
-                        );
-                        out.is_empty()
-                    } else {
-                        false
+                    Record::Observability(record) => {
+                        work.push(Work::Observability(observability::Event::Restore { record }));
+                        true
                     }
-                }
-                Record::Core(core::Record::Notes(row)) => {
-                    work.push(Work::Core(core::Event::Notes(notes::Event::Restore { record: row })));
-                    true
-                }
-                Record::Infrastructure(record) => {
-                    let valid = restore_roles(domain, env, &record);
-                    if valid {
-                        work.push(Work::Infrastructure(infrastructure::Event::Restore { record }));
-                    }
-                    valid
-                }
-                Record::Observability(record) => {
-                    work.push(Work::Observability(observability::Event::Restore { record }));
-                    true
                 }
             };
             if !valid {

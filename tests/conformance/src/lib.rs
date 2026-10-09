@@ -143,6 +143,11 @@ fn env(config: &Config, clock: Clock) -> Env<root::Limits> {
 impl Neighbours {
     fn restored(step: core::RestartStep, rows: &[root::Record]) -> Vec<Input<root::Event, root::Record>> {
         let mut inputs = Vec::new();
+        if step == core::RestartStep::LoadInbox {
+            inputs.extend(rows.iter().cloned().map(Input::Restore));
+            inputs.push(Input::Event(root::Event::RestartDone(step)));
+            return inputs;
+        }
         for group in 0..4 {
             for row in rows {
                 let rank = match row {
@@ -186,12 +191,13 @@ impl Neighbours {
     fn restart(&mut self, store: &mut Store, step: core::RestartStep) -> Vec<Input<root::Event, root::Record>> {
         self.restart_steps.push(step);
         match step {
-            core::RestartStep::LoadCore | core::RestartStep::RestoreConnector { .. } => {
+            core::RestartStep::LoadCore | core::RestartStep::LoadInbox | core::RestartStep::RestoreConnector { .. } => {
                 let keys: Vec<_> = store
                     .rows
                     .keys()
                     .filter(|key| match (step, key) {
                         (core::RestartStep::LoadCore, root::Key::Core(_)) => true,
+                        (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
                         (core::RestartStep::RestoreConnector { connector }, root::Key::Connector { number, .. }) => {
                             connector == *number
                         }
@@ -484,14 +490,16 @@ impl Application for Testing {
             }
             root::Delivery::Restart(step) => {
                 let position = match step {
-                    core::RestartStep::LoadCore => 0,
+                    core::RestartStep::LoadCore | core::RestartStep::LoadInbox => 0,
                     core::RestartStep::RestoreConnector { connector } => u32::from(connector),
                     core::RestartStep::ReadAfresh { connector } => 2 + u32::from(connector),
                     core::RestartStep::AdoptRuns | core::RestartStep::SettleOutbox { .. } | core::RestartStep::Open => {
                         panic!("root performs internal restart phases")
                     }
                 };
-                peers.routes.push(jig_conformance::referee::Observed::RestartStage { position });
+                if step != core::RestartStep::LoadInbox {
+                    peers.routes.push(jig_conformance::referee::Observed::RestartStage { position });
+                }
                 peers.restart(store, step)
             }
             root::Delivery::Assigned { assignment, .. } => {

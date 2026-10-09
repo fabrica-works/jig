@@ -209,6 +209,7 @@ pub struct Observer {
     words: BTreeSet<(u64, u64)>,
     policy_changes: BTreeMap<(u64, [u8; 16]), (u32, people::PolicyChange)>,
     applied_changes: BTreeSet<(u64, [u8; 16])>,
+    forgetting: BTreeMap<u64, Vec<u64>>,
     recorded: Option<Vec<r::Observed>>,
 }
 
@@ -311,6 +312,7 @@ impl Observer {
             words: BTreeSet::new(),
             policy_changes: BTreeMap::new(),
             applied_changes: BTreeSet::new(),
+            forgetting: BTreeMap::new(),
             recorded: None,
         }
     }
@@ -526,6 +528,27 @@ impl Observer {
 
     /// Observe the application records the fake store has just received.
     pub fn submitted(&mut self, now: u64, store: &Store) {
+        if let Some(pending) = store.pending.back() {
+            let mut tasks = Vec::new();
+            for write in &pending.writes {
+                if let jig_fake_store::Write::Erase(root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))) = write
+                {
+                    for key in store.rows.keys() {
+                        if matches!(key, root::Key::Core(core::Key::People(people::Key::ReadChat { task: chat, .. })) if chat == task)
+                        {
+                            assert!(
+                                pending.writes.contains(&jig_fake_store::Write::Erase(key.clone())),
+                                "read marker erases with its owner"
+                            );
+                        }
+                    }
+                    tasks.push(*task);
+                }
+            }
+            if !tasks.is_empty() {
+                self.forgetting.insert(pending.number, tasks);
+            }
+        }
         if !self.application_requests {
             return;
         }
@@ -785,6 +808,12 @@ impl Observer {
         }
         self.observe(now, r::Observed::Durable { number: store.applied, snapshot });
         self.applied = store.applied;
+        let applied: Vec<_> = self.forgetting.keys().copied().filter(|number| *number <= store.applied).collect();
+        for number in applied {
+            for task in self.forgetting.remove(&number).expect("submitted retention") {
+                self.observe(now, r::Observed::Forgotten { task });
+            }
+        }
         for (task, message) in words {
             self.observe(now, r::Observed::Words { task, message });
         }

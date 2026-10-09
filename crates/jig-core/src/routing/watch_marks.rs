@@ -184,6 +184,12 @@ pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
 pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &people::Event) {
     match event {
         people::Event::Roles { project, .. } => core.touch_project_parties(*project),
+        people::Event::ChatState { party, .. } => core.touch_party(*party),
+        people::Event::ChatSeen { request, .. } => {
+            if let Some((party, _)) = core.people.seen_context(*request) {
+                core.touch_party(party);
+            }
+        }
         people::Event::Waiting { task, entries } => {
             let mut parties = List::with_capacity(core.view_subjects.len());
             for (_, binding) in &core.view_subjects {
@@ -216,8 +222,12 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
                 core.touch_party(party);
             }
         }
-        people::Event::ForgetChat { .. }
-        | people::Event::MakeService { .. }
+        people::Event::ForgetChat { party, .. } => {
+            if let Some(party) = party {
+                core.touch_party(*party);
+            }
+        }
+        people::Event::MakeService { .. }
         | people::Event::Seed { .. }
         | people::Event::ApplyRoles { .. }
         | people::Event::SignedIn { .. }

@@ -67,6 +67,7 @@ impl Measured {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "one allocation family fills every owner and scratch path")]
 fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
     for limits in [
         LIMITS,
@@ -128,7 +129,11 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
         for party in 1..=u64::from(limits.people) {
             for position in 1..=u64::from(limits.inbox_entries) + 1 {
                 test.meter.start();
-                test.domain.remember_result(&limits, party, jig_core_people::ResultRef { task: position, position });
+                test.domain.remember_result(
+                    &limits,
+                    party,
+                    jig_core_people::ResultRef { task: position, project: 1, at: Wall::EPOCH, position },
+                );
                 test.drain();
             }
         }
@@ -188,6 +193,31 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
         });
     }
     restored.event(Event::Restored);
+    for project in 1..=limits.projects {
+        restored.event(Event::Roles { project, holdings: Box::new([]) });
+        for party in 1..=u64::from(limits.people) {
+            for position in 1..=u64::from(limits.inbox_entries) + 1 {
+                let number = (party - 1) * u64::from(limits.projects) * (u64::from(limits.inbox_entries) + 1)
+                    + u64::from(project - 1) * (u64::from(limits.inbox_entries) + 1)
+                    + position;
+                restored.meter.start();
+                restored.domain.remember_result(
+                    &limits,
+                    party,
+                    jig_core_people::ResultRef { task: number, project, at: Wall::EPOCH, position: number },
+                );
+                restored.drain();
+            }
+            restored.event(Event::ChatState {
+                party,
+                project,
+                task: u64::from(limits.inbox_tasks) + (party - 1) * u64::from(limits.projects) + u64::from(project),
+                last_reply: 1,
+                live: false,
+                replies: Box::new([]),
+            });
+        }
+    }
     for task in 1..=u64::from(limits.inbox_tasks) {
         let entries = (0..limits.inbox_recipients)
             .map(|message| Entry {
@@ -199,9 +229,31 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
             })
             .collect::<Vec<_>>()
             .into_boxed_slice();
+        let party = (task - 1) % u64::from(limits.people) + 1;
+        let replies = (0..limits.inbox_recipients)
+            .map(|message| jig_core_people::ReplyRef {
+                entry: Entry {
+                    task,
+                    project: 1,
+                    whom: Whom::Person(party),
+                    kind: EntryKind::ChatReply { message: u64::from(message) + 2 },
+                    at: Wall::EPOCH,
+                },
+                activity: u64::from(message) + 2,
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        restored.event(Event::ChatState {
+            party,
+            project: 1,
+            task,
+            last_reply: u64::from(limits.inbox_recipients) + 1,
+            live: true,
+            replies,
+        });
         restored.event(Event::Waiting { task, entries });
     }
     for task in 1..=u64::from(limits.inbox_tasks) {
-        restored.event(Event::ForgetChat { task });
+        restored.event(Event::ForgetChat { task, project: 1, party: None, last_reply: 0 });
     }
 }

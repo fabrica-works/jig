@@ -432,7 +432,13 @@ pub(super) fn from_store(
             }
         }
     }
-    if is_page(&range.scope) { Answer::Page(Box::new(page)) } else { Answer::None(Why::Unknown) }
+    if is_page(&range.scope) {
+        Answer::Page(Box::new(page))
+    } else if let Scope::Reply { .. } = &range.scope {
+        Answer::None(Why::Gone)
+    } else {
+        Answer::None(Why::Unknown)
+    }
 }
 
 fn historical(value: Past, at: Option<skein_lib::Wall>, by: Option<tasks::Party>) -> Answer {
@@ -697,12 +703,27 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 tasks::Line::Notified { recipient: tasks::Party::Person(person), word } if *person == range.party => {
                     Ok(Some(historical(Past::Reply(word.clone()), Some(line.at), Some(word.from))))
                 }
+                tasks::Line::Turn { reply, attempt, turn, .. } => {
+                    let owner = row_owner(&row).expect("matched reply owner");
+                    if core.chat_requester(owner) != Some(range.party) || *reply > owner.last_reply {
+                        return Ok(None);
+                    }
+                    let Some(related) = &row.related else {
+                        return Ok(None);
+                    };
+                    let Some(value) = turn_record(related) else {
+                        return Ok(None);
+                    };
+                    if value.task != *task || value.attempt != *attempt || value.turn != *turn {
+                        return Err(Missing::Unknown);
+                    }
+                    Ok(Some(historical(Past::Turn(value.clone()), Some(value.at), None)))
+                }
                 tasks::Line::Words { .. }
                 | tasks::Line::Heard(_)
                 | tasks::Line::Notified { .. }
                 | tasks::Line::RunBegan { .. }
                 | tasks::Line::RunEnded { .. }
-                | tasks::Line::Turn { .. }
                 | tasks::Line::Decided { .. }
                 | tasks::Line::Milestone { .. } => Ok(None),
             }
@@ -876,14 +897,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                 tasks::Executor::Agent { .. } => {}
                 tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => return Ok(None),
             }
-            Ok(Some(PageRow::Conversation(documents::ConversationLine {
-                chip: documents::chip_from_row(limits, owner),
-                project: owner.project,
-                replies_unread: None,
-                cached_replies: 0,
-                delegates: 0,
-                budget: documents::budget_from_row(owner),
-            })))
+            Ok(Some(PageRow::Conversation(documents::conversation_from_row(core, limits, range.party, owner)?)))
         }
         Scope::Inbox { group, filter } => inbox_row(core, limits, range.party, *group, *filter, row),
         Scope::Task { .. }
@@ -954,6 +968,7 @@ fn inbox_row(
                 return Err(Missing::Unknown);
             }
             Ok(Some(PageRow::Inbox(documents::InboxEntry {
+                reply: None,
                 task: documents::TaskLink::Retained {
                     chip: documents::chip_from_row(limits, owner),
                     at: owner.ended_at,
@@ -997,6 +1012,7 @@ fn inbox_row(
                     continue;
                 }
                 return Ok(Some(PageRow::Inbox(documents::InboxEntry {
+                    reply: None,
                     task: documents::TaskLink::Live(documents::chip_from_row(limits, owner)),
                     project: Some(owner.project),
                     object,
@@ -1051,6 +1067,7 @@ fn person_proposal_need(
         return Err(Missing::Unknown);
     }
     Ok(Some(PageRow::Inbox(documents::InboxEntry {
+        reply: None,
         task: documents::TaskLink::Stored { number: proposal.goal.number, status: None },
         project: Some(proposal.project),
         object,
@@ -1072,26 +1089,37 @@ fn reply_update(
     if line.task != owner.number {
         return Err(Missing::Unknown);
     }
-    let word = match &line.line {
-        tasks::Line::Notified { recipient: tasks::Party::Person(recipient), word } if *recipient == party => word,
+    let (message, reply) = match &line.line {
+        tasks::Line::Turn { reply, .. } => {
+            if core.chat_requester(owner) != Some(party)
+                || *reply > owner.last_reply
+                || *reply <= core.people.chat_seen(party, owner.number).unwrap_or(0)
+            {
+                return Ok(None);
+            }
+            (*reply, Some(Box::new(documents::conversation_from_row(core, limits, party, owner)?)))
+        }
+        tasks::Line::Notified { recipient: tasks::Party::Person(recipient), word } if *recipient == party => {
+            if word.number <= core.people.results_seen(party).unwrap_or(0) {
+                return Ok(None);
+            }
+            (word.number, None)
+        }
         tasks::Line::Notified { .. }
         | tasks::Line::Words { .. }
         | tasks::Line::Heard(_)
         | tasks::Line::RunBegan { .. }
         | tasks::Line::RunEnded { .. }
-        | tasks::Line::Turn { .. }
         | tasks::Line::Decided { .. }
         | tasks::Line::Milestone { .. } => return Ok(None),
     };
-    if word.number <= core.people.results_seen(party).unwrap_or(0) {
-        return Ok(None);
-    }
-    let object = documents::InboxObject::Reply { message: word.number };
+    let object = documents::InboxObject::Reply { message };
     let cursor = documents::Cursor::Inbox { task: owner.number, object, at: Some(line.at) };
     if row.inbox != Some(cursor) {
         return Err(Missing::Unknown);
     }
     Ok(Some(PageRow::Inbox(documents::InboxEntry {
+        reply,
         task: documents::TaskLink::Retained { chip: documents::chip_from_row(limits, owner), at: owner.ended_at },
         project: Some(owner.project),
         object,

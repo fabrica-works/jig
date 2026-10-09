@@ -146,8 +146,25 @@ pub struct Seed {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ResultRef {
     pub task: u64,
+    pub project: u32,
+    pub at: Wall,
     /// Root-issued order in which task results committed.
     pub position: u64,
+}
+
+/// One opaque committed reply's exact immutable activity identity.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ReplyRef {
+    pub entry: Entry,
+    pub activity: u64,
+}
+
+/// A globally ordered recent update; content remains in its owner.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Update {
+    Result(ResultRef),
+    Reply(Entry),
+    ChatReply(ReplyRef),
 }
 
 /// A party's requested read position (domain/people.md, section 6).
@@ -561,8 +578,12 @@ impl Stored {
     reason = "bounded whole keyed requests stay inline and event storage is priced by size_of"
 )]
 pub enum Event {
+    /// Authentic committed chat header; live headers replace their previous contribution.
+    ChatState { party: u64, project: u32, task: u64, last_reply: u64, live: bool, replies: Box<[ReplyRef]> },
+    /// Authorized keyed chat mark, with the owner's complete reply count.
+    ChatSeen { request: Token, project: u32, last_reply: u64 },
     /// The owner forgot an ended chat and its reply references; retire its positions.
-    ForgetChat { task: u64 },
+    ForgetChat { task: u64, project: u32, party: Option<u64>, last_reply: u64 },
     /// Apply an authorized owner request to make a service with a fresh party number.
     MakeService { request: Token, person: u64 },
     /// Add previously unknown collaborators and their first project role in one decision.

@@ -37,6 +37,7 @@ fn the_restart_script_waits_for_each_step_and_each_connector() {
     let mut core = core::Core::new(config, &limits);
     let steps = [
         core::RestartStep::LoadCore,
+        core::RestartStep::LoadInbox,
         core::RestartStep::RestoreConnector { connector: 1 },
         core::RestartStep::RestoreConnector { connector: 2 },
         core::RestartStep::AdoptRuns,

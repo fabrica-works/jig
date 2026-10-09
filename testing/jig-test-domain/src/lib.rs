@@ -683,6 +683,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                         });
                     }
                     core::RestartStep::LoadCore
+                    | core::RestartStep::LoadInbox
                     | core::RestartStep::RestoreConnector { .. }
                     | core::RestartStep::ReadAfresh { .. } => hold(&mut decision, Delivery::Restart(step)),
                 },
@@ -937,6 +938,7 @@ fn resume_restart_outbox(domain: &mut Domain, env: &Env<Limits>) -> bool {
         Some(core::RestartStep::SettleOutbox { connector }) => connector,
         Some(
             core::RestartStep::LoadCore
+            | core::RestartStep::LoadInbox
             | core::RestartStep::RestoreConnector { .. }
             | core::RestartStep::AdoptRuns
             | core::RestartStep::ReadAfresh { .. }
@@ -972,6 +974,13 @@ use routes::{route_connector, route_core};
 /// supplies header, children, proofs, then calls; the core validates their links.
 #[must_use]
 pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) -> bool {
+    if domain.core.restart_step() == Some(core::RestartStep::LoadInbox) {
+        return if let Record::Core(core::Record::Tasks(row)) = record {
+            domain.core.restore_inbox_row(&env.limits.core, &row)
+        } else {
+            false
+        };
+    }
     match record {
         Record::Core(core::Record::Core(row)) => match domain.core.restore_core(row, &env.limits.core) {
             core::Restored::Deployment { commits } => {

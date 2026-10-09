@@ -9,6 +9,8 @@ use jig_ops_domain_observability as observability;
 pub enum Range {
     /// The core's live rows, in its restoration order.
     Core,
+    /// Task owner rows used to rebuild the core's derived inbox after positions restore.
+    Inbox,
     /// Observability's live rows.
     Observability,
     /// Infrastructure's live rows.

@@ -510,7 +510,8 @@ fn route_now(
             };
             work.push(Work::Core(core::Event::RefusedPayload { request, problem, payload }));
         }
-        core::Now::HistoricalProposal { .. }
+        core::Now::SeenChat { .. }
+        | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::CompleteBrief { .. }
         | core::Now::ProcedureDelegateOutcome { .. }

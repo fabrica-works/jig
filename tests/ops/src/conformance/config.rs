@@ -31,7 +31,7 @@ pub fn root(seed: u64) -> (Config, Limits) {
     core_limits.tasks.authority_bytes = 64;
     core_limits.tasks.executor_kinds = 3;
     core_limits.tasks.funders = 16;
-    core_limits.tasks.inbox_messages = 8;
+    core_limits.tasks.inbox_messages = 16;
     core_limits.tasks.inbox_bytes = 2048;
     core_limits.tasks.message_bytes = 512;
     core_limits.tasks.proposal_stall = Duration::from_secs(60);

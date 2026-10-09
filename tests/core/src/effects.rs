@@ -159,12 +159,29 @@ impl World {
     /// A story may configure its programs, policy and worker capacity.
     #[must_use]
     pub fn configured(seed: u64, requirement: bool, configuration: root::Config, limits: root::Limits) -> World {
-        let mut world = Self::empty(fixture(seed, requirement).0, &limits);
+        let mut bootstrap = fixture(seed, requirement).0;
+        if *bootstrap.core.authority.limits() != limits.core.authority {
+            let rules = bootstrap.core.authority.rules().clone();
+            let policy = bootstrap.core.authority.policy(1).expect("bootstrap policy").clone();
+            bootstrap.core.authority = authority::Domain::new(rules, limits.core.authority).expect("bootstrap bounds");
+            let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+            authority::step(&mut bootstrap.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
+        }
+        let mut world = Self::empty(bootstrap, &limits);
         world.send(root::Event::Core(core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) })));
+        let projects: Vec<_> = configuration.core.projects.iter().copied().collect();
         world.observer = crate::observations::Observer::new(&configuration);
         world.observer.durable(world.wall, &world.store);
         world.domain = root::Domain::new(configuration, &limits);
         world.send(root::Event::RestartBegin);
+        for project in projects {
+            if project != 1 {
+                world.send(root::Event::Core(core::Event::People(people::Event::Roles {
+                    project,
+                    holdings: Box::new([]),
+                })));
+            }
+        }
         world.events.extend([
             root::Event::Core(core::Event::Account(accounts::Event::Add {
                 account: 1,
@@ -393,6 +410,20 @@ impl World {
                             generation,
                             valid: Duration::from_secs(60),
                         })));
+                    }
+                    root::Request::Now(core::Now::SeenChat { request, task }) => {
+                        let row = match self.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task))))
+                        {
+                            Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => {
+                                Some(row.clone())
+                            }
+                            Some(_) | None => None,
+                        };
+                        self.events.push_back(root::Event::Core(core::Event::SeenChatLoaded {
+                            request,
+                            row,
+                            busy: false,
+                        }));
                     }
                     root::Request::Now(core::Now::HistoricalPersonTask { request, person, project, task }) => {
                         let key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
@@ -789,7 +820,7 @@ impl World {
     fn restart_step(&mut self, step: core::RestartStep) {
         self.restart_steps.push(step);
         match step {
-            core::RestartStep::LoadCore | core::RestartStep::RestoreConnector { .. } => {
+            core::RestartStep::LoadCore | core::RestartStep::LoadInbox | core::RestartStep::RestoreConnector { .. } => {
                 self.load_restart(step);
             }
             core::RestartStep::ReadAfresh { connector: number } => {
@@ -818,6 +849,7 @@ impl World {
             .keys()
             .filter(|key| match (step, key) {
                 (core::RestartStep::LoadCore, root::Key::Core(_)) => true,
+                (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
                 (core::RestartStep::RestoreConnector { connector }, root::Key::Connector { number, .. }) => {
                     connector == *number
                 }
@@ -850,6 +882,13 @@ impl World {
 
     fn restored(&mut self, step: core::RestartStep, rows: &[root::Record]) {
         let env = self.env();
+        if step == core::RestartStep::LoadInbox {
+            for row in rows {
+                assert!(root::restore_record(&mut self.domain, &env, row.clone()), "restored inbox {row:?}");
+            }
+            self.events.push_back(root::Event::RestartDone(step));
+            return;
+        }
         for group in 0..4 {
             for row in rows {
                 let rank = match row {

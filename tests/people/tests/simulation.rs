@@ -685,13 +685,13 @@ fn a_chat_marked_seen_leaves_other_chats_unread() {
                 task,
                 project: 1,
                 whom: Whom::Person(person),
-                kind: EntryKind::ChatReply { message: task + 100 },
+                kind: EntryKind::ChatReply { message: 1 },
                 at: skein_lib::Wall::EPOCH,
             }]),
         );
     }
     assert_eq!(world.counts(person).unread, 2);
-    let seen = jig_core_people::Seen::Chat { task: chats[0], through: chats[0] + 100 };
+    let seen = jig_core_people::Seen::Chat { task: chats[0], through: 1 };
     let call = world.request(10, [3; 16], Ask::MarkSeen { seen });
     assert!(world.reply(call).is_none());
     world.commit_all();
@@ -712,7 +712,7 @@ fn a_chat_marked_seen_leaves_other_chats_unread() {
     );
     assert_eq!(world.chat_seen(other, chats[0]), 0);
     world.restart();
-    assert_eq!(world.chat_seen(person, chats[0]), chats[0] + 100);
+    assert_eq!(world.chat_seen(person, chats[0]), 1);
     world.forget_chat(chats[0]);
     world.commit_all();
     assert_eq!(world.chat_seen(person, chats[0]), 0);

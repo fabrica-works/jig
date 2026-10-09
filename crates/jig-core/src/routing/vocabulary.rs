@@ -237,6 +237,8 @@ pub enum Now {
     /// Start task preparation and assemble its first store load.
     StartPreparation { task: u64, transcript_waiter: Option<Token> },
     /// Load one proposal decision that has left live task memory.
+    SeenChat { request: Token, task: u64 },
+    /// Load one proposal decision that has left live task memory.
     HistoricalProposal { request: Token, person: u64, project: u32, proposer: u64, proposal: u64 },
     /// Load the ended owner row for a person-task act whose live row is gone.
     HistoricalPersonTask { request: Token, person: u64, project: u32, task: u64 },
@@ -435,6 +437,10 @@ pub enum Event {
     Activate { context: Box<tasks::RunContext>, ready: bool },
     /// The root's transcript slot reservation for an admitted agent run.
     PreparedAgent { context: Box<tasks::RunContext>, transcript_waiter: Option<Token>, busy: bool },
+    /// Forget a fully read ended chat and its read marker in one decision.
+    ForgetChat { row: Box<tasks::TaskRecord> },
+    /// Return the ended owner header for an authenticated chat mark.
+    SeenChatLoaded { request: Token, row: Option<Box<tasks::TaskRecord>>, busy: bool },
     /// One archived proposal decision, translated from the root's store row.
     HistoricalProposal {
         request: Token,

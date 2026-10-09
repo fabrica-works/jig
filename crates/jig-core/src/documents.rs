@@ -4,8 +4,8 @@
 //! `make` authenticates visibility from a supplied party number and copies only
 //! bounded text and lists. Its caller holds the answer until durable.
 //!
-//! Frame counts describe the people's bounded caches; cross-project exact needs
-//! and read positions belong to the inbox work. Object acts belong to the acts
+//! Frame and inbox counts include every live need and bounded unread updates.
+//! Read positions move only on a keyed mark. Object acts belong to the acts
 //! work. Activity positions belong to the activity work. Run writing status,
 //! provisional text and calls belong to the watch stream; committed turns never
 //! enter its text. Application subjects belong to their connectors.
@@ -19,8 +19,8 @@
 //! a proposal's effect authority ceiling is never reported as its price.
 //! Recurring wall schedules and past-period/root spending need store/period
 //! owners; the project reports period numbers and current live-root spending.
-//! Inbox result references may lack project and time, and reply read positions
-//! are absent until inbox work. Lost-host identity and hello refusal history
+//! Inbox references retain their owner project/time and reply positions.
+//! Lost-host identity and hello refusal history
 //! are not retained; deployment preserves its adrift attempts instead. Use
 //! `make_with_clock` for wall-time grace and account cooldowns; `make` leaves
 //! those optional time fields absent when no clock was supplied.
@@ -28,7 +28,7 @@
 mod inbox_deployment;
 pub use inbox_deployment::{
     Account, Capacity, ConversationLine, Conversations, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun,
-    Inbox, InboxEntry, InboxObject, ProjectCapacity, RunLocation, make_with_clock,
+    Inbox, InboxEntry, InboxObject, ProjectCapacity, RunLocation, conversation_from_row, make_with_clock,
 };
 mod objects;
 mod project_note;
@@ -242,6 +242,7 @@ pub struct Frame {
     pub projects: List<people::ProjectRole>,
     pub needs: u32,
     pub updates: Count,
+    pub results_seen: u64,
     pub retention: Duration,
     pub charters: List<OfferedCharter>,
     pub versions: Versions,

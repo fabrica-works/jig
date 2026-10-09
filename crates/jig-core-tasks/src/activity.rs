@@ -40,6 +40,7 @@ pub enum Line {
         spent: u64,
     },
     Turn {
+        reply: u64,
         attempt: u64,
         turn: u32,
         read: Option<u64>,

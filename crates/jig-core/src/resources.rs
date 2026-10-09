@@ -242,6 +242,7 @@ impl Core {
             Some(crate::RestartStep::RestoreConnector { connector }) if connector == name.connector => {}
             Some(
                 crate::RestartStep::LoadCore
+                | crate::RestartStep::LoadInbox
                 | crate::RestartStep::RestoreConnector { .. }
                 | crate::RestartStep::AdoptRuns
                 | crate::RestartStep::ReadAfresh { .. }

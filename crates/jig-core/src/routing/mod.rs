@@ -346,6 +346,8 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::RefusedPayload { .. }
         | Event::Activate { .. }
         | Event::PreparedAgent { .. }
+        | Event::ForgetChat { .. }
+        | Event::SeenChatLoaded { .. }
         | Event::HistoricalProposal { .. }
         | Event::HistoricalPersonTask { .. }
         | Event::HistoricalEscalation { .. }
@@ -399,6 +401,7 @@ pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
     tag_fleet(core, env, child, fleet::max_out(&env.limits.fleet))
 }
 
+#[expect(clippy::too_many_lines, reason = "exhaustive event dispatch delegates each concern")]
 fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<Event>) -> Requests {
     match event {
         Event::Marked { connector, subjects } => view_routes::marked(core, connector, subjects),
@@ -466,6 +469,10 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::Activate { context, ready } => route_activate(core, env, work, context, ready),
         Event::PreparedAgent { context, transcript_waiter, busy } => {
             route_prepared_agent(core, context, transcript_waiter, busy)
+        }
+        Event::ForgetChat { row } => crate::inbox::forget_chat(core, env, work, &row),
+        Event::SeenChatLoaded { request, row, busy } => {
+            crate::inbox::seen_chat_loaded(core, env, work, request, row, busy)
         }
         Event::HistoricalProposal { request, person, project, proposer, proposal, row, busy } => {
             route_historical_proposal(core, work, request, person, project, proposer, proposal, row, busy)

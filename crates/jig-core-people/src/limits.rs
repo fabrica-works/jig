@@ -15,7 +15,7 @@ pub struct Limits {
     pub people: u32,
     /// Maximum visible cached entries and unread count; results retain one extra overflow witness.
     pub inbox_entries: u32,
-    /// Maximum live task and person-proposal projections contributing to the inbox census.
+    /// Maximum live task/person-proposal census rows; per-chat positions retain people × this bound, including ended chats until forgotten.
     pub inbox_tasks: u32,
     /// Maximum recipient references in one task projection, independent of cached entries.
     pub inbox_recipients: u32,
@@ -67,7 +67,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     limits.inbox_tasks.checked_mul(limits.inbox_recipients)?.checked_add(limits.inbox_entries.checked_add(1)?)?;
     let refusal_views = limits.requests.checked_add(limits.room_refusals)?;
     limits.initial_owners.checked_add(4)?;
-    limits.waiters.checked_add(1)?;
+    limits.waiters.checked_add(2)?;
     limits.sign_ins.checked_add(1)?;
     limits.holdings.checked_add(1)?;
     if limits.waiters == 0 || limits.sign_in_lifetime == Duration::ZERO || limits.request_retention == Duration::ZERO {
@@ -104,6 +104,15 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         )?
         .checked_add(List::<crate::domain::Need>::worst_case(limits.inbox_recipients)?)?
         .checked_add(Map::<u64, u64>::worst_case(limits.people)?)?
+        .checked_add(Map::<u64, crate::domain::ChatTotal>::worst_case(limits.inbox_tasks)?)?
+        .checked_add(Map::<(u64, u32), u128>::worst_case(limits.people.checked_mul(limits.projects)?)?)?
+        .checked_add(Map::<u64, Box<[crate::domain::Recent]>>::worst_case(limits.people)?)?
+        .checked_add(
+            u64::from(limits.people).checked_mul(List::<crate::domain::Recent>::worst_case(limits.inbox_entries)?)?,
+        )?
+        .checked_add(List::<crate::domain::Recent>::worst_case(limits.inbox_entries)?)?
+        .checked_add(List::<crate::domain::Recent>::worst_case(limits.inbox_entries)?)?
+        .checked_add(List::<crate::Update>::worst_case(limits.inbox_entries)?)?
         .checked_add(Map::<(u64, u64), u64>::worst_case(chat_positions)?)?
         .checked_add(List::<u64>::worst_case(limits.people)?)?
         .checked_add(Map::<u64, Box<[crate::Entry]>>::worst_case(limits.inbox_tasks)?)?
@@ -111,6 +120,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             u64::from(limits.inbox_tasks).checked_mul(List::<crate::Entry>::worst_case(limits.inbox_recipients)?)?,
         )?
         .checked_add(List::<crate::Entry>::worst_case(limits.inbox_recipients)?)?
+        .checked_add(Map::<(u64, u32), Box<[crate::ResultRef]>>::worst_case(
+            limits.people.checked_mul(limits.projects)?,
+        )?)?
+        .checked_add(
+            u64::from(limits.people.checked_mul(limits.projects)?)
+                .checked_mul(List::<crate::ResultRef>::worst_case(limits.inbox_entries.checked_add(1)?)?)?,
+        )?
+        .checked_add(List::<u32>::worst_case(limits.people.checked_mul(limits.projects)?)?)?
         .checked_add(Map::<u64, Box<[crate::ResultRef]>>::worst_case(limits.people)?)?
         .checked_add(
             u64::from(limits.people)

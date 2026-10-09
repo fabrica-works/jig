@@ -95,6 +95,7 @@ impl Measured {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "one allocation family fills task payloads and every graph phase")]
 fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
     for l in [
         Limits {
@@ -173,6 +174,20 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
                 offered: None,
                 cumulative: 7,
             });
+            for turn in 2..=l.inbox_messages {
+                let reply_to = m.to();
+                m.event(Event::Turn {
+                    reply_to,
+                    task: number,
+                    attempt: number + 10,
+                    turn,
+                    read: None,
+                    offered: None,
+                    cumulative: 7,
+                });
+                assert!(!m.refused);
+            }
+            assert_eq!(m.d.task(number).expect("live task").replies.len(), l.inbox_messages as usize);
             let reply_to = m.to();
             m.event(Event::Activation {
                 saved: None,

@@ -11,7 +11,7 @@ use jig_core_tasks as tasks;
 use jig_core_views as views;
 use jig_test_domain as root;
 use skein_lib::{Rng, Token};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// One independently expected delivery, including decisions that wrote nothing.
 #[derive(Debug, Default)]
@@ -97,6 +97,7 @@ pub struct Parties {
     made: u64,
     automatic: bool,
     consumers: BTreeMap<u64, Consumer>,
+    projects: BTreeMap<u64, BTreeSet<u32>>,
     pub deliveries: Vec<(u64, u64, Document)>,
     pub application_deliveries: Vec<(u64, u64, u16, jig_test_connector::ClientDocument)>,
     pub endings: Vec<(u64, views::End)>,
@@ -111,6 +112,7 @@ impl Parties {
             made,
             automatic,
             consumers: BTreeMap::new(),
+            projects: BTreeMap::new(),
             deliveries: Vec::new(),
             application_deliveries: Vec::new(),
             endings: Vec::new(),
@@ -189,6 +191,10 @@ impl Parties {
             let touched = writes.iter().any(|write| match write {
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => {
                     task_subject(&consumer.subject, row.number)
+                        || match row.requester {
+                            tasks::Party::Person(party) => party_subject(&consumer.subject, party),
+                            tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
+                        }
                 }
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => {
                     task_subject(&consumer.subject, row.number)
@@ -197,14 +203,29 @@ impl Parties {
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
                         }
                 }
+                root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) => {
+                    party_subject(&consumer.subject, row.proposer)
+                        || self.projects.iter().any(|(party, projects)| {
+                            projects.contains(&row.project) && party_subject(&consumer.subject, *party)
+                        })
+                }
                 root::Write::Save(root::Record::Core(core::Record::People(
                     people::Stored::Person { number, .. }
                     | people::Stored::ReadResults { party: number, .. }
                     | people::Stored::ReadChat { party: number, .. },
                 ))) => party_subject(&consumer.subject, *number),
                 root::Write::Save(root::Record::Core(core::Record::People(people::Stored::Roles {
-                    holdings, ..
-                }))) => holdings.iter().any(|holding| party_subject(&consumer.subject, holding.person)),
+                    project,
+                    holdings,
+                }))) => {
+                    holdings.iter().any(|holding| party_subject(&consumer.subject, holding.person))
+                        || self.projects.iter().any(|(party, projects)| {
+                            projects.contains(project) && party_subject(&consumer.subject, *party)
+                        })
+                }
+                root::Write::Erase(root::Key::Core(core::Key::People(people::Key::ReadChat { party, .. }))) => {
+                    party_subject(&consumer.subject, *party)
+                }
                 root::Write::Save(root::Record::Connector {
                     number,
                     record: jig_test_connector::Record::ApplicationObject { object, .. },
@@ -215,6 +236,7 @@ impl Parties {
                     } => *owner == *number && *watched == *object,
                     Watched::Jig(_) => false,
                 },
+
                 root::Write::Save(_) | root::Write::Erase(_) => false,
             });
             if touched {
@@ -232,7 +254,12 @@ impl Parties {
             }
             root::Delivery::Core(core::Held::Delivery { watcher, document }) => {
                 let consumer = self.consumers.get_mut(&watcher.raw()).expect("admitted party watch");
-                consumer.fence.delivered(durable).expect("watch's durable prerequisite");
+                consumer.fence.delivered(durable).unwrap_or_else(|why| {
+                    panic!("watch durable prerequisite {watcher:?} at {durable}: {why}; {document:?}")
+                });
+                if let Document::Frame(frame) = document.as_ref() {
+                    self.projects.insert(frame.party, frame.projects.iter().map(|role| role.project).collect());
+                }
                 self.deliveries.push((watcher.raw(), durable, *document.clone()));
             }
             root::Delivery::Core(core::Held::WatchEnded { watcher, why }) => {

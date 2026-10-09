@@ -1,7 +1,6 @@
 //! Small live documents and the shared bounded chip construction.
 use super::{Chip, Count, ExecutorKind, Frame, Missing, OfferedCharter, PhaseLine, Run, Text};
 use crate::{Core, Limits};
-use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::List;
 use skein_lib::bytes::copy_of;
@@ -82,22 +81,8 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
             .push(OfferedCharter { project: role.project, chat: core.settings.charter, goals, cut })
             .expect("one charter line per project");
     }
-    let waiting = core.people.cached_waiting(&limits.people, party).ok_or(Missing::Unknown)?;
-    let needs = core.people.needs(party).ok_or(Missing::Unknown)?;
-    let mut updates =
-        u32::try_from(core.people.cached_results(party).ok_or(Missing::Unknown)?.len()).expect("cache count fits");
-    for entry in &waiting {
-        match entry.kind {
-            people::EntryKind::Reply { .. } | people::EntryKind::ChatReply { .. } => {
-                updates = updates.saturating_add(1);
-            }
-            people::EntryKind::Proposal { .. }
-            | people::EntryKind::Escalation { .. }
-            | people::EntryKind::Question { .. }
-            | people::EntryKind::PersonTask => {}
-        }
-    }
-    let updates = if updates >= limits.people.inbox_entries { Count::AtLeast(updates) } else { Count::Known(updates) };
+    let counts = core.people.counts(&limits.people, party).ok_or(Missing::Unknown)?;
+    let updates = if counts.more_unread { Count::AtLeast(counts.unread) } else { Count::Known(counts.unread) };
     Ok(Frame {
         party,
         kind: core.people.kind(party).ok_or(Missing::Unknown)?,
@@ -105,8 +90,9 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         name: text(&identity.name, limits.documents.text_bytes),
         cut: projects.len() < roles.len(),
         projects,
-        needs,
+        needs: counts.needs,
         updates,
+        results_seen: core.people.results_seen(party).ok_or(Missing::Unknown)?,
         charters,
         retention: limits.people.request_retention,
         versions: limits.documents.versions,

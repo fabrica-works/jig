@@ -7,10 +7,18 @@ use crate::{Core, fleet};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RestartStep {
     LoadCore,
-    RestoreConnector { connector: u16 },
+    /// Rebuild derived inbox facts after people's read positions have restored.
+    LoadInbox,
+    RestoreConnector {
+        connector: u16,
+    },
     AdoptRuns,
-    ReadAfresh { connector: u16 },
-    SettleOutbox { connector: u16 },
+    ReadAfresh {
+        connector: u16,
+    },
+    SettleOutbox {
+        connector: u16,
+    },
     Open,
 }
 
@@ -111,11 +119,12 @@ impl Core {
                 if !self.restoring_proofs.is_empty() {
                     return self.restart_refuse();
                 }
-                match self.connectors.first() {
-                    Some(&connector) => RestartStep::RestoreConnector { connector },
-                    None => RestartStep::AdoptRuns,
-                }
+                RestartStep::LoadInbox
             }
+            RestartStep::LoadInbox => match self.connectors.first() {
+                Some(&connector) => RestartStep::RestoreConnector { connector },
+                None => RestartStep::AdoptRuns,
+            },
             RestartStep::RestoreConnector { connector } => match self.restart_next_connector(connector) {
                 Some(connector) => RestartStep::RestoreConnector { connector },
                 None => RestartStep::AdoptRuns,

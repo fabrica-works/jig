@@ -26,6 +26,7 @@ mod chats;
 mod goals;
 mod historical;
 mod inbox;
+pub use inbox::restore_key as inbox_restore_key;
 mod memory;
 pub use goals::GoalStart;
 pub use memory::worst_case;
@@ -217,6 +218,7 @@ pub(crate) struct WatchedSubject {
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
+    pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
     pub(crate) application_input: Option<(u16, Token)>,
     pub(crate) task_capacity_mark: u64,
     pub(crate) applications: Map<Token, routing::application_routes::Flight>,
@@ -486,6 +488,15 @@ impl Core {
             );
         }
         Core {
+            archived_chats: Map::with_capacity(
+                limits
+                    .people
+                    .people
+                    .checked_mul(limits.people.inbox_entries)
+                    .expect("validated archive cache product")
+                    .checked_add(1)
+                    .expect("validated archive cache bound"),
+            ),
             application_input: None,
             task_capacity_mark: 0,
             applications: Map::with_capacity(limits.people.pending),

@@ -99,7 +99,7 @@ pub use boundary::{
     Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor, Hold,
     HoldKind, Holding, InvalidResult, Key, Kind, MessageKind, Name, New, NewsClass, NoticeState, Parameter, Party,
     PersonAddress, PersonAnswer, PersonStallNotice, PersonWait, Phase, PoolSlots, Problem, ProcedureDecision,
-    QuestionCredit, RecurringOverlap, RecurringState, RecurringTemplate, Refusal, Request, ResourceAccess,
+    QuestionCredit, RecurringOverlap, RecurringState, RecurringTemplate, Refusal, ReplyHint, Request, ResourceAccess,
     ResultFollowups, ResultKind, ResultsWake, Revisions, RunContext, SavedResource, Spec, Stage, Status, Stored, Stub,
     Subscription, SubscriptionKind, Taken, TaskRecord, TaskResult, Verdict, WakePolicy, WakeRule, Was, Word, Writer,
     WriterSlot,

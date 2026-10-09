@@ -390,6 +390,34 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     {
         return false;
     }
+    if task.last_reply > task.activity
+        || task.replies.len() > usize::try_from(limits.inbox_messages).expect("reply bound fits")
+    {
+        return false;
+    }
+    let mut reply_number = task.last_reply;
+    let mut activity = task.activity;
+    for reply in &task.replies {
+        if reply.number == 0
+            || reply.number != reply_number
+            || reply.activity == 0
+            || reply.activity > activity
+            || reply.attempt == 0
+            || reply.attempt > task.attempt
+            || reply.turn == 0
+        {
+            return false;
+        }
+        reply_number = reply.number.checked_sub(1).expect("positive reply ordinal");
+        activity = reply.activity.checked_sub(1).expect("positive activity position");
+    }
+    if let Some(reply) = task.replies.first() {
+        if task.last_reply == 0 || reply.number != task.last_reply {
+            return false;
+        }
+    } else if task.last_reply != 0 {
+        return false;
+    }
     let mut previous = 0;
     let mut bytes = 0_usize;
     for word in &task.inbox {

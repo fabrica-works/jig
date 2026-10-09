@@ -748,6 +748,16 @@ pub struct PersonStallNotice {
     pub activity: u64,
 }
 
+/// One committed turn's reply reference (domain/people.md, section 6).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ReplyHint {
+    pub number: u64,
+    pub activity: u64,
+    pub attempt: u64,
+    pub turn: u32,
+    pub at: Wall,
+}
+
 /// Owned durable task state emitted to root storage; root uses `RunContext` for preparation and
 /// does not maintain a mutable copy of this ledger. (domain/tasks.md, sections 3 and 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -780,6 +790,10 @@ pub struct TaskRecord {
     pub narrowing: bool,
     /// Root-issued commit order for an ended result; zero while live and until the root saves an ending.
     pub result_position: u64,
+    /// Consecutive committed reply ordinal across attempts.
+    pub last_reply: u64,
+    /// Newest opaque reply hints, bounded by `inbox_messages`; older lines are store-loaded.
+    pub replies: Box<[ReplyHint]>,
     /// One bounded semantic held-chat decision and checked revision. Root owns
     /// authentication, routing and historical receipts.
     pub escalation: crate::Escalation,

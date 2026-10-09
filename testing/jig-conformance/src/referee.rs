@@ -265,6 +265,8 @@ pub enum Observed {
     ApplicationAnswered { reply: u64, connector: u16, outcome: Box<[u8]> },
     /// The fake store applied one whole commit.
     Durable { number: u64, snapshot: Snapshot },
+    /// A durable retention transaction erased an ended owner and its read marker.
+    Forgotten { task: u64 },
     /// A delivery reached a host, party, or system.
     Released { requires: Vec<Receipt> },
     /// A host saw a reserved assignment.
@@ -853,6 +855,11 @@ impl Referee {
             Observed::Durable { number, snapshot } => {
                 self.durable(number, snapshot, now)?;
                 self.applications.durable(number, now)?;
+            }
+            Observed::Forgotten { task } => {
+                require(!self.last.tasks.contains_key(&task), Promise::Commit, "forgotten owner remains durable")?;
+                self.seen.remove(&Receipt::Task(task));
+                self.seen.remove(&Receipt::Ended(task));
             }
             Observed::Released { requires } => {
                 for receipt in requires {

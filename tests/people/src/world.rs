@@ -321,7 +321,11 @@ impl World {
     }
 
     pub fn remember_result(&mut self, person: u64, task: u64, position: u64) {
-        self.domain.remember_result(&self.env.limits, person, people::ResultRef { task, position });
+        self.domain.remember_result(
+            &self.env.limits,
+            person,
+            people::ResultRef { task, project: 1, at: self.env.wall, position },
+        );
     }
 
     #[must_use]
@@ -340,10 +344,23 @@ impl World {
     }
 
     pub fn forget_chat(&mut self, task: u64) {
-        self.send(Event::ForgetChat { task });
+        self.send(Event::ForgetChat { task, project: 1, party: None, last_reply: 0 });
     }
 
     pub fn waiting(&mut self, task: u64, entries: Box<[Entry]>) {
+        if let Some(entry) = entries.iter().find(|entry| matches!(entry.kind, people::EntryKind::ChatReply { .. }))
+            && let (people::Whom::Person(party), people::EntryKind::ChatReply { message }) = (entry.whom, entry.kind)
+        {
+            self.send(Event::ChatState {
+                party,
+                project: entry.project,
+                task,
+                last_reply: message,
+                live: true,
+                replies: Box::new([]),
+            });
+        }
+
         if entries.iter().any(|entry| entry.kind == people::EntryKind::PersonTask) {
             self.person_tasks.entry(task).or_insert_with(|| PersonTask {
                 entries: entries.clone(),
@@ -527,7 +544,12 @@ impl World {
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
-                                    Event::Decided { request, outcome },
+                                    match (allowed, seen) {
+                                        (true, people::Seen::Chat { task: _, through }) => {
+                                            Event::ChatSeen { request, project: 1, last_reply: through }
+                                        }
+                                        _ => Event::Decided { request, outcome },
+                                    },
                                     &mut self.out,
                                 );
                             }

@@ -5,9 +5,13 @@
 //! count every live task projection independently of the entry cache. Root owns policy, task creation
 //! and durability; this child never performs IO or retains credential secrets.
 
+#[path = "inbox.rs"]
+mod inbox;
+use inbox::{chat_seen_decision, mark_seen, prune_unheld_roles, replace_waiting};
+
 use crate::{
-    Again, Ask, Counts, Entry, EntryKind, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind,
-    LimitKind, Limits, Outcome, ProjectRole, Refusal, Reply, Request, RequestKey, ResultRef, Role, Seed, Seen, Stored,
+    Again, Ask, Entry, EntryKind, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, LimitKind,
+    Limits, Outcome, ProjectRole, Refusal, Reply, Request, RequestKey, ResultRef, Role, Seed, Seen, Stored, Update,
     Whom,
 };
 use alloc::boxed::Box;
@@ -47,6 +51,21 @@ enum Phase {
 pub(crate) struct Need {
     project: u32,
     whom: Whom,
+    kind: EntryKind,
+    at: Wall,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub(crate) struct ChatTotal {
+    party: u64,
+    project: u32,
+    last_reply: u64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub(crate) struct Recent {
+    update: Update,
+    gone: bool,
 }
 
 /// Bounded secret-free identities, sign-ins/deadlines, project holdings, completed keys and
@@ -60,6 +79,10 @@ pub struct Domain {
     results_seen: Map<u64, u64>,
     chats_seen: Map<(u64, u64), u64>,
     replies: Map<u64, Box<[Entry]>>,
+    chat_totals: Map<u64, ChatTotal>,
+    chat_updates: Map<(u64, u32), u128>,
+    result_census: Map<(u64, u32), Box<[ResultRef]>>,
+    recent: Map<u64, Box<[Recent]>>,
     unread: Map<u64, Box<[ResultRef]>>,
     waiting: Map<Whom, Box<[Entry]>>,
     needs: Map<u64, Box<[Need]>>,
@@ -113,6 +136,12 @@ impl Domain {
                 limits.people.checked_mul(limits.inbox_tasks).expect("bounded chat positions"),
             ),
             replies: Map::with_capacity(limits.inbox_tasks),
+            chat_totals: Map::with_capacity(limits.inbox_tasks),
+            chat_updates: Map::with_capacity(limits.people.checked_mul(limits.projects).expect("project reply census")),
+            result_census: Map::with_capacity(
+                limits.people.checked_mul(limits.projects).expect("project result census"),
+            ),
+            recent: Map::with_capacity(limits.people),
             unread: Map::with_capacity(limits.people),
             needs: Map::with_capacity(limits.inbox_tasks),
             waiting: Map::with_capacity(
@@ -348,182 +377,6 @@ impl Domain {
         Some(session.person)
     }
 
-    /// Last explicitly accepted results position for a known party, zero before any mark.
-    #[must_use]
-    pub fn results_seen(&self, person: u64) -> Option<u64> {
-        if !self.ready() || !self.people.contains_key(&person) {
-            return None;
-        }
-        Some(*self.results_seen.get(&person).unwrap_or(&0))
-    }
-
-    /// Currently cached unread result references, newest first; missing older entries are loaded from ended tasks.
-    #[must_use]
-    pub fn cached_results(&self, person: u64) -> Option<&[ResultRef]> {
-        if !self.ready() || !self.people.contains_key(&person) {
-            return None;
-        }
-        match self.unread.get(&person) {
-            Some(entries) => Some(entries.as_ref()),
-            None => Some(&[]),
-        }
-    }
-
-    /// Bounded newest-first task-derived references for a current person and exact project roles.
-    /// Older references are obtained by the root from stored task rows.
-    #[must_use]
-    pub fn cached_waiting(&self, limits: &Limits, person: u64) -> Option<Box<[Entry]>> {
-        if !self.ready() || !self.people.contains_key(&person) {
-            return None;
-        }
-        let mut visible = List::with_capacity(limits.inbox_entries);
-        if let Some(entries) = self.waiting.get(&Whom::Person(person)) {
-            for &entry in entries {
-                match entry.kind {
-                    EntryKind::Reply { .. } | EntryKind::ChatReply { .. } if !unread_reply(self, person, entry) => {
-                        continue;
-                    }
-                    EntryKind::Reply { .. }
-                    | EntryKind::ChatReply { .. }
-                    | EntryKind::Proposal { .. }
-                    | EntryKind::Escalation { .. }
-                    | EntryKind::Question { .. }
-                    | EntryKind::PersonTask => {}
-                }
-                insert_newest(&mut visible, entry);
-            }
-        }
-        for (project, holdings) in &self.roles {
-            for holding in holdings {
-                if holding.person == person
-                    && let Some(entries) =
-                        self.waiting.get(&Whom::Role { project: *project, role: role_number(holding.role) })
-                {
-                    for &entry in entries {
-                        insert_newest(&mut visible, entry);
-                    }
-                }
-            }
-        }
-        Some(visible.into_boxed())
-    }
-
-    /// Exact live needs across the party's current projects and roles, including uncached entries.
-    /// Tallies are volatile projections rebuilt from task rows, never durable inbox state.
-    #[must_use]
-    pub fn needs(&self, person: u64) -> Option<u32> {
-        self.identity(person)?;
-        let mut count = 0_u32;
-        for (_, tallies) in &self.needs {
-            for tally in tallies {
-                if addressed(self, person, *tally) {
-                    count = count.checked_add(1).expect("validated task projection bound");
-                }
-            }
-        }
-        Some(count)
-    }
-
-    /// Whether this task currently contributes to the party's exact need count.
-    #[must_use]
-    pub fn task_needs(&self, person: u64, task: u64) -> bool {
-        match self.needs.get(&task) {
-            Some(tallies) => {
-                for tally in tallies {
-                    if addressed(self, person, *tally) {
-                        return true;
-                    }
-                }
-                false
-            }
-            None => false,
-        }
-    }
-
-    /// Last position explicitly marked seen over one chat, zero before any mark.
-    #[must_use]
-    pub fn chat_seen(&self, person: u64, task: u64) -> Option<u64> {
-        self.identity(person)?;
-        Some(*self.chats_seen.get(&(person, task)).unwrap_or(&0))
-    }
-
-    /// Unread replies of one task, capped at `inbox_entries` with an explicit overflow bit.
-    #[must_use]
-    pub fn chat_unread(&self, limits: &Limits, person: u64, task: u64) -> Option<Counts> {
-        self.identity(person)?;
-        let mut unread = 0_u32;
-        if let Some(entries) = self.replies.get(&task) {
-            for entry in entries {
-                let chat_reply = match entry.kind {
-                    EntryKind::ChatReply { .. } => true,
-                    EntryKind::Reply { .. }
-                    | EntryKind::Proposal { .. }
-                    | EntryKind::Escalation { .. }
-                    | EntryKind::Question { .. }
-                    | EntryKind::PersonTask => false,
-                };
-                if chat_reply && unread_reply(self, person, *entry) {
-                    unread = unread.checked_add(1).expect("bounded task projection");
-                }
-            }
-        }
-        Some(Counts { needs: 0, unread: unread.min(limits.inbox_entries), more_unread: unread > limits.inbox_entries })
-    }
-
-    /// Exact needs and updates counted up to `inbox_entries`, independently of visible cache room.
-    #[must_use]
-    pub fn counts(&self, limits: &Limits, person: u64) -> Option<Counts> {
-        let needs = self.needs(person)?;
-        let mut unread = u32::try_from(self.cached_results(person)?.len()).expect("bounded result census");
-        for (_, entries) in &self.replies {
-            for entry in entries {
-                if unread_reply(self, person, *entry) {
-                    unread = unread.checked_add(1).expect("bounded projection census");
-                }
-            }
-        }
-        Some(Counts { needs, unread: unread.min(limits.inbox_entries), more_unread: unread > limits.inbox_entries })
-    }
-
-    /// Keep the newest `inbox_entries` plus one unread result witness; the store pages the rest.
-    pub fn remember_result(&mut self, limits: &Limits, person: u64, entry: ResultRef) {
-        if !self.ready()
-            || !self.people.contains_key(&person)
-            || entry.position <= self.results_seen(person).unwrap_or(0)
-        {
-            return;
-        }
-        let cap = limits.inbox_entries.checked_add(1).expect("bounded unread census");
-        if cap == 0 {
-            return;
-        }
-        let mut entries = List::with_capacity(cap);
-        if let Some(old) = self.unread.get(&person) {
-            for cached in old {
-                if cached.task == entry.task || cached.position == entry.position {
-                    return;
-                }
-            }
-            let mut inserted = false;
-            for &cached in old {
-                if !inserted && entry.position > cached.position {
-                    entries.push(entry).expect("new entry fits before a cached entry");
-                    inserted = true;
-                }
-                if entries.room() > 0 {
-                    entries.push(cached).expect("cache has room");
-                }
-            }
-            if !inserted && entries.room() > 0 {
-                entries.push(entry).expect("cache has room for latest entry");
-            }
-        } else {
-            entries.push(entry).expect("nonzero cache bound");
-        }
-        let saved = self.unread.insert(person, entries.into_boxed());
-        assert!(saved.is_ok(), "one cache per admitted person");
-    }
-
     /// Pure query of completed, successful restoration; false during restoring and permanently
     /// after restore failure.
     #[must_use]
@@ -545,7 +398,7 @@ pub fn max_out(limits: &Limits) -> u32 {
     limits
         .initial_owners
         .saturating_add(4)
-        .max(limits.waiters.saturating_add(1))
+        .max(limits.waiters.saturating_add(2))
         .max(limits.sign_ins.saturating_add(1))
         .max(limits.holdings.saturating_add(1))
         .max(limits.people.saturating_add(1))
@@ -560,7 +413,15 @@ pub fn max_out(limits: &Limits) -> u32 {
 /// targets for keyed replay.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::ForgetChat { task } => forget_chat(domain, &env.limits, task, out),
+        Event::ChatState { party, project, task, last_reply, live, replies } => {
+            inbox::chat_state_event(domain, env, party, project, task, last_reply, live, replies);
+        }
+        Event::ChatSeen { request, project, last_reply } => {
+            chat_seen_decision(domain, env, request, project, last_reply, out);
+        }
+        Event::ForgetChat { task, project, party, last_reply } => {
+            inbox::forget_chat_event(domain, env, task, project, party, last_reply, out);
+        }
         Event::MakeService { request, person } => make_service(domain, env, request, person, out),
         Event::Seed { project, collaborators } => seed(domain, &env.limits, project, &collaborators, out),
         Event::Waiting { task, entries } => replace_waiting(domain, &env.limits, task, &entries),
@@ -597,224 +458,6 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Ask { reply_to, sign_in, key, ask } => admit_ask(domain, env, reply_to, sign_in, key, ask, out),
         Event::Decided { request, outcome } => decided(domain, env, Id::<Pending>::from_token(request), outcome, out),
     }
-}
-
-fn role_number(role: Role) -> u32 {
-    role.number()
-}
-
-fn newer(left: Entry, right: Entry) -> bool {
-    left.at > right.at || (left.at == right.at && (left.task, left.kind) > (right.task, right.kind))
-}
-
-fn insert_newest(entries: &mut List<Entry>, entry: Entry) {
-    if entries.capacity() == 0 {
-        return;
-    }
-    let mut next = List::with_capacity(entries.capacity());
-    let mut inserted = false;
-    for &old in &*entries {
-        if old.task == entry.task && old.kind == entry.kind {
-            return;
-        }
-        if !inserted && newer(entry, old) {
-            next.push(entry).expect("cache has room before older entry");
-            inserted = true;
-        }
-        if next.room() > 0 {
-            next.push(old).expect("cache has room for prior entry");
-        }
-    }
-    if !inserted && next.room() > 0 {
-        next.push(entry).expect("cache has room for new entry");
-    }
-    *entries = next;
-}
-
-fn unread_reply(domain: &Domain, person: u64, entry: Entry) -> bool {
-    let (message, seen) = match entry.kind {
-        EntryKind::Reply { message } => (message, *domain.results_seen.get(&person).unwrap_or(&0)),
-        EntryKind::ChatReply { message } => (message, *domain.chats_seen.get(&(person, entry.task)).unwrap_or(&0)),
-        EntryKind::Proposal { .. }
-        | EntryKind::Escalation { .. }
-        | EntryKind::Question { .. }
-        | EntryKind::PersonTask => return false,
-    };
-    entry.whom == Whom::Person(person) && role(domain, person, entry.project).is_some() && message > seen
-}
-
-fn mark_seen(domain: &mut Domain, limits: &Limits, party: u64, seen: Seen, out: &mut Queue<Request>) {
-    match seen {
-        Seen::Results { through } => {
-            if through <= *domain.results_seen.get(&party).unwrap_or(&0) {
-                return;
-            }
-            assert!(domain.results_seen.insert(party, through).is_ok(), "one result position per party");
-            if let Some(cached) = domain.unread.get(&party) {
-                let mut kept = List::with_capacity(limits.inbox_entries.checked_add(1).expect("bounded census"));
-                for &entry in cached {
-                    if entry.position > through {
-                        kept.push(entry).expect("cached subset");
-                    }
-                }
-                assert!(domain.unread.insert(party, kept.into_boxed()).is_ok(), "admitted result cache");
-            }
-            out.push(Request::Save { record: Stored::ReadResults { party, through } });
-        }
-        Seen::Chat { task, through } => {
-            if through <= *domain.chats_seen.get(&(party, task)).unwrap_or(&0) {
-                return;
-            }
-            assert!(domain.chats_seen.insert((party, task), through).is_ok(), "bounded live chat positions");
-            out.push(Request::Save { record: Stored::ReadChat { party, task, through } });
-        }
-    }
-}
-
-fn forget_chat(domain: &mut Domain, limits: &Limits, task: u64, out: &mut Queue<Request>) {
-    let mut parties = List::with_capacity(limits.people);
-    for ((party, chat), _) in &domain.chats_seen {
-        if *chat == task {
-            parties.push(*party).expect("at most one position per party and chat");
-        }
-    }
-    for party in parties.into_boxed() {
-        let _old = domain.chats_seen.remove(&(party, task));
-        out.push(Request::Erase { key: Key::ReadChat { party, task } });
-    }
-    drop(domain.replies.remove(&task));
-}
-
-fn addressed(domain: &Domain, person: u64, need: Need) -> bool {
-    let Some(held) = role(domain, person, need.project) else { return false };
-    match need.whom {
-        Whom::Person(owner) => owner == person,
-        Whom::Role { project, role } => project == need.project && held.number() == role,
-    }
-}
-
-fn replace_needs(domain: &mut Domain, limits: &Limits, task: u64, entries: &[Entry]) {
-    assert!(
-        entries.len() <= usize::try_from(limits.inbox_recipients).expect("projection bound fits"),
-        "root bounds each task projection"
-    );
-    let mut tallies: List<Need> = List::with_capacity(limits.inbox_recipients);
-    for entry in entries {
-        if entry.task != task || entry.project == 0 {
-            continue;
-        }
-        match entry.kind {
-            EntryKind::Reply { .. } | EntryKind::ChatReply { .. } => continue,
-            EntryKind::Proposal { .. }
-            | EntryKind::Escalation { .. }
-            | EntryKind::Question { .. }
-            | EntryKind::PersonTask => {}
-        }
-        tallies
-            .push(Need { project: entry.project, whom: entry.whom })
-            .expect("root bounds each task's need recipients");
-    }
-    drop(domain.needs.remove(&task));
-    if !tallies.is_empty() {
-        assert!(domain.needs.insert(task, tallies.into_boxed()).is_ok(), "one tally per live task");
-    }
-}
-
-fn replace_waiting(domain: &mut Domain, limits: &Limits, task: u64, entries: &[Entry]) {
-    if task == 0 || domain.phase == Phase::Failed {
-        return;
-    }
-    replace_needs(domain, limits, task, entries);
-    let mut replies = List::with_capacity(limits.inbox_recipients);
-    for &entry in entries {
-        match entry.kind {
-            EntryKind::Reply { .. } | EntryKind::ChatReply { .. } if entry.task == task && entry.project != 0 => {
-                replies.push(entry).expect("bounded reply projection");
-            }
-            EntryKind::Reply { .. }
-            | EntryKind::ChatReply { .. }
-            | EntryKind::Proposal { .. }
-            | EntryKind::Escalation { .. }
-            | EntryKind::Question { .. }
-            | EntryKind::PersonTask => {}
-        }
-    }
-    drop(domain.replies.remove(&task));
-    if !replies.is_empty() {
-        assert!(domain.replies.insert(task, replies.into_boxed()).is_ok(), "one reply projection per task");
-    }
-    let mut recipients = List::with_capacity(domain.waiting.capacity());
-    for (whom, _) in &domain.waiting {
-        recipients.push(*whom).expect("one key per cached recipient");
-    }
-    for &whom in &recipients {
-        let Some(old) = domain.waiting.remove(&whom) else { continue };
-        let mut kept = List::with_capacity(limits.inbox_entries);
-        for entry in old {
-            if entry.task != task {
-                kept.push(entry).expect("cached subset fits");
-            }
-        }
-        if !kept.is_empty() {
-            let saved = domain.waiting.insert(whom, kept.into_boxed());
-            assert!(saved.is_ok(), "removed recipient slot remains available");
-        }
-    }
-    for &entry in entries {
-        if entry.task != task || entry.project == 0 {
-            continue;
-        }
-        // A role with no holder has no party inbox to cache. The number of distinct held
-        // roles is bounded by holdings, even when a policy defines more roles.
-        match entry.whom {
-            Whom::Role { project, role } => {
-                if !held_role(domain, project, role) {
-                    continue;
-                }
-            }
-            Whom::Person(_) => {}
-        }
-        let old = domain.waiting.remove(&entry.whom);
-        let mut cached = List::with_capacity(limits.inbox_entries);
-        if let Some(old) = old {
-            for prior in old {
-                cached.push(prior).expect("cached recipient bound");
-            }
-        }
-        insert_newest(&mut cached, entry);
-        if !cached.is_empty() {
-            drop(domain.waiting.insert(entry.whom, cached.into_boxed()));
-        }
-    }
-}
-
-fn prune_unheld_roles(domain: &mut Domain, project: u32) {
-    let mut stale = List::with_capacity(domain.waiting.capacity());
-    for (whom, _) in &domain.waiting {
-        match *whom {
-            Whom::Role { project: entry_project, role } => {
-                if entry_project == project && !held_role(domain, project, role) {
-                    stale.push(*whom).expect("one cached role per waiting key");
-                }
-            }
-            Whom::Person(_) => {}
-        }
-    }
-    for whom in &stale {
-        domain.waiting.remove(whom);
-    }
-}
-
-fn held_role(domain: &Domain, project: u32, role: u32) -> bool {
-    let Some(holdings) = domain.roles.get(&project) else {
-        return false;
-    };
-    for holding in holdings {
-        if holding.role.number() == role {
-            return true;
-        }
-    }
-    false
 }
 
 /// One expiration per fire; other expirations stay due for later iterations. Expire at most one due

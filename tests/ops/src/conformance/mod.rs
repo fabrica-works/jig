@@ -269,18 +269,24 @@ impl Application for Ops {
             }
             root::Output::Load { step, range } => {
                 let position = match step {
-                    core::RestartStep::LoadCore => 0,
+                    core::RestartStep::LoadCore | core::RestartStep::LoadInbox => 0,
                     core::RestartStep::RestoreConnector { connector } => u32::from(connector),
                     core::RestartStep::AdoptRuns
                     | core::RestartStep::ReadAfresh { .. }
                     | core::RestartStep::SettleOutbox { .. }
                     | core::RestartStep::Open => panic!("only row loads go to the store"),
                 };
-                peers.observed.push(r::Observed::RestartStage { position });
+                if step != core::RestartStep::LoadInbox {
+                    peers.observed.push(r::Observed::RestartStage { position });
+                }
                 let mut rows: Vec<_> = store
                     .rows
                     .values()
                     .filter(|row| match (range, row) {
+                        (root::Range::Inbox, root::Record::Core(_)) => match row.key() {
+                            root::Key::Core(key) => core::inbox_restore_key(&key),
+                            root::Key::Observability(_) | root::Key::Infrastructure(_) => false,
+                        },
                         (
                             root::Range::Core,
                             root::Record::Core(core::Record::Tasks(
@@ -293,7 +299,13 @@ impl Application for Ops {
                         (root::Range::Core, root::Record::Core(_))
                         | (root::Range::Observability, root::Record::Observability(_))
                         | (root::Range::Infrastructure, root::Record::Infrastructure(_)) => true,
-                        (root::Range::Core | root::Range::Observability | root::Range::Infrastructure, _) => false,
+                        (
+                            root::Range::Core
+                            | root::Range::Inbox
+                            | root::Range::Observability
+                            | root::Range::Infrastructure,
+                            _,
+                        ) => false,
                     })
                     .cloned()
                     .collect();

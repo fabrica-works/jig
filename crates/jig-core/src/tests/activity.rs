@@ -155,9 +155,9 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         .collect();
     assert_eq!(lines.iter().map(|row| row.position).collect::<Vec<_>>(), (first + 1..=first + 6).collect::<Vec<_>>());
     assert_eq!(lines[0].line, tasks::Line::RunBegan { attempt: 7, why: tasks::Why::Made, resumed: false });
-    assert_eq!(lines[1].line, tasks::Line::Turn { attempt: 7, turn: 1, read: None });
+    assert_eq!(lines[1].line, tasks::Line::Turn { reply: 1, attempt: 7, turn: 1, read: None });
     assert_eq!(lines[2].line, tasks::Line::Words { message: 1, by: word.from, kind: word.kind, words: word.words });
-    assert_eq!(lines[3].line, tasks::Line::Turn { attempt: 7, turn: 2, read: Some(1) });
+    assert_eq!(lines[3].line, tasks::Line::Turn { reply: 2, attempt: 7, turn: 2, read: Some(1) });
     assert_eq!(lines[4].line, tasks::Line::Heard(result));
     assert_eq!(lines[5].line, tasks::Line::RunEnded { attempt: 7, end: tasks::EndKind::Parked, spent: 6 });
     for turn in [1, 2] {
