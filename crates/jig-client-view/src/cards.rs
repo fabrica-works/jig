@@ -9,7 +9,7 @@ use crate::{
 use jig_client::{
     Domain,
     action::Act,
-    contract::ObjectKey,
+    contract::{Chip, ObjectKey},
     objects::{Card, Left, Object},
 };
 use skein_lib::{Id, List};
@@ -17,8 +17,8 @@ use skein_lib::{Id, List};
 /// The context line chosen by the page that shows this same object.
 #[derive(Debug)]
 pub enum Place {
-    /// The inbox adds project and lineage numbers.
-    Inbox { lineage: List<u64> },
+    /// The inbox adds project and lineage chips.
+    Inbox { lineage: List<Chip> },
     /// The conversation already supplies its context.
     Conversation,
     /// The task page already supplies its context.
@@ -61,7 +61,7 @@ pub fn open(
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(project))]);
             }
             for task in lineage {
-                words.text(b, JigPhrase::ContextTask, &[Hole::Number(*task)]);
+                chip::chip(b, client, task, words, bindings);
             }
         }
         Place::Elsewhere => {
@@ -114,5 +114,86 @@ pub fn state(b: &mut Builder, card: &Card, object: Id<Object>, words: &Words, bi
 /// Close the card region and its keyed item after building its content.
 pub fn close(b: &mut Builder) {
     b.close();
+    b.close();
+}
+
+pub mod chip;
+pub mod common;
+pub mod hold;
+pub mod person;
+pub mod proposal;
+pub mod question;
+pub mod result;
+
+/// Build one object's card wherever it is named; the place changes its context only.
+pub fn card(
+    b: &mut Builder,
+    client: &Domain,
+    object: Id<Object>,
+    place: &Place,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let Some(facts) = client.objects().get(object) else {
+        return;
+    };
+    if facts.reply.is_some() {
+        result::reply(b, client, object, place, words, bindings);
+        return;
+    }
+    match &facts.body {
+        Some(jig_client::objects::Body::Proposal(_)) => proposal::proposal(b, client, object, place, words, bindings),
+        Some(jig_client::objects::Body::Question(_)) => question::question(b, client, object, place, words, bindings),
+        Some(jig_client::objects::Body::PersonTask(_)) => {
+            person::person_task(b, client, object, place, words, bindings);
+        }
+        Some(jig_client::objects::Body::Result(_)) => result::result(b, client, object, place, words, bindings),
+        Some(jig_client::objects::Body::Chip(chip)) => {
+            let title =
+                words.say(JigPhrase::ChipNumber, &[Hole::Number(chip.task), crate::words::name(chip.title.bytes())]);
+            if open(b, client, object, place, &title, words, bindings) {
+                chip::chip(b, client, chip, words, bindings);
+                close(b);
+            }
+        }
+        Some(jig_client::objects::Body::Task(task)) => {
+            let title = words.say(
+                JigPhrase::ChipNumber,
+                &[Hole::Number(task.chip.task), crate::words::name(task.chip.title.bytes())],
+            );
+            if open(b, client, object, place, &title, words, bindings) {
+                chip::chip(b, client, &task.chip, words, bindings);
+                common::acts(b, &facts.card, &task.acts, object, words, bindings);
+                close(b);
+            }
+        }
+        Some(jig_client::objects::Body::Escalation(document)) => {
+            let title = words.say(JigPhrase::Escalation, &[]);
+            if open(b, client, object, place, &title, words, bindings) {
+                chip::chip(b, client, &document.task, words, bindings);
+                close(b);
+            }
+        }
+        Some(jig_client::objects::Body::Note { document, .. }) => {
+            if open(b, client, object, place, document.description.bytes(), words, bindings) {
+                crate::markdown::read(document.body.bytes(), 2, b);
+                common::acts(b, &facts.card, &document.acts, object, words, bindings);
+                close(b);
+            }
+        }
+        None => {
+            let title = words.say(JigPhrase::Object, &[]);
+            if open(b, client, object, place, &title, words, bindings) {
+                words.status(b, JigPhrase::LoadingObject, &[]);
+                close(b);
+            }
+        }
+    }
+}
+/// A refusal without a current object remains a named card of its whole facts.
+pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: &Words) {
+    b.open(Role::Region);
+    b.name(&words.say(JigPhrase::Refused, &[]));
+    words.refusal(b, refusal);
     b.close();
 }

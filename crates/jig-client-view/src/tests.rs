@@ -6,3 +6,4 @@ mod slots;
 mod tree;
 
 mod cards;
+mod cards_objects;

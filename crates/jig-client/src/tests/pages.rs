@@ -185,7 +185,13 @@ fn inbox_delivery(domain: &mut Domain, page: skein_lib::Token, entries: List<Inb
 }
 fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
     ConversationLine {
-        chip: Chip { task, title: text(b"held checkout"), executor: Executor::Agent { charter: 1 }, phase },
+        chip: Chip {
+            task,
+            title: text(b"held checkout"),
+            executor: Executor::Agent { charter: 1 },
+            phase,
+            details: Box::new(super::objects::phase_details(phase)),
+        },
         project: 1,
         first_words: text(b"help checkout"),
         unread: Count { value: 1, limited: false },
@@ -447,6 +453,7 @@ fn task_sections_and_activity_sources_follow_the_executor() {
 fn tree_node(number: u64, phase: Phase, held: u32) -> TreeNode {
     let mut chip = super::objects::chip(number);
     chip.phase = phase;
+    *chip.details = super::objects::phase_details(phase);
     TreeNode {
         chip,
         parent: Some(8),
@@ -676,6 +683,7 @@ fn project_read(requests: &[Request]) -> skein_lib::Token {
 fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine {
     let mut chip = super::objects::chip(number);
     chip.phase = phase;
+    *chip.details = super::objects::phase_details(phase);
     GoalLine {
         chip,
         priority,

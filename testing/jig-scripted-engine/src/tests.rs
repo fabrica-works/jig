@@ -121,10 +121,60 @@ fn keyed_contract_durability_sign_ins_conflict_and_decided_first() {
     assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), final_answer(&up[0]));
     assert_eq!(engine.commits().len(), 2);
 }
+fn nested_chip_payload_bounds(chip: &Chip) {
+    for details in [
+        ChipPhase::Running {
+            attempt: 1,
+            since: Wall::EPOCH,
+            tool: Some(Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap()),
+        },
+        ChipPhase::Idle {
+            wake: WakePolicy {
+                words: true,
+                results: true,
+                topics: List::with_capacity(33),
+                subscriptions: list(vec![]),
+            },
+        },
+    ] {
+        let mut invalid_setup = script();
+        let mut invalid_chip = chip.clone();
+        *invalid_chip.details = details;
+        invalid_setup.truth.object_projects.insert(ObjectKey::Question { task: 8, message: 1 }, 1);
+        invalid_setup.truth.objects.insert(
+            ObjectKey::Question { task: 8, message: 1 },
+            ReadValue::Question(Box::new(Question {
+                task: invalid_chip,
+                message: 1,
+                words: text(b"question"),
+                since: Wall::EPOCH,
+                acts: list(vec![]),
+                ending: None,
+            })),
+        );
+        assert_eq!(
+            Engine::new(invalid_setup, 1).err(),
+            Some(Invalid::Payload),
+            "nested chip phase facts are admitted whole"
+        );
+    }
+}
+
 #[test]
 fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     let mut setup = script();
-    let chip = Chip { task: 8, title: text(b"held"), executor: Executor::Agent { charter: 1 }, phase: Phase::Held };
+    let chip = Chip {
+        task: 8,
+        title: text(b"held"),
+        executor: Executor::Agent { charter: 1 },
+        phase: Phase::Held,
+        details: Box::new(ChipPhase::Held {
+            reason: HoldReason::Budget { spent: 100, limit: 100 },
+            since: Wall::EPOCH,
+            revision: Revision { value: 2 },
+        }),
+    };
+    nested_chip_payload_bounds(&chip);
     let escalation = Escalation {
         ending: None,
         task: chip,
@@ -189,7 +239,13 @@ fn counts() -> PhaseCounts {
 }
 fn task() -> Task {
     Task {
-        chip: Chip { task: 8, title: text(b"chat"), executor: Executor::Agent { charter: 1 }, phase: Phase::Running },
+        chip: Chip {
+            task: 8,
+            title: text(b"chat"),
+            executor: Executor::Agent { charter: 1 },
+            phase: Phase::Running,
+            details: Box::new(ChipPhase::Running { attempt: 1, since: Wall::EPOCH, tool: None }),
+        },
         goal: false,
         priority: None,
         lineage_chips: list(vec![]),

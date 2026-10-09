@@ -618,6 +618,7 @@ fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
         let mut chips = List::with_capacity(1);
         let mut chip = super::objects::chip(44);
         chip.phase = phase;
+        *chip.details = super::objects::phase_details(phase);
         chips.push(chip).unwrap();
         let requests = drive(
             &mut domain,

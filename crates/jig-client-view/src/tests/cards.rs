@@ -25,7 +25,7 @@ use jig_client::{
 };
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 
-const CLIENT: jig_client::Limits = jig_client::Limits {
+pub(super) const CLIENT: jig_client::Limits = jig_client::Limits {
     watches: 8,
     notices: 2,
     notice_life: Duration::from_secs(5),
@@ -53,7 +53,7 @@ const CLIENT: jig_client::Limits = jig_client::Limits {
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     heartbeat: Duration::from_secs(100),
 };
-fn limits() -> crate::Limits {
+pub(super) fn limits() -> crate::Limits {
     crate::Limits {
         nodes: 256,
         depth: 10,
@@ -67,13 +67,13 @@ fn limits() -> crate::Limits {
         markdown_depth: 3,
     }
 }
-fn words() -> Words {
+pub(super) fn words() -> Words {
     Words { book: english::english(CLIENT.text).unwrap(), language: 0, offset_minutes: 60 }
 }
-fn text(bytes: &[u8]) -> Text {
+pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), CLIENT.text).unwrap()
 }
-fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
+pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
     let mut q = Queue::with_capacity(jig_client::max_out(&CLIENT));
     jig_client::step(d, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT }, event, &mut q);
     let mut out = Vec::new();
@@ -82,7 +82,7 @@ fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
     }
     out
 }
-fn document() -> Frame {
+pub(super) fn document() -> Frame {
     let mut projects = List::with_capacity(2);
     projects
         .push(ProjectRole {
@@ -105,7 +105,7 @@ fn document() -> Frame {
         deployment_role: Some(1),
     }
 }
-fn start() -> (Domain, Token) {
+pub(super) fn start() -> (Domain, Token) {
     let mut d = Domain::new(&CLIENT, 1);
     let out = drive(
         &mut d,
@@ -127,7 +127,7 @@ fn start() -> (Domain, Token) {
 fn flat(tree: &Tree) -> Vec<u8> {
     tree.nodes().iter().flat_map(|n| n.text.as_slice().iter().flat_map(|r| r.text.iter().copied())).collect()
 }
-fn contains(tree: &Tree, text: &[u8]) -> bool {
+pub(super) fn contains(tree: &Tree, text: &[u8]) -> bool {
     flat(tree).windows(text.len()).any(|w| w == text)
 }
 
@@ -272,7 +272,15 @@ fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mu
     );
     let shared = d.objects().find(ObjectKey::Question { task: 7, message: 1 }).unwrap();
     let mut lineage = List::with_capacity(1);
-    lineage.push(6).unwrap();
+    lineage
+        .push(Chip {
+            task: 6,
+            title: text(b"Ancestor"),
+            executor: Executor::Party { party: 1 },
+            phase: Phase::Done,
+            details: Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH }),
+        })
+        .unwrap();
     for place in [
         crate::cards::Place::Inbox { lineage },
         crate::cards::Place::Conversation,

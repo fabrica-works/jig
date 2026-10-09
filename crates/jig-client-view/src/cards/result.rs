@@ -1,0 +1,126 @@
+//! Result contracts and unread replies (client/domain/objects.md, section 8).
+use crate::{
+    Builder, JigBindings, Role, Run,
+    phrases::{Hole, jig::JigPhrase},
+    words::{Words, name},
+};
+use jig_client::{
+    Domain,
+    action::Act,
+    contract::{Result as ResultDocument, ResultValue},
+    objects::{Object, result::facts as document},
+};
+use skein_lib::Id;
+/// Build a result's shared card and all its contract payloads.
+pub fn result(
+    b: &mut Builder,
+    client: &Domain,
+    object: Id<Object>,
+    place: &super::Place,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let Some(fact) = client.objects().get(object) else {
+        return;
+    };
+    let Some(document) = document(fact) else {
+        return;
+    };
+    let title = words.say(JigPhrase::Result, &[]);
+    if !super::open(b, client, object, place, &title, words, bindings) {
+        return;
+    }
+    facts(b, client, document, words, bindings);
+    super::common::answer(b, fact, words);
+    super::common::acts(b, &fact.card, &document.acts, object, words, bindings);
+    super::close(b);
+}
+/// Render passive input results side by side without duplicating their domain objects.
+pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::Region);
+    let title = words.say(JigPhrase::ChipNumber, &[Hole::Number(facts.task.task), name(facts.task.title.bytes())]);
+    b.name(&title);
+    super::chip::chip(b, client, &facts.task, words, bindings);
+    words.ending(b, &facts.ending);
+    words.wall(b, facts.at);
+    if let Some(value) = &facts.value {
+        value_nodes(b, client, value, words, bindings);
+    }
+    b.close();
+}
+/// The whole result vocabulary, including connector slots and follow-up chips.
+pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words: &Words, bindings: &mut JigBindings) {
+    match value {
+        ResultValue::Report(text) | ResultValue::Words(text) => crate::markdown::read(text.bytes(), 2, b),
+        ResultValue::Verdict { verdict, fields, tasks, proposal } => {
+            words.text(b, JigPhrase::Verdict, &[Hole::Number(u64::from(*verdict))]);
+            for field in fields {
+                crate::markdown::read(field.bytes(), 2, b);
+            }
+            for task in tasks {
+                super::chip::chip(b, client, task, words, bindings);
+            }
+            if let Some(key) = proposal
+                && let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Proposal(*key))
+            {
+                super::proposal::proposal(b, client, id, &super::Place::Conversation, words, bindings);
+            }
+        }
+        ResultValue::Connector { summary, part } => {
+            crate::markdown::read(summary.bytes(), 2, b);
+            super::common::part(b, part, words, bindings);
+        }
+        ResultValue::Choice { option, by, reason } => {
+            words.text(b, JigPhrase::ChoiceResult, &[Hole::Number(u64::from(*option)), name(by.name.bytes())]);
+            crate::markdown::read(reason.bytes(), 2, b);
+        }
+        ResultValue::Approval { state, approved, by } => {
+            let phrase = if *approved { JigPhrase::ApprovalYes } else { JigPhrase::ApprovalNo };
+            words.text(b, phrase, &[name(state.bytes()), name(by.name.bytes())]);
+        }
+    }
+}
+/// A reply opens the chat at its domain-kept first unread reply position.
+pub fn reply(
+    b: &mut Builder,
+    client: &Domain,
+    object: Id<Object>,
+    place: &super::Place,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let Some(fact) = client.objects().get(object) else {
+        return;
+    };
+    let Some(reply) = &fact.reply else {
+        return;
+    };
+    let title = words.say(JigPhrase::Reply, &[]);
+    if !super::open(b, client, object, place, &title, words, bindings) {
+        return;
+    }
+    match &fact.body {
+        Some(jig_client::objects::Body::Chip(chip)) => super::chip::chip(b, client, chip, words, bindings),
+        Some(jig_client::objects::Body::Task(task)) => super::chip::chip(b, client, &task.chip, words, bindings),
+        Some(
+            jig_client::objects::Body::Proposal(_)
+            | jig_client::objects::Body::Escalation(_)
+            | jig_client::objects::Body::Question(_)
+            | jig_client::objects::Body::PersonTask(_)
+            | jig_client::objects::Body::Result(_)
+            | jig_client::objects::Body::Note { .. },
+        )
+        | None => words.text(b, JigPhrase::ContextTask, &[Hole::Number(reply.chat)]),
+    }
+    b.text(Run::Plain, reply.first_words.bytes());
+    crate::frame::control(
+        b,
+        words,
+        bindings,
+        Role::Link,
+        JigPhrase::FirstUnread,
+        &[Hole::Number(reply.first_unread)],
+        Act::OpenChat { task: reply.chat },
+    );
+    super::close(b);
+}

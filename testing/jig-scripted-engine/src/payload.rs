@@ -4,7 +4,7 @@ use crate::Bounds;
 use core::mem::size_of;
 use jig_client::contract::{
     Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, Amendment, Answer, Ask, AttemptFailure,
-    Authority, Block, Budget, Call, Capacity, Charter, Chip, Closing, ConversationLine, ConversationPage,
+    Authority, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing, ConversationLine, ConversationPage,
     Conversations, Count, Cursor, Decider, Decision, Delivery, Deployment, Disposal, Ending, Escalation, Executor,
     FailureClass, Frame, GoalLine, GoalPage, Goals, Grant, HistoryChange, HistoryLine, HistoryPage, Hold, HoldReason,
     Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message,
@@ -318,7 +318,36 @@ fields!(Needs { questions, proposals, escalations, person_tasks });
 fields!(ProjectRole { project, name, roles, chats, goals, pool, chat_budget });
 fields!(Charter { number, name });
 fields!(Budget { total, own, ended, reserved, left, funder });
-fields!(Chip { task, title, executor, phase });
+fields!(Chip { task, title, executor, phase, details });
+impl Payload for ChipPhase {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Waiting { dependencies, hold } => sum(&[dependencies.heap(bounds), hold.heap(bounds)]),
+            Self::Idle { wake } => wake.heap(bounds),
+            Self::Starting => Some(0),
+            Self::Running { attempt, since, tool } => {
+                sum(&[attempt.heap(bounds), since.heap(bounds), tool.heap(bounds)])
+            }
+            Self::WaitingForWords { attempt, since } => sum(&[attempt.heap(bounds), since.heap(bounds)]),
+            Self::BackingOff { at, attempt, tries, class, reason } => sum(&[
+                at.heap(bounds),
+                attempt.heap(bounds),
+                tries.heap(bounds),
+                class.heap(bounds),
+                reason.heap(bounds),
+            ]),
+            Self::Procedure { panel } => panel.heap(bounds),
+            Self::Person { addressed, taken, since } => {
+                sum(&[addressed.heap(bounds), taken.heap(bounds), since.heap(bounds)])
+            }
+            Self::Closing(value) => value.heap(bounds),
+            Self::Held { reason, since, revision } => {
+                sum(&[reason.heap(bounds), since.heap(bounds), revision.heap(bounds)])
+            }
+            Self::Ended { how, at } => sum(&[how.heap(bounds), at.heap(bounds)]),
+        }
+    }
+}
 fields!(Task {
     chip,
     goal,

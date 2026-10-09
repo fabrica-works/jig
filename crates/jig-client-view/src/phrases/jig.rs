@@ -206,6 +206,212 @@ pub enum JigPhrase {
     ContextProject,
     /// Task (0).
     ContextTask,
+    /// Task (0): (1).
+    ChipNumber,
+    /// Waiting.
+    Waiting,
+    /// Waiting for news.
+    Idle,
+    /// Wakes on any news.
+    WakeAny,
+    /// Wakes at the next scheduled time.
+    WakeAt,
+    /// Wakes on a delegate result.
+    WakeResult,
+    /// Wakes on subscribed news.
+    WakeTopic,
+    /// Wakes on inbox messages.
+    WakeInbox,
+    /// Running.
+    Running,
+    /// Writing.
+    Writing,
+    /// Using tool (0).
+    Tool,
+    /// Attempt (0).
+    Attempt,
+    /// Retrying at (0): try (1) of (2).
+    RetryAt,
+    /// Waiting for your words.
+    WaitingWords,
+    /// Host lost.
+    HostLost,
+    /// Temporary failure.
+    Temporary,
+    /// Permanent failure.
+    Permanent,
+    /// Stalled.
+    Stall,
+    /// Reason: (0).
+    Reason,
+    /// Closing: (0) delegates and (1) effects settling.
+    Closing,
+    /// Held.
+    Held,
+    /// Ended.
+    Ended,
+    /// Waiting for party (0).
+    WaitingParty,
+    /// Waiting for task (0).
+    WaitingTask,
+    /// Waiting for project (0), role (1).
+    WaitingRole,
+    /// Since (0).
+    Since,
+    /// Funds (0); (1) left now, (2) after.
+    Funds,
+    /// From this pool.
+    Pool,
+    /// Why this is proposed.
+    ProposalWhy,
+    /// The accepted tasks will be yours.
+    OwnTasks,
+    /// Tasks acceptance would make.
+    Batch,
+    /// Proposed task (0).
+    BatchTask,
+    /// After proposed task (0).
+    AfterTask,
+    /// Budget (0).
+    Budget,
+    /// Before.
+    Before,
+    /// After.
+    After,
+    /// Delegation depth (0).
+    Depth,
+    /// Tasks allowed (0).
+    TasksAllowed,
+    /// Effect kind (0) on connector (1), resource (2).
+    Grant,
+    /// Tool (0) allowed.
+    ToolAllowed,
+    /// Passed by this holder.
+    PassedBy,
+    /// Widen authority.
+    Widen,
+    /// Amend task (0).
+    AmendTask,
+    /// Effect.
+    Effect,
+    /// Your answer.
+    AnswerField,
+    /// State to approve: (0).
+    ApprovalState,
+    /// Choose an option.
+    Options,
+    /// Cannot do it.
+    CannotDo,
+    /// Taken by (0).
+    TakenBy,
+    /// Becomes news for its requester after (0) min.
+    StallSpan,
+    /// Verdict (0).
+    Verdict,
+    /// Choice (0), by (1).
+    ChoiceResult,
+    /// Approved (0), by (1).
+    ApprovalYes,
+    /// Did not approve (0), by (1).
+    ApprovalNo,
+    /// Open at first reply not read: (0).
+    FirstUnread,
+    /// Reply.
+    Reply,
+    /// Loading connector content.
+    LoadingPart,
+    /// Loading object.
+    LoadingObject,
+    /// Write.
+    ActWrite,
+    /// Answer.
+    ActAnswer,
+    /// Take it.
+    ActTake,
+    /// Hand it back.
+    ActHandBack,
+    /// Accept.
+    ActAccept,
+    /// Reject.
+    ActReject,
+    /// Pass up.
+    ActPassUp,
+    /// Release.
+    ActRelease,
+    /// Leave it held.
+    ActLeaveHeld,
+    /// Amend.
+    ActAmend,
+    /// Amend and release.
+    ActAmendRelease,
+    /// Stop.
+    ActStop,
+    /// Cancel.
+    ActCancel,
+    /// Close.
+    ActClose,
+    /// Take over.
+    ActTakeOver,
+    /// Set goal.
+    ActSetGoal,
+    /// Prioritise.
+    ActPrioritise,
+    /// Mark read.
+    ActMarkSeen,
+    /// Edit note.
+    ActEditNote,
+    /// Delete note.
+    ActDeleteNote,
+    /// Adopt resource.
+    ActAdopt,
+    /// Change policy.
+    ActChangePolicy,
+    /// Set roles.
+    ActSetRoles,
+    /// Make service.
+    ActMakeService,
+    /// Set pool.
+    ActSetPool,
+    /// Chat about it.
+    ChatAbout,
+    /// Starting.
+    TaskStarting,
+    /// Subscribed topic (0).
+    Topic,
+    /// For (0) min.
+    ElapsedSpan,
+    /// Your reason.
+    ReasonField,
+    /// Loading phase details.
+    LoadingPhase,
+    /// Deadline (0).
+    Deadline,
+    /// Held: out of tries.
+    TriesExhausted,
+    /// Held: stalled on (0).
+    StalledOn,
+    /// Held: dependency (0) ended unsuccessfully.
+    DependencyEnded,
+    /// Held: the system changed.
+    DriftHold,
+    /// Held: the effect failed for good.
+    EffectFailedHold,
+    /// Held: the effect may or may not have been made; inspect the system before deciding.
+    EffectUncertainHold,
+    /// Held: spent (0), budget (1).
+    BudgetHold,
+    /// Held: past deadline (0).
+    DeadlineHold,
+    /// Held: stopped by (0) at (1).
+    StoppedHold,
+    /// Held: waiting for a resource past its bound.
+    ResourceHold,
+    /// Held: the pool lost its allocation.
+    PoolHold,
+    /// Held: the procedure needs a decision.
+    ProcedureHold,
+    /// Loading task (0) phase facts.
+    LoadingDependency,
 }
 impl JigPhrase {
     /// Stable phrase identity within jig's owner.
@@ -313,6 +519,109 @@ impl JigPhrase {
             Self::Note => 97,
             Self::ContextProject => 98,
             Self::ContextTask => 99,
+            Self::ChipNumber => 100,
+            Self::Waiting => 101,
+            Self::Idle => 102,
+            Self::WakeAny => 103,
+            Self::WakeAt => 104,
+            Self::WakeResult => 105,
+            Self::WakeTopic => 106,
+            Self::WakeInbox => 107,
+            Self::Running => 108,
+            Self::Writing => 109,
+            Self::Tool => 110,
+            Self::Attempt => 111,
+            Self::RetryAt => 112,
+            Self::WaitingWords => 113,
+            Self::HostLost => 114,
+            Self::Temporary => 115,
+            Self::Permanent => 116,
+            Self::Stall => 117,
+            Self::Reason => 118,
+            Self::Closing => 119,
+            Self::Held => 120,
+            Self::Ended => 121,
+            Self::WaitingParty => 122,
+            Self::WaitingTask => 123,
+            Self::WaitingRole => 124,
+            Self::Since => 125,
+            Self::Funds => 126,
+            Self::Pool => 127,
+            Self::ProposalWhy => 128,
+            Self::OwnTasks => 129,
+            Self::Batch => 130,
+            Self::BatchTask => 131,
+            Self::AfterTask => 132,
+            Self::Budget => 133,
+            Self::Before => 134,
+            Self::After => 135,
+            Self::Depth => 136,
+            Self::TasksAllowed => 137,
+            Self::Grant => 138,
+            Self::ToolAllowed => 139,
+            Self::PassedBy => 140,
+            Self::Widen => 141,
+            Self::AmendTask => 142,
+            Self::Effect => 143,
+            Self::AnswerField => 144,
+            Self::ApprovalState => 145,
+            Self::Options => 146,
+            Self::CannotDo => 147,
+            Self::TakenBy => 148,
+            Self::StallSpan => 149,
+            Self::Verdict => 150,
+            Self::ChoiceResult => 151,
+            Self::ApprovalYes => 152,
+            Self::ApprovalNo => 153,
+            Self::FirstUnread => 154,
+            Self::Reply => 155,
+            Self::LoadingPart => 156,
+            Self::LoadingObject => 157,
+            Self::ActWrite => 158,
+            Self::ActAnswer => 159,
+            Self::ActTake => 160,
+            Self::ActHandBack => 161,
+            Self::ActAccept => 162,
+            Self::ActReject => 163,
+            Self::ActPassUp => 164,
+            Self::ActRelease => 165,
+            Self::ActLeaveHeld => 166,
+            Self::ActAmend => 167,
+            Self::ActAmendRelease => 168,
+            Self::ActStop => 169,
+            Self::ActCancel => 170,
+            Self::ActClose => 171,
+            Self::ActTakeOver => 172,
+            Self::ActSetGoal => 173,
+            Self::ActPrioritise => 174,
+            Self::ActMarkSeen => 175,
+            Self::ActEditNote => 176,
+            Self::ActDeleteNote => 177,
+            Self::ActAdopt => 178,
+            Self::ActChangePolicy => 179,
+            Self::ActSetRoles => 180,
+            Self::ActMakeService => 181,
+            Self::ActSetPool => 182,
+            Self::ChatAbout => 183,
+            Self::TaskStarting => 184,
+            Self::Topic => 185,
+            Self::ElapsedSpan => 186,
+            Self::ReasonField => 187,
+            Self::LoadingPhase => 188,
+            Self::Deadline => 189,
+            Self::TriesExhausted => 190,
+            Self::StalledOn => 191,
+            Self::DependencyEnded => 192,
+            Self::DriftHold => 193,
+            Self::EffectFailedHold => 194,
+            Self::EffectUncertainHold => 195,
+            Self::BudgetHold => 196,
+            Self::DeadlineHold => 197,
+            Self::StoppedHold => 198,
+            Self::ResourceHold => 199,
+            Self::PoolHold => 200,
+            Self::ProcedureHold => 201,
+            Self::LoadingDependency => 202,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -379,7 +688,74 @@ impl JigPhrase {
             | Self::Question
             | Self::PersonTask
             | Self::Result
-            | Self::Note => Box::new([]),
+            | Self::Note
+            | Self::Waiting
+            | Self::Idle
+            | Self::WakeAny
+            | Self::WakeAt
+            | Self::WakeResult
+            | Self::WakeTopic
+            | Self::WakeInbox
+            | Self::Running
+            | Self::Writing
+            | Self::WaitingWords
+            | Self::HostLost
+            | Self::Temporary
+            | Self::Permanent
+            | Self::Stall
+            | Self::Held
+            | Self::Ended
+            | Self::Pool
+            | Self::ProposalWhy
+            | Self::OwnTasks
+            | Self::Batch
+            | Self::Before
+            | Self::After
+            | Self::PassedBy
+            | Self::Widen
+            | Self::Effect
+            | Self::AnswerField
+            | Self::Options
+            | Self::CannotDo
+            | Self::Reply
+            | Self::LoadingPart
+            | Self::LoadingObject
+            | Self::ActWrite
+            | Self::ActAnswer
+            | Self::ActTake
+            | Self::ActHandBack
+            | Self::ActAccept
+            | Self::ActReject
+            | Self::ActPassUp
+            | Self::ActRelease
+            | Self::ActLeaveHeld
+            | Self::ActAmend
+            | Self::ActAmendRelease
+            | Self::ActStop
+            | Self::ActCancel
+            | Self::ActClose
+            | Self::ActTakeOver
+            | Self::ActSetGoal
+            | Self::ActPrioritise
+            | Self::ActMarkSeen
+            | Self::ActEditNote
+            | Self::ActDeleteNote
+            | Self::ActAdopt
+            | Self::ActChangePolicy
+            | Self::ActSetRoles
+            | Self::ActMakeService
+            | Self::ActSetPool
+            | Self::ChatAbout
+            | Self::TaskStarting
+            | Self::ReasonField
+            | Self::LoadingPhase
+            | Self::TriesExhausted
+            | Self::DriftHold
+            | Self::EffectFailedHold
+            | Self::EffectUncertainHold
+            | Self::ResourceHold
+            | Self::PoolHold
+            | Self::ProcedureHold => Box::new([]),
             Self::ByNamed
             | Self::SignedIn
             | Self::Project
@@ -388,7 +764,12 @@ impl JigPhrase {
             | Self::Withdrawn
             | Self::Rejected
             | Self::LeftHeld
-            | Self::DecidedFirst => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
+            | Self::DecidedFirst
+            | Self::Tool
+            | Self::Reason
+            | Self::ApprovalState
+            | Self::TakenBy
+            | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
             Self::Needs
             | Self::MoreNeeds
             | Self::Updates
@@ -406,23 +787,41 @@ impl JigPhrase {
             | Self::LimitConversation
             | Self::Revision
             | Self::ContextProject
-            | Self::ContextTask => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            | Self::ContextTask
+            | Self::Attempt
+            | Self::WaitingParty
+            | Self::WaitingTask
+            | Self::BatchTask
+            | Self::AfterTask
+            | Self::Depth
+            | Self::TasksAllowed
+            | Self::ToolAllowed
+            | Self::AmendTask
+            | Self::Verdict
+            | Self::FirstUnread
+            | Self::Topic
+            | Self::DependencyEnded
+            | Self::LoadingDependency => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::Proposed
             | Self::MadeWords
             | Self::RoleMissing
             | Self::DepthMissing
             | Self::TasksMissing
             | Self::LimitLive
-            | Self::LimitInbox => Box::new([
+            | Self::LimitInbox
+            | Self::Closing
+            | Self::WaitingRole => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::At => Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }]),
-            Self::BudgetMissing => Box::new([
+            Self::At | Self::Since | Self::Deadline | Self::DeadlineHold => {
+                Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }])
+            }
+            Self::BudgetMissing | Self::BudgetHold => Box::new([
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
             ]),
-            Self::GrantMissing => Box::new([
+            Self::GrantMissing | Self::Grant => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Name, bytes: text },
@@ -430,14 +829,38 @@ impl JigPhrase {
             Self::DeadlineMissing => {
                 Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }, HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
-            Self::Amount => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
-            Self::WaitingSpan | Self::Span => Box::new([HoleShape { kind: HoleKind::Span, bytes: 0 }]),
+            Self::Amount | Self::Budget => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
+            Self::WaitingSpan | Self::Span | Self::StallSpan | Self::ElapsedSpan => {
+                Box::new([HoleShape { kind: HoleKind::Span, bytes: 0 }])
+            }
+            Self::ChipNumber | Self::ChoiceResult => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Name, bytes: text },
+            ]),
+            Self::RetryAt => Box::new([
+                HoleShape { kind: HoleKind::Wall, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
+            Self::Funds => Box::new([
+                HoleShape { kind: HoleKind::Amount, bytes: 0 },
+                HoleShape { kind: HoleKind::Amount, bytes: 0 },
+                HoleShape { kind: HoleKind::Amount, bytes: 0 },
+            ]),
+            Self::ApprovalYes | Self::ApprovalNo => Box::new([
+                HoleShape { kind: HoleKind::Name, bytes: text },
+                HoleShape { kind: HoleKind::Name, bytes: text },
+            ]),
+            Self::StoppedHold => Box::new([
+                HoleShape { kind: HoleKind::Name, bytes: text },
+                HoleShape { kind: HoleKind::Wall, bytes: 0 },
+            ]),
         };
         PhraseShape { id: self.id(), holes, plural: None }
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 100] = [
+pub const ALL: [JigPhrase; 203] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -538,11 +961,114 @@ pub const ALL: [JigPhrase; 100] = [
     JigPhrase::Note,
     JigPhrase::ContextProject,
     JigPhrase::ContextTask,
+    JigPhrase::ChipNumber,
+    JigPhrase::Waiting,
+    JigPhrase::Idle,
+    JigPhrase::WakeAny,
+    JigPhrase::WakeAt,
+    JigPhrase::WakeResult,
+    JigPhrase::WakeTopic,
+    JigPhrase::WakeInbox,
+    JigPhrase::Running,
+    JigPhrase::Writing,
+    JigPhrase::Tool,
+    JigPhrase::Attempt,
+    JigPhrase::RetryAt,
+    JigPhrase::WaitingWords,
+    JigPhrase::HostLost,
+    JigPhrase::Temporary,
+    JigPhrase::Permanent,
+    JigPhrase::Stall,
+    JigPhrase::Reason,
+    JigPhrase::Closing,
+    JigPhrase::Held,
+    JigPhrase::Ended,
+    JigPhrase::WaitingParty,
+    JigPhrase::WaitingTask,
+    JigPhrase::WaitingRole,
+    JigPhrase::Since,
+    JigPhrase::Funds,
+    JigPhrase::Pool,
+    JigPhrase::ProposalWhy,
+    JigPhrase::OwnTasks,
+    JigPhrase::Batch,
+    JigPhrase::BatchTask,
+    JigPhrase::AfterTask,
+    JigPhrase::Budget,
+    JigPhrase::Before,
+    JigPhrase::After,
+    JigPhrase::Depth,
+    JigPhrase::TasksAllowed,
+    JigPhrase::Grant,
+    JigPhrase::ToolAllowed,
+    JigPhrase::PassedBy,
+    JigPhrase::Widen,
+    JigPhrase::AmendTask,
+    JigPhrase::Effect,
+    JigPhrase::AnswerField,
+    JigPhrase::ApprovalState,
+    JigPhrase::Options,
+    JigPhrase::CannotDo,
+    JigPhrase::TakenBy,
+    JigPhrase::StallSpan,
+    JigPhrase::Verdict,
+    JigPhrase::ChoiceResult,
+    JigPhrase::ApprovalYes,
+    JigPhrase::ApprovalNo,
+    JigPhrase::FirstUnread,
+    JigPhrase::Reply,
+    JigPhrase::LoadingPart,
+    JigPhrase::LoadingObject,
+    JigPhrase::ActWrite,
+    JigPhrase::ActAnswer,
+    JigPhrase::ActTake,
+    JigPhrase::ActHandBack,
+    JigPhrase::ActAccept,
+    JigPhrase::ActReject,
+    JigPhrase::ActPassUp,
+    JigPhrase::ActRelease,
+    JigPhrase::ActLeaveHeld,
+    JigPhrase::ActAmend,
+    JigPhrase::ActAmendRelease,
+    JigPhrase::ActStop,
+    JigPhrase::ActCancel,
+    JigPhrase::ActClose,
+    JigPhrase::ActTakeOver,
+    JigPhrase::ActSetGoal,
+    JigPhrase::ActPrioritise,
+    JigPhrase::ActMarkSeen,
+    JigPhrase::ActEditNote,
+    JigPhrase::ActDeleteNote,
+    JigPhrase::ActAdopt,
+    JigPhrase::ActChangePolicy,
+    JigPhrase::ActSetRoles,
+    JigPhrase::ActMakeService,
+    JigPhrase::ActSetPool,
+    JigPhrase::ChatAbout,
+    JigPhrase::TaskStarting,
+    JigPhrase::Topic,
+    JigPhrase::ElapsedSpan,
+    JigPhrase::ReasonField,
+    JigPhrase::LoadingPhase,
+    JigPhrase::Deadline,
+    JigPhrase::TriesExhausted,
+    JigPhrase::StalledOn,
+    JigPhrase::DependencyEnded,
+    JigPhrase::DriftHold,
+    JigPhrase::EffectFailedHold,
+    JigPhrase::EffectUncertainHold,
+    JigPhrase::BudgetHold,
+    JigPhrase::DeadlineHold,
+    JigPhrase::StoppedHold,
+    JigPhrase::ResourceHold,
+    JigPhrase::PoolHold,
+    JigPhrase::ProcedureHold,
+    JigPhrase::LoadingDependency,
 ];
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(100);
+    let mut rows = List::with_capacity(203);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

@@ -67,6 +67,26 @@ pub struct Chip {
     pub title: Text,
     pub executor: Executor,
     pub phase: Phase,
+    /// Whole live phase facts; compact `phase` remains the document's filter value.
+    pub details: Box<ChipPhase>,
+}
+
+/// Phase facts at every chip, without nesting chips or task documents.
+/// Dependency numbers name other live chips in the bounded working set.
+/// See client/domain/objects.md, 3, and contract.md, 5.1.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ChipPhase {
+    Waiting { dependencies: List<u64>, hold: Option<Part> },
+    Idle { wake: WakePolicy },
+    Starting,
+    Running { attempt: u32, since: Wall, tool: Option<Text> },
+    WaitingForWords { attempt: u32, since: Wall },
+    BackingOff { at: Wall, attempt: u32, tries: u32, class: FailureClass, reason: Text },
+    Procedure { panel: Part },
+    Person { addressed: Recipient, taken: Option<Party>, since: Wall },
+    Closing(Closing),
+    Held { reason: HoldReason, since: Wall, revision: Revision },
+    Ended { how: Ending, at: Wall },
 }
 
 /// A complete task document with independently moving revisions.

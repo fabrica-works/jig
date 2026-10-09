@@ -24,7 +24,13 @@ fn edges() -> Edges {
     Edges { before: Edge::More(Cursor { value: text(b"before") }), after: Edge::More(Cursor { value: text(b"after") }) }
 }
 fn chip(task: u64) -> Chip {
-    Chip { task, title: text(b"title"), executor: Executor::Party { party: 7 }, phase: Phase::Idle }
+    Chip {
+        task,
+        title: text(b"title"),
+        executor: Executor::Party { party: 7 },
+        phase: Phase::Idle,
+        details: Box::new(super::objects::phase_details(Phase::Idle)),
+    }
 }
 fn conversation(task: u64) -> ConversationLine {
     ConversationLine {

@@ -57,6 +57,8 @@ pub enum JigMeaning {
     Field(jig_client::fields::Purpose),
     /// Digits are kept in the view and submitting goes to that task.
     TaskNumber,
+    /// A connector-owned part referred to by a slot, never an actionable node.
+    Part(jig_client::contract::Part),
 }
 #[derive(Debug)]
 struct Entry {
@@ -90,6 +92,19 @@ impl JigBindings {
         self.entries.push(Entry { token, meaning }).expect("bindings fit their derived capacity");
         Binding { owner: Owner::Jig, token }
     }
+    /// Resolve a part slot's token for its connector's view root.
+    #[must_use]
+    pub fn part(&self, token: Token) -> Option<&jig_client::contract::Part> {
+        for entry in &self.entries {
+            if entry.token == token {
+                match &entry.meaning {
+                    JigMeaning::Part(part) => return Some(part),
+                    JigMeaning::Action(_) | JigMeaning::Field(_) | JigMeaning::TaskNumber => return None,
+                }
+            }
+        }
+        None
+    }
     /// A link's typed address for the platform's address translation.
     #[must_use]
     pub fn address(&self, token: Token) -> Option<jig_client::address::Address> {
@@ -98,6 +113,12 @@ impl JigBindings {
                 match &entry.meaning {
                     JigMeaning::Action(action) => match action {
                         jig_client::action::Act::Go { address } => return Some(*address),
+                        jig_client::action::Act::OpenChat { task } => {
+                            return Some(jig_client::address::Address::Task {
+                                task: *task,
+                                section: jig_client::address::TaskSection::Activity,
+                            });
+                        }
                         jig_client::action::Act::Edit { .. }
                         | jig_client::action::Act::Submit { .. }
                         | jig_client::action::Act::Intend { .. }
@@ -119,7 +140,6 @@ impl JigBindings {
                         | jig_client::action::Act::FilterInbox { .. }
                         | jig_client::action::Act::OpenUpdates
                         | jig_client::action::Act::StartChat { .. }
-                        | jig_client::action::Act::OpenChat { .. }
                         | jig_client::action::Act::GoalForm { .. }
                         | jig_client::action::Act::FilterTasks { .. }
                         | jig_client::action::Act::FilterNotes { .. }
@@ -128,7 +148,7 @@ impl JigBindings {
                         | jig_client::action::Act::OpenEnded { .. }
                         | jig_client::action::Act::SignIn { .. } => return None,
                     },
-                    JigMeaning::Field(_) | JigMeaning::TaskNumber => return None,
+                    JigMeaning::Field(_) | JigMeaning::TaskNumber | JigMeaning::Part(_) => return None,
                 }
             }
         }
@@ -142,6 +162,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
     for entry in &view.entries {
         if entry.token == token {
             return match &entry.meaning {
+                JigMeaning::Part(_) => None,
                 JigMeaning::Action(action) => match act {
                     Act::Press | Act::Submit | Act::Toggle => Some(action.clone()),
                     Act::Input { .. } => None,

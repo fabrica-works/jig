@@ -10,7 +10,48 @@ pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(Box::from(bytes), 32).unwrap()
 }
 pub(super) fn chip(task: u64) -> Chip {
-    Chip { task, title: text(b"title"), executor: Executor::Party { party: 7 }, phase: Phase::Held }
+    Chip {
+        task,
+        title: text(b"title"),
+        executor: Executor::Party { party: 7 },
+        phase: Phase::Held,
+        details: Box::new(phase_details(Phase::Held)),
+    }
+}
+pub(super) fn phase_details(phase: Phase) -> ChipPhase {
+    match phase {
+        Phase::Waiting => ChipPhase::Waiting { dependencies: List::with_capacity(0), hold: None },
+        Phase::Idle => ChipPhase::Idle {
+            wake: WakePolicy {
+                words: true,
+                results: true,
+                topics: List::with_capacity(0),
+                subscriptions: List::with_capacity(0),
+            },
+        },
+        Phase::Due | Phase::Preparing | Phase::Claimed => ChipPhase::Starting,
+        Phase::Running => ChipPhase::Running { attempt: 1, since: Wall::EPOCH, tool: None },
+        Phase::BackingOff => ChipPhase::BackingOff {
+            at: Wall::EPOCH,
+            attempt: 1,
+            tries: 3,
+            class: FailureClass::Temporary,
+            reason: text(b"temporary"),
+        },
+        Phase::Active => ChipPhase::Person { addressed: Recipient::Party(7), taken: None, since: Wall::EPOCH },
+        Phase::Closing => ChipPhase::Closing(Closing { delegates: 0, effects: 0 }),
+        Phase::Held => ChipPhase::Held {
+            reason: HoldReason::Stopped { by: frame(7).party, at: Wall::EPOCH },
+            since: Wall::EPOCH,
+            revision: Revision { value: 3 },
+        },
+        Phase::Done => ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH },
+        Phase::Failed => ChipPhase::Ended { how: Ending::Failed { reason: text(b"failure") }, at: Wall::EPOCH },
+        Phase::Cancelled => ChipPhase::Ended {
+            how: Ending::Cancelled { by: Actor::Party(7), reason: text(b"cancelled") },
+            at: Wall::EPOCH,
+        },
+    }
 }
 pub(super) fn authority() -> Authority {
     Authority {

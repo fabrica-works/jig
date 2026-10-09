@@ -87,6 +87,12 @@ impl Words {
         self.text(b, JigPhrase::At, &[Hole::Wall(self.adjusted_wall(at))]);
         b.close();
     }
+    /// Name the deadline as such, in the person's time presentation.
+    pub fn deadline(&self, b: &mut Builder, at: Wall) {
+        b.open(Role::Time);
+        self.text(b, JigPhrase::Deadline, &[Hole::Wall(self.adjusted_wall(at))]);
+        b.close();
+    }
     /// A wall instant shifted to the person's UTC offset for a phrase hole.
     #[must_use]
     pub fn adjusted_wall(&self, at: Wall) -> Wall {
