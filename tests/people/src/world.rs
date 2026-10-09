@@ -99,6 +99,8 @@ struct Commit {
     cleared_waiting: Vec<u64>,
     sayings: Vec<(u64, u64, Box<[u8]>, bool)>,
     resolved: Vec<(u64, bool)>,
+    amendments: Vec<(u64, u64, bool)>,
+    pending_amendments: Vec<((u64, u64), Option<u64>)>,
 }
 
 #[derive(Debug)]
@@ -128,6 +130,7 @@ pub struct World {
     pub sayings: BTreeMap<u64, (u64, Box<[u8]>, bool)>,
     pub executor_outcomes: Vec<(u64, bool)>,
     specs: BTreeMap<u64, u64>,
+    pending_amendments: BTreeMap<(u64, u64), Option<u64>>,
     commits: VecDeque<Commit>,
     held: VecDeque<Held>,
     calls: BTreeSet<u64>,
@@ -175,6 +178,7 @@ impl World {
             sayings: BTreeMap::new(),
             executor_outcomes: Vec::new(),
             specs: BTreeMap::new(),
+            pending_amendments: BTreeMap::new(),
             commits: VecDeque::new(),
             held: VecDeque::new(),
             calls: BTreeSet::new(),
@@ -217,6 +221,16 @@ impl World {
     /// Present the scripted owner's current spec snapshot.
     pub fn amended_task(&mut self, task: u64, revision: u64) {
         self.specs.insert(task, revision);
+    }
+
+    #[must_use]
+    pub fn spec_revision(&self, task: u64) -> Option<u64> {
+        self.specs.get(&task).copied()
+    }
+
+    #[must_use]
+    pub fn held(&self, task: u64) -> bool {
+        self.holds.contains_key(&task)
     }
 
     #[must_use]
@@ -372,6 +386,8 @@ impl World {
         let mut cleared_waiting = Vec::new();
         let mut sayings = Vec::new();
         let mut resolved = Vec::new();
+        let mut amendments = Vec::new();
+        let mut pending_amendments = Vec::new();
         if !self.settings.authority_refuses {
             tasks.extend(task);
         }
@@ -477,6 +493,15 @@ impl World {
                                     };
                                     let winner = Winner { by: person, choice, at: self.env.wall };
                                     proposals.push((name, winner));
+                                    if choice == ProposalChoice::Accepted
+                                        && let Some(release) = self.pending_amendments.get(&name)
+                                    {
+                                        let released = self
+                                            .holds
+                                            .get(&proposer)
+                                            .is_some_and(|(revision, _)| Some(*revision) == *release);
+                                        amendments.push((proposer, self.specs[&proposer] + 1, released));
+                                    }
                                     winner
                                 };
                                 let outcome = Outcome::ProposalDecided { proposer, proposal, by, at, choice };
@@ -524,12 +549,37 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Amend { task, revision, .. } => {
-                                let outcome = match self.specs.get(&task) {
-                                    Some(&now) if revision != now => {
+                            Ask::Amend { task, revision, amendment, release, .. } => {
+                                let outcome = match self.specs.get(&task).copied() {
+                                    Some(now) if revision != now => {
                                         Outcome::Refused(Refusal::Moved { now: people::Moved::Spec { revision: now } })
                                     }
-                                    Some(_) => Outcome::Amended { task },
+                                    Some(now) => {
+                                        if let Some((held_revision, reason)) = self.holds.get(&task).copied()
+                                            && release.is_some()
+                                            && release != Some(held_revision)
+                                        {
+                                            Outcome::Refused(Refusal::Moved {
+                                                now: people::Moved::Hold { revision: held_revision, reason },
+                                            })
+                                        } else if release.is_some()
+                                            && self.holds.get(&task).is_some_and(|(_, reason)| {
+                                                matches!(reason, people::HoldReason::Uncertain { .. })
+                                            })
+                                        {
+                                            Outcome::Refused(Refusal::Authority {
+                                                lacking: Lack::Again { required: true },
+                                            })
+                                        } else if amendment.authority.is_some() && self.settings.authority_refuses {
+                                            let proposal = self.name();
+                                            pending_amendments.push(((task, proposal), release));
+                                            Outcome::AmendProposed { task, proposal, released: false }
+                                        } else {
+                                            let released = release.is_some() && self.holds.contains_key(&task);
+                                            amendments.push((task, now + 1, released));
+                                            Outcome::Amended { task, released }
+                                        }
+                                    }
                                     None => Outcome::Refused(Refusal::Unknown),
                                 };
                                 people::step(
@@ -584,6 +634,8 @@ impl World {
                 cleared_waiting,
                 sayings,
                 resolved,
+                amendments,
+                pending_amendments,
             });
         }
         for (call, reply) in replies {
@@ -619,6 +671,13 @@ impl World {
                 assert!(self.proposals.insert(name, winner).is_none(), "first proposal decision wins");
             }
             self.executor_outcomes.extend(commit.resolved);
+            self.pending_amendments.extend(commit.pending_amendments);
+            for (task, revision, released) in commit.amendments {
+                self.specs.insert(task, revision);
+                if released {
+                    self.holds.remove(&task);
+                }
+            }
             for (task, message, words, released) in commit.sayings {
                 assert!(self.sayings.insert(message, (task, words, released)).is_none());
                 if released {

@@ -256,6 +256,10 @@ pub(super) fn person_proposal_accept(
             }
         }
         tasks::ProposalAction::Amend { task, amendment } => {
+            if let Err(why) = core.amendment_accept_revision(proposal.proposer, task, amendment.release) {
+                pool_refused(work, request, why);
+                return;
+            }
             let Some(current) = core.tasks.delegation(task) else {
                 pool_refused(work, request, people::Refusal::Unknown);
                 return;
@@ -288,6 +292,7 @@ pub(super) fn person_proposal_accept(
                 message: amend_message,
                 stop_run: false,
                 amendment: tasks::Amendment {
+                    release: None,
                     spec: None,
                     wake: None,
                     dependencies: None,

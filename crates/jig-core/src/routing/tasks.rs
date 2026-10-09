@@ -487,9 +487,9 @@ pub(super) fn tag_tasks(
                         PersonTaskRoute::Cancel(task) => people::Outcome::Cancelled { task },
                         PersonTaskRoute::Release(task) => people::Outcome::Released { task },
                         PersonTaskRoute::Prioritised(project) => people::Outcome::Prioritised { project },
-                        PersonTaskRoute::Amended(task) => people::Outcome::Amended { task },
+                        PersonTaskRoute::Amended { task, released } => people::Outcome::Amended { task, released },
                         PersonTaskRoute::AmendProposed { task, proposal } => {
-                            people::Outcome::AmendProposed { task, proposal }
+                            people::Outcome::AmendProposed { task, proposal, released: false }
                         }
                     };
                     append_people(core, env, people::Event::Decided { request: token, outcome }, &mut out);

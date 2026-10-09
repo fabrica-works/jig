@@ -48,10 +48,30 @@ pub struct AmendmentState {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ProposalAction {
     Batch(List<ProposedTask>),
-    Effect { part: Part, authority: AuthorityLine, attempt: u64, completion: u32, position: u32, purpose: u64 },
-    Amend { task: TaskLink, before: Box<AmendmentState>, after: Box<AmendmentState>, reason: Text },
-    Widen { task: TaskLink, before: AuthorityLine, after: AuthorityLine },
-    Release { task: TaskLink, hold: Option<HoldLine> },
+    Effect {
+        part: Part,
+        authority: AuthorityLine,
+        attempt: u64,
+        completion: u32,
+        position: u32,
+        purpose: u64,
+    },
+    Amend {
+        task: TaskLink,
+        before: Box<AmendmentState>,
+        after: Box<AmendmentState>,
+        reason: Text,
+        release: Option<u64>,
+    },
+    Widen {
+        task: TaskLink,
+        before: AuthorityLine,
+        after: AuthorityLine,
+    },
+    Release {
+        task: TaskLink,
+        hold: Option<HoldLine>,
+    },
 }
 /// Current recipient; earlier recipients are retained proposal history rows.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -173,6 +193,7 @@ pub enum RetainedAction {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AmendmentChange {
+    pub release: Option<u64>,
     pub spec: Option<SpecLine>,
     pub authority: Option<AuthorityLine>,
     pub wake: Option<tasks::WakePolicy>,
@@ -320,6 +341,7 @@ fn action(
                 before: Box::new(amendment(limits, row, None)?),
                 after: Box::new(amendment(limits, row, Some(change))?),
                 reason: super::small::text(&change.reason, limits.documents.text_bytes),
+                release: change.release,
             }
         }
         tasks::ProposalAction::Widen { task, authority } => ProposalAction::Widen {
@@ -740,6 +762,7 @@ pub fn retained_action(limits: &Limits, number: u64, value: &tasks::ProposalActi
         tasks::ProposalAction::Amend { task, amendment: change } => RetainedAction::Amend {
             task: *task,
             change: Box::new(AmendmentChange {
+                release: change.release,
                 spec: match &change.spec {
                     Some(value) => Some(spec(limits, value)),
                     None => None,

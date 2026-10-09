@@ -1356,6 +1356,7 @@ fn invalid_ask(ask: &Ask) -> Refusal {
     Refusal::Limit { which }
 }
 
+#[expect(clippy::too_many_lines, reason = "one exhaustive keyed request-to-answer shape table")]
 fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     #[derive(PartialEq, Eq)]
     enum Expected {
@@ -1374,7 +1375,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Say(u64, bool),
         AnswerQuestion(u64, u64),
         Prioritise(u32),
-        Amend(u64),
+        Amend(u64, bool),
         Roles(u32, bool),
         Policy(u32),
         Pool(u32, u64),
@@ -1400,7 +1401,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::Say { task, release, .. } => Expected::Say(*task, *release),
         Ask::AnswerQuestion { task, question, .. } => Expected::AnswerQuestion(*task, *question),
         Ask::Prioritise { project, .. } => Expected::Prioritise(*project),
-        Ask::Amend { task, .. } => Expected::Amend(*task),
+        Ask::Amend { task, release, .. } => Expected::Amend(*task, release.is_some()),
         Ask::SetRoles { project, holdings } => {
             let mut valid = true;
             for (at, holding) in holdings.iter().enumerate() {
@@ -1444,8 +1445,14 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
             expected == Expected::AnswerQuestion(task, question) && message != 0
         }
         Outcome::Prioritised { project } => expected == Expected::Prioritise(project),
-        Outcome::Amended { task } => expected == Expected::Amend(task),
-        Outcome::AmendProposed { task, proposal } => expected == Expected::Amend(task) && proposal != 0,
+        Outcome::Amended { task, released } => {
+            expected == Expected::Amend(task, true) || !released && expected == Expected::Amend(task, false)
+        }
+        Outcome::AmendProposed { task, proposal, released } => {
+            (expected == Expected::Amend(task, true) || expected == Expected::Amend(task, false))
+                && proposal != 0
+                && !released
+        }
         Outcome::RolesSet { project } => expected == Expected::Roles(project, true),
         Outcome::PolicyChanged { project } => expected == Expected::Policy(project),
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),

@@ -20,8 +20,9 @@ pub(super) fn amend_route(
     task: u64,
     revision: u64,
     amendment: people::Amendment,
+    release: Option<u64>,
 ) {
-    let Some(amendment) = crate::amendments::translate(amendment, &env.limits.tasks) else {
+    let Some(mut amendment) = crate::amendments::translate(amendment, &env.limits.tasks) else {
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     };
@@ -37,6 +38,28 @@ pub(super) fn amend_route(
         pool_refused(work, request, why);
         return;
     }
+    if let Some(revision) = release {
+        if let Err(why) = core.hold_revision(task, revision) {
+            pool_refused(work, request, why);
+            return;
+        }
+        match core.tasks.task(task).expect("amend admission found task").phase {
+            tasks::Phase::Held { why: tasks::Hold::Uncertain { .. }, .. } => {
+                pool_refused(
+                    work,
+                    request,
+                    people::Refusal::Authority { lacking: people::Lack::Again { required: true } },
+                );
+                return;
+            }
+            tasks::Phase::Held { .. }
+            | tasks::Phase::Waiting
+            | tasks::Phase::Active(_)
+            | tasks::Phase::Closing(_)
+            | tasks::Phase::Ended(_) => {}
+        }
+    }
+    amendment.release = release;
     if propose {
         let Some(proposal) = crate::fresh(&mut core.counters, crate::Family::Message) else {
             pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
@@ -67,7 +90,14 @@ pub(super) fn amend_route(
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         return;
     };
-    assert!(core.person_tasks.insert(request, PersonTaskRoute::Amended(task)) == Ok(None), "one person amendment");
+    let released = match core.tasks.task(task).expect("amend admission found task").phase {
+        tasks::Phase::Held { .. } => release.is_some(),
+        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Ended(_) => false,
+    };
+    assert!(
+        core.person_tasks.insert(request, PersonTaskRoute::Amended { task, released }) == Ok(None),
+        "one person amendment"
+    );
     work.push(Event::Tasks(tasks::Event::Amend {
         reply_to: ReplyTo::new(request),
         by: tasks::Party::Person(person),

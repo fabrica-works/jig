@@ -202,7 +202,7 @@ impl Harness {
 }
 
 fn amendment() -> Amendment {
-    Amendment { spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([1]) }
+    Amendment { release: None, spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([1]) }
 }
 
 #[test]
@@ -697,4 +697,54 @@ fn words_release_a_stop_before_its_cancelled_run_answers() {
         saved: None,
     });
     assert_eq!(test.domain.task(1).unwrap().due_reason, crate::Why::Narrowed);
+}
+
+#[test]
+fn an_amendment_releases_only_the_named_hold_and_preflights_both_changes() {
+    let mut h = Harness::new();
+    h.make(vec![task(1, &[])]);
+    h.send(Event::Hold { task: 1, why: Hold::StoppedBy { party: 9 } });
+    let revision = h.revisions(1).hold;
+    let mut change = amendment();
+    change.release = Some(revision);
+    change.spec = Some(Spec { words: Box::new([8]), parameters: Box::new([]), inputs: Box::new([]) });
+    h.amend(1, change.clone());
+    assert_eq!(h.domain.task(1).unwrap().spec.words.as_ref(), &[8]);
+    assert!(match h.domain.task(1).unwrap().phase {
+        crate::Phase::Held { .. } => false,
+        _ => true,
+    });
+    h.send(Event::Hold { task: 1, why: Hold::Budget });
+    h.amend(1, change);
+    assert!(match h.domain.task(1).unwrap().phase {
+        crate::Phase::Held { why: Hold::Budget, .. } => true,
+        _ => false,
+    });
+    let held = h.revisions(1).hold;
+    let mut bad = amendment();
+    bad.release = Some(held);
+    bad.dependencies = Some(Box::new([99]));
+    let before = h.domain.task(1).unwrap().clone();
+    h.send(Event::Amend {
+        reply_to: to(),
+        by: Party::Person(9),
+        task: 1,
+        message: before.last_message + 1,
+        stop_run: false,
+        amendment: bad,
+    });
+    assert_eq!(h.domain.task(1), Some(&before));
+    crate::domain::task_mut(&mut h.domain, 1).unwrap().record.revision = u64::MAX - 1;
+    let before = h.domain.task(1).unwrap().clone();
+    let mut change = amendment();
+    change.release = Some(held);
+    h.send(Event::Amend {
+        reply_to: to(),
+        by: Party::Person(9),
+        task: 1,
+        message: before.last_message + 1,
+        stop_run: false,
+        amendment: change,
+    });
+    assert_eq!(h.domain.task(1), Some(&before));
 }

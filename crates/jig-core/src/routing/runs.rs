@@ -149,6 +149,7 @@ pub(super) fn named_proposal_accept(
                 message,
                 stop_run: false,
                 amendment: tasks::Amendment {
+                    release: None,
                     spec: None,
                     wake: None,
                     dependencies: None,
@@ -255,7 +256,7 @@ pub(crate) fn named_propose(
         return proposal_refused(core, to, key, tasks::Refusal::Unknown);
     };
     if let tasks::ProposalAction::Amend { amendment, .. } = &action
-        && amendment.authority.is_none()
+        && (amendment.authority.is_none() || amendment.release.is_some())
     {
         return proposal_refused(core, to, key, tasks::Refusal::AuthorityShape);
     }

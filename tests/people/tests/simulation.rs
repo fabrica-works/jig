@@ -338,6 +338,7 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
     member(&mut world);
     world.amended_task(7, 2);
     let ask = Ask::Amend {
+        release: None,
         project: 1,
         task: 7,
         revision: 1,
@@ -461,4 +462,86 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
     let replay = world.request(10, [4; 16], ask);
     assert_eq!(world.reply(replay), world.reply(call));
     assert_eq!(world.executor_outcomes, [(9, false)]);
+}
+
+fn edit() -> jig_core_people::Amendment {
+    jig_core_people::Amendment {
+        spec: Some(jig_core_people::Spec {
+            words: b"changed".as_slice().into(),
+            parameters: Box::new([]),
+            inputs: Box::new([]),
+        }),
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: b"evidence".as_slice().into(),
+    }
+}
+
+#[test]
+fn an_amendment_and_a_release_are_one_decision() {
+    let mut world = World::new(Settings::calm(97));
+    member(&mut world);
+    world.amended_task(7, 1);
+    world.held_task(7, 2, jig_core_people::HoldReason::Stopped);
+    let ask = Ask::Amend { project: 1, task: 7, revision: 1, amendment: edit(), release: Some(2) };
+    let call = world.request(10, [1; 16], ask.clone());
+    assert!(world.reply(call).is_none());
+    assert_eq!(world.spec_revision(7), Some(1));
+    assert!(world.held(7));
+    world.commit_all();
+    let expected = Some(Reply::Outcome(Outcome::Amended { task: 7, released: true }));
+    assert_eq!(world.reply(call), expected);
+    assert_eq!(world.spec_revision(7), Some(2));
+    assert!(!world.held(7));
+    world.restart();
+    let routes = world.stats().routes;
+    let replay = world.request(10, [1; 16], ask);
+    assert_eq!(world.reply(replay), expected);
+    assert_eq!(world.stats().routes, routes);
+    assert_eq!(world.spec_revision(7), Some(2));
+    world.assert_settled();
+}
+
+#[test]
+fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
+    let mut world = World::new(Settings { authority_refuses: true, ..Settings::calm(98) });
+    member(&mut world);
+    world.amended_task(7, 1);
+    world.held_task(7, 2, jig_core_people::HoldReason::Stopped);
+    let mut amendment = edit();
+    amendment.authority = Some(jig_core_people::Authority {
+        tools: 0,
+        grants: Box::new([]),
+        delegation: jig_core_people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+        spend: 1,
+        deadline: None,
+        notes: 0,
+        note_resources: Box::new([]),
+    });
+    let call = world.request(10, [1; 16], Ask::Amend { project: 1, task: 7, revision: 1, amendment, release: Some(2) });
+    world.commit_all();
+    let Some(Reply::Outcome(Outcome::AmendProposed { task: 7, proposal, released: false })) = world.reply(call) else {
+        panic!("widening proposed")
+    };
+    assert_eq!(world.spec_revision(7), Some(1));
+    assert!(world.held(7));
+    world.restart();
+    let decision = Ask::DecideProposal { project: 1, proposer: 7, proposal, decision: ProposalDecision::Accept };
+    let call = world.request(10, [2; 16], decision.clone());
+    assert!(world.reply(call).is_none());
+    assert_eq!(world.spec_revision(7), Some(1));
+    assert!(world.held(7));
+    world.commit_all();
+    assert!(matches!(
+        world.reply(call),
+        Some(Reply::Outcome(Outcome::ProposalDecided { choice: ProposalChoice::Accepted, .. }))
+    ));
+    assert_eq!(world.spec_revision(7), Some(2));
+    assert!(!world.held(7));
+    world.restart();
+    let replay = world.request(10, [2; 16], decision);
+    assert_eq!(world.reply(replay), world.reply(call));
+    assert_eq!(world.spec_revision(7), Some(2));
+    world.assert_settled();
 }

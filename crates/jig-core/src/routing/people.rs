@@ -189,8 +189,10 @@ pub(super) fn tag_people(
                     people::Ask::SetRoles { holdings, .. } => {
                         roles_route(core, env, work, &mut out, request, person, project, holdings);
                     }
-                    people::Ask::Amend { task, revision, amendment, .. } => {
-                        amend_route(core, env, work, request, person, role, project, task, revision, amendment);
+                    people::Ask::Amend { task, revision, amendment, release, .. } => {
+                        amend_route(
+                            core, env, work, request, person, role, project, task, revision, amendment, release,
+                        );
                     }
                     people::Ask::ChangePolicy { change, .. } => {
                         change_policy_request(core, env, work, request, person, project, &mut out, change);

@@ -311,7 +311,7 @@ pub enum PersonTaskRoute {
     Cancel(u64),
     Release(u64),
     Prioritised(u32),
-    Amended(u64),
+    Amended { task: u64, released: bool },
     AmendProposed { task: u64, proposal: u64 },
 }
 

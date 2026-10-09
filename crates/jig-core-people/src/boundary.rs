@@ -232,7 +232,7 @@ pub enum Ask {
     /// Set the priorities of a bounded set of current project goals together.
     Prioritise { project: u32, goals: Box<[(u64, u32)]> },
     /// Amend a live task this person may steer, after root policy and funding checks.
-    Amend { project: u32, task: u64, revision: u64, amendment: crate::Amendment },
+    Amend { project: u32, task: u64, revision: u64, amendment: crate::Amendment, release: Option<u64> },
     /// Authenticated Owner's complete project roster replacement; root checks Policy permission and
     /// held-recipient preflight before applying it.
     SetRoles {
@@ -366,9 +366,9 @@ pub enum Outcome {
     /// All named goal priorities were durably changed together.
     Prioritised { project: u32 },
     /// The named task accepted this person's amendment.
-    Amended { task: u64 },
+    Amended { task: u64, released: bool },
     /// A widening amendment waits for an authorized proposal holder.
-    AmendProposed { task: u64, proposal: u64 },
+    AmendProposed { task: u64, proposal: u64, released: bool },
     /// Root accepted one roster and all affected `Waiting` recipients atomically; saved keyed
     /// replay does not apply the roster again.
     RolesSet {
@@ -511,6 +511,10 @@ impl Stored {
 /// Root-to-child inputs; authenticated identity, authoritative roles and restored records
 /// cross this boundary without protocol secrets. (domain/people.md, sections 3–5).
 #[derive(PartialEq, Eq, Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "bounded whole keyed requests stay inline and event storage is priced by size_of"
+)]
 pub enum Event {
     /// Apply an authorized owner request to make a service with a fresh party number.
     MakeService { request: Token, person: u64 },

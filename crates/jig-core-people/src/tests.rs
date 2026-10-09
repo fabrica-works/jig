@@ -1090,6 +1090,7 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
         Ask::Release { project: 1, task: 7, revision: 1, again: None },
         Ask::AnswerPerson { project: 1, task: 7, revision: 1, result: PersonResult::Report { words: Box::new([1]) } },
         Ask::Amend {
+            release: None,
             project: 1,
             task: 7,
             revision: 1,
@@ -1112,7 +1113,9 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
         let changed = match ask {
             Ask::Release { project, task, .. } => Ask::Release { project, task, revision: 2, again: None },
             Ask::AnswerPerson { project, task, result, .. } => Ask::AnswerPerson { project, task, revision: 2, result },
-            Ask::Amend { project, task, amendment, .. } => Ask::Amend { project, task, revision: 2, amendment },
+            Ask::Amend { project, task, amendment, .. } => {
+                Ask::Amend { project, task, revision: 2, amendment, release: None }
+            }
             _ => panic!("only revision-bearing asks scripted"),
         };
         assert_eq!(reply(&test.request(10, 14, changed)), Reply::Refused(Refusal::KeyConflict));
@@ -1336,4 +1339,19 @@ fn a_role_need_leaves_every_holders_count_when_one_acts() {
     test.send(Event::Waiting { task: 1, entries: Box::new([]) });
     assert_eq!(test.d.needs(1), Some(2));
     assert_eq!(test.d.needs(2), Some(2));
+}
+
+#[test]
+fn an_amendment_answer_keeps_the_release_fact_and_named_hold_in_its_key() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let change = Amendment { spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([]) };
+    let ask = Ask::Amend { project: 1, task: 7, revision: 1, amendment: change.clone(), release: Some(2) };
+    let request = route(&test.request(10, 1, ask.clone()));
+    let outcome = Outcome::Amended { task: 7, released: true };
+    let out = test.send(Event::Decided { request, outcome });
+    assert_eq!(reply(&out), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+    let changed = Ask::Amend { project: 1, task: 7, revision: 1, amendment: change, release: Some(3) };
+    assert_eq!(reply(&test.request(10, 1, changed)), Reply::Refused(Refusal::KeyConflict));
 }

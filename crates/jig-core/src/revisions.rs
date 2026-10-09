@@ -7,6 +7,31 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 
 impl Core {
+    /// Acceptance also records the proposal decision after the amendment and optional release.
+    pub(crate) fn amendment_accept_revision(
+        &self,
+        proposer: u64,
+        task: u64,
+        release: Option<u64>,
+    ) -> Result<(), people::Refusal> {
+        let source = self.tasks.task(proposer).ok_or(people::Refusal::Unknown)?;
+        let target = self.tasks.task(task).ok_or(people::Refusal::Unknown)?;
+        let changes: u64 = match target.phase {
+            tasks::Phase::Held { .. } if release == Some(target.revisions.hold) => 2,
+            tasks::Phase::Held { .. }
+            | tasks::Phase::Waiting
+            | tasks::Phase::Active(_)
+            | tasks::Phase::Closing(_)
+            | tasks::Phase::Ended(_) => 1,
+        };
+        let room = if proposer == task {
+            target.revision.checked_add(changes.checked_add(1).expect("at most two task changes")).is_some()
+        } else {
+            source.revision.checked_add(1).is_some() && target.revision.checked_add(changes).is_some()
+        };
+        if room { Ok(()) } else { Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic }) }
+    }
+
     /// Refuse an old hold revision with the current reason before release.
     pub(crate) fn hold_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
         let row = self.tasks.task(task).ok_or(people::Refusal::Unknown)?;

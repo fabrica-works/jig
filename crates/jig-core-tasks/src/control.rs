@@ -20,6 +20,8 @@ pub enum Control {
 /// Whole optional task changes; root checks any widening against its holder.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Amendment {
+    /// Release this exact hold with the change; a later hold remains in place.
+    pub release: Option<u64>,
     pub spec: Option<Spec>,
     pub wake: Option<WakePolicy>,
     pub dependencies: Option<Box<[u64]>>,
@@ -136,6 +138,21 @@ pub(crate) fn amend(
         return refused(to, Some(number), Refusal::Reference, out);
     }
     let old = record(domain, number).expect("entrance found task");
+    let releasing = match old.phase {
+        Phase::Held { .. } => amendment.release == Some(old.revisions.hold),
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,
+    };
+    if releasing {
+        match old.phase {
+            Phase::Held { why: crate::Hold::Uncertain { .. }, .. } => {
+                return refused(to, Some(number), Refusal::AuthorityShape, out);
+            }
+            Phase::Held { .. } | Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {}
+        }
+        if old.revision.checked_add(2).is_none() {
+            return refused(to, Some(number), Refusal::State, out);
+        }
+    }
     let mutable = match old.phase {
         Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => true,
         Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } | Phase::Ended(_) => false,
@@ -289,6 +306,9 @@ pub(crate) fn amend(
         out.push(Request::Stop { task: number, attempt });
     } else {
         crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
+    }
+    if releasing {
+        release(domain, env, number, by, None, None, out).expect("amendment preflighted its exact hold release");
     }
     out.push(Request::Done { reply_to: to });
 }

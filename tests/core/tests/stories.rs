@@ -90,6 +90,7 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
         action: core::NamedAction::Amend {
             target: report,
             amendment: tasks::Amendment {
+                release: None,
                 spec: Some(tasks::Spec {
                     words: b"revised report".as_slice().into(),
                     parameters: Box::new([]),
@@ -946,13 +947,33 @@ fn a_release_after_a_pass_up_keeps_the_hold_revision_and_uses_the_partys_tree() 
 }
 
 #[test]
-fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
-    let mut world = World::new(152, false);
+fn an_amendment_and_a_release_are_one_decision() {
+    let (configuration, limits) = amendment_world_fixture(152);
+    let mut world = World::configured(152, false, configuration, limits);
     let task = world.call_key(1).task;
+    ask(&mut world, 54, people::Ask::Stop { project: 1, task });
+    world.end(tasks::End::Parked, 0);
+    let hold = live_row(&world, task).revisions.hold;
     let revision = live_row(&world, task).revisions.spec;
-    ask(&mut world, 55, people::Ask::Amend { project: 1, task, revision, amendment: amendment(b"first change") });
-    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Amended { task })));
-    ask(&mut world, 56, people::Ask::Amend { project: 1, task, revision, amendment: amendment(b"stale change") });
+    let answers = world.people_answers.len();
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    ask(
+        &mut world,
+        55,
+        people::Ask::Amend { project: 1, task, revision, release: Some(hold), amendment: amendment(b"first change") },
+    );
+    assert_eq!(world.people_answers.len(), answers, "the combined outcome waits for durability");
+    world.release_commits();
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Amended { task, released: true }))
+    );
+    assert!(!matches!(live_row(&world, task).phase, tasks::Phase::Held { .. }));
+    ask(
+        &mut world,
+        56,
+        people::Ask::Amend { project: 1, task, revision, release: None, amendment: amendment(b"stale change") },
+    );
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Moved {
@@ -960,6 +981,28 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
         })))
     );
     assert_eq!(live_row(&world, task).spec.words.as_ref(), b"first change");
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Budget })));
+    let now = live_row(&world, task).revisions.hold;
+    ask(
+        &mut world,
+        79,
+        people::Ask::Amend {
+            project: 1,
+            task,
+            revision: revision + 1,
+            release: Some(hold),
+            amendment: amendment(b"must not land"),
+        },
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Moved {
+            now: people::Moved::Hold { revision: now, reason: people::HoldReason::Budget }
+        })))
+    );
+    assert_eq!(live_row(&world, task).spec.words.as_ref(), b"first change");
+    world.end(tasks::End::Parked, 0);
+    a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(&mut world, 152);
 }
 
 #[test]
@@ -1083,3 +1126,105 @@ fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
 
 #[path = "stories/watches.rs"]
 mod watches;
+
+fn amendment_world_fixture(seed: u64) -> (root::Config, root::Limits) {
+    let (mut configuration, limits) = fixture(seed, false);
+    let rules = configuration.core.authority.rules().clone();
+    let mut policy = configuration.core.authority.policy(1).expect("amendment policy").clone();
+    policy.roles[0].period_spend = 1000;
+    configuration.core.settings.person_budget = 1000;
+    let mut authority_domain = authority::Domain::new(rules, limits.core.authority).expect("bounded amendment policy");
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut authority_domain, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    configuration.core.authority = authority_domain;
+    (configuration, limits)
+}
+
+fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(world: &mut World, seed: u64) {
+    let task = world.call_key(1).task;
+    let hold = live_row(world, task).revisions.hold;
+    let revision = live_row(world, task).revisions.spec;
+
+    let mut change = amendment(b"widened task");
+    let mut widened_authority = people::Authority {
+        tools: 1023,
+        grants: Box::new([people::Grant {
+            connector: 1,
+            kind: 5,
+            pattern: people::Pattern { segments: Box::new([]), last: people::Last::Open(Box::new([])) },
+        }]),
+        delegation: people::Delegation {
+            kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),
+            tasks: 2,
+            depth: 2,
+        },
+        spend: 600,
+        deadline: None,
+        notes: 0,
+        note_resources: Box::new([]),
+    };
+    change.authority = Some(widened_authority.clone());
+
+    ask(world, 81, people::Ask::Amend { project: 1, task, revision, amendment: change, release: Some(hold) });
+    let Some(people::Reply::Outcome(people::Outcome::AmendProposed { proposal, released: false, .. })) =
+        world.people_answers.last().copied()
+    else {
+        panic!("widening proposed: {:?}", world.people_answers)
+    };
+    assert_eq!(live_row(world, task).revisions.spec, revision);
+    assert!(matches!(live_row(world, task).phase, tasks::Phase::Held { .. }));
+    let (restored_configuration, _) = amendment_world_fixture(seed);
+    world.restart_with(restored_configuration);
+    assert!(
+        matches!(&live_row(world, task).proposal.as_ref().expect("retained amendment proposal").action, tasks::ProposalAction::Amend { amendment, .. } if amendment.release == Some(hold))
+    );
+
+    widened_authority.spend = 1000;
+    ask(
+        world,
+        83,
+        people::Ask::ChangePolicy {
+            project: 1,
+            change: people::PolicyChange::Role(people::PolicyRole {
+                number: 0,
+                authority: widened_authority,
+                period_spend: 1000,
+                requests: authority::Requests::ALL.0,
+                decides: authority::Proposals::ALL.0,
+            }),
+        },
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::PolicyChanged { project: 1 }))
+    );
+    let answers = world.people_answers.len();
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    ask(
+        world,
+        82,
+        people::Ask::DecideProposal {
+            project: 1,
+            proposer: task,
+            proposal,
+            decision: people::ProposalDecision::Accept,
+        },
+    );
+    assert_eq!(world.people_answers.len(), answers);
+    world.release_commits();
+    assert!(
+        matches!(
+            world.people_answers.last(),
+            Some(people::Reply::Outcome(people::Outcome::ProposalDecided {
+                choice: people::ProposalChoice::Accepted,
+                ..
+            }))
+        ),
+        "acceptance: {:?}",
+        world.people_answers
+    );
+    assert_eq!(live_row(world, task).spec.words.as_ref(), b"widened task");
+    assert_eq!(live_row(world, task).numbers.budget, 600);
+    assert!(!matches!(live_row(world, task).phase, tasks::Phase::Held { .. }));
+}

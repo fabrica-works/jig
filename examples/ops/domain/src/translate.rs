@@ -543,7 +543,14 @@ pub(crate) mod nested {
             Some(value) => Some(authority(value)?),
             None => None,
         };
-        Ok(tasks::Amendment { spec, wake, dependencies, authority, reason: value.required(b"reason")?.text()? })
+        Ok(tasks::Amendment {
+            release: None,
+            spec,
+            wake,
+            dependencies,
+            authority,
+            reason: value.required(b"reason")?.text()?,
+        })
     }
 
     fn executor(value: &Value) -> Result<tasks::Executor, Problem> {

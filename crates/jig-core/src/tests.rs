@@ -561,6 +561,36 @@ fn make_tree() -> (Core, Limits) {
 }
 
 #[test]
+fn amendment_acceptance_reserves_its_terminal_proposal_revision() {
+    let (mut core, limits) = make_tree();
+    let original = core.tasks.task(3).unwrap().clone();
+    let mut source = core.tasks.task(1).unwrap().clone();
+    let mut target = original.clone();
+    target.revision = u64::MAX - 2;
+    target.escalation = tasks::Escalation::Waiting {
+        revision: target.revisions.hold,
+        holder: tasks::EscalationHolder::Task(1),
+        entry: 1,
+        since: Wall::EPOCH,
+    };
+    source.revision = u64::MAX;
+    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(source)) });
+    send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(target.clone())) });
+    let arithmetic = Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
+    assert_eq!(core.amendment_accept_revision(3, 3, Some(target.revisions.hold)), arithmetic);
+    assert_eq!(core.amendment_accept_revision(3, 3, None), Ok(()));
+    assert_eq!(core.amendment_accept_revision(1, 3, Some(target.revisions.hold)), arithmetic);
+    assert_eq!(core.tasks.task(3), Some(&target));
+    assert_eq!(core.tasks.task(3).unwrap().spec, original.spec);
+    target.revision = u64::MAX - 3;
+    core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
+    send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(target.clone())) });
+    assert_eq!(core.amendment_accept_revision(3, 3, Some(target.revisions.hold)), Ok(()));
+    assert_eq!(core.tasks.task(3), Some(&target));
+}
+
+#[test]
 fn documents_tree_folds_every_unshown_phase_and_keeps_held_counts() {
     let (core, limits) = make_tree();
     let Document::Tree(tree) = make(&core, &limits, 1, &Subject::Tree { task: 1 }, &window()).unwrap() else {
@@ -788,6 +818,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
         tasks::ProposalAction::Amend {
             task: 2,
             amendment: tasks::Amendment {
+                release: Some(1),
                 spec: Some(changed),
                 wake: None,
                 dependencies: None,
@@ -828,7 +859,8 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
                 assert_eq!(purpose, 11);
                 assert!(proposal.funding.is_empty());
             }
-            ProposalAction::Amend { before, after, .. } => {
+            ProposalAction::Amend { before, after, release, .. } => {
+                assert_eq!(release, Some(1));
                 assert_eq!(before.spec.words.bytes.as_ref(), b"Work\nDetailed instructions");
                 assert_eq!(after.spec.words.bytes.as_ref(), b"New question");
                 assert_eq!(after.authority.ceiling.spend, 15);

@@ -16,6 +16,9 @@ impl Core {
         amendment: &tasks::Amendment,
         depth: u32,
     ) -> Result<bool, TaskAmendDenied> {
+        if amendment.release.is_some() {
+            return Err(TaskAmendDenied::Refused { task: target, why: tasks::Refusal::Read });
+        }
         let Some(holder) = self.tasks.delegation(caller) else {
             return Err(TaskAmendDenied::Refused { task: caller, why: tasks::Refusal::Unknown });
         };
@@ -257,6 +260,7 @@ fn granted(value: people::Authority, limits: &tasks::Limits) -> Option<tasks::Au
 #[expect(clippy::manual_map, reason = "the step subset spells out both option cases without a closure")]
 pub(crate) fn translate(value: people::Amendment, limits: &tasks::Limits) -> Option<tasks::Amendment> {
     Some(tasks::Amendment {
+        release: None,
         spec: match value.spec {
             Some(specification) => Some(spec(specification, limits)?),
             None => None,
