@@ -131,8 +131,7 @@ pub struct ResultDoc {
     pub proposal: Option<super::ProposalRef>,
     pub cut: bool,
 }
-/// Exactly what a semantic history record retains today. Times and change
-/// details are added by the activity/history session, rather than invented here.
+/// Timestamped semantic history with immutable amendment settings.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct HistoryLine {
     pub task: u64,
@@ -141,6 +140,7 @@ pub struct HistoryLine {
     pub change: tasks::Change,
     pub reason: Text,
     pub proposal: Option<ProposalHistory>,
+    pub amendment: Option<(Box<AmendmentState>, Box<AmendmentState>)>,
     pub at: Option<Wall>,
 }
 /// Proposal facts retained with a history row, including its recipient or decision.
@@ -178,8 +178,7 @@ pub struct AmendmentChange {
     pub reason: Text,
     pub cut: bool,
 }
-/// A lifecycle row is independent of semantic history; it has no actor or wall
-/// time today. The reader merges these ordered rows with semantic changes.
+/// Timestamped lifecycle row named by a task activity position.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct MilestoneLine {
     pub task: u64,
@@ -192,7 +191,7 @@ pub enum MilestonePhase {
     Waiting,
     Active(tasks::Active),
     Closing { stage: tasks::Stage, ending: Ending },
-    Held { before: PriorPhase, why: tasks::Hold },
+    Held { before: PriorPhase, why: tasks::Hold, ending: Option<Ending> },
     Ended(Ending),
 }
 /// The ended delegate's identity and outcome, made from its retained task row.
@@ -630,7 +629,13 @@ pub fn history_from_row(limits: &Limits, row: &tasks::History) -> Result<History
         by: row.by,
         change: row.change,
         reason: super::small::text(&row.reason, limits.documents.text_bytes),
-        at: None,
+        at: Some(row.at),
+        amendment: match &row.amendment {
+            Some(change) => {
+                Some((Box::new(settings(limits, &change.before)?), Box::new(settings(limits, &change.after)?)))
+            }
+            None => None,
+        },
         proposal: match &row.proposal {
             Some(value) => Some(ProposalHistory {
                 action: retained_action(limits, value.number, &value.action)?,
@@ -734,7 +739,7 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Mileston
     MilestoneLine {
         task: value.task,
         position: value.position,
-        at: None,
+        at: Some(value.at),
         phase: match &value.phase {
             tasks::Phase::Waiting => MilestonePhase::Waiting,
             tasks::Phase::Active(active) => MilestonePhase::Active(*active),
@@ -744,6 +749,10 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Mileston
             },
             tasks::Phase::Held { was, why } => MilestonePhase::Held {
                 why: *why,
+                ending: match was {
+                    tasks::Was::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)),
+                    tasks::Was::Waiting | tasks::Was::Active(_) => None,
+                },
                 before: match was {
                     tasks::Was::Waiting => PriorPhase::Waiting,
                     tasks::Was::Active(active) => PriorPhase::Active(*active),
@@ -753,4 +762,14 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Mileston
             tasks::Phase::Ended(ending) => MilestonePhase::Ended(super::task_tree::ending(limits, ending)),
         },
     }
+}
+
+fn settings(limits: &Limits, row: &tasks::Settings) -> Result<AmendmentState, Missing> {
+    Ok(AmendmentState {
+        spec: spec(limits, &row.spec),
+        authority: super::task_tree::authority(limits, &row.authority)?,
+        wake: row.wake,
+        dependencies: numbers(limits, &row.dependencies),
+        cut: row.dependencies.len() > bound(limits),
+    })
 }

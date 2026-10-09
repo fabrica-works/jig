@@ -207,7 +207,9 @@ impl Accounting {
     pub fn committed(&mut self, rows: &BTreeMap<Key, Stored>, requests: &[Request]) -> Result<(), &'static str> {
         self.messages_and_holders(rows, requests)?;
         for (key, old) in &self.before {
-            if matches!(old, Stored::Ended(_)) && rows.get(key) != Some(old) {
+            if matches!(old, Stored::Ended(_) | Stored::Activity(_) | Stored::History(_) | Stored::Milestone(_))
+                && rows.get(key) != Some(old)
+            {
                 return Err("immutable accounting row changed");
             }
             if matches!(old, Stored::Ledger(_)) && !rows.contains_key(key) {
@@ -269,6 +271,7 @@ impl Accounting {
                             | Stored::Ended(_)
                             | Stored::Stub(_)
                             | Stored::Ledger(_)
+                            | Stored::Activity(_)
                             | Stored::Milestone(_)
                             | Stored::History(_)
                             | Stored::PersonProposal(_) => None,
@@ -306,6 +309,7 @@ impl Accounting {
                             | Stored::Ended(_)
                             | Stored::Stub(_)
                             | Stored::Ledger(_)
+                            | Stored::Activity(_)
                             | Stored::Milestone(_)
                             | Stored::History(_)
                             | Stored::PersonProposal(_) => None,
@@ -367,6 +371,7 @@ impl Accounting {
                 | Stored::Writer(_)
                 | Stored::Pool(_)
                 | Stored::Stub(_)
+                | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
                 | Stored::PersonProposal(_) => {}

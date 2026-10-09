@@ -9,8 +9,9 @@
 )]
 use crate::{
     Amendment, Authority, Budget, Contract, Control, Delegation, Domain, EscalationDecision, EscalationHolder,
-    EscalationOutcome, Event, Executor, Funder, Hold, Key, Limits, New, Numbers, Parameter, Party, PersonAddress,
-    Request, Retries, Retry, Revisions, Scopes, Spec, Stored, TaskResult, Tools, WakePolicy, max_out, step,
+    EscalationOutcome, Event, Executor, Funder, Hold, Key, Limits, MessageKind, New, Numbers, Parameter, Party,
+    PersonAddress, Request, Retries, Retry, Revisions, Scopes, Spec, Stored, TaskResult, Tools, WakePolicy, max_out,
+    step,
 };
 use alloc::{boxed::Box, collections::BTreeMap};
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
@@ -387,4 +388,154 @@ fn parameters_wake_policy_and_dependencies_each_move_only_the_spec() {
     change.dependencies = Some(Box::new([]));
     test.amend(2, change);
     assert_eq!(test.revisions(2), Revisions { hold: 0, spec: 3, person: 0 });
+}
+
+fn activity(test: &Harness, task: u64) -> Vec<crate::ActivityLine> {
+    test.stored
+        .values()
+        .filter_map(|row| match row {
+            Stored::Activity(row) if row.task == task => Some(row.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn write(test: &mut Harness, number: u64, message: u64) {
+    test.send(Event::Message {
+        reply_to: to(),
+        project: 1,
+        task: number,
+        word: crate::Word {
+            number: message,
+            from: Party::Person(9),
+            kind: MessageKind::Words,
+            words: Box::from(&b"Whole words"[..]),
+            at: test.env.wall,
+            hits: 1,
+            eligible: true,
+        },
+    });
+}
+
+#[test]
+fn activity_keeps_whole_words_after_a_committed_turn_takes_them() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    write(&mut test, 1, 1);
+    test.send(Event::Prepare { reply_to: to(), task: 1 });
+    test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, budget: 10, writes: Box::new([]) });
+    test.send(Event::Started { task: 1, attempt: 1 });
+    test.send(Event::Turn {
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        turn: 1,
+        read: Some(1),
+        offered: Some(1),
+        cumulative: 1,
+    });
+    assert!(test.domain.task(1).unwrap().inbox.is_empty());
+    let lines = activity(&test, 1);
+    assert!(lines.iter().any(|row| match &row.line {
+        crate::Line::Words { message: 1, by: Party::Person(9), words, .. } => words.as_ref() == b"Whole words",
+        _ => false,
+    }));
+}
+
+#[test]
+fn activity_orders_an_amendments_message_and_decision_and_keeps_both_settings() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    let first = test.domain.task(1).unwrap().activity;
+    let before = test.domain.task(1).unwrap().spec.clone();
+    let mut change = amendment();
+    let after = Spec { words: Box::from(&b"Changed"[..]), ..before.clone() };
+    change.spec = Some(after.clone());
+    test.env.wall = Wall::from_nanos(8);
+    test.amend(1, change);
+    let lines = activity(&test, 1);
+    assert_eq!(lines[usize::try_from(first).unwrap()].position, first + 1);
+    let crate::Line::Heard(word) = &lines[usize::try_from(first).unwrap()].line else { panic!() };
+    assert_eq!(word.kind, MessageKind::Amendment { revision: 1 });
+    assert_eq!(lines[usize::try_from(first).unwrap() + 1].line, crate::Line::Decided { revision: 1 });
+    assert_eq!(lines[usize::try_from(first).unwrap() + 1].at, Wall::from_nanos(8));
+    let Stored::History(row) = &test.stored[&Key::History { task: 1, revision: 1 }] else { panic!() };
+    let change = row.amendment.as_ref().unwrap();
+    assert_eq!(change.before.spec, before);
+    assert_eq!(change.after.spec, after);
+}
+
+#[test]
+fn activity_positions_continue_after_restart_and_the_ended_task_keeps_its_lines() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    write(&mut test, 1, 1);
+    let before = activity(&test, 1);
+    test.restart();
+    test.env.wall = Wall::from_nanos(5);
+    write(&mut test, 1, 2);
+    test.send(Event::Control {
+        reply_to: to(),
+        by: Party::Person(9),
+        task: 1,
+        control: Control::Cancel { reason: Box::from(&b"Ended"[..]) },
+    });
+    test.send(Event::EffectsSettled { task: 1 });
+    test.send(Event::Settled { task: 1 });
+    assert!(test.domain.task(1).is_none());
+    let after = activity(&test, 1);
+    assert_eq!(&after[..before.len()], before.as_slice());
+    for (index, row) in after.iter().enumerate() {
+        assert_eq!(row.position, u64::try_from(index).unwrap() + 1);
+    }
+    let Stored::Ended(row) = &test.stored[&Key::Ended(1)] else { panic!() };
+    assert_eq!(row.activity, after.last().unwrap().position);
+}
+
+#[test]
+fn activity_keeps_each_news_admission_before_the_unread_hints_merge() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    let reply = test.send(Event::SubscribeTopic {
+        reply_to: to(),
+        task: 1,
+        subscription: crate::Subscription {
+            number: 10,
+            kind: crate::SubscriptionKind::Topic { connector: 1, topic: 1 },
+        },
+    });
+    assert!(reply.iter().any(|request| match request {
+        Request::Done { .. } => true,
+        _ => false,
+    }));
+    for number in [1, 2] {
+        test.env.wall = Wall::from_nanos(number);
+        test.send(Event::Notice {
+            task: 1,
+            word: crate::Word {
+                number,
+                from: Party::Deployment { project: 1 },
+                kind: MessageKind::News { subscription: 10, class: crate::NewsClass::Kept },
+                words: Box::from([u8::try_from(number).unwrap()]),
+                at: test.env.wall,
+                hits: 1,
+                eligible: true,
+            },
+        });
+    }
+    let row = test.domain.task(1).unwrap();
+    assert_eq!(row.inbox.len(), 1);
+    assert_eq!(row.inbox[0].at, Wall::from_nanos(1));
+    assert_eq!(row.inbox[0].hits, 2);
+    let messages: Vec<_> = activity(&test, 1)
+        .into_iter()
+        .filter_map(|row| match row.line {
+            crate::Line::Heard(word) => Some(word),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(messages.len(), 2);
+    assert_eq!(messages[0].at, Wall::from_nanos(1));
+    assert_eq!(messages[1].at, Wall::from_nanos(2));
+    assert_eq!(messages[1].hits, 1);
 }

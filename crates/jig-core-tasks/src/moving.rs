@@ -281,7 +281,7 @@ pub(crate) fn apply(
         assert!(row.record.root == previous_root, "subtree has one root");
         row.record.root = number;
         row.record.depth = row.record.depth.checked_sub(previous_depth).expect("subtree depth preflight");
-        crate::control::history(domain, child, Party::Person(person), Change::Moved, reason, out);
+        crate::control::history(domain, child, env.wall, Party::Person(person), Change::Moved, reason, out);
         publish(domain, env, child, out);
     }
     let mut waiting = List::with_capacity(env.limits.tasks);

@@ -692,6 +692,7 @@ pub(super) fn tag_tasks(
                     }
                     tasks::Stored::Live(_)
                     | tasks::Stored::Milestone(_)
+                    | tasks::Stored::Activity(_)
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::Ledger(_)
@@ -757,6 +758,7 @@ pub(super) fn tag_tasks(
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::History(_)
                     | tasks::Stored::Milestone(_)
+                    | tasks::Stored::Activity(_)
                     | tasks::Stored::Stub(_) => None,
                 };
                 match &record {
@@ -784,7 +786,8 @@ pub(super) fn tag_tasks(
                         },
                         &mut out,
                     ),
-                    tasks::Stored::Live(_)
+                    tasks::Stored::Activity(_)
+                    | tasks::Stored::Live(_)
                     | tasks::Stored::Ended(_)
                     | tasks::Stored::PersonProposal(_)
                     | tasks::Stored::Ledger(_)

@@ -253,7 +253,10 @@ impl Application for Ops {
                         (
                             root::Range::Core,
                             root::Record::Core(core::Record::Tasks(
-                                tasks::Stored::Ended(_) | tasks::Stored::History(_) | tasks::Stored::Milestone(_),
+                                tasks::Stored::Ended(_)
+                                | tasks::Stored::Activity(_)
+                                | tasks::Stored::History(_)
+                                | tasks::Stored::Milestone(_),
                             )),
                         ) => false,
                         (root::Range::Core, root::Record::Core(_))

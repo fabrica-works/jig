@@ -36,6 +36,32 @@ pub struct History {
     pub change: Change,
     pub reason: Box<[u8]>,
     pub proposal: Option<Box<crate::Proposal>>,
+    pub at: skein_lib::Wall,
+    pub amendment: Option<Box<AmendmentHistory>>,
+}
+
+/// Immutable settings before and after an admitted amendment.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Settings {
+    pub spec: Spec,
+    pub wake: WakePolicy,
+    pub dependencies: Box<[u64]>,
+    pub authority: Authority,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AmendmentHistory {
+    pub before: Settings,
+    pub after: Settings,
+}
+
+fn settings(task: &crate::TaskRecord) -> Settings {
+    Settings {
+        spec: task.spec.clone(),
+        wake: task.wake,
+        dependencies: task.dependencies.clone(),
+        authority: task.authority.clone(),
+    }
 }
 
 /// One immutable lifecycle milestone, identified independently of semantic revisions.
@@ -44,6 +70,7 @@ pub struct Milestone {
     pub task: u64,
     pub position: u64,
     pub phase: Phase,
+    pub at: skein_lib::Wall,
 }
 
 /// One kind of durable task-tree change.
@@ -64,23 +91,25 @@ pub enum Change {
 pub(crate) fn history(
     domain: &mut Domain,
     number: u64,
+    at: skein_lib::Wall,
     by: Party,
     change: Change,
     reason: &[u8],
     out: &mut Queue<Request>,
 ) {
-    let task = task_mut(domain, number).expect("history task live");
+    save_history(
+        domain,
+        History { task: number, revision: 0, by, change, reason: reason.into(), proposal: None, at, amendment: None },
+        out,
+    );
+}
+
+fn save_history(domain: &mut Domain, mut row: History, out: &mut Queue<Request>) {
+    let task = task_mut(domain, row.task).expect("history task live");
     task.record.revision = task.record.revision.checked_add(1).expect("revision preflighted");
-    out.push(Request::Save {
-        record: Stored::History(History {
-            task: number,
-            revision: task.record.revision,
-            by,
-            change,
-            reason: reason.into(),
-            proposal: None,
-        }),
-    });
+    row.revision = task.record.revision;
+    crate::activity::append(&mut task.record, row.at, crate::Line::Decided { revision: row.revision }, out);
+    out.push(Request::Save { record: Stored::History(row) });
 }
 
 #[expect(
@@ -198,6 +227,7 @@ pub(crate) fn amend(
         hits: 1,
         eligible: true,
     };
+    let before = settings(old);
     let prepared = crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::Merged)
         .expect("authenticated amendment has a merged inbox slot");
     if let Some(authority) = &amendment.authority
@@ -234,10 +264,25 @@ pub(crate) fn amend(
     }
     task.record.last_message = message;
     task.record.inbox = prepared.inbox;
+    crate::activity::message(&mut task.record, &prepared.activity_word, out);
     if attempt.is_some() {
         task.record.narrowing = true;
     }
-    history(domain, number, by, Change::Amended, &amendment.reason, out);
+    let after = settings(&task.record);
+    save_history(
+        domain,
+        History {
+            task: number,
+            revision: 0,
+            by,
+            change: Change::Amended,
+            reason: amendment.reason,
+            proposal: None,
+            at: env.wall,
+            amendment: Some(Box::new(AmendmentHistory { before, after })),
+        },
+        out,
+    );
     publish(domain, env, number, out);
     if let Some(attempt) = attempt {
         out.push(Request::Stop { task: number, attempt });
@@ -287,7 +332,15 @@ pub(crate) fn prioritise(
     for (number, priority) in goals {
         let task = task_mut(domain, *number).expect("priority preflight found task");
         task.record.tracked = Some(*priority);
-        history(domain, *number, Party::Person(person), Change::Prioritised { priority: *priority }, &[], out);
+        history(
+            domain,
+            *number,
+            env.wall,
+            Party::Person(person),
+            Change::Prioritised { priority: *priority },
+            &[],
+            out,
+        );
         publish(domain, env, *number, out);
     }
     out.push(Request::Done { reply_to: to });
@@ -354,7 +407,7 @@ pub(crate) fn apply(
                 }
             }
             for child in selected.into_boxed() {
-                history(domain, child, by, Change::Cancelled, &reason, out);
+                history(domain, child, env.wall, by, Change::Cancelled, &reason, out);
             }
             crate::closing::cancel_tree(domain, env, number, by, &reason, out);
             out.push(Request::Done { reply_to: to });
@@ -388,7 +441,7 @@ pub(crate) fn apply(
             }
             task.record.tries = Tries::NONE;
             task.record.refusals = 0;
-            history(domain, number, by, Change::Released, &[], out);
+            history(domain, number, env.wall, by, Change::Released, &[], out);
             publish(domain, env, number, out);
             if record(domain, number).expect("released task live").phase == Phase::Active(Active::Due) {
                 crate::domain::activate(domain, number, out);

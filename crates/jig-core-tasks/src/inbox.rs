@@ -18,6 +18,8 @@ pub(crate) enum Admission {
 pub(crate) struct Prepared {
     pub previous: Option<u64>,
     pub word: Word,
+    /// Admission before unread hint merging changes its time, kind or hit count.
+    pub activity_word: Word,
     pub inbox: Box<[Word]>,
 }
 
@@ -58,6 +60,7 @@ pub(crate) fn prepare(
         }
         Admission::RoomKept | Admission::Merged => {}
     }
+    let activity_word = word.clone();
     let previous = if task.last_message == 0 { None } else { Some(task.last_message) };
     let key = match admission {
         Admission::Merged => merge_key(word.kind),
@@ -97,7 +100,7 @@ pub(crate) fn prepare(
         }
     }
     inbox.push(word.clone()).expect("admitted inbox room");
-    Some(Prepared { previous, word, inbox: inbox.into_boxed() })
+    Some(Prepared { previous, word, activity_word, inbox: inbox.into_boxed() })
 }
 
 /// Account for messages already waiting and the result credit reserved for
@@ -272,6 +275,7 @@ pub(crate) fn message(
     let task = task_mut(domain, number).expect("admitted task still live");
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
+    crate::activity::message(&mut task.record, &prepared.activity_word, out);
     if let Some(question) = answer {
         let mut credits = List::with_capacity(env.limits.inbox_messages);
         for credit in &task.record.questions {
@@ -340,6 +344,7 @@ pub(crate) fn delegate_result(
     let task = task_mut(domain, number).expect("requester remains live");
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
+    crate::activity::message(&mut task.record, &prepared.activity_word, out);
     publish(domain, env, number, out);
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
 }
@@ -361,6 +366,7 @@ pub(crate) fn proposal_decision(
     let task = task_mut(domain, number).expect("proposal's live proposer");
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
+    crate::activity::message(&mut task.record, &prepared.activity_word, out);
     publish(domain, env, number, out);
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
 }

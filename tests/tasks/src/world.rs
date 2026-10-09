@@ -625,6 +625,7 @@ impl World {
                 | Stored::Ended(_)
                 | Stored::Stub(_)
                 | Stored::Ledger(_)
+                | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
                 | Stored::PersonProposal(_) => None,
@@ -715,6 +716,7 @@ impl World {
                 | Stored::Pool(_)
                 | Stored::Stub(_)
                 | Stored::Ledger(_)
+                | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
                 | Stored::PersonProposal(_) => None,
@@ -732,6 +734,7 @@ impl World {
                 Stored::Ended(_)
                 | Stored::Stub(_)
                 | Stored::Ledger(_)
+                | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
                 | Stored::PersonProposal(_) => {}
@@ -761,6 +764,7 @@ impl World {
             | Stored::Pool(_)
             | Stored::Stub(_)
             | Stored::Ledger(_)
+            | Stored::Activity(_)
             | Stored::Milestone(_)
             | Stored::History(_)
             | Stored::PersonProposal(_) => {
@@ -788,6 +792,7 @@ impl World {
                 | Key::Stub(_)
                 | Key::Ledger(_)
                 | Key::Milestone { .. }
+                | Key::Activity { .. }
                 | Key::History { .. }
                 | Key::PersonProposal(_) => None,
             })
@@ -850,6 +855,7 @@ impl World {
                 | Stored::Writer(_)
                 | Stored::Pool(_)
                 | Stored::Stub(_)
+                | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
                 | Stored::PersonProposal(_) => None,

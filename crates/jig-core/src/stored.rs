@@ -317,7 +317,10 @@ impl Core {
                 self.view_phases.insert(task.number, (tasks::view_phase(&task.phase), task.tracked)).is_ok()
             }
             tasks::Stored::Ledger(_) | tasks::Stored::Writer(_) | tasks::Stored::Pool(_) => true,
-            tasks::Stored::Ended(_) | tasks::Stored::History(_) | tasks::Stored::Milestone(_) => false,
+            tasks::Stored::Ended(_)
+            | tasks::Stored::History(_)
+            | tasks::Stored::Activity(_)
+            | tasks::Stored::Milestone(_) => false,
         }
     }
 

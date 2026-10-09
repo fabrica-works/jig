@@ -15,6 +15,11 @@ use core::mem::{size_of, size_of_val};
 #[must_use]
 pub fn stored_bytes(record: &Stored) -> Option<u64> {
     match record {
+        Stored::Activity(row) => match &row.line {
+            crate::Line::Words { words, .. } => bytes(words.len()),
+            crate::Line::Heard(word) => bytes(word.words.len()),
+            crate::Line::Decided { .. } | crate::Line::Milestone { .. } => Some(0),
+        },
         Stored::Milestone(row) => phase_bytes(&row.phase),
         Stored::PersonProposal(row) => {
             let mut total = bytes(size_of::<crate::PersonProposal>())?
@@ -34,6 +39,12 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
             let mut total = bytes(row.reason.len())?;
             if let Some(proposal) = &row.proposal {
                 total = total.checked_add(proposal_bytes(proposal)?)?;
+            }
+            if let Some(amendment) = &row.amendment {
+                total = total
+                    .checked_add(bytes(size_of::<crate::AmendmentHistory>())?)?
+                    .checked_add(settings_bytes(&amendment.before)?)?
+                    .checked_add(settings_bytes(&amendment.after)?)?;
             }
             Some(total)
         }
@@ -279,4 +290,10 @@ fn task_bytes(task: &TaskRecord) -> Option<u64> {
         .checked_add(bytes(size_of_val(&*task.waiting_on))?)?
         .checked_add(inbox_bytes)?
         .checked_add(saved_bytes)
+}
+
+fn settings_bytes(value: &crate::Settings) -> Option<u64> {
+    spec_bytes(&value.spec)?
+        .checked_add(authority_bytes(&value.authority)?)?
+        .checked_add(bytes(size_of_val(&*value.dependencies))?)
 }

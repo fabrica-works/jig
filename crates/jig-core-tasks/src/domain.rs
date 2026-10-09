@@ -400,6 +400,7 @@ pub(crate) fn output_bound(limits: &Limits) -> Option<u32> {
         .checked_add(limits.tasks.checked_mul(limits.subscriptions)?.checked_mul(2)?)?
         .checked_add(crate::limits::stub_capacity(limits)?)?
         .checked_add(limits.tasks.checked_mul(limits.holdings)?.checked_mul(3)?)?
+        .checked_add(crate::activity::lines_per_decision(limits)?)?
         .checked_add(8)
 }
 
@@ -750,25 +751,28 @@ pub(crate) fn activate(domain: &mut Domain, number: u64, out: &mut Queue<Request
     });
 }
 
-fn milestone(domain: &mut Domain, number: u64, out: &mut Queue<Request>) {
+fn milestone(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
     let task = task_mut(domain, number).expect("milestone task is live");
     if task.observed_phase.as_ref() == Some(&task.record.phase) {
         return;
     }
     task.record.milestone = task.record.milestone.checked_add(1).expect("task history position fits");
     task.observed_phase = Some(task.record.phase.clone());
+    let position = task.record.milestone;
+    crate::activity::append(&mut task.record, env.wall, crate::Line::Milestone { position }, out);
     out.push(Request::Save {
         record: Stored::Milestone(crate::Milestone {
             task: number,
             position: task.record.milestone,
             phase: task.record.phase.clone(),
+            at: env.wall,
         }),
     });
 }
 
 pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
-    crate::proposals::withdraw_on_close(domain, number, out);
-    milestone(domain, number, out);
+    crate::proposals::withdraw_on_close(domain, env, number, out);
+    milestone(domain, env, number, out);
     let task = task_mut(domain, number).expect("published task is live");
     let held = match task.record.phase {
         Phase::Held { why, .. } => Some(why),
@@ -1006,6 +1010,7 @@ pub(crate) fn make_admitted(
                 revision: 0,
                 revisions: crate::Revisions { hold: 0, spec: 0, person: 0 },
                 milestone: 0,
+                activity: 0,
                 narrowing: false,
                 result_position: 0,
                 escalation: crate::Escalation::Unheld { revision: 0 },

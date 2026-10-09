@@ -780,7 +780,10 @@ impl World {
                             | core::CoreRecord::EscalationDecision(_),
                         )
                         | core::Record::Tasks(
-                            tasks::Stored::History(_) | tasks::Stored::Ended(_) | tasks::Stored::Milestone(_),
+                            tasks::Stored::History(_)
+                            | tasks::Stored::Activity(_)
+                            | tasks::Stored::Ended(_)
+                            | tasks::Stored::Milestone(_),
                         ),
                     ) => continue,
                     root::Record::Core(

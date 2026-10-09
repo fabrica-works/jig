@@ -322,7 +322,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     }
     crate::funders::end(domain, env, number, out);
     ended.phase = Phase::Ended(ending.clone());
-    end_milestone(&mut ended, out);
+    end_milestone(&mut ended, env.wall, out);
     ended.ended_at = Some(env.wall);
     let id = domain.names.remove(&number).expect("ending name exists");
     crate::holds::release(domain, number);
@@ -403,13 +403,16 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     fact(domain, Fact::Ended { task: number, status });
 }
 
-fn end_milestone(ended: &mut crate::TaskRecord, out: &mut Queue<Request>) {
+fn end_milestone(ended: &mut crate::TaskRecord, at: skein_lib::Wall, out: &mut Queue<Request>) {
     ended.milestone = ended.milestone.checked_add(1).expect("task history position fits");
+    let position = ended.milestone;
+    crate::activity::append(ended, at, crate::Line::Milestone { position }, out);
     out.push(Request::Save {
         record: Stored::Milestone(crate::Milestone {
             task: ended.number,
             position: ended.milestone,
             phase: ended.phase.clone(),
+            at,
         }),
     });
 }

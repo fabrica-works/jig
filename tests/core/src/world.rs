@@ -97,7 +97,7 @@ pub fn limits() -> root::Limits {
         + jig_test_connector::MAX_OUT * 2
         + tasks.tasks
         + 6;
-    root::Limits {
+    let mut limits = root::Limits {
         journal: JournalLimits { commits: 3, held: 2000, writes: writes.max(2000), now: 32, release: 32 },
         routes: 200,
         connector: jig_test_connector_world::LIMITS,
@@ -159,7 +159,18 @@ pub fn limits() -> root::Limits {
                 recalled: 1,
             },
         },
-    }
+    };
+    let room = core::room_max(&limits.core).expect("fixture core bounds");
+    let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two connectors");
+    limits.journal.writes = limits.journal.writes.max(room.writes.checked_add(connectors).expect("fixture writes"));
+    limits.journal.held = limits.journal.held.max(
+        room.held
+            .checked_add(connectors)
+            .expect("fixture deliveries")
+            .checked_mul(limits.journal.commits)
+            .expect("fixture flights"),
+    );
+    limits
 }
 
 fn authority_limits() -> authority::Limits {

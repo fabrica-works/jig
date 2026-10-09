@@ -379,6 +379,7 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
         | tasks::Stored::Writer(_)
         | tasks::Stored::Pool(_)
         | tasks::Stored::Stub(_)
+        | tasks::Stored::Activity(_)
         | tasks::Stored::Milestone(_) => None,
     }
 }

@@ -373,6 +373,7 @@ fn restore_refuses_task_funding_outside_its_requester_ancestry() {
             | Stored::Writer(_)
             | Stored::Pool(_)
             | Stored::Stub(_)
+            | Stored::Activity(_)
             | Stored::Milestone(_)
             | Stored::History(_)
             | Stored::PersonProposal(_) => {}
@@ -433,7 +434,7 @@ fn waiting_restore_requests_recheck_once_and_identical_recipient_changes_nothing
         let mut domain = Domain::new(&LIMITS, 37, Box::new([1]));
         let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
         for record in source.records.values() {
-            if matches!(record, Stored::Milestone(_) | Stored::History(_) | Stored::Ended(_)) {
+            if matches!(record, Stored::Milestone(_) | Stored::Activity(_) | Stored::History(_) | Stored::Ended(_)) {
                 continue;
             }
             let mut record = record.clone();

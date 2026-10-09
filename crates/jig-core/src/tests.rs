@@ -1020,6 +1020,8 @@ fn documents_history_retains_every_change_kind_and_a_passed_proposal_state() {
     ];
     for change in changes {
         let row = tasks::History {
+            amendment: None,
+            at: Wall::EPOCH,
             task: 2,
             revision: 5,
             by: tasks::Party::Person(1),
@@ -1134,6 +1136,7 @@ fn documents_project_exposes_two_roles_members_pool_and_resource_parts() {
 fn documents_lifecycle_history_keeps_holds_and_endings() {
     let (_, limits) = make_tree();
     let row = tasks::Milestone {
+        at: Wall::EPOCH,
         task: 2,
         position: 3,
         phase: tasks::Phase::Held { was: tasks::Was::Active(tasks::Active::Due), why: tasks::Hold::Deadline },
@@ -1142,12 +1145,17 @@ fn documents_lifecycle_history_keeps_holds_and_endings() {
     assert_eq!(line.position, 3);
     assert_eq!(
         line.phase,
-        MilestonePhase::Held { before: PriorPhase::Active(tasks::Active::Due), why: tasks::Hold::Deadline }
+        MilestonePhase::Held {
+            before: PriorPhase::Active(tasks::Active::Due),
+            why: tasks::Hold::Deadline,
+            ending: None
+        }
     );
-    assert_eq!(line.at, None);
+    assert_eq!(line.at, Some(Wall::EPOCH));
     let line = milestone_from_row(
         &limits,
         &tasks::Milestone {
+            at: Wall::EPOCH,
             task: 2,
             position: 4,
             phase: tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::from(&b"Failure"[..]) }),

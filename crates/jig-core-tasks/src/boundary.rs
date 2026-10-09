@@ -734,6 +734,8 @@ pub struct TaskRecord {
     pub revision: u64,
     /// Last lifecycle milestone, independent of semantic amendments and proposals.
     pub milestone: u64,
+    /// Last immutable activity position; restored with live state, never reused.
+    pub activity: u64,
     /// An admitted authority narrowing stopped the current run; its terminal starts the task anew.
     pub narrowing: bool,
     /// Root-issued commit order for an ended result; zero while live and until the root saves an ending.
@@ -830,6 +832,8 @@ pub struct TaskRecord {
 /// in this child. (domain/tasks.md, section 2).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Key {
+    /// One immutable line in the ordered task activity range.
+    Activity { task: u64, position: u64 },
     /// A person-origin proposal, retained as history after its decision.
     PersonProposal(u64),
     /// Immutable plan change outside the live arena.
@@ -854,6 +858,8 @@ pub enum Key {
 /// funding, writer slots and pool counts are restored before admission.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Stored {
+    /// Historical activity loaded on demand, never restored as live state.
+    Activity(crate::ActivityLine),
     /// One immutable lifecycle milestone, loaded on demand.
     Milestone(crate::Milestone),
     /// Pending or decided person-origin goal proposal.
@@ -893,6 +899,7 @@ impl Stored {
         match self {
             Stored::PersonProposal(row) => Key::PersonProposal(row.number),
             Stored::History(row) => Key::History { task: row.task, revision: row.revision },
+            Stored::Activity(row) => Key::Activity { task: row.task, position: row.position },
             Stored::Milestone(row) => Key::Milestone { task: row.task, position: row.position },
             Stored::Live(record) => Key::Live(record.number),
             Stored::Ended(record) => Key::Ended(record.number),

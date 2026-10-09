@@ -60,6 +60,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod activity;
 mod admission;
 mod batch;
 mod boundary;
@@ -89,6 +90,7 @@ mod tests;
 mod value;
 mod wake;
 mod writers;
+pub use activity::{ActivityLine, Line, line_bytes_limit, lines_per_decision};
 pub use batch::{bounded_batch, valid_authority, valid_contract, valid_spec};
 pub use boundary::{
     Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor, Hold,
@@ -98,7 +100,7 @@ pub use boundary::{
     RunContext, SavedResource, Spec, Stage, Status, Stored, Stub, Subscription, SubscriptionKind, Taken, TaskRecord,
     TaskResult, Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
 };
-pub use control::{Amendment, Change, Control, History, Milestone};
+pub use control::{Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings};
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};
 pub use escalation::{Escalation, EscalationContext, EscalationDecision, EscalationHolder, EscalationOutcome};
 pub use facts::Fact;
