@@ -372,9 +372,9 @@ fn dependency_order_negative_verdict_starts_but_failure_holds() {
         assert!(!w.activations.contains(&2));
         w.settle(1);
         if fail {
-            assert_eq!(w.record(2).phase, Phase::Held { was: Was::Waiting, why: Hold::Dependency(1) });
+            assert_eq!(w.record(2).phase, Phase::Held { was: Was::Waiting, why: Hold::Dependency(1), source: None });
             w.restart();
-            assert_eq!(w.record(2).phase, Phase::Held { was: Was::Waiting, why: Hold::Dependency(1) });
+            assert_eq!(w.record(2).phase, Phase::Held { was: Was::Waiting, why: Hold::Dependency(1), source: None });
         } else {
             w.restart();
             w.claim(2, 2);
@@ -436,7 +436,10 @@ fn every_failure_class_holds_after_its_retry_budget() {
                 w.advance();
             }
         }
-        assert_eq!(w.record(1).phase, Phase::Held { was: Was::Active(Active::Due), why: Hold::Failures(class) });
+        assert_eq!(
+            w.record(1).phase,
+            Phase::Held { was: Was::Active(Active::Due), why: Hold::Failures(class), source: None }
+        );
         assert_eq!(w.record(1).tries.of(class), 3);
         let before = w.records.clone();
         w.restart();
@@ -457,7 +460,10 @@ fn a_delegate_failing_past_its_tries_is_held_and_released_finishes() {
             w.advance();
         }
     }
-    assert_eq!(w.record(2).phase, Phase::Held { was: Was::Active(Active::Due), why: Hold::Failures(Class::Run) });
+    assert_eq!(
+        w.record(2).phase,
+        Phase::Held { was: Was::Active(Active::Due), why: Hold::Failures(Class::Run), source: None }
+    );
     assert_eq!(w.record(2).tries.run, 3);
     w.restart();
     let reply_to = w.to();
@@ -494,9 +500,9 @@ fn hold_reasons_survive_restart_and_release_without_losing_task_state() {
         let mut w = World::new(106 + u64::try_from(index).expect("bounded reason index"), LIMITS);
         w.make(Party::Person(1), vec![task(1, &[])]);
         w.send(Event::Hold { task: 1, why: reason });
-        assert_eq!(w.record(1).phase, Phase::Held { was: Was::Active(Active::Due), why: reason });
+        assert_eq!(w.record(1).phase, Phase::Held { was: Was::Active(Active::Due), why: reason, source: None });
         w.restart();
-        assert_eq!(w.record(1).phase, Phase::Held { was: Was::Active(Active::Due), why: reason });
+        assert_eq!(w.record(1).phase, Phase::Held { was: Was::Active(Active::Due), why: reason, source: None });
         let reply_to = w.to();
         let call = reply_to.into_token().raw();
         w.send(Event::Control {
@@ -520,7 +526,7 @@ fn releasing_a_held_closing_task_retries_its_unsettled_effects() {
     w.claim(1, 1);
     w.finish(1);
     w.send(Event::Hold { task: 1, why: Hold::EffectFailed });
-    assert!(matches!(w.record(1).phase, Phase::Held { was: Was::Closing(_), why: Hold::EffectFailed }));
+    assert!(matches!(w.record(1).phase, Phase::Held { was: Was::Closing(_), why: Hold::EffectFailed, .. }));
     w.restart();
     let reply_to = w.to();
     let call = reply_to.into_token().raw();
@@ -574,7 +580,11 @@ fn held_running_task_waits_for_terminal_and_retains_its_hold() {
     assert!(w.results.is_empty());
     assert!(matches!(
         w.record(1).phase,
-        Phase::Held { was: Was::Closing(jig_core_tasks::Closing { stage: Stage::Delegates, .. }), why: Hold::Stopped }
+        Phase::Held {
+            was: Was::Closing(jig_core_tasks::Closing { stage: Stage::Delegates, .. }),
+            why: Hold::Stopped,
+            ..
+        }
     ));
 }
 

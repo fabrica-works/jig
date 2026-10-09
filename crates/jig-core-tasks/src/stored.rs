@@ -51,6 +51,11 @@ fn valid_phase(task: &TaskRecord, limits: &Limits) -> bool {
     {
         return false;
     }
+    if let Phase::Held { why, source, .. } = &task.phase
+        && !crate::hold_origin::valid(limits, *why, source.as_deref())
+    {
+        return false;
+    }
     match task.executor {
         Executor::Person(_) if !person_phase(&task.phase) => return false,
         Executor::Person(_) | Executor::Agent { .. } | Executor::Procedure { .. } => {}

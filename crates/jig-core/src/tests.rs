@@ -649,7 +649,7 @@ fn documents_goal_progress_counts_every_phase_including_ended_plan_rows() {
             stage: tasks::Stage::Delegates,
             ending: tasks::Ending::Failed { reason: Box::new([]) },
         }),
-        tasks::Phase::Held { was: tasks::Was::Waiting, why: tasks::Hold::Budget },
+        tasks::Phase::Held { was: tasks::Was::Waiting, why: tasks::Hold::Budget, source: None },
         tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: Box::new([]) })),
         tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::new([]) }),
         tasks::Phase::Ended(tasks::Ending::Cancelled {
@@ -1237,16 +1237,21 @@ fn documents_lifecycle_history_keeps_holds_and_endings() {
         at: Wall::EPOCH,
         task: 2,
         position: 3,
-        phase: tasks::Phase::Held { was: tasks::Was::Active(tasks::Active::Due), why: tasks::Hold::Deadline },
+        phase: tasks::Phase::Held {
+            was: tasks::Was::Active(tasks::Active::Due),
+            why: tasks::Hold::Deadline,
+            source: None,
+        },
     };
-    let line = milestone_from_row(&limits, &row);
+    let line = milestone_from_row(&limits, &row).unwrap();
     assert_eq!(line.position, 3);
     assert_eq!(
         line.phase,
         MilestonePhase::Held {
             before: PriorPhase::Active(tasks::Active::Due),
             why: tasks::Hold::Deadline,
-            ending: None
+            ending: None,
+            source: None
         }
     );
     assert_eq!(line.at, Some(Wall::EPOCH));
@@ -1259,6 +1264,7 @@ fn documents_lifecycle_history_keeps_holds_and_endings() {
             phase: tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::from(&b"Failure"[..]) }),
         },
     );
+    let line = line.unwrap();
     let MilestonePhase::Ended(Ending::Failed(words)) = line.phase else { panic!() };
     assert_eq!(words.bytes.as_ref(), b"Failure");
 }
@@ -2649,3 +2655,5 @@ fn deployment_capacity_carries_direct_batch_refusals_and_task_history_cut() {
 mod application_documents;
 
 mod chip_phase;
+
+mod hold_origin;

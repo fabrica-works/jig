@@ -18,7 +18,7 @@ use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 
 const RETRY: Retry = Retry { retries: 2, base: Duration::from_millis(10), max: Duration::from_secs(1) };
 
-const LIMITS: Limits = Limits {
+pub(super) const LIMITS: Limits = Limits {
     tasks: 16,
     funders: 32,
     project_tasks: 16,
@@ -72,7 +72,7 @@ fn authority() -> Authority {
 }
 
 #[must_use]
-fn task(number: u64, dependencies: &[u64]) -> New {
+pub(super) fn task(number: u64, dependencies: &[u64]) -> New {
     New {
         number,
         project: 1,
@@ -90,18 +90,18 @@ fn task(number: u64, dependencies: &[u64]) -> New {
     }
 }
 
-struct Harness {
-    domain: Domain,
-    env: Env<Limits>,
-    stored: BTreeMap<Key, Stored>,
+pub(super) struct Harness {
+    pub(super) domain: Domain,
+    pub(super) env: Env<Limits>,
+    pub(super) stored: BTreeMap<Key, Stored>,
 }
 
-fn to() -> ReplyTo {
+pub(super) fn to() -> ReplyTo {
     ReplyTo::new(Token::new(1))
 }
 
 impl Harness {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let mut test = Self {
             domain: Domain::new(&LIMITS, 91, Box::new([1])),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS },
@@ -112,7 +112,7 @@ impl Harness {
         test
     }
 
-    fn send(&mut self, event: Event) -> Vec<Request> {
+    pub(super) fn send(&mut self, event: Event) -> Vec<Request> {
         let mut out = Queue::with_capacity(max_out(&LIMITS));
         step(&mut self.domain, &self.env, event, &mut out);
         let mut requests = Vec::new();
@@ -131,7 +131,7 @@ impl Harness {
         requests
     }
 
-    fn make(&mut self, batch: Vec<New>) {
+    pub(super) fn make(&mut self, batch: Vec<New>) {
         let out = self.send(Event::Make { reply_to: to(), creator: Party::Person(9), batch: batch.into_boxed_slice() });
         assert!(
             out.iter().any(|request| match request {
@@ -165,12 +165,12 @@ impl Harness {
         );
     }
 
-    fn route(&mut self, number: u64, holder: EscalationHolder, entry: u64) {
+    pub(super) fn route(&mut self, number: u64, holder: EscalationHolder, entry: u64) {
         let revision = self.revisions(number).hold;
         self.send(Event::RoutedEscalation { task: number, revision, holder, entry });
     }
 
-    fn restart(&mut self) {
+    pub(super) fn restart(&mut self) {
         self.domain = Domain::new(&LIMITS, 91, Box::new([1]));
         let rows: Vec<_> = self
             .stored

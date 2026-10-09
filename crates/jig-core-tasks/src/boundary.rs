@@ -600,9 +600,18 @@ pub enum Phase {
         was: Was,
 
         why: Hold,
+        /// Exact connector-owned cause, retained in lifecycle milestones.
+        source: Option<Box<HoldSource>>,
     },
     /// Historical outcome outside the live arena; restoring it as live is refused.
     Ended(/** Historical final ending; this phase is excluded from the live restore arena. */ Ending),
+}
+
+/// Reference to the connector-owned explanation of a hold (client/domain/objects.md, 5).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum HoldSource {
+    Resource(Name),
+    Effect { connector: u16, entry: u64 },
 }
 
 /// A connector resource name opaque to the tasks hub (domain/tasks.md, 6.1).
@@ -1394,6 +1403,8 @@ pub enum Event {
         /// Authorized or root-classified hold reason; tasks judges no policy here.
         why: Hold,
     },
+    /// Connector-classified hold with its exact opaque resource or effect identity.
+    HoldFrom { task: u64, why: Hold, source: Box<HoldSource> },
     /// Root notification that prior effects settled; matching `Effects` stages advance.
     EffectsSettled {
         /// Closing task whose prior effects have settled.

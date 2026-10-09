@@ -123,6 +123,8 @@ pub enum Event {
         decision: Box<tasks::ProcedureDecision>,
     },
     Outbox {
+        /// Number of the connector that owns this outbox entry.
+        connector: u16,
         entry: u64,
         task: u64,
         outcome: OutboxOutcome,
@@ -464,7 +466,14 @@ impl Core {
 
     /// Decide whether a connector's settled write holds or wakes its task.
     #[must_use]
-    pub fn connector_outbox(&self, task: u64, outcome: OutboxOutcome, procedure: bool) -> Option<tasks::Event> {
+    pub fn connector_outbox(
+        &self,
+        task: u64,
+        connector: u16,
+        entry: u64,
+        outcome: OutboxOutcome,
+        procedure: bool,
+    ) -> Option<tasks::Event> {
         let cancelling = match self.tasks.task(task) {
             Some(row) => match &row.phase {
                 tasks::Phase::Closing(closing) | tasks::Phase::Held { was: tasks::Was::Closing(closing), .. } => {
@@ -481,11 +490,21 @@ impl Core {
             None => false,
         };
         match outcome {
-            OutboxOutcome::Held { entry } => Some(tasks::Event::Hold { task, why: tasks::Hold::Uncertain { entry } }),
-            OutboxOutcome::Failed if !procedure => Some(tasks::Event::Hold { task, why: tasks::Hold::EffectFailed }),
-            OutboxOutcome::Withdrawn if !cancelling && !procedure => {
-                Some(tasks::Event::Hold { task, why: tasks::Hold::EffectFailed })
-            }
+            OutboxOutcome::Held { entry } => Some(tasks::Event::HoldFrom {
+                task,
+                why: tasks::Hold::Uncertain { entry },
+                source: Box::new(tasks::HoldSource::Effect { connector, entry }),
+            }),
+            OutboxOutcome::Failed if !procedure => Some(tasks::Event::HoldFrom {
+                task,
+                why: tasks::Hold::EffectFailed,
+                source: Box::new(tasks::HoldSource::Effect { connector, entry }),
+            }),
+            OutboxOutcome::Withdrawn if !cancelling && !procedure => Some(tasks::Event::HoldFrom {
+                task,
+                why: tasks::Hold::EffectFailed,
+                source: Box::new(tasks::HoldSource::Effect { connector, entry }),
+            }),
             OutboxOutcome::Made | OutboxOutcome::Failed | OutboxOutcome::Withdrawn | OutboxOutcome::NotMade
                 if procedure =>
             {

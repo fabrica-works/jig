@@ -433,7 +433,7 @@ fn unresolved_or_inconsistent_escalation_rows_refuse_before_retention() {
     source.make(Party::Person(1), vec![task(1, &[])]);
     for corrupt in 0..6 {
         let mut task = source.record(1).clone();
-        task.phase = Phase::Held { was: Was::Active(Active::Due), why: Hold::Deadline };
+        task.phase = Phase::Held { was: Was::Active(Active::Due), why: Hold::Deadline, source: None };
         task.escalation = match corrupt {
             0 => Escalation::Routing { revision: 1 },
             1 => Escalation::Unheld { revision: 0 },
@@ -476,7 +476,7 @@ fn waiting_restore_requests_recheck_once_and_identical_recipient_changes_nothing
             }
             let mut record = record.clone();
             if let Stored::Live(task) = &mut record {
-                task.phase = Phase::Held { was: Was::Active(Active::Due), why: Hold::Deadline };
+                task.phase = Phase::Held { was: Was::Active(Active::Due), why: Hold::Deadline, source: None };
                 task.revisions.hold = 4;
                 task.escalation = if rejected {
                     Escalation::Rejected { revision: 4, by: 1, reason: b"no".as_slice().into() }

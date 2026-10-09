@@ -294,8 +294,8 @@ pub(crate) fn activation(
         End::Failed(Class::Lost) => true,
         End::Failed(_) | End::Parked | End::Refused | End::Finished { .. } | End::FinishedWithFollowups { .. } => false,
     };
-    let held = match old.phase {
-        Phase::Held { why, .. } => Some(why),
+    let held = match &old.phase {
+        Phase::Held { why, source, .. } => Some((*why, source.clone())),
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => None,
     };
     let closing = match &old.phase {
@@ -398,7 +398,7 @@ pub(crate) fn activation(
         task.record.saved = tags;
     }
     task.record.phase = match held {
-        Some(why) => Phase::Held { was: was(next), why },
+        Some((why, source)) => Phase::Held { was: was(next), why, source },
         None => next,
     };
     crate::writers::answered(domain, env, number, attempt, lost_writer, out);
@@ -433,7 +433,7 @@ fn failure(domain: &mut Domain, env: &Env<Limits>, number: u64, class: Class) ->
     fact(domain, Fact::Failed { task: number, class });
     if times > retry.retries {
         fact(domain, Fact::Held { task: number, why: Hold::Failures(class) });
-        Phase::Held { was: Was::Active(Active::Due), why: Hold::Failures(class) }
+        Phase::Held { was: Was::Active(Active::Due), why: Hold::Failures(class), source: None }
     } else {
         let duration = crate::failures::backoff(times, retry, &mut domain.rng);
         Phase::Active(Active::BackingOff { until: wall_after(env, duration) })
@@ -463,6 +463,20 @@ pub(crate) fn preparation_failed(domain: &mut Domain, env: &Env<Limits>, number:
 }
 
 pub(crate) fn hold(domain: &mut Domain, env: &Env<Limits>, number: u64, why: Hold, out: &mut Queue<Request>) {
+    hold_from(domain, env, number, why, None, out);
+}
+
+pub(crate) fn hold_from(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    number: u64,
+    why: Hold,
+    source: Option<Box<crate::HoldSource>>,
+    out: &mut Queue<Request>,
+) {
+    if !crate::hold_origin::valid(&env.limits, why, source.as_deref()) {
+        return;
+    }
     if !why.valid() {
         return;
     }
@@ -473,7 +487,11 @@ pub(crate) fn hold(domain: &mut Domain, env: &Env<Limits>, number: u64, why: Hol
         return;
     };
     match task.phase {
-        Phase::Held { why: current, .. } if current == why => return,
+        Phase::Held { why: current, source: ref previous, .. }
+            if current == why && (source.is_none() || previous == &source) =>
+        {
+            return;
+        }
         Phase::Ended(_) => return,
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } => {}
     }
@@ -483,8 +501,12 @@ pub(crate) fn hold(domain: &mut Domain, env: &Env<Limits>, number: u64, why: Hol
     let task = task_mut(domain, number).expect("hold names live task");
     let old = core::mem::replace(&mut task.record.phase, Phase::Waiting);
     task.record.phase = match old {
-        Phase::Held { was, .. } => Phase::Held { was, why },
-        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => Phase::Held { was: was(old), why },
+        Phase::Held { was, source: previous, why: before } => {
+            Phase::Held { was, why, source: if before == why && source.is_none() { previous } else { source } }
+        }
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => {
+            Phase::Held { was: was(old), why, source }
+        }
     };
     publish(domain, env, number, out);
     fact(domain, Fact::Held { task: number, why });

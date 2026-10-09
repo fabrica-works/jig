@@ -200,6 +200,25 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
                 },
                 cause: tasks::Cause::Priced { cumulative: 10 },
             });
+            let mut remaining = l.hold_bytes as usize;
+            let mut path = Vec::new();
+            for segment in 0..l.hold_segments {
+                let length = if segment + 1 == l.hold_segments { remaining } else { remaining / 2 };
+                path.push(vec![1; length].into_boxed_slice());
+                remaining -= length;
+            }
+            m.event(Event::HoldFrom {
+                task: number,
+                why: Hold::Drift,
+                source: Box::new(tasks::HoldSource::Resource(tasks::Name {
+                    connector: 1,
+                    path: path.into_boxed_slice(),
+                })),
+            });
+            assert!(matches!(
+                &m.d.task(number).expect("live held task").phase,
+                tasks::Phase::Held { source: Some(_), .. }
+            ));
             m.event(Event::Hold { task: number, why: Hold::Effects });
             m.event(Event::EffectsSettled { task: number });
             m.event(Event::Settled { task: number });
@@ -350,11 +369,21 @@ fn borrowed_stored_bytes_matches_allocator_for_every_retained_row() {
     };
     record.phase = tasks::Phase::Held {
         was: tasks::Was::Closing(tasks::Closing { stage: tasks::Stage::Delegates, ending: ending.clone() }),
-        why: Hold::Budget,
+        why: Hold::Drift,
+        source: Some(Box::new(tasks::HoldSource::Resource(tasks::Name {
+            connector: 1,
+            path: Box::new([Box::new([8, 9]), Box::new([10])]),
+        }))),
     };
     record.escalation = tasks::Escalation::Rejected { revision: 1, by: 1, reason: Box::new([6, 7, 8, 9]) };
     let mut rows = world.records.values().cloned().collect::<Vec<_>>();
     rows.push(Stored::Live(Box::new(record.clone())));
+    rows.push(Stored::Milestone(tasks::Milestone {
+        task: 1,
+        position: 1,
+        phase: record.phase.clone(),
+        at: skein_lib::Wall::EPOCH,
+    }));
     record.phase = tasks::Phase::Ended(ending);
     rows.push(Stored::Ended(Box::new(record)));
     for row in rows {

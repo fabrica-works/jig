@@ -22,8 +22,10 @@ pub enum PartKind {
     Result,
     /// A procedure's panel or kind.
     Procedure,
-    /// An effect's description.
+    /// A proposed effect's description.
     Effect,
+    /// An existing connector-owned outbox entry.
+    Outbox,
 }
 
 /// The core's key for a connector-owned part; keys are never shortened.
@@ -150,6 +152,7 @@ pub enum EscalationState {
 /// A hold's reason, revision and prior lifecycle, with its escalation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct HoldLine {
+    pub source: Option<Part>,
     pub reason: tasks::Hold,
     pub revision: u64,
     pub before: PriorPhase,
@@ -453,9 +456,22 @@ pub(super) fn ending(limits: &Limits, value: &tasks::Ending) -> Ending {
     }
 }
 
-pub(super) fn hold(limits: &Limits, row: &tasks::TaskRecord) -> Option<HoldLine> {
+pub(super) fn hold_source(limits: &Limits, source: Option<&tasks::HoldSource>) -> Result<Option<Part>, Missing> {
+    match source {
+        None => Ok(None),
+        Some(tasks::HoldSource::Resource(name)) => {
+            Ok(Some(part_path(limits, name.connector, PartKind::Resource, &name.path)?))
+        }
+        Some(tasks::HoldSource::Effect { connector, entry }) => {
+            Ok(Some(Part { connector: *connector, kind: PartKind::Outbox, key: PartKey::Number(*entry) }))
+        }
+    }
+}
+
+pub(super) fn hold(limits: &Limits, row: &tasks::TaskRecord) -> Result<Option<HoldLine>, Missing> {
     match &row.phase {
-        tasks::Phase::Held { was, why } => Some(HoldLine {
+        tasks::Phase::Held { was, why, source } => Ok(Some(HoldLine {
+            source: hold_source(limits, source.as_deref())?,
             reason: *why,
             revision: row.revisions.hold,
             before: match was {
@@ -476,8 +492,8 @@ pub(super) fn hold(limits: &Limits, row: &tasks::TaskRecord) -> Option<HoldLine>
             },
             tries: row.tries,
             hold_wait_since: row.hold_wait_since,
-        }),
-        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Ended(_) => None,
+        })),
+        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Ended(_) => Ok(None),
     }
 }
 
@@ -690,7 +706,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         result,
         budget: budget(row),
         authority: authority(limits, &row.authority)?,
-        hold: hold(limits, row),
+        hold: hold(limits, row)?,
         proposals,
         cut,
     })
@@ -864,6 +880,7 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     let task = u64::try_from(size_of::<Task>())
         .ok()?
         .checked_add(text.checked_mul(5)?)?
+        .checked_add(path)?
         .checked_add(chip)?
         .checked_add(List::<Chip>::worst_case(limits.lines)?.checked_add(lines.checked_mul(chip)?)?.checked_mul(2)?)?
         .checked_add(List::<Parameter>::worst_case(limits.lines)?.checked_add(lines.checked_mul(text)?)?)?

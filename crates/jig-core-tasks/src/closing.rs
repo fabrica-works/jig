@@ -360,6 +360,7 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
                     task.record.phase = Phase::Held {
                         was: crate::run::was(core::mem::replace(&mut task.record.phase, Phase::Waiting)),
                         why: Hold::Dependency(number),
+                        source: None,
                     };
                 }
             },

@@ -194,10 +194,25 @@ pub fn phase_bytes(phase: &Phase) -> Option<u64> {
     match phase {
         Phase::Closing(closing) => ending_bytes(&closing.ending),
         Phase::Ended(ending) => ending_bytes(ending),
-        Phase::Held { was, .. } => match was {
-            Was::Closing(closing) => ending_bytes(&closing.ending),
-            Was::Waiting | Was::Active(_) => Some(0),
-        },
+        Phase::Held { was, source, .. } => {
+            let mut total = match was {
+                Was::Closing(closing) => ending_bytes(&closing.ending)?,
+                Was::Waiting | Was::Active(_) => 0,
+            };
+            if let Some(source) = source {
+                total = total.checked_add(bytes(size_of::<crate::HoldSource>())?)?;
+                match &**source {
+                    crate::HoldSource::Resource(name) => {
+                        total = total.checked_add(bytes(size_of_val(&*name.path))?)?;
+                        for segment in &name.path {
+                            total = total.checked_add(bytes(segment.len())?)?;
+                        }
+                    }
+                    crate::HoldSource::Effect { .. } => {}
+                }
+            }
+            Some(total)
+        }
         Phase::Waiting | Phase::Active(_) => Some(0),
     }
 }

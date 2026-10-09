@@ -358,10 +358,16 @@ pub(crate) fn connector(
             }
             complete(core, env, work, &mut out, owner);
         }
-        connector::Event::Outbox { entry, task, outcome } => settled(core, work, &mut out, entry, task, outcome),
+        connector::Event::Outbox { connector, entry, task, outcome } => {
+            settled(core, work, &mut out, connector, entry, task, outcome);
+        }
         connector::Event::Closed { task, connector } => closed(core, &env.limits, work, task, connector),
-        connector::Event::Drift { task, resource: _ } => {
-            work.push(Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Drift }));
+        connector::Event::Drift { task, resource } => {
+            work.push(Event::Tasks(tasks::Event::HoldFrom {
+                task,
+                why: tasks::Hold::Drift,
+                source: Box::new(tasks::HoldSource::Resource(resource)),
+            }));
         }
         connector::Event::Resource { project, name, role, hold } => {
             crate::resources::role(core, &env.limits, project, name.clone(), role);
@@ -1144,6 +1150,7 @@ fn settled(
     core: &mut Core,
     work: &mut Queue<Event>,
     out: &mut Queue<Request>,
+    connector_number: u16,
     entry: u64,
     task: u64,
     outcome: connector::OutboxOutcome,
@@ -1151,7 +1158,9 @@ fn settled(
     let mut found = None;
     for (&key, part) in &core.call_parts {
         match part {
-            CallPart::Effect { connector, entry: number, deadline, .. } if *number == entry && key.task == task => {
+            CallPart::Effect { connector, entry: number, deadline, .. }
+                if *number == entry && key.task == task && *connector == connector_number =>
+            {
                 found = Some((key, *connector, *deadline));
                 break;
             }
@@ -1218,7 +1227,7 @@ fn settled(
         },
         None => false,
     };
-    if let Some(event) = core.connector_outbox(task, outcome, procedure) {
+    if let Some(event) = core.connector_outbox(task, connector_number, entry, outcome, procedure) {
         work.push(Event::Tasks(event));
     }
 }

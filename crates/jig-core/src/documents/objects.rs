@@ -214,7 +214,7 @@ pub enum MilestonePhase {
     Waiting,
     Active(tasks::Active),
     Closing { stage: tasks::Stage, ending: Ending },
-    Held { before: PriorPhase, why: tasks::Hold, ending: Option<Ending> },
+    Held { before: PriorPhase, why: tasks::Hold, source: Option<Part>, ending: Option<Ending> },
     Ended(Ending),
 }
 /// The ended delegate's identity and outcome, made from its retained task row.
@@ -351,7 +351,7 @@ fn action(
         },
         tasks::ProposalAction::Release { task } => ProposalAction::Release {
             task: super::task_tree::link(core, limits, party, *task)?,
-            hold: super::task_tree::hold(limits, super::small::visible(core, party, *task)?),
+            hold: super::task_tree::hold(limits, super::small::visible(core, party, *task)?)?,
         },
     })
 }
@@ -792,9 +792,8 @@ pub fn retained_action(limits: &Limits, number: u64, value: &tasks::ProposalActi
     })
 }
 /// Convert a retained lifecycle milestone without inventing missing actor/time.
-#[must_use]
-pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> MilestoneLine {
-    MilestoneLine {
+pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Result<MilestoneLine, Missing> {
+    Ok(MilestoneLine {
         task: value.task,
         position: value.position,
         at: Some(value.at),
@@ -805,8 +804,9 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Mileston
                 stage: closing.stage,
                 ending: super::task_tree::ending(limits, &closing.ending),
             },
-            tasks::Phase::Held { was, why } => MilestonePhase::Held {
+            tasks::Phase::Held { was, why, source } => MilestonePhase::Held {
                 why: *why,
+                source: super::task_tree::hold_source(limits, source.as_deref())?,
                 ending: match was {
                     tasks::Was::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)),
                     tasks::Was::Waiting | tasks::Was::Active(_) => None,
@@ -819,7 +819,7 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Mileston
             },
             tasks::Phase::Ended(ending) => MilestonePhase::Ended(super::task_tree::ending(limits, ending)),
         },
-    }
+    })
 }
 
 fn settings(limits: &Limits, row: &tasks::Settings) -> Result<AmendmentState, Missing> {

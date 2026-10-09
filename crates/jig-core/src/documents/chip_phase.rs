@@ -96,7 +96,7 @@ pub(super) fn from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<ChipD
         retry: row.retry_notice,
         wake: row.wake,
         person_wait: row.person_wait,
-        hold: super::task_tree::hold(limits, row),
+        hold: super::task_tree::hold(limits, row)?,
         budget: super::task_tree::budget(row),
         activity: row.activity,
         resources_cut: needs_resources
@@ -207,5 +207,6 @@ pub(super) fn heap_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(List::<u64>::worst_case(limits.lines)?)?
         .checked_add(List::<u16>::worst_case(limits.lines)?)?
         .checked_add(List::<ResourceLine>::worst_case(limits.lines)?)?
-        .checked_add(lines.checked_mul(path)?)
+        .checked_add(lines.checked_mul(path)?)?
+        .checked_add(path)
 }

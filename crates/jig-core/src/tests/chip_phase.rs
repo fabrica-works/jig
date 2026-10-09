@@ -27,6 +27,7 @@ fn chip_owner_facts_keep_readiness_retry_hold_and_ending_clocks_distinct() {
     row.phase = tasks::Phase::Held {
         why: tasks::Hold::Failures(tasks::Class::Lost),
         was: tasks::Was::Active(tasks::Active::BackingOff { until: Wall::from_nanos(50) }),
+        source: None,
     };
     row.tries.lost = 2;
     row.retry_notice = Some(tasks::RetryNotice::Failed { class: tasks::Class::Lost, count: 2, allowance: 3 });

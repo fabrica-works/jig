@@ -152,6 +152,17 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?,
         )?
         .checked_add(u64::from(limits.result_bytes).checked_mul(3)?)?
+        .checked_add(
+            // Live phase, observed phase, and bounded transition scratch.
+            3_u64.checked_mul(
+                u64::try_from(size_of::<crate::HoldSource>())
+                    .ok()?
+                    .checked_add(
+                        u64::from(limits.hold_segments).checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?,
+                    )?
+                    .checked_add(u64::from(limits.hold_bytes))?,
+            )?,
+        )?
         .checked_add(u64::from(limits.parameters).checked_mul(u64::try_from(size_of::<Parameter>()).ok()?)?)?
         .checked_add(u64::from(limits.inputs).checked_mul(8)?)?
         .checked_add(u64::from(limits.dependencies).checked_mul(16)?)?

@@ -728,6 +728,7 @@ pub(super) fn route_connector(
                     connector::Outcome::Skipped => core::connector::OutboxOutcome::NotMade,
                 };
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Outbox {
+                    connector: number,
                     entry,
                     task,
                     outcome,

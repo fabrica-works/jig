@@ -600,7 +600,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
             let owner = row_owner(&row).expect("matched owner");
             let hold = match &row.related {
                 Some(record) => match milestone_record(record) {
-                    Some(value) if value.task == *task => Some(documents::milestone_from_row(limits, value)),
+                    Some(value) if value.task == *task => Some(documents::milestone_from_row(limits, value)?),
                     Some(_) | None => None,
                 },
                 None => None,
@@ -772,7 +772,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     Ok(Some(PageRow::History(documents::history_from_row(limits, value)?)))
                 }
                 Record::Tasks(tasks::Stored::Milestone(value)) if value.task == owner.number => {
-                    Ok(Some(PageRow::Milestone(documents::milestone_from_row(limits, value))))
+                    Ok(Some(PageRow::Milestone(documents::milestone_from_row(limits, value)?)))
                 }
                 Record::Tasks(
                     tasks::Stored::History(_)

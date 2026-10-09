@@ -834,6 +834,7 @@ pub(crate) fn infrastructure_out(
             }
             infrastructure::Request::Outcome { entry, key, outcome } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Outbox {
+                    connector: domain.numbers.infrastructure,
                     entry,
                     task: key.task,
                     outcome: translate::infrastructure_outcome(outcome),
@@ -1035,6 +1036,7 @@ pub(crate) fn observability_out(
             }
             observability::Request::Outcome { entry, key, outcome } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Outbox {
+                    connector: domain.numbers.observability,
                     entry,
                     task: key.task,
                     outcome: translate::observability_outcome(outcome),

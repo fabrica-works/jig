@@ -398,6 +398,7 @@ impl World {
             | Event::Activation { cause: Cause::Unpriced, .. }
             | Event::PreparationFailed { .. }
             | Event::Hold { .. }
+            | Event::HoldFrom { .. }
             | Event::EffectsSettled { .. }
             | Event::Retained { .. }
             | Event::Settled { .. }
@@ -462,6 +463,7 @@ impl World {
             | Event::Activation { .. }
             | Event::PreparationFailed { .. }
             | Event::Hold { .. }
+            | Event::HoldFrom { .. }
             | Event::EffectsSettled { .. }
             | Event::Retained { .. }
             | Event::Settled { .. }
