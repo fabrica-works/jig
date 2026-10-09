@@ -10,21 +10,18 @@
 //! provisional text and calls belong to the watch stream; committed turns never
 //! enter its text. Application subjects belong to their connectors.
 //!
-//! Store-only notes, ended rows and proposal routing trails use the public row
-//! constructors. Notes retain their last write wall time; history and milestones lack
-//! wall times and amendment before snapshots until that work owns their records.
-//! Person stall times are kept from the active wait, distinct from creation.
-//! Result followup identities are not retained today; their optional field says so. Dependency results missing from live memory are
-//! stored references for the reader. Effect pricing belongs to its connector;
-//! a proposal's effect authority ceiling is never reported as its price.
-//! Recurring wall schedules and past-period/root spending need store/period
-//! owners; the project reports period numbers and current live-root spending.
-//! Inbox references retain their owner project/time and reply positions.
-//! Lost-host identity and hello refusal history
-//! are not retained; deployment preserves its adrift attempts instead. Use
-//! `make_with_clock` for wall-time grace and account cooldowns; `make` leaves
-//! those optional time fields absent when no clock was supplied.
+//! Store-only rows use public bounded row constructors without restoring them.
+//! Chips retain owner phase clocks, readiness, retries, resource references and
+//! endings. Core-aware constructors also join fenced best-effort observations;
+//! their engine receipt clocks are distinct from placement/adoption clocks.
+//! Retained failure and dependency explanations use exact task/activity reads.
+//! Closing chips name the connectors they wait on (QUESTIONS 29). Effect
+//! descriptions, prices and counts remain in each connector's panel. Recurring wall
+//! schedules still require their schedule owner. `make_with_clock` projects
+//! host grace and account cooldowns from monotonic deadlines.
 
+mod chip_phase;
+pub use chip_phase::{ChipDetails, ChipObservation, ChipWork};
 mod inbox_deployment;
 pub use inbox_deployment::{
     Account, Capacity, ConversationLine, Conversations, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun,
@@ -205,7 +202,7 @@ pub enum PhaseLine {
     /// Current activation state of an agent or procedure.
     Active(tasks::Active),
     /// Waiting for the addressed party or role.
-    Person { address: tasks::PersonAddress, taken_by: Option<u64>, since: Wall },
+    Person { address: tasks::PersonAddress, taken_by: Option<u64>, since: Option<Wall> },
     /// Closing through its ordered obligations.
     Closing(tasks::Stage),
     /// Held for this reason at this independent revision.
@@ -221,6 +218,8 @@ pub struct Chip {
     pub title: Text,
     pub executor: ExecutorKind,
     pub phase: PhaseLine,
+    /// Nonrecursive owner facts and optional fenced live observations.
+    pub details: Box<ChipDetails>,
 }
 
 /// A project's charter numbers offered for chats and goals.
@@ -381,7 +380,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     {
         return None;
     }
-    let chip = u64::from(limits.text_bytes).checked_add(List::<u64>::worst_case(limits.lines)?)?;
+    let chip = chip_phase::heap_worst_case(limits)?;
     let chips = List::<Chip>::worst_case(limits.chips)?.checked_add(u64::from(limits.chips).checked_mul(chip)?)?;
     let charter = List::<u32>::worst_case(limits.lines)?;
     let frame = List::<people::ProjectRole>::worst_case(limits.lines)?
@@ -405,9 +404,19 @@ pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
     inbox_deployment::scratch_worst_case(limits)
 }
 
-/// A compact task identity made from a loaded row, without restoring it.
-#[must_use]
-pub fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Chip {
+/// Join volatile live observations to a loaded owner row. The reader checks
+/// project visibility first; this does not restore or change the row.
+pub fn chip_from_row_with_core(core: &Core, limits: &Limits, row: &tasks::TaskRecord) -> Result<Chip, Missing> {
+    small::chip_with_core(core, limits, row)
+}
+
+pub(crate) fn chip_heap_worst_case(limits: &DocumentLimits) -> Option<u64> {
+    chip_phase::heap_worst_case(limits)
+}
+
+/// Construct a bounded chip from a loaded owner row, without live observations
+/// or restoring it. Whole opaque resource keys must fit the receiving limits.
+pub fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<Chip, Missing> {
     small::chip_from_row(limits, row)
 }
 

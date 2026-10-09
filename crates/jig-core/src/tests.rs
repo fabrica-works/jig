@@ -2647,3 +2647,5 @@ fn deployment_capacity_carries_direct_batch_refusals_and_task_history_cut() {
     assert!(core.tasks.task(7).is_none());
 }
 mod application_documents;
+
+mod chip_phase;

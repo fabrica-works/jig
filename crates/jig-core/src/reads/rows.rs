@@ -679,7 +679,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
             Ok(Some(historical(
                 Past::Question {
                     question: documents::Question {
-                        task: documents::chip_from_row(limits, owner),
+                        task: documents::chip_from_row_with_core(core, limits, owner)?,
                         message: *number,
                         from: *by,
                         at: line.at,
@@ -874,7 +874,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                 | tasks::Phase::Held { .. } => unreachable!("ended goal"),
             }
             Ok(Some(PageRow::Goal(documents::GoalLine {
-                chip: documents::chip_from_row(limits, owner),
+                chip: documents::chip_from_row_with_core(core, limits, owner)?,
                 priority: owner.tracked.expect("tracked goal"),
                 phases,
                 budget: documents::budget_from_row(owner),
@@ -970,7 +970,7 @@ fn inbox_row(
             Ok(Some(PageRow::Inbox(documents::InboxEntry {
                 reply: None,
                 task: documents::TaskLink::Retained {
-                    chip: documents::chip_from_row(limits, owner),
+                    chip: documents::chip_from_row_with_core(core, limits, owner)?,
                     at: owner.ended_at,
                 },
                 project: Some(owner.project),
@@ -1013,7 +1013,7 @@ fn inbox_row(
                 }
                 return Ok(Some(PageRow::Inbox(documents::InboxEntry {
                     reply: None,
-                    task: documents::TaskLink::Live(documents::chip_from_row(limits, owner)),
+                    task: documents::TaskLink::Live(documents::chip_from_row_with_core(core, limits, owner)?),
                     project: Some(owner.project),
                     object,
                     activity: None,
@@ -1120,7 +1120,10 @@ fn reply_update(
     }
     Ok(Some(PageRow::Inbox(documents::InboxEntry {
         reply,
-        task: documents::TaskLink::Retained { chip: documents::chip_from_row(limits, owner), at: owner.ended_at },
+        task: documents::TaskLink::Retained {
+            chip: documents::chip_from_row_with_core(core, limits, owner)?,
+            at: owner.ended_at,
+        },
         project: Some(owner.project),
         object,
         activity: Some(line.position),
@@ -1455,7 +1458,7 @@ fn hydrate_task(
                     task.cut = true;
                     break;
                 }
-                nearest.push(documents::chip_from_row(limits, parent)).expect("bounded lineage");
+                nearest.push(documents::chip_from_row_with_core(core, limits, parent)?).expect("bounded lineage");
                 requester = parent.requester;
             }
             tasks::Party::Person(_) | tasks::Party::Deployment { .. } => break,
@@ -1491,7 +1494,10 @@ fn hydrate_links(
             if core.people.role(party, owner.project).is_none() {
                 return Err(Missing::NotAllowed);
             }
-            *link = documents::TaskLink::Retained { chip: documents::chip_from_row(limits, owner), at: owner.ended_at };
+            *link = documents::TaskLink::Retained {
+                chip: documents::chip_from_row_with_core(core, limits, owner)?,
+                at: owner.ended_at,
+            };
         }
     }
     Ok(())
@@ -1568,8 +1574,10 @@ fn hydrate_person(
             && ended(owner)
         {
             shown.result = Some(documents::result_from_row(core, limits, party, owner)?);
-            shown.task =
-                documents::TaskLink::Retained { chip: documents::chip_from_row(limits, owner), at: owner.ended_at };
+            shown.task = documents::TaskLink::Retained {
+                chip: documents::chip_from_row_with_core(core, limits, owner)?,
+                at: owner.ended_at,
+            };
         }
     }
     Ok(person)

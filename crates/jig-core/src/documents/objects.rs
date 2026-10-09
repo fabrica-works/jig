@@ -593,7 +593,7 @@ pub fn person_from_row(
             .expect("bounded dependency results");
     }
     Ok(PersonTask {
-        task: super::small::chip_from_row(limits, row),
+        task: super::small::chip_with_core(core, limits, row)?,
         revision: row.revisions.person,
         requester: row.requester,
         spec: spec(limits, &row.spec),
@@ -644,7 +644,7 @@ pub fn result_from_row(
         followups.push(super::task_tree::link(core, limits, party, *task)?).expect("bounded followups");
     }
     Ok(ResultDoc {
-        task: super::small::chip_from_row(limits, row),
+        task: super::small::chip_with_core(core, limits, row)?,
         contract: super::task_tree::contract(limits, &row.contract),
         ending: super::task_tree::ending(limits, value),
         at: row.ended_at,
@@ -719,7 +719,7 @@ pub fn history_from_row(limits: &Limits, row: &tasks::History) -> Result<History
 pub fn ended_delegate_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<EndedDelegate, Missing> {
     match &row.phase {
         tasks::Phase::Ended(value) => Ok(EndedDelegate {
-            chip: super::small::chip_from_row(limits, row),
+            chip: super::small::chip_from_row(limits, row)?,
             ended: super::task_tree::ending(limits, value),
             at: row.ended_at,
         }),

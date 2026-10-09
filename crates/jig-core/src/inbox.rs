@@ -89,7 +89,10 @@ pub(crate) fn reply_refs(limits: &Limits, row: &tasks::TaskRecord, party: u64) -
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let headers = limits.people.people.checked_mul(limits.people.inbox_entries)?.checked_add(1)?;
     skein_lib::Map::<u64, ArchivedChat>::worst_case(headers)?
-        .checked_add(u64::from(headers).checked_mul(u64::from(limits.documents.text_bytes).checked_mul(3)?)?)?
+        .checked_add(
+            u64::from(headers)
+                .checked_mul(crate::documents::chip_heap_worst_case(&limits.documents)?.checked_mul(2)?)?,
+        )?
         .checked_add(List::<u64>::worst_case(headers)?)?
         .checked_add(List::<people::ReplyRef>::worst_case(limits.tasks.inbox_messages)?)?
         .checked_add(List::<people::Update>::worst_case(limits.people.inbox_entries)?)
@@ -127,7 +130,7 @@ impl Core {
         } else {
             None
         };
-        let chip = crate::documents::chip_from_row(limits, row);
+        let chip = crate::documents::chip_from_row(limits, row).expect("ended chip has no whole resource paths");
         assert!(
             self.archived_chats
                 .insert(row.number, ArchivedChat { party, project: row.project, at: row.ended_at, chip, line })

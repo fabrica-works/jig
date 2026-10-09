@@ -663,7 +663,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
     Ok(Task {
-        chip: super::small::chip_from_row(limits, row),
+        chip: super::small::chip_with_core(core, limits, row)?,
         project: row.project,
         goal,
         priority: row.tracked,
@@ -853,7 +853,7 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     let text = u64::from(limits.text_bytes);
     let lines = u64::from(limits.lines);
     let rows = u64::from(limits.rows);
-    let chip = text.checked_add(List::<u64>::worst_case(limits.lines)?)?;
+    let chip = super::chip_phase::heap_worst_case(limits)?;
     let path = List::<Box<[u8]>>::worst_case(limits.lines)?.checked_add(lines.checked_mul(text)?)?;
     let grant = path.checked_add(text)?;
     let authority = List::<GrantLine>::worst_case(limits.lines)?

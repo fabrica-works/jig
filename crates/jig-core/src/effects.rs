@@ -359,7 +359,7 @@ pub(crate) fn connector(
             complete(core, env, work, &mut out, owner);
         }
         connector::Event::Outbox { entry, task, outcome } => settled(core, work, &mut out, entry, task, outcome),
-        connector::Event::Closed { task, connector } => closed(core, work, task, connector),
+        connector::Event::Closed { task, connector } => closed(core, &env.limits, work, task, connector),
         connector::Event::Drift { task, resource: _ } => {
             work.push(Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Drift }));
         }
@@ -444,8 +444,9 @@ fn describe_refused(
     }
 }
 
-fn closed(core: &mut Core, work: &mut Queue<Event>, task: u64, connector: u16) {
+fn closed(core: &mut Core, limits: &Limits, work: &mut Queue<Event>, task: u64, connector: u16) {
     if core.closing_connectors.remove(&(task, connector)).is_some() {
+        core.touch_task_number(limits, task);
         let mut remaining = false;
         for ((number, _), ()) in &core.closing_connectors {
             remaining |= *number == task;

@@ -12,6 +12,11 @@ use jig_core_views as views;
 use skein_lib::{Env, List, Queue, Set};
 
 impl Core {
+    /// Connector settlement changes the chips nested in watched documents.
+    pub(crate) fn touch_task_number(&mut self, limits: &Limits, task: u64) {
+        touch_number(self, limits, task);
+    }
+
     /// Gather this party's frame, inbox and conversations after owned facts change.
     pub fn touch_party(&mut self, party: u64) {
         for (_, binding) in &self.view_subjects {
@@ -134,17 +139,17 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
             Subject::Goals { project } => *project == row.project && goal,
             Subject::Conversations { party } => owner == Some(*party),
+            Subject::Inbox { party } => core.people.role(*party, row.project).is_some(),
             Subject::Frame { .. }
-            | Subject::Inbox { .. }
             | Subject::Deployment
-            | Subject::Proposal { .. }
+            | Subject::Note { .. }
+            | Subject::Application { .. }
+            | Subject::Project { .. }
             | Subject::Escalation { .. }
             | Subject::Question { .. }
             | Subject::PersonTask { .. }
             | Subject::Result { .. }
-            | Subject::Project { .. }
-            | Subject::Note { .. }
-            | Subject::Application { .. } => false,
+            | Subject::Proposal { .. } => false,
         };
         if touched {
             let _new = core.changed_views.insert(binding.subject).expect("bounded watched marks");

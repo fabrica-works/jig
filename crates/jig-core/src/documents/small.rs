@@ -1,6 +1,7 @@
 //! Small live documents and the shared bounded chip construction.
 use super::{Chip, Count, ExecutorKind, Frame, Missing, OfferedCharter, PhaseLine, Run, Text};
 use crate::{Core, Limits};
+use alloc::boxed::Box;
 use jig_core_tasks as tasks;
 use skein_lib::List;
 use skein_lib::bytes::copy_of;
@@ -25,10 +26,17 @@ pub(super) fn visible(core: &Core, party: u64, number: u64) -> Result<&tasks::Ta
 
 pub(super) fn chip(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<Chip, Missing> {
     let row = visible(core, party, number)?;
-    Ok(chip_from_row(limits, row))
+    chip_with_core(core, limits, row)
 }
 
-pub(super) fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Chip {
+pub(super) fn chip_with_core(core: &Core, limits: &Limits, row: &tasks::TaskRecord) -> Result<Chip, Missing> {
+    let mut chip = chip_from_row(limits, row)?;
+    super::chip_phase::observe(core, limits, row, &mut chip.details)?;
+    Ok(chip)
+}
+
+#[expect(clippy::manual_map, reason = "step code explicitly selects readiness without closures")]
+pub(super) fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<Chip, Missing> {
     let number = row.number;
     let first = skein_lib::bytes::find(&row.spec.words, b"\n").unwrap_or(row.spec.words.len());
     let title = text(row.spec.words.get(..first).expect("first line prefix"), limits.documents.text_bytes);
@@ -51,16 +59,21 @@ pub(super) fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Chip {
             }
         }
         tasks::Phase::Active(active) => match row.executor {
-            tasks::Executor::Person(address) => {
-                PhaseLine::Person { address, taken_by: row.taken_by, since: row.created_at }
-            }
+            tasks::Executor::Person(address) => PhaseLine::Person {
+                address,
+                taken_by: row.taken_by,
+                since: match row.person_wait {
+                    Some(wait) => Some(wait.since),
+                    None => None,
+                },
+            },
             tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => PhaseLine::Active(*active),
         },
         tasks::Phase::Closing(closing) => PhaseLine::Closing(closing.stage),
         tasks::Phase::Held { why, .. } => PhaseLine::Held { reason: *why, revision: row.revisions.hold },
         tasks::Phase::Ended(_) => PhaseLine::Ended,
     };
-    Chip { number, title, executor, phase }
+    Ok(Chip { number, title, executor, phase, details: Box::new(super::chip_phase::from_row(limits, row)?) })
 }
 
 pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, Missing> {
