@@ -16,6 +16,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 
+mod random;
 #[cfg(test)]
 mod tests;
 mod tree;
@@ -23,6 +24,7 @@ mod tree;
 use alloc::boxed::Box;
 use core::fmt;
 use jig_client_view::{Act, NodeId, Role};
+pub use random::{RandomDoing, RandomPerson};
 use skein_lib::{Duration, Time};
 pub use tree::TreeFace;
 

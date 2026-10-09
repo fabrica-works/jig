@@ -234,3 +234,153 @@ fn unbound_disabled_and_noncomposer_controls_reject_scripted_acts() {
         ));
     }
 }
+
+fn random_tree() -> View {
+    build(|b| {
+        b.open(Role::Page);
+        b.open(Role::Button);
+        b.name(b"Accept");
+        b.bind(binding(1));
+        b.close();
+        b.open(Role::TextField);
+        b.name(b"Subject");
+        b.bind(binding(2));
+        b.close();
+        b.open(Role::TextArea);
+        b.name(b"Reply");
+        b.bind(binding(3));
+        b.state(State::SubmitsOnEnter);
+        b.close();
+        b.open(Role::Check);
+        b.name(b"Checked");
+        b.bind(binding(4));
+        b.close();
+        b.open(Role::Link);
+        b.name(b"Task");
+        b.link(binding(5));
+        b.close();
+        b.open(Role::TextArea);
+        b.name(b"Disabled");
+        b.bind(binding(6));
+        b.state(State::Disabled);
+        b.close();
+        b.open(Role::Button);
+        b.name(b"Unbound");
+        b.close();
+        b.close();
+    })
+}
+
+#[test]
+fn random_people_replay_the_same_seed_over_the_same_trees() {
+    let first = random_tree();
+    let second = fixture();
+    for seed in 0..32 {
+        let mut a = RandomPerson::new(seed, 32);
+        let mut b = RandomPerson::new(seed, 32);
+        for at in 0..64 {
+            let tree = if at % 2 == 0 { first.tree() } else { second.tree() };
+            assert_eq!(a.next(tree), b.next(tree), "seed {seed} at {at}");
+        }
+    }
+}
+
+#[test]
+fn a_sweep_presses_every_bound_node_and_reaches_fields_composers_and_history() {
+    use std::collections::BTreeSet;
+    let view = random_tree();
+    let tree = view.tree();
+    let expected: BTreeSet<_> = tree
+        .nodes()
+        .iter()
+        .filter(|n| tree.bound(n.id).is_some() && !n.states.as_slice().contains(&State::Disabled))
+        .map(|n| n.id)
+        .collect();
+    let mut pressed = BTreeSet::new();
+    let mut inputs = BTreeSet::new();
+    let mut submitted = BTreeSet::new();
+    let mut toggled = BTreeSet::new();
+    let mut alphabet = BTreeSet::new();
+    let mut back = false;
+    let mut reload = false;
+    let mut empty = false;
+    let mut full = false;
+    for seed in 0..32 {
+        let mut person = RandomPerson::new(seed, 32);
+        for _ in 0..64 {
+            match person.next(tree) {
+                Some(RandomDoing::Act { node, act }) => {
+                    let control = tree.find(node).expect("visible control");
+                    assert!(TreeFace::new(tree).allows(node, &act));
+                    match act {
+                        Act::Press => {
+                            pressed.insert(node);
+                        }
+                        Act::Input { value } => {
+                            assert!(value.len() <= 32);
+                            empty |= value.is_empty();
+                            full |= value.len() == 32;
+                            inputs.insert(node);
+                            alphabet.extend(value.iter().copied());
+                        }
+                        Act::Submit => {
+                            submitted.insert(node);
+                            assert!(control.states.as_slice().contains(&State::SubmitsOnEnter));
+                        }
+                        Act::Toggle => {
+                            toggled.insert(node);
+                            assert_eq!(control.role, Role::Check);
+                        }
+                    }
+                }
+                Some(RandomDoing::Back) => back = true,
+                Some(RandomDoing::Reload) => reload = true,
+                None => unreachable!("tree has bound nodes"),
+            }
+        }
+    }
+    assert_eq!(pressed, expected);
+    assert_eq!(inputs.len(), 2);
+    assert_eq!(submitted.len(), 1);
+    assert_eq!(toggled.len(), 1);
+    assert!(back && reload && empty && full);
+    for byte in b" 0123456789#*_`[]()>-+.!\n" {
+        assert!(alphabet.contains(byte));
+    }
+}
+
+#[test]
+fn random_people_never_act_on_unbound_disabled_or_unshown_nodes() {
+    let view = build(|b| {
+        b.open(Role::Page);
+        b.open(Role::Button);
+        b.name(b"Unbound");
+        b.close();
+        b.open(Role::TextArea);
+        b.name(b"Disabled");
+        b.bind(binding(1));
+        b.state(State::Disabled);
+        b.close();
+        b.close();
+    });
+    let empty = jig_client_view::Tree::new(0);
+    let unshown = {
+        let mut b = Builder::new(&LIMITS);
+        b.open(Role::Button);
+        b.bind(binding(1));
+        b.close();
+        b.finish()
+    };
+    let mut person = RandomPerson::new(1, 0);
+    for tree in [view.tree(), &empty, &unshown] {
+        for _ in 0..128 {
+            assert!(matches!(person.next(tree), None | Some(RandomDoing::Back | RandomDoing::Reload)));
+        }
+    }
+    let view = random_tree();
+    for _ in 0..128 {
+        if let Some(RandomDoing::Act { act: Act::Input { value }, .. }) = person.next(view.tree()) {
+            assert!(value.is_empty());
+        }
+    }
+}
