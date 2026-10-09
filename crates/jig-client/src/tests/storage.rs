@@ -69,7 +69,12 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
         panic!("task first");
     };
     assert_eq!(moved[3], Request::Show { address, replace: true });
-    assert_eq!(moved[4], Request::Save { record: crate::store::Record::Place { version: 1, party: 7, address } });
+    assert_eq!(
+        moved[4],
+        Request::Save {
+            record: crate::store::Record::Place { version: crate::store::STORE_VERSION, party: 7, address }
+        }
+    );
     let mut document = super::confirmation::task();
     document.chip.executor = Executor::Agent { charter: 1 };
     let activity_requests = drive(

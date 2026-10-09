@@ -16,13 +16,13 @@ pub enum Record {
     /// Where the party was.
     Place { version: u16, party: u64, address: Address },
     /// Words not yet sent.
-    Draft { version: u16, party: u64, task: u64, words: Text },
+    Draft { version: u16, party: u64, task: u64, words: Text, touched: u64 },
 }
 
 use crate::{Domain, Request, contract::Limit, facts::Fact};
 use skein_lib::{List, Queue};
 /// Version of this domain's small-store vocabulary.
-pub const STORE_VERSION: u16 = 1;
+pub const STORE_VERSION: u16 = 2;
 impl Record {
     /// Its key, owned solely by this domain.
     #[must_use]

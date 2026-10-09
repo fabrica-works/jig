@@ -351,7 +351,9 @@ pub struct PersonTask {
     pub inputs: List<Result>,
     pub addressed: Recipient,
     pub taken: Option<Party>,
-    pub stall: Option<Wall>,
+    pub since: Option<Wall>,
+    pub stall: Option<Duration>,
+    pub deadline: Option<Wall>,
     pub acts: List<Offered>,
     pub ending: Option<Ending>,
 }

@@ -51,12 +51,17 @@ pub struct Intent {
     pub ask: Box<Ask>,
     pub progress: Progress,
     pub answer: Option<Answer>,
+    /// The composer edit included by this write, so later typing survives its answer.
+    pub draft_touch: Option<u64>,
 }
 /// The owner and answer consumed at the durable terminal.
 #[derive(Debug)]
 pub struct Receipt {
     pub origin: Origin,
     pub answer: Answer,
+    pub scope: u64,
+    pub draft_touch: Option<u64>,
+    pub ask: Box<Ask>,
 }
 /// Pending intents, with retired facts available until reclaim.
 #[derive(Debug)]
@@ -83,7 +88,7 @@ impl Intents {
                 return Some(*id);
             }
         }
-        let intent = Intent { scope, origin, ask, progress: Progress::InFlight, answer: None };
+        let intent = Intent { scope, origin, ask, progress: Progress::InFlight, answer: None, draft_touch: None };
         match self.slab.insert(intent) {
             Ok(id) => {
                 let old = self.ids.insert(id, ()).expect("registry fits its paired slab");
@@ -112,7 +117,13 @@ impl Intents {
         self.ids.remove(&id)?;
         let intent = self.slab.get_mut(id).expect("registered intent exists");
         intent.answer = Some(answer.clone());
-        let receipt = Receipt { origin: intent.origin, answer };
+        let receipt = Receipt {
+            origin: intent.origin,
+            scope: intent.scope,
+            draft_touch: intent.draft_touch,
+            ask: intent.ask.clone(),
+            answer,
+        };
         self.slab.retire(id);
         Some(receipt)
     }
@@ -136,7 +147,7 @@ impl Intents {
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     Slab::<Intent>::worst_case(limits.intents)?
         .checked_add(Map::<Id<Intent>, ()>::worst_case(limits.intents)?)?
-        .checked_add(u64::from(limits.intents).checked_mul(limits.document_bytes)?.checked_mul(2)?)
+        .checked_add(u64::from(limits.intents).checked_mul(limits.document_bytes)?.checked_mul(3)?)
 }
 
 /// A card policy's one send, joined by object and act. Jig 21 calls this after
@@ -151,8 +162,33 @@ pub fn send_card(
     let scope = domain.confirmed?;
     let object_id = domain.objects.find(object)?;
     let origin = Origin::Card { object, act };
+    let mut joined = false;
+    for (id, ()) in &domain.intents.ids {
+        let intent = domain.intents.slab.get(*id).expect("registered intent exists");
+        if intent.scope == scope && intent.origin == origin {
+            joined = true;
+        }
+    }
     match domain.intents.ask(scope, origin, ask, out) {
         Some(id) => {
+            if act == ActKind::Write && !joined {
+                let task = match object {
+                    ObjectKey::Task(task) => Some(task),
+                    ObjectKey::Proposal(_)
+                    | ObjectKey::Escalation(_)
+                    | ObjectKey::Question { .. }
+                    | ObjectKey::PersonTask(_)
+                    | ObjectKey::Result(_)
+                    | ObjectKey::Note { .. } => None,
+                };
+                if let Some(task) = task {
+                    let touch = domain.drafts.touch(task);
+                    let intent = domain.intents.slab.get_mut(id).expect("joined intent exists");
+                    if intent.draft_touch.is_none() {
+                        intent.draft_touch = touch;
+                    }
+                }
+            }
             let progress = domain.intents.get(id).expect("joined intent exists").progress;
             let object = domain.objects.get_mut(object_id).expect("named card exists");
             object.card = crate::objects::Card::Deciding { request: Some(id.token()), progress };
@@ -219,7 +255,28 @@ pub(crate) fn answered(
         Origin::Page { generation, purpose } => {
             crate::pages::conversations::answered(domain, env, request, generation, purpose, receipt.answer, out);
         }
-        Origin::Card { object, act } => crate::objects::answer::answered(domain, object, act, receipt.answer, out),
+        Origin::Card { object, act } => {
+            if act == ActKind::Write {
+                match object {
+                    ObjectKey::Task(task) => crate::drafts::sent(
+                        domain,
+                        receipt.scope,
+                        task,
+                        receipt.draft_touch,
+                        &receipt.ask,
+                        &receipt.answer,
+                        out,
+                    ),
+                    ObjectKey::Proposal(_)
+                    | ObjectKey::Escalation(_)
+                    | ObjectKey::Question { .. }
+                    | ObjectKey::PersonTask(_)
+                    | ObjectKey::Result(_)
+                    | ObjectKey::Note { .. } => {}
+                }
+            }
+            crate::objects::answer::answered(domain, object, act, receipt.answer, out);
+        }
     }
 }
 fn unknown(domain: &mut crate::Domain, request: Token, out: &mut Queue<Request>) {

@@ -9,7 +9,7 @@ use crate::{
     intents::{ByValue, send_card},
     notices::{self, Kind},
     objects::Source,
-    store::{self, Record},
+    store::{self, Record, STORE_VERSION},
 };
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 fn limits() -> Limits {
@@ -91,11 +91,11 @@ fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines(
     out = Queue::with_capacity(crate::max_out(&limits));
     assert!(store::coalesce(
         &mut domain,
-        Record::Draft { version: 1, party: 7, task: 8, words: text(b"first") },
+        Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"first"), touched: 1 },
         &mut out
     ));
     drive(&mut domain, &limits, Time::from_nanos(500_000_000), Event::Frame { asked: Token::new(90) });
-    let newest = Record::Draft { version: 1, party: 7, task: 8, words: text(b"newest") };
+    let newest = Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"newest"), touched: 1 };
     assert!(store::coalesce(&mut domain, newest.clone(), &mut out));
     assert!(out.is_empty());
     assert!(tick(&mut domain, &limits, Time::from_nanos(1_499_999_999)).is_empty());
@@ -132,7 +132,7 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
     let mut domain = Domain::new(&limits, 3);
     domain.provider(crate::signin::Provider { number: 1, name: text(b"P") }).unwrap();
     let mut kept = List::with_capacity(1);
-    kept.push(Record::Draft { version: 1, party: 7, task: 8, words: text(b"kept") }).unwrap();
+    kept.push(Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"kept"), touched: 1 }).unwrap();
     let (f, page) = start(&mut domain, &limits, kept);
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     domain.reads.ask(0, Source::Window { generation: 0, number: 1 }, Read::Deployment, &mut out).unwrap();

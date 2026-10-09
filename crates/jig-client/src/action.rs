@@ -28,6 +28,12 @@ pub enum Act {
     Dispose { task: u64, take_over: bool },
     /// Supply the task amendment in the open confirmation.
     Change { change: Box<crate::contract::Amendment> },
+    /// Write words and release a task stopped by this party in the same request.
+    WriteRelease { release: bool },
+    /// Set the one goal priority in the open confirmation.
+    Priority { priority: u32 },
+    /// Start a new chat naming a card by its committed title.
+    ChatAbout { object: Token },
     /// Read an object again after it moved or an answer became unknown.
     LookAgain { object: Token },
     /// Confirm the open act.

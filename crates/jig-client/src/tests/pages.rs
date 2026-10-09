@@ -14,7 +14,7 @@ use skein_lib::{List, Time};
 fn text(value: &[u8]) -> Text {
     Text::new(Box::from(value), LIMITS.text).unwrap()
 }
-fn project(number: u32, chats: bool) -> ProjectRole {
+pub(super) fn project(number: u32, chats: bool) -> ProjectRole {
     let mut charters = List::with_capacity(1);
     if chats {
         charters.push(Charter { number: 1, name: text(b"guide") }).unwrap();
@@ -122,7 +122,14 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
     assert_eq!(old.page(), &Page::OutOfDate);
     let mut other = Domain::new(&LIMITS, 7);
     let mut kept = List::with_capacity(1);
-    kept.push(crate::store::Record::Draft { version: 1, party: 8, task: 42, words: text(b"secret") }).unwrap();
+    kept.push(crate::store::Record::Draft {
+        version: crate::store::STORE_VERSION,
+        party: 8,
+        task: 42,
+        words: text(b"secret"),
+        touched: 1,
+    })
+    .unwrap();
     let f = start(&mut other, kept);
     delivered(&mut other, Time::ZERO, f, frame(7));
     assert_eq!(other.page(), &Page::SomeoneElse);

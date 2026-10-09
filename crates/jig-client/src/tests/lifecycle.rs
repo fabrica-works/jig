@@ -9,7 +9,7 @@ use crate::{
     objects::{Card, Source},
     pages::Page,
     signin::Provider,
-    store::{self, Record, StoreKey},
+    store::{self, Record, STORE_VERSION, StoreKey},
 };
 use skein_lib::{Id, List, Queue, Time, Token};
 fn text(bytes: &[u8]) -> Text {
@@ -79,7 +79,7 @@ fn fields_count_only_domain_writes_and_records_restore_save_and_erase() {
     assert_eq!(fields.edit(Purpose::NewChat, text(b"large")), Err(Limit::Words { limit: 4 }));
     assert_eq!(fields.get(Purpose::NewChat).unwrap().text.bytes(), b"next");
     let mut kept = List::with_capacity(3);
-    let draft = Record::Draft { version: 1, party: 7, task: 8, words: text(b"draft") };
+    let draft = Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"draft"), touched: 1 };
     kept.push(draft.clone()).unwrap();
     kept.push(Record::Place { version: 9, party: 8, address: Address::Deployment }).unwrap();
     let mut domain = Domain::new(&LIMITS, 2);

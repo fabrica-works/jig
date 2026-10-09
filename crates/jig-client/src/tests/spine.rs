@@ -26,6 +26,7 @@ pub(super) const LIMITS: Limits = Limits {
     delegates: 2,
     document_bytes: 65536,
     records: 2,
+    drafts: 1,
     projects: 2,
     roles: 2,
     charters: 2,
@@ -225,7 +226,7 @@ fn a_reopened_page_is_behind_until_its_first_delivery_and_never_changes_the_link
 #[test]
 fn a_different_party_keeps_the_previous_partys_work_hidden_until_they_return() {
     let mut kept = List::with_capacity(1);
-    kept.push(Record::Place { version: 1, party: 7, address: Address::Deployment }).unwrap();
+    kept.push(Record::Place { version: crate::store::STORE_VERSION, party: 7, address: Address::Deployment }).unwrap();
     let mut domain = Domain::new(&LIMITS, 4);
     let watch = start(&mut domain, kept);
     let refused = delivered(&mut domain, Time::ZERO, watch, frame(8));

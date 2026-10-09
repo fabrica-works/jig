@@ -76,7 +76,9 @@ pub(super) fn person() -> PersonTask {
         inputs: List::with_capacity(0),
         addressed: Recipient::Role { project: 1, role: 2 },
         taken: None,
+        since: None,
         stall: None,
+        deadline: None,
         acts: List::with_capacity(0),
         ending: None,
     }

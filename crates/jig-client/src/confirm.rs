@@ -459,6 +459,24 @@ pub(crate) fn change(domain: &mut Domain, change: Amendment) {
         domain.changed();
     }
 }
+/// Records whether the one write also releases the held task.
+pub(crate) fn write_release(domain: &mut Domain, release: bool) {
+    if let Some(open) = &mut domain.confirming
+        && open.act == ActKind::Write
+    {
+        open.choices.release = release;
+        domain.changed();
+    }
+}
+/// Records a goal's new place, leaving admission to the engine.
+pub(crate) fn priority(domain: &mut Domain, priority: u32) {
+    if let Some(open) = &mut domain.confirming
+        && open.act == ActKind::Prioritise
+    {
+        open.choices.priority = Some(priority);
+        domain.changed();
+    }
+}
 /// Checks the recalled revision and complete form before asking for one send.
 pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
     sync(domain);

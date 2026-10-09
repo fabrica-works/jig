@@ -47,6 +47,7 @@ pub enum Timer {
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) started: bool,
+    pub(crate) drafts: crate::drafts::Drafts,
     pub(crate) confirming: Option<crate::confirm::Confirmation>,
     pub(crate) now: Time,
     pub(crate) clock: crate::clock::State,
@@ -92,6 +93,7 @@ impl Domain {
         assert!(crate::limits::worst_case(limits).is_some(), "client limits are valid");
         Self {
             started: false,
+            drafts: crate::drafts::Drafts::new(limits.drafts),
             confirming: None,
             now: Time::ZERO,
             clock: crate::clock::State { page_times: false, armed: false },
@@ -261,6 +263,11 @@ impl Domain {
     #[must_use]
     pub const fn intents(&self) -> &crate::intents::Intents {
         &self.intents
+    }
+    /// Current-party drafts, including their saved touch order.
+    #[must_use]
+    pub const fn drafts(&self) -> &crate::drafts::Drafts {
+        &self.drafts
     }
     /// Current fields, with counts of domain writes.
     #[must_use]
@@ -519,6 +526,7 @@ pub fn max_out(limits: &Limits) -> u32 {
         .saturating_mul(2)
         .saturating_add(limits.objects)
         .saturating_add(limits.parts.saturating_mul(2))
+        .saturating_add(limits.records)
         .saturating_add(16)
 }
 
@@ -550,64 +558,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::confirm::close(domain);
             crate::pages::routing::navigate(domain, env, place, true, out);
         }
-        Event::Act { act } => match act {
-            Act::Go { address } => {
-                crate::confirm::close(domain);
-                crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out);
-            }
-            Act::Edit { field, text } => match domain.fields.edit(field, text) {
-                Ok(()) => domain.changed(),
-                Err(which) => {
-                    crate::pages::routing::refuse(domain, which);
-                    out.push(Request::Fact { fact: Fact::Refused { which } });
-                }
-            },
-            Act::Dismiss => {
-                if domain.confirming.is_some() {
-                    crate::confirm::close(domain);
-                } else {
-                    crate::notices::dismiss_first(domain);
-                }
-            }
-            Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
-            Act::StartChat { project } => crate::pages::conversations::start(domain, env, project, out),
-            Act::OpenChat { task } => crate::pages::conversations::open_chat(domain, env, task, out),
-            Act::OpenUpdates => crate::pages::conversations::open_updates(domain, out),
-            Act::FilterInbox { filter } => crate::pages::conversations::filter_inbox(domain, filter, out),
-            Act::Filter { group, project } => crate::pages::conversations::filter_inbox(
-                domain,
-                crate::pages::inbox::Filter { project, kind: Some(group), goal: None },
-                out,
-            ),
-            Act::FoldCall { name, open } => crate::conversation::routing::fold(domain, name, open),
-            Act::More { window, end } => {
-                crate::conversation::routing::more(domain, window, end, out);
-                crate::pages::conversations::more(domain, window, end, out);
-                crate::pages::task::more(domain, window, end, out);
-            }
-            Act::FilterPlan { filter } => crate::pages::task::filter(domain, filter),
-            Act::HistoryScope { subtree } => crate::pages::task::history(domain, subtree, out),
-            Act::OpenEnded { task } => crate::pages::task::open_ended(domain, task, out),
-            Act::Submit { field: crate::fields::Purpose::NewChat } => {
-                let project = match domain.address {
-                    Address::Conversations { project } | Address::Inbox { project } => project,
-                    Address::Project { project, .. } => Some(project),
-                    Address::Task { .. } | Address::Deployment => None,
-                };
-                if let Some(project) = project {
-                    crate::pages::conversations::start(domain, env, project, out);
-                }
-            }
-            Act::Intend { object, act } => crate::confirm::open(domain, env, Id::from_token(object), act),
-            Act::Choose { option } => crate::confirm::choose(domain, option),
-            Act::CannotDo => crate::confirm::cannot(domain),
-            Act::Again { again } => crate::confirm::again(domain, again),
-            Act::Dispose { task, take_over } => crate::confirm::dispose(domain, task, take_over),
-            Act::Change { change } => crate::confirm::change(domain, *change),
-            Act::Confirm => crate::confirm::send(domain, out),
-            Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out),
-            Act::Submit { .. } | Act::Fold { .. } => {}
-        },
+        Event::Act { act } => act_event(domain, env, act, out),
         Event::Start { .. } => {}
         Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
         Event::Progress { request, progress } => crate::intents::progress(domain, request, progress, out),
@@ -621,9 +572,90 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
         }
     }
+    crate::drafts::sync(domain, out);
     crate::confirm::sync(domain);
     crate::signin::returned(domain, env, out);
     crate::clock::sync(domain);
+}
+fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<Request>) {
+    match act {
+        Act::Go { address } => {
+            crate::confirm::close(domain);
+            crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out);
+        }
+        Act::Edit { field: crate::fields::Purpose::Composer { task }, text } => {
+            if let Err(which) = crate::drafts::edit(domain, task, text, out) {
+                crate::pages::routing::refuse(domain, which);
+                out.push(Request::Fact { fact: Fact::Refused { which } });
+            }
+        }
+        Act::Edit { field, text } => match domain.fields.edit(field, text) {
+            Ok(()) => domain.changed(),
+            Err(which) => {
+                crate::pages::routing::refuse(domain, which);
+                out.push(Request::Fact { fact: Fact::Refused { which } });
+            }
+        },
+        Act::Dismiss => {
+            if domain.confirming.is_some() {
+                crate::confirm::close(domain);
+            } else {
+                crate::notices::dismiss_first(domain);
+            }
+        }
+        Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
+        Act::StartChat { project } => crate::pages::conversations::start(domain, env, project, out),
+        Act::OpenChat { task } => crate::pages::conversations::open_chat(domain, env, task, out),
+        Act::OpenUpdates => crate::pages::conversations::open_updates(domain, out),
+        Act::FilterInbox { filter } => crate::pages::conversations::filter_inbox(domain, filter, out),
+        Act::Filter { group, project } => crate::pages::conversations::filter_inbox(
+            domain,
+            crate::pages::inbox::Filter { project, kind: Some(group), goal: None },
+            out,
+        ),
+        Act::FoldCall { name, open } => crate::conversation::routing::fold(domain, name, open),
+        Act::More { window, end } => {
+            crate::conversation::routing::more(domain, window, end, out);
+            crate::pages::conversations::more(domain, window, end, out);
+            crate::pages::task::more(domain, window, end, out);
+        }
+        Act::FilterPlan { filter } => crate::pages::task::filter(domain, filter),
+        Act::HistoryScope { subtree } => crate::pages::task::history(domain, subtree, out),
+        Act::OpenEnded { task } => crate::pages::task::open_ended(domain, task, out),
+        Act::Submit { field: crate::fields::Purpose::NewChat } => {
+            let project = match domain.address {
+                Address::Conversations { project } | Address::Inbox { project } => project,
+                Address::Project { project, .. } => Some(project),
+                Address::Task { .. } | Address::Deployment => None,
+            };
+            if let Some(project) = project {
+                crate::pages::conversations::start(domain, env, project, out);
+            }
+        }
+        Act::Submit { field: crate::fields::Purpose::Composer { task } } => {
+            if let Some(id) = domain.objects.find(crate::contract::ObjectKey::Task(task)) {
+                crate::confirm::open(domain, env, id, crate::contract::ActKind::Write);
+            }
+        }
+        Act::WriteRelease { release } => crate::confirm::write_release(domain, release),
+        Act::Priority { priority } => crate::confirm::priority(domain, priority),
+        Act::ChatAbout { object } => {
+            if let Some(object) = domain.objects.get(Id::from_token(object)) {
+                let key = object.key;
+                crate::confirm::close(domain);
+                crate::pages::conversations::about(domain, env, key, out);
+            }
+        }
+        Act::Intend { object, act } => crate::confirm::open(domain, env, Id::from_token(object), act),
+        Act::Choose { option } => crate::confirm::choose(domain, option),
+        Act::CannotDo => crate::confirm::cannot(domain),
+        Act::Again { again } => crate::confirm::again(domain, again),
+        Act::Dispose { task, take_over } => crate::confirm::dispose(domain, task, take_over),
+        Act::Change { change } => crate::confirm::change(domain, *change),
+        Act::Confirm => crate::confirm::send(domain, out),
+        Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out),
+        Act::Submit { .. } | Act::Fold { .. } => {}
+    }
 }
 fn start(
     domain: &mut Domain,

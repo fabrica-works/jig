@@ -38,6 +38,8 @@ pub struct Limits {
     /// the root box), list capacities, texts and nested documents.
     pub document_bytes: u64,
     pub records: u32,
+    /// Per-task composers kept across navigation and restart.
+    pub drafts: u32,
     pub projects: u32,
     pub roles: u32,
     pub charters: u32,
@@ -69,6 +71,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(2)?
         .checked_add(limits.objects)?
         .checked_add(limits.parts.checked_mul(2)?)?
+        .checked_add(limits.records)?
         .checked_add(16)?;
     limits.objects.checked_mul(2)?;
     let timer_capacity = timers(limits)?;
@@ -83,6 +86,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(crate::intents::worst_case(limits)?)?;
     total = total.checked_add(crate::notices::worst_case(limits)?)?;
     total = total.checked_add(crate::fields::worst_case(limits)?)?;
+    total = total.checked_add(crate::drafts::worst_case(limits)?)?;
+    total = total.checked_add(List::<u64>::worst_case(limits.records)?)?;
     total = total.checked_add(crate::confirm::worst_case(limits)?)?;
     total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows)?)?;
     total = total.checked_add(crate::signin::worst_case(limits)?)?;
@@ -93,7 +98,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(crate::windows::worst_case(limits)?)?;
     total = total.checked_add(Map::<Id<Watch>, ()>::worst_case(limits.watches)?)?;
     total = total.checked_add(Deadlines::<Timer>::worst_case(timer_capacity)?)?;
-    total = total.checked_add(List::<Record>::worst_case(limits.records)?)?;
+    total = total.checked_add(List::<Record>::worst_case(limits.records)?.checked_mul(2)?)?;
     total = total.checked_add(u64::from(limits.records).checked_mul(u64::from(limits.text))?)?;
     total = total.checked_add(u64::try_from(size_of::<Frame>()).ok()?)?;
     total = total.checked_add(u64::from(limits.text))?;

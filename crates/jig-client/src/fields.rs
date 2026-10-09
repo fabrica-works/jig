@@ -62,6 +62,34 @@ impl Fields {
     pub fn write(&mut self, purpose: Purpose, text: Text) -> Result<(), Limit> {
         self.set(purpose, text, true)
     }
+    /// Removes hidden composers when their party changes; unrelated forms remain owned by their policies.
+    pub(crate) fn clear_composers(&mut self) {
+        for _ in 0..self.rows.len() {
+            let mut removed = None;
+            for (purpose, _) in &self.rows {
+                match purpose {
+                    Purpose::Composer { .. } => {
+                        removed = Some(*purpose);
+                        break;
+                    }
+                    Purpose::NewChat
+                    | Purpose::Answer
+                    | Purpose::Reason
+                    | Purpose::Amendment
+                    | Purpose::Instructions
+                    | Purpose::NoteDescription
+                    | Purpose::NoteBody
+                    | Purpose::NewGoal => {}
+                }
+            }
+            match removed {
+                Some(purpose) => {
+                    self.rows.remove(&purpose);
+                }
+                None => break,
+            }
+        }
+    }
     fn set(&mut self, purpose: Purpose, text: Text, written: bool) -> Result<(), Limit> {
         if u64::try_from(text.bytes().len()).expect("text length fits u64") > u64::from(self.text) {
             return Err(Limit::Words { limit: self.text });
