@@ -29,5 +29,7 @@ pub mod store;
 pub mod watches;
 pub mod windows;
 pub use boundary::{Event, Request};
+pub use domain::{Domain, fire, max_out, next_deadline, reclaim, step};
+pub use limits::{Limits, worst_case};
 #[cfg(test)]
 mod tests;
