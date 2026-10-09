@@ -90,7 +90,7 @@ pub(crate) fn claim(
     if !fits {
         return refused(to, Some(number), Refusal::Funding, out);
     }
-    match crate::writers::claim(domain, &env.limits, number, attempt, writes, out) {
+    match crate::writers::claim(domain, env, number, attempt, writes, out) {
         Ok(()) => {}
         Err(Some(resource)) => return out.push(Request::WriterWaiting { reply_to: to, task: Some(number), resource }),
         Err(None) => return refused(to, Some(number), Refusal::Holds, out),

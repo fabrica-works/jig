@@ -1032,19 +1032,27 @@ pub struct Problem {
     /// All live delegates that prevented a finish, in the requester's current order.
     /// Absent for every other refusal.
     pub blocked_by: Option<Box<[u64]>>,
+    /// Exact room check metadata; absent for shape, state and other refusals.
+    pub capacity: Option<crate::Capacity>,
 }
 
 impl Problem {
     /// A refusal with no live-delegate blockers.
     #[must_use]
     pub const fn new(task: Option<u64>, why: Refusal) -> Self {
-        Self { task, why, blocked_by: None }
+        Self { task, why, blocked_by: None, capacity: None }
+    }
+
+    /// An unchanged refusal carrying owner-proven capacity metadata.
+    #[must_use]
+    pub const fn capacity(task: Option<u64>, why: Refusal, capacity: crate::Capacity) -> Self {
+        Self { task, why, blocked_by: None, capacity: Some(capacity) }
     }
 
     /// A finish refused until these named delegates end or are cancelled.
     #[must_use]
     pub fn live_delegates(task: u64, delegates: &[u64]) -> Self {
-        Self { task: Some(task), why: Refusal::LiveDelegates, blocked_by: Some(Box::from(delegates)) }
+        Self { task: Some(task), why: Refusal::LiveDelegates, blocked_by: Some(Box::from(delegates)), capacity: None }
     }
 }
 

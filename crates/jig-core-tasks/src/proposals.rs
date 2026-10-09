@@ -221,6 +221,23 @@ pub(crate) fn propose_person(
         return refused(to, None, Refusal::Read, out);
     }
     if domain.person_proposals.len() >= env.limits.tasks || domain.person_proposals.contains_key(&proposal.number) {
+        if domain.person_proposals.len() >= env.limits.tasks && !domain.person_proposals.contains_key(&proposal.number)
+        {
+            return crate::capacity::refuse(
+                domain,
+                env,
+                to,
+                None,
+                Refusal::Busy,
+                crate::Capacity {
+                    project: Some(proposal.project),
+                    by: Party::Person(proposal.proposer),
+                    action: crate::CapacityAction::PersonProposal { number: proposal.number },
+                    cause: crate::CapacityCause::Proposals { limit: env.limits.tasks },
+                },
+                out,
+            );
+        }
         return refused(to, None, Refusal::Busy, out);
     }
     for (_, old) in &domain.person_proposals {
@@ -498,6 +515,30 @@ pub(crate) fn propose(
         return refused(to, Some(proposal.proposer), Refusal::Unknown, out);
     };
     if task.project != proposal.project || task.proposal.is_some() || task.revision == u64::MAX {
+        if task.project == proposal.project
+            && task.revision != u64::MAX
+            && let Some(prior) = &task.proposal
+        {
+            match prior.state {
+                ProposalState::Pending { .. } => {
+                    return crate::capacity::refuse(
+                        domain,
+                        env,
+                        to,
+                        Some(proposal.proposer),
+                        Refusal::Busy,
+                        crate::Capacity {
+                            project: Some(proposal.project),
+                            by: Party::Task(proposal.proposer),
+                            action: crate::CapacityAction::Proposal { number: proposal.number },
+                            cause: crate::CapacityCause::Proposals { limit: 1 },
+                        },
+                        out,
+                    );
+                }
+                ProposalState::Accepted { .. } | ProposalState::Rejected { .. } | ProposalState::Withdrawn => {}
+            }
+        }
         return refused(to, Some(proposal.proposer), Refusal::Busy, out);
     }
     if !crate::inbox::room(
@@ -507,7 +548,20 @@ pub(crate) fn propose(
         1,
         usize::try_from(env.limits.message_bytes).expect("u32 fits usize"),
     ) {
-        return refused(to, Some(proposal.proposer), Refusal::Busy, out);
+        return crate::capacity::refuse(
+            domain,
+            env,
+            to,
+            Some(proposal.proposer),
+            Refusal::Busy,
+            crate::Capacity {
+                project: Some(proposal.project),
+                by: Party::Task(proposal.proposer),
+                action: crate::CapacityAction::Proposal { number: proposal.number },
+                cause: crate::capacity::inbox(proposal.proposer, &env.limits),
+            },
+            out,
+        );
     }
     match task.phase {
         Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => {}

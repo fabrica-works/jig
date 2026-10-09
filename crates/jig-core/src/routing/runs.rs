@@ -39,7 +39,7 @@ pub(super) fn escalation_refused(
         &mut out,
         to,
         key,
-        CallPart::EscalationRefused(tasks::Problem { task: Some(task), why, blocked_by: None }),
+        CallPart::EscalationRefused(tasks::Problem { task: Some(task), why, blocked_by: None, capacity: None }),
     );
     out.push(Request::Decided);
     Requests::Out(out)
@@ -52,7 +52,7 @@ pub(super) fn proposal_refused(core: &mut Core, to: ReplyTo, key: CallKey, why: 
         &mut out,
         to,
         key,
-        CallPart::ProposalRefused(tasks::Problem { task: Some(key.task), why, blocked_by: None }),
+        CallPart::ProposalRefused(tasks::Problem { task: Some(key.task), why, blocked_by: None, capacity: None }),
     );
     out.push(Request::Decided);
     Requests::Out(out)
@@ -381,6 +381,7 @@ pub(super) fn named_action(
                         task: Some(key.task),
                         why: tasks::Refusal::Unknown,
                         blocked_by: None,
+                        capacity: None,
                     }),
                 );
                 out.push(Request::Decided);
@@ -397,6 +398,7 @@ pub(super) fn named_action(
                         task: Some(target),
                         why: tasks::Refusal::Busy,
                         blocked_by: None,
+                        capacity: None,
                     }),
                 );
                 out.push(Request::Decided);
@@ -441,6 +443,7 @@ pub(super) fn named_action(
                         task: Some(key.task),
                         why: tasks::Refusal::Busy,
                         blocked_by: None,
+                        capacity: None,
                     }),
                 );
                 out.push(Request::Decided);
@@ -485,7 +488,12 @@ pub(super) fn named_action(
                         &mut out,
                         ReplyTo::new(token),
                         key,
-                        CallPart::ControlRefused(tasks::Problem { task: Some(task), why, blocked_by: None }),
+                        CallPart::ControlRefused(tasks::Problem {
+                            task: Some(task),
+                            why,
+                            blocked_by: None,
+                            capacity: None,
+                        }),
                     );
                     out.push(Request::Decided);
                     return Requests::Out(out);
@@ -506,6 +514,7 @@ pub(super) fn named_action(
                         task: Some(target),
                         why: tasks::Refusal::Busy,
                         blocked_by: None,
+                        capacity: None,
                     }),
                 );
                 out.push(Request::Decided);

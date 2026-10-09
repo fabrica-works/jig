@@ -99,8 +99,14 @@ pub(crate) fn subscribe(
     if subscription.number == 0 || find(task, subscription.number).is_some() {
         return refused(to, Some(number), Refusal::Subscription, out);
     }
+    let capacity = crate::Capacity {
+        project: Some(task.project),
+        by: crate::Party::Task(number),
+        action: crate::CapacityAction::Subscription { number: subscription.number },
+        cause: crate::CapacityCause::Subscriptions { limit: env.limits.subscriptions },
+    };
     if task.subscriptions.len() >= usize::try_from(env.limits.subscriptions).expect("u32 fits usize") {
-        return refused(to, Some(number), Refusal::Busy, out);
+        return crate::capacity::refuse(domain, env, to, Some(number), Refusal::Busy, capacity, out);
     }
     match subscription.kind {
         SubscriptionKind::Task { target, held, result } => {
@@ -120,7 +126,15 @@ pub(crate) fn subscribe(
     }
     let reserve = usize::try_from(env.limits.result_bytes.max(env.limits.message_bytes)).expect("u32 fits usize");
     if !crate::inbox::room(domain, &env.limits, number, 1, reserve) {
-        return refused(to, Some(number), Refusal::Busy, out);
+        return crate::capacity::refuse(
+            domain,
+            env,
+            to,
+            Some(number),
+            Refusal::Busy,
+            crate::Capacity { cause: crate::capacity::inbox(number, &env.limits), ..capacity },
+            out,
+        );
     }
     let row = task_mut(domain, number).expect("subscriber live");
     let mut next = List::with_capacity(env.limits.subscriptions);

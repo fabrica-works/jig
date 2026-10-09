@@ -59,6 +59,9 @@ pub struct Domain {
     pub(crate) rng: Rng,
     facts: Queue<Fact>,
     lost: u64,
+    pub(crate) room_refusals: Queue<crate::CapacityRefusal>,
+    pub(crate) room_refusals_lost: u64,
+    pub(crate) room_refusals_mark: u64,
 }
 
 /// One bounded live row projected for an authenticated tree or goal watch.
@@ -148,6 +151,9 @@ impl Domain {
             rng: Rng::new(seed),
             facts: Queue::with_capacity(limits.facts),
             lost: 0,
+            room_refusals: Queue::with_capacity(limits.room_refusals),
+            room_refusals_lost: 0,
+            room_refusals_mark: 0,
         }
     }
 
@@ -514,10 +520,10 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::escalation::decide(domain, env, reply_to, task, revision, by, entry, decision, out);
         }
         Event::OpenPeriod { reply_to, project, period, budget } => {
-            crate::funders::open(domain, reply_to, project, period, budget, out);
+            crate::funders::open(domain, env, reply_to, project, period, budget, out);
         }
         Event::CarvePool { reply_to, project, person, period, budget } => {
-            crate::funders::carve(domain, reply_to, project, person, period, budget, out);
+            crate::funders::carve(domain, env, reply_to, project, person, period, budget, out);
         }
         Event::ResizePool { reply_to, project, person, period, budget } => {
             crate::funders::resize_pool(domain, reply_to, project, person, period, budget, out);
@@ -540,7 +546,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::ReadAfresh { resource } => crate::writers::read_afresh(domain, env, &resource, out),
         Event::ChargeEffect { funder, maximum } => crate::funders::charge_effect(domain, env, funder, maximum, out),
         Event::EffectInFlight { reply_to, task, resource, entry } => {
-            crate::writers::effect_in_flight(domain, &env.limits, reply_to, task, resource, entry, out);
+            crate::writers::effect_in_flight(domain, env, reply_to, task, resource, entry, out);
         }
         Event::EffectSettled { resource, entry } => crate::writers::effect_settled(domain, env, &resource, entry, out),
         Event::Turn { reply_to, task, attempt, turn, read, offered, cumulative } => {
@@ -661,7 +667,7 @@ pub(crate) fn fact(domain: &mut Domain, observation: Fact) {
 }
 
 pub(crate) fn refused(to: ReplyTo, task: Option<u64>, why: Refusal, out: &mut Queue<Request>) {
-    out.push(Request::Refused { reply_to: to, problem: Problem { task, why, blocked_by: None } });
+    out.push(Request::Refused { reply_to: to, problem: Problem { task, why, blocked_by: None, capacity: None } });
 }
 
 pub(crate) fn entrance(domain: &Domain, to: ReplyTo, number: u64) -> Result<ReplyTo, (ReplyTo, Refusal)> {
@@ -891,7 +897,7 @@ pub(crate) fn make(
         return refused(to, None, Refusal::NotReady, out);
     }
     if let Err(problem) = crate::batch::check(domain, &env.limits, creator, &batch) {
-        return out.push(Request::Refused { reply_to: to, problem });
+        return crate::capacity::refused(domain, env, to, problem, out);
     }
     let numbers = make_admitted(domain, env, creator, batch, out);
     out.push(Request::Made { reply_to: to, tasks: numbers });
@@ -912,7 +918,7 @@ fn make_result_followups(
     if let Err(problem) =
         crate::batch::check_result_followups(domain, &env.limits, Party::Task(proposer), proposal, &batch)
     {
-        return out.push(Request::Refused { reply_to: to, problem });
+        return crate::capacity::refused(domain, env, to, problem, out);
     }
     remember_result_followups(domain, &env.limits, proposer, &batch);
     let numbers = make_admitted(domain, env, Party::Task(proposer), batch, out);

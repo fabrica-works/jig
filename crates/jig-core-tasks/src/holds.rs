@@ -289,7 +289,13 @@ fn waiting_count(domain: &Domain, holding: &Holding) -> u32 {
 pub(crate) fn check_batch(domain: &Domain, limits: &Limits, creator: Party, batch: &[New]) -> Result<(), Problem> {
     for (at, new) in batch.iter().enumerate() {
         if new.holdings.len() > usize::try_from(limits.holdings).expect("u32 fits usize") {
-            return Err(Problem::new(Some(new.number), Refusal::Holds));
+            return Err(crate::capacity::batch_problem(
+                Some(new.number),
+                Refusal::Holds,
+                creator,
+                batch,
+                crate::CapacityCause::Holdings { limit: limits.holdings },
+            ));
         }
         for (index, needed) in new.holdings.iter().enumerate() {
             if !shape(limits, name(needed)) {
@@ -337,6 +343,7 @@ pub(crate) fn check_batch(domain: &Domain, limits: &Limits, creator: Party, batc
                         return Err(Problem {
                             task: Some(new.number),
                             why: Refusal::HoldTaken,
+                            capacity: None,
                             blocked_by: match occupied {
                                 Some(owner) => Some(Box::new([owner])),
                                 None => None,
@@ -355,7 +362,13 @@ pub(crate) fn check_batch(domain: &Domain, limits: &Limits, creator: Party, batc
                 }
             }
             if queued >= limits.hold_waiters && blocked {
-                return Err(Problem::new(Some(new.number), Refusal::Holds));
+                return Err(crate::capacity::batch_problem(
+                    Some(new.number),
+                    Refusal::Holds,
+                    creator,
+                    batch,
+                    crate::CapacityCause::HoldWaiters { limit: limits.hold_waiters },
+                ));
             }
         }
         let mut handing_down = false;

@@ -5,7 +5,7 @@ use crate::{Authority, Contract, Executor, Last, Limits, New, Parameter, Party, 
 use skein_lib::List;
 
 fn problem(task: Option<u64>, why: Refusal) -> Problem {
-    Problem { task, why, blocked_by: None }
+    Problem { task, why, blocked_by: None, capacity: None }
 }
 
 pub(crate) fn check(domain: &Domain, limits: &Limits, creator: Party, batch: &[New]) -> Result<(), Problem> {
@@ -49,10 +49,12 @@ fn check_with_result_proposal(
     if size > limits.batch {
         return Err(problem(None, Refusal::Batch));
     }
-    if domain.names.len().saturating_add(size) > limits.tasks
-        || domain.tasks.capacity().saturating_sub(domain.tasks.len()) < size
-    {
-        return Err(problem(None, Refusal::Live));
+    if !live_room(domain, limits, size) {
+        return Err(Problem::capacity(
+            None,
+            Refusal::Live,
+            crate::Capacity::batch(creator, batch, None, crate::CapacityCause::Tasks { limit: limits.tasks }),
+        ));
     }
     let parent = match creator {
         Party::Task(number) => {
@@ -81,7 +83,13 @@ fn check_with_result_proposal(
                 Phase::Waiting | Phase::Active(_) => {}
             }
             if u32::try_from(parent.delegates.len()).unwrap_or(u32::MAX).saturating_add(size) > limits.delegates {
-                return Err(problem(Some(number), Refusal::Delegates));
+                return Err(crate::capacity::batch_problem(
+                    Some(number),
+                    Refusal::Delegates,
+                    creator,
+                    batch,
+                    crate::CapacityCause::Delegates { limit: limits.delegates },
+                ));
             }
             let Some(result_bytes) =
                 usize::try_from(limits.result_bytes).expect("u32 fits usize").checked_mul(batch.len())
@@ -97,7 +105,11 @@ fn check_with_result_proposal(
             }
             let Some(messages) = size.checked_add(news) else { return Err(problem(Some(number), Refusal::Busy)) };
             if !crate::inbox::room(domain, limits, number, messages, result_bytes) {
-                return Err(problem(Some(number), Refusal::Busy));
+                return Err(Problem::capacity(
+                    Some(number),
+                    Refusal::Busy,
+                    crate::Capacity::batch(creator, batch, Some(number), crate::capacity::inbox(number, limits)),
+                ));
             }
             if parent.depth.saturating_add(1) > limits.depth {
                 return Err(problem(Some(number), Refusal::Depth));
@@ -109,7 +121,13 @@ fn check_with_result_proposal(
                 Some(total) => total > limits.tree_tasks,
                 None => true,
             } {
-                return Err(problem(Some(number), Refusal::Tree));
+                return Err(crate::capacity::batch_problem(
+                    Some(number),
+                    Refusal::Tree,
+                    creator,
+                    batch,
+                    crate::CapacityCause::Tree { limit: limits.tree_tasks },
+                ));
             }
             Some(parent)
         }
@@ -210,7 +228,13 @@ fn check_members(
             }
         }
         if in_project > limits.project_tasks {
-            return Err(problem(number, Refusal::Project));
+            return Err(crate::capacity::batch_problem(
+                number,
+                Refusal::Project,
+                creator,
+                batch,
+                crate::CapacityCause::ProjectTasks { limit: limits.project_tasks },
+            ));
         }
         match new.executor {
             Executor::Agent { charter } => {
@@ -514,4 +538,9 @@ pub fn bounded_batch(limits: &Limits, batch: &[New]) -> bool {
         }
     }
     true
+}
+
+fn live_room(domain: &Domain, limits: &Limits, size: u32) -> bool {
+    domain.names.len().saturating_add(size) <= limits.tasks
+        && domain.tasks.capacity().saturating_sub(domain.tasks.len()) >= size
 }

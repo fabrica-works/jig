@@ -149,6 +149,8 @@ pub struct Deployment {
     pub person_room_refusals_forgotten: u64,
     /// Permanent refusal answers follow this retention; unsaved entrance history is live-only.
     pub person_answer_retention: Duration,
+    pub task_room_refusals: List<tasks::CapacityRefusal>,
+    pub task_room_refusals_forgotten: u64,
     pub cut: bool,
 }
 /// Recent refused hello facts, without protocol rights or advertised workstream payloads.
@@ -637,6 +639,13 @@ pub(super) fn deployment(
     }
     cut |= usize::try_from(refused.len()).expect("refusal count fits") > line_bound(limits);
     cut |= core.people.capacity_refusals_lost() != 0;
+    let refused_tasks = core.tasks.capacity_refusals();
+    let mut task_room_refusals = List::with_capacity(limits.documents.lines);
+    for value in refused_tasks.as_slice().iter().rev().take(line_bound(limits)) {
+        task_room_refusals.push(*value).expect("bounded task room refusals");
+    }
+    cut |= usize::try_from(refused_tasks.len()).expect("refusal count fits") > line_bound(limits);
+    cut |= core.tasks.capacity_refusals_lost() != 0;
     Ok(Deployment {
         hosts,
         attempts,
@@ -664,6 +673,8 @@ pub(super) fn deployment(
         person_room_refusals,
         person_room_refusals_forgotten: core.people.capacity_refusals_lost(),
         person_answer_retention: limits.people.request_retention,
+        task_room_refusals,
+        task_room_refusals_forgotten: core.tasks.capacity_refusals_lost(),
         cut,
     })
 }
@@ -714,6 +725,7 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_mul(carriers)?
         .checked_add(List::<HelloRefusalLine>::worst_case(limits.lines)?)?
         .checked_add(List::<people::CapacityRefusal>::worst_case(limits.lines)?)?
+        .checked_add(List::<tasks::CapacityRefusal>::worst_case(limits.lines)?)?
         .checked_add(u64::try_from(size_of::<Deployment>()).ok()?)
 }
 
@@ -735,6 +747,7 @@ pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
     .checked_add(List::<people::CapacityRefusal>::worst_case(
         limits.people.requests.checked_add(limits.people.room_refusals)?,
     )?)?
+    .checked_add(List::<tasks::CapacityRefusal>::worst_case(limits.tasks.room_refusals)?)?
     .checked_add(List::<fleet::AttemptView>::worst_case(tracked)?)?
     .checked_add(List::<accounts::Fact>::worst_case(limits.accounts.accounts)?)?
     .checked_add(Map::<

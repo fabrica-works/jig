@@ -171,7 +171,7 @@ pub(crate) fn activation(
                         if let Err(problem) =
                             crate::batch::check_direct_followups(domain, &environment.limits, number, charge, batch)
                         {
-                            return out.push(Request::Refused { reply_to: to, problem });
+                            return crate::capacity::refused(domain, environment, to, problem, out);
                         }
                     }
                     ResultFollowups::Proposal(proposal) => {

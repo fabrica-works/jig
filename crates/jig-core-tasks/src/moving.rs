@@ -194,7 +194,21 @@ pub(crate) fn apply(
             Some(count) => count > domain.funding.capacity(),
             None => true,
         } {
-            return refused(to, Some(number), Refusal::Busy, out);
+            let project = old.project;
+            return crate::capacity::refuse(
+                domain,
+                env,
+                to,
+                Some(number),
+                Refusal::Busy,
+                crate::Capacity {
+                    project: Some(project),
+                    by: Party::Person(person),
+                    action: crate::CapacityAction::Move,
+                    cause: crate::CapacityCause::Funders { limit: env.limits.funders },
+                },
+                out,
+            );
         }
     }
     if create_period {

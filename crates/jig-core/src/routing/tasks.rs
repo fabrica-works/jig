@@ -1143,6 +1143,11 @@ pub(super) fn tag_tasks(
         };
         out.push(request);
     }
+    let capacity_mark = core.tasks.capacity_mark();
+    if capacity_mark != core.task_capacity_mark || capacity_mark == u64::MAX {
+        core.task_capacity_mark = capacity_mark;
+        core.touch_deployment();
+    }
     out.push(Request::Decided);
     Requests::Out(out)
 }
@@ -1221,10 +1226,17 @@ pub(super) fn route_tasks(
             }
         }
         if tracked > env.limits.tasks.tasks.saturating_sub(core.projections.len()) {
-            let tasks::Event::Make { reply_to, .. } = event else { unreachable!("checked creation event") };
+            let tasks::Event::Make { reply_to, creator, batch } = event else { unreachable!("checked creation event") };
+            let capacity = tasks::Capacity::batch(
+                creator,
+                &batch,
+                None,
+                tasks::CapacityCause::Tasks { limit: env.limits.tasks.tasks },
+            );
+            core.tasks.remember_capacity(env.wall, capacity);
             out.push(tasks::Request::Refused {
                 reply_to,
-                problem: tasks::Problem { task: None, why: tasks::Refusal::Live, blocked_by: None },
+                problem: tasks::Problem::capacity(None, tasks::Refusal::Live, capacity),
             });
             return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false);
         }

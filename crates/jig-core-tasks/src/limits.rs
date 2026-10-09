@@ -88,6 +88,8 @@ pub struct Limits {
     pub retries: Retries,
     /// Optional content-free observation capacity; overflow is diagnostic and changes no decision.
     pub facts: u32,
+    /// Recent owner-proven room refusals; zero omits history and counts omissions.
+    pub room_refusals: u32,
 }
 
 /// Maximum ended identities named by bounded live dependencies, inputs or references.
@@ -237,6 +239,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<u64>::worst_case(limits.tasks.checked_mul(limits.subscriptions)?)?)?
         .checked_add(Deadlines::<u64>::worst_case(limits.tasks)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)?
+        .checked_add(Queue::<crate::CapacityRefusal>::worst_case(limits.room_refusals)?)?
+        .checked_add(List::<crate::CapacityRefusal>::worst_case(limits.room_refusals)?)?
         .checked_add(
             u64::from(limits.tasks).checked_mul(
                 payload

@@ -50,6 +50,7 @@ pub const LIMITS: Limits = Limits {
     executor_kinds: 3,
     retries: Retries { transient: RETRY, permanent: RETRY, run: RETRY, agent: RETRY, lost: RETRY, invalid: RETRY },
     facts: 16,
+    room_refusals: 2,
 };
 
 #[must_use]

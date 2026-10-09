@@ -40,7 +40,21 @@ pub(crate) fn introduce(
         if !crate::batch::contains(&row.references, peer)
             && row.references.len() >= usize::try_from(env.limits.references).expect("u32 fits usize")
         {
-            return refused(to, Some(task), Refusal::Busy, out);
+            let project = row.project;
+            return crate::capacity::refuse(
+                domain,
+                env,
+                to,
+                Some(task),
+                Refusal::Busy,
+                crate::Capacity {
+                    project: Some(project),
+                    by: Party::Task(by),
+                    action: crate::CapacityAction::Introduce { left, right },
+                    cause: crate::CapacityCause::References { limit: env.limits.references },
+                },
+                out,
+            );
         }
     }
     for (task, peer) in [(left, right), (right, left)] {

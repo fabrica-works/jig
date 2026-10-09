@@ -39,7 +39,7 @@ pub(crate) fn stepped(
     match &decision {
         ProcedureDecision::Delegate(batch) => {
             if let Err(problem) = crate::batch::check(domain, &env.limits, Party::Task(number), batch) {
-                return out.push(Request::Refused { reply_to: to, problem });
+                return crate::capacity::refused(domain, env, to, problem, out);
             }
         }
         ProcedureDecision::Result(result) => {

@@ -56,12 +56,13 @@ fn free(domain: &mut Domain, env: &Env<Limits>, resource: &Name, out: &mut Queue
 
 pub(crate) fn claim(
     domain: &mut Domain,
-    limits: &Limits,
+    env: &Env<Limits>,
     task: u64,
     attempt: u64,
     writes: &[Name],
     out: &mut Queue<Request>,
 ) -> Result<(), Option<Name>> {
+    let limits = &env.limits;
     if writes.len() > usize::try_from(limits.holdings).expect("u32 fits usize") {
         return Err(None);
     }
@@ -89,6 +90,16 @@ pub(crate) fn claim(
     }
     if domain.writers.len().saturating_add(u32::try_from(writes.len()).unwrap_or(u32::MAX)) > domain.writers.capacity()
     {
+        let project = record(domain, task).expect("writer task preflighted").project;
+        domain.remember_capacity(
+            env.wall,
+            crate::Capacity {
+                project: Some(project),
+                by: Party::Task(task),
+                action: crate::CapacityAction::Claim { attempt },
+                cause: crate::CapacityCause::Writers { limit: domain.writers.capacity() },
+            },
+        );
         return Err(None);
     }
     for resource in writes {
@@ -147,13 +158,14 @@ pub(crate) fn effect_ready(domain: &Domain, limits: &Limits, task: u64, resource
 
 pub(crate) fn effect_in_flight(
     domain: &mut Domain,
-    limits: &Limits,
+    env: &Env<Limits>,
     to: ReplyTo,
     task: u64,
     resource: Name,
     entry: u64,
     out: &mut Queue<Request>,
 ) {
+    let limits = &env.limits;
     if !crate::holds::valid_name(limits, &resource)
         || !covers(domain, task, &resource, limits.depth.saturating_add(1))
         || entry == 0
@@ -166,7 +178,21 @@ pub(crate) fn effect_in_flight(
             out.push(Request::WriterWaiting { reply_to: to, task: Some(task), resource });
         }
     } else if domain.writers.len() == domain.writers.capacity() {
-        refused(to, Some(task), Refusal::Holds, out);
+        let project = record(domain, task).expect("writer task preflighted").project;
+        crate::capacity::refuse(
+            domain,
+            env,
+            to,
+            Some(task),
+            Refusal::Holds,
+            crate::Capacity {
+                project: Some(project),
+                by: Party::Task(task),
+                action: crate::CapacityAction::Effect { entry },
+                cause: crate::CapacityCause::Writers { limit: domain.writers.capacity() },
+            },
+            out,
+        );
     } else {
         take(domain, resource, Writer::Effect { entry }, out);
         out.push(Request::Done { reply_to: to });

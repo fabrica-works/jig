@@ -291,7 +291,12 @@ fn a_conflicting_late_terminal_cannot_replace_an_already_committed_answer() {
         &env,
         core::Event::RefusedPayload {
             request: Token::new(9921),
-            problem: tasks::Problem { task: Some(key.task), why: tasks::Refusal::State, blocked_by: None },
+            problem: tasks::Problem {
+                task: Some(key.task),
+                why: tasks::Refusal::State,
+                blocked_by: None,
+                capacity: None,
+            },
             payload: Some(core::PayloadRefusal::Answer { task: key.task, attempt: key.attempt }),
         },
     );

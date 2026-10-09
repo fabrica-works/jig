@@ -60,6 +60,7 @@ pub fn limits() -> root::Limits {
             invalid: retry,
         },
         facts: 2,
+        room_refusals: 2,
     };
     let people = people::Limits {
         people: 2,

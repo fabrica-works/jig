@@ -1111,6 +1111,7 @@ fn accept_refused(
                         task: Some(key.task),
                         why: tasks::Refusal::AuthorityShape,
                         blocked_by: None,
+                        capacity: None,
                     }),
                 );
             }

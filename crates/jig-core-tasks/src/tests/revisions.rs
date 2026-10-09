@@ -56,6 +56,7 @@ const LIMITS: Limits = Limits {
     executor_kinds: 3,
     retries: Retries { transient: RETRY, permanent: RETRY, run: RETRY, agent: RETRY, lost: RETRY, invalid: RETRY },
     facts: 16,
+    room_refusals: 2,
 };
 
 #[must_use]
@@ -750,4 +751,134 @@ fn an_amendment_releases_only_the_named_hold_and_preflights_both_changes() {
         amendment: change,
     });
     assert_eq!(h.domain.task(1), Some(&before));
+}
+
+#[test]
+fn capacity_history_distinguishes_project_shape_from_room_and_survives_diagnostic_draining() {
+    let mut h = Harness::new();
+    h.make(vec![task(1, &[])]);
+    h.env.limits.project_tasks = 1;
+    let mut wrong = task(2, &[]);
+    wrong.project = 2;
+    let denied = h.send(Event::Make { reply_to: to(), creator: Party::Task(1), batch: Box::new([wrong]) });
+    assert!(denied.iter().any(|r| match r {
+        Request::Refused { problem, .. } => problem.why == crate::Refusal::Project && problem.capacity.is_none(),
+        _ => false,
+    }));
+    assert!(h.domain.capacity_refusals().is_empty());
+    for number in 2..=4 {
+        h.env.wall = Wall::from_nanos(number);
+        let denied =
+            h.send(Event::Make { reply_to: to(), creator: Party::Person(9), batch: Box::new([task(number, &[])]) });
+        assert!(denied.iter().any(|r| match r {
+            Request::Refused { problem, .. } => problem.capacity.is_some(),
+            _ => false,
+        }));
+    }
+    let rows = h.domain.capacity_refusals();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows.get(0).unwrap().at, Wall::from_nanos(3));
+    assert_eq!(rows.get(1).unwrap().at, Wall::from_nanos(4));
+    assert_eq!(rows.get(1).unwrap().request.project, Some(1));
+    assert_eq!(rows.get(1).unwrap().request.by, Party::Person(9));
+    assert_eq!(rows.get(1).unwrap().request.action, crate::CapacityAction::Batch { first: Some(4), members: 1 });
+    assert_eq!(rows.get(1).unwrap().request.cause, crate::CapacityCause::ProjectTasks { limit: 1 });
+    assert_eq!(h.domain.capacity_refusals_lost(), 1);
+    while h.domain.pop_fact().is_some() {}
+    assert_eq!(h.domain.capacity_refusals(), rows);
+    assert!(h.domain.task(4).is_none());
+    let mut cold = Harness::new();
+    cold.domain = Domain::new(&LIMITS, 91, Box::new([1]));
+    for row in h.stored.values() {
+        match row {
+            Stored::Live(_) | Stored::Ledger(_) => {
+                cold.send(Event::Restore { record: row.clone() });
+            }
+            _ => {}
+        }
+    }
+    cold.send(Event::Restored);
+    assert!(cold.domain.ready());
+    assert!(cold.domain.capacity_refusals().is_empty(), "room history is live-only");
+    assert_eq!(cold.domain.capacity_refusals_lost(), 0);
+}
+
+#[test]
+fn pending_task_proposal_room_keeps_original_action_and_excludes_wrong_project() {
+    let mut h = Harness::new();
+    h.make(vec![task(1, &[])]);
+    let proposal = crate::Proposal {
+        number: 7,
+        proposer: 1,
+        project: 1,
+        action: crate::ProposalAction::Release { task: 1 },
+        reason: Box::new([]),
+        as_holder: false,
+        state: crate::ProposalState::Pending { holder: crate::ProposalHolder::Person(9), since: Wall::EPOCH },
+    };
+    let accepted = h.send(Event::Propose { reply_to: to(), proposal: proposal.clone() });
+    assert!(accepted.iter().any(|r| match r {
+        Request::Done { .. } => true,
+        _ => false,
+    }));
+    let mut newer = proposal;
+    newer.number = 8;
+    newer.project = 2;
+    h.send(Event::Propose { reply_to: to(), proposal: newer.clone() });
+    assert!(h.domain.capacity_refusals().is_empty());
+    newer.project = 1;
+    h.env.wall = Wall::from_nanos(17);
+    h.send(Event::Propose { reply_to: to(), proposal: newer });
+    let rows = h.domain.capacity_refusals();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows.get(0).unwrap().at, Wall::from_nanos(17));
+    assert_eq!(rows.get(0).unwrap().request.action, crate::CapacityAction::Proposal { number: 8 });
+    assert_eq!(rows.get(0).unwrap().request.cause, crate::CapacityCause::Proposals { limit: 1 });
+    assert_eq!(h.domain.proposal(1, 7).unwrap().number, 7);
+    h.env.limits.inbox_messages = 1;
+    h.env.wall = Wall::from_nanos(23);
+    let prior = h.domain.task(1).unwrap().clone();
+    let denied = h.send(Event::Message {
+        reply_to: to(),
+        project: 1,
+        task: 1,
+        release: false,
+        word: crate::Word {
+            number: 9,
+            from: Party::Person(9),
+            kind: MessageKind::Words,
+            words: Box::new([1]),
+            at: Wall::EPOCH,
+            hits: 1,
+            eligible: true,
+        },
+    });
+    assert!(denied.iter().any(|r| match r {
+        Request::Refused { problem, .. } => problem.capacity.is_some(),
+        _ => false,
+    }));
+    let rows = h.domain.capacity_refusals();
+    let message = rows.get(1).unwrap();
+    assert_eq!(message.at, Wall::from_nanos(23));
+    assert_eq!(message.request.action, crate::CapacityAction::Message { task: 1, number: 9 });
+    assert_eq!(message.request.cause, crate::CapacityCause::Inbox { task: 1, messages: 1, bytes: LIMITS.inbox_bytes });
+    assert_eq!(h.domain.task(1).unwrap(), &prior, "refused words change no admitted inbox or task row");
+}
+
+#[test]
+fn zero_capacity_history_counts_real_source_room_without_retaining_payloads() {
+    let limits = Limits { funders: 0, room_refusals: 0, ..LIMITS };
+    let env = Env { now: Time::ZERO, wall: Wall::from_nanos(21), limits };
+    let mut domain = Domain::new(&limits, 1, Box::new([1]));
+    let mut out = Queue::with_capacity(max_out(&limits));
+    step(&mut domain, &env, Event::Restored, &mut out);
+    while out.pop().is_some() {}
+    step(&mut domain, &env, Event::OpenPeriod { reply_to: to(), project: 1, period: 4, budget: 100 }, &mut out);
+    let Request::Refused { problem, .. } = out.pop().unwrap() else { panic!("source full") };
+    let fact = problem.capacity.unwrap();
+    assert_eq!(fact.action, crate::CapacityAction::Source { funder: Funder::Period { project: 1, period: 4 } });
+    assert_eq!(fact.cause, crate::CapacityCause::Funders { limit: 0 });
+    assert!(domain.capacity_refusals().is_empty());
+    assert_eq!(domain.capacity_refusals_lost(), 1);
+    assert_eq!(domain.capacity_mark(), 1);
 }

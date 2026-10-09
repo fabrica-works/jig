@@ -480,6 +480,13 @@ pub(crate) fn release(
         let Some(prepared) =
             crate::inbox::prepare(domain, &env.limits, number, word, crate::inbox::Admission::Refusable)
         else {
+            let capacity = crate::Capacity {
+                project: Some(task.project),
+                by,
+                action: crate::CapacityAction::Release,
+                cause: crate::capacity::inbox(number, &env.limits),
+            };
+            domain.remember_capacity(env.wall, capacity);
             return Err(Refusal::Busy);
         };
         Some(prepared)

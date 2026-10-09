@@ -292,8 +292,14 @@ pub(crate) fn message(
         Some(_) => Admission::RoomKept,
         None => Admission::Refusable,
     };
+    let capacity = crate::Capacity {
+        project: Some(project),
+        by: word.from,
+        action: crate::CapacityAction::Message { task: number, number: word.number },
+        cause: crate::capacity::inbox(number, &env.limits),
+    };
     let Some(prepared) = prepare(domain, &env.limits, number, word, admission) else {
-        return refused(to, Some(number), Refusal::Busy, out);
+        return crate::capacity::refuse(domain, env, to, Some(number), Refusal::Busy, capacity, out);
     };
     if prepared.word.kind == MessageKind::Question {
         let source = match prepared.word.from {
@@ -301,7 +307,15 @@ pub(crate) fn message(
             Party::Person(_) | Party::Deployment { .. } => return refused(to, Some(number), Refusal::Reference, out),
         };
         if !room(domain, &env.limits, source, 1, usize::try_from(env.limits.message_bytes).expect("u32 fits usize")) {
-            return refused(to, Some(source), Refusal::Busy, out);
+            return crate::capacity::refuse(
+                domain,
+                env,
+                to,
+                Some(source),
+                Refusal::Busy,
+                crate::Capacity { cause: crate::capacity::inbox(source, &env.limits), ..capacity },
+                out,
+            );
         }
     }
     let task = task_mut(domain, number).expect("admitted task still live");

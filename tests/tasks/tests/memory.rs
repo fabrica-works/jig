@@ -44,6 +44,7 @@ impl Measured {
     fn event(&mut self, event: Event) {
         self.meter.start();
         tasks::step(&mut self.d, &self.env, event, &mut self.out);
+        let _history = self.d.capacity_refusals();
         let measured = self.meter.end();
         self.refused = false;
         while let Some(request) = self.out.pop() {
@@ -132,6 +133,13 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
         let reply_to = m.to();
         m.event(Event::Make { reply_to, creator: Party::Person(1), batch: batch.into_boxed_slice() });
         assert!(!m.refused);
+        for _ in 0..=l.room_refusals {
+            let reply_to = m.to();
+            m.event(Event::Make { reply_to, creator: Party::Person(1), batch: Box::new([filled(&l, 100)]) });
+            assert!(m.refused);
+        }
+        assert_eq!(m.d.capacity_refusals().len(), l.room_refusals);
+        assert_eq!(m.d.capacity_refusals_lost(), 1);
         for number in 1..=u64::from(l.tasks) {
             m.claim(number);
             let reply_to = m.to();

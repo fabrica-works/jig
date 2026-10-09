@@ -386,7 +386,15 @@ pub(crate) fn save_funding(domain: &Domain, funder: Funder, out: &mut Queue<Requ
     out.push(Request::Save { record: Stored::Ledger(ledger) });
 }
 
-pub(crate) fn open(domain: &mut Domain, to: ReplyTo, project: u32, period: u64, budget: u64, out: &mut Queue<Request>) {
+pub(crate) fn open(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    to: ReplyTo,
+    project: u32,
+    period: u64,
+    budget: u64,
+    out: &mut Queue<Request>,
+) {
     if !domain.ready() {
         return refused(to, None, Refusal::NotReady, out);
     }
@@ -406,7 +414,20 @@ pub(crate) fn open(domain: &mut Domain, to: ReplyTo, project: u32, period: u64, 
         }
     }
     if domain.funding.len() == domain.funding.capacity() {
-        return refused(to, None, Refusal::Busy, out);
+        return crate::capacity::refuse(
+            domain,
+            env,
+            to,
+            None,
+            Refusal::Busy,
+            crate::Capacity {
+                project: Some(project),
+                by: crate::Party::Deployment { project },
+                action: crate::CapacityAction::Source { funder },
+                cause: crate::CapacityCause::Funders { limit: env.limits.funders },
+            },
+            out,
+        );
     }
     let record = FundingRecord {
         funder,
@@ -421,8 +442,13 @@ pub(crate) fn open(domain: &mut Domain, to: ReplyTo, project: u32, period: u64, 
     out.push(Request::Done { reply_to: to });
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one authorized pool admission carries source identity, budget and actual decision environment"
+)]
 pub(crate) fn carve(
     domain: &mut Domain,
+    env: &Env<Limits>,
     to: ReplyTo,
     project: u32,
     person: u64,
@@ -450,7 +476,20 @@ pub(crate) fn carve(
         return refused(to, None, Refusal::Funding, out);
     }
     if domain.funding.len() == domain.funding.capacity() {
-        return refused(to, None, Refusal::Busy, out);
+        return crate::capacity::refuse(
+            domain,
+            env,
+            to,
+            None,
+            Refusal::Busy,
+            crate::Capacity {
+                project: Some(project),
+                by: crate::Party::Deployment { project },
+                action: crate::CapacityAction::Source { funder },
+                cause: crate::CapacityCause::Funders { limit: env.limits.funders },
+            },
+            out,
+        );
     }
     let record = FundingRecord {
         funder,

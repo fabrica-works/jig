@@ -21,7 +21,13 @@ pub(super) fn delegate_refused(
     why: tasks::Refusal,
 ) -> Requests {
     let mut out = Queue::with_capacity(3);
-    call_decision(core, &mut out, to, key, CallPart::DelegationRefused(tasks::Problem { task, why, blocked_by: None }));
+    call_decision(
+        core,
+        &mut out,
+        to,
+        key,
+        CallPart::DelegationRefused(tasks::Problem { task, why, blocked_by: None, capacity: None }),
+    );
     out.push(Request::Decided);
     Requests::Out(out)
 }
@@ -675,6 +681,7 @@ pub(super) fn delegate_input_failed(work: &mut Queue<Event>, to: ReplyTo, key: C
             task: Some(key.task),
             why: tasks::Refusal::Inputs,
             blocked_by: None,
+            capacity: None,
         }),
     });
     let mut out = Queue::with_capacity(1);

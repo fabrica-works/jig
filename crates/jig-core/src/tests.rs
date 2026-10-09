@@ -73,6 +73,7 @@ fn limits() -> Limits {
             invalid: retry,
         },
         facts: 2,
+        room_refusals: 2,
     };
     let people = people::Limits {
         people: 2,
@@ -2599,4 +2600,38 @@ fn a_person_result_document_uses_the_durable_answer_instead_of_the_cleared_claim
         result: None,
     });
     assert_eq!(result_from_row(&core, &limits, 1, &row).expect("cancelled").chosen_by, None);
+}
+
+#[test]
+fn deployment_capacity_carries_direct_batch_refusals_and_task_history_cut() {
+    let (mut core, mut limits) = make_tree();
+    limits.people.projects = 2;
+    limits.documents.lines = 1;
+    limits.tasks.tasks = 4;
+    restore_document_party(&mut core, &limits, &[0, 1]);
+    for number in 5..=7 {
+        let new = new_row(&core, number, tasks::Funder::Task(1), Some(4));
+        step(
+            &mut core,
+            &Env { now: Time::ZERO, wall: Wall::from_nanos(number), limits },
+            Event::Tasks(tasks::Event::Make {
+                reply_to: ReplyTo::new(Token::new(number)),
+                creator: tasks::Party::Task(1),
+                batch: Box::new([new]),
+            }),
+        );
+    }
+    let Document::Deployment(document) = make(&core, &limits, 1, &Subject::Deployment, &window()).unwrap() else {
+        panic!("deployment")
+    };
+    assert!(document.cut);
+    assert_eq!(document.task_room_refusals.len(), 1);
+    assert_eq!(document.task_room_refusals_forgotten, 1);
+    let fact = document.task_room_refusals.get(0).unwrap();
+    assert_eq!(fact.at, Wall::from_nanos(7));
+    assert_eq!(fact.request.project, Some(1));
+    assert_eq!(fact.request.by, tasks::Party::Task(1));
+    assert_eq!(fact.request.action, tasks::CapacityAction::Batch { first: Some(7), members: 1 });
+    assert_eq!(fact.request.cause, tasks::CapacityCause::Tasks { limit: 4 });
+    assert!(core.tasks.task(7).is_none());
 }

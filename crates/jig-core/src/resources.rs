@@ -28,6 +28,12 @@ pub(crate) enum Kind {
 }
 
 impl Kind {
+    fn by(&self) -> tasks::Party {
+        match self {
+            Kind::Creation { creator } => *creator,
+            Kind::Result { proposer, .. } => tasks::Party::Task(*proposer),
+        }
+    }
     fn event(self, reply_to: ReplyTo, batch: Box<[tasks::New]>) -> tasks::Event {
         match self {
             Kind::Creation { creator } => tasks::Event::Make { reply_to, creator, batch },
@@ -77,10 +83,19 @@ pub(crate) fn defer(
             };
             let role = core.resource_roles.get(&Key { project: member.project, name: name.clone() });
             if role == Some(&connector::ResourceRole::Unavailable) || role.is_none() && core.resource_roles_full {
-                out.push(tasks::Request::Refused {
-                    reply_to,
-                    problem: tasks::Problem::new(Some(member.number), tasks::Refusal::ResourceUnavailable),
-                });
+                let problem = if role.is_none() && core.resource_roles_full {
+                    let capacity = tasks::Capacity::batch(
+                        kind.by(),
+                        &batch,
+                        Some(member.number),
+                        tasks::CapacityCause::ResourceReports { limit: core.resource_roles.capacity() },
+                    );
+                    core.tasks.remember_capacity(env.wall, capacity);
+                    tasks::Problem::capacity(Some(member.number), tasks::Refusal::ResourceUnavailable, capacity)
+                } else {
+                    tasks::Problem::new(Some(member.number), tasks::Refusal::ResourceUnavailable)
+                };
+                out.push(tasks::Request::Refused { reply_to, problem });
                 return None;
             }
         }
@@ -110,7 +125,17 @@ pub(crate) fn defer(
         return Some(kind.event(reply_to, members.into_boxed()));
     }
     if core.awaiting_resources.len() == core.awaiting_resources.capacity() {
-        out.push(tasks::Request::Refused { reply_to, problem: tasks::Problem::new(None, tasks::Refusal::Busy) });
+        let capacity = tasks::Capacity::batch(
+            kind.by(),
+            &batch,
+            None,
+            tasks::CapacityCause::CreationFlights { limit: core.awaiting_resources.capacity() },
+        );
+        core.tasks.remember_capacity(env.wall, capacity);
+        out.push(tasks::Request::Refused {
+            reply_to,
+            problem: tasks::Problem::capacity(None, tasks::Refusal::Busy, capacity),
+        });
         return None;
     }
     let token = reply_to.into_token();
