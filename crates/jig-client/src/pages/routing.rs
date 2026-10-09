@@ -70,6 +70,10 @@ pub(crate) fn navigate(
         refuse(domain, Limit::Reads);
         return;
     };
+    match domain.page {
+        Page::SigningIn => domain.signin.returning = true,
+        Page::Starting | Page::Work { .. } | Page::Elsewhere | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {}
+    }
     domain.close_page(out);
     domain.reads.abandon(domain.generation);
     out.push(Request::PartsLeft { generation: domain.generation });
@@ -94,6 +98,7 @@ pub(crate) fn navigate(
                 }
             }
             out.push(Request::Show { address, replace });
+            crate::store::place(domain, out);
         }
         Place::Elsewhere => {
             domain.page = Page::Elsewhere;
@@ -104,9 +109,15 @@ pub(crate) fn navigate(
             domain.changed();
         }
     }
+    crate::signin::returned(domain, env, out);
 }
 /// Opens only what the selected work page shows; services have no page.
 pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
+    if domain.confirmed.is_none() {
+        domain.page = Page::SomeoneElse;
+        domain.changed();
+        return;
+    }
     if let Some(frame) = &domain.frame.document {
         match frame.party.kind {
             PartyKind::Service => {

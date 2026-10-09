@@ -12,6 +12,9 @@ use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 
 pub(super) const LIMITS: Limits = Limits {
     watches: 4,
+    intents: 2,
+    fields: 4,
+    providers: 2,
     objects: 2,
     sources: 8,
     reads: 4,

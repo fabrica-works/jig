@@ -27,3 +27,5 @@ fn version_ranges_are_inclusive_and_invalid_ranges_match_nothing() {
 mod spine;
 
 mod storage;
+
+mod lifecycle;

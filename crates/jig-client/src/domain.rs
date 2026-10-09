@@ -39,6 +39,11 @@ pub enum Timer {
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) started: bool,
+    pub(crate) confirmed: Option<u64>,
+    pub(crate) text_limit: u32,
+    pub(crate) intents: crate::intents::Intents,
+    pub(crate) fields: crate::fields::Fields,
+    pub(crate) signin: crate::signin::SignIn,
     pub(crate) blocked: bool,
     pub(crate) frame: FrameState,
     pub(crate) link: Link,
@@ -68,6 +73,11 @@ impl Domain {
         assert!(crate::limits::worst_case(limits).is_some(), "client limits are valid");
         Self {
             started: false,
+            confirmed: None,
+            text_limit: limits.text,
+            intents: crate::intents::Intents::new(limits.intents),
+            fields: crate::fields::Fields::new(limits.fields, limits.text),
+            signin: crate::signin::SignIn::new(limits.providers),
             blocked: false,
             frame: FrameState { document: None },
             link: Link::Starting,
@@ -90,6 +100,46 @@ impl Domain {
             turn_rows: crate::windows::TurnWindow::new(limits.rows),
             history_rows: crate::windows::HistoryWindow::new(limits.rows),
         }
+    }
+    /// Installs one provider before start, refusing duplicates and oversized names.
+    pub fn provider(&mut self, provider: crate::signin::Provider) -> Result<(), crate::signin::Provider> {
+        if self.started
+            || u64::try_from(provider.name.bytes().len()).expect("name length fits u64") > u64::from(self.text_limit)
+        {
+            return Err(provider);
+        }
+        for kept in &self.signin.providers {
+            if kept.number == provider.number {
+                return Err(provider);
+            }
+        }
+        self.signin.providers.push(provider)
+    }
+    /// Provider names for the sign-in page.
+    #[must_use]
+    pub const fn signin(&self) -> &crate::signin::SignIn {
+        &self.signin
+    }
+    /// Pending intents and any terminal awaiting reclaim.
+    #[must_use]
+    pub const fn intents(&self) -> &crate::intents::Intents {
+        &self.intents
+    }
+    /// Current fields, with counts of domain writes.
+    #[must_use]
+    pub const fn fields(&self) -> &crate::fields::Fields {
+        &self.fields
+    }
+    /// Writes a field from domain policy and advances the view's shown count.
+    pub fn write_field(&mut self, purpose: crate::fields::Purpose, text: crate::contract::Text) -> Result<(), Limit> {
+        self.fields.write(purpose, text)?;
+        self.changed();
+        Ok(())
+    }
+    /// This domain's restored and saved records.
+    #[must_use]
+    pub const fn records(&self) -> &List<Record> {
+        &self.kept
     }
     /// What the frame most recently said, without interpreting authority.
     #[must_use]
@@ -171,6 +221,9 @@ impl Domain {
                     let removed = self.watch_ids.remove(&id);
                     assert!(removed.is_some(), "closed watch was registered");
                     self.watches.retire(id);
+                    if self.frame_watch == Some(id) {
+                        self.frame_watch = None;
+                    }
                     let count = self.objects.len();
                     let excess = self.objects.replace(crate::objects::Source::Watch(id), &[]);
                     assert!(excess == 0, "empty source replacement never refuses");
@@ -184,11 +237,12 @@ impl Domain {
         self.watches.reclaim();
         self.objects.reclaim();
         self.reads.reclaim();
+        self.intents.reclaim();
     }
     pub(crate) fn changed(&mut self) {
         self.shown = self.shown.saturating_add(1);
     }
-    fn set_link(&mut self, link: Link, out: &mut Queue<Request>) {
+    pub(crate) fn set_link(&mut self, link: Link, out: &mut Queue<Request>) {
         if self.link != link {
             self.link = link;
             self.changed();
@@ -256,7 +310,7 @@ impl Domain {
             }
         }
     }
-    fn close_all(&mut self, out: &mut Queue<Request>) {
+    pub(crate) fn close_all(&mut self, out: &mut Queue<Request>) {
         for (id, ()) in &self.watch_ids {
             let watch = self.watches.get_mut(*id).expect("registered watch exists");
             close_watch(watch, *id, &mut self.timers, out);
@@ -316,7 +370,7 @@ pub fn max_out(limits: &Limits) -> u32 {
         .saturating_mul(2)
         .saturating_add(limits.objects)
         .saturating_add(limits.parts.saturating_mul(2))
-        .saturating_add(12)
+        .saturating_add(16)
 }
 
 /// Routes one event, accepting no input until Start.
@@ -345,24 +399,31 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Went { place } => crate::pages::routing::navigate(domain, env, place, true, out),
         Event::Act { act } => match act {
             Act::Go { address } => crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out),
-            Act::Edit { .. }
-            | Act::Submit { .. }
+            Act::Edit { field, text } => match domain.fields.edit(field, text) {
+                Ok(()) => domain.changed(),
+                Err(which) => {
+                    crate::pages::routing::refuse(domain, which);
+                    out.push(Request::Fact { fact: Fact::Refused { which } });
+                }
+            },
+            Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
+            Act::Submit { .. }
             | Act::Intend { .. }
             | Act::Choose { .. }
             | Act::Confirm
             | Act::Dismiss
             | Act::Fold { .. }
             | Act::Filter { .. }
-            | Act::More { .. }
-            | Act::SignIn { .. } => {}
+            | Act::More { .. } => {}
         },
-        Event::Start { .. }
-        | Event::Ask { .. }
-        | Event::Progress { .. }
-        | Event::Answered { .. }
-        | Event::SignedOut => {}
+        Event::Start { .. } => {}
+        Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
+        Event::Progress { request, progress } => crate::intents::progress(domain, request, progress),
+        Event::Answered { request, answer } => crate::intents::answered(domain, request, answer, out),
+        Event::SignedOut => signed_out(domain, out),
         Event::Read { read, result } => crate::pages::routing::read_result(domain, env, read, result, out),
     }
+    crate::signin::returned(domain, env, out);
 }
 fn start(
     domain: &mut Domain,
@@ -376,12 +437,7 @@ fn start(
     domain.wall = env.wall;
     domain.address = address;
     domain.offset = offset;
-    for record in kept.as_slice() {
-        match domain.kept.push(record.clone()) {
-            Ok(()) => {}
-            Err(_) => break,
-        }
-    }
+    crate::store::restore(domain, env.limits.text, kept, out);
     domain.frame_watch = domain.open(env, Subject::Frame, Owner::Frame, out);
     domain.changed();
 }
@@ -444,6 +500,7 @@ fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mu
     let range: VersionRange = frame.versions;
     if !range.contains(CLIENT_VERSION) {
         domain.blocked = true;
+        domain.confirmed = None;
         domain.page = Page::OutOfDate;
         domain.frame.document = Some(frame);
         domain.close_all(out);
@@ -452,6 +509,10 @@ fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mu
         domain.changed();
         return;
     }
+    domain.signin.service = match frame.party.kind {
+        crate::contract::PartyKind::Service => true,
+        crate::contract::PartyKind::Person => false,
+    };
     let first = domain.frame.document.is_none();
     let party = frame.party.number;
     let mut mismatch = false;
@@ -466,6 +527,7 @@ fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mu
     let previous = domain.frame.party();
     let retention = frame.retention;
     domain.frame.document = Some(frame);
+    domain.confirmed = if mismatch { None } else { Some(party) };
     domain.changed();
     if first || previous != Some(party) || mismatch {
         let confirmed = if mismatch { None } else { Some(party) };
@@ -532,6 +594,7 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
         Following::Closed => return,
         Following::Closing => {
             domain.retire(id);
+            crate::signin::returned(domain, env, out);
             return;
         }
         Following::Opening { .. } | Following::Live | Following::Reopening { .. } => {}
@@ -559,13 +622,10 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
             signed_out(domain, out);
         }
     }
+    crate::signin::returned(domain, env, out);
 }
 pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
-    domain.close_all(out);
-    domain.page = Page::SigningIn;
-    domain.set_link(Link::Offline, out);
-    out.push(Request::Confirmed { party: None });
-    domain.changed();
+    crate::signin::signed_out(domain, out);
 }
 /// Fires at most one expired deadline, respecting watch terminal obligations.
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {

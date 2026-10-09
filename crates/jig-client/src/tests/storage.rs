@@ -59,7 +59,7 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
         Card::Deciding { request: Token::new(99), progress: crate::intents::Progress::InFlight };
     let address = Address::Task { task: 8, section: TaskSection::Activity };
     let moved = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
-    assert_eq!(moved.len(), 6);
+    assert_eq!(moved.len(), 7);
     assert_eq!(moved[0], Request::Close { watch: inbox });
     assert_eq!(moved[1], Request::PartsLeft { generation: 0 });
     let Request::Open { subject: Subject::Task { task: 8 }, .. } = moved[2] else {
@@ -72,6 +72,7 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
         panic!("read next");
     };
     assert_eq!(moved[5], Request::Show { address, replace: true });
+    assert_eq!(moved[6], Request::Save { record: crate::store::Record::Place { version: 1, party: 7, address } });
     assert_eq!(domain.objects.find(ObjectKey::Task(5)), Some(pending));
     assert!(domain.objects.get(pending).unwrap().sources.is_empty());
     let gone = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });

@@ -2,7 +2,7 @@
 //! Jig 21 adds draft and confirmation policies. Person edits never advance writes.
 use crate::contract::Text;
 /// Why a person is typing into a field.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Purpose {
     /// The first words of a chat.
     NewChat,
@@ -23,4 +23,60 @@ pub enum Purpose {
 pub struct Field {
     pub text: Text,
     pub writes: u64,
+}
+
+use crate::contract::Limit;
+use skein_lib::Map;
+/// A bounded set of purposes, shared by pages and confirmations.
+#[derive(Debug)]
+pub struct Fields {
+    rows: Map<Purpose, Field>,
+    text: u32,
+}
+impl Fields {
+    /// Allocates the configured purposes; jig 21 owns their draft policy.
+    #[must_use]
+    pub fn new(capacity: u32, text: u32) -> Self {
+        Self { rows: Map::with_capacity(capacity), text }
+    }
+    /// The current text and its write count.
+    #[must_use]
+    pub fn get(&self, purpose: Purpose) -> Option<&Field> {
+        self.rows.get(&purpose)
+    }
+    /// A person's edit changes text and never advances the domain-write count.
+    pub fn edit(&mut self, purpose: Purpose, text: Text) -> Result<(), Limit> {
+        self.set(purpose, text, false)
+    }
+    /// A domain write advances the count before publishing the new text.
+    pub fn write(&mut self, purpose: Purpose, text: Text) -> Result<(), Limit> {
+        self.set(purpose, text, true)
+    }
+    fn set(&mut self, purpose: Purpose, text: Text, written: bool) -> Result<(), Limit> {
+        if u64::try_from(text.bytes().len()).expect("text length fits u64") > u64::from(self.text) {
+            return Err(Limit::Words { limit: self.text });
+        }
+        match self.rows.get_mut(&purpose) {
+            Some(field) => {
+                if written {
+                    field.writes = field.writes.checked_add(1).ok_or(Limit::Fields)?;
+                }
+                field.text = text;
+                Ok(())
+            }
+            None => {
+                let writes = u64::from(written);
+                match self.rows.insert(purpose, Field { text, writes }) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(Limit::Fields),
+                }
+            }
+        }
+    }
+}
+/// Purpose entries and all their bounded words.
+#[must_use]
+pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
+    Map::<Purpose, Field>::worst_case(limits.fields)?
+        .checked_add(u64::from(limits.fields).checked_mul(u64::from(limits.text))?)
 }

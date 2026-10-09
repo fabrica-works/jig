@@ -21,6 +21,9 @@ pub struct Backoff {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Limits {
     pub watches: u32,
+    pub intents: u32,
+    pub fields: u32,
+    pub providers: u32,
     pub objects: u32,
     pub sources: u32,
     pub reads: u32,
@@ -52,12 +55,15 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(2)?
         .checked_add(limits.objects)?
         .checked_add(limits.parts.checked_mul(2)?)?
-        .checked_add(12)?;
+        .checked_add(16)?;
     limits.objects.checked_mul(2)?;
     if limits.sources == 0 {
         return None;
     }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;
+    total = total.checked_add(crate::intents::worst_case(limits)?)?;
+    total = total.checked_add(crate::fields::worst_case(limits)?)?;
+    total = total.checked_add(crate::signin::worst_case(limits)?)?;
     total = total.checked_add(crate::objects::worst_case(limits)?)?;
     total = total.checked_add(Slab::<crate::reads::Reading>::worst_case(limits.reads)?)?;
     total = total.checked_add(Map::<Id<crate::reads::Reading>, ()>::worst_case(limits.reads)?)?;
