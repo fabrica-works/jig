@@ -1,0 +1,393 @@
+//! Faulty client and front run through real callbacks, trees, patches and people.
+use jig_client_view::{Act, Binding, Key, NodeId, Owner, Patch, Role, Run, Tree, View};
+use jig_client_world::{Until, harness::*};
+use jig_fake_person::{Face, Find, Found, Step, TreeFace};
+use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
+
+#[global_allocator]
+static HEAP: skein_world::domain::heap::Counting = skein_world::domain::heap::Counting;
+
+struct Broken<const BAD: u8>;
+struct Root {
+    answered: bool,
+    shown: u64,
+}
+enum Event {
+    Start,
+    Press,
+    Answer,
+}
+struct Wire;
+const KEY: Key = Key { owner: Owner::Jig, kind: 1, a: 1, b: 1 };
+const LIMITS: jig_client_view::Limits = jig_client_view::Limits {
+    nodes: 16,
+    depth: 4,
+    text_per_node: 64,
+    text_bytes: 1024,
+    drawing_bytes: 0,
+    styles_per_node: 0,
+    patches: 128,
+    bindings: 2,
+    slots: 0,
+    markdown_depth: 1,
+};
+impl<const BAD: u8> App for Broken<BAD> {
+    type Root = Root;
+    type View = View;
+    type Limits = ();
+    type Event = Event;
+    type Request = Wire;
+    type Record = ();
+    type Key = ();
+    type Address = ();
+    fn limits() {}
+    fn new(_: u64) -> (Root, View) {
+        (Root { answered: false, shown: 0 }, View::new(&LIMITS))
+    }
+    fn start((): (), _: Vec<()>, _: i32) -> Event {
+        Event::Start
+    }
+    fn went((): ()) -> Event {
+        Event::Start
+    }
+    fn step(root: &mut Root, _: &Env<()>, event: Event, out: &mut Queue<Wire>) {
+        match event {
+            Event::Start => {}
+            Event::Press => {
+                out.push(Wire);
+            }
+            Event::Answer => root.answered = true,
+        }
+        root.shown += 1;
+    }
+    fn fire(_: &mut Root, _: &Env<()>, _: &mut Queue<Wire>) {}
+    fn take(_: &mut Root, _: &Env<()>, _: &mut Queue<Wire>) {}
+    fn next_deadline(_: &Root) -> Option<Time> {
+        None
+    }
+    fn build(view: &mut View, root: &Root, out: &mut Queue<Patch>) {
+        let mut b = view.builder();
+        b.open(Role::Page);
+        b.open(Role::Status);
+        b.name(if BAD == 9 { b"Offline" } else { b"Online" });
+        b.close();
+        if !(BAD == 5 && root.answered) {
+            b.open(Role::Item);
+            b.key(KEY);
+            b.open(Role::Status);
+            b.name(if root.answered { if BAD == 10 { b"Leaving" } else { b"Done" } } else { b"Waiting" });
+            b.close();
+            b.text(Run::Plain, b"Revision 7");
+            b.open(Role::Button);
+            b.name(b"Choose");
+            b.bind(Binding { owner: Owner::Jig, token: Token::new(1) });
+            b.close();
+            b.close();
+        }
+        if root.answered {
+            b.open(Role::Status);
+            b.name(b"Sent words");
+            b.text(Run::Plain, b"Words");
+            b.close();
+        }
+        b.close();
+        view.finish(b, root.shown, out);
+    }
+    fn tree(view: &View) -> &Tree {
+        view.tree()
+    }
+    fn act(_: &mut View, _: NodeId, _: Act) -> Option<Event> {
+        Some(Event::Press)
+    }
+    fn duty(_: Wire) -> Duty<Self> {
+        Duty::Wire(Wire)
+    }
+    fn record_key((): &()) {}
+    fn unsent(_: Wire) -> Option<Event> {
+        None
+    }
+    fn max_out((): &()) -> u32 {
+        1
+    }
+    fn patch_limit(_: &View) -> u32 {
+        LIMITS.patches
+    }
+    fn worst_case((): &()) -> u64 {
+        if BAD == 7 { 0 } else { 65536 }
+    }
+    fn sent(_: &Wire) -> Option<Sent> {
+        Some(Sent {
+            attempt: Token::new(1),
+            key: [1; 16],
+            card: Some(CardKey::of(KEY)),
+            revision: Some((0, if BAD == 4 { 8 } else { 7 })),
+            words: Some((9, b"Words".to_vec())),
+        })
+    }
+    fn received(event: &Event) -> Vec<Receipt> {
+        match event {
+            Event::Answer => vec![Receipt::Answer { attempt: Token::new(1), final_answer: true, words: Some((9, 1)) }],
+            Event::Start | Event::Press => vec![],
+        }
+    }
+    fn card(_: &Tree, _: NodeId) -> Option<CardKey> {
+        Some(CardKey::of(KEY))
+    }
+    fn seen(tree: &Tree) -> Vec<Seen> {
+        let has = |name: &[u8]| matches!(TreeFace::new(tree).find(&Find::named(Role::Status, name)), Found::Node(_));
+        let mut seen = vec![Seen::Link { live: has(b"Online") }];
+        if has(b"Waiting") || has(b"Done") || has(b"Leaving") {
+            seen.push(Seen::Card {
+                key: CardKey::of(KEY),
+                state: if has(b"Leaving") {
+                    CardSeen::Left { reason: false }
+                } else if has(b"Done") {
+                    CardSeen::Done
+                } else {
+                    CardSeen::Waiting
+                },
+                revision: Some(7),
+            });
+        }
+        if has(b"Sent words") {
+            seen.push(Seen::Words { task: 9, message: Some(1), words: b"Words".to_vec() });
+        }
+        seen
+    }
+}
+enum Progress {
+    Quiet,
+    Sent,
+    Reported,
+    Received,
+    RetentionChecked,
+}
+struct FrontOf<const BAD: u8> {
+    client: Option<ClientId>,
+    progress: Progress,
+    truth: Vec<Observed>,
+}
+impl<const BAD: u8> Front<Broken<BAD>> for FrontOf<BAD> {
+    fn bind(&mut self, client: ClientId, _: u64) {
+        self.client = Some(client);
+        if BAD == 6 || BAD == 9 {
+            self.truth.push(Observed::Reachable { live: BAD == 9 });
+        }
+    }
+    fn wire(&mut self, _: ClientId, _: Time, _: Wall, _: Wire) {
+        self.progress = Progress::Sent;
+    }
+    fn poll(&mut self, now: Time, _: Wall) -> Vec<(ClientId, Event)> {
+        if matches!(self.progress, Progress::Received) && (BAD == 11 || BAD == 12) {
+            self.progress = Progress::RetentionChecked;
+            self.truth.push(Observed::Durable { commit: 2, at: now });
+            if BAD == 12 {
+                self.truth.push(Observed::Ended { task: 9, commit: 2 });
+            }
+            self.truth.push(Observed::Retained { task: 9, messages: vec![], commit: 2 });
+            return vec![];
+        }
+        if !matches!(self.progress, Progress::Sent) {
+            return vec![];
+        }
+        self.progress = Progress::Reported;
+        if BAD != 1 {
+            self.truth.push(Observed::Durable { commit: 1, at: now });
+            self.truth.push(Observed::Made { party: 7, key: [1; 16], commit: 1 });
+        }
+        if BAD == 2 {
+            self.truth.push(Observed::Made { party: 7, key: [1; 16], commit: 1 });
+        }
+        if BAD != 3 {
+            self.truth.push(Observed::Kept {
+                task: 9,
+                message: 1,
+                words: b"Words".to_vec(),
+                commit: u64::from(BAD != 1),
+            });
+        }
+        if BAD == 8 { vec![] } else { vec![(self.client.expect("bound"), Event::Answer)] }
+    }
+    fn observed(&mut self) -> Vec<Observed> {
+        std::mem::take(&mut self.truth)
+    }
+    fn next_due(&self) -> Option<Time> {
+        None
+    }
+    fn fault(&mut self, _: Time, _: FrontFault) {}
+    fn reload(&mut self, _: ClientId, _: Time) {}
+    fn received(&mut self, _: ClientId, event: &Event) {
+        if matches!(event, Event::Answer) {
+            self.progress = Progress::Received;
+        }
+    }
+    fn sign_in(&mut self, _: ClientId, _: Time, _: Wall) {}
+}
+fn run<const BAD: u8>() {
+    let settings = Settings {
+        memory: BAD == 7,
+        heartbeat: Duration::from_millis(5),
+        request_within: Duration::from_millis(20),
+        link_within: Duration::from_millis(5),
+        ..Settings::default()
+    };
+    let mut w = World::<Broken<BAD>, _>::new(
+        settings,
+        FrontOf::<BAD> { client: None, progress: Progress::Quiet, truth: vec![] },
+    );
+    let c = w.client(7, ());
+    if BAD != 6 && BAD != 9 {
+        w.person(
+            c,
+            vec![
+                Step::Press { find: Find::named(Role::Button, b"Choose") },
+                Step::Pause { span: Duration::from_millis(10) },
+            ],
+        );
+    }
+    let result = w.run(Until::Done);
+    assert_eq!(result.verdict, skein_world::domain::Verdict::Passed);
+}
+#[test]
+fn correct_boundaries_meet_the_request_and_keep_the_words() {
+    run::<0>();
+}
+#[test]
+#[should_panic(expected = "nothing shown done before durable")]
+fn an_answer_before_the_write_is_caught() {
+    run::<1>();
+}
+#[test]
+#[should_panic(expected = "made once")]
+fn two_makes_for_one_party_key_are_caught() {
+    run::<2>();
+}
+#[test]
+#[should_panic(expected = "nothing sent lost")]
+fn sent_words_missing_from_committed_activity_are_caught() {
+    run::<3>();
+}
+#[test]
+#[should_panic(expected = "what they saw is what they decided")]
+fn an_act_with_a_different_revision_is_caught() {
+    run::<4>();
+}
+#[test]
+#[should_panic(expected = "a card leaves for a reason")]
+fn a_card_removed_without_a_visible_reason_is_caught() {
+    run::<5>();
+}
+#[test]
+#[should_panic(expected = "Offline")]
+fn unreachable_truth_without_offline_is_caught() {
+    run::<6>();
+}
+#[test]
+#[should_panic(expected = "bounded")]
+fn a_client_exceeding_its_heap_envelope_is_caught() {
+    run::<7>();
+}
+#[test]
+#[should_panic(expected = "Request")]
+fn a_request_without_a_final_answer_misses_its_deadline() {
+    run::<8>();
+}
+#[test]
+#[should_panic(expected = "Online")]
+fn recovered_truth_without_an_online_view_misses_its_deadline() {
+    run::<9>();
+}
+
+#[test]
+fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
+    use jig_test_client_domain::family;
+    let mut w = jig_client_world::stories::chat_ready(20);
+    let subject = family::Subject { scope: family::Scope::Project(1), kind: family::Kind::Item(1) };
+    let mut state = jig_client_world::scripted::Family::default();
+    state.documents.insert(
+        subject,
+        family::Document::Item(family::Item {
+            project: 1,
+            key: 1,
+            revision: jig_client::contract::Revision { value: 7 },
+            state: family::ItemState::Ready,
+            value: 1,
+            task: 9,
+            proposals: jig_client_world::test::list([]),
+            touchable: true,
+        }),
+    );
+    w.front()
+        .engine
+        .act_application(Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, state, vec![])
+        .expect("family fixture fits");
+    let c = w.client(
+        7,
+        jig_test_client_domain::Address::First(jig_test_client_domain::first::Address { project: 1, item: 1 }),
+    );
+    w.person(
+        c,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Touch"), within: Duration::from_secs(1) },
+            Step::Press { find: Find::named(Role::Button, b"Touch") },
+            Step::See { find: Find::named(Role::Status, b"Touched revision 8"), within: Duration::from_secs(1) },
+        ],
+    );
+    let result = w.run(Until::Done);
+    assert_eq!(result.verdict, skein_world::domain::Verdict::Passed);
+    assert!(result.judged.1 > 0);
+}
+
+#[test]
+fn the_test_clients_sent_words_are_found_in_committed_activity() {
+    use jig_client::contract::{Activity, ActivityLine, Answer, Ask, Made, Outcome, Read};
+    use jig_client_world::stories;
+    let mut w = stories::chat_ready(21);
+    w.front()
+        .engine
+        .script(jig_scripted_engine::Rule {
+            party: Some(7),
+            ask: Ask::Write { project: 1, task: 9, words: stories::text(b"Words"), release: false },
+            answer: Answer::Done(Outcome::Made { what: Made::Words { task: 9, message: 1 } }),
+            changes: vec![jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
+                party: 7,
+                read: Read::Activity { task: 9, before: None },
+                rows: jig_scripted_engine::Rows::Activity(vec![ActivityLine {
+                    position: 1,
+                    at: Wall::EPOCH,
+                    event: Activity::Words { by: stories::frame(7).party, message: 1, words: stories::text(b"Words") },
+                }]),
+            })],
+        })
+        .expect("words script fits");
+    let c = w.client(7, stories::chat());
+    w.person(
+        c,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Write"), within: Duration::from_secs(1) },
+            Step::Press { find: Find::named(Role::Button, b"Write") },
+            Step::Type { find: Find::named(Role::TextArea, b"Your answer"), words: Box::from(*b"Words") },
+            Step::Press { find: Find::named(Role::Button, b"Confirm") },
+            Step::See { find: Find::named(Role::Status, b"Sent"), within: Duration::from_secs(1) },
+            Step::Pause { span: Duration::from_millis(30) },
+        ],
+    );
+    let result = w.run(Until::Done);
+    assert_eq!(result.verdict, skein_world::domain::Verdict::Passed);
+    assert!(result.judged.1 > 0);
+}
+
+#[test]
+#[should_panic(expected = "explanation absent")]
+fn a_departure_after_a_write_still_needs_an_explanation() {
+    run::<10>();
+}
+#[test]
+#[should_panic(expected = "nothing sent lost")]
+fn previously_sent_words_cannot_leave_later_activity() {
+    run::<11>();
+}
+#[test]
+fn ending_the_task_discharges_word_retention() {
+    run::<12>();
+}

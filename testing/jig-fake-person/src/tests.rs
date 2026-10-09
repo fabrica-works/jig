@@ -399,3 +399,40 @@ fn random_people_never_act_on_unbound_disabled_or_unshown_nodes() {
         }
     }
 }
+
+#[test]
+fn a_subtree_face_distinguishes_repeated_regions_and_never_escapes() {
+    let view = build(|b| {
+        b.open(Role::Page);
+        for word in [b"First".as_slice(), b"Second"] {
+            b.open(Role::Region);
+            b.name(b"Conversation");
+            b.open(Role::Button);
+            b.name(word);
+            b.bind(binding(1));
+            b.close();
+            b.text(Run::Plain, word);
+            b.close();
+        }
+        b.close();
+    });
+    let regions: Vec<_> = view.tree().nodes().iter().filter(|n| n.role == Role::Region).map(|n| n.id).collect();
+    let mut face = TreeFace::subtree(view.tree(), regions[1]).expect("second region");
+    assert!(matches!(face.find(&Find::named(Role::Button, b"second")), Found::Node(_)));
+    assert!(matches!(face.find(&Find::text(b"SECOND")), Found::Node(_)));
+    assert_eq!(face.find(&Find::named(Role::Button, b"First")), Found::Absent);
+    let Found::Node(first) = TreeFace::new(view.tree()).find(&Find::named(Role::Button, b"First")) else {
+        panic!("first button");
+    };
+    assert!(!face.allows(first, &Act::Press));
+    assert!(TreeFace::subtree(view.tree(), NodeId(0)).is_none());
+    assert!(TreeFace::subtree(view.tree(), NodeId(u32::MAX)).is_none());
+    assert!(
+        matches!(
+            TreeFace::new(view.tree())
+                .find(&Find::named(Role::Button, b"Second").within(Box::from([region(b"Conversation")]))),
+            Found::Absent
+        ),
+        "whole-tree Find retains first-match behavior"
+    );
+}

@@ -8,3 +8,5 @@ pub mod test;
 pub use harness::{App, ClientId, Front, Outcome, Settings, Until, World};
 pub use scripted::Scripted;
 pub use test::Test;
+
+mod observe;

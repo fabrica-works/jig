@@ -69,11 +69,17 @@ pub struct Scripted {
     committed: usize,
     last_attempt: Option<Token>,
     last_watch: Option<Token>,
+    link: Vec<Observed>,
+    recovery: Option<Time>,
 }
 impl Scripted {
     /// Installs a checked story and its application documents.
     #[must_use]
     pub fn new(script: engine::Script, seed: u64, family: Family) -> Self {
+        let mut initial = Vec::new();
+        for source in &script.truth.sources {
+            observe_change(&engine::Change::Source(source.clone()), 0, &mut initial);
+        }
         Self {
             ledger: Ledger::new("scripted wire operation"),
             engine: engine::Engine::with_application(script, seed, family).expect("script keeps contract"),
@@ -83,6 +89,8 @@ impl Scripted {
             committed: 0,
             last_attempt: None,
             last_watch: None,
+            link: initial,
+            recovery: None,
         }
     }
     fn transport(&mut self, client: ClientId, local: Token, first: bool, fresh: bool) -> Token {
@@ -219,6 +227,10 @@ impl Front<Test> for Scripted {
         }
     }
     fn poll(&mut self, now: Time, _: Wall) -> Vec<(ClientId, Event)> {
+        if self.recovery.is_some_and(|at| at <= now) {
+            self.recovery = None;
+            self.link.push(Observed::Reachable { live: true });
+        }
         self.engine
             .poll(now)
             .into_iter()
@@ -272,7 +284,8 @@ impl Front<Test> for Scripted {
                     Up::ApplicationAnswer { attempt: _, envelope: e, answer } => Event::Answer {
                         attempt: local,
                         envelope: envelope(e),
-                        answer: answer.map(|a| domain::Answered::First(a.expect("family refusal is typed by owner"))),
+                        answer: answer
+                            .map(|a| domain::Answered::First(a.expect("test family fixture requires a typed outcome"))),
                     },
                     Up::ApplicationRead { token: _, terminal } => Event::First(first::Event::Read {
                         read: local,
@@ -309,20 +322,31 @@ impl Front<Test> for Scripted {
             .collect()
     }
     fn next_due(&self) -> Option<Time> {
-        self.engine.next_due()
+        [self.engine.next_due(), self.recovery].into_iter().flatten().min()
     }
     fn observed(&mut self) -> Vec<Observed> {
-        let mut seen = Vec::new();
+        let mut seen = std::mem::take(&mut self.link);
         for commit in &self.engine.commits()[self.committed..] {
             seen.push(Observed::Durable { commit: commit.number, at: commit.durable.expect("durable ledger") });
             if let (Some(party), Some(key)) = (commit.party, commit.key) {
                 seen.push(Observed::Made { party, key, commit: commit.number });
             }
+            let mut facts = Vec::new();
+            for change in &commit.changes {
+                observe_change(change, commit.number, &mut facts);
+            }
+            // All changes in this durable commit are atomic. Ending discharges retention first.
+            facts.sort_by_key(|fact| !matches!(fact, Observed::Ended { .. }));
+            seen.extend(facts);
         }
         self.committed = self.engine.commits().len();
         seen
     }
     fn fault(&mut self, now: Time, fault: FrontFault) {
+        if let FrontFault::Restart { offline } = &fault {
+            self.link.push(Observed::Reachable { live: false });
+            self.recovery = Some(now.saturating_add(*offline));
+        }
         let fault = match fault {
             FrontFault::Busy => engine::Fault::Busy,
             FrontFault::NotReady => engine::Fault::NotReady,
@@ -372,5 +396,95 @@ impl Front<Test> for Scripted {
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
         let party = self.parties[&client];
         self.engine.act(now, wall, engine::Change::SignIn { sign_in: party, party }).expect("sign in fits");
+    }
+}
+
+fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>) {
+    match change {
+        engine::Change::Source(source) => {
+            if let (Read::Activity { task, .. }, engine::Rows::Activity(rows)) = (&source.read, &source.rows) {
+                for row in rows {
+                    if let Activity::Words { message, words, .. } = &row.event {
+                        seen.push(Observed::Kept {
+                            task: *task,
+                            message: *message,
+                            words: words.bytes().to_vec(),
+                            commit,
+                        });
+                    }
+                }
+                seen.push(Observed::Retained {
+                    task: *task,
+                    messages: rows
+                        .iter()
+                        .filter_map(|row| match &row.event {
+                            Activity::Words { message, .. } => Some(*message),
+                            Activity::RunBegan { .. }
+                            | Activity::RunEnded { .. }
+                            | Activity::Turn { .. }
+                            | Activity::Result { .. }
+                            | Activity::News { .. }
+                            | Activity::Decision { .. } => None,
+                        })
+                        .collect(),
+                    commit,
+                });
+            }
+        }
+        engine::Change::Forget { key } => seen.push(Observed::Stopped { card: crate::observe::key(*key), commit }),
+        engine::Change::Object { key, value, .. } => {
+            let terminal = match value {
+                ReadValue::Proposal(p) => p.ending.is_some(),
+                ReadValue::Escalation(e) => e.ending.is_some(),
+                ReadValue::Question(q) => q.ending.is_some(),
+                ReadValue::PersonTask(p) => p.ending.is_some(),
+                ReadValue::Task(t) => t.result.is_some(),
+                ReadValue::Result(_) => true,
+                ReadValue::Frame(_)
+                | ReadValue::Ended(_)
+                | ReadValue::History(_)
+                | ReadValue::Activity(_)
+                | ReadValue::Inbox(_)
+                | ReadValue::Conversations(_)
+                | ReadValue::Goals(_)
+                | ReadValue::Spend(_)
+                | ReadValue::Project(_)
+                | ReadValue::Notes(_)
+                | ReadValue::Deployment(_) => false,
+            };
+            if terminal {
+                seen.push(Observed::Stopped { card: crate::observe::key(*key), commit });
+            }
+            match value {
+                ReadValue::Task(t) if t.result.is_some() => seen.push(Observed::Ended { task: t.chip.task, commit }),
+                ReadValue::Result(r) => seen.push(Observed::Ended { task: r.task.task, commit }),
+                ReadValue::Task(_)
+                | ReadValue::Frame(_)
+                | ReadValue::Proposal(_)
+                | ReadValue::Escalation(_)
+                | ReadValue::Question(_)
+                | ReadValue::PersonTask(_)
+                | ReadValue::Ended(_)
+                | ReadValue::History(_)
+                | ReadValue::Activity(_)
+                | ReadValue::Inbox(_)
+                | ReadValue::Conversations(_)
+                | ReadValue::Goals(_)
+                | ReadValue::Spend(_)
+                | ReadValue::Project(_)
+                | ReadValue::Notes(_)
+                | ReadValue::Deployment(_) => {}
+            }
+        }
+        engine::Change::Request(_)
+        | engine::Change::Frame(_)
+        | engine::Change::SignIn { .. }
+        | engine::Change::SignedOut { .. }
+        | engine::Change::Project(_)
+        | engine::Change::Note(_)
+        | engine::Change::DeleteNote { .. }
+        | engine::Change::Deployment(_)
+        | engine::Change::Tree(_)
+        | engine::Change::Seen { .. } => {}
     }
 }

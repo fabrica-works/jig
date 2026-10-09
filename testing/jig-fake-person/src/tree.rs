@@ -8,12 +8,28 @@ use jig_client_view::{Act, Node, NodeId, Role, State, Tree};
 #[derive(Debug)]
 pub struct TreeFace<'a> {
     tree: &'a Tree,
+    start: usize,
+    end: usize,
 }
 impl<'a> TreeFace<'a> {
     /// Borrow the displayed tree; builders' unassigned ids are not visible ids.
     #[must_use]
     pub fn new(tree: &'a Tree) -> Self {
-        Self { tree }
+        Self { tree, start: 0, end: tree.nodes().len() }
+    }
+    /// Query one visible subtree using the same role, text and ancestor finds.
+    /// Repeated accessible names outside this subtree cannot shadow its targets.
+    #[must_use]
+    pub fn subtree(tree: &'a Tree, id: NodeId) -> Option<Self> {
+        if id == NodeId(0) {
+            return None;
+        }
+        let start = tree.nodes().iter().position(|node| node.id == id)?;
+        let end = start.checked_add(usize::try_from(tree.nodes()[start].size).ok()?)?;
+        if end > tree.nodes().len() {
+            return None;
+        }
+        Some(Self { tree, start, end })
     }
 }
 
@@ -50,8 +66,8 @@ fn matches(nodes: &[Node], index: usize, target: &Target) -> bool {
 impl Face for TreeFace<'_> {
     fn find(&mut self, find: &Find) -> Found {
         let nodes = self.tree.nodes();
-        let mut start = 0;
-        let mut end = nodes.len();
+        let mut start = self.start;
+        let mut end = self.end;
         for region in &find.within {
             let Some((index, node)) =
                 nodes.iter().enumerate().take(end).skip(start).find(|(index, _)| matches(nodes, *index, region))
@@ -66,6 +82,9 @@ impl Face for TreeFace<'_> {
             .map_or(Found::Absent, |index| Found::Node(nodes[index].id))
     }
     fn allows(&self, id: NodeId, act: &Act) -> bool {
+        if !self.tree.nodes()[self.start..self.end].iter().any(|node| node.id == id) {
+            return false;
+        }
         let Some(node) = self.tree.find(id) else {
             return false;
         };

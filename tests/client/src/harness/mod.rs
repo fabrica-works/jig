@@ -1,5 +1,7 @@
 //! Shell duties and the reusable application/front boundaries (testing.md, 4).
+mod observation;
 pub mod referee;
+pub use observation::*;
 mod world;
 use jig_client_view::{Act, NodeId, Patch, Tree};
 use skein_lib::{Env, Queue, Time, Wall};
@@ -33,6 +35,12 @@ pub trait App: Sized {
     fn patch_limit(view: &Self::View) -> u32;
     fn worst_case(limits: &Self::Limits) -> u64;
     fn seen(tree: &Tree) -> Vec<Seen>;
+    /// Translate a keyed wire request without reading root state.
+    fn sent(request: &Self::Request) -> Option<Sent>;
+    /// Translate delivered documents and answers before the callback.
+    fn received(event: &Self::Event) -> Vec<Receipt>;
+    /// The enclosing card a person acted on, from the public tree alone.
+    fn card(tree: &Tree, node: NodeId) -> Option<CardKey>;
 }
 /// One persistent shell record change.
 #[derive(Debug)]
@@ -59,28 +67,6 @@ pub trait Front<A: App> {
     fn reload(&mut self, client: ClientId, now: Time);
     fn received(&mut self, client: ClientId, event: &A::Event);
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall);
-}
-/// A card’s externally visible progress or departure.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CardSeen {
-    Waiting,
-    Deciding,
-    Done { commit: u64 },
-    Left { reason: bool },
-}
-/// Facts read from a visible accessibility tree.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Seen {
-    Card { key: u64, state: CardSeen },
-    Words { client: ClientId, words: Vec<u8> },
-    Link { live: bool },
-}
-/// Durable truth reported by the engine boundary.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Observed {
-    Durable { commit: u64, at: Time },
-    Made { party: u64, key: [u8; 16], commit: u64 },
-    Kept { task: u64, message: u64 },
 }
 /// A fault the engine boundary can inject.
 #[derive(Clone, Debug)]

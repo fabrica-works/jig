@@ -14,3 +14,6 @@ pub use limits::{Limits, worst_case};
 pub use root::{View, build, decode};
 #[cfg(test)]
 mod tests;
+
+/// Public document subjects name the family’s rendered cards.
+pub use family::key as family_key;

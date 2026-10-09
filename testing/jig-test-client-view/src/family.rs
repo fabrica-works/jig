@@ -7,7 +7,7 @@ use crate::{
 use jig_client::contract::{ObjectKey, Part};
 use jig_client_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
 use jig_test_client_domain::{
-    family::{Document, ItemState},
+    family::{Document, ItemState, Kind, Scope, Subject},
     first::{self, Card, Value},
 };
 use skein_lib::{Decimal, Id, Token};
@@ -86,7 +86,7 @@ fn object(b: &mut Builder, side: &first::Side, id: Id<first::Object>, words: &Wo
         return;
     };
     b.open(Role::Item);
-    b.key(Key { owner: NAV.owner, kind: 1, a: id.token().raw(), b: 0 });
+    b.key(key(&object.subject));
     b.open(Role::Region);
     let title = match &object.value {
         Value::Known(Document::Item(item)) => words.say(Word::Item, &[Hole::Number(item.key)]),
@@ -197,5 +197,24 @@ fn card(b: &mut Builder, card: &Card, words: &Words) {
             first::Answer::Moved { revision, .. } => words.status(b, Word::Moved, &[Hole::Number(revision.value)]),
             first::Answer::Gone => words.status(b, Word::Gone, &[]),
         },
+    }
+}
+
+/// Stable card identity from its public document subject (testing.md, 6).
+/// Slab identities remain the side's private routing vocabulary.
+#[must_use]
+pub fn key(subject: &Subject) -> Key {
+    let project = match subject.scope {
+        Scope::Project(project) => u64::from(project),
+        Scope::Deployment => 0,
+    };
+    match subject.kind {
+        Kind::Item(item) => Key { owner: NAV.owner, kind: 10, a: project, b: item },
+        Kind::Panel(task) => Key { owner: NAV.owner, kind: 11, a: project, b: task },
+        Kind::Result(task) => Key { owner: NAV.owner, kind: 12, a: project, b: task },
+        Kind::Effect(proposal) => Key { owner: NAV.owner, kind: 13, a: proposal.proposer, b: proposal.number },
+        Kind::Hold(task) => Key { owner: NAV.owner, kind: 14, a: project, b: task },
+        Kind::Project(project) => Key { owner: NAV.owner, kind: 15, a: u64::from(project), b: 0 },
+        Kind::Deployment => Key { owner: NAV.owner, kind: 16, a: 0, b: 0 },
     }
 }

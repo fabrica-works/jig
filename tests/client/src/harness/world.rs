@@ -1,7 +1,7 @@
 //! Tabs retain records and history; epochs discard old deliveries. Each callback
 //! writes its store, dispatches wire duties, then applies and checks patches
 //! (client/domain/testing.md, 4; client/domain/view.md, 11).
-use super::{App, Duty, Front, FrontFault, StoreWrite};
+use super::{App, CardKey, Duty, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
 use jig_client_view::{Act, NodeId, Tree};
 use jig_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
@@ -24,6 +24,9 @@ pub struct Settings {
     pub memory: bool,
     pub random_steps: u32,
     pub word_bytes: u32,
+    pub heartbeat: Duration,
+    pub request_within: Duration,
+    pub link_within: Duration,
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -35,6 +38,9 @@ impl Default for Settings {
             memory: false,
             random_steps: 32,
             word_bytes: 32,
+            heartbeat: Duration::from_millis(100),
+            request_within: Duration::from_secs(2),
+            link_within: Duration::from_millis(500),
         }
     }
 }
@@ -70,6 +76,7 @@ struct Client<A: App> {
     at: usize,
     party: u64,
     epoch: u64,
+    acted_card: Option<CardKey>,
 }
 enum PersonKind<A: App> {
     Script(Person<A::Address>),
@@ -115,13 +122,17 @@ impl<A: App, F: Front<A>> World<A, F> {
             heap_bound,
             heap_peak: 0,
             rng: Rng::new(settings.seed),
+            referee: Referee::new(super::referee::Rules::new(
+                settings.heartbeat,
+                settings.request_within,
+                settings.link_within,
+            )),
             settings,
             front,
             clients: Vec::new(),
             people: Vec::new(),
             schedule: Schedule::new(),
             trace: Trace::default(),
-            referee: Referee::new(super::referee::Rules::default()),
             now: Time::ZERO,
             callbacks: 0,
             dropped: 0,
@@ -148,7 +159,9 @@ impl<A: App, F: Front<A>> World<A, F> {
             at: 0,
             party,
             epoch: 0,
+            acted_card: None,
         });
+        self.observe(Observation::Client { client: id });
         self.front.bind(id, party);
         self.callback(id, Some(A::start(address, kept, 0)));
         self.check_heap();
@@ -186,9 +199,12 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     /// Restarts this tab from its kept records and advances its delivery epoch.
     pub fn reload(&mut self, id: ClientId) {
+        self.observe(Observation::LeftPage { client: id });
+        self.clients[id.0].acted_card = None;
         self.front.reload(id, self.now);
         let c = &mut self.clients[id.0];
         c.epoch += 1;
+        c.acted_card = None;
         let (root, view) = A::new(self.rng.next_u64());
         c.root = root;
         c.view = view;
@@ -199,12 +215,16 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     /// Navigates and records an address in the shell history.
     pub fn go(&mut self, id: ClientId, address: A::Address) {
+        self.observe(Observation::LeftPage { client: id });
+        self.clients[id.0].acted_card = None;
         self.history(id, address.clone(), false);
         self.callback(id, Some(A::went(address)));
     }
     /// Moves to the previous history entry when present.
     pub fn back(&mut self, id: ClientId) {
         if self.clients[id.0].at > 0 {
+            self.observe(Observation::LeftPage { client: id });
+            self.clients[id.0].acted_card = None;
             self.clients[id.0].at -= 1;
             let address = self.clients[id.0].history[self.clients[id.0].at].clone();
             self.callback(id, Some(A::went(address)));
@@ -213,6 +233,8 @@ impl<A: App, F: Front<A>> World<A, F> {
     /// Moves to the next history entry when present.
     pub fn forward(&mut self, id: ClientId) {
         if self.clients[id.0].at + 1 < self.clients[id.0].history.len() {
+            self.observe(Observation::LeftPage { client: id });
+            self.clients[id.0].acted_card = None;
             self.clients[id.0].at += 1;
             let address = self.clients[id.0].history[self.clients[id.0].at].clone();
             self.callback(id, Some(A::went(address)));
@@ -220,6 +242,9 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     /// Reports a platform act and mirrors a local field edit before diffing.
     pub fn act(&mut self, id: ClientId, node: NodeId, act: Act) {
+        if let Some(card) = A::card(A::tree(&self.clients[id.0].view), node) {
+            self.clients[id.0].acted_card = Some(card);
+        }
         if let Act::Input { value } = &act {
             self.clients[id.0].model.input(node, value);
         }
@@ -268,7 +293,16 @@ impl<A: App, F: Front<A>> World<A, F> {
             c.at += 1;
         }
     }
+    fn observe(&mut self, observation: Observation) {
+        self.referee.observe(self.now, observation, &mut Vec::new());
+        self.referee.assert_holding(self.settings.seed);
+    }
     fn callback(&mut self, id: ClientId, event: Option<A::Event>) {
+        if let Some(event) = &event {
+            for receipt in A::received(event) {
+                self.observe(Observation::Delivered { client: id, receipt });
+            }
+        }
         let env =
             Env { now: self.now, wall: Wall::from_nanos(1_000_000_000_000 + self.now.as_nanos()), limits: A::limits() };
         let mut out = Queue::with_capacity(A::max_out(&env.limits));
@@ -322,10 +356,20 @@ impl<A: App, F: Front<A>> World<A, F> {
                     );
                 }
             } else {
+                if let Some(mut sent) = A::sent(&request) {
+                    if self.clients[id.0].acted_card.is_some() {
+                        sent.card.clone_from(&self.clients[id.0].acted_card);
+                    }
+                    self.observe(Observation::Request { client: id, party: self.clients[id.0].party, sent });
+                }
                 self.front.wire(id, self.now, env.wall, request);
             }
         }
         for (address, replace) in shows {
+            if self.clients[id.0].history[self.clients[id.0].at] != address {
+                self.observe(Observation::LeftPage { client: id });
+                self.clients[id.0].acted_card = None;
+            }
             self.history(id, address, replace);
         }
         for back in signs {
@@ -342,8 +386,10 @@ impl<A: App, F: Front<A>> World<A, F> {
             c.model.apply(patch);
         }
         c.model.check(A::tree(&c.view));
+        let seen = A::seen(A::tree(&c.view));
         self.callbacks += 1;
         self.trace.log(self.now, format!("client {} epoch {} tree {}", id.0, c.epoch, A::tree(&c.view).len()));
+        self.observe(Observation::Shown { client: id, seen });
     }
     fn check_heap(&mut self) {
         if let Some(meter) = &self.meter {
@@ -352,7 +398,8 @@ impl<A: App, F: Front<A>> World<A, F> {
                 .heap_bound
                 .checked_mul(u64::try_from(self.clients.len()).expect("client count fits"))
                 .expect("world heap bound fits");
-            self.heap_peak = self.heap_peak.max(meter.check(measured, bound, &"client world iteration"));
+            self.heap_peak = self.heap_peak.max(meter.check(measured, u64::MAX, &"client world iteration"));
+            self.observe(Observation::Bounded { heap: self.heap_peak, bound });
         }
     }
     fn walk_people(&mut self) -> bool {
@@ -423,7 +470,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 );
             }
             for observed in self.front.observed() {
-                self.referee.observe(self.now, observed, &mut Vec::new());
+                self.observe(Observation::Truth(observed));
             }
             self.referee.fire(self.now, &mut Vec::new());
             self.referee.assert_holding(self.settings.seed);
@@ -443,7 +490,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             let progress = self.walk_people();
             let done = self.people.iter().all(|person| person.done);
             let stop = match until {
-                Until::Done => done && self.schedule.is_empty(),
+                Until::Done => done && self.schedule.is_empty() && self.referee.verdict() == Verdict::Passed,
                 Until::Time(at) => self.now >= at,
                 Until::Steps(count) => iterations >= count,
             };
@@ -458,6 +505,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             let next = [
                 self.schedule.next_time(),
                 self.front.next_due(),
+                self.referee.next_deadline(),
                 self.clients.iter().filter_map(|c| A::next_deadline(&c.root)).min(),
                 self.people.iter().filter(|p| !p.done).filter_map(|p| p.wake).min(),
             ]

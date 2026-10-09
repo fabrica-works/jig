@@ -197,21 +197,15 @@ impl App for Test {
             + 2 * view::worst_case(&bounds, limits, &words, &family).expect("view worst case")
     }
     fn seen(tree: &Tree) -> Vec<crate::harness::Seen> {
-        tree.nodes()
-            .iter()
-            .filter_map(|n| {
-                if n.role == jig_client_view::Role::Status {
-                    n.name.as_ref().and_then(|name| {
-                        if name.as_ref() == b"Offline" {
-                            Some(crate::harness::Seen::Link { live: false })
-                        } else {
-                            None
-                        }
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect()
+        crate::observe::seen(tree)
+    }
+    fn sent(request: &Request) -> Option<Sent> {
+        crate::observe::sent(request)
+    }
+    fn received(event: &Event) -> Vec<Receipt> {
+        crate::observe::received(event)
+    }
+    fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
+        crate::observe::card(tree, node)
     }
 }

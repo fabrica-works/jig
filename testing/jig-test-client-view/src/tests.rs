@@ -395,3 +395,24 @@ fn buttons_and_parameter_fields_decode_to_their_owner_and_departed_nodes_are_sta
     assert_eq!(decode(&mut view, button, Act::Press), None);
     assert_eq!(decode(&mut view, field, Act::Input { value: b"21".as_slice().into() }), None);
 }
+
+#[test]
+fn family_card_keys_are_public_subjects_across_page_and_fragment_positions() {
+    let mut root = ready();
+    let rows = family_document(&mut root, 2);
+    load_cards(&mut root, rows);
+    let mut view = view();
+    patches(&mut view, &root);
+    for kind in [family::Kind::Item(5), family::Kind::Panel(9)] {
+        let subject = family::Subject { scope: family::Scope::Project(3), kind };
+        let key = crate::family_key(&subject);
+        assert!(
+            view.tree().nodes().iter().any(|node| node.key == Some(key)),
+            "subject {subject:?} is rendered independently of its slab position"
+        );
+    }
+    assert_ne!(
+        crate::family_key(&family::Subject { scope: family::Scope::Project(3), kind: family::Kind::Panel(9) }),
+        crate::family_key(&family::Subject { scope: family::Scope::Project(4), kind: family::Kind::Panel(9) })
+    );
+}
