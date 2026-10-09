@@ -4,7 +4,7 @@
 use super::children::append_people;
 use super::refusals::{person_message_refusal, person_move_refusal, person_task_refusal};
 use super::runs::call_decision;
-use super::view_routes::task_saved_view;
+use super::view_routes::touch_task;
 use crate::{
     Ask, CallPart, Core, CoreKey, CoreRecord, EscalationDecisionRecord, Event, Held, Key, Limits, Now,
     PersonProposalRoute, PersonTaskRoute, Record, Request, Requests, RoutedCall, SentRoute, Write,
@@ -655,6 +655,7 @@ pub(super) fn tag_tasks(
                         assert!(core.ending_positions.insert(task.number, position) == Ok(None), "one ending position");
                         match task.requester {
                             tasks::Party::Person(person) => {
+                                core.touch_party(person);
                                 core.people.remember_result(
                                     &env.limits.people,
                                     person,
@@ -746,7 +747,19 @@ pub(super) fn tag_tasks(
                         }
                     }
                     crate::projections::save(core, &env.limits, task, &mut out);
-                    task_saved_view(core, env, task, &mut out);
+                    touch_task(core, &env.limits, task);
+                }
+                match &record {
+                    tasks::Stored::Ended(task) => touch_task(core, &env.limits, task),
+                    tasks::Stored::PersonProposal(_) => core.touch_deployment(),
+                    tasks::Stored::Live(_)
+                    | tasks::Stored::Ledger(_)
+                    | tasks::Stored::Writer(_)
+                    | tasks::Stored::Pool(_)
+                    | tasks::Stored::History(_)
+                    | tasks::Stored::Milestone(_)
+                    | tasks::Stored::Activity(_)
+                    | tasks::Stored::Stub(_) => {}
                 }
                 let waiting = match &record {
                     tasks::Stored::Live(task) | tasks::Stored::Ended(task) => {
@@ -830,7 +843,19 @@ pub(super) fn tag_tasks(
             }
             tasks::Request::Ended { task, requester, ending } => {
                 let position = core.ending_positions.remove(&task).expect("ended row assigned its result position");
-                out.push(Request::Held(Box::new(Held::ViewFinished { task })));
+                let Requests::Out(mut ended) = super::view_routes::route_view(
+                    core,
+                    env,
+                    jig_core_views::Event::RunEnded { run: Token::new(task) },
+                );
+                for _ in 0..ended.len() {
+                    match ended.pop().expect("ended run outputs") {
+                        Request::Decided => {}
+                        request @ (Request::Write(_) | Request::Held(_) | Request::Now(_) | Request::Ask { .. }) => {
+                            out.push(request);
+                        }
+                    }
+                }
                 for key in core.retire_calls(task, u64::MAX, u32::MAX, env.limits.call_records) {
                     out.push(Request::Write(Write::Erase(Key::Core(CoreKey::Call(key)))));
                 }

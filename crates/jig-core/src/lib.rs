@@ -189,15 +189,22 @@ impl ToolFamilies {
 /// A watch's authenticated owner and concrete construction inputs.
 /// `client/domain/contract.md`, sections 7.1 and 7.2.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct WatchBinding {
+pub(crate) struct WatchBinding {
     /// The party whose document is constructed.
-    pub party: u64,
+    pub(crate) party: u64,
     /// The sign-in that admitted this watch.
-    pub sign_in: u64,
+    pub(crate) sign_in: u64,
     /// The core-owned subject.
-    pub subject: documents::Subject,
+    pub(crate) subject: skein_lib::Id<WatchedSubject>,
     /// The requested bounded window.
-    pub window: documents::Window,
+    pub(crate) window: documents::Window,
+}
+
+/// A concrete subject shared by watches, with its opaque child name.
+#[derive(Debug)]
+pub(crate) struct WatchedSubject {
+    pub(crate) subject: documents::Subject,
+    pub(crate) watchers: u32,
 }
 
 /// The eight child domains of the core; routing owns durable live state.
@@ -210,9 +217,9 @@ pub struct Core {
     /// Application connectors addressed only by number.
     pub connectors: Box<[u16]>,
     /// Subjects owned by the parent; the child echoes each watch token.
-    pub view_subjects: Map<Token, WatchBinding>,
-    /// Last projected task phases.
-    pub view_phases: Map<u64, (u32, Option<u32>)>,
+    pub(crate) view_subjects: Map<Token, WatchBinding>,
+    pub(crate) view_names: skein_lib::Slab<WatchedSubject>,
+    pub(crate) changed_views: skein_lib::Set<skein_lib::Id<WatchedSubject>>,
     /// Historical result reads in flight.
     pub reading_results: Map<u64, Token>,
     /// Historical dependency results held for preparation.
@@ -437,6 +444,7 @@ impl Core {
 
     /// Allocate the eight children and the bounded live core tables.
     #[must_use]
+    #[expect(clippy::too_many_lines, reason = "construct all bounded children, bindings and subject marks together")]
     pub fn new(config: Config, limits: &Limits) -> Core {
         assert!(config.settings.tools.valid(), "each engine tool has one configured authority bit");
         assert!(*config.authority.limits() == limits.authority, "core prices its authority's configured bounds");
@@ -475,7 +483,8 @@ impl Core {
             restart_attempts: limits.fleet.attempts,
             counters: Counters::bootstrap(config.deployment),
             view_subjects: Map::with_capacity(limits.views.watchers),
-            view_phases: Map::with_capacity(limits.tasks.tasks),
+            view_names: skein_lib::Slab::with_capacity(limits.views.watchers),
+            changed_views: skein_lib::Set::with_capacity(limits.views.watchers),
             reading_results: Map::with_capacity(limits.load_slots),
             dependency_results: Map::with_capacity(limits.tasks.tasks),
             made: Map::with_capacity(limits.people.pending),
@@ -546,6 +555,7 @@ impl Core {
         self.people.reclaim();
         self.fleet.reclaim();
         self.views.reclaim();
+        self.view_names.reclaim();
     }
 
     /// Discard expendable child observations without changing a decision.

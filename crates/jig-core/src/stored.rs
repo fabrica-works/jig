@@ -314,7 +314,7 @@ impl Core {
                 {
                     return false;
                 }
-                self.view_phases.insert(task.number, (tasks::view_phase(&task.phase), task.tracked)).is_ok()
+                true
             }
             tasks::Stored::Ledger(_) | tasks::Stored::Writer(_) | tasks::Stored::Pool(_) => true,
             tasks::Stored::Ended(_)

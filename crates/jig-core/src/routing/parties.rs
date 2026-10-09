@@ -409,6 +409,7 @@ pub(super) fn roles_route(
         pool_refused(work, request, why);
         return;
     }
+    core.touch_project_parties(project);
     let mut applied = Queue::with_capacity(people::max_out(&env.limits.people));
     people::step(
         &mut core.people,
@@ -419,7 +420,10 @@ pub(super) fn roles_route(
     let mut terminal = None;
     for _ in 0..applied.len() {
         match applied.pop().expect("role application output count") {
-            people::Request::Save { record } => out.push(Request::Write(Write::Save(Record::People(record)))),
+            people::Request::Save { record } => {
+                super::view_routes::touch_people_row(core, &record);
+                out.push(Request::Write(Write::Save(Record::People(record))));
+            }
             people::Request::RolesApplied { reply_to, request: actual, result } => {
                 assert!(
                     reply_to.into_token() == request && actual == request && terminal.is_none(),

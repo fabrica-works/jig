@@ -110,12 +110,6 @@ pub enum Held {
     PeopleReply { to: ReplyTo, sign_in: Option<u64>, reply: people::Reply },
     /// A named core call answer, assembled and delivered after its decision commits.
     CallAnswer { to: ReplyTo, key: CallKey, part: CallPart },
-    /// A started run becomes visible after the same claim commits.
-    ViewStart { run: Token, attempt: Token },
-    /// A finished task becomes visible after its terminal commits.
-    ViewFinished { task: u64 },
-    /// A task phase changed for current live watchers.
-    ViewTaskPhase { task: Token, trees: Box<[Token]>, project: u32, phase: u32, priority: Option<u32> },
     /// An ended task's result is delivered to its person requester.
     Result { person: u64, task: u64, words: Box<[u8]> },
     /// A host may forget its terminal only after the task decision commits.
@@ -124,8 +118,6 @@ pub enum Held {
     TaskTerminalAcknowledged { task: u64, attempt: u64 },
     /// The fleet may forget one accepted turn after its decision commits.
     TaskTurnKept { task: u64, attempt: u64, turn: u32 },
-    /// A newly accepted turn becomes visible after commit.
-    ViewTurn { task: u64, attempt: u64, turn: u32 },
     /// A host may forget its turn only after that turn commits.
     AcknowledgeTurn { channel: Token, run: Token, attempt: Token, turn: u32 },
     /// Fence and cancel one hosted attempt after the decision commits.
@@ -178,8 +170,16 @@ pub enum Now {
     WatchRefused { watcher: Token, why: WatchRefusal },
     /// Secret-free account protocol output with no store decision.
     Account(accounts::Request),
-    /// A live view observation or terminal with no durable mutation.
-    View(views::Request),
+    /// A provisional run suffix leaves through the journal door, without a commit.
+    RunText {
+        watcher: Token,
+        turn: views::TurnName,
+        from: u32,
+        to: u32,
+        text: Box<[u8]>,
+        cut: bool,
+        call: Option<views::Call>,
+    },
     /// One page of scope index lines.
     NotesIndexed { owner: Token, lines: List<notes::Line>, more: u32 },
     /// One page of recalled entries.

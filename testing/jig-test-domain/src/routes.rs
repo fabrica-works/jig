@@ -67,14 +67,10 @@ pub(super) fn route_core(
                 | core::Held::Relay { .. }
                 | core::Held::PeopleReply { .. }
                 | core::Held::CallAnswer { .. }
-                | core::Held::ViewStart { .. }
-                | core::Held::ViewFinished { .. }
-                | core::Held::ViewTaskPhase { .. }
                 | core::Held::Result { .. }
                 | core::Held::Acknowledge { .. }
                 | core::Held::TaskTerminalAcknowledged { .. }
                 | core::Held::TaskTurnKept { .. }
-                | core::Held::ViewTurn { .. }
                 | core::Held::AcknowledgeTurn { .. }
                 | core::Held::Cancel { .. }
                 | core::Held::Refuse { .. }
@@ -473,7 +469,7 @@ fn route_now(
         | core::Now::SignInRefused { .. }
         | core::Now::WatchRefused { .. }
         | core::Now::Account(_)
-        | core::Now::View(_)
+        | core::Now::RunText { .. }
         | core::Now::NotesIndexed { .. }
         | core::Now::NotesRecalled { .. }
         | core::Now::NotesRefused { .. }

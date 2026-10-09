@@ -304,6 +304,17 @@ pub fn finish_decision(core: &mut Core, env: &Env<Limits>) -> Requests {
             forget(core, *number, &mut out);
         }
     }
+    if out.is_empty() {
+        let Requests::Out(mut watches) = crate::routing::finish_watches(core, env);
+        for _ in 0..watches.len() {
+            match watches.pop().expect("watch decision outputs") {
+                Request::Decided => {}
+                request @ (Request::Write(_) | Request::Held(_) | Request::Now(_) | Request::Ask { .. }) => {
+                    out.push(request);
+                }
+            }
+        }
+    }
     out.push(Request::Decided);
     Requests::Out(out)
 }

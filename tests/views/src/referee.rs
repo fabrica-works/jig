@@ -266,7 +266,11 @@ impl Referee {
                 text: text.to_vec(),
                 call: call.clone(),
             }),
-            Event::Changed { .. } | Event::Unwatch { .. } | Event::Gone { .. } | Event::RunEnded { .. } => {}
+            Event::Changed { .. }
+            | Event::Unwatch { .. }
+            | Event::Gone { .. }
+            | Event::RunEnded { .. }
+            | Event::EndWatch { .. } => {}
         }
     }
     pub fn saw(&mut self, requests: &[Request]) {

@@ -435,6 +435,8 @@ fn documents_reject_oversized_whole_requests_and_invalid_bounds() {
 
 fn tree_core() -> (Core, Limits) {
     let (old, mut limits) = core();
+    limits.views.watchers = 8;
+    limits.views.watchers_per_party = 8;
     limits.tasks.tasks = 16;
     limits.tasks.project_tasks = 16;
     limits.tasks.tree_tasks = 16;
@@ -1444,6 +1446,11 @@ fn watch_core() -> (Core, Limits) {
     let records = [
         people::Stored::Person { number: 1, identity },
         people::Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(Duration::from_secs(60).as_nanos()) },
+        people::Stored::SignIn {
+            number: 11,
+            person: 1,
+            expires: Wall::from_nanos(Duration::from_secs(120).as_nanos()),
+        },
         people::Stored::Roles {
             project: 1,
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
@@ -1607,4 +1614,186 @@ fn assert_watch_refusal(request: &Request, why: WatchRefusal) {
     let Request::Now(now) = request else { panic!("refusal writes nothing") };
     let Now::WatchRefused { why: got, .. } = now.as_ref() else { panic!("watch refusal") };
     assert_eq!(*got, why);
+}
+
+fn finish_watch_outputs(core: &mut Core, limits: &Limits) -> Box<[Request]> {
+    for _ in 0_u32..8 {
+        let Requests::Out(mut out) =
+            finish_decision(core, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits });
+        let mut requests = List::with_capacity(out.len());
+        let mut handoff = false;
+        while let Some(request) = out.pop() {
+            match request {
+                Request::Write(_) | Request::Ask { .. } => handoff = true,
+                request @ (Request::Held(_) | Request::Now(_) | Request::Decided) => requests.push(request).unwrap(),
+            }
+        }
+        if !handoff {
+            return requests.into_boxed();
+        }
+    }
+    panic!("bounded projection completion");
+}
+
+#[test]
+fn one_task_change_marks_its_task_every_tree_goals_and_named_chips_once() {
+    let (mut core, mut limits) = make_tree();
+    let (authenticated, auth_limits) = watch_core();
+    core.people = authenticated.people;
+    limits.people = auth_limits.people;
+    finish_watch_outputs(&mut core, &limits);
+    let mut chips = List::with_capacity(1);
+    chips.push(2).unwrap();
+    let subjects = [
+        Subject::Task { task: 2 },
+        Subject::Tree { task: 2 },
+        Subject::Tree { task: 1 },
+        Subject::Goals { project: 1 },
+        Subject::Chips { tasks: chips },
+    ];
+    for (index, subject) in subjects.into_iter().enumerate() {
+        let watcher = Token::new(u64::try_from(index).unwrap() + 30);
+        watch_outputs(&mut core, &limits, Event::Watch { watcher, sign_in: 10, subject, window: window() });
+        watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+    }
+    let changed =
+        watch_outputs(&mut core, &limits, Event::Tasks(tasks::Event::Hold { task: 2, why: tasks::Hold::Budget }));
+    assert!(!changed.is_empty());
+    let out = finish_watch_outputs(&mut core, &limits);
+    assert_eq!(out.len(), 6);
+    let mut watchers = skein_lib::Set::with_capacity(5);
+    for request in out.iter().take(5) {
+        let Request::Held(held) = request else { panic!("held change") };
+        let Held::Delivery { watcher, document } = held.as_ref() else { panic!("document change") };
+        assert!(watchers.insert(*watcher).unwrap());
+        let binding = core.view_subjects.get(watcher).unwrap();
+        let subject = &core.view_names.get(binding.subject).unwrap().subject;
+        assert_eq!(document.as_ref(), &make(&core, &limits, 1, subject, &window()).unwrap());
+    }
+    assert_eq!(finish_watch_outputs(&mut core, &limits).len(), 1);
+}
+
+#[test]
+fn ten_changed_decisions_coalesce_behind_one_inflight_delivery() {
+    let (mut core, limits) = watch_core();
+    let watcher = Token::new(30);
+    watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher, sign_in: 10, subject: Subject::Inbox { party: 1 }, window: window() },
+    );
+    for message in 1..=10 {
+        watch_outputs(
+            &mut core,
+            &limits,
+            Event::People(people::Event::Waiting {
+                task: 1,
+                entries: Box::new([people::Entry {
+                    task: 1,
+                    project: 1,
+                    whom: people::Whom::Person(1),
+                    kind: people::EntryKind::Reply { message },
+                    at: Wall::from_nanos(message),
+                }]),
+            }),
+        );
+        assert_eq!(finish_watch_outputs(&mut core, &limits).len(), 1);
+    }
+    let out = watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+    assert_eq!(out.len(), 2);
+    let Request::Held(held) = &out[0] else { panic!("coalesced held delivery") };
+    let Held::Delivery { document, .. } = held.as_ref() else { panic!("typed current document") };
+    assert_eq!(document.as_ref(), &make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &window()).unwrap());
+    assert_eq!(watch_outputs(&mut core, &limits, Event::Delivered { watcher }).len(), 1);
+}
+
+#[test]
+fn a_no_write_watch_delivery_waits_for_the_last_commit_already_made() {
+    let (mut core, limits) = watch_core();
+    let mut journal = skein_lib::Journal::<u8, Box<Held>>::new(&skein_lib::JournalLimits {
+        commits: 2,
+        writes: 1,
+        held: 4,
+        now: 1,
+        release: 4,
+    });
+    let mut earlier = journal.decision(&skein_lib::JournalRoom { writes: 1, held: 0 }).unwrap();
+    earlier.write(7).unwrap();
+    journal.accept(earlier);
+    let commit = journal.commit().unwrap();
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Task { task: 1 }, window: window() },
+    );
+    let mut decision = journal.decision(&skein_lib::JournalRoom { writes: 0, held: 1 }).unwrap();
+    for request in out {
+        if let Request::Held(held) = request {
+            decision.hold(held).unwrap();
+        }
+    }
+    journal.accept(decision);
+    assert!(journal.commit().is_none());
+    let mut released = Queue::with_capacity(4);
+    assert_eq!(journal.release(&mut released), skein_lib::Released::None);
+    journal.committed(commit.number);
+    assert_eq!(journal.release(&mut released), skein_lib::Released::Some);
+    assert_eq!(released.len(), 1);
+    let delivery = released.pop().unwrap();
+    let Held::Delivery { watcher, .. } = delivery.as_ref() else { panic!("held first document") };
+    assert_eq!(*watcher, Token::new(30));
+}
+
+#[test]
+fn watches_share_subject_tokens_and_expired_signins_end_only_their_own_watch() {
+    let (mut core, limits) = watch_core();
+    for (number, sign_in) in [(30, 10), (31, 11)] {
+        let watcher = Token::new(number);
+        watch_outputs(
+            &mut core,
+            &limits,
+            Event::Watch { watcher, sign_in, subject: Subject::Task { task: 1 }, window: window() },
+        );
+        watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+    }
+    assert_eq!(
+        core.view_subjects.get(&Token::new(30)).unwrap().subject,
+        core.view_subjects.get(&Token::new(31)).unwrap().subject
+    );
+    let Requests::Out(mut out) = routing::finish_watches(
+        &mut core,
+        &Env {
+            now: Time::from_nanos(Duration::from_secs(61).as_nanos()),
+            wall: Wall::from_nanos(Duration::from_secs(61).as_nanos()),
+            limits,
+        },
+    );
+    let Request::Held(held) = out.pop().unwrap() else { panic!("held watch ending") };
+    let Held::WatchEnded { watcher, why } = held.as_ref() else { panic!("admission ending") };
+    assert_eq!((*watcher, *why), (Token::new(30), views::End::SignedOut));
+    assert!(core.view_subjects.contains_key(&Token::new(31)));
+    assert_eq!(core.view_names.len(), 1);
+}
+
+#[test]
+fn taking_a_changed_delivery_after_signin_expiry_ends_instead_of_making_a_document() {
+    let (mut core, limits) = watch_core();
+    let watcher = Token::new(30);
+    watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher, sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
+    );
+    core.touch_party(1);
+    finish_watch_outputs(&mut core, &limits);
+    let at = Duration::from_secs(61).as_nanos();
+    let Requests::Out(mut out) = step(
+        &mut core,
+        &Env { now: Time::from_nanos(at), wall: Wall::from_nanos(at), limits },
+        Event::Delivered { watcher },
+    );
+    let Request::Held(held) = out.pop().unwrap() else { panic!("held signed-out ending") };
+    let Held::WatchEnded { why, .. } = held.as_ref() else { panic!("no document after expiry") };
+    assert_eq!(*why, views::End::SignedOut);
+    assert!(core.view_subjects.is_empty());
 }

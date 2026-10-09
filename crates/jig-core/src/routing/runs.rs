@@ -692,7 +692,7 @@ pub(super) fn route_accepted_turn(
             for key in core.retire_calls(task, attempt, turn, env.limits.call_records) {
                 out.push(Request::Write(Write::Erase(Key::Core(CoreKey::Call(key)))));
             }
-            out.push(Request::Held(Box::new(Held::ViewTurn { task, attempt, turn })));
+            super::view_routes::touch_number(core, &env.limits, task);
         }
         tasks::Accepted::Already => {}
     }

@@ -305,11 +305,7 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
         other @ (core::Held::Delivery { .. }
         | core::Held::WatchEnded { .. }
         | core::Held::PeopleReply { .. }
-        | core::Held::ViewStart { .. }
-        | core::Held::ViewFinished { .. }
-        | core::Held::ViewTaskPhase { .. }
         | core::Held::Result { .. }
-        | core::Held::ViewTurn { .. }
         | core::Held::Refuse { .. }
         | core::Held::TurnBusy { .. }
         | core::Held::NotesLoad { .. }
@@ -1157,7 +1153,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         other @ (core::Now::SignInRefused { .. }
         | core::Now::WatchRefused { .. }
         | core::Now::Account(_)
-        | core::Now::View(_)
+        | core::Now::RunText { .. }
         | core::Now::NotesIndexed { .. }
         | core::Now::NotesRecalled { .. }
         | core::Now::NotesRefused { .. }

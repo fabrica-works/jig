@@ -69,6 +69,8 @@ pub struct Follow {
 /// Events from the parent.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// The parent ends this watch's admission, independently of other parties.
+    EndWatch { watcher: Token, end: End },
     /// Admit an opaque subject and party under a unique watcher token.
     Watch { watcher: Token, party: Token, subject: Token, window: Window, follow: Option<Follow> },
     /// The parent finished changing these subjects.

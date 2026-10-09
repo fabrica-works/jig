@@ -1,0 +1,320 @@
+//! Bounded subject marks gathered while a decision routes.
+//! `client/domain/contract.md`, 7.2. Task saves gather the affected watched
+//! subjects; party-entry updates gather frame and inbox subjects. Marks hold
+//! no state snapshots and coalesce in a set. Once projection handoffs finish,
+//! the views child asks for documents from the decision's final live state.
+
+use crate::documents::Subject;
+use crate::{Core, Limits, Request, Requests};
+use jig_core_people as people;
+use jig_core_tasks as tasks;
+use jig_core_views as views;
+use skein_lib::{Env, List, Queue, Set};
+
+impl Core {
+    /// Gather this party's frame, inbox and conversations after owned facts change.
+    pub fn touch_party(&mut self, party: u64) {
+        for (_, binding) in &self.view_subjects {
+            let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
+            let touched = match subject {
+                Subject::Frame { party: owner }
+                | Subject::Inbox { party: owner }
+                | Subject::Conversations { party: owner } => *owner == party,
+                Subject::Task { .. }
+                | Subject::Tree { .. }
+                | Subject::Chips { .. }
+                | Subject::Goals { .. }
+                | Subject::Run { .. }
+                | Subject::Deployment
+                | Subject::Proposal { .. }
+                | Subject::Escalation { .. }
+                | Subject::Question { .. }
+                | Subject::PersonTask { .. }
+                | Subject::Result { .. }
+                | Subject::Project { .. }
+                | Subject::Note { .. } => false,
+            };
+            if touched {
+                let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
+            }
+        }
+    }
+
+    /// Gather deployment facts after host, account or task capacity changes.
+    pub fn touch_deployment(&mut self) {
+        for (_, binding) in &self.view_subjects {
+            let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
+            let touched = match subject {
+                Subject::Deployment => true,
+                Subject::Frame { .. }
+                | Subject::Task { .. }
+                | Subject::Tree { .. }
+                | Subject::Chips { .. }
+                | Subject::Inbox { .. }
+                | Subject::Goals { .. }
+                | Subject::Conversations { .. }
+                | Subject::Run { .. }
+                | Subject::Proposal { .. }
+                | Subject::Escalation { .. }
+                | Subject::Question { .. }
+                | Subject::PersonTask { .. }
+                | Subject::Result { .. }
+                | Subject::Project { .. }
+                | Subject::Note { .. } => false,
+            };
+            if touched {
+                let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
+            }
+        }
+    }
+
+    pub(crate) fn touch_project_parties(&mut self, project: u32) {
+        let mut parties = List::with_capacity(self.view_subjects.len());
+        for (_, binding) in &self.view_subjects {
+            if self.people.role(binding.party, project).is_some() {
+                parties.push(binding.party).expect("one party per watch");
+            }
+        }
+        for party in parties.into_boxed() {
+            self.touch_party(party);
+        }
+    }
+}
+
+pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskRecord) {
+    if core.view_subjects.is_empty() {
+        return;
+    }
+    core.touch_deployment();
+    let mut trees = List::with_capacity(limits.tasks.depth.checked_add(1).expect("bounded lineage"));
+    trees.push(row.number).expect("a task is in its own tree");
+    let mut requester = row.requester;
+    for _ in 0..limits.tasks.depth {
+        requester = match requester {
+            tasks::Party::Task(parent) => {
+                trees.push(parent).expect("bounded task lineage");
+                match core.tasks.delegation(parent) {
+                    Some(parent) => parent.requester,
+                    None => break,
+                }
+            }
+            tasks::Party::Person(_) | tasks::Party::Deployment { .. } => break,
+        };
+    }
+    let goal = row.tracked.is_some()
+        || match core.tasks.task(row.root) {
+            Some(root) => root.tracked.is_some(),
+            None => false,
+        };
+    let root = match core.tasks.task(row.root) {
+        Some(root) => root,
+        None => row,
+    };
+    let chat = root.tracked.is_none()
+        && root.recurring.is_none()
+        && match root.executor {
+            tasks::Executor::Agent { charter } => charter == core.settings.charter,
+            tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
+        };
+    let owner = if chat {
+        match root.requester {
+            tasks::Party::Person(party) => Some(party),
+            tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
+        }
+    } else {
+        None
+    };
+    for (_, binding) in &core.view_subjects {
+        let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
+        let touched = match subject {
+            Subject::Task { task } => *task == row.number,
+            Subject::Run { task } => *task == row.number && core.proofs.contains_key(task),
+            Subject::Tree { task } => trees.as_slice().contains(task),
+            Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
+            Subject::Goals { project } => *project == row.project && goal,
+            Subject::Conversations { party } => owner == Some(*party),
+            Subject::Frame { .. }
+            | Subject::Inbox { .. }
+            | Subject::Deployment
+            | Subject::Proposal { .. }
+            | Subject::Escalation { .. }
+            | Subject::Question { .. }
+            | Subject::PersonTask { .. }
+            | Subject::Result { .. }
+            | Subject::Project { .. }
+            | Subject::Note { .. } => false,
+        };
+        if touched {
+            let _new = core.changed_views.insert(binding.subject).expect("bounded watched marks");
+        }
+    }
+}
+
+pub(super) fn touch_number(core: &mut Core, limits: &Limits, task: u64) {
+    if core.view_subjects.is_empty() {
+        return;
+    }
+    // The row belongs to the hub; this temporary copy ends in this call.
+    let row = match core.tasks.task(task) {
+        Some(row) => row.clone(),
+        None => return,
+    };
+    touch_task(core, limits, &row);
+}
+
+pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
+    match row {
+        people::Stored::Person { number, .. } | people::Stored::ReadPosition { person: number, .. } => {
+            core.touch_party(*number);
+        }
+        people::Stored::Roles { holdings, .. } => {
+            for holding in holdings {
+                core.touch_party(holding.person);
+            }
+        }
+        people::Stored::SignIn { .. } | people::Stored::Policy { .. } | people::Stored::Answer { .. } => {}
+    }
+}
+
+pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &people::Event) {
+    match event {
+        people::Event::Roles { project, .. } => core.touch_project_parties(*project),
+        people::Event::Waiting { task, entries } => {
+            let mut parties = List::with_capacity(core.view_subjects.len());
+            for (_, binding) in &core.view_subjects {
+                let old = core.people.cached_waiting(&limits.people, binding.party);
+                let mut touched = match old {
+                    Some(old) => {
+                        let mut present = false;
+                        for entry in &old {
+                            present |= entry.task == *task;
+                        }
+                        present
+                    }
+                    None => false,
+                };
+                for entry in entries {
+                    touched |= match entry.whom {
+                        people::Whom::Person(party) => party == binding.party,
+                        people::Whom::Role { project, role } => match core.people.role(binding.party, project) {
+                            Some(held) => held.number() == role,
+                            None => false,
+                        },
+                    };
+                }
+                if touched {
+                    parties.push(binding.party).expect("bounded watched parties");
+                }
+            }
+            for party in parties.into_boxed() {
+                core.touch_party(party);
+            }
+        }
+        people::Event::MakeService { .. }
+        | people::Event::Seed { .. }
+        | people::Event::ApplyRoles { .. }
+        | people::Event::SignedIn { .. }
+        | people::Event::SignOut { .. }
+        | people::Event::Ask { .. }
+        | people::Event::Decided { .. }
+        | people::Event::Restore { .. }
+        | people::Event::Restored => {}
+    }
+}
+
+pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
+    if core.view_subjects.is_empty() {
+        let mut out = Queue::with_capacity(1);
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
+    let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded watch finish").held);
+    let mut watches = List::with_capacity(core.view_subjects.len());
+    for (watcher, binding) in &core.view_subjects {
+        watches.push((*watcher, binding.clone())).expect("bounded watch snapshot");
+    }
+    for (watcher, binding) in watches.into_boxed() {
+        let ending = if core.people.person(binding.sign_in, env.now, env.wall) == Some(binding.party) {
+            visibility_end(core, &binding)
+        } else {
+            Some(views::End::SignedOut)
+        };
+        if let Some(end) = ending {
+            append(super::view_routes::route_view(core, env, views::Event::EndWatch { watcher, end }), &mut out);
+        }
+    }
+    let changed = core::mem::replace(&mut core.changed_views, Set::with_capacity(env.limits.views.watchers));
+    for name in &changed {
+        let mut subjects = List::with_capacity(1);
+        subjects.push(name.token()).expect("one opaque subject mark");
+        append(super::view_routes::route_view(core, env, views::Event::Changed { subjects }), &mut out);
+    }
+    out.push(Request::Decided);
+    Requests::Out(out)
+}
+
+fn append(requests: Requests, out: &mut Queue<Request>) {
+    let Requests::Out(mut requests) = requests;
+    for _ in 0..requests.len() {
+        match requests.pop().expect("watch route outputs") {
+            Request::Decided => {}
+            request @ (Request::Write(_) | Request::Held(_) | Request::Now(_) | Request::Ask { .. }) => {
+                out.push(request);
+            }
+        }
+    }
+}
+
+fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::End> {
+    let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
+    match subject {
+        Subject::Task { task } | Subject::Tree { task } | Subject::Run { task } => {
+            let Some(row) = core.tasks.task(*task) else { return Some(views::End::Gone) };
+            match row.phase {
+                tasks::Phase::Ended(_) => Some(views::End::Gone),
+                tasks::Phase::Waiting
+                | tasks::Phase::Active(_)
+                | tasks::Phase::Closing(_)
+                | tasks::Phase::Held { .. } => {
+                    if core.people.role(binding.party, row.project).is_some() {
+                        None
+                    } else {
+                        Some(views::End::NotAllowed)
+                    }
+                }
+            }
+        }
+        Subject::Chips { tasks: named } => {
+            for task in named {
+                if let Some(row) = core.tasks.task(*task)
+                    && core.people.role(binding.party, row.project).is_none()
+                {
+                    return Some(views::End::NotAllowed);
+                }
+            }
+            None
+        }
+        Subject::Goals { project } => {
+            if core.people.role(binding.party, *project).is_some() {
+                None
+            } else {
+                Some(views::End::NotAllowed)
+            }
+        }
+        Subject::Deployment => {
+            if core.people.role(binding.party, 0).is_some() {
+                None
+            } else {
+                Some(views::End::NotAllowed)
+            }
+        }
+        Subject::Frame { .. } | Subject::Inbox { .. } | Subject::Conversations { .. } => None,
+        Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => Some(views::End::Gone),
+    }
+}

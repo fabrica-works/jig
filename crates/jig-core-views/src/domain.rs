@@ -66,6 +66,7 @@ pub const fn max_out(limits: &Limits) -> u32 {
 /// Apply one parent event with `max_out` room reserved.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::EndWatch { watcher, end } => watch::close(domain, watcher, end, out),
         Event::Watch { watcher, party, subject, window, follow } => {
             watch::open(domain, &env.limits, watcher, party, subject, window, follow, out);
         }

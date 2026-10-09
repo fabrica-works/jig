@@ -540,10 +540,6 @@ impl World {
                 | core::Held::Assign { .. }
                 | core::Held::Inbound { .. }
                 | core::Held::Relayed { .. }
-                | core::Held::ViewStart { .. }
-                | core::Held::ViewFinished { .. }
-                | core::Held::ViewTaskPhase { .. }
-                | core::Held::ViewTurn { .. }
                 | core::Held::Relay { .. }
                 | core::Held::Result { .. }
                 | core::Held::Acknowledge { .. }

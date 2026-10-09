@@ -125,6 +125,7 @@ impl Core {
             &mut out,
         );
         assert!(out.is_empty(), "loss changes topology and deadlines without child effects");
+        self.touch_deployment();
     }
 
     /// Route a restored task's current claim to views and the fleet, holding

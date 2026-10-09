@@ -721,12 +721,7 @@ impl World {
                 assert_eq!(words.as_ref(), b"done");
                 self.results += 1;
             }
-            root::Delivery::Core(
-                core::Held::ViewStart { .. }
-                | core::Held::ViewFinished { .. }
-                | core::Held::ViewTaskPhase { .. }
-                | core::Held::ViewTurn { .. },
-            ) => {}
+            root::Delivery::Core(core::Held::Delivery { .. } | core::Held::WatchEnded { .. }) => {}
             other @ (root::Delivery::CallAnswer { .. }
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)

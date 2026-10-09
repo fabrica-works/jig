@@ -13,7 +13,7 @@ use jig_core_notes as notes;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 use jig_core_views as views;
-use skein_lib::{List, Map, Queue};
+use skein_lib::{Id, List, Map, Queue, Set, Slab};
 
 use crate::{CallKey, Event, HistoricalResult, Limits, Request};
 
@@ -142,7 +142,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         }
     }
     for capacity in [
-        limits.tasks.tasks,        // view phases
         limits.load_slots,         // reads
         limits.tasks.tasks,        // dependency results
         limits.people.pending,     // made
@@ -174,6 +173,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         total = total.checked_add(Map::<CallKey, Event>::worst_case(capacity)?)?;
     }
     total = total.checked_add(Map::<skein_lib::Token, crate::WatchBinding>::worst_case(limits.views.watchers)?)?;
+    total = total.checked_add(Slab::<crate::WatchedSubject>::worst_case(limits.views.watchers)?)?;
+    total = total.checked_add(Set::<Id<crate::WatchedSubject>>::worst_case(limits.views.watchers)?.checked_mul(2)?)?;
+    total = total.checked_add(List::<(skein_lib::Token, crate::WatchBinding)>::worst_case(limits.views.watchers)?)?;
+    total = total.checked_add(List::<u64>::worst_case(limits.views.watchers)?)?;
+    total = total.checked_add(List::<u64>::worst_case(limits.tasks.depth.checked_add(1)?)?)?;
+    total = total.checked_add(List::<u64>::worst_case(limits.documents.chips)?)?;
     total = total
         .checked_add(u64::from(limits.views.watchers).checked_mul(List::<u64>::worst_case(limits.documents.chips)?)?)?;
     total = total.checked_add(Map::<u64, Box<crate::Projection>>::worst_case(limits.tasks.tasks)?)?;
@@ -230,6 +235,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(bytes(limits.call_records, bytes(limits.notes.recalled, note_entry)?)?)?;
     total = total.checked_add(bytes(task.tasks, u64::from(task.result_bytes).checked_mul(3)?)?)?;
     total = total.checked_add(u64::from(task.message_bytes))?;
+    // Documents move from this bounded construction map into held outputs.
+    // The application journal separately prices outputs retained across decisions.
     total =
         total.checked_add(Map::<skein_lib::Token, crate::documents::Document>::worst_case(limits.views.watchers)?)?;
     total = total.checked_add(

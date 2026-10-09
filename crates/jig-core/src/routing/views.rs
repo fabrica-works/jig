@@ -10,9 +10,8 @@
 //! | Unwatch | child closes after outstanding terminals | held watch ending |
 
 use crate::documents::{self, Missing, Subject, Window};
-use crate::{Core, Held, Limits, Now, Request, Requests, WatchBinding, WatchRefusal};
+use crate::{Core, Held, Limits, Now, Request, Requests, WatchBinding, WatchRefusal, WatchedSubject};
 use alloc::boxed::Box;
-use jig_core_tasks as tasks;
 use jig_core_views as views;
 use skein_lib::{Env, List, Map, Queue, Token};
 
@@ -21,44 +20,7 @@ pub(super) fn route_view(core: &mut Core, env: &Env<Limits>, event: views::Event
     views::step(&mut core.views, &Env { now: env.now, wall: env.wall, limits: env.limits.views }, event, &mut out);
     made_outputs(core, env, out)
 }
-pub(super) fn task_saved_view(core: &mut Core, env: &Env<Limits>, task: &tasks::TaskRecord, out: &mut Queue<Request>) {
-    let phase = tasks::view_phase(&task.phase);
-    let current = (phase, task.tracked);
-    let changed = match core.view_phases.get(&task.number) {
-        Some(previous) => *previous != current,
-        None => true,
-    };
-    if phase == 4 {
-        core.view_phases.remove(&task.number);
-    } else {
-        core.view_phases.insert(task.number, current).expect("one live phase per task");
-    }
-    if !changed || core.view_subjects.is_empty() {
-        return;
-    }
-    let mut trees = List::with_capacity(env.limits.tasks.depth.saturating_add(1));
-    trees.push(Token::new(task.number)).expect("self is in its own bounded tree");
-    let mut requester = task.requester;
-    for _ in 0..env.limits.tasks.depth {
-        requester = match requester {
-            tasks::Party::Task(parent) => {
-                trees.push(Token::new(parent)).expect("bounded ancestor depth");
-                match core.tasks.delegation(parent) {
-                    Some(context) => context.requester,
-                    None => break,
-                }
-            }
-            tasks::Party::Person(_) | tasks::Party::Deployment { .. } => break,
-        };
-    }
-    out.push(Request::Held(Box::new(Held::ViewTaskPhase {
-        task: Token::new(task.number),
-        trees: trees.into_boxed(),
-        project: task.project,
-        phase,
-        priority: task.tracked,
-    })));
-}
+pub(super) use super::watch_marks::{touch_number, touch_people_event, touch_people_row, touch_task};
 
 // Construct and move each document into the decision that asked for it.
 pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<views::Request>) -> Requests {
@@ -68,25 +30,13 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
     for _ in 0..child.len() {
         match child.pop().expect("view output count") {
             views::Request::Make { watcher, .. } => {
-                let outcome = match core.view_subjects.get(&watcher) {
-                    Some(binding) => match documents::make_with_clock(
-                        core,
-                        &env.limits,
-                        binding.party,
-                        &binding.subject,
-                        &binding.window,
-                        documents::DocumentClock { now: env.now, wall: env.wall },
-                    ) {
-                        Ok(document) => {
-                            documents.insert(watcher, document).expect("bounded construction scratch");
-                            views::Made::Ready
-                        }
-                        Err(Missing::NotAllowed) => views::Made::Gone { why: views::End::NotAllowed },
-                        Err(Missing::Unknown | Missing::Ended | Missing::TooLarge) => {
-                            views::Made::Gone { why: views::End::Gone }
-                        }
-                    },
-                    None => views::Made::Gone { why: views::End::Gone },
+                let outcome = match watch_document(core, &env.limits, watcher, env.now, env.wall) {
+                    Ok(document) => {
+                        let previous = documents.insert(watcher, document).expect("bounded construction scratch");
+                        assert!(previous.is_none(), "one construction per watcher");
+                        views::Made::Ready
+                    }
+                    Err(why) => views::Made::Gone { why },
                 };
                 views::step(
                     &mut core.views,
@@ -112,17 +62,19 @@ pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<
                 out.push(Request::Held(Box::new(Held::Delivery { watcher, document: Box::new(document) })));
             }
             views::Request::Ended { watcher, end: why } => {
-                core.view_subjects.remove(&watcher);
+                forget_watch(core, watcher);
                 out.push(Request::Held(Box::new(Held::WatchEnded { watcher, why })));
             }
             views::Request::Refused { watcher, refusal } => {
-                core.view_subjects.remove(&watcher);
+                forget_watch(core, watcher);
                 let why = match refusal {
                     views::Refusal::Busy => WatchRefusal::Busy,
                 };
                 out.push(Request::Now(Box::new(Now::WatchRefused { watcher, why })));
             }
-            request @ views::Request::Stream { .. } => out.push(Request::Now(Box::new(Now::View(request)))),
+            views::Request::Stream { watcher, turn, from, to, text, cut, call } => {
+                out.push(Request::Now(Box::new(Now::RunText { watcher, turn, from, to, text, cut, call })));
+            }
         }
     }
     out.push(Request::Decided);
@@ -152,9 +104,6 @@ pub(super) fn open(
     }
     if !watch_subject(&subject) {
         return refused(watcher, WatchRefusal::Unknown);
-    }
-    if window.rows == 0 {
-        return refused(watcher, WatchRefusal::Busy);
     }
     // Construction checks all named chips, owner-only subjects and deployment
     // roles. Admission retains no made document and consumes no keyed slot.
@@ -206,14 +155,36 @@ pub(super) fn open(
         | Subject::Project { .. }
         | Subject::Note { .. } => None,
     };
+    let mut existing = None;
+    for (_, binding) in &core.view_subjects {
+        if core.view_names.get(binding.subject).expect("bound subject").subject == subject {
+            existing = Some(binding.subject);
+            break;
+        }
+    }
+    let name = match existing {
+        Some(name) => {
+            let shared = core.view_names.get_mut(name).expect("shared watched subject");
+            shared.watchers = shared.watchers.checked_add(1).expect("bounded subject watchers");
+            name
+        }
+        None => {
+            if core.view_names.is_full() {
+                return refused(watcher, WatchRefusal::Busy);
+            }
+            core.view_names.insert(WatchedSubject { subject, watchers: 1 }).expect("admitted watched subject")
+        }
+    };
     let view_window = views::Window { rows: window.rows, after: None };
-    core.view_subjects
-        .insert(watcher, WatchBinding { party, sign_in, subject, window })
+    let previous = core
+        .view_subjects
+        .insert(watcher, WatchBinding { party, sign_in, subject: name, window })
         .expect("bounded watch binding");
+    assert!(previous.is_none(), "one binding per watcher");
     route_view(
         core,
         env,
-        views::Event::Watch { watcher, party: Token::new(party), subject: watcher, window: view_window, follow },
+        views::Event::Watch { watcher, party: Token::new(party), subject: name.token(), window: view_window, follow },
     )
 }
 
@@ -235,5 +206,76 @@ fn watch_subject(subject: &Subject) -> bool {
         | Subject::Result { .. }
         | Subject::Project { .. }
         | Subject::Note { .. } => false,
+    }
+}
+
+fn forget_watch(core: &mut Core, watcher: Token) {
+    let Some(binding) = core.view_subjects.remove(&watcher) else { return };
+    let subject = core.view_names.get_mut(binding.subject).expect("bound watched subject");
+    subject.watchers = subject.watchers.checked_sub(1).expect("an ending watch owns its subject");
+    if subject.watchers == 0 {
+        let _changed = core.changed_views.remove(&binding.subject);
+        core.view_names.retire(binding.subject);
+    }
+}
+
+fn watch_document(
+    core: &Core,
+    limits: &Limits,
+    watcher: Token,
+    now: skein_lib::Time,
+    wall: skein_lib::Wall,
+) -> Result<documents::Document, views::End> {
+    let binding = core.view_subjects.get(&watcher).ok_or(views::End::Gone)?;
+    if core.people.person(binding.sign_in, now, wall) != Some(binding.party) {
+        return Err(views::End::SignedOut);
+    }
+    let subject = &core.view_names.get(binding.subject).expect("bound watched subject").subject;
+    let filtered = match subject {
+        Subject::Chips { tasks: named } => {
+            let mut tasks = List::with_capacity(named.len());
+            for number in named {
+                let Some(row) = core.tasks.task(*number) else { continue };
+                match row.phase {
+                    jig_core_tasks::Phase::Ended(_) => {}
+                    jig_core_tasks::Phase::Waiting
+                    | jig_core_tasks::Phase::Active(_)
+                    | jig_core_tasks::Phase::Closing(_)
+                    | jig_core_tasks::Phase::Held { .. } => tasks.push(*number).expect("bounded live chips"),
+                }
+            }
+            Some(Subject::Chips { tasks })
+        }
+        Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Run { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => None,
+    };
+    let subject = match &filtered {
+        Some(filtered) => filtered,
+        None => subject,
+    };
+    match documents::make_with_clock(
+        core,
+        limits,
+        binding.party,
+        subject,
+        &binding.window,
+        documents::DocumentClock { now, wall },
+    ) {
+        Ok(document) => Ok(document),
+        Err(Missing::NotAllowed) => Err(views::End::NotAllowed),
+        Err(Missing::Unknown | Missing::Ended | Missing::TooLarge) => Err(views::End::Gone),
     }
 }

@@ -25,6 +25,7 @@ pub(super) fn route_people(
     work: &mut Queue<Event>,
     event: people::Event,
 ) -> Requests {
+    super::view_routes::touch_people_event(core, &env.limits, &event);
     let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
     people::step(&mut core.people, &Env { now: env.now, wall: env.wall, limits: env.limits.people }, event, &mut child);
     tag_people(core, env, child, work)
@@ -82,7 +83,10 @@ pub(super) fn tag_people(
                 }
                 continue;
             }
-            people::Request::Save { record } => Request::Write(Write::Save(Record::People(record))),
+            people::Request::Save { record } => {
+                super::view_routes::touch_people_row(core, &record);
+                Request::Write(Write::Save(Record::People(record)))
+            }
             people::Request::Erase { key } => Request::Write(Write::Erase(Key::People(key))),
             people::Request::Reply { to, reply } => {
                 Request::Held(Box::new(Held::PeopleReply { to, sign_in: core.signing_in, reply }))

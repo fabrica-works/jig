@@ -42,6 +42,7 @@ pub use vocabulary::{
     Ask, CoreBriefBudgets, EscalationChoice, Event, Held, HoldingsNeed, Limits, NamedAction, Now, PayloadRefusal,
     ProposalChoice, Request, Requests, Timer, ToolKind, WatchRefusal, Write,
 };
+pub(crate) use watch_marks::finish_watches;
 
 mod children;
 #[path = "notes.rs"]
@@ -61,6 +62,7 @@ mod task_routes;
 #[path = "views.rs"]
 mod view_routes;
 mod vocabulary;
+mod watch_marks;
 
 impl Core {
     /// Retain a numbered connector call until its translated answer arrives.
@@ -280,6 +282,7 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
         .checked_add(
             limits.tasks.tasks.checked_mul(limits.tasks.tree_tasks.checked_add(limits.connectors)?.checked_add(4)?)?,
         )?
+        .checked_add(limits.views.watchers.checked_mul(4)?)?
         .checked_add(8)
 }
 
@@ -381,6 +384,9 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
 pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
     let mut child = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
     fleet::resume(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, &mut child);
+    if !child.is_empty() {
+        core.touch_deployment();
+    }
     tag_fleet(core, env, child, fleet::max_out(&env.limits.fleet))
 }
 
@@ -476,6 +482,9 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
         Timer::Fleet => {
             let mut out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
             fleet::fire(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, &mut out);
+            if !out.is_empty() {
+                core.touch_deployment();
+            }
             tag_fleet(core, env, out, fleet::max_out(&env.limits.fleet))
         }
         Timer::Brief => {
@@ -494,6 +503,9 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
                 &Env { now: env.now, wall: env.wall, limits: env.limits.accounts },
                 &mut out,
             );
+            if !out.is_empty() {
+                core.touch_deployment();
+            }
             tag_account(out)
         }
         Timer::View => {

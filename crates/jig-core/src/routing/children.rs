@@ -14,6 +14,7 @@ use jig_core_tasks as tasks;
 use skein_lib::{Env, Queue, ReplyTo, Token};
 
 pub(super) fn append_people(core: &mut Core, env: &Env<Limits>, event: people::Event, out: &mut Queue<Request>) {
+    super::view_routes::touch_people_event(core, &env.limits, &event);
     let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
     people::step(&mut core.people, &Env { now: env.now, wall: env.wall, limits: env.limits.people }, event, &mut child);
     let mut work = Queue::with_capacity(0);
@@ -231,7 +232,7 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
             }
             fleet::Request::Assign { channel, kind, run, attempt, activation, assignment } => {
                 record_host(core, &mut out, run, attempt, kind);
-                out.push(Request::Held(Box::new(Held::ViewStart { run, attempt })));
+                super::view_routes::touch_number(core, &env.limits, run.raw());
                 Request::Held(Box::new(Held::Assign { channel, run, attempt, activation, assignment }))
             }
             fleet::Request::Inbound { channel, run, attempt, message } => {
@@ -332,6 +333,7 @@ pub(super) fn route_account(core: &mut Core, env: &Env<Limits>, event: accounts:
         event,
         &mut out,
     );
+    core.touch_deployment();
     tag_account(out)
 }
 
@@ -347,6 +349,30 @@ pub(super) fn route_brief(core: &mut Core, env: &Env<Limits>, event: brief::Gath
 }
 
 pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, event: fleet::Event) -> Requests {
+    let touched = match &event {
+        fleet::Event::Start { .. }
+        | fleet::Event::Adopt { .. }
+        | fleet::Event::Cancel { .. }
+        | fleet::Event::Acknowledge { .. }
+        | fleet::Event::Loaded
+        | fleet::Event::Hello { .. }
+        | fleet::Event::Lost { .. }
+        | fleet::Event::Answer { .. } => true,
+        fleet::Event::Inbound { .. }
+        | fleet::Event::Relay { .. }
+        | fleet::Event::Relayed { .. }
+        | fleet::Event::Grant { .. }
+        | fleet::Event::Rejected { .. }
+        | fleet::Event::Exhausted { .. }
+        | fleet::Event::Turn { .. }
+        | fleet::Event::TurnKept { .. }
+        | fleet::Event::TurnBusy { .. }
+        | fleet::Event::Bounced { .. }
+        | fleet::Event::Told { .. } => false,
+    };
+    if touched {
+        core.touch_deployment();
+    }
     let mut out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
     fleet::step(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, event, &mut out);
     tag_fleet(core, env, out, fleet::max_out(&env.limits.fleet))
