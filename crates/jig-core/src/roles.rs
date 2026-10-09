@@ -247,14 +247,11 @@ impl Core {
         goals: usize,
         task_capacity: u32,
     ) -> Result<(), people::Refusal> {
-        let allowed = match role {
-            Some(people::Role::Owner | people::Role::Maintainer | people::Role::Policy { .. }) => {
-                match self.authority.role(project, role.expect("checked role").number()) {
-                    Some(policy) => policy.requests.allows(authority::RequestKind::Amend),
-                    None => false,
-                }
-            }
-            Some(people::Role::Member | people::Role::Observer) | None => false,
+        crate::acts::role(self, project, role, crate::acts::Act::Prioritise)?;
+        let named = role.expect("common priority role judgment admitted membership");
+        let allowed = match self.authority.role(project, named.number()) {
+            Some(policy) => policy.requests.allows(authority::RequestKind::Amend),
+            None => false,
         };
         if !allowed {
             return Err(people::Refusal::Role { held: role });
