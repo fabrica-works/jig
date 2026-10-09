@@ -69,6 +69,7 @@ fn region(
     seen: &mut skein_lib::Set<u64>,
 ) {
     b.open(Role::Region);
+    b.style(crate::JigStyle::Chip.token());
     b.name(&words.say(JigPhrase::ChipNumber, &[Hole::Number(chip.task), name(chip.title.bytes())]));
     head(b, chip, words, bindings);
     details(b, client, &chip.details, words, bindings, pending, seen);

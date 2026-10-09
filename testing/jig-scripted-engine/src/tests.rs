@@ -184,11 +184,36 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
             before: Phase::Running,
             since: Wall::EPOCH,
             result: None,
+            spend: list(vec![SpendLine { task: 8, attempt: None, spent: 100 }]),
+        },
+        steering: Box::new(Steering {
+            addressed: None,
+            revision: Revision { value: 1 },
+            spec: text(b"held work"),
+            instructions: text(b""),
+            wake: WakePolicy {
+                words: true,
+                results: true,
+                topics: List::with_capacity(0),
+                subscriptions: List::with_capacity(0),
+            },
+            dependencies: List::with_capacity(0),
+            authority: authority(),
+            budget: Budget { total: 100, own: 100, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
+        }),
+        impact: Impact {
+            tasks: PhaseCounts { waiting: 0, running: 0, held: 1, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            live_runs: 0,
+            proposals: 0,
+            effects_pending: 0,
+            effects_settling: 0,
+            takeover_budget: 0,
         },
         waiting: Recipient::Party(1),
         trail: list(vec![]),
         acts: list(vec![Offered { act: ActKind::Release, admission: Admission::Allowed }]),
     };
+    nested_escalation_payload_bounds(&escalation);
     setup.truth.object_projects.insert(ObjectKey::Escalation(8), 1);
     setup.truth.objects.insert(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(escalation)));
     let mut engine = Engine::new(setup, 2).expect("valid script");
@@ -545,7 +570,7 @@ fn scenario_run_offsets_cut_names_and_activity() {
 }
 fn scenario_byte_bound_pages_and_watch_windows() {
     let mut setup = live_script();
-    setup.bounds.document_bytes = 2000;
+    setup.bounds.document_bytes = 3000;
     setup.truth.sources.push(Source {
         party: 1,
         read: Read::History { task: 8, subtree: false, after: None },
@@ -556,7 +581,7 @@ fn scenario_byte_bound_pages_and_watch_windows() {
                     task: 8,
                     by: Actor::Party(1),
                     at: Wall::EPOCH,
-                    change: HistoryChange::Amended { before: text(&[b'a'; 600]), after: text(&[b'b'; 600]) },
+                    change: HistoryChange::Amended { before: text(&[b'a'; 1100]), after: text(&[b'b'; 1100]) },
                 })
                 .collect(),
         ),
@@ -573,7 +598,7 @@ fn scenario_byte_bound_pages_and_watch_windows() {
     assert!(page.after.is_some());
     assert!(payload::fits(value, &engine.bounds));
     let mut setup = live_script();
-    setup.bounds.document_bytes = 2000;
+    setup.bounds.document_bytes = 3000;
     let entries = (0..2)
         .map(|position| {
             let line = ConversationLine {
@@ -582,7 +607,7 @@ fn scenario_byte_bound_pages_and_watch_windows() {
                 budget: budget(),
                 chip: task().chip,
                 project: 1,
-                first_words: text(&[b'x'; 600]),
+                first_words: text(&[b'x'; 1100]),
                 unread: Count { value: 1, limited: false },
                 seen: 0,
                 last_reply: 1,
@@ -714,4 +739,23 @@ fn reads_watches_and_run_scenarios() {
     scenario_pages_and_read_barriers();
     scenario_watch_subjects_coalescing_and_lifecycle();
     scenario_run_offsets_cut_names_and_activity();
+}
+
+fn nested_escalation_payload_bounds(escalation: &Escalation) {
+    for text_or_capacity in [true, false] {
+        let mut invalid_setup = script();
+        let mut row = escalation.clone();
+        if text_or_capacity {
+            row.steering.spec = Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap();
+        } else {
+            row.hold.spend = List::with_capacity(33);
+        }
+        invalid_setup.truth.object_projects.insert(ObjectKey::Escalation(8), 1);
+        invalid_setup.truth.objects.insert(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row)));
+        assert_eq!(
+            Engine::new(invalid_setup, 1).err(),
+            Some(Invalid::Payload),
+            "whole nested steering and hold spend are admitted"
+        );
+    }
 }

@@ -52,6 +52,11 @@ pub fn open(
     b.key(key);
     b.open(Role::Region);
     b.name(title);
+    b.style(crate::JigStyle::Card.token());
+    match facts.card {
+        Card::Deciding { .. } => b.state(crate::State::Busy),
+        Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
+    }
     b.open(Role::Heading { level: 2 });
     b.text(crate::Run::Plain, title);
     b.close();
@@ -119,6 +124,7 @@ pub fn close(b: &mut Builder) {
 
 pub mod chip;
 pub mod common;
+pub mod escalation;
 pub mod hold;
 pub mod person;
 pub mod proposal;
@@ -133,21 +139,26 @@ pub fn card(
     place: &Place,
     words: &Words,
     bindings: &mut JigBindings,
-) {
+) -> bool {
     let Some(facts) = client.objects().get(object) else {
-        return;
+        return false;
     };
     if facts.reply.is_some() {
-        result::reply(b, client, object, place, words, bindings);
-        return;
+        return result::reply(b, client, object, place, words, bindings);
     }
     match &facts.body {
-        Some(jig_client::objects::Body::Proposal(_)) => proposal::proposal(b, client, object, place, words, bindings),
-        Some(jig_client::objects::Body::Question(_)) => question::question(b, client, object, place, words, bindings),
+        Some(jig_client::objects::Body::Proposal(_)) => {
+            proposal::proposal(b, client, object, place, words, bindings);
+        }
+        Some(jig_client::objects::Body::Question(_)) => {
+            question::question(b, client, object, place, words, bindings);
+        }
         Some(jig_client::objects::Body::PersonTask(_)) => {
             person::person_task(b, client, object, place, words, bindings);
         }
-        Some(jig_client::objects::Body::Result(_)) => result::result(b, client, object, place, words, bindings),
+        Some(jig_client::objects::Body::Result(_)) => {
+            result::result(b, client, object, place, words, bindings);
+        }
         Some(jig_client::objects::Body::Chip(chip)) => {
             let title =
                 words.say(JigPhrase::ChipNumber, &[Hole::Number(chip.task), crate::words::name(chip.title.bytes())]);
@@ -167,12 +178,8 @@ pub fn card(
                 close(b);
             }
         }
-        Some(jig_client::objects::Body::Escalation(document)) => {
-            let title = words.say(JigPhrase::Escalation, &[]);
-            if open(b, client, object, place, &title, words, bindings) {
-                chip::chip(b, client, &document.task, words, bindings);
-                close(b);
-            }
+        Some(jig_client::objects::Body::Escalation(_)) => {
+            escalation::escalation(b, client, object, place, words, bindings);
         }
         Some(jig_client::objects::Body::Note { document, .. }) => {
             if open(b, client, object, place, document.description.bytes(), words, bindings) {
@@ -189,6 +196,7 @@ pub fn card(
             }
         }
     }
+    true
 }
 /// A refusal without a current object remains a named card of its whole facts.
 pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: &Words) {

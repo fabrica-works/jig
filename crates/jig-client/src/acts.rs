@@ -54,10 +54,10 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
         },
         ActKind::Amend | ActKind::AmendRelease => match &object.body {
             Some(Body::Task(document)) => Some(document.spec_revision),
+            Some(Body::Escalation(document)) => Some(document.steering.revision),
             Some(
                 Body::Chip(_)
                 | Body::Proposal(_)
-                | Body::Escalation(_)
                 | Body::Question(_)
                 | Body::PersonTask(_)
                 | Body::Result(_)

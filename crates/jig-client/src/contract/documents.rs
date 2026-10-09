@@ -234,6 +234,8 @@ pub struct Hold {
     pub before: Phase,
     pub since: Wall,
     pub result: Option<ResultValue>,
+    /// Spend snapshot attributed to each run and delegate when held.
+    pub spend: List<SpendLine>,
 }
 
 /// Why a task is held, with the facts its card needs.
@@ -294,9 +296,27 @@ pub struct Escalation {
     pub ending: Option<Ending>,
     pub task: Chip,
     pub hold: Hold,
+    /// Bounded specification facts for amend-and-release from this card.
+    pub steering: Box<Steering>,
+    /// Whole cancellation impact, refreshed without changing the hold revision.
+    pub impact: Impact,
     pub waiting: Recipient,
     pub trail: List<Passed>,
     pub acts: List<Offered>,
+}
+
+/// Bounded before facts for a task amendment, without nesting a task document.
+/// The escalation and its held task name the same independent specification revision.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Steering {
+    pub addressed: Option<Recipient>,
+    pub revision: Revision,
+    pub spec: Text,
+    pub instructions: Text,
+    pub wake: WakePolicy,
+    pub dependencies: List<u64>,
+    pub authority: Authority,
+    pub budget: Budget,
 }
 
 /// A holder an object passed and why.

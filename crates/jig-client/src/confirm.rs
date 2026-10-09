@@ -58,6 +58,9 @@ pub enum Missing {
 /// One act and the revision its card showed when the confirmation opened.
 #[derive(Debug)]
 pub struct Confirmation {
+    /// Domain write generation for fields owned by this new confirmation.
+    /// Stable through edits and live-document updates; advances on opening another.
+    pub writes: u64,
     pub act: ActKind,
     pub object: Id<Object>,
     pub revision: Option<Revision>,
@@ -177,6 +180,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         priority: None,
     };
     domain.confirming = Some(Confirmation {
+        writes: domain.shown,
         act,
         object: id,
         revision,

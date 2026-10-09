@@ -28,7 +28,14 @@ fn intend(domain: &mut Domain, id: Id<Object>, act: ActKind) -> Box<[Request]> {
     drive(domain, Time::ZERO, Event::Act { act: Act::Intend { object: id.token(), act } })
 }
 pub(super) fn change() -> Amendment {
-    Amendment { words: Some(text(b"amended")), wake: None, dependencies: None, authority: None, instructions: None }
+    Amendment {
+        addressed: None,
+        words: Some(text(b"amended")),
+        wake: None,
+        dependencies: None,
+        authority: None,
+        instructions: None,
+    }
 }
 fn counts() -> PhaseCounts {
     PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }

@@ -57,6 +57,10 @@ pub enum JigMeaning {
     Field(jig_client::fields::Purpose),
     /// Digits are kept in the view and submitting goes to that task.
     TaskNumber,
+    /// Digits edit the confirmation's priority without a hidden submit.
+    Priority,
+    /// A typed amendment snapshot updated by one named form field.
+    Amendment { change: Box<jig_client::contract::Amendment>, field: crate::confirmation::amendment::Field },
     /// A connector-owned part referred to by a slot, never an actionable node.
     Part(jig_client::contract::Part),
 }
@@ -99,7 +103,11 @@ impl JigBindings {
             if entry.token == token {
                 match &entry.meaning {
                     JigMeaning::Part(part) => return Some(part),
-                    JigMeaning::Action(_) | JigMeaning::Field(_) | JigMeaning::TaskNumber => return None,
+                    JigMeaning::Action(_)
+                    | JigMeaning::Field(_)
+                    | JigMeaning::TaskNumber
+                    | JigMeaning::Priority
+                    | JigMeaning::Amendment { .. } => return None,
                 }
             }
         }
@@ -148,7 +156,11 @@ impl JigBindings {
                         | jig_client::action::Act::OpenEnded { .. }
                         | jig_client::action::Act::SignIn { .. } => return None,
                     },
-                    JigMeaning::Field(_) | JigMeaning::TaskNumber | JigMeaning::Part(_) => return None,
+                    JigMeaning::Field(_)
+                    | JigMeaning::TaskNumber
+                    | JigMeaning::Part(_)
+                    | JigMeaning::Priority
+                    | JigMeaning::Amendment { .. } => return None,
                 }
             }
         }
@@ -163,6 +175,18 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
         if entry.token == token {
             return match &entry.meaning {
                 JigMeaning::Part(_) => None,
+                JigMeaning::Priority => match act {
+                    Act::Input { value } => {
+                        Some(jig_client::action::Act::Priority { priority: u32::try_from(number(&value)?).ok()? })
+                    }
+                    Act::Press | Act::Submit | Act::Toggle => None,
+                },
+                JigMeaning::Amendment { change, field } => match act {
+                    Act::Input { value } => {
+                        crate::confirmation::amendment::edit(change, *field, value, view.text_limit)
+                    }
+                    Act::Press | Act::Submit | Act::Toggle => None,
+                },
                 JigMeaning::Action(action) => match act {
                     Act::Press | Act::Submit | Act::Toggle => Some(action.clone()),
                     Act::Input { .. } => None,

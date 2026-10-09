@@ -596,8 +596,8 @@ pub(crate) fn read_card(
     let key = object.key;
     let leaving = match &object.card {
         Card::Leaving { how: Left::Looking, .. } => true,
-        Card::Open | Card::Refused { .. } | Card::Unknown { .. } => false,
-        Card::Deciding { .. }
+        Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Deciding { request: None, .. } => false,
+        Card::Deciding { request: Some(_), .. }
         | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => return,
     };
     let body = match result {

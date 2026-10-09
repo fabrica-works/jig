@@ -412,6 +412,172 @@ pub enum JigPhrase {
     ProcedureHold,
     /// Loading task (0) phase facts.
     LoadingDependency,
+    /// Before the hold.
+    BeforeHold,
+    /// Task (0), attempt (1): spent (2).
+    SpentRun,
+    /// Task (0): spent (1).
+    SpentDelegate,
+    /// Review before confirming.
+    Confirmation,
+    /// Confirm.
+    Confirm,
+    /// Dismiss.
+    Dismiss,
+    /// Dangerous action: review its consequences.
+    Dangerous,
+    /// This will be proposed to its holder.
+    WillPropose,
+    /// The revision this action names changed; inspect the current facts and open it again.
+    ChangedConfirmation,
+    /// Required words are missing.
+    MissingWords,
+    /// Choose an option.
+    MissingChoice,
+    /// Choose whether to make the effect again.
+    MissingAgain,
+    /// Supply the amendment.
+    MissingChange,
+    /// Choose what becomes of every live delegate.
+    MissingDelegates,
+    /// Supply a priority.
+    MissingPriority,
+    /// Waiting for this object’s project context.
+    MissingContext,
+    /// Acceptance makes or changes the following, funded as shown.
+    WillAccept,
+    /// Reject this proposal and send its proposer your reason.
+    WillReject,
+    /// Pass this decision to the holder above.
+    WillPassUp,
+    /// Remove this escalation from your inbox; the task stays held with your reason.
+    WillLeaveHeld,
+    /// Stop the live run and hold its task.
+    WillStop,
+    /// Cancel this task and everything below it; already made effects remain.
+    WillCancel,
+    /// Close this chat after disposing of every live delegate; pending effects settle.
+    WillClose,
+    /// Become this task’s requester and move its funding.
+    WillTakeOver,
+    /// Take this role task so others cannot answer it at once.
+    WillTake,
+    /// Hand this task back to its role.
+    WillHandBack,
+    /// Send these words to the task.
+    WillWrite,
+    /// Send the answer matching the task’s contract.
+    WillAnswer,
+    /// Replace the named specification with these changes.
+    WillAmend,
+    /// Amend and release in one decision.
+    WillAmendRelease,
+    /// Change this goal’s priority.
+    WillPrioritise,
+    /// Replace the named note revision.
+    WillEditNote,
+    /// Delete this note revision.
+    WillDeleteNote,
+    /// Make a goal from these words and options.
+    WillGoal,
+    /// The next run resumes its conversation; tries count again from zero.
+    ResumeRelease,
+    /// Releasing carries on closing with the kept result.
+    ContinueClosing,
+    /// Release to wait again.
+    ReleaseWait,
+    /// Release for the executor to decide afresh.
+    ReleaseFresh,
+    /// Release with procedure counts reset.
+    ReleaseProcedure,
+    /// Make the effect again.
+    RepeatEffect,
+    /// Release without making the effect again; tell its executor so.
+    SkipEffect,
+    /// Inspect the connector’s system facts; the engine will do as you choose.
+    EngineFollowsChoice,
+    /// (0) waiting tasks.
+    TasksWaiting,
+    /// (0) running tasks.
+    TasksRunning,
+    /// (0) held tasks.
+    TasksHeld,
+    /// (0) closing tasks.
+    TasksClosing,
+    /// (0) completed tasks.
+    TasksDone,
+    /// (0) failed tasks.
+    TasksFailed,
+    /// (0) cancelled tasks.
+    TasksCancelled,
+    /// (0) live runs.
+    LiveRuns,
+    /// (0) proposals will be withdrawn.
+    PendingProposals,
+    /// (0) effects not yet begun will be cancelled.
+    PendingEffects,
+    /// (0) begun effects will settle.
+    SettlingEffects,
+    /// Takeover reserves (0) from your pool.
+    TakeoverFunds,
+    /// Cancel delegate (0) and its subtree.
+    DelegateCancel,
+    /// Take over delegate (0), reserving (1).
+    DelegateTake,
+    /// Choose each delegate’s outcome.
+    DelegateChoices,
+    /// Write and release together.
+    WriteAndRelease,
+    /// Write without releasing.
+    WriteOnly,
+    /// New specification.
+    NewSpec,
+    /// New instructions.
+    NewInstructions,
+    /// New budget.
+    NewBudget,
+    /// New deadline (UTC, YYYY-MM-DD HH:MM).
+    NewDeadline,
+    /// Drop dependency (0).
+    DropDependency,
+    /// New goal priority.
+    PriorityField,
+    /// Note description.
+    NoteDescription,
+    /// Note body.
+    NoteBody,
+    /// Charter (0).
+    Charter,
+    /// Priority (0).
+    Priority,
+    /// Notice.
+    Notice,
+    /// Outcome unknown for this action; inspect its current facts.
+    UnknownAction,
+    /// Results through (0).
+    ResultsThrough,
+    /// Chat (0), replies through (1).
+    RepliesThrough,
+    /// Failed.
+    FailedPhase,
+    /// Cancelled.
+    CancelledPhase,
+    /// Address to party number.
+    AddressParty,
+    /// Address to task number.
+    AddressTask,
+    /// Address to role number in this project.
+    AddressRole,
+    /// Due to run.
+    DuePhase,
+    /// Preparing a host.
+    PreparingPhase,
+    /// Claimed by a host.
+    ClaimedPhase,
+    /// Executor active.
+    ActivePhase,
+    /// Closing.
+    ClosingPhase,
 }
 impl JigPhrase {
     /// Stable phrase identity within jig's owner.
@@ -622,6 +788,89 @@ impl JigPhrase {
             Self::PoolHold => 200,
             Self::ProcedureHold => 201,
             Self::LoadingDependency => 202,
+            Self::BeforeHold => 203,
+            Self::SpentRun => 204,
+            Self::SpentDelegate => 205,
+            Self::Confirmation => 206,
+            Self::Confirm => 207,
+            Self::Dismiss => 208,
+            Self::Dangerous => 209,
+            Self::WillPropose => 210,
+            Self::ChangedConfirmation => 211,
+            Self::MissingWords => 212,
+            Self::MissingChoice => 213,
+            Self::MissingAgain => 214,
+            Self::MissingChange => 215,
+            Self::MissingDelegates => 216,
+            Self::MissingPriority => 217,
+            Self::MissingContext => 218,
+            Self::WillAccept => 219,
+            Self::WillReject => 220,
+            Self::WillPassUp => 221,
+            Self::WillLeaveHeld => 222,
+            Self::WillStop => 223,
+            Self::WillCancel => 224,
+            Self::WillClose => 225,
+            Self::WillTakeOver => 226,
+            Self::WillTake => 227,
+            Self::WillHandBack => 228,
+            Self::WillWrite => 229,
+            Self::WillAnswer => 230,
+            Self::WillAmend => 231,
+            Self::WillAmendRelease => 232,
+            Self::WillPrioritise => 233,
+            Self::WillEditNote => 234,
+            Self::WillDeleteNote => 235,
+            Self::WillGoal => 236,
+            Self::ResumeRelease => 237,
+            Self::ContinueClosing => 238,
+            Self::ReleaseWait => 239,
+            Self::ReleaseFresh => 240,
+            Self::ReleaseProcedure => 241,
+            Self::RepeatEffect => 242,
+            Self::SkipEffect => 243,
+            Self::EngineFollowsChoice => 244,
+            Self::TasksWaiting => 245,
+            Self::TasksRunning => 246,
+            Self::TasksHeld => 247,
+            Self::TasksClosing => 248,
+            Self::TasksDone => 249,
+            Self::TasksFailed => 250,
+            Self::TasksCancelled => 251,
+            Self::LiveRuns => 252,
+            Self::PendingProposals => 253,
+            Self::PendingEffects => 254,
+            Self::SettlingEffects => 255,
+            Self::TakeoverFunds => 256,
+            Self::DelegateCancel => 257,
+            Self::DelegateTake => 258,
+            Self::DelegateChoices => 259,
+            Self::WriteAndRelease => 260,
+            Self::WriteOnly => 261,
+            Self::NewSpec => 262,
+            Self::NewInstructions => 263,
+            Self::NewBudget => 264,
+            Self::NewDeadline => 265,
+            Self::DropDependency => 266,
+            Self::PriorityField => 267,
+            Self::NoteDescription => 268,
+            Self::NoteBody => 269,
+            Self::Charter => 270,
+            Self::Priority => 271,
+            Self::Notice => 272,
+            Self::UnknownAction => 273,
+            Self::ResultsThrough => 274,
+            Self::RepliesThrough => 275,
+            Self::FailedPhase => 276,
+            Self::CancelledPhase => 277,
+            Self::AddressParty => 278,
+            Self::AddressTask => 279,
+            Self::AddressRole => 280,
+            Self::DuePhase => 281,
+            Self::PreparingPhase => 282,
+            Self::ClaimedPhase => 283,
+            Self::ActivePhase => 284,
+            Self::ClosingPhase => 285,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -755,7 +1004,69 @@ impl JigPhrase {
             | Self::EffectUncertainHold
             | Self::ResourceHold
             | Self::PoolHold
-            | Self::ProcedureHold => Box::new([]),
+            | Self::ProcedureHold
+            | Self::BeforeHold
+            | Self::Confirmation
+            | Self::Confirm
+            | Self::Dismiss
+            | Self::Dangerous
+            | Self::WillPropose
+            | Self::ChangedConfirmation
+            | Self::MissingWords
+            | Self::MissingChoice
+            | Self::MissingAgain
+            | Self::MissingChange
+            | Self::MissingDelegates
+            | Self::MissingPriority
+            | Self::MissingContext
+            | Self::WillAccept
+            | Self::WillReject
+            | Self::WillPassUp
+            | Self::WillLeaveHeld
+            | Self::WillStop
+            | Self::WillCancel
+            | Self::WillClose
+            | Self::WillTakeOver
+            | Self::WillTake
+            | Self::WillHandBack
+            | Self::WillWrite
+            | Self::WillAnswer
+            | Self::WillAmend
+            | Self::WillAmendRelease
+            | Self::WillPrioritise
+            | Self::WillEditNote
+            | Self::WillDeleteNote
+            | Self::WillGoal
+            | Self::ResumeRelease
+            | Self::ContinueClosing
+            | Self::ReleaseWait
+            | Self::ReleaseFresh
+            | Self::ReleaseProcedure
+            | Self::RepeatEffect
+            | Self::SkipEffect
+            | Self::EngineFollowsChoice
+            | Self::DelegateChoices
+            | Self::WriteAndRelease
+            | Self::WriteOnly
+            | Self::NewSpec
+            | Self::NewInstructions
+            | Self::NewBudget
+            | Self::NewDeadline
+            | Self::PriorityField
+            | Self::NoteDescription
+            | Self::NoteBody
+            | Self::Notice
+            | Self::UnknownAction
+            | Self::FailedPhase
+            | Self::CancelledPhase
+            | Self::AddressParty
+            | Self::AddressTask
+            | Self::AddressRole
+            | Self::DuePhase
+            | Self::PreparingPhase
+            | Self::ClaimedPhase
+            | Self::ActivePhase
+            | Self::ClosingPhase => Box::new([]),
             Self::ByNamed
             | Self::SignedIn
             | Self::Project
@@ -801,7 +1112,23 @@ impl JigPhrase {
             | Self::FirstUnread
             | Self::Topic
             | Self::DependencyEnded
-            | Self::LoadingDependency => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            | Self::LoadingDependency
+            | Self::TasksWaiting
+            | Self::TasksRunning
+            | Self::TasksHeld
+            | Self::TasksClosing
+            | Self::TasksDone
+            | Self::TasksFailed
+            | Self::TasksCancelled
+            | Self::LiveRuns
+            | Self::PendingProposals
+            | Self::PendingEffects
+            | Self::SettlingEffects
+            | Self::DelegateCancel
+            | Self::DropDependency
+            | Self::Charter
+            | Self::Priority
+            | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::Proposed
             | Self::MadeWords
             | Self::RoleMissing
@@ -810,7 +1137,8 @@ impl JigPhrase {
             | Self::LimitLive
             | Self::LimitInbox
             | Self::Closing
-            | Self::WaitingRole => Box::new([
+            | Self::WaitingRole
+            | Self::RepliesThrough => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
@@ -829,7 +1157,9 @@ impl JigPhrase {
             Self::DeadlineMissing => {
                 Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }, HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
-            Self::Amount | Self::Budget => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
+            Self::Amount | Self::Budget | Self::TakeoverFunds => {
+                Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }])
+            }
             Self::WaitingSpan | Self::Span | Self::StallSpan | Self::ElapsedSpan => {
                 Box::new([HoleShape { kind: HoleKind::Span, bytes: 0 }])
             }
@@ -855,12 +1185,21 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Name, bytes: text },
                 HoleShape { kind: HoleKind::Wall, bytes: 0 },
             ]),
+            Self::SpentRun => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Amount, bytes: 0 },
+            ]),
+            Self::SpentDelegate | Self::DelegateTake => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Amount, bytes: 0 },
+            ]),
         };
         PhraseShape { id: self.id(), holes, plural: None }
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 203] = [
+pub const ALL: [JigPhrase; 286] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -1064,11 +1403,94 @@ pub const ALL: [JigPhrase; 203] = [
     JigPhrase::PoolHold,
     JigPhrase::ProcedureHold,
     JigPhrase::LoadingDependency,
+    JigPhrase::BeforeHold,
+    JigPhrase::SpentRun,
+    JigPhrase::SpentDelegate,
+    JigPhrase::Confirmation,
+    JigPhrase::Confirm,
+    JigPhrase::Dismiss,
+    JigPhrase::Dangerous,
+    JigPhrase::WillPropose,
+    JigPhrase::ChangedConfirmation,
+    JigPhrase::MissingWords,
+    JigPhrase::MissingChoice,
+    JigPhrase::MissingAgain,
+    JigPhrase::MissingChange,
+    JigPhrase::MissingDelegates,
+    JigPhrase::MissingPriority,
+    JigPhrase::MissingContext,
+    JigPhrase::WillAccept,
+    JigPhrase::WillReject,
+    JigPhrase::WillPassUp,
+    JigPhrase::WillLeaveHeld,
+    JigPhrase::WillStop,
+    JigPhrase::WillCancel,
+    JigPhrase::WillClose,
+    JigPhrase::WillTakeOver,
+    JigPhrase::WillTake,
+    JigPhrase::WillHandBack,
+    JigPhrase::WillWrite,
+    JigPhrase::WillAnswer,
+    JigPhrase::WillAmend,
+    JigPhrase::WillAmendRelease,
+    JigPhrase::WillPrioritise,
+    JigPhrase::WillEditNote,
+    JigPhrase::WillDeleteNote,
+    JigPhrase::WillGoal,
+    JigPhrase::ResumeRelease,
+    JigPhrase::ContinueClosing,
+    JigPhrase::ReleaseWait,
+    JigPhrase::ReleaseFresh,
+    JigPhrase::ReleaseProcedure,
+    JigPhrase::RepeatEffect,
+    JigPhrase::SkipEffect,
+    JigPhrase::EngineFollowsChoice,
+    JigPhrase::TasksWaiting,
+    JigPhrase::TasksRunning,
+    JigPhrase::TasksHeld,
+    JigPhrase::TasksClosing,
+    JigPhrase::TasksDone,
+    JigPhrase::TasksFailed,
+    JigPhrase::TasksCancelled,
+    JigPhrase::LiveRuns,
+    JigPhrase::PendingProposals,
+    JigPhrase::PendingEffects,
+    JigPhrase::SettlingEffects,
+    JigPhrase::TakeoverFunds,
+    JigPhrase::DelegateCancel,
+    JigPhrase::DelegateTake,
+    JigPhrase::DelegateChoices,
+    JigPhrase::WriteAndRelease,
+    JigPhrase::WriteOnly,
+    JigPhrase::NewSpec,
+    JigPhrase::NewInstructions,
+    JigPhrase::NewBudget,
+    JigPhrase::NewDeadline,
+    JigPhrase::DropDependency,
+    JigPhrase::PriorityField,
+    JigPhrase::NoteDescription,
+    JigPhrase::NoteBody,
+    JigPhrase::Charter,
+    JigPhrase::Priority,
+    JigPhrase::Notice,
+    JigPhrase::UnknownAction,
+    JigPhrase::ResultsThrough,
+    JigPhrase::RepliesThrough,
+    JigPhrase::FailedPhase,
+    JigPhrase::CancelledPhase,
+    JigPhrase::AddressParty,
+    JigPhrase::AddressTask,
+    JigPhrase::AddressRole,
+    JigPhrase::DuePhase,
+    JigPhrase::PreparingPhase,
+    JigPhrase::ClaimedPhase,
+    JigPhrase::ActivePhase,
+    JigPhrase::ClosingPhase,
 ];
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(203);
+    let mut rows = List::with_capacity(286);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

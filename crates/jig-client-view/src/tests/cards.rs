@@ -131,7 +131,6 @@ pub(super) fn contains(tree: &Tree, text: &[u8]) -> bool {
     flat(tree).windows(text.len()).any(|w| w == text)
 }
 
-#[test]
 fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_state() {
     let (mut d, watch) = start();
     let words = words();
@@ -169,7 +168,6 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
     }
 }
 
-#[test]
 fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_by_place() {
     let (mut d, frame_watch) = start();
     let source = Source::Window { generation: 0, number: 1 };
@@ -315,7 +313,6 @@ fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mu
     }
 }
 
-#[test]
 fn every_binding_kind_decodes_and_old_tokens_are_retired() {
     let mut bindings = JigBindings::new(64, 4);
     let object = Token::new(7);
@@ -349,11 +346,10 @@ fn every_binding_kind_decodes_and_old_tokens_are_retired() {
     assert_ne!(bindings.insert(JigMeaning::Field(field)).token, token);
 }
 
-#[test]
 fn jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset() {
     let mut language = english::language();
     let missing = language.phrases.last().unwrap().id;
-    let size = language.phrases.len() - 1;
+    let size = language.phrases.len().checked_sub(1).unwrap();
     language.phrases = language.phrases.into_vec().into_iter().take(size).collect::<Vec<_>>().into_boxed_slice();
     assert_eq!(
         Phrasebook::load(
@@ -377,4 +373,12 @@ fn jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset()
     assert!(contains(&tree, b"18446744073709551615"));
     assert_eq!(words.say(JigPhrase::Live, &[]).as_ref(), b"Live");
     assert_eq!(words.say(JigPhrase::Amount, &[Hole::Amount(12)]).as_ref(), b"12");
+}
+
+#[test]
+fn jig_card_frames_bindings_and_phrase_contracts() {
+    frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_state();
+    shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_by_place();
+    every_binding_kind_decodes_and_old_tokens_are_retired();
+    jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset();
 }

@@ -1,6 +1,7 @@
 #![expect(
     clippy::disallowed_methods,
     clippy::disallowed_types,
+    clippy::disallowed_macros,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary tests inspect trees and script public domain requests"
 )]
@@ -176,9 +177,7 @@ fn press(tree: &Tree, label: &[u8], bindings: &mut JigBindings) -> Action {
     decode(bindings, token, Act::Press).unwrap()
 }
 
-#[test]
-fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_change() {
-    let words = words();
+fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_change(words: &crate::words::Words) {
     let p = proposal(ProposalAction::Widen { before: authority(), after: authority() });
     for (key, value, label, whole) in [
         (
@@ -202,13 +201,13 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
     ] {
         let (mut d, id) = loaded(key, value);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        let tree = render(&d, id, &words, &mut bindings);
+        let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, whole));
         assert!(contains(&tree, b"Your pool has 12 left; this needs 40"));
         assert!(!tree.nodes().iter().any(|n| n.role == Role::Button && n.name.as_deref() == Some(b"Pass up")));
         let action = press(&tree, label, &mut bindings);
         drive(&mut d, Event::Act { act: action });
-        let tree = render(&d, id, &words, &mut bindings);
+        let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, whole));
         assert!(contains(&tree, b"review the confirmation"));
         if label == b"Answer" {
@@ -233,7 +232,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
                 _ => None,
             })
             .unwrap();
-        let tree = render(&d, id, &words, &mut bindings);
+        let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, b"Being decided"));
         assert!(contains(&tree, whole));
         drive(
@@ -243,7 +242,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
                 answer: Answer::Refused(Refusal::Moved { now: Revision { value: 19 }, what: Moved::PersonTask }),
             },
         );
-        let tree = render(&d, id, &words, &mut bindings);
+        let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, b"19"));
         assert!(contains(&tree, whole));
         let action = press(&tree, label, &mut bindings);
@@ -270,13 +269,11 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
                 }),
             },
         );
-        assert!(contains(&render(&d, id, &words, &mut bindings), whole));
+        assert!(contains(&render(&d, id, words, &mut bindings), whole));
     }
 }
 
-#[test]
-fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads() {
-    let words = words();
+fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words: &crate::words::Words) {
     let part = Part::Result { connector: 2, task: 8 };
     for contract in [
         PersonContract::Choice { options: list([OptionLine { number: 3, words: text(b"Third choice") }]) },
@@ -285,7 +282,7 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads() {
     ] {
         let (mut d, id) = loaded(ObjectKey::PersonTask(8), ReadValue::PersonTask(Box::new(person(contract))));
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        let before = render(&d, id, &words, &mut bindings);
+        let before = render(&d, id, words, &mut bindings);
         for node in before.nodes() {
             if node.role == Role::Choice {
                 assert!(node.states.as_slice().contains(&State::Disabled));
@@ -293,7 +290,7 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads() {
         }
         let action = press(&before, b"Answer", &mut bindings);
         drive(&mut d, Event::Act { act: action });
-        let tree = render(&d, id, &words, &mut bindings);
+        let tree = render(&d, id, words, &mut bindings);
         assert!(contains(&tree, b"whole report"));
         assert!(contains(&tree, b"Becomes news for its requester after 4 min"));
         for node in tree.nodes() {
@@ -311,10 +308,10 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads() {
     }
     let (mut result_domain, id, watch) = loaded_with_watch(ObjectKey::Result(8), ReadValue::Result(Box::new(result())));
     let mut bindings = JigBindings::new(64, CLIENT.text);
-    let tree = render(&result_domain, id, &words, &mut bindings);
+    let tree = render(&result_domain, id, words, &mut bindings);
     assert!(contains(&tree, b"whole failure"));
     drive(&mut result_domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::PassUp } });
-    let tree = render(&result_domain, id, &words, &mut bindings);
+    let tree = render(&result_domain, id, words, &mut bindings);
     assert!(contains(&tree, b"Your pool has 12 left; this needs 40"));
     assert!(contains(&tree, b"whole report"));
     let out = drive(
@@ -339,7 +336,7 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads() {
         })
         .unwrap();
     drive(&mut result_domain, Event::Read { read, result: ReadResult::Value(ReadValue::Result(Box::new(result()))) });
-    let tree = render(&result_domain, id, &words, &mut bindings);
+    let tree = render(&result_domain, id, words, &mut bindings);
     assert!(tree.nodes().iter().any(|n| n.role == Role::Status && n.name.as_deref() == Some(b"Leaving")));
     assert!(contains(&tree, b"whole failure"));
     assert!(contains(&tree, b"whole report"));
@@ -358,15 +355,13 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads() {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        cards::result::value_nodes(&mut b, &d, &value, &words, &mut bindings);
+        cards::result::value_nodes(&mut b, &d, &value, words, &mut bindings);
         b.close();
         assert!(contains(&b.finish(), whole));
     }
 }
 
-#[test]
-fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots() {
-    let words = words();
+fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crate::words::Words) {
     let part = Part::Effect { connector: 2, proposal: ProposalKey { proposer: 8, number: 9 } };
     for (action, whole) in [
         (
@@ -391,6 +386,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots() {
                 task: 8,
                 before: text(b"full before"),
                 change: Amendment {
+                    addressed: None,
                     words: Some(text(b"full after")),
                     instructions: None,
                     wake: None,
@@ -404,7 +400,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots() {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        cards::proposal::action(&mut b, &action, &words, &mut bindings);
+        cards::proposal::action(&mut b, &action, words, &mut bindings);
         b.close();
         let tree = b.finish();
         assert!(contains(&tree, whole));
@@ -414,8 +410,8 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots() {
             }
         }
     }
-    all_chip_phases(&words);
-    live_reply_and_dependency_chips(&words);
+    all_chip_phases(words);
+    live_reply_and_dependency_chips(words);
 }
 
 fn all_chip_phases(words: &crate::words::Words) {
@@ -598,4 +594,531 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::Region).count(), 2);
     bindings.begin();
     assert_eq!(decode(&mut bindings, link.token, Act::Press), None);
+}
+
+fn impact() -> Impact {
+    Impact {
+        tasks: PhaseCounts { waiting: 1, running: 2, held: 3, closing: 4, done: 5, failed: 6, cancelled: 7 },
+        live_runs: 8,
+        proposals: 9,
+        effects_pending: 10,
+        effects_settling: 11,
+        takeover_budget: 12,
+    }
+}
+fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
+    let mut task = chip();
+    task.details =
+        Box::new(ChipPhase::Held { reason: reason.clone(), since: Wall::EPOCH, revision: Revision { value: 4 } });
+    Escalation {
+        task,
+        hold: Hold {
+            revision: Revision { value: 4 },
+            reason,
+            before: Phase::Closing,
+            since: Wall::EPOCH,
+            result: Some(ResultValue::Report(text(b"kept closing result"))),
+            spend: list([
+                SpendLine { task: 8, attempt: Some(2), spent: 7 },
+                SpendLine { task: 9, attempt: None, spent: 3 },
+            ]),
+        },
+        steering: Box::new(Steering {
+            addressed: Some(Recipient::Role { project: 4, role: 2 }),
+            revision: Revision { value: 6 },
+            spec: text(b"held specification"),
+            instructions: text(b"held instructions"),
+            wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
+            dependencies: list([9]),
+            authority: authority(),
+            budget: Budget { total: 10, own: 10, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
+        }),
+        impact: impact(),
+        waiting: Recipient::Task(1),
+        trail: list([Passed {
+            by: Actor::Party(3),
+            at: Wall::EPOCH,
+            reason: text(b"previous holder reason"),
+            lacking: None,
+        }]),
+        acts: list(acts.iter().map(|act| Offered { act: *act, admission: Admission::Allowed })),
+        ending: None,
+    }
+}
+fn dialog(d: &Domain, words: &crate::words::Words, bindings: &mut JigBindings) -> Tree {
+    bindings.begin();
+    let mut b = Builder::new(&limits());
+    b.open(Role::Page);
+    crate::confirmation::confirmation(&mut b, d, words, bindings);
+    b.close();
+    b.finish()
+}
+fn task_doc(acts: &[ActKind]) -> Task {
+    Task {
+        chip: chip(),
+        goal: true,
+        priority: Some(1),
+        lineage_chips: list([]),
+        inputs: list([]),
+        project: 4,
+        requester: Actor::Party(1),
+        lineage: list([]),
+        spec: text(b"whole task specification"),
+        spec_revision: Revision { value: 6 },
+        instructions: text(b"whole task instructions"),
+        wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
+        result_contract: ResultContract::Report,
+        dependencies: list([]),
+        references: list([]),
+        resources: list([]),
+        budget: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) },
+        authority: authority(),
+        hold: Some(escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[]).hold),
+        escalation: None,
+        proposals: list([]),
+        activity: 0,
+        deadline: None,
+        changed: Wall::EPOCH,
+        acts: list(acts.iter().map(|act| Offered { act: *act, admission: Admission::Allowed })),
+        parts: list([]),
+        closing: None,
+        spend: list([]),
+        result: None,
+        runtime: Runtime::Held,
+        impact: impact(),
+        delegates: list([LiveDelegate { chip: chip(), takeover_budget: 13 }]),
+        writer_slots: list([]),
+    }
+}
+fn input(tree: &Tree, label: &[u8], value: &[u8], bindings: &mut JigBindings) -> Action {
+    let node = tree.nodes().iter().find(|n| n.name.as_deref() == Some(label) && n.binding.is_some()).unwrap();
+    decode(bindings, node.binding.unwrap().token, Act::Input { value: Box::from(value) }).unwrap()
+}
+fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_semantic_facts(
+    words: &crate::words::Words,
+) {
+    use crate::confirmation::amendment::deadline;
+    use ActKind::{AmendRelease, Cancel, Release};
+    let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
+    let part = Part::Hold { connector: 2, task: 8 };
+    let reasons = [
+        (
+            HoldReason::Tries {
+                failures: list([AttemptFailure {
+                    attempt: 2,
+                    class: FailureClass::Permanent,
+                    reason: text(b"attempt refusal"),
+                    at: Wall::EPOCH,
+                }]),
+            },
+            vec![Release, AmendRelease, Cancel],
+            b"attempt refusal".as_slice(),
+        ),
+        (
+            HoldReason::Stalled { since: Wall::EPOCH, waiting: text(b"the person") },
+            vec![Release, AmendRelease, Cancel],
+            b"the person".as_slice(),
+        ),
+        (
+            HoldReason::Dependency { task: 9, how: Ending::Failed { reason: text(b"dependency refusal") } },
+            vec![AmendRelease, Cancel],
+            b"dependency refusal".as_slice(),
+        ),
+        (HoldReason::Drift { part: part.clone() }, vec![Release, Cancel], b"system changed".as_slice()),
+        (HoldReason::EffectFailed { part: part.clone() }, vec![Release, Cancel], b"failed for good".as_slice()),
+        (HoldReason::EffectUncertain { part: part.clone() }, vec![Release, Cancel], b"may or may not".as_slice()),
+        (HoldReason::Budget { spent: 10, limit: 10 }, vec![AmendRelease, Cancel], b"spent 10".as_slice()),
+        (HoldReason::Deadline { at: Wall::EPOCH }, vec![AmendRelease, Cancel], b"past deadline".as_slice()),
+        (
+            HoldReason::Stopped { by: document().party, at: Wall::EPOCH },
+            vec![Release, AmendRelease, Cancel],
+            b"stopped by Pat".as_slice(),
+        ),
+        (
+            HoldReason::Resource { resource: part.clone(), holder: Actor::Task(9) },
+            vec![Release, AmendRelease, Cancel],
+            b"past its bound".as_slice(),
+        ),
+        (HoldReason::Pool { part: part.clone() }, vec![Release, Cancel], b"pool lost".as_slice()),
+        (
+            HoldReason::Procedure { part: part.clone() },
+            vec![Release, AmendRelease, Cancel],
+            b"procedure needs".as_slice(),
+        ),
+    ];
+    for (reason, acts, expected) in reasons {
+        escalation_row_scenario(reason, &acts, expected, words, &mut bindings);
+    }
+    confirmation_act_scenarios(words, &mut bindings);
+    goal_dialog_scenario(words, &mut bindings);
+    notice_scenarios(words);
+    assert_eq!(deadline(b"1970-01-01 00:00"), Some(Wall::EPOCH));
+    assert_eq!(deadline(b"2000-02-29 12:34").unwrap().as_nanos(), 951_827_640_000_000_000);
+    assert!(deadline(b"2100-02-29 00:00").is_none());
+    assert!(deadline(b"2000-02-30 00:00").is_none());
+    assert!(deadline(b"1969-12-31 23:59").is_none());
+    assert!(deadline(b"9999-12-31 00:00").is_none());
+}
+fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBindings) {
+    for act in [
+        ActKind::Write,
+        ActKind::Take,
+        ActKind::HandBack,
+        ActKind::Release,
+        ActKind::LeaveHeld,
+        ActKind::Amend,
+        ActKind::AmendRelease,
+        ActKind::Stop,
+        ActKind::Cancel,
+        ActKind::Close,
+        ActKind::TakeOver,
+        ActKind::Prioritise,
+        ActKind::SetGoal,
+        ActKind::MarkSeen,
+        ActKind::Adopt,
+        ActKind::ChangePolicy,
+        ActKind::SetRoles,
+        ActKind::MakeService,
+        ActKind::SetPool,
+    ] {
+        let task = task_doc(&[act]);
+        let (mut d, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(task)));
+        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act } });
+        let tree = dialog(&d, words, bindings);
+        assert!(contains(&tree, &words.say(cards::common::act_phrase(act), &[])));
+        if act == ActKind::Cancel {
+            assert!(contains(&tree, b"Dangerous action"));
+            assert!(contains(&tree, b"11 begun effects will settle"));
+            assert!(tree.nodes().iter().any(|n| n.role == Role::Button
+                && n.styles.as_slice().contains(&crate::JigStyle::Danger.token())
+                && n.states.as_slice().contains(&State::Disabled)));
+            let edit = input(&tree, b"Your reason", b"stop it", bindings);
+            drive(&mut d, Event::Act { act: edit });
+            let tree = dialog(&d, words, bindings);
+            assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
+        }
+        if act == ActKind::Close {
+            let choose = press(&tree, b"Take over delegate 8, reserving 13", bindings);
+            drive(&mut d, Event::Act { act: choose });
+            assert_eq!(d.confirmation().unwrap().choices.disposals.as_slice(), &[Disposal::TakeOver { task: 8 }]);
+            let tree = dialog(&d, words, bindings);
+            assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
+        }
+        if act == ActKind::Prioritise {
+            let change = input(&tree, b"New goal priority", b"3", bindings);
+            drive(&mut d, Event::Act { act: change });
+            assert_eq!(d.confirmation().unwrap().choices.priority, Some(3));
+        }
+    }
+    for act in [ActKind::Accept, ActKind::Reject, ActKind::PassUp] {
+        let mut p = proposal(ProposalAction::Batch { tasks: list([]), own: true });
+        p.acts = list([Offered { act, admission: Admission::Proposed { to: Recipient::Task(2) } }]);
+        let (mut d, id) = loaded(ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p)));
+        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act } });
+        let tree = dialog(&d, words, bindings);
+        assert!(contains(&tree, b"will be proposed"));
+        assert!(contains(&tree, b"Waiting for task 2"));
+        if act == ActKind::Accept {
+            assert!(contains(&tree, b"accepted tasks will be yours"));
+            assert!(contains(&tree, b"Funds 10; 20 left now, 10 after"));
+        }
+    }
+    let p = person(PersonContract::Words);
+    let (mut d, id) = loaded(ObjectKey::PersonTask(8), ReadValue::PersonTask(Box::new(p)));
+    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Answer } });
+    let tree = dialog(&d, words, bindings);
+    assert!(tree.nodes().iter().any(|n| n.role == Role::TextArea && n.name.as_deref() == Some(b"Your answer")));
+    let choose = press(&tree, b"Cannot do it", bindings);
+    drive(&mut d, Event::Act { act: choose });
+    assert!(d.confirmation().unwrap().choices.cannot);
+    for act in [ActKind::EditNote, ActKind::DeleteNote] {
+        let note = Note {
+            number: 1,
+            revision: Revision { value: 2 },
+            scope: NoteScope::Project(4),
+            description: text(b"note title"),
+            body: text(b"note body"),
+            by: Actor::Party(1),
+            tasks: list([]),
+            changed: Wall::EPOCH,
+            acts: offered(act),
+        };
+        let (mut d, id) = note_loaded(note);
+        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act } });
+        let tree = dialog(&d, words, bindings);
+        assert!(contains(&tree, b"note title"));
+        if act == ActKind::EditNote {
+            assert!(tree.nodes().iter().any(|n| n.value.as_ref().is_some_and(|v| v.text.as_ref() == b"note body")));
+        }
+    }
+    changed_dialog_scenario(words, bindings);
+}
+fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings) {
+    use jig_client::address::{Address, Place, ProjectSection};
+    let (mut d, frame) = start();
+    let mut doc = document();
+    doc.projects.get_mut(0).unwrap().goals = list([Charter { number: 1, name: text(b"lead") }]);
+    drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(doc))) });
+    let out = drive(
+        &mut d,
+        Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Goals }) },
+    );
+    let read = out
+        .iter()
+        .find_map(|r| match r {
+            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    let budget = Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) };
+    let project = Project {
+        number: 4,
+        name: text(b"One"),
+        period: 1,
+        spend_lines: list([]),
+        policy: Policy {
+            ceiling: authority(),
+            period: 1,
+            spend: 0,
+            roles: list([]),
+            requirements: list([]),
+            deciders: list([]),
+        },
+        roles: list([]),
+        spend: budget,
+        pools: list([Pool { party: 1, period: 1, budget }]),
+        resources: list([]),
+        services: list([]),
+        recurring: list([]),
+        parts: list([]),
+        acts: list([Offered {
+            act: ActKind::SetGoal,
+            admission: Admission::Proposed { to: Recipient::Role { project: 4, role: 2 } },
+        }]),
+    };
+    drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project))) });
+    drive(&mut d, Event::Act { act: Action::Edit { field: Purpose::NewGoal, text: text(b"whole new goal") } });
+    drive(
+        &mut d,
+        Event::Act {
+            act: Action::GoalForm {
+                form: jig_client::pages::project::goals::GoalForm {
+                    project: 4,
+                    charter: 1,
+                    budget: 21,
+                    deadline: Some(Wall::EPOCH),
+                    priority: 2,
+                },
+            },
+        },
+    );
+    drive(&mut d, Event::Act { act: Action::Submit { field: Purpose::NewGoal } });
+    let tree = dialog(&d, words, bindings);
+    assert!(contains(&tree, b"whole new goal"));
+    assert!(contains(&tree, b"Your pool has 20 left; this needs 21"));
+    assert!(contains(&tree, b"will be proposed"));
+    assert!(contains(&tree, b"Charter 1"));
+    assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
+}
+fn notice_scenarios(words: &crate::words::Words) {
+    use jig_client::notices::Kind;
+    for kind in [
+        Kind::Link(jig_client::link::Link::Offline),
+        Kind::Link(jig_client::link::Link::Live),
+        Kind::Answer { object: ObjectKey::Task(8), answer: Answer::Done(Outcome::Changed) },
+        Kind::PageAnswer {
+            answer: Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 } }),
+        },
+        Kind::Unknown { object: ObjectKey::Escalation(8), act: ActKind::Release },
+        Kind::PageUnknown { purpose: jig_client::pages::IntentPurpose::SetGoal },
+        Kind::Refused(Limit::Objects),
+    ] {
+        let mut b = Builder::new(&limits());
+        crate::notices::facts(&mut b, &kind, words);
+        let tree = b.finish();
+        assert_eq!(tree.nodes()[0].role, Role::Status);
+        assert!(tree.nodes()[0].name.is_some());
+        assert!(tree.len() > 1);
+    }
+    let (mut d, _) = start();
+    jig_client::notices::show(&mut d, Kind::Refused(Limit::Objects));
+    let mut b = Builder::new(&limits());
+    let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
+    crate::notices::notices(&mut b, &d, words, &mut bindings);
+    let tree = b.finish();
+    assert!(contains(&tree, b"Working set limit"));
+    let dismiss = press(&tree, b"Dismiss", &mut bindings);
+    drive(&mut d, Event::Act { act: dismiss });
+    assert!(d.notices().ids().is_empty());
+}
+
+fn note_loaded(note: Note) -> (Domain, Id<Object>) {
+    use jig_client::address::{Address, Place, ProjectSection};
+    let (mut d, frame) = start();
+    drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    let out = drive(
+        &mut d,
+        Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Notes }) },
+    );
+    let read = out
+        .iter()
+        .find_map(|r| match r {
+            Request::Read { read, what: Read::Notes { .. } } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    drive(
+        &mut d,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                rows: list([note]),
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    let id = d.objects().find(ObjectKey::Note { project: 4, note: 1 }).unwrap();
+    (d, id)
+}
+
+#[expect(
+    clippy::match_like_matches_macro,
+    reason = "ordinary scenario patterns use matches with an explicit catch-all; the macro is disallowed"
+)]
+fn escalation_row_scenario(
+    reason: HoldReason,
+    acts: &[ActKind],
+    expected: &[u8],
+    words: &crate::words::Words,
+    bindings: &mut JigBindings,
+) {
+    let row = escalation_doc(reason, acts);
+    let (mut d, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
+    let tree = render(&d, id, words, bindings);
+    assert!(contains(&tree, expected));
+    assert!(contains(&tree, b"kept closing result"));
+    assert!(contains(&tree, b"Task 8, attempt 2: spent 7"));
+    assert!(contains(&tree, b"Task 9: spent 3"));
+    assert!(contains(&tree, b"previous holder reason"));
+    for act in acts {
+        assert!(
+            tree.nodes().iter().any(|n| n.role == Role::Button
+                && n.name.as_deref() == Some(&words.say(cards::common::act_phrase(*act), &[])))
+        );
+    }
+    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: acts[0] } });
+    let tree = dialog(&d, words, bindings);
+    assert!(tree.nodes().iter().any(|n| n.role == Role::Dialog && n.name.is_some()));
+    if match row.hold.reason {
+        HoldReason::EffectUncertain { .. } => true,
+        _ => false,
+    } {
+        assert!(contains(&tree, b"engine will do as you choose"));
+        let choose = press(&tree, b"Release without making the effect again; tell its executor so", bindings);
+        drive(&mut d, Event::Act { act: choose });
+        assert_eq!(d.confirmation().unwrap().choices.again, Some(false));
+        let tree = dialog(&d, words, bindings);
+        let send = press(&tree, b"Confirm", bindings);
+        let out = drive(&mut d, Event::Act { act: send });
+        assert!(out.iter().any(|r| match r {
+            Request::Send { ask, .. } => match **ask {
+                Ask::Release { again: Some(false), .. } => true,
+                _ => false,
+            },
+            _ => false,
+        }));
+    }
+    if acts[0] == ActKind::AmendRelease {
+        assert!(contains(&tree, b"held specification"));
+        let initial_writes = d.confirmation().unwrap().writes;
+        let written = tree
+            .nodes()
+            .iter()
+            .find(|n| n.name.as_deref() == Some(b"New instructions"))
+            .unwrap()
+            .value
+            .as_ref()
+            .unwrap()
+            .written;
+        assert_eq!(written, initial_writes);
+        let change = input(&tree, b"New budget", b"25", bindings);
+        drive(&mut d, Event::Act { act: change });
+        assert_eq!(d.confirmation().unwrap().choices.change.as_ref().unwrap().authority.as_ref().unwrap().budget, 25);
+        let tree = dialog(&d, words, bindings);
+        let change = input(&tree, b"New instructions", b"try another way", bindings);
+        drive(&mut d, Event::Act { act: change });
+        let open = d.confirmation().unwrap();
+        assert_eq!(open.choices.change.as_ref().unwrap().instructions.as_ref().unwrap().bytes(), b"try another way");
+        assert_eq!(open.choices.change.as_ref().unwrap().authority.as_ref().unwrap().budget, 25);
+        assert_eq!(open.revision, Some(Revision { value: 6 }));
+        let tree = dialog(&d, words, bindings);
+        let change = input(&tree, b"Address to role number in this project", b"7", bindings);
+        drive(&mut d, Event::Act { act: change });
+        assert_eq!(
+            d.confirmation().unwrap().choices.change.as_ref().unwrap().addressed,
+            Some(Recipient::Role { project: 4, role: 7 })
+        );
+    }
+    if expected == b"spent 10" {
+        let initial_writes = d.confirmation().unwrap().writes;
+        drive(&mut d, Event::Act { act: Action::Dismiss });
+        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        assert!(d.confirmation().unwrap().writes > initial_writes);
+        let tree = dialog(&d, words, bindings);
+        let value = tree
+            .nodes()
+            .iter()
+            .find(|n| n.name.as_deref() == Some(b"New instructions"))
+            .unwrap()
+            .value
+            .as_ref()
+            .unwrap();
+        assert_eq!(value.text.as_ref(), b"held instructions");
+        assert_eq!(value.written, d.confirmation().unwrap().writes);
+    }
+}
+
+fn changed_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings) {
+    let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::Release]);
+    let (mut d, id, _watch) = loaded_with_watch(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
+    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Release } });
+    let out = drive(&mut d, Event::Act { act: Action::Confirm });
+    let request = out
+        .iter()
+        .find_map(|r| match r {
+            Request::Send { request, .. } => Some(*request),
+            _ => None,
+        })
+        .unwrap();
+    let out = drive(
+        &mut d,
+        Event::Answered {
+            request,
+            answer: Answer::Refused(Refusal::Moved { now: Revision { value: 5 }, what: Moved::Hold }),
+        },
+    );
+    let mut moved = row;
+    moved.hold.revision.value = 5;
+    let read = out
+        .iter()
+        .find_map(|r| match r {
+            Request::Read { read, .. } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Release } });
+    drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Escalation(Box::new(moved))) });
+    let tree = dialog(&d, words, bindings);
+    assert!(contains(&tree, b"revision this action names changed"));
+    assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Confirm") && n.binding.is_some()));
+}
+
+#[test]
+fn jig_object_cards_hold_actions_confirmations_and_notices() {
+    let words = words();
+    whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_change(&words);
+    person_contracts_and_result_values_keep_choices_slots_and_full_payloads(&words);
+    proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(&words);
+    escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_semantic_facts(&words);
 }

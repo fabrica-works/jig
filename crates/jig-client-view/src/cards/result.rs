@@ -19,21 +19,22 @@ pub fn result(
     place: &super::Place,
     words: &Words,
     bindings: &mut JigBindings,
-) {
+) -> bool {
     let Some(fact) = client.objects().get(object) else {
-        return;
+        return false;
     };
     let Some(document) = document(fact) else {
-        return;
+        return false;
     };
     let title = words.say(JigPhrase::Result, &[]);
     if !super::open(b, client, object, place, &title, words, bindings) {
-        return;
+        return false;
     }
     facts(b, client, document, words, bindings);
     super::common::answer(b, fact, words);
     super::common::acts(b, &fact.card, &document.acts, object, words, bindings);
     super::close(b);
+    true
 }
 /// Render passive input results side by side without duplicating their domain objects.
 pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &Words, bindings: &mut JigBindings) {
@@ -88,16 +89,16 @@ pub fn reply(
     place: &super::Place,
     words: &Words,
     bindings: &mut JigBindings,
-) {
+) -> bool {
     let Some(fact) = client.objects().get(object) else {
-        return;
+        return false;
     };
     let Some(reply) = &fact.reply else {
-        return;
+        return false;
     };
     let title = words.say(JigPhrase::Reply, &[]);
     if !super::open(b, client, object, place, &title, words, bindings) {
-        return;
+        return false;
     }
     match &fact.body {
         Some(jig_client::objects::Body::Chip(chip)) => super::chip::chip(b, client, chip, words, bindings),
@@ -123,4 +124,5 @@ pub fn reply(
         Act::OpenChat { task: reply.chat },
     );
     super::close(b);
+    true
 }

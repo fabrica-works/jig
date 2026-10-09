@@ -18,16 +18,16 @@ pub fn proposal(
     place: &super::Place,
     words: &Words,
     bindings: &mut JigBindings,
-) {
+) -> bool {
     let Some(object_facts) = client.objects().get(object) else {
-        return;
+        return false;
     };
     let Some(document) = facts(object_facts) else {
-        return;
+        return false;
     };
     let title = words.say(JigPhrase::Proposal, &[]);
     if !super::open(b, client, object, place, &title, words, bindings) {
-        return;
+        return false;
     }
     words.actor(b, document.proposer);
     words.waiting(b, client.wall(), document.since);
@@ -44,6 +44,7 @@ pub fn proposal(
     super::common::answer(b, object_facts, words);
     super::common::acts(b, &object_facts.card, &document.acts, object, words, bindings);
     super::close(b);
+    true
 }
 /// Describe every proposal kind without evaluating the authority it asks for.
 pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings: &mut JigBindings) {
@@ -118,6 +119,9 @@ fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words, bindings: 
 }
 /// Changes retain the before/after facts instead of interpreting instructions.
 pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &mut JigBindings) {
+    if let Some(to) = change.addressed {
+        super::common::recipient(b, to, words);
+    }
     if let Some(text) = &change.words {
         crate::markdown::read(text.bytes(), 2, b);
     }

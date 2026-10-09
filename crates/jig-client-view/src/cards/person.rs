@@ -20,16 +20,16 @@ pub fn person_task(
     place: &super::Place,
     words: &Words,
     bindings: &mut JigBindings,
-) {
+) -> bool {
     let Some(fact) = client.objects().get(object) else {
-        return;
+        return false;
     };
     let Some(document) = facts(fact) else {
-        return;
+        return false;
     };
     let title = words.say(JigPhrase::PersonTask, &[]);
     if !super::open(b, client, object, place, &title, words, bindings) {
-        return;
+        return false;
     }
     super::chip::chip(b, client, &document.task, words, bindings);
     words.actor(b, document.requester);
@@ -61,6 +61,7 @@ pub fn person_task(
     super::common::answer(b, fact, words);
     super::common::acts(b, &fact.card, &document.acts, object, words, bindings);
     super::close(b);
+    true
 }
 /// Show the contract's named state or options; active choices belong to the confirmation.
 pub fn contract(

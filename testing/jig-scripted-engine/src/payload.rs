@@ -12,9 +12,9 @@ use jig_client::contract::{
     PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
     ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult, ReadValue,
     Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultValue, Revision, RolePolicy,
-    RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod, Subject, Task,
-    TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange,
-    WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod, Steering, Subject,
+    Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage,
+    VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
@@ -71,7 +71,7 @@ macro_rules! fields {
         }
     };
 }
-fields!(Amendment { words, wake, dependencies, authority, instructions });
+fields!(Amendment { addressed, words, wake, dependencies, authority, instructions });
 fields!(WakePolicy { words, results, topics, subscriptions });
 impl Payload for PersonAnswer {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -434,7 +434,7 @@ impl Payload for Recipient {
         }
     }
 }
-fields!(Hold { revision, reason, before, since, result });
+fields!(Hold { revision, reason, before, since, result, spend });
 impl Payload for HoldReason {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -461,7 +461,8 @@ impl Payload for FailureClass {
         }
     }
 }
-fields!(Escalation { ending, task, hold, waiting, trail, acts });
+fields!(Escalation { ending, task, hold, steering, impact, waiting, trail, acts });
+fields!(Steering { addressed, revision, spec, instructions, wake, dependencies, authority, budget });
 fields!(Passed { by, at, reason, lacking });
 fields!(Proposal { key, project, proposer, why, action, needs, funding, waiting, trail, since, acts, ending });
 impl Payload for ProposalAction {
