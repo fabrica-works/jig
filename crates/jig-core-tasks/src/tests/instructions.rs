@@ -1,6 +1,6 @@
 //! Instruction amendments through the task owner's public entrance.
 #![allow(
-    clippy::disallowed_macros,
+    clippy::match_like_matches_macro,
     clippy::disallowed_methods,
     clippy::disallowed_types,
     clippy::wildcard_enum_match_arm,
@@ -26,7 +26,7 @@ fn amend(h: &mut Harness, change: Amendment) -> Vec<Request> {
         reply_to: to(),
         by: Party::Person(9),
         task: 1,
-        message: h.domain.task(1).unwrap().last_message + 1,
+        message: h.domain.task(1).unwrap().last_message.checked_add(1).unwrap(),
         stop_run: false,
         amendment: change,
     })
@@ -40,8 +40,14 @@ fn an_instruction_amendment_is_heard_whole_and_keeps_immutable_settings_across_r
     h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
     h.send(Event::Started { task: 1, attempt: 1 });
     let out = amend(&mut h, change(b"Use the new evidence"));
-    assert!(out.iter().any(|r| matches!(r, Request::Relay { task: 1, attempt: 1, word, .. } if word.words.as_ref() == b"Use the new evidence")));
-    assert!(!out.iter().any(|r| matches!(r, Request::Stop { .. })));
+    assert!(out.iter().any(|r| match r {
+        Request::Relay { task: 1, attempt: 1, word, .. } => word.words.as_ref() == b"Use the new evidence",
+        _ => false,
+    }));
+    assert!(!out.iter().any(|r| match r {
+        Request::Stop { .. } => true,
+        _ => false,
+    }));
     assert_eq!(h.domain.task(1).unwrap().revisions, Revisions { spec: 1, hold: 0, person: 0 });
     let Stored::History(history) = &h.stored[&Key::History { task: 1, revision: 1 }] else {
         panic!("history");
@@ -82,13 +88,25 @@ fn unsupported_and_oversized_instruction_edits_leave_the_task_unchanged() {
             Executor::Procedure { .. } | Executor::Person(_) => change(b"agent only"),
         };
         let out = amend(&mut h, edit);
-        assert!(out.iter().any(|r| matches!(r, Request::Refused { problem, .. } if matches!(problem.why, Refusal::Read | Refusal::Executor))));
+        assert!(out.iter().any(|r| match r {
+            Request::Refused { problem, .. } => match problem.why {
+                Refusal::Read | Refusal::Executor => true,
+                _ => false,
+            },
+            _ => false,
+        }));
         assert_eq!(h.domain.task(1).unwrap(), &before);
-        assert!(!out.iter().any(|r| matches!(r, Request::Save { .. } | Request::Relay { .. })));
+        assert!(!out.iter().any(|r| match r {
+            Request::Save { .. } | Request::Relay { .. } => true,
+            _ => false,
+        }));
         let mut corrupt = before;
         corrupt.instructions = Some(vec![1; usize::try_from(LIMITS.message_bytes).unwrap() + 1].into_boxed_slice());
         let mut fresh = Harness::new();
         let out = fresh.send(Event::Restore { record: Stored::Live(Box::new(corrupt)) });
-        assert!(out.iter().any(|r| matches!(r, Request::RestoreRefused { .. })));
+        assert!(out.iter().any(|r| match r {
+            Request::RestoreRefused { .. } => true,
+            _ => false,
+        }));
     }
 }

@@ -32,6 +32,16 @@ pub struct Transcript {
 }
 
 impl Core {
+    /// Current charter policy with this task's durable instruction replacement.
+    pub(crate) fn run_policy(&self, task: u64, resume: bool) -> RunPolicy {
+        let mut policy = self.settings.run.clone();
+        if let Some(instructions) = &self.tasks.task(task).expect("prepared task is live").instructions {
+            policy.instructions.clone_from(instructions);
+        }
+        policy.resume = resume;
+        policy
+    }
+
     /// Decide a run against current policy, funds, account usability and
     /// connector-translated workspace writes.
     #[must_use]

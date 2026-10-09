@@ -824,7 +824,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
             task: 2,
             amendment: tasks::Amendment {
                 release: Some(1),
-                instructions: None,
+                instructions: Some(b"Use the new evidence".as_slice().into()),
                 spec: Some(changed),
                 wake: None,
                 dependencies: None,
@@ -867,6 +867,8 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
             }
             ProposalAction::Amend { before, after, release, .. } => {
                 assert_eq!(release, Some(1));
+                assert_eq!(before.instructions.as_ref().unwrap().bytes, core.settings.run.instructions);
+                assert_eq!(after.instructions.as_ref().unwrap().bytes.as_ref(), b"Use the new evidence");
                 assert_eq!(before.spec.words.bytes.as_ref(), b"Work\nDetailed instructions");
                 assert_eq!(after.spec.words.bytes.as_ref(), b"New question");
                 assert_eq!(after.authority.ceiling.spend, 15);

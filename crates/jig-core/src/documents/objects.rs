@@ -38,7 +38,7 @@ pub struct ProposedTask {
 /// The relevant task fields before and after one proposed amendment.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AmendmentState {
-    /// Exact retained override; absent denotes the configured charter default.
+    /// Known current instructions in proposals; exact retained override in history.
     pub instructions: Option<Text>,
     pub spec: SpecLine,
     pub authority: AuthorityLine,
@@ -293,6 +293,7 @@ pub(super) fn proposed(limits: &Limits, value: &tasks::New) -> Result<ProposedTa
     })
 }
 fn amendment(
+    core: &Core,
     limits: &Limits,
     row: &tasks::TaskRecord,
     change: Option<&tasks::Amendment>,
@@ -307,15 +308,15 @@ fn amendment(
         ),
     };
     Ok(AmendmentState {
-        instructions: match change {
-            Some(change) => match change.instructions.as_ref().or(row.instructions.as_ref()) {
-                Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
-                None => None,
-            },
-            None => match &row.instructions {
-                Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
-                None => None,
-            },
+        instructions: match row.executor {
+            tasks::Executor::Agent { .. } => {
+                let value = match change {
+                    Some(change) => change.instructions.as_ref().or(row.instructions.as_ref()),
+                    None => row.instructions.as_ref(),
+                };
+                Some(super::small::text(value.unwrap_or(&core.settings.run.instructions), limits.documents.text_bytes))
+            }
+            tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => None,
         },
         spec: spec(limits, description),
         authority: super::task_tree::authority(limits, authority)?,
@@ -356,8 +357,8 @@ fn action(
             let row = super::small::visible(core, party, *task)?;
             ProposalAction::Amend {
                 task: super::task_tree::link(core, limits, party, *task)?,
-                before: Box::new(amendment(limits, row, None)?),
-                after: Box::new(amendment(limits, row, Some(change))?),
+                before: Box::new(amendment(core, limits, row, None)?),
+                after: Box::new(amendment(core, limits, row, Some(change))?),
                 reason: super::small::text(&change.reason, limits.documents.text_bytes),
                 release: change.release,
             }
