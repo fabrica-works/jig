@@ -1,11 +1,13 @@
-//! Bounded people state, request admission and restoration (domain/people.md, sections 3–5). `step` handles root events; `fire` expires sign-ins.
+//! Bounded people state, task-derived inbox counts, request admission and restoration
+//! (domain/people.md, sections 3–6). `step` handles root events; `fire` expires sign-ins.
 //! The child keeps identities, roles, sign-ins and keyed outcomes, routes each
-//! admitted flight once and waits for `Decided`. Root owns policy, task creation
+//! admitted flight once and waits for `Decided`. Its bounded volatile need references
+//! count every live task projection independently of the entry cache. Root owns policy, task creation
 //! and durability; this child never performs IO or retains credential secrets.
 
 use crate::{
-    Again, Ask, Entry, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, LimitKind, Limits,
-    Outcome, ProjectRole, Refusal, Reply, Request, RequestKey, ResultRef, Role, Seed, Stored, Whom,
+    Again, Ask, Entry, EntryKind, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, LimitKind,
+    Limits, Outcome, ProjectRole, Refusal, Reply, Request, RequestKey, ResultRef, Role, Seed, Stored, Whom,
 };
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Env, Id, List, Map, Queue, ReplyTo, Slab, Time, Token, Wall};
@@ -40,9 +42,15 @@ enum Phase {
     Failed,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub(crate) struct Need {
+    project: u32,
+    whom: Whom,
+}
+
 /// Bounded secret-free identities, sign-ins/deadlines, project holdings, completed keys and
-/// volatile flights; knows tasks only by returned number and starts in restoring phase.
-/// (domain/people.md, sections 2–5).
+/// volatile flights and task-derived inbox references; knows no task content and starts restoring.
+/// (domain/people.md, sections 2–6).
 #[derive(Debug)]
 pub struct Domain {
     phase: Phase,
@@ -51,6 +59,7 @@ pub struct Domain {
     read_positions: Map<u64, u64>,
     unread: Map<u64, Box<[ResultRef]>>,
     waiting: Map<Whom, Box<[Entry]>>,
+    needs: Map<u64, Box<[Need]>>,
     identities: Map<IdentityKey, u64>,
     sign_ins: Map<u64, SignIn>,
     alarms: Deadlines<u64>,
@@ -96,6 +105,7 @@ impl Domain {
             people: Map::with_capacity(limits.people),
             read_positions: Map::with_capacity(limits.people),
             unread: Map::with_capacity(limits.people),
+            needs: Map::with_capacity(limits.inbox_tasks),
             waiting: Map::with_capacity(
                 limits
                     .people
@@ -336,6 +346,38 @@ impl Domain {
         Some(visible.into_boxed())
     }
 
+    /// Exact live needs across the party's current projects and roles, including uncached entries.
+    /// Tallies are volatile projections rebuilt from task rows, never durable inbox state.
+    #[must_use]
+    pub fn needs(&self, person: u64) -> Option<u32> {
+        self.identity(person)?;
+        let mut count = 0_u32;
+        for (_, tallies) in &self.needs {
+            for tally in tallies {
+                if addressed(self, person, *tally) {
+                    count = count.checked_add(1).expect("validated task projection bound");
+                }
+            }
+        }
+        Some(count)
+    }
+
+    /// Whether this task currently contributes to the party's exact need count.
+    #[must_use]
+    pub fn task_needs(&self, person: u64, task: u64) -> bool {
+        match self.needs.get(&task) {
+            Some(tallies) => {
+                for tally in tallies {
+                    if addressed(self, person, *tally) {
+                        return true;
+                    }
+                }
+                false
+            }
+            None => false,
+        }
+    }
+
     /// Advance one authenticated person's position inside the root decision that replies.
     /// The returned people row is saved with the reply's commit.
     pub fn advance_read_position(&mut self, person: u64, position: u64) -> Option<Stored> {
@@ -502,10 +544,46 @@ fn insert_newest(entries: &mut List<Entry>, entry: Entry) {
     *entries = next;
 }
 
+fn addressed(domain: &Domain, person: u64, need: Need) -> bool {
+    let Some(held) = role(domain, person, need.project) else { return false };
+    match need.whom {
+        Whom::Person(owner) => owner == person,
+        Whom::Role { project, role } => project == need.project && held.number() == role,
+    }
+}
+
+fn replace_needs(domain: &mut Domain, limits: &Limits, task: u64, entries: &[Entry]) {
+    assert!(
+        entries.len() <= usize::try_from(limits.inbox_recipients).expect("projection bound fits"),
+        "root bounds each task projection"
+    );
+    let mut tallies: List<Need> = List::with_capacity(limits.inbox_recipients);
+    for entry in entries {
+        if entry.task != task || entry.project == 0 {
+            continue;
+        }
+        match entry.kind {
+            EntryKind::Reply { .. } => continue,
+            EntryKind::Proposal { .. }
+            | EntryKind::Escalation { .. }
+            | EntryKind::Question { .. }
+            | EntryKind::PersonTask => {}
+        }
+        tallies
+            .push(Need { project: entry.project, whom: entry.whom })
+            .expect("root bounds each task's need recipients");
+    }
+    drop(domain.needs.remove(&task));
+    if !tallies.is_empty() {
+        assert!(domain.needs.insert(task, tallies.into_boxed()).is_ok(), "one tally per live task");
+    }
+}
+
 fn replace_waiting(domain: &mut Domain, limits: &Limits, task: u64, entries: &[Entry]) {
     if task == 0 || domain.phase == Phase::Failed {
         return;
     }
+    replace_needs(domain, limits, task, entries);
     let mut recipients = List::with_capacity(domain.waiting.capacity());
     for (whom, _) in &domain.waiting {
         recipients.push(*whom).expect("one key per cached recipient");

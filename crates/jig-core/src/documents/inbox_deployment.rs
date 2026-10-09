@@ -1,6 +1,7 @@
 //! Party pages and deployment facts (`client/domain/pages.md`, sections 3, 4
-//! and 7; `contract.md`, 5 and 7.1). These are bounded cache views. Exact
-//! cross-project counts, reply read positions and stored inbox rows come later.
+//! and 7; `contract.md`, 5 and 7.1). Entries are bounded cache views;
+//! needs count all live task projections across the party's projects. Reply
+//! read positions and stored inbox rows are supplied by their owners.
 use super::{BudgetLine, Chip, Count, Cursor, Missing, Proposer, TaskLink, Window};
 use crate::{Core, Limits};
 use alloc::boxed::Box;
@@ -38,6 +39,7 @@ pub struct Inbox {
     pub needs: List<InboxEntry>,
     pub updates: List<InboxEntry>,
     pub next: Option<Cursor>,
+    /// Exact needs across every project the party currently holds a role in.
     pub cached_needs: u32,
     pub cached_updates: Count,
     pub updates_time_complete: bool,
@@ -237,7 +239,7 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
     let entries = core.people.cached_waiting(&limits.people, party).ok_or(Missing::Unknown)?;
     let results = core.people.cached_results(party).ok_or(Missing::Unknown)?;
     let mut ordered = Map::with_capacity(limits.people.inbox_entries.checked_mul(2).ok_or(Missing::TooLarge)?);
-    let mut cached_needs = 0_u32;
+    let cached_needs = core.people.needs(party).ok_or(Missing::Unknown)?;
     let mut cached_updates = 0_u32;
     let mut times = true;
     for entry in &entries {
@@ -247,8 +249,6 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
         let value = object(entry.task, entry.kind);
         if updates(value) {
             cached_updates = cached_updates.checked_add(1).expect("bounded cache");
-        } else {
-            cached_needs = cached_needs.checked_add(1).expect("bounded cache");
         }
         let cursor = Cursor::Inbox { task: entry.task, object: value, at: Some(entry.at) };
         ordered

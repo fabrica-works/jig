@@ -17,6 +17,8 @@ struct Winner {
 pub const LIMITS: Limits = Limits {
     people: 8,
     inbox_entries: 4,
+    inbox_tasks: 16,
+    inbox_recipients: 64,
     sign_ins: 8,
     projects: 3,
     holdings: 8,

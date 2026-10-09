@@ -10,6 +10,8 @@ use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 const LIMITS: Limits = Limits {
     people: 4,
     inbox_entries: 2,
+    inbox_tasks: 16,
+    inbox_recipients: 64,
     sign_ins: 4,
     projects: 3,
     holdings: 4,
@@ -1285,4 +1287,53 @@ fn a_said_answer_keeps_the_release_fact_and_request_choice() {
     let out = test.send(Event::Decided { request, outcome });
     assert_eq!(reply(&out), Reply::Outcome(outcome));
     assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+}
+
+#[test]
+fn needs_count_every_live_entry_across_projects_past_the_cache() {
+    let mut test = Test::new(LIMITS);
+    test.signin(1, 10, identity(0, 1));
+    for project in [1, 2] {
+        test.send(Event::Roles { project, holdings: Box::new([Holding { person: 1, role: Role::Member }]) });
+    }
+    for task in 1..=5 {
+        let project = if task % 2 == 0 { 2 } else { 1 };
+        let entry = Entry { task, project, whom: Whom::Person(1), kind: EntryKind::PersonTask, at: Wall::EPOCH };
+        test.send(Event::Waiting { task, entries: Box::new([entry]) });
+    }
+    assert_eq!(test.d.needs(1), Some(5));
+    assert_eq!(test.d.cached_waiting(&LIMITS, 1).unwrap().len(), 2);
+    assert!(test.d.task_needs(1, 1), "oldest need remains counted after cache eviction");
+    test.send(Event::Waiting { task: 1, entries: Box::new([]) });
+    assert_eq!(test.d.needs(1), Some(4));
+    test.send(Event::Roles { project: 2, holdings: Box::new([]) });
+    assert_eq!(test.d.needs(1), Some(2), "only current project roles contribute");
+}
+
+#[test]
+fn a_role_need_leaves_every_holders_count_when_one_acts() {
+    let mut test = Test::new(LIMITS);
+    test.signin(1, 10, identity(0, 1));
+    test.signin(2, 20, identity(0, 2));
+    test.send(Event::Roles {
+        project: 1,
+        holdings: Box::new([Holding { person: 1, role: Role::Member }, Holding { person: 2, role: Role::Member }]),
+    });
+    for task in 1..=3 {
+        let entry = Entry {
+            task,
+            project: 1,
+            whom: Whom::Role { project: 1, role: Role::Member.number() },
+            kind: EntryKind::PersonTask,
+            at: Wall::EPOCH,
+        };
+        test.send(Event::Waiting { task, entries: Box::new([entry]) });
+    }
+    assert_eq!(test.d.needs(1), Some(3));
+    assert_eq!(test.d.needs(2), Some(3));
+    let request = route(&test.request(10, 1, Ask::TakePerson { project: 1, task: 1 }));
+    test.send(Event::Decided { request, outcome: Outcome::PersonTaken { task: 1 } });
+    test.send(Event::Waiting { task: 1, entries: Box::new([]) });
+    assert_eq!(test.d.needs(1), Some(2));
+    assert_eq!(test.d.needs(2), Some(2));
 }

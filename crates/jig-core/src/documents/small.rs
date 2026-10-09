@@ -83,7 +83,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
             .expect("one charter line per project");
     }
     let waiting = core.people.cached_waiting(&limits.people, party).ok_or(Missing::Unknown)?;
-    let mut needs = 0_u32;
+    let needs = core.people.needs(party).ok_or(Missing::Unknown)?;
     let mut updates =
         u32::try_from(core.people.cached_results(party).ok_or(Missing::Unknown)?.len()).expect("cache count fits");
     for entry in &waiting {
@@ -92,7 +92,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
             people::EntryKind::Proposal { .. }
             | people::EntryKind::Escalation { .. }
             | people::EntryKind::Question { .. }
-            | people::EntryKind::PersonTask => needs = needs.saturating_add(1),
+            | people::EntryKind::PersonTask => {}
         }
     }
     let updates = if updates >= limits.people.inbox_entries { Count::AtLeast(updates) } else { Count::Known(updates) };

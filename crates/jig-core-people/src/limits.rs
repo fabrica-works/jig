@@ -15,6 +15,10 @@ pub struct Limits {
     pub people: u32,
     /// Maximum cached unread result references per person; older entries are paged from tasks.
     pub inbox_entries: u32,
+    /// Maximum live task projections contributing to exact need counts.
+    pub inbox_tasks: u32,
+    /// Maximum need recipient references in one task projection, independent of cached entries.
+    pub inbox_recipients: u32,
     /// Maximum live secret-free sign-ins and expiry alarms.
     pub sign_ins: u32,
     /// Maximum retained project role sets.
@@ -54,6 +58,7 @@ pub struct Limits {
 /// incoming/outgoing payloads and Request queue storage.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    limits.inbox_tasks.checked_mul(limits.inbox_recipients)?;
     limits.initial_owners.checked_add(4)?;
     limits.waiters.checked_add(1)?;
     limits.sign_ins.checked_add(1)?;
@@ -84,6 +89,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     people
         .checked_add(roles)?
         .checked_add(waiting)?
+        .checked_add(Map::<u64, Box<[crate::domain::Need]>>::worst_case(limits.inbox_tasks)?)?
+        .checked_add(
+            u64::from(limits.inbox_tasks)
+                .checked_mul(List::<crate::domain::Need>::worst_case(limits.inbox_recipients)?)?,
+        )?
+        .checked_add(List::<crate::domain::Need>::worst_case(limits.inbox_recipients)?)?
         .checked_add(Map::<u64, u64>::worst_case(limits.people)?)?
         .checked_add(Map::<u64, Box<[crate::ResultRef]>>::worst_case(limits.people)?)?
         .checked_add(

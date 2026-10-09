@@ -182,16 +182,17 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
             let mut parties = List::with_capacity(core.view_subjects.len());
             for (_, binding) in &core.view_subjects {
                 let old = core.people.cached_waiting(&limits.people, binding.party);
-                let mut touched = match old {
-                    Some(old) => {
-                        let mut present = false;
-                        for entry in &old {
-                            present |= entry.task == *task;
+                let mut touched = core.people.task_needs(binding.party, *task)
+                    || match old {
+                        Some(old) => {
+                            let mut present = false;
+                            for entry in &old {
+                                present |= entry.task == *task;
+                            }
+                            present
                         }
-                        present
-                    }
-                    None => false,
-                };
+                        None => false,
+                    };
                 for entry in entries {
                     touched |= match entry.whom {
                         people::Whom::Person(party) => party == binding.party,

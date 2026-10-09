@@ -1,5 +1,6 @@
 use jig_core_people::{
-    Ask, Domain, Event, Holding, Identity, IdentityKey, Limits, Outcome, Request, Role, fire, max_out, step, worst_case,
+    Ask, Domain, Entry, EntryKind, Event, Holding, Identity, IdentityKey, Limits, Outcome, Request, Role, Whom, fire,
+    max_out, step, worst_case,
 };
 use jig_people_world::LIMITS;
 use skein_lib::{Env, Queue, ReplyTo, Time, Token, Wall};
@@ -109,6 +110,20 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
                 .into_boxed_slice();
             test.event(Event::Roles { project, holdings });
         }
+        for task in 1..=u64::from(limits.inbox_tasks) {
+            let entries = (0..limits.inbox_recipients)
+                .map(|message| Entry {
+                    task,
+                    project: 1,
+                    whom: Whom::Person(1),
+                    kind: EntryKind::Question { message: u64::from(message) },
+                    at: Wall::EPOCH,
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice();
+            test.event(Event::Waiting { task, entries });
+        }
+        assert_eq!(test.domain.needs(1), Some(limits.inbox_tasks * limits.inbox_recipients));
         for key in
             1..=u8::try_from(limits.requests.saturating_sub(limits.pending)).expect("test values are admitted and fit")
         {

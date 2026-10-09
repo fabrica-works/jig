@@ -77,6 +77,8 @@ fn limits() -> Limits {
     let people = people::Limits {
         people: 2,
         inbox_entries: 2,
+        inbox_tasks: 16,
+        inbox_recipients: 64,
         sign_ins: 2,
         projects: 1,
         holdings: 2,
