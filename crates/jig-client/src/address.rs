@@ -63,3 +63,11 @@ pub enum Place {
     /// No page at this place.
     Missing,
 }
+
+impl Address {
+    /// Every task chip links by its never-reused task number.
+    #[must_use]
+    pub const fn task(task: u64) -> Self {
+        Self::Task { task, section: TaskSection::Overview }
+    }
+}

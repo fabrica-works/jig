@@ -1,10 +1,10 @@
 //! One page at a time, with a generation and its watch freshness.
-//! Jig 20.3 adds reads, object sources and navigation ordering; jig 22 fills each
-//! work page. See client/domain/client.md, 5 and 8.2.
+//! Reads, object sources and parts belong to the current generation. See client/domain/client.md, 5 and 8.2.
 use crate::{address::Address, contract::Limit};
 pub mod conversations;
 pub mod deployment;
 pub mod inbox;
+pub mod navigation;
 pub mod project;
 pub(crate) mod routing;
 pub mod task;

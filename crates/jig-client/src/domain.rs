@@ -61,6 +61,8 @@ pub struct Domain {
     pub(crate) frame: FrameState,
     pub(crate) link: Link,
     pub(crate) page: Page,
+    pub(crate) navigation: crate::pages::navigation::Navigation,
+    pub(crate) updates_count: u32,
     pub(crate) address: Address,
     pub(crate) generation: u32,
     pub(crate) offset: Offset,
@@ -100,6 +102,8 @@ impl Domain {
             frame: FrameState { document: None },
             link: Link::Starting,
             page: Page::Starting,
+            navigation: crate::pages::navigation::Navigation::new(limits.navigation_entries),
+            updates_count: limits.updates_count,
             address: Address::Inbox { project: None },
             generation: 0,
             offset: Offset { minutes: 0 },
@@ -117,6 +121,60 @@ impl Domain {
             conversation_rows: crate::windows::ConversationWindow::new(limits.rows),
             turn_rows: crate::windows::TurnWindow::new(limits.rows),
             history_rows: crate::windows::HistoryWindow::new(limits.rows),
+        }
+    }
+    /// Installs ordered navigation and its home before start; capacities are checked.
+    pub fn configure_navigation(
+        &mut self,
+        navigation: crate::pages::navigation::Navigation,
+    ) -> Result<(), crate::pages::navigation::Navigation> {
+        if self.started || navigation.entries.capacity() > self.navigation.entries.capacity() {
+            return Err(navigation);
+        }
+        self.navigation = navigation;
+        Ok(())
+    }
+    /// Configured destinations, in the application's order.
+    #[must_use]
+    pub const fn navigation(&self) -> &crate::pages::navigation::Navigation {
+        &self.navigation
+    }
+    /// Counts and current identity shown on every page, including application pages.
+    #[must_use]
+    pub fn frame_summary(&self) -> crate::frame::Summary {
+        let mut summary = self.frame.summary(self.address, self.link, self.page_behind_value(), self.updates_count);
+        match self.address {
+            Address::Task { task, .. } => {
+                if let Some(id) = self.objects.find(crate::contract::ObjectKey::Task(task))
+                    && let Some(object) = self.objects.get(id)
+                {
+                    match &object.body {
+                        Some(crate::objects::Body::Task(task)) => summary.project = Some(task.project),
+                        Some(
+                            crate::objects::Body::Chip(_)
+                            | crate::objects::Body::Proposal(_)
+                            | crate::objects::Body::Escalation(_)
+                            | crate::objects::Body::Question(_)
+                            | crate::objects::Body::PersonTask(_)
+                            | crate::objects::Body::Result(_),
+                        )
+                        | None => {}
+                    }
+                }
+            }
+            Address::Inbox { .. } | Address::Conversations { .. } | Address::Project { .. } | Address::Deployment => {}
+        }
+        summary
+    }
+    fn page_behind_value(&self) -> bool {
+        match self.page {
+            Page::Work { behind, .. } => behind,
+            Page::Starting
+            | Page::Elsewhere
+            | Page::SigningIn
+            | Page::Missing
+            | Page::OutOfDate
+            | Page::SomeoneElse => false,
         }
     }
     /// Installs one provider before start, refusing duplicates and oversized names.
@@ -683,10 +741,42 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
             }
         }
         WatchEnd::Unknown | WatchEnd::NotAllowed | WatchEnd::SubjectEnded => {
+            let task_subject = match &watch.subject {
+                Subject::Task { .. } => true,
+                Subject::Frame
+                | Subject::Tree { .. }
+                | Subject::Chips { .. }
+                | Subject::Inbox { .. }
+                | Subject::Goals { .. }
+                | Subject::Conversations
+                | Subject::Run { .. }
+                | Subject::Deployment => false,
+            };
             domain.retire(id);
             match owner {
                 Owner::Frame => domain.set_link(Link::Offline, out),
-                Owner::Page { .. } => {}
+                Owner::Page { generation } => {
+                    if generation == domain.generation && task_subject {
+                        match domain.address {
+                            Address::Task { .. } => match end {
+                                WatchEnd::Unknown | WatchEnd::NotAllowed => {
+                                    domain.page = Page::Missing;
+                                    domain.changed();
+                                }
+                                WatchEnd::SubjectEnded
+                                | WatchEnd::Closed
+                                | WatchEnd::Dropped
+                                | WatchEnd::Busy
+                                | WatchEnd::Stopping
+                                | WatchEnd::SignedOut => {}
+                            },
+                            Address::Inbox { .. }
+                            | Address::Conversations { .. }
+                            | Address::Project { .. }
+                            | Address::Deployment => {}
+                        }
+                    }
+                }
             }
         }
         WatchEnd::SignedOut => {

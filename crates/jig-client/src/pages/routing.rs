@@ -131,6 +131,17 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
             PartyKind::Person => {}
         }
     }
+    if domain.address == Address::Deployment {
+        let allowed = match &domain.frame.document {
+            Some(frame) => frame.deployment_role.is_some(),
+            None => false,
+        };
+        if !allowed {
+            domain.page = Page::Missing;
+            domain.changed();
+            return;
+        }
+    }
     domain.page =
         Page::Work { address: domain.address, generation: domain.generation, behind: false, excess: 0, refused: None };
     domain.changed();
@@ -359,11 +370,11 @@ pub(crate) fn read_result(
     }
     match result {
         ReadResult::None(why) => match why {
-            contract::ReadNone::Unknown | contract::ReadNone::Gone => {
+            contract::ReadNone::Unknown | contract::ReadNone::Gone | contract::ReadNone::Refused => {
                 domain.page = Page::Missing;
                 domain.changed();
             }
-            contract::ReadNone::Refused | contract::ReadNone::Busy | contract::ReadNone::Unreachable => {
+            contract::ReadNone::Busy | contract::ReadNone::Unreachable => {
                 refuse(domain, Limit::Reads);
             }
             contract::ReadNone::SignedOut => crate::domain::signed_out(domain, out),

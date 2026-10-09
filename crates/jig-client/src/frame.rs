@@ -55,3 +55,48 @@ pub fn fits(frame: &Frame, limits: &crate::Limits) -> bool {
     }
     true
 }
+
+/// Facts on every page's frame, with exact needs and bounded unread updates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Summary {
+    pub party: Option<u64>,
+    pub needs: u64,
+    pub updates: crate::contract::Count,
+    pub project: Option<u32>,
+    pub link: Link,
+    pub behind: bool,
+}
+impl FrameState {
+    /// Derives display facts from the committed frame; never guesses unread counts.
+    #[must_use]
+    pub fn summary(&self, address: Address, link: Link, behind: bool, limit: u32) -> Summary {
+        let mut summary = Summary {
+            party: None,
+            needs: 0,
+            updates: crate::contract::Count { value: 0, limited: false },
+            project: None,
+            link,
+            behind,
+        };
+        if let Some(frame) = &self.document {
+            summary.party = Some(frame.party.number);
+            summary.needs = u64::from(frame.needs.questions)
+                .checked_add(u64::from(frame.needs.proposals))
+                .expect("two u32 counts fit u64")
+                .checked_add(u64::from(frame.needs.escalations))
+                .expect("three u32 counts fit u64")
+                .checked_add(u64::from(frame.needs.person_tasks))
+                .expect("four u32 counts fit u64");
+            summary.updates = crate::contract::Count {
+                value: frame.updates.value.min(limit),
+                limited: frame.updates.limited || frame.updates.value > limit,
+            };
+            summary.project = match address {
+                Address::Inbox { project } | Address::Conversations { project } => project,
+                Address::Project { project, .. } => Some(project),
+                Address::Task { .. } | Address::Deployment => None,
+            };
+        }
+        summary
+    }
+}

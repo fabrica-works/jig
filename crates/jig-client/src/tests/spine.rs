@@ -30,6 +30,8 @@ pub(super) const LIMITS: Limits = Limits {
     charters: 2,
     text: 32,
     rows: 2,
+    navigation_entries: 8,
+    updates_count: 99,
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     heartbeat: Duration::from_nanos(100),
 };
@@ -76,7 +78,7 @@ pub(super) fn frame(party: u64) -> Frame {
         updates: Count { value: 0, limited: false },
         versions: VersionRange { first: 1, last: 1 },
         retention: Duration::from_secs(1000),
-        deployment_role: None,
+        deployment_role: Some(1),
     }
 }
 pub(super) fn start(domain: &mut Domain, kept: List<Record>) -> Token {

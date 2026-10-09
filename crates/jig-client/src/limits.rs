@@ -41,6 +41,10 @@ pub struct Limits {
     pub charters: u32,
     pub text: u32,
     pub rows: u32,
+    /// Maximum configured navigation destinations.
+    pub navigation_entries: u32,
+    /// The largest unread update count displayed without a lower-bound mark.
+    pub updates_count: u32,
     pub backoff: Backoff,
     pub heartbeat: Duration,
 }
@@ -70,6 +74,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     let mut total = Slab::<Watch>::worst_case(limits.watches)?;
+    total = total.checked_add(List::<crate::pages::navigation::Destination>::worst_case(limits.navigation_entries)?)?;
     total = total.checked_add(crate::intents::worst_case(limits)?)?;
     total = total.checked_add(crate::notices::worst_case(limits)?)?;
     total = total.checked_add(crate::fields::worst_case(limits)?)?;
