@@ -9,7 +9,9 @@ struct CrateManifest {
 }
 
 fn kit_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("kit root exists")
+    // Cargo and nextest run tests from the current package directory. A cached
+    // binary may have been compiled in a worktree that has since been removed.
+    std::env::current_dir().expect("package directory exists").join("../..").canonicalize().expect("kit root exists")
 }
 
 fn walk_directory(name: &str, at_root: bool) -> bool {
