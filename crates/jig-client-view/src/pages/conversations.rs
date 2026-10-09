@@ -150,11 +150,7 @@ pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words
         }
         Runtime::Procedure { panel } => cards::common::part(b, panel, words, bindings),
         Runtime::Person { addressed, .. } => cards::common::recipient(b, *addressed, words),
-        Runtime::Closing(closing) => words.text(
-            b,
-            JigPhrase::Closing,
-            &[Hole::Number(u64::from(closing.delegates)), Hole::Number(u64::from(closing.effects))],
-        ),
+        Runtime::Closing(closing) => cards::common::closing(b, closing, words, bindings),
         Runtime::Held => words.text(b, JigPhrase::Held, &[]),
         Runtime::Ended => words.text(b, JigPhrase::Ended, &[]),
     }

@@ -294,7 +294,18 @@ fn conversation_states(words: &crate::words::Words) {
             },
             b"Retrying at".as_slice(),
         ),
-        (Runtime::Closing(Closing { delegates: 1, effects: 2 }), b"Closing: 1 delegates".as_slice()),
+        (
+            Runtime::Closing(Closing {
+                delegates: 1,
+                connectors: {
+                    let mut rows = List::with_capacity(2);
+                    rows.push(1).unwrap();
+                    rows.push(2).unwrap();
+                    rows
+                },
+            }),
+            b"Closing: 1 delegates".as_slice(),
+        ),
         (Runtime::Held, b"Held".as_slice()),
         (Runtime::Ended, b"Ended".as_slice()),
     ];

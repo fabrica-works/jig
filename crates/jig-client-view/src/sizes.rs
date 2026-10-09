@@ -32,7 +32,8 @@ fn acts(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn chip_nodes(limits: &Limits) -> Option<u32> {
     // Region + named link + executor; phase has at most four nodes per row
-    // (missing dependency or failed attempt), plus twelve fixed nodes.
+    // (missing dependency, failed attempt, or conjunction/name slot/effects),
+    // plus twelve fixed nodes.
     limits.rows.checked_mul(4)?.checked_add(16)?.checked_mul(limits.objects.checked_add(1)?)
 }
 fn frame_of_card(limits: &Limits) -> Option<u32> {

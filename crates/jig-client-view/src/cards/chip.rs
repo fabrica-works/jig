@@ -171,13 +171,11 @@ pub fn details(
             if let Some(by) = taken {
                 words.text(b, JigPhrase::TakenBy, &[name(by.name.bytes())]);
             }
-            words.text(b, JigPhrase::Since, &[Hole::Wall(words.adjusted_wall(*since))]);
+            if let Some(since) = since {
+                words.text(b, JigPhrase::Since, &[Hole::Wall(words.adjusted_wall(*since))]);
+            }
         }
-        ChipPhase::Closing(closing) => words.text(
-            b,
-            JigPhrase::Closing,
-            &[Hole::Number(u64::from(closing.delegates)), Hole::Number(u64::from(closing.effects))],
-        ),
+        ChipPhase::Closing(closing) => super::common::closing(b, closing, words, bindings),
         ChipPhase::Held { reason, since, revision: _ } => {
             super::hold::reason(b, reason, words, bindings);
             words.text(b, JigPhrase::Since, &[Hole::Wall(words.adjusted_wall(*since))]);

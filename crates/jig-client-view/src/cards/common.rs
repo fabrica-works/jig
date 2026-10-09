@@ -77,7 +77,8 @@ pub fn acts(
 /// Leave a slot and retain the typed part that its owning view root will resolve.
 pub fn part(b: &mut Builder, part: &Part, words: &Words, bindings: &mut JigBindings) {
     let connector = match part {
-        Part::Resource { connector, .. }
+        Part::Connector { connector }
+        | Part::Resource { connector, .. }
         | Part::Kind { connector, .. }
         | Part::Panel { connector, .. }
         | Part::Result { connector, .. }
@@ -88,6 +89,16 @@ pub fn part(b: &mut Builder, part: &Part, words: &Words, bindings: &mut JigBindi
     };
     let token = bindings.insert(JigMeaning::Part(part.clone())).token;
     b.slot(SlotRef { owner: Owner::Side { connector }, token }, &words.say(JigPhrase::LoadingPart, &[]));
+}
+/// Closing keeps only engine-owned delegate counts and the connectors it waits on.
+/// The connector's words fill a name-only part; effect details remain in its task panel.
+pub fn closing(b: &mut Builder, closing: &jig_client::contract::Closing, words: &Words, bindings: &mut JigBindings) {
+    words.text(b, JigPhrase::Closing, &[Hole::Number(u64::from(closing.delegates))]);
+    for connector in &closing.connectors {
+        words.text(b, JigPhrase::ClosingConnector, &[]);
+        part(b, &Part::Connector { connector: *connector }, words, bindings);
+        words.text(b, JigPhrase::ClosingEffects, &[]);
+    }
 }
 /// Say where an object is waiting, without deriving its policy recipient.
 pub fn recipient(b: &mut Builder, to: Recipient, words: &Words) {

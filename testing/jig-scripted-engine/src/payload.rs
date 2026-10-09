@@ -274,7 +274,7 @@ impl Payload for Part {
             }
             Self::Effect { connector, proposal } => sum(&[connector.heap(bounds), proposal.heap(bounds)]),
             Self::Project { connector, project } => sum(&[connector.heap(bounds), project.heap(bounds)]),
-            Self::Deployment { connector } => sum(&[connector.heap(bounds)]),
+            Self::Connector { connector } | Self::Deployment { connector } => sum(&[connector.heap(bounds)]),
         }
     }
 }
@@ -383,7 +383,7 @@ fields!(Task {
     delegates,
     writer_slots
 });
-fields!(Closing { delegates, effects });
+fields!(Closing { delegates, connectors });
 fields!(SpendLine { task, attempt, spent });
 impl Payload for ActKind {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {

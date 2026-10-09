@@ -244,8 +244,12 @@ pub enum JigPhrase {
     Stall,
     /// Reason: (0).
     Reason,
-    /// Closing: (0) delegates and (1) effects settling.
+    /// Closing: (0) delegates.
     Closing,
+    /// Conjunction before a connector name in a closing phase.
+    ClosingConnector,
+    /// The named connector owns the effects being settled.
+    ClosingEffects,
     /// Held.
     Held,
     /// Ended.
@@ -887,6 +891,8 @@ impl JigPhrase {
             Self::Stall => 117,
             Self::Reason => 118,
             Self::Closing => 119,
+            Self::ClosingConnector => 403,
+            Self::ClosingEffects => 404,
             Self::Held => 120,
             Self::Ended => 121,
             Self::WaitingParty => 122,
@@ -1302,6 +1308,8 @@ impl JigPhrase {
             | Self::Options
             | Self::CannotDo
             | Self::Reply
+            | Self::ClosingConnector
+            | Self::ClosingEffects
             | Self::LoadingPart
             | Self::LoadingObject
             | Self::ActWrite
@@ -1480,6 +1488,7 @@ impl JigPhrase {
             | Self::DropDependency
             | Self::Charter
             | Self::Priority
+            | Self::Closing
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::Proposed
             | Self::MadeWords
@@ -1488,7 +1497,6 @@ impl JigPhrase {
             | Self::TasksMissing
             | Self::LimitLive
             | Self::LimitInbox
-            | Self::Closing
             | Self::WaitingRole
             | Self::RepliesThrough => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -1561,7 +1569,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 377] = [
+pub const ALL: [JigPhrase; 379] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -1682,6 +1690,8 @@ pub const ALL: [JigPhrase; 377] = [
     JigPhrase::Stall,
     JigPhrase::Reason,
     JigPhrase::Closing,
+    JigPhrase::ClosingConnector,
+    JigPhrase::ClosingEffects,
     JigPhrase::Held,
     JigPhrase::Ended,
     JigPhrase::WaitingParty,
@@ -1943,7 +1953,7 @@ pub const ALL: [JigPhrase; 377] = [
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(377);
+    let mut rows = List::with_capacity(379);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

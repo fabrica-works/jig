@@ -39,7 +39,8 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
                     &filter,
                     NoteScope::Resource { project, connector: *connector, pattern: path.clone() },
                 ),
-                Part::Kind { .. }
+                Part::Connector { .. }
+                | Part::Kind { .. }
                 | Part::Panel { .. }
                 | Part::Result { .. }
                 | Part::Effect { .. }

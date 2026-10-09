@@ -465,11 +465,11 @@ fn all_chip_phases(words: &crate::words::Words) {
             ChipPhase::Person {
                 addressed: Recipient::Role { project: 4, role: 2 },
                 taken: Some(document().party),
-                since: Wall::EPOCH,
+                since: Some(Wall::EPOCH),
             },
             b"Taken by Pat",
         ),
-        (ChipPhase::Closing(Closing { delegates: 2, effects: 1 }), b"2 delegates and 1 effects settling"),
+        (ChipPhase::Closing(Closing { delegates: 2, connectors: list([1]) }), b"Closing: 2 delegates"),
         (
             ChipPhase::Held {
                 reason: HoldReason::Stopped { by: document().party, at: Wall::EPOCH },
@@ -514,7 +514,9 @@ fn all_chip_phases(words: &crate::words::Words) {
         assert!(contains(&tree, b"Task 8: Review"));
         for node in tree.nodes() {
             if let Some(slot) = node.slot {
-                assert_eq!(bindings.part(slot.token), Some(&part));
+                let expected =
+                    if value.phase == Phase::Closing { Part::Connector { connector: 1 } } else { part.clone() };
+                assert_eq!(bindings.part(slot.token), Some(&expected));
             }
         }
         if contains(&tree, b"Attempt") {
@@ -1147,4 +1149,50 @@ fn jig_object_cards_hold_actions_confirmations_and_notices() {
     proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(&words);
     escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_semantic_facts(&words);
     sizes::scenario(&words);
+    closing_connectors_use_their_owners_words(&words);
+    person_chip_preserves_absent_readiness(&words);
+}
+
+fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
+    let mut b = Builder::new(&limits());
+    let mut bindings = JigBindings::new(16, CLIENT.text);
+    b.open(Role::Page);
+    cards::common::closing(&mut b, &Closing { delegates: 2, connectors: list([7, 11]) }, words, &mut bindings);
+    b.close();
+    let slots = b.slots(0);
+    assert_eq!(slots.len(), 2);
+    for slot in &slots {
+        let connector = match bindings.part(slot.reference.token).unwrap() {
+            Part::Connector { connector } => *connector,
+            _ => panic!("a name-only connector part"),
+        };
+        assert_eq!(slot.reference.owner, crate::Owner::Side { connector });
+        let mut own = Builder::new(&limits());
+        own.open(Role::Region);
+        own.text(crate::Run::Plain, if connector == 7 { b"amber" } else { b"blue" });
+        own.close();
+        b.splice(slot.id, own);
+    }
+    let tree = b.finish();
+    for fact in [b"Closing: 2 delegates".as_slice(), b"amber", b"blue", b"'s effects settling"] {
+        assert!(contains(&tree, fact));
+    }
+    assert!(!contains(&tree, b"1 effects"));
+    assert!(!contains(&tree, b"2 effects"));
+}
+
+fn person_chip_preserves_absent_readiness(words: &crate::words::Words) {
+    for since in [None, Some(Wall::EPOCH)] {
+        let (d, _) = start();
+        let mut value = chip();
+        value.phase = Phase::Active;
+        *value.details = ChipPhase::Person { addressed: Recipient::Party(1), taken: None, since };
+        let mut b = Builder::new(&limits());
+        let mut bindings = JigBindings::new(16, CLIENT.text);
+        b.open(Role::Page);
+        cards::chip::chip(&mut b, &d, &value, words, &mut bindings);
+        b.close();
+        let tree = b.finish();
+        assert_eq!(contains(&tree, b"Since"), since.is_some());
+    }
 }

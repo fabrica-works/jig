@@ -83,7 +83,7 @@ pub enum ChipPhase {
     WaitingForWords { attempt: u32, since: Wall },
     BackingOff { at: Wall, attempt: u32, tries: u32, class: FailureClass, reason: Text },
     Procedure { panel: Part },
-    Person { addressed: Recipient, taken: Option<Party>, since: Wall },
+    Person { addressed: Recipient, taken: Option<Party>, since: Option<Wall> },
     Closing(Closing),
     Held { reason: HoldReason, since: Wall, revision: Revision },
     Ended { how: Ending, at: Wall },
@@ -128,10 +128,10 @@ pub struct Task {
 }
 
 /// What a task still waits for while closing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Closing {
     pub delegates: u32,
-    pub effects: u32,
+    pub connectors: List<u16>,
 }
 
 /// Spend attributed to a run or delegate.
@@ -809,7 +809,7 @@ pub enum Runtime {
     /// A connector procedure is active, shown in its panel.
     Procedure { panel: Part },
     /// A person task is waiting for its named recipient.
-    Person { addressed: Recipient, since: Wall },
+    Person { addressed: Recipient, since: Option<Wall> },
     /// Closing while its children and effects settle.
     Closing(Closing),
     /// Held, with its cause in the task hold.

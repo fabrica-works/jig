@@ -139,6 +139,8 @@ pub enum Phase {
 /// An application value named without carrying its type.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Part {
+    /// The connector name, supplied by its own view words.
+    Connector { connector: u16 },
     /// A resource in its connector.
     Resource { connector: u16, path: Text },
     /// An effect or read kind.

@@ -38,8 +38,8 @@ pub(super) fn phase_details(phase: Phase) -> ChipPhase {
             class: FailureClass::Temporary,
             reason: text(b"temporary"),
         },
-        Phase::Active => ChipPhase::Person { addressed: Recipient::Party(7), taken: None, since: Wall::EPOCH },
-        Phase::Closing => ChipPhase::Closing(Closing { delegates: 0, effects: 0 }),
+        Phase::Active => ChipPhase::Person { addressed: Recipient::Party(7), taken: None, since: Some(Wall::EPOCH) },
+        Phase::Closing => ChipPhase::Closing(Closing { delegates: 0, connectors: List::with_capacity(0) }),
         Phase::Held => ChipPhase::Held {
             reason: HoldReason::Stopped { by: frame(7).party, at: Wall::EPOCH },
             since: Wall::EPOCH,

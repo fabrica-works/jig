@@ -10,7 +10,7 @@ use skein_lib::{List, bytes::copy_of};
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "English data matches the closed phrase vocabulary whole")]
 pub fn language() -> Language {
-    let mut phrases = List::with_capacity(377);
+    let mut phrases = List::with_capacity(379);
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
             JigPhrase::ProposalsWaiting => Box::new([
@@ -453,10 +453,10 @@ pub fn language() -> Language {
             JigPhrase::Closing => Box::new([
                 Segment::Text(copy_of(b"Closing: ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" delegates and ")),
-                Segment::Hole { index: 1, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" effects settling")),
+                Segment::Text(copy_of(b" delegates")),
             ]),
+            JigPhrase::ClosingConnector => Box::new([Segment::Text(copy_of(b"and "))]),
+            JigPhrase::ClosingEffects => Box::new([Segment::Text(copy_of(b"'s effects settling"))]),
             JigPhrase::Held => Box::new([Segment::Text(copy_of(b"Held"))]),
             JigPhrase::Ended => Box::new([Segment::Text(copy_of(b"Ended"))]),
             JigPhrase::WaitingParty => Box::new([
@@ -857,6 +857,6 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
     Phrasebook::load(
         shapes(text),
         Box::new([language()]),
-        &PhraseLimits { languages: 1, phrases: 377, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
+        &PhraseLimits { languages: 1, phrases: 379, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
     )
 }

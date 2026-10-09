@@ -172,6 +172,7 @@ fn nested_chip_payload_bounds(chip: &Chip) {
 #[test]
 fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     bounded_offer_payloads_and_predictions();
+    closing_connector_payload_bounds();
     let mut setup = script();
     let chip = Chip {
         task: 8,
@@ -871,4 +872,13 @@ fn bounded_offer_payloads_and_predictions() {
         setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload), "all nested bounded facts are priced");
     }
+}
+
+fn closing_connector_payload_bounds() {
+    let mut setup = live_script();
+    let mut row = task();
+    row.chip.phase = Phase::Closing;
+    row.chip.details = Box::new(ChipPhase::Closing(Closing { delegates: 1, connectors: List::with_capacity(33) }));
+    setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+    assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload));
 }
