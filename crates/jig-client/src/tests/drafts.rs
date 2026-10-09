@@ -1,5 +1,5 @@
 use super::{
-    confirmation::{change, task},
+    confirmation::{change, reread, task},
     objects::{chip, live, text},
     pages::project,
     spine::{LIMITS, delivered, drain, drive, frame},
@@ -94,7 +94,13 @@ fn prepare_steering(domain: &mut Domain, act: ActKind) -> Ask {
         }
         ActKind::AmendRelease => {
             drive(domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
-            Ask::Amend { project: 1, task: 8, revision: Revision { value: 9 }, change: change(), release: true }
+            Ask::Amend {
+                project: 1,
+                task: 8,
+                revision: Revision { value: 9 },
+                change: change(),
+                release: Some(Revision { value: 3 }),
+            }
         }
         ActKind::Prioritise => {
             assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Priority));
@@ -281,5 +287,54 @@ fn a_words_answer_clears_only_the_submitted_touch_and_refused_or_unknown_words_k
             assert_eq!(domain.fields().get(Purpose::Composer { task: 8 }).unwrap().writes, 0);
         }
         assert!(drive(&mut domain, Time::ZERO, Event::Answered { request, answer }).is_empty());
+    }
+}
+
+#[test]
+fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_revision_moves() {
+    for which in 0_u8..3 {
+        let (mut domain, _) = live();
+        let mut document = steering_document(ActKind::AmendRelease);
+        let id = install(&mut domain, document.clone());
+        intend(&mut domain, id, ActKind::AmendRelease);
+        assert_eq!(domain.confirmation().unwrap().revision, Some(Revision { value: 9 }));
+        assert_eq!(domain.confirmation().unwrap().release_revision, Some(Revision { value: 3 }));
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+        match which {
+            0 => document.hold.as_mut().unwrap().revision = Revision { value: 4 },
+            1 => document.spec_revision = Revision { value: 10 },
+            2 => document.hold = None,
+            _ => unreachable!(),
+        }
+        reread(&mut domain, Body::Task(Box::new(document.clone())), Read::Task { task: 8 });
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+        assert_eq!(
+            domain.confirmation().unwrap().missing,
+            match which {
+                0 => Some(Missing::ChangedHold { now: Some(Revision { value: 4 }) }),
+                1 => Some(Missing::Changed { now: Some(Revision { value: 10 }) }),
+                2 => Some(Missing::ChangedHold { now: None }),
+                _ => unreachable!(),
+            }
+        );
+        // Further draft editing does not acknowledge a newly displayed hold.
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+        if which < 2 {
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Dismiss });
+            intend(&mut domain, id, ActKind::AmendRelease);
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+            let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+            assert_eq!(
+                only_send(&rows).1,
+                &Ask::Amend {
+                    project: 1,
+                    task: 8,
+                    revision: document.spec_revision,
+                    change: change(),
+                    release: Some(document.hold.as_ref().unwrap().revision),
+                }
+            );
+        }
     }
 }

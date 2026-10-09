@@ -172,7 +172,7 @@ pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
         .checked_add(form.max(proposal_action(limits)?).max(person_contract(limits)?).max(markdown(limits)?))?
         .checked_add(delegates)?
         .checked_add(limits.rows)?
-        .checked_add(64)
+        .checked_add(65)
 }
 /// Full visible notices and the oldest notice's dismissal control.
 #[must_use]

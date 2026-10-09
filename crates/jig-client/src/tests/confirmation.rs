@@ -99,7 +99,7 @@ fn sent(rows: &[Request]) -> &Ask {
 fn edit(domain: &mut Domain, field: Purpose, bytes: &[u8]) {
     assert!(drive(domain, Time::ZERO, Event::Act { act: Act::Edit { field, text: text(bytes) } }).is_empty());
 }
-fn reread(domain: &mut Domain, body: Body, what: Read) {
+pub(super) fn reread(domain: &mut Domain, body: Body, what: Read) {
     let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
     let read = domain.reads.ask(0, Source::Window { generation: 0, number: 4 }, what, &mut out).unwrap();
     let value = match body {
@@ -160,7 +160,7 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
         let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
         let expected = match case {
             0 => Ask::Release { project: 1, task: 8, revision: Revision { value: 3 }, again: None },
-            1 => Ask::Amend { project: 1, task: 8, revision: Revision { value: 9 }, change: change(), release: false },
+            1 => Ask::Amend { project: 1, task: 8, revision: Revision { value: 9 }, change: change(), release: None },
             2 => Ask::AnswerPerson {
                 project: 1,
                 task: 8,
@@ -266,7 +266,7 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
     assert!(open.missing.is_none());
     assert_eq!(
         sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
-        &Ask::Amend { project: 1, task: 8, revision: Revision { value: 9 }, change: change(), release: false }
+        &Ask::Amend { project: 1, task: 8, revision: Revision { value: 9 }, change: change(), release: None }
     );
 }
 
@@ -374,7 +374,7 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
                 task: 8,
                 revision: row.spec_revision,
                 change: draft,
-                release: act == ActKind::AmendRelease
+                release: if act == ActKind::AmendRelease { Some(row.hold.as_ref().unwrap().revision) } else { None }
             }
         );
     }
@@ -477,6 +477,6 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
     assert!(domain.confirmation().unwrap().missing.is_none());
     assert_eq!(
         sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
-        &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: false }
+        &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: None }
     );
 }

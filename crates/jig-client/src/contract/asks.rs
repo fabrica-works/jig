@@ -117,7 +117,7 @@ pub enum Ask {
     /// Release a hold, choosing whether to repeat an uncertain effect.
     Release { project: u32, task: u64, revision: Revision, again: Option<bool> },
     /// Amend and optionally release in one decision.
-    Amend { project: u32, task: u64, revision: Revision, change: Amendment, release: bool },
+    Amend { project: u32, task: u64, revision: Revision, change: Amendment, release: Option<Revision> },
     /// Stop a run and hold its task.
     Stop { project: u32, task: u64 },
     /// Cancel a task and its subtree.

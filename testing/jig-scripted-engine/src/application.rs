@@ -249,7 +249,7 @@ impl<A: Application> Engine<A> {
             let result = self.decide(party, ask, wall);
             match result {
                 Ok((jig_client::contract::Answer::Done(_), changes)) => {
-                    requests.push(ask.clone());
+                    requests.push((**ask).clone());
                     effects.extend(changes);
                 }
                 Ok((jig_client::contract::Answer::Refused(refusal), _)) => {

@@ -25,7 +25,7 @@ pub struct Truth {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Change {
     /// A jig request on an application requester's behalf; only application decisions may use this.
-    Request(Ask),
+    Request(Box<Ask>),
     /// Replace a party's authoritative frame, including roles, versions and retention.
     Frame(Frame),
     /// Confirm a numbered sign-in for a party.

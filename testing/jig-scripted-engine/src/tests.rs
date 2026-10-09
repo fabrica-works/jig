@@ -813,7 +813,7 @@ fn bounded_offer_payloads_and_predictions() {
             project: 1,
             task: 8,
             revision: Revision { value: 1 },
-            release: false,
+            release: None,
             change: Amendment {
                 addressed: None,
                 words: None,
@@ -955,5 +955,63 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
         };
         setup.truth.objects.insert(ObjectKey::Proposal(row.key), ReadValue::Proposal(Box::new(row)));
         assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload));
+    }
+}
+
+#[test]
+fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
+    let change = Change::Request(Box::new(Ask::MarkSeen { seen: Seen::Results { through: 1 } }));
+    let mut exact = Bounds {
+        document_bytes: u64::try_from(core::mem::size_of::<Box<Ask>>())
+            .unwrap()
+            .checked_add(u64::try_from(core::mem::size_of::<Ask>()).unwrap())
+            .unwrap(),
+        ..Bounds::default()
+    };
+    assert_eq!(change.validate(&exact), Ok(()));
+    exact.document_bytes = exact.document_bytes.checked_sub(1).unwrap();
+    assert_eq!(change.validate(&exact), Err(Invalid::Payload));
+    for stale_hold in [false, true] {
+        let mut setup = script();
+        let mut row = task();
+        row.hold = Some(Hold {
+            revision: Revision { value: 7 },
+            reason: HoldReason::Stopped { by: party(1), at: Wall::EPOCH },
+            before: Phase::Running,
+            since: Wall::EPOCH,
+            result: None,
+            spend: list(vec![]),
+        });
+        row.acts = list(vec![Offered { act: ActKind::AmendRelease, admission: Admission::Allowed }]);
+        setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+        let mut engine = Engine::new(setup, 1).unwrap();
+        send(
+            &mut engine,
+            0,
+            11,
+            1,
+            1,
+            Ask::Amend {
+                project: 1,
+                task: 8,
+                revision: Revision { value: if stale_hold { 1 } else { 2 } },
+                release: Some(Revision { value: if stale_hold { 6 } else { 7 } }),
+                change: Amendment {
+                    addressed: None,
+                    words: Some(text(b"new spec")),
+                    wake: None,
+                    dependencies: None,
+                    authority: None,
+                    instructions: None,
+                },
+            },
+        );
+        assert_eq!(
+            final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
+            &Answer::Refused(Refusal::Moved {
+                now: Revision { value: if stale_hold { 7 } else { 1 } },
+                what: if stale_hold { Moved::Hold } else { Moved::Spec },
+            })
+        );
     }
 }

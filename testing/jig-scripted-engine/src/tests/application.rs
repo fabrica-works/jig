@@ -51,8 +51,12 @@ impl Application for OwnApplication {
                 vec![Change::Seen { party: 1, results: 3, replies: vec![] }]
             } else {
                 ask.core.as_ref().map_or_else(
-                    || vec![Change::Request(Ask::MarkSeen { seen: Seen::Results { through: self.document.revision } })],
-                    |asks| asks.iter().cloned().map(Change::Request).collect(),
+                    || {
+                        vec![Change::Request(Box::new(Ask::MarkSeen {
+                            seen: Seen::Results { through: self.document.revision },
+                        }))]
+                    },
+                    |asks| asks.iter().cloned().map(|ask| Change::Request(Box::new(ask))).collect(),
                 )
             },
         }

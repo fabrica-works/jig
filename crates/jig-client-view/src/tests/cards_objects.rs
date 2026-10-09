@@ -1061,6 +1061,8 @@ fn escalation_row_scenario(
     }
     if acts[0] == ActKind::AmendRelease {
         assert!(contains(&tree, b"held specification"));
+        assert!(contains(&tree, b"Hold revision 4"));
+        assert_eq!(d.confirmation().unwrap().release_revision, Some(Revision { value: 4 }));
         let initial_writes = d.confirmation().unwrap().writes;
         let written = tree
             .nodes()

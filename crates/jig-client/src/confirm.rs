@@ -52,6 +52,8 @@ pub enum Missing {
     Context,
     /// The named revision moved while the confirmation was open.
     Changed { now: Option<Revision> },
+    /// The independently named hold changed while reviewing an amendment.
+    ChangedHold { now: Option<Revision> },
     /// The engine does not admit the act, or local admission is full.
     Refused { why: Refusal },
 }
@@ -64,6 +66,10 @@ pub struct Confirmation {
     pub act: ActKind,
     pub object: Id<Object>,
     pub revision: Option<Revision>,
+    /// Hold snapshot for an amendment that also releases.
+    pub release_revision: Option<Revision>,
+    /// A moved hold stays invalid until the person reviews it again.
+    pub release_changed: bool,
     pub choices: Choices,
     pub missing: Option<Missing>,
     pub changed: bool,
@@ -186,6 +192,8 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         act,
         object: id,
         revision,
+        release_revision: if act == ActKind::AmendRelease { acts::hold_revision(object) } else { None },
+        release_changed: false,
         choices,
         missing: None,
         changed: false,
@@ -209,15 +217,24 @@ pub(crate) fn sync(domain: &mut Domain) {
         return;
     };
     let now = acts::revision(object, open.act);
-    let changed = open.changed || now != open.revision;
+    let hold_now = if open.act == ActKind::AmendRelease { acts::hold_revision(object) } else { None };
+    let release_changed = open.release_changed || hold_now != open.release_revision;
+    let changed = open.changed || now != open.revision || release_changed;
     let proposed = match draft_admission(object, open) {
         Admission::Proposed { to } => Some(to),
         Admission::Allowed | Admission::Bounded { .. } | Admission::Refused(_) => None,
     };
-    let missing = if changed { Some(Missing::Changed { now }) } else { missing(domain, open, object) };
+    let missing = if release_changed {
+        Some(Missing::ChangedHold { now: hold_now })
+    } else if changed {
+        Some(Missing::Changed { now })
+    } else {
+        missing(domain, open, object)
+    };
     let open = domain.confirming.as_mut().expect("confirmation exists");
     if open.changed != changed || open.missing != missing || open.proposed != proposed {
         open.changed = changed;
+        open.release_changed = release_changed;
         open.missing = missing;
         open.proposed = proposed;
         domain.changed();
@@ -421,6 +438,9 @@ fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Miss
         ActKind::Amend | ActKind::AmendRelease => {
             if open.choices.change.is_none() {
                 return Some(Missing::Change);
+            }
+            if open.act == ActKind::AmendRelease && open.release_revision.is_none() {
+                return Some(Missing::Refused { why: Refusal::NotOffered });
             }
             None
         }

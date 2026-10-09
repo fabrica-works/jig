@@ -155,6 +155,9 @@ fn action(
                 &[],
             );
             amendment::form(b, client, object, open, words, bindings);
+            if let Some(revision) = open.release_revision {
+                words.text(b, JigPhrase::HoldRevision, &[Hole::Number(revision.value)]);
+            }
             if open.act == ActKind::AmendRelease
                 && let Some(hold) = held(object)
             {
@@ -461,6 +464,12 @@ pub fn missing_words(b: &mut Builder, missing: &Missing, words: &Words) {
             words.text(b, JigPhrase::ChangedConfirmation, &[]);
             if let Some(now) = now {
                 words.text(b, JigPhrase::Revision, &[Hole::Number(now.value)]);
+            }
+        }
+        Missing::ChangedHold { now } => {
+            words.text(b, JigPhrase::ChangedConfirmation, &[]);
+            if let Some(now) = now {
+                words.text(b, JigPhrase::HoldRevision, &[Hole::Number(now.value)]);
             }
         }
         Missing::Refused { why } => words.refusal(b, why),

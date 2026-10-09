@@ -144,6 +144,13 @@ impl<A: crate::Application> Engine<A> {
                     return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
                 }
             }
+            if let Ask::Amend { release: Some(seen), .. } = ask
+                && let ReadValue::Task(task) = value
+                && let Some(hold) = &task.hold
+                && *seen != hold.revision
+            {
+                return Ok((Answer::Refused(Refusal::Moved { now: hold.revision, what: Moved::Hold }), Vec::new()));
+            }
             let waiting = match value {
                 ReadValue::Proposal(value) => Some(&value.waiting),
                 ReadValue::Escalation(value) => Some(&value.waiting),
@@ -462,7 +469,7 @@ fn target(ask: &Ask) -> Target {
         Ask::Amend { project, task, revision, release, .. } => (
             Some(*project),
             Some(ObjectKey::Task(*task)),
-            if *release { ActKind::AmendRelease } else { ActKind::Amend },
+            if release.is_some() { ActKind::AmendRelease } else { ActKind::Amend },
             Some((*revision, Moved::Spec)),
         ),
         Ask::Stop { project, task } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Stop, None),

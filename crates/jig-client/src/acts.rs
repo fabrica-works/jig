@@ -110,6 +110,28 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
         | ActKind::SetPool => None,
     }
 }
+/// The hold displayed independently of the task's spec revision.
+#[must_use]
+pub fn hold_revision(object: &Object) -> Option<Revision> {
+    match &object.body {
+        Some(Body::Task(document)) => {
+            let Some(hold) = &document.hold else {
+                return None;
+            };
+            Some(hold.revision)
+        }
+        Some(Body::Escalation(document)) => Some(document.hold.revision),
+        Some(
+            Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => None,
+    }
+}
 fn words(fields: &Fields, purpose: Purpose) -> Option<Text> {
     Some(fields.get(purpose)?.text.clone())
 }
@@ -143,7 +165,11 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
             task,
             revision: confirmation.revision?,
             change: choices.change.clone()?,
-            release: confirmation.act == ActKind::AmendRelease,
+            release: if confirmation.act == ActKind::AmendRelease {
+                Some(confirmation.release_revision?)
+            } else {
+                None
+            },
         }),
         ActKind::Answer => answer(object, confirmation, fields, project, task),
         ActKind::Take => Some(Ask::Take { project, task }),

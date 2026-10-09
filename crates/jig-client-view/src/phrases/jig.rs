@@ -662,6 +662,8 @@ pub enum JigPhrase {
     NextPeriod,
     /// A collective policy holder in project (0), followed by every supplied role.
     WaitingRoles,
+    /// The independently named hold revision (0).
+    HoldRevision,
     /// The engine's current period number.
     CurrentPeriod,
     /// When its retained period ledger opened.
@@ -1165,6 +1167,7 @@ impl JigPhrase {
             Self::NextRun => 407,
             Self::NextPeriod => 408,
             Self::WaitingRoles => 411,
+            Self::HoldRevision => 412,
             Self::CurrentPeriod => 409,
             Self::PeriodBegan => 410,
             Self::Settings => 321,
@@ -1549,6 +1552,7 @@ impl JigPhrase {
             | Self::Period
             | Self::CurrentPeriod
             | Self::WaitingRoles
+            | Self::HoldRevision
             | Self::RoleNumber
             | Self::PartyNumber
             | Self::DecidesKind
@@ -1704,7 +1708,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 412] = [
+pub const ALL: [JigPhrase; 413] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -2033,6 +2037,7 @@ pub const ALL: [JigPhrase; 412] = [
     JigPhrase::NextRun,
     JigPhrase::NextPeriod,
     JigPhrase::WaitingRoles,
+    JigPhrase::HoldRevision,
     JigPhrase::CurrentPeriod,
     JigPhrase::PeriodBegan,
     JigPhrase::Settings,
@@ -2121,7 +2126,7 @@ pub const ALL: [JigPhrase; 412] = [
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(412);
+    let mut rows = List::with_capacity(413);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }
