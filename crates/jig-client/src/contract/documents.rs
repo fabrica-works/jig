@@ -6,6 +6,7 @@ use super::{
     Actor, Amendment, Authority, Count, Decision, Ending, Executor, Holding, Lacking, NoteScope, ObjectKey, Part,
     Party, Phase, Policy, ProposalKey, Refusal, Revision, Text, Turn, TurnName, VersionRange, WakePolicy,
 };
+use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
 /// Who is signed in and what the engine offers.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -473,6 +474,8 @@ pub enum InboxGroup {
 /// An entry names an object, project and read position.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InboxEntry {
+    /// Whole committed chat facts for a reply entry; absent for other groups.
+    pub reply: Option<Box<ConversationLine>>,
     pub lineage: List<Chip>,
     pub goal: Option<u64>,
     pub recipient: Option<Recipient>,

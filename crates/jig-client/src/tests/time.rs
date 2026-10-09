@@ -140,6 +140,7 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
     for task in 1..=2 {
         entries
             .push(InboxEntry {
+                reply: None,
                 lineage: List::with_capacity(0),
                 goal: None,
                 recipient: None,

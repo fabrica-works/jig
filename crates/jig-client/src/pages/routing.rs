@@ -318,13 +318,7 @@ pub(crate) fn delivery(
             domain.inbox.more = inbox.more;
             if domain.inbox.before.is_none() {
                 domain.inbox.replace(inbox.entries);
-                let mut keys = List::with_capacity(env.limits.rows);
-                for entry in &domain.inbox.rows {
-                    if keys.push(entry.object).is_err() {
-                        break;
-                    }
-                }
-                names(domain, env, source, keys, out);
+                crate::pages::replies::inbox(domain, env, source, out);
                 crate::pages::conversations::mark_results(domain, out);
             }
             domain.timed_page(!domain.inbox.rows.is_empty());
@@ -343,6 +337,7 @@ pub(crate) fn delivery(
                 if dropped > 0 {
                     refuse(domain, Limit::Objects);
                 }
+                crate::pages::replies::conversations(domain, env, source, out);
             }
             domain.changed();
         }
@@ -370,16 +365,18 @@ pub(crate) fn read_result(
     if receipt.abandoned || receipt.generation != domain.generation {
         return;
     }
-    match &receipt.what {
+    let inbox_read = match &receipt.what {
         Read::History { subtree, .. } => {
             if *subtree != domain.task_page.subtree_history {
                 return;
             }
+            false
         }
         Read::Ended { task, .. } => {
             if Some(*task) != domain.task_page.ended_task {
                 return;
             }
+            false
         }
         Read::Notes { scope, description, .. } => {
             let valid = match &domain.project_page.note_filter {
@@ -389,6 +386,7 @@ pub(crate) fn read_result(
             if !valid {
                 return;
             }
+            false
         }
         Read::Frame
         | Read::Task { .. }
@@ -399,15 +397,14 @@ pub(crate) fn read_result(
         | Read::Result { .. }
         | Read::Activity { .. }
         | Read::Conversations { .. }
-        | Read::Inbox { .. }
-        | Read::InboxGroup { .. }
         | Read::Goals { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
-        | Read::Deployment => {}
-    }
+        | Read::Deployment => false,
+        Read::Inbox { .. } | Read::InboxGroup { .. } => true,
+    };
     match receipt.source {
-        Source::Window { number: 10, .. } => {
+        Source::Window { number: 10, .. } if inbox_read => {
             if domain.inbox.reading != Some(token) {
                 return;
             }
@@ -486,6 +483,7 @@ fn read_value(
                 domain.changed();
             }
             crate::pages::conversations::order(&mut domain.conversation_rows.rows);
+            crate::pages::replies::conversations(domain, env, source, out);
             domain.changed();
         }
         ReadValue::Inbox(page) => {
@@ -493,13 +491,7 @@ fn read_value(
             domain.inbox.after = page.after;
             domain.inbox.more = domain.inbox.after.is_some();
             domain.inbox.replace(page.rows);
-            let mut keys = List::with_capacity(env.limits.rows);
-            for entry in &domain.inbox.rows {
-                if keys.push(entry.object).is_err() {
-                    break;
-                }
-            }
-            names(domain, env, source, keys, out);
+            crate::pages::replies::inbox(domain, env, source, out);
             crate::pages::conversations::mark_results(domain, out);
             domain.changed();
         }

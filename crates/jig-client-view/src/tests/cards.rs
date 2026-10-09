@@ -244,6 +244,7 @@ fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mu
     let mut entries = List::with_capacity(1);
     entries
         .push(InboxEntry {
+            reply: None,
             lineage: List::with_capacity(0),
             goal: None,
             recipient: None,

@@ -513,7 +513,7 @@ impl Payload for InboxGroup {
         }
     }
 }
-fields!(InboxEntry { lineage, goal, recipient, stall, object, project, group, position, at });
+fields!(InboxEntry { reply, lineage, goal, recipient, stall, object, project, group, position, at });
 fields!(Inbox { entries, needs, updates, results_seen, replies_seen, more });
 fields!(ReplyPosition { chat, through });
 fields!(ConversationLine { runtime, delegates, budget, chip, project, first_words, unread, seen, last_reply, changed });

@@ -97,6 +97,7 @@ fn inbox(keys: &[ObjectKey]) -> Delivery {
     for key in keys {
         entries
             .push(InboxEntry {
+                reply: None,
                 lineage: List::with_capacity(0),
                 goal: None,
                 recipient: None,

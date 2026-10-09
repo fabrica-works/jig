@@ -148,6 +148,7 @@ fn deployment_without_a_role_is_missing_and_never_watched() {
 
 fn entry(task: u64, group: InboxGroup, at: u64) -> InboxEntry {
     InboxEntry {
+        reply: None,
         object: ObjectKey::Task(task),
         project: 1,
         group,
@@ -1052,4 +1053,209 @@ fn project_and_deployment_pages_preserve_facts_confirmations_and_revision_checks
     project_board_orders_live_waiting_and_ended_goals_and_names_task_cards();
     a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once();
     project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts();
+}
+
+fn read_named(requests: &[Request], expected: &Read) -> skein_lib::Token {
+    for request in requests {
+        if let Request::Read { read, what } = request
+            && what == expected
+        {
+            return *read;
+        }
+    }
+    panic!("expected the named read");
+}
+fn reply_entry(task: u64, seen: u64, last: u64) -> InboxEntry {
+    let mut row = entry(task, InboxGroup::Replies, last);
+    let mut line = list_entry(task, Phase::Idle, last);
+    line.seen = seen;
+    line.last_reply = last;
+    line.unread = Count { value: u32::try_from(last.saturating_sub(seen)).unwrap(), limited: false };
+    row.reply = Some(Box::new(line));
+    row
+}
+#[test]
+fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_requests() {
+    use crate::{action::Act, objects::Body, pages::inbox::Filter};
+    let (mut domain, page) = live_inbox(45);
+    let mut rows = List::with_capacity(1);
+    rows.push(reply_entry(8, 4, 7)).unwrap();
+    let out = inbox_delivery(&mut domain, page, rows);
+    let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    let object = domain.objects().get(id).unwrap();
+    assert_eq!(object.project, Some(1));
+    assert_eq!(object.reply.as_ref().unwrap().first_words.bytes(), b"help checkout");
+    assert_eq!(object.reply.as_ref().unwrap().first_unread, 5);
+    let Some(Body::Chip(chip)) = &object.body else {
+        panic!("whole committed chat chip");
+    };
+    assert_eq!(chip.title.bytes(), b"held checkout");
+    assert_eq!(object.sources.len(), 1);
+    assert!(domain.conversation_rows().rows.is_empty());
+
+    let mut task = super::confirmation::task();
+    task.chip.task = 8;
+    task.chip.title = text(b"current task title");
+    task.spec = text(b"whole task specification");
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &Read::Task { task: 8 }),
+            result: ReadResult::Value(ReadValue::Task(Box::new(task.clone()))),
+        },
+    );
+    domain.reclaim();
+    let filter = Filter { project: Some(1), kind: Some(InboxGroup::Replies), goal: None };
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterInbox { filter } });
+    let what = Read::Inbox { project: filter.project, kind: filter.kind, goal: filter.goal, after: None };
+    let mut rows = List::with_capacity(1);
+    rows.push(reply_entry(8, 6, 9)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &what),
+            result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                rows,
+                before: Some(Cursor { value: text(b"back") }),
+                after: None,
+            }))),
+        },
+    );
+    let object = domain.objects().get(id).unwrap();
+    assert_eq!(object.reply.as_ref().unwrap().first_unread, 7);
+    assert_eq!(object.sources.len(), 1, "watch and read share the displayed row owner");
+    let Some(Body::Task(kept)) = &object.body else {
+        panic!("task document retained");
+    };
+    assert_eq!(**kept, task, "reply receipts do not replace the task's facts");
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::OpenChat { task: 8 } });
+    let mut marked = false;
+    for request in &out {
+        if let Request::Send { ask, .. } = request {
+            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 9 } });
+            marked = true;
+        }
+    }
+    assert!(marked, "an inbox-only reply marks its committed last position");
+    assert!(domain.objects().get(id).is_none(), "leaving drops unretained page objects");
+
+    let (mut domain, page) = live_inbox(46);
+    let mut bad = reply_entry(8, 1, 2);
+    bad.reply.as_mut().unwrap().chip.task = 9;
+    let mut rows = List::with_capacity(1);
+    rows.push(bad).unwrap();
+    inbox_delivery(&mut domain, page, rows);
+    assert!(domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.is_none());
+    assert!(domain.objects().find(ObjectKey::Task(9)).is_none(), "mismatched facts cannot name another chat");
+}
+fn live_conversation_page(seed: u64) -> (Domain, skein_lib::Token, skein_lib::Token) {
+    let (mut domain, _) = live_inbox(seed);
+    let entered =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
+    let watch = open_token(&entered);
+    let first_read = read_named(&entered, &Read::Conversations { project: None, after: None });
+    (domain, watch, first_read)
+}
+#[test]
+fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen_facts() {
+    use crate::{
+        action::{Act, End},
+        objects::{Body, Source},
+    };
+    let (mut domain, watch, first_read) = live_conversation_page(47);
+    let mut rows = List::with_capacity(2);
+    rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
+    rows.push(list_entry(9, Phase::Idle, 9)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
+                rows: rows.clone(),
+                more: true,
+            }))),
+        },
+    );
+    let eight = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    let nine = domain.objects().find(ObjectKey::Task(9)).unwrap();
+    assert_eq!(domain.objects().get(eight).unwrap().reply.as_ref().unwrap().first_unread, 3);
+    assert!(domain.objects().get(eight).unwrap().sources.contains(&Source::Watch(skein_lib::Id::from_token(watch))));
+    let mut task = super::confirmation::task();
+    task.chip.task = 9;
+    task.spec = text(b"retained full document");
+    assert!(domain.objects.put(ObjectKey::Task(9), Body::Task(Box::new(task.clone()))));
+    rows.get_mut(1).unwrap().seen = 3;
+    rows.get_mut(1).unwrap().unread.value = 0;
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
+                rows: rows.clone(),
+                more: true,
+            }))),
+        },
+    );
+    assert!(domain.objects().get(nine).unwrap().reply.is_none(), "committed seen facts remove stale unread metadata");
+    let cursor = Cursor { value: text(b"older") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: first_read,
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.objects().get(eight).unwrap().sources.len(), 1);
+    domain.reclaim();
+    let out = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: Act::More {
+                window: skein_lib::Token::new(crate::pages::conversations::CONVERSATIONS_WINDOW),
+                end: End::After,
+            },
+        },
+    );
+    let mut rows = List::with_capacity(1);
+    rows.push(list_entry(10, Phase::Done, 8)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &Read::Conversations { project: None, after: Some(cursor) }),
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                rows,
+                before: Some(Cursor { value: text(b"back") }),
+                after: None,
+            }))),
+        },
+    );
+    assert!(domain.objects().find(ObjectKey::Task(8)).is_none(), "a dropped row has no obsolete watch name");
+    assert_eq!(domain.objects().get(nine).unwrap().sources.len(), 1);
+    let Some(Body::Task(kept)) = &domain.objects().get(nine).unwrap().body else {
+        panic!("task retained");
+    };
+    assert_eq!(**kept, task);
+    let ten = domain.objects().find(ObjectKey::Task(10)).unwrap();
+    assert_eq!(domain.objects().get(ten).unwrap().reply.as_ref().unwrap().first_words.bytes(), b"help checkout");
+    let out = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert!(domain.objects().find(ObjectKey::Task(9)).is_none());
+    assert!(domain.objects().find(ObjectKey::Task(10)).is_none());
+    let mut closed = false;
+    for request in &out {
+        if let Request::Close { watch: old } = request {
+            closed |= *old == watch;
+        }
+    }
+    assert!(closed);
 }

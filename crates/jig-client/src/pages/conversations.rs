@@ -245,9 +245,20 @@ pub(crate) fn mark_results(domain: &mut Domain, out: &mut Queue<Request>) {
 }
 pub(crate) fn open_chat(domain: &mut Domain, env: &Env<crate::Limits>, task: u64, out: &mut Queue<Request>) {
     let mut through = None;
+    for entry in &domain.inbox.rows {
+        if entry.group == InboxGroup::Replies
+            && entry.object == ObjectKey::Task(task)
+            && let Some(line) = &entry.reply
+            && line.chip.task == task
+            && line.project == entry.project
+            && line.last_reply > line.seen
+        {
+            through = Some(line.last_reply);
+        }
+    }
     for row in &domain.conversation_rows.rows {
         if row.chip.task == task && row.last_reply > row.seen {
-            through = Some(row.last_reply);
+            through = Some(through.unwrap_or(0).max(row.last_reply));
         }
     }
     if let Some(through) = through {
@@ -377,7 +388,7 @@ pub const fn live(phase: contract::Phase) -> bool {
         | contract::Phase::Held => true,
     }
 }
-/// Heap for inbox context, its cursors and the one chat form refusal.
+/// Heap for inbox lineage and whole reply-line context, cursors and the chat form.
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     List::<contract::InboxEntry>::worst_case(limits.rows)?

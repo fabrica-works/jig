@@ -354,7 +354,13 @@ impl Objects {
     }
     /// Attaches a chat's reply navigation without replacing its task facts or card.
     pub fn reply(&mut self, source: Source, line: crate::contract::ConversationLine) -> Option<Id<Object>> {
-        let reply = result::Reply::from_line(line)?;
+        let key = ObjectKey::Task(line.chip.task);
+        let Some(reply) = result::Reply::from_line(line) else {
+            if let Some(id) = self.find(key) {
+                self.slab.get_mut(id).expect("indexed chat exists").reply = None;
+            }
+            return None;
+        };
         let id = self.name(ObjectKey::Task(reply.chat), source)?;
         self.slab.get_mut(id).expect("named chat exists").reply = Some(reply);
         Some(id)
@@ -405,7 +411,15 @@ pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
 fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<bool> {
     use crate::contract::Delivery;
     match value {
-        Delivery::Frame(_) | Delivery::Run(_) | Delivery::Deployment(_) | Delivery::Conversations(_) => None,
+        Delivery::Frame(_) | Delivery::Run(_) | Delivery::Deployment(_) => None,
+        Delivery::Conversations(chats) => {
+            for row in &chats.rows {
+                if key == ObjectKey::Task(row.chip.task) {
+                    return Some(true);
+                }
+            }
+            Some(false)
+        }
         Delivery::Task(task) => Some(key == ObjectKey::Task(task.chip.task)),
         Delivery::Inbox(inbox) => {
             for entry in &inbox.entries {
