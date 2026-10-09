@@ -11,12 +11,16 @@ extern crate alloc;
 
 mod binding;
 mod builder;
+mod diff;
 mod limits;
+mod render;
 mod tree;
 
 pub use binding::{Act, Binding, BoundAct, number};
 pub use builder::{Builder, Slot, SlotId};
+pub use diff::{Attribute, Made, Patch, diff};
 pub use limits::{Limits, worst_case};
+pub use render::View;
 pub use tree::{
     Drawing, DrawingKind, Key, Node, NodeId, Owner, Role, Run, SlotRef, State, Style, TextRun, Tree, Value,
 };
