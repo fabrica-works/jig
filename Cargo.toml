@@ -4,6 +4,7 @@
 resolver = "3"
 members = [
     "crates/jig-client",
+    "crates/jig-client-transcript",
     "crates/jig-client-view",
     "crates/jig-core-accounts",
     "testing/jig-test-connector",
@@ -50,6 +51,7 @@ publish = false
 
 [workspace.dependencies]
 jig-client = { path = "crates/jig-client" }
+jig-client-transcript = { path = "crates/jig-client-transcript" }
 jig-client-view = { path = "crates/jig-client-view" }
 skein-lib = { git = "https://git.ekanayaka.io/ai/skein.git" }
 skein-json = { git = "https://git.ekanayaka.io/ai/skein.git" }

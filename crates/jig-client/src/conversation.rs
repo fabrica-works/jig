@@ -385,7 +385,7 @@ impl Conversation {
                                         add_part(&mut parts, part);
                                     }
                                 }
-                                Block::Text(_) | Block::Result { .. } => {}
+                                Block::Text(_) | Block::Result { .. } | Block::Opaque { .. } => {}
                             }
                         }
                     }
@@ -466,7 +466,7 @@ impl Conversation {
                                         add_name(&mut names, *key);
                                     }
                                 }
-                                Block::Text(_) | Block::Result { .. } => {}
+                                Block::Text(_) | Block::Result { .. } | Block::Opaque { .. } => {}
                             }
                         }
                     }
@@ -539,7 +539,7 @@ fn has_call(rows: &List<ActivityLine>, name: CallName) -> bool {
                                         return true;
                                     }
                                 }
-                                Block::Text(_) | Block::Result { .. } => {}
+                                Block::Text(_) | Block::Result { .. } | Block::Opaque { .. } => {}
                             }
                         }
                     }

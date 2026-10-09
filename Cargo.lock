@@ -112,6 +112,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-transcript"
+version = "0.0.0"
+dependencies = [
+ "jig-client",
+ "skein-lib",
+ "smith-transcript",
+]
+
+[[package]]
 name = "jig-client-view"
 version = "0.0.0"
 dependencies = [

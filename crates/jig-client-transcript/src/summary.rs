@@ -1,0 +1,185 @@
+//! Bounded tool-outcome summaries; tool names and inputs remain on their calls.
+//! Provider text results remain verbatim; opaque payloads never enter a summary.
+use alloc::boxed::Box;
+use skein_lib::Intake;
+use skein_lib::stream::Read;
+use smith_transcript::v2 as smith;
+
+#[derive(Debug)]
+pub(super) struct Summary {
+    pub bytes: Box<[u8]>,
+    pub failed: bool,
+}
+
+pub(super) fn summarize(returned: &smith::Returned) -> Summary {
+    let mut builder = Builder { bytes: Intake::with_capacity(256), failed: true };
+    match returned {
+        smith::Returned::Outcome(outcome) => builder.outcome(outcome.value()),
+        smith::Returned::Said(said) => {
+            // This arm is handled directly by the receiving text budget.
+            builder.put(b"Tool returned text");
+            builder.failed = said.error();
+        }
+        smith::Returned::Invalid(invalid) => {
+            builder.put(b"Invalid call: ");
+            match invalid.problem() {
+                smith::CallProblem::UnknownTool => builder.put(b"unknown tool"),
+                smith::CallProblem::NotAnObject => builder.put(b"input is not an object"),
+                smith::CallProblem::Missing(field) => {
+                    builder.put(b"missing ");
+                    builder.put(field.field());
+                }
+                smith::CallProblem::WrongType(field) => {
+                    builder.put(b"wrong type for ");
+                    builder.put(field.field());
+                }
+                smith::CallProblem::BadValue(field) => {
+                    builder.put(b"bad value for ");
+                    builder.put(field.field());
+                }
+                smith::CallProblem::TooLarge => builder.put(b"input too large"),
+            }
+        }
+        smith::Returned::NotRun => builder.put(b"Not run"),
+        smith::Returned::Withdrawn => builder.put(b"Withdrawn"),
+    }
+    let length = builder.bytes.len();
+    Summary {
+        bytes: builder.bytes.meet(Read::Fill(length)).expect("summary bytes are buffered"),
+        failed: builder.failed,
+    }
+}
+
+#[derive(Debug)]
+struct Builder {
+    bytes: Intake,
+    failed: bool,
+}
+impl Builder {
+    fn put(&mut self, bytes: &[u8]) {
+        self.bytes.append(bytes).expect("fixed summary words and numeric fields fit 256 bytes");
+    }
+    fn number(&mut self, mut value: u64) {
+        let mut digits = [0_u8; 20];
+        let mut start = 20_usize;
+        for _ in 0_u32..20 {
+            start = start.checked_sub(1).expect("one place per decimal digit");
+            *digits.get_mut(start).expect("twenty digit buffer") =
+                u8::try_from(value % 10).expect("decimal digit").checked_add(b'0').expect("ascii digit");
+            value /= 10;
+            if value == 0 {
+                break;
+            }
+        }
+        self.put(digits.get(start..).expect("decimal suffix"));
+    }
+    fn outcome(&mut self, outcome: &smith::Outcome) {
+        match outcome {
+            smith::Outcome::Read(read) => {
+                self.failed = false;
+                self.put(b"Read ");
+                self.number(u64::from(read.lines()));
+                self.put(b" of ");
+                self.number(u64::from(read.total()));
+                self.put(b" lines; skipped ");
+                self.number(u64::from(read.skipped()));
+                if read.cut() {
+                    self.put(b"; content cut");
+                }
+            }
+            smith::Outcome::Listed(listed) => {
+                self.failed = false;
+                self.put(b"Listed ");
+                self.number(u64::from(listed.entries().len()));
+                self.put(b" entries; more ");
+                self.number(listed.more());
+            }
+            smith::Outcome::Found(found) => {
+                self.failed = false;
+                self.put(b"Found ");
+                self.number(u64::from(found.hits().len()));
+                self.put(b" hits; more ");
+                self.number(found.more());
+                if found.timed_out() {
+                    self.put(b"; search timed out");
+                }
+            }
+            smith::Outcome::Written(written) => {
+                self.failed = false;
+                if written.created() {
+                    self.put(b"Created file");
+                } else {
+                    self.put(b"Wrote file");
+                }
+            }
+            smith::Outcome::Edited(edited) => {
+                self.failed = false;
+                self.put(b"Edited ");
+                self.number(u64::from(edited.replaced()));
+                self.put(b" matches");
+            }
+            smith::Outcome::Exited(end) => self.command(end),
+            smith::Outcome::NotGranted => self.put(b"Tool refused: not granted"),
+            smith::Outcome::Outside => self.put(b"Tool refused: outside workspace"),
+            smith::Outcome::ReadOnly => self.put(b"Tool refused: read only"),
+            smith::Outcome::TooLong => self.put(b"Tool refused: path too long"),
+            smith::Outcome::NotFound => self.put(b"Tool refused: not found"),
+            smith::Outcome::NotFile => self.put(b"Tool refused: not a file"),
+            smith::Outcome::Linked => self.put(b"Tool refused: linked path"),
+            smith::Outcome::Protected => self.put(b"Tool refused: protected path"),
+            smith::Outcome::NotDirectory => self.put(b"Tool refused: not a directory"),
+            smith::Outcome::TooLarge(large) => {
+                self.put(b"Tool refused: too large, ");
+                self.number(large.size());
+                self.put(b" bytes");
+            }
+            smith::Outcome::NotRead => self.put(b"Tool refused: not read"),
+            smith::Outcome::Stale => self.put(b"Tool refused: stale read"),
+            smith::Outcome::NoMatch => self.put(b"Tool refused: no match"),
+            smith::Outcome::Ambiguous(ambiguous) => {
+                self.put(b"Tool refused: ambiguous, ");
+                self.number(u64::from(ambiguous.count()));
+                self.put(b" matches");
+            }
+            smith::Outcome::Unchanged => {
+                self.failed = false;
+                self.put(b"Unchanged");
+            }
+            smith::Outcome::Failed(failed) => {
+                self.put(b"Tool failed: ");
+                match failed.fault() {
+                    smith::Fault::Denied => self.put(b"denied"),
+                    smith::Fault::NoSpace => self.put(b"no space"),
+                    smith::Fault::Other => self.put(b"other fault"),
+                }
+            }
+            smith::Outcome::TimedOut => self.put(b"Tool timed out"),
+            smith::Outcome::Cancelled => self.put(b"Tool cancelled"),
+            smith::Outcome::Busy => self.put(b"Tool busy"),
+            smith::Outcome::NulByte => self.put(b"Tool refused: NUL byte"),
+        }
+    }
+    fn command(&mut self, end: &smith::CommandEnd) {
+        self.put(b"Command ended: ");
+        match end.exit() {
+            smith::Exit::Code(code) => {
+                self.failed = code.code() != 0;
+                self.put(b"exit ");
+                self.number(u64::from(code.code()));
+            }
+            smith::Exit::Signal(signal) => {
+                self.put(b"signal ");
+                self.number(u64::from(signal.signal()));
+            }
+            smith::Exit::TimedOut => self.put(b"timed out"),
+        }
+        self.put(b"; output bytes ");
+        let length = u64::try_from(end.head().len())
+            .expect("schema bounded bytes")
+            .checked_add(u64::try_from(end.last().len()).expect("schema bounded bytes"))
+            .expect("schema bounded bytes");
+        self.number(length);
+        self.put(b"; dropped ");
+        self.number(end.dropped());
+    }
+}

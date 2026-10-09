@@ -118,7 +118,13 @@ fn calls(position: u64, number: u32) -> ActivityLine {
         at: Wall::EPOCH,
         event: Activity::Turn {
             name: TurnName { attempt: 1, number },
-            turn: Turn { messages, used: Usage { input: 1, output: 2, cached: 0 }, spent: 3, read_through: None },
+            turn: Turn {
+                messages,
+                used: Usage { input: 1, output: 2, cached: 0 },
+                spent: 3,
+                read_through: None,
+                cut: false,
+            },
         },
     }
 }

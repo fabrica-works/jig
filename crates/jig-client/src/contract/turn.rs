@@ -10,6 +10,8 @@ pub struct Turn {
     pub used: Usage,
     pub spent: u64,
     pub read_through: Option<u64>,
+    /// Some messages, blocks or text did not fit the receiving limits.
+    pub cut: bool,
 }
 
 /// What a turn consumed, in integer units.
@@ -45,6 +47,8 @@ pub enum Speaker {
 pub enum Block {
     /// Words as written.
     Text(Text),
+    /// An uninterpreted provider block, with its dialect and byte count.
+    Opaque { dialect: Text, size: u64 },
     /// A tool call.
     Call(Call),
     /// A tool result summary.
@@ -61,4 +65,12 @@ pub struct Call {
     pub failed: bool,
     pub objects: List<ObjectKey>,
     pub parts: List<Part>,
+}
+
+/// Receiving bounds for a decoded turn; total text counts every retained field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TurnLimits {
+    pub messages: u32,
+    pub blocks: u32,
+    pub text: u32,
 }
