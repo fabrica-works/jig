@@ -1,6 +1,6 @@
 //! The fleet's state and its entry points (programming-model.md, section 3).
 
-use skein_lib::{Deadlines, Env, Id, Map, Queue, Slab, Time, Token};
+use skein_lib::{Deadlines, Env, Id, List, Map, Queue, Slab, Time, Token};
 
 use crate::attempt::{self, Attempt, Run};
 use crate::boundary::{Event, HostKind, Request};
@@ -128,6 +128,65 @@ impl Domain {
     }
 
     /// When the earliest alarm falls due.
+    /// Copy bounded connected host facts without changing placement.
+    #[must_use]
+    pub fn host_views(&self) -> List<crate::HostView> {
+        let mut result = List::with_capacity(self.tokens.capacity());
+        for (_, id) in &self.tokens {
+            let value = self.channels.get(*id).expect("connected channel");
+            result
+                .push(crate::HostView {
+                    channel: value.token,
+                    kind: value.kind,
+                    slots: value.slots,
+                    used: value.hosts.len(),
+                    draining: value.draining,
+                })
+                .expect("one view per connected channel");
+        }
+        result
+    }
+    /// Copy bounded current attempt facts, without exposing outstanding replies.
+    #[must_use]
+    pub fn attempt_views(&self) -> List<crate::AttemptView> {
+        let mut result = List::with_capacity(self.names.capacity());
+        for (_, id) in &self.names {
+            let value = self.attempts.get(*id).expect("named attempt");
+            let (state, at, until) = match value.state {
+                attempt::State::Waiting { .. } => (crate::AttemptState::Waiting, None, None),
+                attempt::State::Adopted { until, .. } => (crate::AttemptState::Adopted, None, Some(until)),
+                attempt::State::Claimed { at, .. } => (crate::AttemptState::Claimed, Some(at), None),
+                attempt::State::Cancelled { at, .. } => (crate::AttemptState::Cancelled, Some(at), None),
+                attempt::State::Handed { at } => (crate::AttemptState::Handed, Some(at), None),
+                attempt::State::Acknowledged { until } => (crate::AttemptState::Acknowledged, None, Some(until)),
+                attempt::State::Stray { at, until } => (crate::AttemptState::Stray, Some(at), until),
+                attempt::State::Kept { at, until, .. } => (crate::AttemptState::Kept, Some(at), until),
+                attempt::State::Fenced { at } => (crate::AttemptState::Fenced, Some(at), None),
+                attempt::State::Closed => (crate::AttemptState::Closed, None, None),
+            };
+            let (placement, deadline) = match at {
+                Some(attempt::Where::On(channel)) => {
+                    let channel = self.channels.get(channel).expect("attempt host");
+                    (crate::Placement::Connected { channel: channel.token, kind: channel.kind }, until)
+                }
+                Some(attempt::Where::Adrift { until }) => (crate::Placement::Adrift { until }, Some(until)),
+                None => (crate::Placement::None, until),
+            };
+            result
+                .push(crate::AttemptView {
+                    run: value.run,
+                    attempt: value.token,
+                    kept: value.kept,
+                    listed: value.listed,
+                    state,
+                    placement,
+                    until: deadline,
+                })
+                .expect("one view per named attempt");
+        }
+        result
+    }
+
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
         self.alarms.next()

@@ -19,7 +19,17 @@
 //! a proposal's effect authority ceiling is never reported as its price.
 //! Recurring wall schedules and past-period/root spending need store/period
 //! owners; the project reports period numbers and current live-root spending.
+//! Inbox result references may lack project and time, and reply read positions
+//! are absent until inbox work. Lost-host identity and hello refusal history
+//! are not retained; deployment preserves its adrift attempts instead. Use
+//! `make_with_clock` for wall-time grace and account cooldowns; `make` leaves
+//! those optional time fields absent when no clock was supplied.
 
+mod inbox_deployment;
+pub use inbox_deployment::{
+    Account, Capacity, ConversationLine, Conversations, Deployment, DocumentClock, Host, HostRun, Inbox, InboxEntry,
+    InboxObject, ProjectCapacity, RunLocation, make_with_clock,
+};
 mod objects;
 mod project_note;
 mod small;
@@ -72,8 +82,11 @@ pub struct DocumentLimits {
 
 /// Continuation position in a subject's stable numbered list.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Cursor {
-    pub number: u64,
+pub enum Cursor {
+    /// A task or goal number in the subject's ordered list.
+    Number { number: u64 },
+    /// Exact identity of one inbox row; number families may overlap.
+    Inbox { task: u64, object: InboxObject, at: Option<Wall> },
 }
 
 /// The bounded slice requested by a watch or read.
@@ -84,7 +97,7 @@ pub struct Window {
 }
 
 /// Identity of the immutable proposal's maker.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Proposer {
     /// A task's proposal.
     Task(u64),
@@ -251,6 +264,12 @@ pub enum Document {
     Project(Box<Project>),
     /// A note loaded by its owning child.
     Note(Note),
+    /// Party-only bounded waiting and unread groups.
+    Inbox(Inbox),
+    /// Party-only directly requested live chats.
+    Conversations(Conversations),
+    /// Fleet placement, accounts and finite capacities.
+    Deployment(Box<Deployment>),
 }
 
 /// Make the current visible document without changing state or emitting effects.
@@ -293,7 +312,21 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             let goals = task_tree::goals(core, limits, party, *project, window)?;
             Ok(Document::Goals(goals))
         }
-        Subject::Inbox { .. } | Subject::Conversations { .. } | Subject::Deployment => Err(Missing::Unknown),
+        Subject::Inbox { party: owner } => {
+            if *owner != party {
+                return Err(Missing::NotAllowed);
+            }
+            Ok(Document::Inbox(inbox_deployment::inbox(core, limits, party, window)?))
+        }
+        Subject::Conversations { party: owner } => {
+            if *owner != party {
+                return Err(Missing::NotAllowed);
+            }
+            Ok(Document::Conversations(inbox_deployment::conversations(core, limits, party, window)?))
+        }
+        Subject::Deployment => {
+            Ok(Document::Deployment(Box::new(inbox_deployment::deployment(core, limits, party, None)?)))
+        }
         Subject::Proposal { proposer, number } => {
             Ok(Document::Proposal(Box::new(objects::proposal(core, limits, party, *proposer, *number)?)))
         }
@@ -336,6 +369,13 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
             .max(frame)
             .max(task_tree::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
-            .max(project_note::worst_case(limits)?),
+            .max(project_note::worst_case(limits)?)
+            .max(inbox_deployment::worst_case(limits)?),
     )
+}
+
+/// Peak scratch allocated while constructing party/deployment pages. Child
+/// accessors copy bounded shallow facts only; documents themselves are separate.
+pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
+    inbox_deployment::scratch_worst_case(limits)
 }

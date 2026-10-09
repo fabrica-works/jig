@@ -682,7 +682,8 @@ pub(super) fn tree(core: &Core, limits: &Limits, party: u64, number: u64, window
     let mut folded_total = 0_u32;
     let mut last = None;
     let after = match window.after {
-        Some(cursor) => cursor.number,
+        Some(Cursor::Number { number }) => number,
+        Some(Cursor::Inbox { .. }) => return Err(Missing::Unknown),
         None => 0,
     };
     let mut more = false;
@@ -726,7 +727,7 @@ pub(super) fn tree(core: &Core, limits: &Limits, party: u64, number: u64, window
             cut: row.dependencies.len() > bound(limits),
         })
         .expect("tree window room checked");
-        last = Some(Cursor { number: row.number });
+        last = Some(Cursor::Number { number: row.number });
     }
     let mut folded = List::with_capacity(1);
     if folded_total > 0 {
@@ -759,7 +760,7 @@ pub(super) fn goals(core: &Core, limits: &Limits, party: u64, project: u32, wind
     let mut more = false;
     for (_, number) in &order {
         if !taking {
-            if window.after == Some(Cursor { number: *number }) {
+            if window.after == Some(Cursor::Number { number: *number }) {
                 taking = true;
             }
             continue;
@@ -818,7 +819,7 @@ pub(super) fn goals(core: &Core, limits: &Limits, party: u64, project: u32, wind
                 held_below,
             })
             .expect("goal window room checked");
-        last = Some(Cursor { number: *number });
+        last = Some(Cursor::Number { number: *number });
     }
     if !taking {
         return Err(Missing::Unknown);

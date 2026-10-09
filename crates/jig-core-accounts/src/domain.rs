@@ -1,4 +1,4 @@
-use skein_lib::{Deadlines, Duration, Env, Map, Queue, Time};
+use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time};
 
 use crate::{Event, Fact, Failure, Grant, Limits, Request, State};
 
@@ -90,6 +90,32 @@ impl Domain {
             }
         }
         false
+    }
+
+    /// Copy the secret-free state and usability facts currently retained.
+    #[must_use]
+    pub fn account_views(&self) -> List<Fact> {
+        let mut result = List::with_capacity(self.accounts.capacity());
+        for (number, entry) in &self.accounts {
+            result
+                .push(Fact {
+                    account: *number,
+                    state: match entry.phase {
+                        Phase::Fresh { .. } => State::Fresh,
+                        Phase::Refreshing { .. } => State::Refreshing,
+                        Phase::Retrying { .. } => State::Retrying,
+                        Phase::Revoked => State::Revoked,
+                        Phase::Closing { .. } => State::Closing,
+                    },
+                    generation: entry.generation,
+                    usable: entry.usable,
+                    unsaved: entry.unsaved,
+                    spent_until: entry.spent,
+                    attention: entry.unsaved || entry.spent_attention || entry.phase == Phase::Revoked,
+                })
+                .expect("one view per account");
+        }
+        result
     }
 
     #[must_use]

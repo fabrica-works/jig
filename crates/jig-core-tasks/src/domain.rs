@@ -171,6 +171,12 @@ impl Domain {
         &self.funding
     }
 
+    /// Borrow the retained pending person-origin proposals for a project census.
+    #[must_use]
+    pub const fn person_proposals(&self) -> &Map<u64, crate::PersonProposal> {
+        &self.person_proposals
+    }
+
     /// Pure remaining ledger slots for a root-administered period/pool pair.
     #[must_use]
     pub fn funding_room(&self) -> u32 {

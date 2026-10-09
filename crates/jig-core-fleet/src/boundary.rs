@@ -557,3 +557,45 @@ pub enum Refusal {
     /// The fleet knows the attempt already.
     Duplicate,
 }
+
+/// Read-only connected host facts; no protocol channel or reply right is retained.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct HostView {
+    pub channel: Token,
+    pub kind: HostKind,
+    pub slots: u32,
+    pub used: u32,
+    pub draining: bool,
+}
+/// The semantic attempt state, without its outstanding reply right.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AttemptState {
+    Waiting,
+    Adopted,
+    Claimed,
+    Cancelled,
+    Handed,
+    Acknowledged,
+    Stray,
+    Kept,
+    Fenced,
+    Closed,
+}
+/// Current placement; monotonic timer facts are translated by the parent with
+/// its injected clock when constructing a wall-time document.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Placement {
+    None,
+    Connected { channel: Token, kind: HostKind },
+    Adrift { until: skein_lib::Time },
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AttemptView {
+    pub run: Token,
+    pub attempt: Token,
+    pub kept: u32,
+    pub listed: bool,
+    pub state: AttemptState,
+    pub placement: Placement,
+    pub until: Option<skein_lib::Time>,
+}

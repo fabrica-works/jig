@@ -539,7 +539,7 @@ fn documents_tree_folds_every_unshown_phase_and_keeps_held_counts() {
     assert_eq!(tree.folded.get(0).unwrap().held_below, 1);
     assert_eq!(tree.folded.get(0).unwrap().phases.held, 1);
     assert_eq!(tree.folded.get(0).unwrap().phases.starting, 1);
-    assert_eq!(tree.next, Some(Cursor { number: 2 }));
+    assert_eq!(tree.next, Some(Cursor::Number { number: 2 }));
     let Document::Tree(next) =
         make(&core, &limits, 1, &Subject::Tree { task: 1 }, &Window { rows: 2, after: tree.next }).unwrap()
     else {
@@ -640,7 +640,7 @@ fn documents_goals_follow_priority_and_resume_at_the_named_cursor() {
         panic!()
     };
     assert_eq!(goals.lines.get(0).unwrap().chip.number, 5);
-    assert_eq!(goals.next, Some(Cursor { number: 5 }));
+    assert_eq!(goals.next, Some(Cursor::Number { number: 5 }));
     let Document::Goals(next) =
         make(&core, &limits, 1, &Subject::Goals { project: 1 }, &Window { rows: 1, after: goals.next }).unwrap()
     else {
@@ -1154,4 +1154,257 @@ fn documents_lifecycle_history_keeps_holds_and_endings() {
     );
     let MilestonePhase::Ended(Ending::Failed(words)) = line.phase else { panic!() };
     assert_eq!(words.bytes.as_ref(), b"Failure");
+}
+
+fn restore_document_party(core: &mut Core, limits: &Limits, projects: &[u32]) {
+    let identity = core.people.identity(1).unwrap().clone();
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    people::step(
+        &mut core.people,
+        &env,
+        people::Event::Restore { record: people::Stored::Person { number: 1, identity } },
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    for project in projects {
+        people::step(
+            &mut core.people,
+            &env,
+            people::Event::Restore {
+                record: people::Stored::Roles {
+                    project: *project,
+                    holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
+                },
+            },
+            &mut out,
+        );
+        while out.pop().is_some() {}
+    }
+    people::step(&mut core.people, &env, people::Event::Restored, &mut out);
+    assert!(core.people.identity(1).is_some());
+}
+#[test]
+fn documents_inbox_keeps_two_projects_groups_order_and_exact_cursor() {
+    let (mut core, mut limits) = make_tree();
+    limits.people.projects = 2;
+    limits.people.inbox_entries = 8;
+    restore_document_party(&mut core, &limits, &[1, 2]);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::OpenPeriod { reply_to: ReplyTo::new(Token::new(101)), project: 2, period: 1, budget: 1000 },
+    );
+    let mut task = new_row(&core, 5, tasks::Funder::Period { project: 2, period: 1 }, None);
+    task.project = 2;
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(102)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([task]),
+        },
+    );
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    let needs = [
+        people::Entry {
+            task: 1,
+            project: 1,
+            whom: people::Whom::Person(1),
+            kind: people::EntryKind::Question { message: 9 },
+            at: Wall::from_nanos(30),
+        },
+        people::Entry {
+            task: 1,
+            project: 1,
+            whom: people::Whom::Person(1),
+            kind: people::EntryKind::Question { message: 8 },
+            at: Wall::from_nanos(20),
+        },
+        people::Entry {
+            task: 5,
+            project: 2,
+            whom: people::Whom::Role { project: 2, role: 0 },
+            kind: people::EntryKind::PersonTask,
+            at: Wall::from_nanos(10),
+        },
+    ];
+    people::step(
+        &mut core.people,
+        &env,
+        people::Event::Waiting { task: 1, entries: Box::new([needs[0], needs[1]]) },
+        &mut out,
+    );
+    people::step(
+        &mut core.people,
+        &env,
+        people::Event::Waiting {
+            task: 5,
+            entries: Box::new([
+                needs[2],
+                people::Entry {
+                    task: 5,
+                    project: 2,
+                    whom: people::Whom::Person(1),
+                    kind: people::EntryKind::Reply { message: 7 },
+                    at: Wall::from_nanos(40),
+                },
+            ]),
+        },
+        &mut out,
+    );
+    let Document::Inbox(first) =
+        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(first.needs.len(), 2);
+    assert_eq!(first.cached_needs, 3);
+    assert!(first.updates.is_empty());
+    assert_eq!(first.needs.get(0).unwrap().project, Some(2));
+    assert_eq!(first.needs.get(1).unwrap().object, InboxObject::Question { message: 8 });
+    let Document::Inbox(next) =
+        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: first.next }).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(next.needs.get(0).unwrap().object, InboxObject::Question { message: 9 });
+    assert_eq!(next.updates.get(0).unwrap().object, InboxObject::Reply { message: 7 });
+    assert_eq!(next.next, None);
+    assert_eq!(make(&core, &limits, 1, &Subject::Inbox { party: 2 }, &window()), Err(Missing::NotAllowed));
+}
+#[test]
+fn documents_cached_inbox_results_preserve_positions_and_unknown_store_metadata() {
+    let (mut core, limits) = make_tree();
+    core.people.remember_result(&limits.people, 1, people::ResultRef { task: 100, position: 30 });
+    core.people.remember_result(&limits.people, 1, people::ResultRef { task: 99, position: 31 });
+    let Document::Inbox(inbox) =
+        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(inbox.updates.get(0).unwrap().object, InboxObject::Result { position: 31 });
+    assert_eq!(inbox.updates.get(0).unwrap().project, None);
+    assert_eq!(inbox.updates.get(0).unwrap().at, None);
+    assert_eq!(inbox.updates.get(0).unwrap().unread, Some(true));
+    assert!(!inbox.updates_time_complete);
+    assert_eq!(inbox.cached_updates, Count::AtLeast(2));
+}
+#[test]
+fn documents_conversations_show_chats_and_exclude_goals() {
+    let (mut core, limits) = make_tree();
+    let row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(110)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
+    let Document::Conversations(conversations) =
+        make(&core, &limits, 1, &Subject::Conversations { party: 1 }, &window()).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(conversations.lines.len(), 1);
+    assert_eq!(conversations.lines.get(0).unwrap().chip.number, 5);
+    assert_eq!(conversations.lines.get(0).unwrap().budget.numbers.budget, 100);
+    assert_eq!(conversations.lines.get(0).unwrap().replies_unread, None);
+}
+#[test]
+fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_clock() {
+    let (mut core, mut limits) = make_tree();
+    limits.people.projects = 2;
+    assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
+    restore_document_party(&mut core, &limits, &[0]);
+    let env = Env { now: Time::from_nanos(100), wall: Wall::from_nanos(1000), limits: limits.fleet };
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &env,
+        fleet::Event::Hello {
+            channel: Token::new(10),
+            hello: fleet::Hello {
+                stop_bound: Duration::from_secs(1),
+                slots: 1,
+                workstreams: Box::new([]),
+                hosting: Box::new([fleet::Hosted {
+                    run: Token::new(2),
+                    attempt: Token::new(9),
+                    phase: fleet::Phase::Active,
+                }]),
+            },
+        },
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    let clock = DocumentClock { now: env.now, wall: env.wall };
+    let Document::Deployment(deployment) =
+        make_with_clock(&core, &limits, 1, &Subject::Deployment, &window(), clock).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(deployment.hosts.len(), 1);
+    assert_eq!(deployment.hosts.get(0).unwrap().used, 1);
+    assert_eq!(deployment.hosts.get(0).unwrap().free, 0);
+    assert_eq!(deployment.attempts.get(0).unwrap().attempt, 9);
+    fleet::step(&mut core.fleet, &env, fleet::Event::Lost { channel: Token::new(10) }, &mut out);
+    let Document::Deployment(deployment) =
+        make_with_clock(&core, &limits, 1, &Subject::Deployment, &window(), clock).unwrap()
+    else {
+        panic!()
+    };
+    assert!(deployment.hosts.is_empty());
+    assert_eq!(deployment.workers.used, 0);
+    assert_eq!(deployment.attempts.len(), 1);
+    let RunLocation::Adrift { until, remaining } = deployment.attempts.get(0).unwrap().location else { panic!() };
+    assert_eq!(until, Some(Wall::from_nanos(1000 + limits.fleet.grace.as_nanos())));
+    assert_eq!(remaining, Some(limits.fleet.grace));
+    let Document::Deployment(without_clock) = make(&core, &limits, 1, &Subject::Deployment, &window()).unwrap() else {
+        panic!()
+    };
+    assert_eq!(without_clock.attempts.get(0).unwrap().location, RunLocation::Adrift { until: None, remaining: None });
+}
+#[test]
+fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
+    let (mut core, mut limits) = make_tree();
+    limits.people.projects = 2;
+    restore_document_party(&mut core, &limits, &[0]);
+    let env = Env { now: Time::from_nanos(100), wall: Wall::from_nanos(1000), limits: limits.accounts };
+    let mut out = Queue::with_capacity(accounts::MAX_OUT);
+    accounts::step(
+        &mut core.accounts,
+        &env,
+        accounts::Event::Add { account: 1, generation: 1, valid: Some(Duration::from_secs(60)) },
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    accounts::step(
+        &mut core.accounts,
+        &env,
+        accounts::Event::Exhausted { account: 1, retry_after: Duration::from_secs(5) },
+        &mut out,
+    );
+    let Document::Deployment(deployment) = make_with_clock(
+        &core,
+        &limits,
+        1,
+        &Subject::Deployment,
+        &window(),
+        DocumentClock { now: env.now, wall: env.wall },
+    )
+    .unwrap() else {
+        panic!()
+    };
+    let account = deployment.accounts.get(0).unwrap();
+    assert!(!account.usable);
+    assert_eq!(account.number, 1);
+    assert_eq!(account.state, accounts::State::Fresh);
+    assert_eq!(account.spent_until, Some(Wall::from_nanos(1000 + Duration::from_secs(5).as_nanos())));
+    assert!(!account.waiting.is_empty());
 }
