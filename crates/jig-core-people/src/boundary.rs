@@ -226,13 +226,13 @@ pub enum Ask {
     /// Cancel a task and its descendants with a bounded reason.
     Cancel { project: u32, task: u64, reason: Box<[u8]> },
     /// Lift a held task's cause and rejudge it.
-    Release { project: u32, task: u64 },
+    Release { project: u32, task: u64, revision: u64 },
     /// Claim one role-addressed person task for this authenticated person.
     TakePerson { project: u32, task: u64 },
     /// Give this person's current role task claim back to its role.
     HandBackPerson { project: u32, task: u64 },
     /// Supply the bounded result required by an addressed person task.
-    AnswerPerson { project: u32, task: u64, result: PersonResult },
+    AnswerPerson { project: u32, task: u64, revision: u64, result: PersonResult },
     /// Adopt a live task as this authenticated person's own goal, retaining its old requester's reference.
     Move { project: u32, task: u64, reason: Box<[u8]> },
     /// Authenticated keyed decision for a proposal waiting at this person or a policy role.
@@ -244,7 +244,7 @@ pub enum Ask {
     /// Set the priorities of a bounded set of current project goals together.
     Prioritise { project: u32, goals: Box<[(u64, u32)]> },
     /// Amend a live task this person may steer, after root policy and funding checks.
-    Amend { project: u32, task: u64, amendment: crate::Amendment },
+    Amend { project: u32, task: u64, revision: u64, amendment: crate::Amendment },
     /// Authenticated Owner's complete project roster replacement; root checks Policy permission and
     /// held-recipient preflight before applying it.
     SetRoles {
@@ -265,7 +265,7 @@ pub enum Ask {
         project: u32,
         /// Positive held chat identity.
         task: u64,
-        /// Positive task-local waiting revision, never a transport key.
+        /// Positive task-local hold revision, unchanged by passing or rerouting.
         revision: u64,
         /// One bounded semantic choice; root authorizes before mutation.
         decision: EscalationDecision,
@@ -358,10 +358,10 @@ pub enum Refusal {
     /// Root names an unknown target, bootstrap lacks its initialized project, or restore references
     /// an unknown person.
     Unknown,
-    /// A note changed since the person recalled its revision or belongs to a different scope.
-    NoteMoved,
-    /// A named note has gone from the store.
-    NoteMissing,
+    /// The thing decided changed; its current revision and reason are given.
+    Moved { now: crate::Moved },
+    /// The proposal or escalation waits for another recipient now.
+    NotWaiting,
     /// Root reports the requested target has ended.
     Ended,
     /// Configured capacity is unavailable or the root reports transient admission pressure; a newly
@@ -556,6 +556,7 @@ impl Stored {
 /// Root-to-child inputs; authenticated identity, authoritative roles and restored records
 /// cross this boundary without protocol secrets. (domain/people.md, sections 3–5).
 #[derive(PartialEq, Eq, Debug)]
+#[expect(clippy::large_enum_variant, reason = "bounded owned asks remain inline; queues count the complete event size")]
 pub enum Event {
     /// Forget a volatile watch key when its stream closes.
     WatchClosed { watcher: Token },

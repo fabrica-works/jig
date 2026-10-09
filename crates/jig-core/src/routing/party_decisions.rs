@@ -361,7 +361,7 @@ pub(super) fn person_escalation_decide(
         return;
     }
     if !Core::escalation_standing(&context, person, role) {
-        pool_refused(work, request, people::Refusal::Standing);
+        pool_refused(work, request, people::Refusal::NotWaiting);
         return;
     }
     let semantic = match &decision {
@@ -475,6 +475,12 @@ pub(super) fn escalation_request(
         && (context.project != project || !core.escalation_visible(&context, person, role))
     {
         pool_refused(work, request, people::Refusal::Standing);
+        return;
+    }
+    if let Some(context) = core.tasks.escalation(task)
+        && context.escalation.revision() != revision
+    {
+        pool_refused(work, request, crate::revisions::moved_hold(context.escalation.revision(), context.why));
         return;
     }
     out.push(Request::Now(Box::new(Now::HistoricalEscalation { request, person, project, task, revision })));

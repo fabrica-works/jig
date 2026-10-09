@@ -139,7 +139,7 @@ fn a_revision_must_name_the_entry_the_writer_recalled() {
         revision: 2,
     };
     let got = h.step(Event::Loaded { owner: *owner, rows: rows(&[Record::Entry(old)]), more: false });
-    assert_eq!(&*got, &[Request::Refused { owner: Token::new(5), why: Refusal::Moved }]);
+    assert_eq!(&*got, &[Request::Refused { owner: Token::new(5), why: Refusal::Moved { revision: 2 } }]);
 }
 
 #[test]

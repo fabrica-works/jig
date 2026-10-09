@@ -36,7 +36,7 @@ fn a_revision_of_an_entry_changed_since_it_was_recalled_is_refused_as_moved() {
             entry: task_entry(20, PROJECT, b"stale", b"stale", 9),
             recalled: Some(1)
         }),
-        Answer::Refused { why: Refusal::Moved }
+        Answer::Refused { why: Refusal::Moved { revision: 2 } }
     );
     assert_eq!(world.stored_entry(20).expect("entry retained").revision, 2);
     assert_eq!(world.commits(), 2);

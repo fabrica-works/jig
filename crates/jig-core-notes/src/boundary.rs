@@ -138,7 +138,7 @@ pub enum Refusal {
     /// The named entry is absent.
     Missing,
     /// The entry is newer than the revision the writer saw.
-    Moved,
+    Moved { revision: u32 },
     /// The entry's revision has reached its numeric bound.
     RevisionExhausted,
 }

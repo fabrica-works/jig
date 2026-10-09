@@ -28,7 +28,7 @@ impl Core {
         let Some(role_policy) = self.authority.role(project, holding.number()) else {
             unreachable!("member belongs to configured policy")
         };
-        let standing = self.person_tree(person, task, depth) || self.person_escalation_recipient(person, holding, task);
+        let standing = self.person_tree(person, task, depth);
         if !role_policy.requests.allows(authority::RequestKind::Amend) && !standing {
             return Err(people::Refusal::Authority);
         }
@@ -149,7 +149,7 @@ impl Core {
                 None => false,
             },
         };
-        let standing = self.person_tree(person, task, depth) || self.person_escalation_recipient(person, holding, task);
+        let standing = self.person_tree(person, task, depth);
         if context.project != project || !any_task && !standing {
             return Err(people::Refusal::Standing);
         }

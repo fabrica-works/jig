@@ -1522,8 +1522,8 @@ fn decided(domain: &mut Domain, env: &Env<Limits>, id: Id<Pending>, outcome: Out
             | Refusal::ResourceUnavailable
             | Refusal::Authority
             | Refusal::Unknown
-            | Refusal::NoteMoved
-            | Refusal::NoteMissing
+            | Refusal::Moved { .. }
+            | Refusal::NotWaiting
             | Refusal::Ended
             | Refusal::Limit
             | Refusal::KeyConflict,

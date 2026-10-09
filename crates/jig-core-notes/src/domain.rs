@@ -226,7 +226,10 @@ fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>,
                 Some(recalled) => {
                     assert!(old.name == entry.name, "entry lookup returns the named entry");
                     if old.revision != recalled || old.scope != entry.scope {
-                        push(out, Request::Refused { owner: pending.owner, why: Refusal::Moved });
+                        push(
+                            out,
+                            Request::Refused { owner: pending.owner, why: Refusal::Moved { revision: old.revision } },
+                        );
                     } else if let Some(revision) = old.revision.checked_add(1) {
                         domain.invalidate(&entry.scope);
                         save_new(pending.owner, entry, revision, out);
@@ -242,7 +245,10 @@ fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>,
                 Change::Correct { description, body, references, recalled } => {
                     assert!(old.name == name, "entry lookup returns the named entry");
                     if old.revision != recalled || old.scope != scope {
-                        push(out, Request::Refused { owner: pending.owner, why: Refusal::Moved });
+                        push(
+                            out,
+                            Request::Refused { owner: pending.owner, why: Refusal::Moved { revision: old.revision } },
+                        );
                     } else if let Some(revision) = old.revision.checked_add(1) {
                         old.description = description;
                         old.body = body;
@@ -263,7 +269,10 @@ fn entry_loaded(domain: &mut Domain, mut pending: Pending, found: Option<Entry>,
                         push(out, Request::Erase { key: Key::Line { scope: old.scope, name } });
                         push(out, Request::Deleted { owner: pending.owner, name });
                     } else {
-                        push(out, Request::Refused { owner: pending.owner, why: Refusal::Moved });
+                        push(
+                            out,
+                            Request::Refused { owner: pending.owner, why: Refusal::Moved { revision: old.revision } },
+                        );
                     }
                 }
             },

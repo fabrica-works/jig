@@ -116,8 +116,8 @@ pub(super) fn note_person_refusal(why: notes::Refusal) -> people::Refusal {
     match why {
         notes::Refusal::Busy => people::Refusal::Busy,
         notes::Refusal::Oversized | notes::Refusal::Full | notes::Refusal::RevisionExhausted => people::Refusal::Limit,
-        notes::Refusal::Missing => people::Refusal::NoteMissing,
-        notes::Refusal::Moved => people::Refusal::NoteMoved,
+        notes::Refusal::Missing => people::Refusal::Ended,
+        notes::Refusal::Moved { revision } => people::Refusal::Moved { now: people::Moved::Note { revision } },
         notes::Refusal::Exists => people::Refusal::Unknown,
     }
 }

@@ -124,15 +124,18 @@ impl Core {
                 PersonTaskRoute::HandBack(task),
                 tasks::Event::HandBackPerson { reply_to: ReplyTo::new(request), task, person },
             ),
-            people::Ask::AnswerPerson { result, .. } => (
-                PersonTaskRoute::Answer(task),
-                tasks::Event::AnswerPerson {
-                    reply_to: ReplyTo::new(request),
-                    task,
-                    person,
-                    result: person_result(result),
-                },
-            ),
+            people::Ask::AnswerPerson { revision, result, .. } => {
+                self.person_revision(task, revision)?;
+                (
+                    PersonTaskRoute::Answer(task),
+                    tasks::Event::AnswerPerson {
+                        reply_to: ReplyTo::new(request),
+                        task,
+                        person,
+                        result: person_result(result),
+                    },
+                )
+            }
             people::Ask::Move { .. }
             | people::Ask::DecideProposal { .. }
             | people::Ask::Say { .. }

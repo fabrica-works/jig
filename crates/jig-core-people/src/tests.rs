@@ -1000,3 +1000,39 @@ fn authenticated_escalation_decisions_route_without_membership_and_io_pressure_i
         Reply::Refused(Refusal::SignIn)
     );
 }
+
+#[test]
+#[expect(clippy::wildcard_enum_match_arm, reason = "the test scripts only three revision-bearing asks")]
+fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
+    let asks = [
+        Ask::Release { project: 1, task: 7, revision: 1 },
+        Ask::AnswerPerson { project: 1, task: 7, revision: 1, result: PersonResult::Report { words: Box::new([1]) } },
+        Ask::Amend {
+            project: 1,
+            task: 7,
+            revision: 1,
+            amendment: Amendment { spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([]) },
+        },
+    ];
+    let facts = [
+        Moved::Hold { revision: 2, reason: HoldReason::Budget },
+        Moved::Person { revision: 2 },
+        Moved::Spec { revision: 2 },
+    ];
+    for (ask, now) in asks.into_iter().zip(facts) {
+        let mut test = Test::new(LIMITS);
+        test.member();
+        let request = route(&test.request(10, 14, ask.clone()));
+        let outcome = Outcome::Refused(Refusal::Moved { now });
+        let outputs = test.send(Event::Decided { request, outcome });
+        assert_eq!(reply(&outputs), Reply::Outcome(outcome));
+        assert_eq!(reply(&test.request(10, 14, ask.clone())), Reply::Outcome(outcome));
+        let changed = match ask {
+            Ask::Release { project, task, .. } => Ask::Release { project, task, revision: 2 },
+            Ask::AnswerPerson { project, task, result, .. } => Ask::AnswerPerson { project, task, revision: 2, result },
+            Ask::Amend { project, task, amendment, .. } => Ask::Amend { project, task, revision: 2, amendment },
+            _ => panic!("only revision-bearing asks scripted"),
+        };
+        assert_eq!(reply(&test.request(10, 14, changed)), Reply::Refused(Refusal::KeyConflict));
+    }
+}

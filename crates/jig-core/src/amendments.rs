@@ -90,7 +90,7 @@ impl Core {
                 None => false,
             },
         };
-        let standing = self.person_tree(person, task, depth) || self.person_escalation_recipient(person, role, task);
+        let standing = self.person_tree(person, task, depth);
         if context.project != project || !any_task && !standing {
             return Err(people::Refusal::Standing);
         }

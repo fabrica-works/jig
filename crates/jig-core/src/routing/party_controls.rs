@@ -18,6 +18,7 @@ pub(super) fn amend_route(
     role: Option<people::Role>,
     project: u32,
     task: u64,
+    revision: u64,
     amendment: people::Amendment,
 ) {
     let Some(amendment) = crate::amendments::translate(amendment, &env.limits.tasks) else {
@@ -32,6 +33,10 @@ pub(super) fn amend_route(
                 return;
             }
         };
+    if let Err(why) = core.spec_revision(task, revision) {
+        pool_refused(work, request, why);
+        return;
+    }
     if propose {
         let Some(proposal) = crate::fresh(&mut core.counters, crate::Family::Message) else {
             pool_refused(work, request, people::Refusal::Limit);
@@ -178,6 +183,34 @@ pub(super) fn release_request(
 ) {
     match core.control_admit(&ask, person, project, role, env.limits.tasks.depth, env.limits.tasks.result_bytes) {
         Ok(task) => {
+            let revision = match ask {
+                people::Ask::Release { revision, .. } => revision,
+                people::Ask::Watch { .. }
+                | people::Ask::EditNote { .. }
+                | people::Ask::MakeService { .. }
+                | people::Ask::Adopt { .. }
+                | people::Ask::SetGoal { .. }
+                | people::Ask::Stop { .. }
+                | people::Ask::Cancel { .. }
+                | people::Ask::TakePerson { .. }
+                | people::Ask::HandBackPerson { .. }
+                | people::Ask::AnswerPerson { .. }
+                | people::Ask::Move { .. }
+                | people::Ask::DecideProposal { .. }
+                | people::Ask::Say { .. }
+                | people::Ask::AnswerQuestion { .. }
+                | people::Ask::Prioritise { .. }
+                | people::Ask::Amend { .. }
+                | people::Ask::SetRoles { .. }
+                | people::Ask::ChangePolicy { .. }
+                | people::Ask::SetPool { .. }
+                | people::Ask::DecideEscalation { .. }
+                | people::Ask::StartChat { .. } => unreachable!("release route owns its ask"),
+            };
+            if let Err(why) = core.hold_revision(task, revision) {
+                pool_refused(work, request, why);
+                return;
+            }
             assert!(core.person_tasks.insert(request, PersonTaskRoute::Release(task)) == Ok(None), "one release route");
             work.push(Event::Tasks(tasks::Event::Control {
                 reply_to: ReplyTo::new(request),

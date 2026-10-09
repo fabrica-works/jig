@@ -41,7 +41,7 @@ fn a_choice_waits_until_a_person_task_is_visible() {
     );
     party.sign_in = Some(1);
     assert!(party.tick(Time::ZERO).is_none());
-    party.waiting(Some(Waiting::Choice { task: 7 }));
+    party.waiting(Some(Waiting::Choice { task: 7, revision: 3 }));
     assert!(matches!(
         party.tick(Time::ZERO),
         Some(Up::Request { ask: Ask::Choose { task: Task::Number(7), code: 2, .. }, .. })

@@ -182,11 +182,14 @@ impl Peers {
                     }
                     parties::Ask::Say { task, words } => people::Ask::Say { project, task: task_number(task), words },
                     parties::Ask::Stop { task } => people::Ask::Stop { project, task: task_number(task) },
-                    parties::Ask::Release { task } => people::Ask::Release { project, task: task_number(task) },
+                    parties::Ask::Release { task, revision } => {
+                        people::Ask::Release { project, task: task_number(task), revision }
+                    }
                     parties::Ask::Take { task } => people::Ask::TakePerson { project, task: task_number(task) },
-                    parties::Ask::Choose { task, code, words } => people::Ask::AnswerPerson {
+                    parties::Ask::Choose { task, revision, code, words } => people::Ask::AnswerPerson {
                         project,
                         task: task_number(task),
+                        revision,
                         result: people::PersonResult::Verdict { code, words },
                     },
                     parties::Ask::Decide { .. } => panic!("party resolves its visible proposal"),
@@ -368,7 +371,7 @@ fn waiting(store: &Store, party: &parties::Party) -> Option<parties::Waiting> {
             && task.taken_by.is_none_or(|holder| holder == person)
             && matches!(task.phase, tasks::Phase::Active(_))
         {
-            return Some(parties::Waiting::Choice { task: task.number });
+            return Some(parties::Waiting::Choice { task: task.number, revision: task.revisions.person });
         }
     }
     None

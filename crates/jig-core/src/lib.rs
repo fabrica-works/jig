@@ -38,6 +38,7 @@ mod proposals;
 mod resources;
 mod restart;
 pub use restart::{RestartRequest, RestartStep};
+mod revisions;
 mod roles;
 mod routing;
 mod run;

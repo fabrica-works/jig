@@ -38,6 +38,7 @@
 extern crate alloc;
 mod amendment;
 mod boundary;
+mod decisions;
 mod domain;
 mod facts;
 mod limits;
@@ -53,6 +54,7 @@ pub use boundary::{
     InitialOwner, Key, Kind, NoteChange, NoteScope, Outcome, PersonResult, ProposalChoice, ProposalDecision, Refusal,
     Reply, Request, RequestKey, ResourceName, ResourceRole, ResultRef, Role, Seed, Stored, WatchSubject, Whom,
 };
+pub use decisions::{FailureClass, HoldReason, Moved};
 pub use domain::{Domain, fire, max_out, step};
 pub use facts::Fact;
 pub use limits::{Limits, worst_case};

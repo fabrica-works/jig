@@ -46,11 +46,11 @@ pub enum Ask {
     /// Stop a current run.
     Stop { task: Task },
     /// Release a held task.
-    Release { task: Task },
+    Release { task: Task, revision: u64 },
     /// Claim visible role-addressed work.
     Take { task: Task },
     /// Answer one visible report choice.
-    Choose { task: Task, code: u32, words: Box<[u8]> },
+    Choose { task: Task, revision: u64, code: u32, words: Box<[u8]> },
     /// Decide the visible proposal.
     Decide { accept: bool },
     /// A resolved proposal retained with the keyed request for later duplicates.
@@ -80,7 +80,7 @@ pub enum Waiting {
     /// One action needing this party's authority.
     Proposal { proposer: u64, proposal: u64 },
     /// One person task asking for a result.
-    Choice { task: u64 },
+    Choice { task: u64, revision: u64 },
 }
 
 /// A reply a client can see, translated by the world.
@@ -222,13 +222,13 @@ impl Party {
                 }
             }
             Act::AnswerWaiting { code, words } => {
-                let Some(Waiting::Choice { task }) = self.waiting else { return None };
+                let Some(Waiting::Choice { task, revision }) = self.waiting else { return None };
                 Up::Request {
                     to,
                     sign_in: self.sign_in?,
                     project: self.project,
                     key: request_key(to),
-                    ask: Ask::Choose { task: Task::Number(task), code, words },
+                    ask: Ask::Choose { task: Task::Number(task), revision, code, words },
                 }
             }
         };
@@ -244,7 +244,7 @@ impl Party {
             Task::Number(number) => number,
             Task::Last => self.last_task?,
             Task::Waiting => match self.waiting? {
-                Waiting::Choice { task } => task,
+                Waiting::Choice { task, .. } => task,
                 Waiting::Proposal { .. } => return None,
             },
         };
@@ -255,9 +255,11 @@ impl Party {
         Some(match ask {
             Ask::Say { task, words } => Ask::Say { task: self.task(task)?, words },
             Ask::Stop { task } => Ask::Stop { task: self.task(task)? },
-            Ask::Release { task } => Ask::Release { task: self.task(task)? },
+            Ask::Release { task, revision } => Ask::Release { task: self.task(task)?, revision },
             Ask::Take { task } => Ask::Take { task: self.task(task)? },
-            Ask::Choose { task, code, words } => Ask::Choose { task: self.task(task)?, code, words },
+            Ask::Choose { task, revision, code, words } => {
+                Ask::Choose { task: self.task(task)?, revision, code, words }
+            }
             Ask::Decide { accept } => {
                 let Some(Waiting::Proposal { proposer, proposal }) = self.waiting else { return None };
                 Ask::Decision { proposer, proposal, accept }

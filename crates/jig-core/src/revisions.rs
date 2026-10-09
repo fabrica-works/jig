@@ -1,0 +1,80 @@
+//! Revision checks at the decision boundary (client/domain/contract.md,
+//! section 5.2; domain/people.md, section 5.1). The tasks child keeps each
+//! counter. The core compares the revision a party named before changing state,
+//! and translates the current hold reason without exposing a child's types.
+use crate::Core;
+use jig_core_people as people;
+use jig_core_tasks as tasks;
+
+impl Core {
+    /// Refuse an old hold revision with the current reason before release.
+    pub(crate) fn hold_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
+        let row = self.tasks.task(task).ok_or(people::Refusal::Ended)?;
+        match row.phase {
+            tasks::Phase::Held { why, .. } if row.revisions.hold != revision => {
+                Err(moved_hold(row.revisions.hold, why))
+            }
+            tasks::Phase::Held { .. }
+            | tasks::Phase::Waiting
+            | tasks::Phase::Active(_)
+            | tasks::Phase::Closing(_)
+            | tasks::Phase::Ended(_) => Ok(()),
+        }
+    }
+
+    /// Compare only the task spec, independent of progress or history.
+    pub(crate) fn spec_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
+        let row = self.tasks.task(task).ok_or(people::Refusal::Ended)?;
+        if row.revisions.spec == revision {
+            Ok(())
+        } else {
+            Err(people::Refusal::Moved { now: people::Moved::Spec { revision: row.revisions.spec } })
+        }
+    }
+
+    /// Compare the question and displayed results before accepting an answer.
+    pub(crate) fn person_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
+        let row = self.tasks.task(task).ok_or(people::Refusal::Ended)?;
+        if row.revisions.person == revision {
+            Ok(())
+        } else {
+            Err(people::Refusal::Moved { now: people::Moved::Person { revision: row.revisions.person } })
+        }
+    }
+}
+
+pub(crate) fn moved_hold(revision: u64, why: tasks::Hold) -> people::Refusal {
+    people::Refusal::Moved { now: people::Moved::Hold { revision, reason: hold_reason(why) } }
+}
+
+fn hold_reason(why: tasks::Hold) -> people::HoldReason {
+    match why {
+        tasks::Hold::Failures(class) => people::HoldReason::Failures { class: failure_class(class) },
+        tasks::Hold::Stalled => people::HoldReason::Stalled,
+        tasks::Hold::Dependency(task) => people::HoldReason::Dependency { task },
+        tasks::Hold::Stopped => people::HoldReason::Stopped,
+        tasks::Hold::StoppedBy { party } => people::HoldReason::StoppedBy { party },
+        tasks::Hold::Drift => people::HoldReason::Drift,
+        tasks::Hold::Effects => people::HoldReason::Effects,
+        tasks::Hold::EffectFailed => people::HoldReason::EffectFailed,
+        tasks::Hold::Uncertain { entry } => people::HoldReason::Uncertain { entry },
+        tasks::Hold::Budget => people::HoldReason::Budget,
+        tasks::Hold::Deadline => people::HoldReason::Deadline,
+        tasks::Hold::HoldsWaited => people::HoldReason::HoldsWaited,
+        tasks::Hold::ResourceUnavailable => people::HoldReason::ResourceUnavailable,
+        tasks::Hold::ResourceAccess => people::HoldReason::ResourceAccess,
+        tasks::Hold::PoolLost { pool } => people::HoldReason::PoolLost { pool },
+        tasks::Hold::Procedure => people::HoldReason::Procedure,
+    }
+}
+
+fn failure_class(class: tasks::Class) -> people::FailureClass {
+    match class {
+        tasks::Class::Transient => people::FailureClass::Transient,
+        tasks::Class::Permanent => people::FailureClass::Permanent,
+        tasks::Class::Run => people::FailureClass::Run,
+        tasks::Class::Agent => people::FailureClass::Agent,
+        tasks::Class::Lost => people::FailureClass::Lost,
+        tasks::Class::Invalid => people::FailureClass::Invalid,
+    }
+}

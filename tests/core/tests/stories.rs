@@ -881,3 +881,83 @@ fn a_context_adoption_still_refuses_effects_after_a_cold_restart() {
     })) if findings.contains(&authority::Finding::ResourceAccess)));
     assert!(world.systems[0].observed().is_empty());
 }
+
+fn live_row(world: &World, task: u64) -> &tasks::TaskRecord {
+    match world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))) {
+        Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => row,
+        row => panic!("live task row missing: {row:?}"),
+    }
+}
+
+fn amendment(words: &[u8]) -> people::Amendment {
+    people::Amendment {
+        spec: Some(people::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
+        wake: None,
+        dependencies: None,
+        authority: None,
+        reason: b"new evidence".as_slice().into(),
+    }
+}
+
+#[test]
+fn a_release_naming_an_old_hold_is_refused_as_moved_saying_what_holds_it_now() {
+    let mut world = World::new(150, false);
+    let task = world.call_key(1).task;
+    ask(&mut world, 50, people::Ask::Stop { project: 1, task });
+    let revision = live_row(&world, task).revisions.hold;
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Budget })));
+    ask(&mut world, 51, people::Ask::Release { project: 1, task, revision });
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Moved {
+            now: people::Moved::Hold { revision: revision + 1, reason: people::HoldReason::Budget }
+        })))
+    );
+    assert!(matches!(live_row(&world, task).phase, tasks::Phase::Held { why: tasks::Hold::Budget, .. }));
+    let refusal = world.people_answers.last().copied();
+    world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Deadline })));
+    ask(&mut world, 51, people::Ask::Release { project: 1, task, revision });
+    assert_eq!(world.people_answers.last().copied(), refusal, "replay retains the refused decision's facts");
+}
+
+#[test]
+fn a_release_after_a_pass_up_keeps_the_hold_revision_and_uses_the_partys_tree() {
+    let mut world = World::new(151, false);
+    let task = world.call_key(1).task;
+    ask(&mut world, 52, people::Ask::Stop { project: 1, task });
+    world.end(tasks::End::Parked, 0);
+    let revision = live_row(&world, task).revisions.hold;
+    ask(
+        &mut world,
+        53,
+        people::Ask::DecideEscalation { project: 1, task, revision, decision: people::EscalationDecision::Pass },
+    );
+    assert!(matches!(
+        world.people_answers.last(),
+        Some(people::Reply::Outcome(people::Outcome::EscalationDecided {
+            choice: people::EscalationChoice::Passed,
+            ..
+        }))
+    ));
+    assert_eq!(live_row(&world, task).revisions.hold, revision);
+    ask(&mut world, 54, people::Ask::Release { project: 1, task, revision });
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Released { task })));
+    assert!(!matches!(live_row(&world, task).phase, tasks::Phase::Held { .. }));
+}
+
+#[test]
+fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
+    let mut world = World::new(152, false);
+    let task = world.call_key(1).task;
+    let revision = live_row(&world, task).revisions.spec;
+    ask(&mut world, 55, people::Ask::Amend { project: 1, task, revision, amendment: amendment(b"first change") });
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Amended { task })));
+    ask(&mut world, 56, people::Ask::Amend { project: 1, task, revision, amendment: amendment(b"stale change") });
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Moved {
+            now: people::Moved::Spec { revision: revision + 1 }
+        })))
+    );
+    assert_eq!(live_row(&world, task).spec.words.as_ref(), b"first change");
+}

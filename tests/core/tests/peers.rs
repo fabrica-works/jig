@@ -202,7 +202,19 @@ fn a_person_stops_a_scripted_run_and_releases_it_for_a_new_attempt() {
     acts(&mut world, 2, Box::new([Act::Request { key: [6; 16], ask: Ask::Chat { words: Box::from(&b"start"[..]) } }]));
     acts(&mut world, 2, Box::new([Act::Request { key: [7; 16], ask: Ask::Stop { task: Task::Last } }]));
     assert_eq!(world.cancellations.len(), 1);
-    acts(&mut world, 2, Box::new([Act::Request { key: [8; 16], ask: Ask::Release { task: Task::Last } }]));
+    let task = world.peers.as_ref().expect("peers").parties[2].last_task.expect("started task");
+    let revision = world
+        .store
+        .rows
+        .values()
+        .find_map(|row| match row {
+            root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) if row.number == task => {
+                Some(row.revisions.hold)
+            }
+            root::Record::Core(_) | root::Record::Connector { .. } => None,
+        })
+        .expect("visible held task row");
+    acts(&mut world, 2, Box::new([Act::Request { key: [8; 16], ask: Ask::Release { task: Task::Last, revision } }]));
     let peers = world.peers.as_ref().expect("peers");
     assert_eq!(peers.workers[0].seen.len(), 2);
     assert!(peers.workers[0].seen[1].attempt > peers.workers[0].seen[0].attempt);
