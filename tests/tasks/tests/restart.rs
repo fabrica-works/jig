@@ -71,6 +71,8 @@ fn a_crash_before_finished_decision_resumes_current_attempt() {
     let mut w = World::new(24, LIMITS);
     w.make(Party::Person(1), vec![task(1, &[])]);
     w.claim(1, 1);
+    let started = w.record(1).run_since;
+    assert!(started.is_some());
     let reply_to = w.to();
     w.stage(Event::Activation {
         saved: None,
@@ -84,6 +86,7 @@ fn a_crash_before_finished_decision_resumes_current_attempt() {
     assert!(w.closing.is_empty());
     w.restart();
     assert_eq!(w.runs.get(&1), Some(&1));
+    assert_eq!(w.record(1).run_since, started);
     w.finish(1);
     w.settle(1);
 }
@@ -94,7 +97,7 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
     use skein_lib::{Env, Queue, Time, Wall};
     let mut source = World::new(25, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
-    for corrupt in 0..8 {
+    for corrupt in 0..13 {
         let mut domain = Domain::new(&LIMITS, 25, Box::new([1]));
         let env = Env { limits: LIMITS, now: Time::ZERO, wall: Wall::EPOCH };
         let mut out = Queue::with_capacity(max_out(&LIMITS));
@@ -135,6 +138,21 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
                         7 => Box::new([0, number]),
                         _ => unreachable!(),
                     };
+                }
+                8 => record.run_since = Some(Wall::EPOCH),
+                9 => {
+                    record.attempt = 1;
+                    record.phase = Phase::Active(Active::Running { attempt: 1 });
+                }
+                10 => record.phase = Phase::Active(Active::BackingOff { until: Wall::EPOCH }),
+                11 => {
+                    record.phase = Phase::Active(Active::BackingOff { until: Wall::EPOCH });
+                    record.retry_notice = Some(jig_core_tasks::RetryNotice::Refused { count: 1 });
+                }
+                12 => {
+                    record.attempt = 1;
+                    record.phase = Phase::Active(Active::Claimed { attempt: 1 });
+                    record.run_since = Some(Wall::EPOCH);
                 }
                 _ => unreachable!(),
             }

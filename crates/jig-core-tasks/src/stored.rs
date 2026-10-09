@@ -335,6 +335,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || !crate::batch::valid_authority(limits, &task.authority)
         || !crate::holds::valid_record(domain, limits, task)
         || !valid_phase(task, limits)
+        || !crate::runtime::valid(task)
         || !valid_escalation(task, limits)
         || !valid_proposal(task, limits)
         || !valid_followups(task)

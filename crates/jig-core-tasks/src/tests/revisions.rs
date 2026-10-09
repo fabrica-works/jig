@@ -882,3 +882,68 @@ fn zero_capacity_history_counts_real_source_room_without_retaining_payloads() {
     assert_eq!(domain.capacity_refusals_lost(), 1);
     assert_eq!(domain.capacity_mark(), 1);
 }
+
+#[test]
+fn lifecycle_wall_times_keep_the_first_start_through_duplicate_reports_holds_and_restore() {
+    let mut h = Harness::new();
+    h.env.wall = Wall::from_nanos(3);
+    h.make(vec![task(1, &[])]);
+    assert_eq!(h.domain.task(1).unwrap().phase_since, Wall::from_nanos(3));
+    h.env.wall = Wall::from_nanos(5);
+    h.send(Event::Prepare { reply_to: to(), task: 1 });
+    h.env.wall = Wall::from_nanos(7);
+    h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    assert_eq!(h.domain.task(1).unwrap().run_since, None);
+    h.env.wall = Wall::from_nanos(11);
+    h.send(Event::Started { task: 1, attempt: 1 });
+    let started = Some(Wall::from_nanos(11));
+    h.env.wall = Wall::from_nanos(13);
+    h.send(Event::Started { task: 1, attempt: 1 });
+    h.send(Event::Started { task: 1, attempt: 2 });
+    assert_eq!(h.domain.task(1).unwrap().run_since, started);
+    assert_eq!(h.domain.task(1).unwrap().phase_since, Wall::from_nanos(11));
+    h.env.wall = Wall::from_nanos(17);
+    h.send(Event::Hold { task: 1, why: Hold::Budget });
+    h.route(1, EscalationHolder::Person(9), 1);
+    h.restart();
+    assert_eq!(h.domain.task(1).unwrap().phase_since, Wall::from_nanos(17));
+    assert_eq!(h.domain.task(1).unwrap().run_since, started);
+    h.env.wall = Wall::from_nanos(19);
+    h.send(Event::Control {
+        reply_to: to(),
+        by: Party::Person(9),
+        task: 1,
+        control: Control::Release { again: None, message: None },
+    });
+    assert_eq!(h.domain.task(1).unwrap().run_since, started);
+    assert_eq!(h.domain.task(1).unwrap().phase_since, Wall::from_nanos(19));
+}
+
+#[test]
+fn retry_observations_distinguish_attempt_failures_from_preparation_refusals_and_survive_restore() {
+    let mut h = Harness::new();
+    h.make(vec![task(1, &[]), task(2, &[])]);
+    h.send(Event::Prepare { reply_to: to(), task: 1 });
+    h.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, resumed: false, budget: 10, writes: Box::new([]) });
+    h.env.wall = Wall::from_nanos(20);
+    h.send(Event::Activation {
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        end: crate::End::Failed(crate::Class::Lost),
+        saved: None,
+        cause: crate::Cause::Unpriced,
+    });
+    let failed = Some(crate::RetryNotice::Failed { class: crate::Class::Lost, count: 1, allowance: 2 });
+    assert_eq!(h.domain.task(1).unwrap().retry_notice, failed);
+    assert_eq!(h.domain.task(1).unwrap().phase_since, Wall::from_nanos(20));
+    h.env.wall = Wall::from_nanos(23);
+    h.send(Event::Prepare { reply_to: to(), task: 2 });
+    h.send(Event::PreparationFailed { task: 2 });
+    let refused = Some(crate::RetryNotice::Refused { count: 1 });
+    assert_eq!(h.domain.task(2).unwrap().retry_notice, refused);
+    h.restart();
+    assert_eq!(h.domain.task(1).unwrap().retry_notice, failed);
+    assert_eq!(h.domain.task(2).unwrap().retry_notice, refused);
+    assert_eq!(h.domain.task(2).unwrap().phase_since, Wall::from_nanos(23));
+}

@@ -99,6 +99,8 @@ pub(crate) fn claim(
     task.record.numbers.reserved = task.record.numbers.reserved.checked_add(budget).expect("available budget");
     task.record.run_reserved = budget;
     task.record.attempt = attempt;
+    task.record.run_since = None;
+    task.record.retry_notice = None;
     task.record.run_spent = 0;
     task.record.invalid_result = None;
     task.record.turn = 0;
@@ -118,6 +120,7 @@ pub(crate) fn started(domain: &mut Domain, env: &Env<Limits>, number: u64, attem
         && task.record.phase == Phase::Active(Active::Claimed { attempt })
     {
         task.record.phase = Phase::Active(Active::Running { attempt });
+        task.record.run_since = Some(env.wall);
         publish(domain, env, number, out);
     }
 }
@@ -426,6 +429,7 @@ fn failure(domain: &mut Domain, env: &Env<Limits>, number: u64, class: Class) ->
     task.record.refusals = 0;
     let times = task.record.tries.of(class);
     let retry = env.limits.retries.of(class);
+    task.record.retry_notice = Some(crate::RetryNotice::Failed { class, count: times, allowance: retry.retries });
     fact(domain, Fact::Failed { task: number, class });
     if times > retry.retries {
         fact(domain, Fact::Held { task: number, why: Hold::Failures(class) });
@@ -440,6 +444,7 @@ fn pause(domain: &mut Domain, env: &Env<Limits>, number: u64) -> Phase {
     let task = task_mut(domain, number).expect("pause names live task");
     task.record.refusals = task.record.refusals.saturating_add(1);
     let times = task.record.refusals;
+    task.record.retry_notice = Some(crate::RetryNotice::Refused { count: times });
     let duration = crate::failures::backoff(times, env.limits.retries.transient, &mut domain.rng);
     Phase::Active(Active::BackingOff { until: wall_after(env, duration) })
 }

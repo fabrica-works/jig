@@ -83,6 +83,7 @@ mod proposals;
 mod recurring;
 mod refs;
 mod run;
+mod runtime;
 mod standing;
 mod stored;
 mod subscriptions;
@@ -116,6 +117,7 @@ pub use proposals::{
     PersonProposal, PersonProposalState, Proposal, ProposalAction, ProposalDecision, ProposalHolder, ProposalKind,
     ProposalOutcome, ProposalState,
 };
+pub use runtime::RetryNotice;
 pub use value::{
     Authority, AuthorityExecutor, Budget, Delegation, Funder, Grant, Last, Numbers, Pattern, ResourceScope, Scopes,
     Tools,

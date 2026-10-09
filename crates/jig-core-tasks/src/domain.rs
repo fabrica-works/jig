@@ -766,6 +766,7 @@ fn milestone(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queu
         return;
     }
     let initial = task.observed_phase.is_none();
+    task.record.phase_since = env.wall;
     let previous_held = match &task.observed_phase {
         Some(Phase::Held { .. }) => true,
         Some(Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_)) | None => false,
@@ -1066,6 +1067,9 @@ pub(crate) fn make_admitted(
             procedure_offered: None,
             record: TaskRecord {
                 created_at: env.wall,
+                phase_since: env.wall,
+                run_since: None,
+                retry_notice: None,
                 ended_at: None,
                 revision: 0,
                 revisions: crate::Revisions { hold: 0, spec: 0, person: 0 },

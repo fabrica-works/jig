@@ -757,6 +757,13 @@ pub struct TaskRecord {
     pub revisions: Revisions,
     /// Injected creation time used to order active person tasks in derived inboxes.
     pub created_at: Wall,
+    /// Injected wall time at which the current lifecycle phase began.
+    pub phase_since: Wall,
+    /// First matching task start report: root reports placement or adoption, not agent or tool start.
+    /// Retained through holds and the terminal; a new claim clears it.
+    pub run_since: Option<Wall>,
+    /// The classified failure or pre-execution refusal that last paused this activation.
+    pub retry_notice: Option<crate::RetryNotice>,
     /// Injected time of the durable ending, used for newest-first result pages.
     pub ended_at: Option<Wall>,
     /// Last committed semantic change to this task; history rows are keyed by this sequence.
