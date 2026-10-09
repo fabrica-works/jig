@@ -386,8 +386,7 @@ impl World {
                         Ask::DecideProposal { .. } => RouteKind::Proposal,
                         Ask::TakePerson { .. } => RouteKind::TakePerson,
                         Ask::Release { .. } | Ask::Amend { .. } => RouteKind::Control,
-                        Ask::Watch { .. }
-                        | Ask::EditNote { .. }
+                        Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
                         | Ask::Cancel { .. }
@@ -509,8 +508,7 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Watch { .. }
-                            | Ask::EditNote { .. }
+                            Ask::EditNote { .. }
                             | Ask::Adopt { .. }
                             | Ask::Stop { .. }
                             | Ask::Cancel { .. }

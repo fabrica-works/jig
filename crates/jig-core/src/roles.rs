@@ -139,7 +139,6 @@ impl Core {
             | people::Ask::AnswerQuestion { .. }
             | people::Ask::Prioritise { .. }
             | people::Ask::Amend { .. }
-            | people::Ask::Watch { .. }
             | people::Ask::EditNote { .. }
             | people::Ask::MakeService { .. }
             | people::Ask::SetRoles { .. }
@@ -273,16 +272,6 @@ impl Core {
             by: tasks::Party::Person(person),
             goals,
         })
-    }
-
-    /// Check a party role's current authority to open a live watch.
-    #[must_use]
-    pub fn watch_authorized(&self, project: u32, role: Option<people::Role>) -> bool {
-        let Some(role) = role else { return false };
-        match self.authority.role(project, role.number()) {
-            Some(policy) => policy.requests.allows(authority::RequestKind::Watch),
-            None => false,
-        }
     }
 
     /// Check a party role's current note scope, including connector paths.

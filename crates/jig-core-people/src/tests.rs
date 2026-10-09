@@ -387,20 +387,6 @@ fn policy_role_receives_shared_waiting_and_replays_its_key_after_restart() {
 }
 
 #[test]
-fn a_watch_key_is_volatile_and_replays_only_while_open() {
-    let mut test = Test::new(LIMITS);
-    test.member();
-    let ask = Ask::Watch { project: 1, subject: WatchSubject::Goals };
-    let request = route(&test.request(10, 13, ask.clone()));
-    let opened = test.send(Event::Decided { request, outcome: Outcome::Watching { watcher: Token::new(7) } });
-    assert_eq!(reply(&opened), Reply::Outcome(Outcome::Watching { watcher: Token::new(7) }));
-    assert!(!opened.iter().any(is_answer), "a watch has no durable answer row");
-    assert_eq!(reply(&test.request(10, 13, ask.clone())), Reply::Outcome(Outcome::Watching { watcher: Token::new(7) }));
-    assert!(test.send(Event::WatchClosed { watcher: Token::new(7) }).is_empty());
-    route(&test.request(10, 13, ask));
-}
-
-#[test]
 fn a_note_edit_checks_membership_then_retains_the_refusal() {
     let ask = Ask::EditNote {
         project: 1,

@@ -35,7 +35,6 @@ impl Core {
             | people::Ask::AnswerQuestion { .. }
             | people::Ask::Prioritise { .. }
             | people::Ask::Amend { .. }
-            | people::Ask::Watch { .. }
             | people::Ask::EditNote { .. }
             | people::Ask::MakeService { .. }
             | people::Ask::SetRoles { .. }
@@ -65,7 +64,6 @@ impl Core {
                             | people::Ask::AnswerQuestion { .. }
                             | people::Ask::Prioritise { .. }
                             | people::Ask::Amend { .. }
-                            | people::Ask::Watch { .. }
                             | people::Ask::EditNote { .. }
                             | people::Ask::MakeService { .. }
                             | people::Ask::SetRoles { .. }
@@ -90,7 +88,6 @@ impl Core {
                         | people::Ask::AnswerQuestion { .. }
                         | people::Ask::Prioritise { .. }
                         | people::Ask::Amend { .. }
-                        | people::Ask::Watch { .. }
                         | people::Ask::EditNote { .. }
                         | people::Ask::MakeService { .. }
                         | people::Ask::SetRoles { .. }
@@ -142,7 +139,6 @@ impl Core {
             | people::Ask::AnswerQuestion { .. }
             | people::Ask::Prioritise { .. }
             | people::Ask::Amend { .. }
-            | people::Ask::Watch { .. }
             | people::Ask::EditNote { .. }
             | people::Ask::MakeService { .. }
             | people::Ask::SetRoles { .. }

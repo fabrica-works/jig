@@ -115,19 +115,6 @@ impl Core {
         entries.into_boxed()
     }
 
-    /// Close the party's volatile watch when the view child ends it.
-    pub fn watch_closed(&mut self, env: &Env<Limits>, watcher: Token) {
-        self.watching.remove(&watcher);
-        let mut out = Queue::with_capacity(people::max_out(&env.limits.people));
-        people::step(
-            &mut self.people,
-            &Env { now: env.now, wall: env.wall, limits: env.limits.people },
-            people::Event::WatchClosed { watcher },
-            &mut out,
-        );
-        assert!(out.is_empty(), "closing a live watch writes nothing");
-    }
-
     /// A lost channel changes fleet topology without an external output.
     pub fn lost_channel(&mut self, env: &Env<Limits>, channel: Token) {
         let mut out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));

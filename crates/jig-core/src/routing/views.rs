@@ -1,27 +1,22 @@
-//! Task marks, watch admission and live delivery events routed through people
-//! and views (`domain/engine.md`, section 11).
+//! Watch admission and construction in the core's vocabulary.
+//! `client/domain/contract.md`, sections 3.2 and 7. Documents are made when
+//! views asks and moved into held outputs; no document remains in the core.
+//! The child owns pacing and provisional text, and knows no concrete subject.
+//!
+//! | Event | State change | Emits |
+//! | --- | --- | --- |
+//! | Watch | retain authenticated construction inputs | first held delivery or refusal |
+//! | Delivered | child clears its in-flight mark | next current held delivery if changed |
+//! | Unwatch | child closes after outstanding terminals | held watch ending |
 
-use crate::{Core, Held, Limits, Now, Request, Requests};
+use crate::documents::{self, Missing, Subject, Window};
+use crate::{Core, Held, Limits, Now, Request, Requests, WatchBinding, WatchRefusal};
 use alloc::boxed::Box;
-use jig_core_people as people;
 use jig_core_tasks as tasks;
 use jig_core_views as views;
-use skein_lib::{Env, List, Queue, ReplyTo, Token};
+use skein_lib::{Env, List, Map, Queue, Token};
 
 pub(super) fn route_view(core: &mut Core, env: &Env<Limits>, event: views::Event) -> Requests {
-    match &event {
-        views::Event::Delivered { watcher } => {
-            core.view_documents.remove(watcher);
-        }
-        views::Event::StreamDelivered { .. }
-        | views::Event::Text { .. }
-        | views::Event::RunEnded { .. }
-        | views::Event::Watch { .. }
-        | views::Event::Changed { .. }
-        | views::Event::Made { .. }
-        | views::Event::Unwatch { .. }
-        | views::Event::Gone { .. } => {}
-    }
     let mut out = Queue::with_capacity(views::max_out(&env.limits.views));
     views::step(&mut core.views, &Env { now: env.now, wall: env.wall, limits: env.limits.views }, event, &mut out);
     made_outputs(core, env, out)
@@ -38,7 +33,7 @@ pub(super) fn task_saved_view(core: &mut Core, env: &Env<Limits>, task: &tasks::
     } else {
         core.view_phases.insert(task.number, current).expect("one live phase per task");
     }
-    if !changed || core.watching.is_empty() {
+    if !changed || core.view_subjects.is_empty() {
         return;
     }
     let mut trees = List::with_capacity(env.limits.tasks.depth.saturating_add(1));
@@ -65,20 +60,31 @@ pub(super) fn task_saved_view(core: &mut Core, env: &Env<Limits>, task: &tasks::
     })));
 }
 
-// Resolve the child’s construction requests from the parent’s current state.
-fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<views::Request>) -> Requests {
+// Construct and move each document into the decision that asked for it.
+pub(super) fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<views::Request>) -> Requests {
     let room = views::max_out(&env.limits.views);
     let mut ready = Queue::with_capacity(room);
+    let mut documents = Map::with_capacity(env.limits.views.watchers);
     for _ in 0..child.len() {
         match child.pop().expect("view output count") {
             views::Request::Make { watcher, .. } => {
                 let outcome = match core.view_subjects.get(&watcher) {
-                    Some(subject) => match view_document(core, &env.limits, watcher, *subject) {
-                        Some(document) => {
-                            core.view_documents.insert(watcher, document).expect("bounded parent documents");
+                    Some(binding) => match documents::make_with_clock(
+                        core,
+                        &env.limits,
+                        binding.party,
+                        &binding.subject,
+                        &binding.window,
+                        documents::DocumentClock { now: env.now, wall: env.wall },
+                    ) {
+                        Ok(document) => {
+                            documents.insert(watcher, document).expect("bounded construction scratch");
                             views::Made::Ready
                         }
-                        None => views::Made::Gone { why: views::End::Gone },
+                        Err(Missing::NotAllowed) => views::Made::Gone { why: views::End::NotAllowed },
+                        Err(Missing::Unknown | Missing::Ended | Missing::TooLarge) => {
+                            views::Made::Gone { why: views::End::Gone }
+                        }
                     },
                     None => views::Made::Gone { why: views::End::Gone },
                 };
@@ -92,291 +98,142 @@ fn made_outputs(core: &mut Core, env: &Env<Limits>, mut child: Queue<views::Requ
             request @ (views::Request::Watching { .. }
             | views::Request::Refused { .. }
             | views::Request::Stream { .. }
-            | views::Request::Deliver { .. }) => ready.push(request),
-            request @ views::Request::Ended { watcher, .. } => {
-                core.view_subjects.remove(&watcher);
-                core.view_documents.remove(&watcher);
-                core.watching.remove(&watcher);
-                ready.push(request);
-            }
-        }
-    }
-    let mut terminal_checked = Queue::with_capacity(room);
-    for _ in 0..ready.len() {
-        let request = ready.pop().expect("made output count");
-        match &request {
-            views::Request::Ended { watcher, .. } => {
-                core.view_subjects.remove(watcher);
-                core.view_documents.remove(watcher);
-                core.watching.remove(watcher);
-            }
-            views::Request::Watching { .. }
-            | views::Request::Make { .. }
-            | views::Request::Stream { .. }
             | views::Request::Deliver { .. }
-            | views::Request::Refused { .. } => {}
+            | views::Request::Ended { .. }) => ready.push(request),
         }
-        terminal_checked.push(request);
     }
-    tag_view(terminal_checked, room)
-}
-pub(super) fn tag_view(mut child: Queue<views::Request>, room: u32) -> Requests {
     let mut out = Queue::with_capacity(room.checked_add(1).expect("view output room"));
-    for _ in 0..child.len() {
-        let request = match child.pop().expect("view output count") {
-            views::Request::Make { .. } => unreachable!("construction is resolved by the parent route"),
-            request @ (views::Request::Watching { .. }
-            | views::Request::Refused { .. }
-            | views::Request::Stream { .. }
-            | views::Request::Deliver { .. }
-            | views::Request::Ended { .. }) => Request::Now(Box::new(Now::View(request))),
-        };
-        out.push(request);
+    for _ in 0..ready.len() {
+        match ready.pop().expect("made output count") {
+            views::Request::Watching { .. } => {}
+            views::Request::Make { .. } => unreachable!("construction answered within the step"),
+            views::Request::Deliver { watcher, .. } => {
+                let document = documents.remove(&watcher).expect("delivery follows construction");
+                out.push(Request::Held(Box::new(Held::Delivery { watcher, document: Box::new(document) })));
+            }
+            views::Request::Ended { watcher, end: why } => {
+                core.view_subjects.remove(&watcher);
+                out.push(Request::Held(Box::new(Held::WatchEnded { watcher, why })));
+            }
+            views::Request::Refused { watcher, refusal } => {
+                core.view_subjects.remove(&watcher);
+                let why = match refusal {
+                    views::Refusal::Busy => WatchRefusal::Busy,
+                };
+                out.push(Request::Now(Box::new(Now::WatchRefused { watcher, why })));
+            }
+            request @ views::Request::Stream { .. } => out.push(Request::Now(Box::new(Now::View(request)))),
+        }
     }
     out.push(Request::Decided);
     Requests::Out(out)
 }
 
-/// Resolve the project of a concrete view subject from the task hub.
-#[must_use]
-pub fn watch_project(core: &Core, subject: crate::ViewSubject) -> u32 {
-    match subject {
-        crate::ViewSubject::Run { task, .. } | crate::ViewSubject::Tree { task } => {
-            match core.tasks.delegation(task.raw()) {
-                Some(context) => context.project,
-                None => 0,
-            }
-        }
-        crate::ViewSubject::Goals { project } => project,
-        crate::ViewSubject::Inbox { .. } => 0,
-    }
+fn refused(watcher: Token, why: WatchRefusal) -> Requests {
+    let mut out = Queue::with_capacity(2);
+    out.push(Request::Now(Box::new(Now::WatchRefused { watcher, why })));
+    out.push(Request::Decided);
+    Requests::Out(out)
 }
 
-fn watch_views(subject: people::WatchSubject, project: u32) -> crate::ViewSubject {
-    match subject {
-        people::WatchSubject::Run { task, attempt } => {
-            crate::ViewSubject::Run { task: Token::new(task), attempt: Token::new(attempt) }
-        }
-        people::WatchSubject::Tree { task } => crate::ViewSubject::Tree { task: Token::new(task) },
-        people::WatchSubject::Goals => crate::ViewSubject::Goals { project },
-        people::WatchSubject::Inbox { party } => crate::ViewSubject::Inbox { party },
-    }
-}
-
-fn view_document(
-    core: &Core,
-    limits: &Limits,
-    watcher: Token,
-    subject: crate::ViewSubject,
-) -> Option<crate::documents::Document> {
-    let party = *core.watching.get(&watcher)?;
-    let subject = match subject {
-        crate::ViewSubject::Run { task, .. } => crate::documents::Subject::Run { task: task.raw() },
-        crate::ViewSubject::Tree { task } => crate::documents::Subject::Tree { task: task.raw() },
-        crate::ViewSubject::Goals { project } => crate::documents::Subject::Goals { project },
-        crate::ViewSubject::Inbox { party } => crate::documents::Subject::Inbox { party },
-    };
-    crate::documents::make(
-        core,
-        limits,
-        party,
-        &subject,
-        &crate::documents::Window { rows: limits.documents.rows, after: None },
-    )
-    .ok()
-}
-
-fn watch_refusal(out: &mut Queue<Request>, watcher: Token, refusal: people::Refusal) {
-    out.push(Request::Now(Box::new(Now::WatchRefused { watcher, reply: people::Reply::Refused(refusal) })));
-}
-
-fn people_reply(out: &mut Queue<Request>, to: ReplyTo, reply: people::Reply) {
-    match reply {
-        people::Reply::Outcome(people::Outcome::Watching { watcher }) => {
-            out.push(Request::Now(Box::new(Now::View(views::Request::Watching { watcher }))));
-        }
-        people::Reply::Outcome(people::Outcome::Refused(refusal)) | people::Reply::Refused(refusal) => {
-            watch_refusal(out, to.into_token(), refusal);
-        }
-        reply @ (people::Reply::Again(_) | people::Reply::SignedOut) => {
-            out.push(Request::Now(Box::new(Now::WatchRefused { watcher: to.into_token(), reply })));
-        }
-        people::Reply::Outcome(_) | people::Reply::SignedIn { .. } => {
-            unreachable!("watch replies only with open or refusal")
-        }
-    }
-}
-
-#[expect(clippy::too_many_arguments, reason = "the keyed watch carries its caller, project and subject")]
-#[expect(clippy::too_many_lines, reason = "one volatile route admits the party then opens the view")]
 pub(super) fn open(
     core: &mut Core,
     env: &Env<Limits>,
     watcher: Token,
     sign_in: u64,
-    key: [u8; 16],
-    project: u32,
-    subject: people::WatchSubject,
-    ready: bool,
+    subject: Subject,
+    window: Window,
 ) -> Requests {
-    let room = people::max_out(&env.limits.people).checked_mul(2).expect("bounded people outputs");
-    let room = room.checked_add(views::max_out(&env.limits.views)).expect("bounded view outputs");
-    let room = room.checked_add(1).expect("bounded watch outputs");
-    let mut out = Queue::with_capacity(room);
-    if !ready {
-        out.push(Request::Now(Box::new(Now::WatchRefused {
-            watcher,
-            reply: people::Reply::Again(people::Again::Busy),
-        })));
-        out.push(Request::Decided);
-        return Requests::Out(out);
+    let Some(party) = core.people.person(sign_in, env.now, env.wall) else {
+        return refused(watcher, WatchRefusal::SignedOut);
+    };
+    if core.view_subjects.contains_key(&watcher) || core.view_subjects.len() >= env.limits.views.watchers {
+        return refused(watcher, WatchRefusal::Busy);
     }
-    let ask = people::Ask::Watch { project, subject };
-    let mut admitted = Queue::with_capacity(people::max_out(&env.limits.people));
-    people::step(
-        &mut core.people,
-        &Env { now: env.now, wall: env.wall, limits: env.limits.people },
-        people::Event::Ask { reply_to: ReplyTo::new(watcher), sign_in, key, ask },
-        &mut admitted,
-    );
-    for _ in 0..admitted.len() {
-        match admitted.pop().expect("watch admission output count") {
-            people::Request::Route { request, person, project, role, ask } => {
-                let people::Ask::Watch { subject, .. } = *ask else {
-                    unreachable!("watch admission routes only its watch ask")
-                };
-                let subject = watch_views(subject, project);
-                let actual = watch_project(core, subject);
-                let inbox = match subject {
-                    crate::ViewSubject::Inbox { .. } => true,
-                    crate::ViewSubject::Run { .. }
-                    | crate::ViewSubject::Tree { .. }
-                    | crate::ViewSubject::Goals { .. } => false,
-                };
-                let mut opened = false;
-                let outcome = if actual != project || (project == 0 && !inbox) {
-                    people::Outcome::Refused(people::Refusal::Unknown)
-                } else if project != 0 && !core.watch_authorized(project, role) {
-                    people::Outcome::Refused(people::Refusal::Authority { lacking: people::Lack::Shape })
-                } else if core.watching.contains_key(&watcher) || core.watching.len() >= env.limits.views.watchers {
-                    people::Outcome::Again(people::Again::Busy)
-                } else {
-                    core.watching.insert(watcher, person).expect("bounded parent watch party");
-                    match view_document(core, &env.limits, watcher, subject) {
-                        Some(document) => {
-                            core.view_documents.insert(watcher, document).expect("bounded parent watch documents");
-                            core.view_subjects.insert(watcher, subject).expect("bounded parent watch subjects");
-                            let mut views_out = Queue::with_capacity(views::max_out(&env.limits.views));
-                            views::step(
-                                &mut core.views,
-                                &Env { now: env.now, wall: env.wall, limits: env.limits.views },
-                                views::Event::Watch {
-                                    watcher,
-                                    party: Token::new(person),
-                                    subject: watcher,
-                                    window: views::Window { rows: env.limits.documents.rows, after: None },
-                                    follow: match subject {
-                                        crate::ViewSubject::Run { task, .. } => {
-                                            Some(views::Follow { run: task, turn: None, offset: 0 })
-                                        }
-                                        crate::ViewSubject::Tree { .. }
-                                        | crate::ViewSubject::Goals { .. }
-                                        | crate::ViewSubject::Inbox { .. } => None,
-                                    },
-                                },
-                                &mut views_out,
-                            );
-                            let mut result = people::Outcome::Refused(people::Refusal::Unknown);
-                            for _ in 0..views_out.len() {
-                                match views_out.pop().expect("watch output count") {
-                                    views::Request::Watching { watcher: opened_watcher } => {
-                                        assert!(opened_watcher == watcher, "watch name is echoed");
-                                        out.push(Request::Now(Box::new(Now::View(views::Request::Watching {
-                                            watcher,
-                                        }))));
-                                        result = people::Outcome::Watching { watcher };
-                                        opened = true;
-                                    }
-                                    views::Request::Make { watcher, .. } => {
-                                        let mut made = Queue::with_capacity(views::max_out(&env.limits.views));
-                                        views::step(
-                                            &mut core.views,
-                                            &Env { now: env.now, wall: env.wall, limits: env.limits.views },
-                                            views::Event::Made { watcher, outcome: views::Made::Ready },
-                                            &mut made,
-                                        );
-                                        for _ in 0..made.len() {
-                                            out.push(Request::Now(Box::new(Now::View(
-                                                made.pop().expect("made document output"),
-                                            ))));
-                                        }
-                                    }
-                                    request @ (views::Request::Deliver { .. } | views::Request::Stream { .. }) => {
-                                        out.push(Request::Now(Box::new(Now::View(request))));
-                                    }
-                                    views::Request::Refused { refusal, .. } => {
-                                        result = match refusal {
-                                            views::Refusal::Busy => people::Outcome::Again(people::Again::Busy),
-                                        };
-                                    }
-                                    views::Request::Ended { .. } => unreachable!("new watch cannot end before opening"),
-                                }
-                            }
-                            result
-                        }
-                        None => people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Words }),
-                    }
-                };
-                if !opened {
-                    core.view_subjects.remove(&watcher);
-                    core.view_documents.remove(&watcher);
-                    core.watching.remove(&watcher);
-                }
-                if opened {
-                    assert!(core.watching.get(&watcher) == Some(&person), "admitted watch party is retained");
-                }
-                let mut decided = Queue::with_capacity(people::max_out(&env.limits.people));
-                people::step(
-                    &mut core.people,
-                    &Env { now: env.now, wall: env.wall, limits: env.limits.people },
-                    people::Event::Decided { request, outcome },
-                    &mut decided,
-                );
-                while let Some(reply) = decided.pop() {
-                    match reply {
-                        people::Request::Reply { to, reply } => {
-                            if opened {
-                                match reply {
-                                    people::Reply::Outcome(people::Outcome::Watching { .. }) => {}
-                                    other @ (people::Reply::SignedIn { .. }
-                                    | people::Reply::SignedOut
-                                    | people::Reply::Again(_)
-                                    | people::Reply::Outcome(_)
-                                    | people::Reply::Refused(_)) => people_reply(&mut out, to, other),
-                                }
-                            } else {
-                                people_reply(&mut out, to, reply);
-                            }
-                        }
-                        people::Request::Save { .. }
-                        | people::Request::Erase { .. }
-                        | people::Request::Route { .. }
-                        | people::Request::RolesApplied { .. }
-                        | people::Request::RolesRefused { .. }
-                        | people::Request::ServiceMade { .. }
-                        | people::Request::RestoreRefused { .. } => unreachable!("watch writes nothing"),
-                    }
-                }
+    if !watch_subject(&subject) {
+        return refused(watcher, WatchRefusal::Unknown);
+    }
+    if window.rows == 0 {
+        return refused(watcher, WatchRefusal::Busy);
+    }
+    // Construction checks all named chips, owner-only subjects and deployment
+    // roles. Admission retains no made document and consumes no keyed slot.
+    match documents::make(core, &env.limits, party, &subject, &window) {
+        Ok(_) => {}
+        Err(Missing::NotAllowed) => return refused(watcher, WatchRefusal::NotAllowed),
+        Err(Missing::Unknown | Missing::Ended) => return refused(watcher, WatchRefusal::Unknown),
+        Err(Missing::TooLarge) => return refused(watcher, WatchRefusal::Busy),
+    }
+    let subject = match subject {
+        Subject::Chips { tasks: named } => {
+            let mut tasks = List::with_capacity(named.len());
+            for number in named.into_boxed() {
+                tasks.push(number).expect("admitted chip count");
             }
-            people::Request::Reply { to, reply } => people_reply(&mut out, to, reply),
-            people::Request::Save { .. }
-            | people::Request::Erase { .. }
-            | people::Request::RolesApplied { .. }
-            | people::Request::RolesRefused { .. }
-            | people::Request::ServiceMade { .. }
-            | people::Request::RestoreRefused { .. } => unreachable!("watch admission writes nothing"),
+            Subject::Chips { tasks }
         }
+        subject @ (Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Run { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. }) => subject,
+    };
+    let follow = match &subject {
+        Subject::Run { task } => Some(views::Follow { run: Token::new(*task), turn: None, offset: 0 }),
+        Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => None,
+    };
+    let view_window = views::Window { rows: window.rows, after: None };
+    core.view_subjects
+        .insert(watcher, WatchBinding { party, sign_in, subject, window })
+        .expect("bounded watch binding");
+    route_view(
+        core,
+        env,
+        views::Event::Watch { watcher, party: Token::new(party), subject: watcher, window: view_window, follow },
+    )
+}
+
+fn watch_subject(subject: &Subject) -> bool {
+    match subject {
+        Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations { .. }
+        | Subject::Run { .. }
+        | Subject::Deployment => true,
+        Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => false,
     }
-    out.push(Request::Decided);
-    Requests::Out(out)
 }

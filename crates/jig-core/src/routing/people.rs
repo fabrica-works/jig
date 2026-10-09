@@ -171,7 +171,6 @@ pub(super) fn tag_people(
                     people::Ask::Move { task, reason, .. } => {
                         move_request(core, env, work, request, person, project, role, task, reason);
                     }
-                    people::Ask::Watch { .. } => unreachable!("the core routes every party request"),
                 }
                 continue;
             }

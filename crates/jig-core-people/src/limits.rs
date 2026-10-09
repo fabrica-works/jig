@@ -93,7 +93,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<u64, SignIn>::worst_case(limits.sign_ins)?)?
         .checked_add(Deadlines::<u64>::worst_case(limits.sign_ins)?)?
         .checked_add(Map::<RequestKey, Answered>::worst_case(limits.requests)?)?
-        .checked_add(Map::<RequestKey, crate::domain::OpenWatch>::worst_case(limits.requests)?)?
         .checked_add(Deadlines::<RequestKey>::worst_case(limits.requests)?)?
         .checked_add(u64::from(limits.requests).checked_mul(ask_bytes)?)?
         .checked_add(Slab::<Pending>::worst_case(limits.pending)?)?

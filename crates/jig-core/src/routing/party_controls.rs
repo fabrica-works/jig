@@ -132,8 +132,7 @@ pub(super) fn cancel_request(
         core.control_admit(&ask, person, project, role, env.limits.tasks.depth, env.limits.tasks.result_bytes);
     let reason = match ask {
         people::Ask::Cancel { reason, .. } => reason,
-        people::Ask::Watch { .. }
-        | people::Ask::EditNote { .. }
+        people::Ask::EditNote { .. }
         | people::Ask::MakeService { .. }
         | people::Ask::Adopt { .. }
         | people::Ask::SetGoal { .. }
@@ -185,8 +184,7 @@ pub(super) fn release_request(
         Ok(task) => {
             let revision = match ask {
                 people::Ask::Release { revision, .. } => revision,
-                people::Ask::Watch { .. }
-                | people::Ask::EditNote { .. }
+                people::Ask::EditNote { .. }
                 | people::Ask::MakeService { .. }
                 | people::Ask::Adopt { .. }
                 | people::Ask::SetGoal { .. }

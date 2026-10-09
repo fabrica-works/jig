@@ -89,6 +89,11 @@ pub enum Write {
 /// Core output that must follow the decision's commit.
 #[derive(Debug)]
 pub enum Held {
+    /// Current subject document, held until every preceding commit is durable.
+    Delivery { watcher: Token, document: Box<crate::documents::Document> },
+    /// A watch has ended after every outstanding terminal.
+    WatchEnded { watcher: Token, why: views::End },
+
     /// A connector may make this entry only after its keeping decision commits.
     MakeEffect { connector: u16, entry: u64 },
     /// A rendered answer and all opaque evidence have reached the store.
@@ -139,6 +144,19 @@ pub enum Held {
     NotesDeleted { owner: Token, name: u64 },
 }
 
+/// Why an unkeyed watch was not admitted (`client/domain/contract.md`, 7.2).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum WatchRefusal {
+    /// Its sign-in is absent or expired.
+    SignedOut,
+    /// Its party may not see the subject.
+    NotAllowed,
+    /// No live watch subject exists by that name.
+    Unknown,
+    /// The configured watch or document bound is full.
+    Busy,
+}
+
 /// Core output that follows no mutation.
 #[derive(Debug)]
 pub enum Now {
@@ -157,7 +175,7 @@ pub enum Now {
     /// A sign-in whose core-owned person or session counter is exhausted.
     SignInRefused { to: ReplyTo },
     /// A volatile watch refused before any durable decision.
-    WatchRefused { watcher: Token, reply: people::Reply },
+    WatchRefused { watcher: Token, why: WatchRefusal },
     /// Secret-free account protocol output with no store decision.
     Account(accounts::Request),
     /// A live view observation or terminal with no durable mutation.
@@ -293,8 +311,12 @@ pub enum Event {
     EffectDeadline,
     /// Allocate the person and session named by a new party sign-in.
     SignIn { reply_to: ReplyTo, identity: people::Identity },
-    /// Admit and open a volatile watch across the people and views children.
-    Watch { watcher: Token, sign_in: u64, key: [u8; 16], project: u32, subject: people::WatchSubject, ready: bool },
+    /// Admit a visible subject on a live sign-in, without a request key.
+    Watch { watcher: Token, sign_in: u64, subject: crate::documents::Subject, window: crate::documents::Window },
+    /// The client leaves one volatile watch.
+    Unwatch { watcher: Token },
+    /// The protocol took a watch's held document.
+    Delivered { watcher: Token },
     /// Task lifecycle or hub work.
     Tasks(tasks::Event),
     /// An application asks for one admitted recurring core procedure.

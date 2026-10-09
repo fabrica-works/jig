@@ -1409,3 +1409,194 @@ fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     assert_eq!(account.spent_until, Some(Wall::from_nanos(1000 + Duration::from_secs(5).as_nanos())));
     assert!(!account.waiting.is_empty());
 }
+
+fn watch_core() -> (Core, Limits) {
+    let (mut core, mut limits) = core();
+    limits.people.projects = 2;
+    limits.people.requests = 0;
+    make_task(&mut core, &limits, 1);
+    core.proofs
+        .insert(
+            1,
+            RunProof {
+                task: 1,
+                attempt: 7,
+                transcript_from: 0,
+                host: fleet::HostKind::Engine,
+                offered: None,
+                turn: None,
+                terminal: None,
+            },
+        )
+        .unwrap();
+    let identity = core.people.identity(1).unwrap().clone();
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    let records = [
+        people::Stored::Person { number: 1, identity },
+        people::Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(Duration::from_secs(60).as_nanos()) },
+        people::Stored::Roles {
+            project: 1,
+            holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
+        },
+        people::Stored::Roles {
+            project: 0,
+            holdings: Box::new([people::Holding { person: 1, role: people::Role::Observer }]),
+        },
+    ];
+    for record in records {
+        people::step(&mut core.people, &env, people::Event::Restore { record }, &mut out);
+        while out.pop().is_some() {}
+    }
+    people::step(&mut core.people, &env, people::Event::Restored, &mut out);
+    (core, limits)
+}
+
+fn watch_outputs(core: &mut Core, limits: &Limits, event: Event) -> Box<[Request]> {
+    match step(core, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits }, event) {
+        Requests::Out(mut out) => {
+            let mut requests = List::with_capacity(out.len());
+            while let Some(request) = out.pop() {
+                requests.push(request).unwrap();
+            }
+            requests.into_boxed()
+        }
+    }
+}
+
+fn watch_subjects() -> [Subject; 9] {
+    let mut chips = List::with_capacity(1);
+    chips.push(1).unwrap();
+    [
+        Subject::Frame { party: 1 },
+        Subject::Task { task: 1 },
+        Subject::Tree { task: 1 },
+        Subject::Chips { tasks: chips },
+        Subject::Inbox { party: 1 },
+        Subject::Goals { project: 1 },
+        Subject::Conversations { party: 1 },
+        Subject::Run { task: 1 },
+        Subject::Deployment,
+    ]
+}
+
+#[test]
+fn an_unkeyed_watch_on_each_subject_makes_its_first_document_as_a_held_output() {
+    for subject in watch_subjects() {
+        let (mut core, limits) = watch_core();
+        let expected = make(&core, &limits, 1, &subject, &window()).unwrap();
+        let out = watch_outputs(
+            &mut core,
+            &limits,
+            Event::Watch { watcher: Token::new(30), sign_in: 10, subject, window: window() },
+        );
+        assert_eq!(out.len(), 2);
+        let Request::Held(held) = &out[0] else { panic!("document is held") };
+        let Held::Delivery { watcher, document } = held.as_ref() else { panic!("typed delivery") };
+        assert_eq!(*watcher, Token::new(30));
+        assert_eq!(document.as_ref(), &expected);
+        let Request::Decided = &out[1] else { panic!("one decision") };
+    }
+}
+
+#[test]
+fn watch_admission_checks_each_subjects_project_or_owner() {
+    for subject in watch_subjects() {
+        let (mut core, limits) = watch_core();
+        let subject = match subject {
+            Subject::Frame { .. } => Subject::Frame { party: 2 },
+            Subject::Inbox { .. } => Subject::Inbox { party: 2 },
+            Subject::Conversations { .. } => Subject::Conversations { party: 2 },
+            other @ (Subject::Task { .. }
+            | Subject::Tree { .. }
+            | Subject::Chips { .. }
+            | Subject::Goals { .. }
+            | Subject::Run { .. }
+            | Subject::Deployment
+            | Subject::Proposal { .. }
+            | Subject::Escalation { .. }
+            | Subject::Question { .. }
+            | Subject::PersonTask { .. }
+            | Subject::Result { .. }
+            | Subject::Project { .. }
+            | Subject::Note { .. }) => other,
+        };
+        let mut out = Queue::with_capacity(people::max_out(&limits.people));
+        for project in [0, 1] {
+            people::step(
+                &mut core.people,
+                &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
+                people::Event::Roles { project, holdings: Box::new([]) },
+                &mut out,
+            );
+        }
+        let out = watch_outputs(
+            &mut core,
+            &limits,
+            Event::Watch { watcher: Token::new(30), sign_in: 10, subject, window: window() },
+        );
+        assert_watch_refusal(&out[0], WatchRefusal::NotAllowed);
+        assert!(core.view_subjects.is_empty());
+    }
+}
+
+#[test]
+fn signed_out_unknown_and_full_watches_are_refused_without_keyed_work() {
+    let (mut core, limits) = watch_core();
+    for (sign_in, subject, why) in [
+        (99, Subject::Frame { party: 1 }, WatchRefusal::SignedOut),
+        (10, Subject::Task { task: 99 }, WatchRefusal::Unknown),
+        (10, Subject::Project { project: 1 }, WatchRefusal::Unknown),
+    ] {
+        let out = watch_outputs(
+            &mut core,
+            &limits,
+            Event::Watch { watcher: Token::new(30), sign_in, subject, window: window() },
+        );
+        assert_watch_refusal(&out[0], why);
+    }
+    for watcher in 1..=limits.views.watchers {
+        watch_outputs(
+            &mut core,
+            &limits,
+            Event::Watch {
+                watcher: Token::new(u64::from(watcher)),
+                sign_in: 10,
+                subject: Subject::Frame { party: 1 },
+                window: window(),
+            },
+        );
+    }
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
+    );
+    assert_watch_refusal(&out[0], WatchRefusal::Busy);
+}
+
+#[test]
+fn an_unwatch_waits_for_its_delivery_then_ends_as_a_held_output() {
+    let (mut core, limits) = watch_core();
+    let watcher = Token::new(30);
+    watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher, sign_in: 10, subject: Subject::Frame { party: 1 }, window: window() },
+    );
+    let out = watch_outputs(&mut core, &limits, Event::Unwatch { watcher });
+    assert_eq!(out.len(), 1);
+    let out = watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+    let Request::Held(held) = &out[0] else { panic!("ending is held") };
+    let Held::WatchEnded { watcher: got, why } = held.as_ref() else { panic!("watch ending") };
+    assert_eq!(*got, watcher);
+    assert_eq!(*why, views::End::Unwatched);
+    assert!(core.view_subjects.is_empty());
+}
+
+fn assert_watch_refusal(request: &Request, why: WatchRefusal) {
+    let Request::Now(now) = request else { panic!("refusal writes nothing") };
+    let Now::WatchRefused { why: got, .. } = now.as_ref() else { panic!("watch refusal") };
+    assert_eq!(*got, why);
+}

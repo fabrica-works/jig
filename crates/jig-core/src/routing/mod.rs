@@ -37,11 +37,10 @@ use task_routes::{
     route_connector_repair, route_person_escalation, route_person_proposal, route_task_escalation, route_tasks,
     tag_tasks,
 };
-pub use view_routes::watch_project;
-use view_routes::{open, route_view, tag_view};
+use view_routes::{made_outputs, open, route_view};
 pub use vocabulary::{
     Ask, CoreBriefBudgets, EscalationChoice, Event, Held, HoldingsNeed, Limits, NamedAction, Now, PayloadRefusal,
-    ProposalChoice, Request, Requests, Timer, ToolKind, Write,
+    ProposalChoice, Request, Requests, Timer, ToolKind, WatchRefusal, Write,
 };
 
 mod children;
@@ -311,6 +310,8 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::EffectDeadline
         | Event::SignIn { .. }
         | Event::Watch { .. }
+        | Event::Unwatch { .. }
+        | Event::Delivered { .. }
         | Event::Tasks(_)
         | Event::StartRecurring { .. }
         | Event::StartBrief { .. }
@@ -391,9 +392,9 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::EffectConnector(event) => crate::effects::connector(core, env, work, event),
         Event::EffectDeadline => crate::effects::deadline(core, env),
         Event::SignIn { reply_to, identity } => sign_in(core, work, reply_to, identity),
-        Event::Watch { watcher, sign_in, key, project, subject, ready } => {
-            open(core, env, watcher, sign_in, key, project, subject, ready)
-        }
+        Event::Watch { watcher, sign_in, subject, window } => open(core, env, watcher, sign_in, subject, window),
+        Event::Unwatch { watcher } => route_view(core, env, views::Event::Unwatch { watcher }),
+        Event::Delivered { watcher } => route_view(core, env, views::Event::Delivered { watcher }),
         Event::Tasks(event) => route_tasks(core, env, work, event),
         Event::StartRecurring { project, authority, template } => {
             route_start_recurring(core, work, project, authority, template)
@@ -498,7 +499,7 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
         Timer::View => {
             let mut out = Queue::with_capacity(views::max_out(&env.limits.views));
             views::fire(&mut core.views, &Env { now: env.now, wall: env.wall, limits: env.limits.views }, &mut out);
-            tag_view(out, views::max_out(&env.limits.views))
+            made_outputs(core, env, out)
         }
     }
 }

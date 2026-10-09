@@ -136,15 +136,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         size_of::<crate::routing::ProcedureCreation>(),
         size_of::<crate::run::Transcript>(),
         size_of::<crate::RunProof>(),
-        size_of::<crate::ViewSubject>(),
     ] {
         if value > largest {
             return None;
         }
     }
     for capacity in [
-        limits.views.watchers,     // watching
-        limits.views.watchers,     // opaque subject translation
         limits.tasks.tasks,        // view phases
         limits.load_slots,         // reads
         limits.tasks.tasks,        // dependency results
@@ -176,6 +173,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     ] {
         total = total.checked_add(Map::<CallKey, Event>::worst_case(capacity)?)?;
     }
+    total = total.checked_add(Map::<skein_lib::Token, crate::WatchBinding>::worst_case(limits.views.watchers)?)?;
+    total = total
+        .checked_add(u64::from(limits.views.watchers).checked_mul(List::<u64>::worst_case(limits.documents.chips)?)?)?;
     total = total.checked_add(Map::<u64, Box<crate::Projection>>::worst_case(limits.tasks.tasks)?)?;
     total = total.checked_add(bytes(
         limits.tasks.tasks.checked_mul(limits.connectors.checked_add(2)?)?,

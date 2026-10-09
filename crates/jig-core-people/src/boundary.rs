@@ -195,25 +195,10 @@ pub enum NoteChange {
     Delete { recalled: u32 },
 }
 
-/// A live view's subject, named without depending on the sibling views child.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum WatchSubject {
-    /// One run attempt's stream.
-    Run { task: u64, attempt: u64 },
-    /// One task and its delegate tree.
-    Tree { task: u64 },
-    /// Current goals of one project.
-    Goals,
-    /// The requesting party's inbox.
-    Inbox { party: u64 },
-}
-
 /// Authenticated keyed requests admitted by the people child and routed by
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ask {
-    /// Open one role-checked live view, retained only while the view is open.
-    Watch { project: u32, subject: WatchSubject },
     /// Correct or delete a note whose scope the party's project role permits.
     EditNote { project: u32, name: u64, scope: Box<NoteScope>, change: Box<NoteChange> },
     /// Make a deployment service in a project with a role and display name.
@@ -344,8 +329,6 @@ pub enum Outcome {
     Again(crate::Again),
     /// Unsaved expired-sign-in answer.
     SignedOut,
-    /// One live watch was opened; it writes no durable answer record.
-    Watching { watcher: Token },
     /// A note correction or deletion was committed with its keyed answer.
     NoteEdited { name: u64 },
     /// A service party and its project role were committed together.
@@ -525,8 +508,6 @@ impl Stored {
 /// cross this boundary without protocol secrets. (domain/people.md, sections 3–5).
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
-    /// Forget a volatile watch key when its stream closes.
-    WatchClosed { watcher: Token },
     /// Apply an authorized owner request to make a service with a fresh party number.
     MakeService { request: Token, person: u64 },
     /// Add previously unknown collaborators and their first project role in one decision.

@@ -48,14 +48,13 @@ mod sibling_routes;
 pub use numbers::{Counters, Deployment, Family, fresh};
 pub use routing::{
     Ask, CoreBriefBudgets, EscalationChoice, Event, Held, Limits, NamedAction, Now, PayloadRefusal, ProposalChoice,
-    Request, Requests, Timer, ToolKind, Write, fire, resume_fleet, room, room_max, step,
+    Request, Requests, Timer, ToolKind, WatchRefusal, Write, fire, resume_fleet, room, room_max, step,
 };
 pub use sibling_routes::{MadeRoute, PersonMessage, SentRoute};
 mod conversation;
 pub use conversation::{DeliveryOutcome, SettledAnswer, SettledCall, conversation_worst_case};
 mod stored;
 mod translate;
-pub use routing::watch_project;
 pub use run::{
     GoalRoute, HistoricalResult, Model, PendingRelay, PersonProposalRoute, PersonTaskRoute, RestoringProof, RoutedCall,
     RunAdmission, RunCharter, RunPolicy, Transcript,
@@ -187,20 +186,21 @@ impl ToolFamilies {
     }
 }
 
-/// The eight child domains of the core. Routing and durable live state are
-/// Subjects named by the core's existing party watch route.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ViewSubject {
-    /// A task's current attempt.
-    Run { task: Token, attempt: Token },
-    /// A task's delegate tree.
-    Tree { task: Token },
-    /// A project's goals.
-    Goals { project: u32 },
-    /// A party's inbox.
-    Inbox { party: u64 },
+/// A watch's authenticated owner and concrete construction inputs.
+/// `client/domain/contract.md`, sections 7.1 and 7.2.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct WatchBinding {
+    /// The party whose document is constructed.
+    pub party: u64,
+    /// The sign-in that admitted this watch.
+    pub sign_in: u64,
+    /// The core-owned subject.
+    pub subject: documents::Subject,
+    /// The requested bounded window.
+    pub window: documents::Window,
 }
 
+/// The eight child domains of the core; routing owns durable live state.
 /// added here as the root's boundary is drawn.
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
@@ -209,12 +209,8 @@ pub struct Core {
     pub(crate) restart_attempts: u32,
     /// Application connectors addressed only by number.
     pub connectors: Box<[u16]>,
-    /// Live view watcher correlation.
-    pub watching: Map<Token, u64>,
     /// Subjects owned by the parent; the child echoes each watch token.
-    pub view_subjects: Map<Token, ViewSubject>,
-    /// Documents awaiting the corresponding delivery terminal.
-    pub view_documents: Map<Token, documents::Document>,
+    pub view_subjects: Map<Token, WatchBinding>,
     /// Last projected task phases.
     pub view_phases: Map<u64, (u32, Option<u32>)>,
     /// Historical result reads in flight.
@@ -441,7 +437,6 @@ impl Core {
 
     /// Allocate the eight children and the bounded live core tables.
     #[must_use]
-    #[expect(clippy::too_many_lines, reason = "construct every bounded child and parent route table together")]
     pub fn new(config: Config, limits: &Limits) -> Core {
         assert!(config.settings.tools.valid(), "each engine tool has one configured authority bit");
         assert!(*config.authority.limits() == limits.authority, "core prices its authority's configured bounds");
@@ -479,9 +474,7 @@ impl Core {
             restart: restart::Restart::Cold,
             restart_attempts: limits.fleet.attempts,
             counters: Counters::bootstrap(config.deployment),
-            watching: Map::with_capacity(limits.views.watchers),
             view_subjects: Map::with_capacity(limits.views.watchers),
-            view_documents: Map::with_capacity(limits.views.watchers),
             view_phases: Map::with_capacity(limits.tasks.tasks),
             reading_results: Map::with_capacity(limits.load_slots),
             dependency_results: Map::with_capacity(limits.tasks.tasks),
