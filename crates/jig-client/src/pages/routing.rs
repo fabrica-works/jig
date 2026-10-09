@@ -314,6 +314,7 @@ pub(crate) fn delivery(
         Delivery::Inbox(inbox) => {
             domain.inbox.needs = inbox.needs;
             domain.inbox.updates = inbox.updates;
+            domain.inbox.results_seen = inbox.results_seen;
             domain.inbox.marked_results = domain.inbox.marked_results.max(inbox.results_seen);
             domain.inbox.more = inbox.more;
             if domain.inbox.before.is_none() {

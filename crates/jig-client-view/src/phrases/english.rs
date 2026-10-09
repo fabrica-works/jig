@@ -10,9 +10,52 @@ use skein_lib::{List, bytes::copy_of};
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "English data matches the closed phrase vocabulary whole")]
 pub fn language() -> Language {
-    let mut phrases = List::with_capacity(286);
+    let mut phrases = List::with_capacity(309);
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::OwnSpend => {
+                Box::new([Segment::Text(copy_of(b"Agent spend: ")), Segment::Hole { index: 0, kind: HoleKind::Amount }])
+            }
+            JigPhrase::DelegateSpend => Box::new([
+                Segment::Text(copy_of(b"Delegate spend: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+            ]),
+
+            JigPhrase::NeedsYou => Box::new([Segment::Text(copy_of(b"Needs you"))]),
+            JigPhrase::InboxUpdates => Box::new([Segment::Text(copy_of(b"Updates"))]),
+            JigPhrase::AllKinds => Box::new([Segment::Text(copy_of(b"All kinds"))]),
+            JigPhrase::AllGoals => Box::new([Segment::Text(copy_of(b"All goals"))]),
+            JigPhrase::OnlyGoal => {
+                Box::new([Segment::Text(copy_of(b"Goal ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::NewUpdate => Box::new([Segment::Text(copy_of(b"New"))]),
+            JigPhrase::OnCall => Box::new([Segment::Text(copy_of(b"For the person on call"))]),
+            JigPhrase::PassesUp => {
+                Box::new([Segment::Text(copy_of(b"Passes up at ")), Segment::Hole { index: 0, kind: HoleKind::Wall }])
+            }
+            JigPhrase::ReadEarlier => Box::new([Segment::Text(copy_of(b"Read earlier"))]),
+            JigPhrase::ReadLater => Box::new([Segment::Text(copy_of(b"Read later"))]),
+            JigPhrase::WindowStart => Box::new([Segment::Text(copy_of(b"Start of the list"))]),
+            JigPhrase::WindowEnd => Box::new([Segment::Text(copy_of(b"End of the list"))]),
+            JigPhrase::MoreRows => Box::new([Segment::Text(copy_of(b"More entries are available"))]),
+            JigPhrase::NewChat => Box::new([Segment::Text(copy_of(b"First words"))]),
+            JigPhrase::StartChat => Box::new([Segment::Text(copy_of(b"Start a conversation"))]),
+            JigPhrase::Delegates => Box::new([
+                Segment::Text(copy_of(b"Live delegates: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::SignInPage => Box::new([Segment::Text(copy_of(b"Sign in"))]),
+            JigPhrase::SignInWith => {
+                Box::new([Segment::Text(copy_of(b"Sign in with ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
+            }
+            JigPhrase::MissingPage => Box::new([Segment::Text(copy_of(b"Page missing"))]),
+            JigPhrase::UpdateClient => Box::new([Segment::Text(copy_of(
+                b"Client out of date: update or reload this client to continue; pending requests are kept",
+            ))]),
+            JigPhrase::SomeoneElse => {
+                Box::new([Segment::Text(copy_of(b"Someone else's work: sign in as its owner to continue"))])
+            }
+
             JigPhrase::LoadingNavigation => Box::new([Segment::Text(copy_of(b"Loading navigation"))]),
             JigPhrase::ByNamed => {
                 Box::new([Segment::Text(copy_of(b"By ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
@@ -687,6 +730,6 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
     Phrasebook::load(
         shapes(text),
         Box::new([language()]),
-        &PhraseLimits { languages: 1, phrases: 286, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
+        &PhraseLimits { languages: 1, phrases: 309, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
     )
 }

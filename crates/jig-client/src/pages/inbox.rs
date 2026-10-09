@@ -29,6 +29,8 @@ pub struct Inbox {
     pub reading: Option<skein_lib::Token>,
     pub opening_updates: bool,
     pub marked_results: u64,
+    /// The committed read position; pending mark-seen requests do not advance it.
+    pub results_seen: u64,
 }
 impl Inbox {
     /// Allocates the page's bounded context window.
@@ -46,6 +48,7 @@ impl Inbox {
             reading: None,
             opening_updates: false,
             marked_results: 0,
+            results_seen: 0,
         }
     }
     /// A filtered row belongs here only while its shared object still waits.

@@ -14,6 +14,7 @@ mod builder;
 pub mod cards;
 pub mod confirmation;
 pub mod notices;
+pub mod pages;
 pub mod styles;
 pub use styles::JigStyle;
 mod diff;

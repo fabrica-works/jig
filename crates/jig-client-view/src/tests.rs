@@ -9,3 +9,5 @@ mod cards;
 mod cards_objects;
 
 mod cards_access;
+
+mod pages;

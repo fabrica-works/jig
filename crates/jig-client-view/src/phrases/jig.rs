@@ -578,6 +578,52 @@ pub enum JigPhrase {
     ActivePhase,
     /// Closing.
     ClosingPhase,
+    /// Needs you.
+    NeedsYou,
+    /// Updates.
+    InboxUpdates,
+    /// All kinds.
+    AllKinds,
+    /// All goals.
+    AllGoals,
+    /// Goal (0).
+    OnlyGoal,
+    /// New.
+    NewUpdate,
+    /// For the person on call.
+    OnCall,
+    /// Passes up at (0).
+    PassesUp,
+    /// Read earlier.
+    ReadEarlier,
+    /// Read later.
+    ReadLater,
+    /// Start of the list.
+    WindowStart,
+    /// End of the list.
+    WindowEnd,
+    /// More entries are available.
+    MoreRows,
+    /// First words.
+    NewChat,
+    /// Start a conversation.
+    StartChat,
+    /// Live delegates: (0).
+    Delegates,
+    /// Sign in.
+    SignInPage,
+    /// Sign in with (0).
+    SignInWith,
+    /// Page missing.
+    MissingPage,
+    /// Client out of date: update or reload this client to continue; pending requests are kept.
+    UpdateClient,
+    /// Someone else's work: sign in as its owner to continue.
+    SomeoneElse,
+    /// Agent spend: (0).
+    OwnSpend,
+    /// Delegate spend: (0).
+    DelegateSpend,
 }
 impl JigPhrase {
     /// Stable phrase identity within jig's owner.
@@ -871,6 +917,29 @@ impl JigPhrase {
             Self::ClaimedPhase => 283,
             Self::ActivePhase => 284,
             Self::ClosingPhase => 285,
+            Self::NeedsYou => 286,
+            Self::InboxUpdates => 287,
+            Self::AllKinds => 288,
+            Self::AllGoals => 289,
+            Self::OnlyGoal => 290,
+            Self::NewUpdate => 291,
+            Self::OnCall => 292,
+            Self::PassesUp => 293,
+            Self::ReadEarlier => 294,
+            Self::ReadLater => 295,
+            Self::WindowStart => 296,
+            Self::WindowEnd => 297,
+            Self::MoreRows => 298,
+            Self::NewChat => 299,
+            Self::StartChat => 300,
+            Self::Delegates => 301,
+            Self::SignInPage => 302,
+            Self::SignInWith => 303,
+            Self::MissingPage => 304,
+            Self::UpdateClient => 305,
+            Self::SomeoneElse => 306,
+            Self::OwnSpend => 307,
+            Self::DelegateSpend => 308,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -879,7 +948,24 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::LoadingNavigation
+            Self::NeedsYou
+            | Self::InboxUpdates
+            | Self::AllKinds
+            | Self::AllGoals
+            | Self::NewUpdate
+            | Self::OnCall
+            | Self::ReadEarlier
+            | Self::ReadLater
+            | Self::WindowStart
+            | Self::WindowEnd
+            | Self::MoreRows
+            | Self::NewChat
+            | Self::StartChat
+            | Self::SignInPage
+            | Self::MissingPage
+            | Self::UpdateClient
+            | Self::SomeoneElse
+            | Self::LoadingNavigation
             | Self::Refused
             | Self::Leaving
             | Self::Live
@@ -1067,7 +1153,8 @@ impl JigPhrase {
             | Self::ClaimedPhase
             | Self::ActivePhase
             | Self::ClosingPhase => Box::new([]),
-            Self::ByNamed
+            Self::SignInWith
+            | Self::ByNamed
             | Self::SignedIn
             | Self::Project
             | Self::Failed
@@ -1081,7 +1168,9 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::Needs
+            Self::OnlyGoal
+            | Self::Delegates
+            | Self::Needs
             | Self::MoreNeeds
             | Self::Updates
             | Self::MoreUpdates
@@ -1142,7 +1231,7 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::At | Self::Since | Self::Deadline | Self::DeadlineHold => {
+            Self::PassesUp | Self::At | Self::Since | Self::Deadline | Self::DeadlineHold => {
                 Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
             Self::BudgetMissing | Self::BudgetHold => Box::new([
@@ -1157,7 +1246,7 @@ impl JigPhrase {
             Self::DeadlineMissing => {
                 Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }, HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
-            Self::Amount | Self::Budget | Self::TakeoverFunds => {
+            Self::OwnSpend | Self::DelegateSpend | Self::Amount | Self::Budget | Self::TakeoverFunds => {
                 Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }])
             }
             Self::WaitingSpan | Self::Span | Self::StallSpan | Self::ElapsedSpan => {
@@ -1199,7 +1288,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 286] = [
+pub const ALL: [JigPhrase; 309] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -1486,11 +1575,34 @@ pub const ALL: [JigPhrase; 286] = [
     JigPhrase::ClaimedPhase,
     JigPhrase::ActivePhase,
     JigPhrase::ClosingPhase,
+    JigPhrase::NeedsYou,
+    JigPhrase::InboxUpdates,
+    JigPhrase::AllKinds,
+    JigPhrase::AllGoals,
+    JigPhrase::OnlyGoal,
+    JigPhrase::NewUpdate,
+    JigPhrase::OnCall,
+    JigPhrase::PassesUp,
+    JigPhrase::ReadEarlier,
+    JigPhrase::ReadLater,
+    JigPhrase::WindowStart,
+    JigPhrase::WindowEnd,
+    JigPhrase::MoreRows,
+    JigPhrase::NewChat,
+    JigPhrase::StartChat,
+    JigPhrase::Delegates,
+    JigPhrase::SignInPage,
+    JigPhrase::SignInWith,
+    JigPhrase::MissingPage,
+    JigPhrase::UpdateClient,
+    JigPhrase::SomeoneElse,
+    JigPhrase::OwnSpend,
+    JigPhrase::DelegateSpend,
 ];
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(286);
+    let mut rows = List::with_capacity(309);
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }
