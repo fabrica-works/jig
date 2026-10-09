@@ -89,6 +89,19 @@ fn complete_policy_recipients_and_authority_refuse_a_shortened_receiving_form() 
     let mut full = core.tasks.task(2).unwrap().authority.clone();
     full.delegation.kinds = Box::new([tasks::AuthorityExecutor::Charter(1), tasks::AuthorityExecutor::Role(0)]);
     assert_eq!(act_authority(&limits, &full), Err(Missing::TooLarge));
+    limits.documents.lines = 2;
+    let mut before = core.tasks.task(2).unwrap().clone();
+    let pattern = tasks::Pattern { segments: Box::new([]), last: tasks::Last::Open(Box::new([])) };
+    before.authority.grants = Box::new([
+        tasks::Grant { connector: 1, kind: 1, pattern: pattern.clone() },
+        tasks::Grant { connector: 1, kind: 2, pattern: pattern.clone() },
+        tasks::Grant { connector: 1, kind: 3, pattern },
+    ]);
+    assert_eq!(
+        task_from_row(&core, &limits, 1, &before),
+        Err(Missing::TooLarge),
+        "the before authority cannot be shortened beneath a bounded offer"
+    );
 }
 
 #[test]

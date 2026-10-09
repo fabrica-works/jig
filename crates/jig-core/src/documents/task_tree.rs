@@ -681,8 +681,18 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         tasks::Phase::Ended(value) => Some(ending(limits, value)),
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
+    let acts = super::offers::task(core, limits, party, row)?;
+    let authority = authority(limits, &row.authority)?;
+    if authority.cut {
+        for offer in &acts {
+            if let crate::acts::Admission::Bounded { within: crate::acts::Bounds::Amend { .. }, .. } = offer.admission {
+                // The before facts used to compare a draft must also be whole.
+                return Err(Missing::TooLarge);
+            }
+        }
+    }
     Ok(Task {
-        acts: super::offers::task(core, limits, party, row)?,
+        acts,
         chip: super::small::chip_with_core(core, limits, row)?,
         project: row.project,
         goal,
@@ -710,7 +720,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         contract: contract(limits, &row.contract),
         result,
         budget: budget(row),
-        authority: authority(limits, &row.authority)?,
+        authority,
         hold: hold(limits, row)?,
         proposals,
         cut,
