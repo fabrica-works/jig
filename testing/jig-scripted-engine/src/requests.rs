@@ -1,0 +1,386 @@
+//! Requests are decided once in the party's key space and released after durability.
+//! Revision and decided-first checks precede scripted outcomes; contract.md, 3–4.
+use crate::{Engine, Envelope, Invalid, Keyed, Up, payload};
+use jig_client::contract::{
+    ActKind, Actor, Admission, Answer, Ask, Decision, Ending, Moved, ObjectKey, Offered, Outcome, Phase, ReadValue,
+    Recipient, Refusal, Revision,
+};
+use skein_lib::{List, Time, Token, Wall};
+
+impl Engine {
+    /// Runs one attempt; the world's root supplies the table's attempt token.
+    /// Invalid typed payloads are rejected before anything is decided or retained.
+    pub fn send(
+        &mut self,
+        now: Time,
+        wall: Wall,
+        sign_in: u64,
+        key: [u8; 16],
+        attempt: Token,
+        ask: Ask,
+    ) -> core::result::Result<(), Invalid> {
+        if !payload::fits(&ask, &self.bounds) {
+            return Err(Invalid::Payload);
+        }
+        let Some(party) = self.truth.sign_ins.get(&sign_in).copied() else {
+            self.queue(now, 0, Up::Answer { attempt, envelope: Envelope::SignedOut, answer: None });
+            return Ok(());
+        };
+        self.keys.retain(|_, keyed| keyed.retained_until.is_none_or(|until| now <= until));
+        if let Some(old) = self.keys.get(&(party, key)) {
+            let answer = if old.ask == ask { old.answer.clone() } else { Answer::Refused(Refusal::KeyConflict) };
+            let commit = old.commit;
+            self.queue(now, commit, Up::Answer { attempt, envelope: Envelope::Final, answer: Some(answer) });
+            return Ok(());
+        }
+        let (answer, changes) = self.decide(party, &ask, wall)?;
+        let commit = self.commit(now, wall, Some(party), Some(key), Some(ask.clone()), Some(answer.clone()), changes);
+        self.keys.insert((party, key), Keyed { ask, answer: answer.clone(), commit, retained_until: None });
+        self.queue(now, commit, Up::Answer { attempt, envelope: Envelope::Final, answer: Some(answer) });
+        Ok(())
+    }
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive decision checks all revision and offered-act variants before changing truth"
+    )]
+    fn decide(
+        &mut self,
+        party: u64,
+        ask: &Ask,
+        wall: Wall,
+    ) -> core::result::Result<(Answer, Vec<crate::Change>), Invalid> {
+        let (project, object, kind, revision) = target(ask);
+        if project.is_some_and(|project| !self.truth.visible(party, project)) {
+            return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+        }
+        if let Ask::EditNote { note, revision, .. } | Ask::DeleteNote { note, revision, .. } = ask {
+            let Some(current) = self.truth.notes.get(note) else {
+                return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+            };
+            if *revision != current.revision {
+                return Ok((Answer::Refused(Refusal::Moved { now: current.revision, what: Moved::Note }), Vec::new()));
+            }
+        }
+        if let Some(key) = object {
+            if project != self.truth.project(key) {
+                return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+            }
+            let Some(value) = self.truth.objects.get(&key) else {
+                return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+            };
+            if let Some(Ending::Decided { by, how, at }) = ending(value) {
+                return Ok((
+                    Answer::Done(Outcome::DecidedFirst { by: by.clone(), how: how.clone(), at: *at }),
+                    Vec::new(),
+                ));
+            }
+            if let Some(how) = ending(value) {
+                return Ok((Answer::Refused(Refusal::Ended { how: how.clone() }), Vec::new()));
+            }
+            if let Some((seen, what)) = revision {
+                let current = match (value, what) {
+                    (ReadValue::Task(value), Moved::Spec) => Some(value.spec_revision),
+                    (ReadValue::Task(value), Moved::Hold) => value.hold.as_ref().map(|hold| hold.revision),
+                    (ReadValue::Escalation(value), Moved::Hold) => Some(value.hold.revision),
+                    (ReadValue::PersonTask(value), Moved::PersonTask) => Some(value.revision),
+                    (
+                        ReadValue::Frame(_)
+                        | ReadValue::Task(_)
+                        | ReadValue::Proposal(_)
+                        | ReadValue::Escalation(_)
+                        | ReadValue::Question(_)
+                        | ReadValue::PersonTask(_)
+                        | ReadValue::Result(_)
+                        | ReadValue::Ended(_)
+                        | ReadValue::History(_)
+                        | ReadValue::Activity(_)
+                        | ReadValue::Inbox(_)
+                        | ReadValue::Conversations(_)
+                        | ReadValue::Goals(_)
+                        | ReadValue::Spend(_)
+                        | ReadValue::Project(_)
+                        | ReadValue::Notes(_)
+                        | ReadValue::Deployment(_),
+                        Moved::Hold | Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting,
+                    ) => None,
+                };
+                if let Some(now) = current {
+                    if seen != now {
+                        return Ok((Answer::Refused(Refusal::Moved { now, what }), Vec::new()));
+                    }
+                } else {
+                    return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+                }
+            }
+            let waiting = match value {
+                ReadValue::Proposal(value) => Some(value.waiting),
+                ReadValue::Escalation(value) => Some(value.waiting),
+                ReadValue::Frame(_)
+                | ReadValue::Task(_)
+                | ReadValue::Question(_)
+                | ReadValue::PersonTask(_)
+                | ReadValue::Result(_)
+                | ReadValue::Ended(_)
+                | ReadValue::History(_)
+                | ReadValue::Activity(_)
+                | ReadValue::Inbox(_)
+                | ReadValue::Conversations(_)
+                | ReadValue::Goals(_)
+                | ReadValue::Spend(_)
+                | ReadValue::Project(_)
+                | ReadValue::Notes(_)
+                | ReadValue::Deployment(_) => None,
+            };
+            if waiting.is_some_and(|waiting| !recipient(&self.truth, party, waiting)) {
+                return Ok((
+                    Answer::Refused(Refusal::Moved { now: Revision { value: 0 }, what: Moved::Waiting }),
+                    Vec::new(),
+                ));
+            }
+        }
+        let note_offers = match ask {
+            Ask::EditNote { note, .. } | Ask::DeleteNote { note, .. } => {
+                self.truth.notes.get(note).map(|note| &note.acts)
+            }
+            Ask::StartChat { .. }
+            | Ask::Write { .. }
+            | Ask::AnswerQuestion { .. }
+            | Ask::AnswerPerson { .. }
+            | Ask::Take { .. }
+            | Ask::HandBack { .. }
+            | Ask::DecideProposal { .. }
+            | Ask::DecideEscalation { .. }
+            | Ask::Release { .. }
+            | Ask::Amend { .. }
+            | Ask::Stop { .. }
+            | Ask::Cancel { .. }
+            | Ask::Close { .. }
+            | Ask::TakeOver { .. }
+            | Ask::SetGoal { .. }
+            | Ask::Prioritise { .. }
+            | Ask::MarkSeen { .. }
+            | Ask::Adopt { .. }
+            | Ask::ChangePolicy { .. }
+            | Ask::SetRoles { .. }
+            | Ask::MakeService { .. }
+            | Ask::SetPool { .. } => None,
+        };
+        let offer = note_offers.or_else(|| {
+            object
+                .and_then(|key| self.truth.objects.get(&key))
+                .and_then(offers)
+                .or_else(|| project.and_then(|p| self.truth.projects.get(&p).map(|p| &p.acts)))
+        });
+        let admission =
+            offer.and_then(|acts| acts.iter().find(|offered| offered.act == kind).map(|offered| &offered.admission));
+        if let Some(Admission::Refused(refusal)) = admission {
+            return Ok((Answer::Refused(refusal.clone()), Vec::new()));
+        }
+        if let Ask::StartChat { project, .. } = ask
+            && !self.truth.frames.get(&party).is_some_and(|frame| {
+                frame.projects.iter().any(|role| role.project == *project && !role.chats.is_empty())
+            })
+        {
+            return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+        }
+        if let Some(rule) =
+            self.rules.iter().find(|rule| rule.ask == *ask && rule.party.is_none_or(|number| number == party)).cloned()
+        {
+            if matches!(rule.answer, Answer::Done(_)) {
+                if matches!(admission, Some(Admission::Proposed { .. }))
+                    && !matches!(rule.answer, Answer::Done(Outcome::Proposed { .. }))
+                {
+                    return Err(Invalid::Script);
+                }
+                if admission.is_none() && !matches!(ask, Ask::StartChat { .. } | Ask::MarkSeen { .. }) {
+                    return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+                }
+            }
+            let mut next = self.truth.clone();
+            for change in &rule.changes {
+                next.apply(change)?;
+            }
+            self.truth = next;
+            return Ok((rule.answer, rule.changes));
+        }
+        if admission.is_none() {
+            return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+        }
+        if let Some(Admission::Proposed { .. }) = admission {
+            return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+        }
+        let how = match ask {
+            Ask::DecideProposal { decision, .. } | Ask::DecideEscalation { decision, .. } => Some(decision.clone()),
+            Ask::Release { again, .. } => Some(Decision::Released { again: *again }),
+            Ask::StartChat { .. }
+            | Ask::Write { .. }
+            | Ask::AnswerQuestion { .. }
+            | Ask::AnswerPerson { .. }
+            | Ask::Take { .. }
+            | Ask::HandBack { .. }
+            | Ask::Amend { .. }
+            | Ask::Stop { .. }
+            | Ask::Cancel { .. }
+            | Ask::Close { .. }
+            | Ask::TakeOver { .. }
+            | Ask::SetGoal { .. }
+            | Ask::Prioritise { .. }
+            | Ask::MarkSeen { .. }
+            | Ask::EditNote { .. }
+            | Ask::DeleteNote { .. }
+            | Ask::Adopt { .. }
+            | Ask::ChangePolicy { .. }
+            | Ask::SetRoles { .. }
+            | Ask::MakeService { .. }
+            | Ask::SetPool { .. } => None,
+        };
+        if let (Some(key), Some(how)) = (object, how) {
+            if matches!(how, Decision::PassedUp | Decision::LeftHeld { .. }) {
+                return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+            }
+            let by = self.truth.frames.get(&party).expect("signed-in party has a frame").party.clone();
+            let mut value = self.truth.objects.get(&key).expect("target checked").clone();
+            let terminal = Ending::Decided { by, how: how.clone(), at: wall };
+            match &mut value {
+                ReadValue::Proposal(v) => v.ending = Some(terminal),
+                ReadValue::Escalation(v) => v.ending = Some(terminal),
+                ReadValue::Task(v) => {
+                    v.hold = None;
+                    v.escalation = None;
+                    v.chip.phase = Phase::Due;
+                }
+                ReadValue::Frame(_)
+                | ReadValue::Question(_)
+                | ReadValue::PersonTask(_)
+                | ReadValue::Result(_)
+                | ReadValue::Ended(_)
+                | ReadValue::History(_)
+                | ReadValue::Activity(_)
+                | ReadValue::Inbox(_)
+                | ReadValue::Conversations(_)
+                | ReadValue::Goals(_)
+                | ReadValue::Spend(_)
+                | ReadValue::Project(_)
+                | ReadValue::Notes(_)
+                | ReadValue::Deployment(_) => return Ok((Answer::Refused(Refusal::NotOffered), Vec::new())),
+            }
+            let change =
+                crate::Change::Object { project: project.expect("object requests name a project"), key, value };
+            change.validate(&self.bounds)?;
+            self.truth.apply(&change)?;
+            return Ok((Answer::Done(Outcome::Decided { by: Actor::Party(party), how, at: wall }), vec![change]));
+        }
+        Ok((Answer::Refused(Refusal::NotOffered), Vec::new()))
+    }
+}
+pub(crate) fn recipient(truth: &crate::Truth, party: u64, to: Recipient) -> bool {
+    match to {
+        Recipient::Party(number) => number == party,
+        Recipient::Role { project, role } => truth.frames.get(&party).is_some_and(|frame| {
+            frame.projects.iter().any(|p| p.project == project && p.roles.iter().any(|r| *r == role))
+        }),
+        Recipient::Task(task) => truth.objects.get(&ObjectKey::Task(task)).is_some_and(|value| {
+            if let ReadValue::Task(v) = value { v.requester == Actor::Party(party) } else { false }
+        }),
+    }
+}
+fn offers(value: &ReadValue) -> Option<&List<Offered>> {
+    match value {
+        ReadValue::Task(v) => Some(&v.acts),
+        ReadValue::Proposal(v) => Some(&v.acts),
+        ReadValue::Escalation(v) => Some(&v.acts),
+        ReadValue::Question(v) => Some(&v.acts),
+        ReadValue::PersonTask(v) => Some(&v.acts),
+        ReadValue::Result(v) => Some(&v.acts),
+        ReadValue::Frame(_)
+        | ReadValue::Ended(_)
+        | ReadValue::History(_)
+        | ReadValue::Activity(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::Conversations(_)
+        | ReadValue::Goals(_)
+        | ReadValue::Spend(_)
+        | ReadValue::Project(_)
+        | ReadValue::Notes(_)
+        | ReadValue::Deployment(_) => None,
+    }
+}
+fn ending(value: &ReadValue) -> Option<&Ending> {
+    match value {
+        ReadValue::Task(v) => v.result.as_ref().map(|result| &result.ending),
+        ReadValue::Proposal(v) => v.ending.as_ref(),
+        ReadValue::Escalation(v) => v.ending.as_ref(),
+        ReadValue::Question(v) => v.ending.as_ref(),
+        ReadValue::PersonTask(v) => v.ending.as_ref(),
+        ReadValue::Result(v) => Some(&v.ending),
+        ReadValue::Frame(_)
+        | ReadValue::Ended(_)
+        | ReadValue::History(_)
+        | ReadValue::Activity(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::Conversations(_)
+        | ReadValue::Goals(_)
+        | ReadValue::Spend(_)
+        | ReadValue::Project(_)
+        | ReadValue::Notes(_)
+        | ReadValue::Deployment(_) => None,
+    }
+}
+fn decision_kind(decision: &Decision) -> ActKind {
+    match decision {
+        Decision::Accepted => ActKind::Accept,
+        Decision::Rejected { .. } => ActKind::Reject,
+        Decision::PassedUp => ActKind::PassUp,
+        Decision::Released { .. } => ActKind::Release,
+        Decision::LeftHeld { .. } => ActKind::LeaveHeld,
+    }
+}
+type Target = (Option<u32>, Option<ObjectKey>, ActKind, Option<(Revision, Moved)>);
+fn target(ask: &Ask) -> Target {
+    match ask {
+        Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Write, None),
+        Ask::Write { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Write, None),
+        Ask::AnswerQuestion { project, task, message, .. } => {
+            (Some(*project), Some(ObjectKey::Question { task: *task, message: *message }), ActKind::Answer, None)
+        }
+        Ask::AnswerPerson { project, task, revision, .. } => {
+            (Some(*project), Some(ObjectKey::PersonTask(*task)), ActKind::Answer, Some((*revision, Moved::PersonTask)))
+        }
+        Ask::Take { project, task } => (Some(*project), Some(ObjectKey::PersonTask(*task)), ActKind::Take, None),
+        Ask::HandBack { project, task } => {
+            (Some(*project), Some(ObjectKey::PersonTask(*task)), ActKind::HandBack, None)
+        }
+        Ask::DecideProposal { project, proposal, decision } => {
+            (Some(*project), Some(ObjectKey::Proposal(*proposal)), decision_kind(decision), None)
+        }
+        Ask::DecideEscalation { project, task, revision, decision } => (
+            Some(*project),
+            Some(ObjectKey::Escalation(*task)),
+            decision_kind(decision),
+            Some((*revision, Moved::Hold)),
+        ),
+        Ask::Release { project, task, revision, .. } => {
+            (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Release, Some((*revision, Moved::Hold)))
+        }
+        Ask::Amend { project, task, revision, release, .. } => (
+            Some(*project),
+            Some(ObjectKey::Task(*task)),
+            if *release { ActKind::AmendRelease } else { ActKind::Amend },
+            Some((*revision, Moved::Spec)),
+        ),
+        Ask::Stop { project, task } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Stop, None),
+        Ask::Cancel { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Cancel, None),
+        Ask::Close { project, chat, .. } => (Some(*project), Some(ObjectKey::Task(*chat)), ActKind::Close, None),
+        Ask::TakeOver { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::TakeOver, None),
+        Ask::SetGoal { project, .. } => (Some(*project), None, ActKind::SetGoal, None),
+        Ask::Prioritise { project, .. } => (Some(*project), None, ActKind::Prioritise, None),
+        Ask::MarkSeen { .. } => (None, None, ActKind::MarkSeen, None),
+        Ask::EditNote { project, .. } => (Some(*project), None, ActKind::EditNote, None),
+        Ask::DeleteNote { project, .. } => (Some(*project), None, ActKind::DeleteNote, None),
+        Ask::Adopt { project, .. } => (Some(*project), None, ActKind::Adopt, None),
+        Ask::ChangePolicy { project, .. } => (Some(*project), None, ActKind::ChangePolicy, None),
+        Ask::SetRoles { project, .. } => (Some(*project), None, ActKind::SetRoles, None),
+        Ask::MakeService { project, .. } => (Some(*project), None, ActKind::MakeService, None),
+        Ask::SetPool { project, .. } => (Some(*project), None, ActKind::SetPool, None),
+    }
+}

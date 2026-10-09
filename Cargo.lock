@@ -437,6 +437,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-scripted-engine"
+version = "0.0.0"
+dependencies = [
+ "jig-client",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-tasks-world"
 version = "0.0.0"
 dependencies = [

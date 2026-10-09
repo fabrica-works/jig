@@ -524,3 +524,17 @@ fn fake_person_links_only_the_semantic_view_and_foundation() {
         );
     }
 }
+
+#[test]
+fn scripted_engine_links_only_the_client_and_foundation() {
+    let engines: Vec<_> =
+        manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-scripted-engine")).collect();
+    assert_eq!(engines.len(), 1);
+    for manifest in engines {
+        assert!(
+            manifest.dependencies.iter().all(|name| ["skein-lib", "jig-client"].contains(&name.as_str())),
+            "{}",
+            manifest.path.display()
+        );
+    }
+}
