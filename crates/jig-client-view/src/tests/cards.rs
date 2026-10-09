@@ -154,6 +154,7 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
         );
         b.close();
         let tree = b.finish();
+        super::cards_access::check(&tree);
         assert!(tree.nodes().iter().any(|n| n.role == Role::Status && n.name.as_deref() == Some(expected)));
         if expected != b"Connecting" {
             assert!(contains(&tree, b"10 need you"));
@@ -208,6 +209,7 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
         crate::cards::state(&mut b, &state, id, &words, &mut bindings);
         b.close();
         let tree = b.finish();
+        super::cards_access::check(&tree);
         assert!(tree.nodes().iter().any(|n| n.role == Role::Status));
         if let Card::Refused { .. } = state {
             assert!(contains(&tree, b"Your pool has 12 left; this needs 40"));
@@ -291,6 +293,7 @@ fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mu
         crate::cards::close(&mut b);
         b.close();
         let tree = b.finish();
+        super::cards_access::check(&tree);
         assert!(
             tree.nodes().iter().any(|n| n.role == Role::Region && n.name.as_deref() == Some(b"Question".as_slice()))
         );
@@ -368,6 +371,7 @@ fn jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset()
     words.amount(&mut b, u64::MAX);
     b.close();
     let tree = b.finish();
+    super::cards_access::check(&tree);
     assert!(contains(&tree, b"At 01:00"));
     assert!(contains(&tree, b"Waiting 4 min"));
     assert!(contains(&tree, b"18446744073709551615"));

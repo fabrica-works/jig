@@ -214,3 +214,12 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
     }
     None
 }
+
+/// Owned heap for the last tree's jig meanings, separately from tree storage.
+/// Amendment controls clone one bounded document plus newly entered words and
+/// instructions. The envelope also covers action text and connector part paths.
+#[must_use]
+pub fn jig_bindings_worst_case(capacity: u32, client: &jig_client::Limits) -> Option<u64> {
+    let payload = client.document_bytes.checked_mul(2)?.checked_add(u64::from(client.text).checked_mul(4)?)?;
+    skein_lib::List::<Entry>::worst_case(capacity)?.checked_add(u64::from(capacity).checked_mul(payload)?)
+}

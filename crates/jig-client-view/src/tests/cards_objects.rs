@@ -163,7 +163,21 @@ fn render(d: &Domain, id: Id<Object>, words: &crate::words::Words, bindings: &mu
     b.open(Role::Page);
     cards::card(&mut b, d, id, &cards::Place::Elsewhere, words, bindings);
     b.close();
-    b.finish()
+    let tree = b.finish();
+    super::cards_access::check(&tree);
+    assert!(tree.len() <= crate::card_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
+    let facts = d.objects().get(id).unwrap();
+    match facts.card {
+        jig_client::objects::Card::Deciding { .. } => {
+            assert!(tree.nodes().iter().any(|node| node.styles.as_slice().contains(&crate::JigStyle::Card.token())
+                && node.states.as_slice().contains(&State::Busy)));
+        }
+        jig_client::objects::Card::Open
+        | jig_client::objects::Card::Refused { .. }
+        | jig_client::objects::Card::Unknown { .. }
+        | jig_client::objects::Card::Leaving { .. } => {}
+    }
+    tree
 }
 fn press(tree: &Tree, label: &[u8], bindings: &mut JigBindings) -> Action {
     let token = tree
@@ -403,6 +417,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
         cards::proposal::action(&mut b, &action, words, &mut bindings);
         b.close();
         let tree = b.finish();
+        super::cards_access::check(&tree);
         assert!(contains(&tree, whole));
         for node in tree.nodes() {
             if let Some(slot) = node.slot {
@@ -494,6 +509,7 @@ fn all_chip_phases(words: &crate::words::Words) {
         cards::chip::chip(&mut b, &d, &value, words, &mut bindings);
         b.close();
         let tree = b.finish();
+        super::cards_access::check(&tree);
         assert!(contains(&tree, expected), "phase text {expected:?}");
         assert!(contains(&tree, b"Task 8: Review"));
         for node in tree.nodes() {
@@ -590,6 +606,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     cards::chip::chip(&mut b, &d, &root, words, &mut bindings);
     b.close();
     let tree = b.finish();
+    super::cards_access::check(&tree);
     assert!(contains(&tree, b"Using tool actual tool"));
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::Region).count(), 2);
     bindings.begin();
@@ -651,7 +668,10 @@ fn dialog(d: &Domain, words: &crate::words::Words, bindings: &mut JigBindings) -
     b.open(Role::Page);
     crate::confirmation::confirmation(&mut b, d, words, bindings);
     b.close();
-    b.finish()
+    let tree = b.finish();
+    super::cards_access::check(&tree);
+    assert!(tree.len() <= crate::confirmation_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
+    tree
 }
 fn task_doc(acts: &[ActKind]) -> Task {
     Task {
@@ -936,6 +956,7 @@ fn notice_scenarios(words: &crate::words::Words) {
         let mut b = Builder::new(&limits());
         crate::notices::facts(&mut b, &kind, words);
         let tree = b.finish();
+        super::cards_access::check(&tree);
         assert_eq!(tree.nodes()[0].role, Role::Status);
         assert!(tree.nodes()[0].name.is_some());
         assert!(tree.len() > 1);
@@ -946,6 +967,7 @@ fn notice_scenarios(words: &crate::words::Words) {
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
     crate::notices::notices(&mut b, &d, words, &mut bindings);
     let tree = b.finish();
+    super::cards_access::check(&tree);
     assert!(contains(&tree, b"Working set limit"));
     let dismiss = press(&tree, b"Dismiss", &mut bindings);
     drive(&mut d, Event::Act { act: dismiss });
@@ -1114,6 +1136,9 @@ fn changed_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindin
     assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Confirm") && n.binding.is_some()));
 }
 
+#[path = "cards_sizes.rs"]
+mod sizes;
+
 #[test]
 fn jig_object_cards_hold_actions_confirmations_and_notices() {
     let words = words();
@@ -1121,4 +1146,5 @@ fn jig_object_cards_hold_actions_confirmations_and_notices() {
     person_contracts_and_result_values_keep_choices_slots_and_full_payloads(&words);
     proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(&words);
     escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_semantic_facts(&words);
+    sizes::scenario(&words);
 }

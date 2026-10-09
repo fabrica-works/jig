@@ -22,14 +22,19 @@ mod limits;
 pub mod markdown;
 pub mod phrases;
 mod render;
+mod sizes;
 mod tree;
 pub mod words;
 
-pub use binding::{Act, Binding, BoundAct, JigBindings, JigMeaning, decode, number};
+pub use binding::{Act, Binding, BoundAct, JigBindings, JigMeaning, decode, jig_bindings_worst_case, number};
 pub use builder::{Builder, Slot, SlotId};
 pub use diff::{Attribute, Made, Patch, diff};
 pub use limits::{Limits, worst_case};
 pub use render::View;
+pub use sizes::{
+    card_nodes, chip_nodes, confirmation_nodes, escalation_nodes, frame_nodes, notices_nodes, person_task_nodes,
+    proposal_nodes, question_nodes, refusal_nodes, reply_nodes, result_nodes,
+};
 pub use tree::{
     Drawing, DrawingKind, Key, Node, NodeId, Owner, Role, Run, SlotRef, State, Style, TextRun, Tree, Value,
 };

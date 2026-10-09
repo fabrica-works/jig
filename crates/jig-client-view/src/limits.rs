@@ -56,3 +56,54 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(children)?
         .checked_add(ancestry)
 }
+
+impl Limits {
+    /// Largest jig renderer in one enclosing page, with English's phrase
+    /// envelope (256 literal bytes, at most three holes). Pages and connector
+    /// fragments add their counts at the application's view root. Custom
+    /// languages use `of_words` to include their checked saying capacities.
+    #[must_use]
+    pub fn of(client: &jig_client::Limits) -> Option<Self> {
+        let phrase = client.text.max(64).checked_mul(3)?.checked_add(256)?;
+        Self::with_phrase_bytes(client, phrase)
+    }
+
+    /// The same renderer envelope using the largest checked saying across
+    /// every loaded language; the root may switch language without resizing.
+    #[must_use]
+    pub fn of_words(client: &jig_client::Limits, words: &crate::words::Words) -> Option<Self> {
+        let mut phrase = 0;
+        for id in crate::phrases::jig::ALL {
+            phrase = phrase.max(words.book.capacity(id.id())?);
+        }
+        Self::with_phrase_bytes(client, phrase)
+    }
+
+    fn with_phrase_bytes(client: &jig_client::Limits, phrase: u32) -> Option<Self> {
+        let nodes = crate::card_nodes(client)?
+            .max(crate::frame_nodes(client)?)
+            .max(crate::confirmation_nodes(client)?)
+            .max(crate::notices_nodes(client)?)
+            .checked_add(1)?;
+        // A field carries a saying as its name and the full domain value.
+        // Markdown links may carry both label and external target.
+        let text_per_node = phrase.checked_add(client.text)?.max(client.text.checked_mul(2)?);
+        Some(Self {
+            nodes,
+            // Page, card/input result, verdict proposal, and its deepest
+            // Markdown list path. Dependency regions are siblings, not nested.
+            depth: 32,
+            text_per_node,
+            text_bytes: nodes.checked_mul(text_per_node)?,
+            drawing_bytes: 0,
+            styles_per_node: 2,
+            // At most one remove per old node and one structural plus three
+            // attribute edits per new node (diff.rs).
+            patches: nodes.checked_mul(5)?,
+            // Each actionable node or part slot issues at most one meaning.
+            bindings: nodes,
+            slots: nodes,
+            markdown_depth: 3,
+        })
+    }
+}
