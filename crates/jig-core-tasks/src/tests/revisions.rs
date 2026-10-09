@@ -334,6 +334,7 @@ fn priority_spend_delegate_phase_and_run_turn_do_not_move_decision_revisions() {
 #[test]
 fn a_dependency_result_moves_only_its_person_tasks_revision_and_ended_rows_keep_it() {
     let mut test = Harness::new();
+    test.env.wall = Wall::from_nanos(1_000_000_000);
     let mut input = task(1, &[]);
     input.executor = Executor::Person(PersonAddress::Person(10));
     let mut dependent = task(2, &[1]);
@@ -373,7 +374,9 @@ fn a_dependency_result_moves_only_its_person_tasks_revision_and_ended_rows_keep_
     test.send(Event::EffectsSettled { task: 2 });
     let out = test.send(Event::Settled { task: 2 });
     assert!(out.iter().any(|request| match request {
-        Request::Save { record: Stored::Ended(row) } if row.revisions == Revisions { hold: 0, spec: 0, person: 1 } =>
+        Request::Save { record: Stored::Ended(row) }
+            if row.revisions == Revisions { hold: 0, spec: 0, person: 1 }
+                && row.person_answer == Some(crate::PersonAnswer { by: 10, at: test.env.wall }) =>
             true,
         _ => false,
     }));

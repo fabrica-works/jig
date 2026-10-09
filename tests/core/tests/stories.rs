@@ -9,9 +9,13 @@ use jig_test_domain as root;
 use skein_lib::{List, Queue, ReplyTo, Token};
 
 fn ask(world: &mut World, request: u8, ask: people::Ask) {
+    ask_as(world, world.sign_in.expect("signed-in person"), request, ask);
+}
+
+fn ask_as(world: &mut World, sign_in: u64, request: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
         reply_to: ReplyTo::new(Token::new(6000 + u64::from(request))),
-        sign_in: world.sign_in.expect("signed-in person"),
+        sign_in,
         key: [request; 16],
         ask,
     })));
@@ -1049,22 +1053,31 @@ fn a_party_deciding_a_cancelled_task_hears_who_cancelled_it_and_when() {
     );
 }
 
-#[test]
-fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
-    let (mut configuration, mut limits) = jig_core_world::faults::plan_fixture(160);
+fn person_world_fixture(seed: u64) -> (root::Config, root::Limits) {
+    let (mut configuration, mut limits) = jig_core_world::faults::plan_fixture(seed);
     limits.core.tasks.person_stall = skein_lib::Duration::from_secs(1);
-    let kinds = Box::new([authority::Executor::Charter(1), authority::Executor::Role(0)]);
-    configuration.core.settings.chat_authority.delegation.kinds = kinds.clone();
+    let kinds: Box<[authority::Executor]> = Box::new([authority::Executor::Charter(1), authority::Executor::Role(0)]);
+    configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
     let mut rules = configuration.core.authority.rules().clone();
-    rules.ceiling.delegation.kinds = kinds.clone();
+    rules.ceiling.delegation.kinds.clone_from(&kinds);
     let mut policy = configuration.core.authority.policy(1).expect("plan policy").clone();
-    policy.ceiling.delegation.kinds = kinds.clone();
+    policy.ceiling.delegation.kinds.clone_from(&kinds);
     policy.roles[0].authority.delegation.kinds = kinds;
     let mut domain = authority::Domain::new(rules, limits.core.authority).expect("bounded person-task policy");
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     configuration.core.authority = domain;
+    (configuration, limits)
+}
+
+#[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one person-task story checks revision, handoff and durable first-answer facts"
+)]
+fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
+    let (configuration, limits) = person_world_fixture(160);
     let mut world = World::configured(160, false, configuration, limits);
     let parent = world.assignments[0];
     let mut input = member(&world, tasks::Executor::Agent { charter: 1 }, b"input report");
@@ -1106,22 +1119,81 @@ fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
         })))
     );
     assert!(!world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(choice)))));
-    ask(&mut world, 63, people::Ask::TakePerson { project: 1, task: choice });
-    ask(
-        &mut world,
-        64,
-        people::Ask::AnswerPerson {
-            project: 1,
-            task: choice,
-            revision: now,
-            result: people::PersonResult::Report { words: b"current observation".as_slice().into() },
+    let first_sign_in = world.sign_in.expect("first party signed in");
+    let first_person = match live_row(&world, parent.0).requester {
+        tasks::Party::Person(person) => person,
+        tasks::Party::Task(_) | tasks::Party::Deployment { .. } => panic!("person's chat"),
+    };
+    world.send(root::Event::Core(core::Event::SignIn {
+        reply_to: ReplyTo::new(Token::new(6100)),
+        identity: people::Identity {
+            key: people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
+            login: b"second".as_slice().into(),
+            name: b"second holder".as_slice().into(),
         },
+    }));
+    let second_sign_in = world.sign_in.expect("second party signed in");
+    let Some(people::Reply::SignedIn { person: second_person, .. }) = world.people_answers.last().copied() else {
+        panic!("second sign-in")
+    };
+    world.sign_in = Some(first_sign_in);
+    world.send(root::Event::Core(core::Event::People(people::Event::Roles {
+        project: 1,
+        holdings: Box::new([
+            people::Holding { person: first_person, role: people::Role::Owner },
+            people::Holding { person: second_person, role: people::Role::Owner },
+        ]),
+    })));
+    ask(&mut world, 63, people::Ask::TakePerson { project: 1, task: choice });
+    ask_as(&mut world, second_sign_in, 65, people::Ask::TakePerson { project: 1, task: choice });
+    let taken = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Taken { by: first_person }));
+    assert_eq!(world.people_answers.last(), Some(&taken));
+    let answer = people::Ask::AnswerPerson {
+        project: 1,
+        task: choice,
+        revision: now,
+        result: people::PersonResult::Report { words: b"current observation".as_slice().into() },
+    };
+    ask_as(&mut world, second_sign_in, 66, answer.clone());
+    assert_eq!(world.people_answers.last(), Some(&taken));
+    assert_eq!(live_row(&world, choice).taken_by, Some(first_person));
+    ask(&mut world, 67, people::Ask::HandBackPerson { project: 1, task: choice });
+    assert_eq!(live_row(&world, choice).taken_by, None);
+    let waiting = live_row(&world, choice).person_wait;
+    world.restart_with(person_world_fixture(160).0);
+    assert_eq!(live_row(&world, choice).person_wait, waiting, "handoff and restart preserve the same wait and notice");
+    ask_as(&mut world, second_sign_in, 68, people::Ask::TakePerson { project: 1, task: choice });
+    ask(&mut world, 69, answer.clone());
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Taken { by: second_person })))
     );
+    ask_as(&mut world, second_sign_in, 70, answer.clone());
     assert_eq!(
         world.people_answers.last(),
         Some(&people::Reply::Outcome(people::Outcome::PersonAnswered { task: choice }))
     );
     assert!(world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(choice)))));
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(choice)))]
+    else {
+        panic!("ended person task")
+    };
+    let winner = row.person_answer.expect("retained first answer");
+    assert_eq!(winner.by, second_person);
+    let ended = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Ended {
+        how: people::Ending::Decided { by: winner.by, at: winner.at },
+    }));
+    ask(&mut world, 71, answer.clone());
+    assert_eq!(world.people_answers.last(), Some(&ended), "the ended owner row identifies who answered");
+    world.restart_with(person_world_fixture(160).0);
+    ask(&mut world, 69, answer.clone());
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Taken { by: second_person })))
+    );
+    ask(&mut world, 72, answer);
+    assert_eq!(world.people_answers.last(), Some(&ended), "first answer survives cold restoration");
 }
 
 #[path = "stories/watches.rs"]
@@ -1227,4 +1299,107 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
     assert_eq!(live_row(world, task).spec.words.as_ref(), b"widened task");
     assert_eq!(live_row(world, task).numbers.budget, 600);
     assert!(!matches!(live_row(world, task).phase, tasks::Phase::Held { .. }));
+}
+
+#[test]
+fn a_goal_with_a_deadline_is_held_past_it() {
+    let (configuration, limits) = amendment_world_fixture(161);
+    let mut world = World::configured(161, false, configuration, limits);
+    let deadline = skein_lib::Wall::from_nanos(1_000_000_000);
+    ask(
+        &mut world,
+        90,
+        people::Ask::SetGoal {
+            project: 1,
+            spec: b"finish before the deadline".as_slice().into(),
+            charter: 1,
+            budget: 600,
+            priority: 0,
+            deadline: Some(deadline),
+        },
+    );
+    let Some(people::Reply::Outcome(people::Outcome::GoalProposed { proposal })) = world.people_answers.last().copied()
+    else {
+        panic!("goal proposed: {:?}", world.people_answers)
+    };
+    let proposal_key = root::Key::Core(core::Key::Tasks(tasks::Key::PersonProposal(proposal)));
+    let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) =
+        world.store.rows.get(&proposal_key)
+    else {
+        panic!("durable goal proposal")
+    };
+    let goal = row.goal.number;
+    let proposer = row.proposer;
+    assert_eq!(row.goal.authority.budget.deadline, Some(deadline));
+    world.restart_with(amendment_world_fixture(161).0);
+    let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) =
+        world.store.rows.get(&proposal_key)
+    else {
+        panic!("restored goal proposal")
+    };
+    assert_eq!(row.goal.authority.budget.deadline, Some(deadline));
+    ask(
+        &mut world,
+        91,
+        people::Ask::ChangePolicy {
+            project: 1,
+            change: people::PolicyChange::Role(people::PolicyRole {
+                number: 0,
+                authority: people::Authority {
+                    tools: 1023,
+                    grants: Box::new([people::Grant {
+                        connector: 1,
+                        kind: 5,
+                        pattern: people::Pattern { segments: Box::new([]), last: people::Last::Open(Box::new([])) },
+                    }]),
+                    delegation: people::Delegation {
+                        kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),
+                        tasks: 2,
+                        depth: 2,
+                    },
+                    spend: 1000,
+                    deadline: None,
+                    notes: 0,
+                    note_resources: Box::new([]),
+                },
+                period_spend: 1000,
+                requests: authority::Requests::ALL.0,
+                decides: authority::Proposals::ALL.0,
+            }),
+        },
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::PolicyChanged { project: 1 }))
+    );
+    ask(
+        &mut world,
+        92,
+        people::Ask::DecideProposal { project: 1, proposer, proposal, decision: people::ProposalDecision::Accept },
+    );
+    assert!(
+        matches!(
+            world.people_answers.last(),
+            Some(people::Reply::Outcome(people::Outcome::ProposalDecided {
+                choice: people::ProposalChoice::Accepted,
+                ..
+            }))
+        ),
+        "acceptance: {:?}",
+        world.people_answers
+    );
+    assert_eq!(live_row(&world, goal).authority.budget.deadline, Some(deadline));
+    world.advance(skein_lib::Duration::from_secs(2));
+    world.send(root::Event::Core(core::Event::Account(jig_core_accounts::Event::Add {
+        account: 1,
+        generation: 1,
+        valid: Some(skein_lib::Duration::from_secs(60)),
+    })));
+    let chat = world.assignments[0];
+    finish(&mut world, chat, b"chat finished");
+    assert!(
+        matches!(live_row(&world, goal).phase, tasks::Phase::Held { why: tasks::Hold::Deadline, .. }),
+        "deadline hold: {:?}",
+        live_row(&world, goal).phase
+    );
 }

@@ -186,8 +186,8 @@ impl Peers {
                         people::Ask::MarkSeen { seen: people::Seen::Chat { task: task_number(task), through } }
                     }
                     parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
-                    parties::Ask::Goal { words, budget, priority } => {
-                        people::Ask::SetGoal { project, spec: words, charter: 1, budget, priority }
+                    parties::Ask::Goal { words, budget, priority, deadline } => {
+                        people::Ask::SetGoal { project, spec: words, charter: 1, budget, priority, deadline }
                     }
                     parties::Ask::Say { task, words, release, .. } => {
                         people::Ask::Say { project, task: task_number(task), words, release }
@@ -546,6 +546,7 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         people::Refusal::Limit { which } => parties::Refusal::Limit { which: party_limit(which) },
         people::Refusal::Moved { now } => parties::Refusal::Moved { now: party_moved(now) },
         people::Refusal::Ended { how } => parties::Refusal::Ended { how: party_ending(how) },
+        people::Refusal::Taken { by } => parties::Refusal::Taken { by },
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
         people::Refusal::Unknown => parties::Refusal::Unknown,

@@ -47,7 +47,7 @@ pub enum Ask {
     /// Start one chat.
     Chat { words: Box<[u8]> },
     /// Ask for tracked work.
-    Goal { words: Box<[u8]>, budget: u64, priority: u32 },
+    Goal { words: Box<[u8]>, budget: u64, priority: u32, deadline: Option<Wall> },
     /// Add words to a task.
     Say { task: Task, words: Box<[u8]>, release: bool },
     /// Stop a current run.
@@ -342,7 +342,7 @@ pub fn random_acts(seed: u64, role: Role, count: u32) -> Box<[Act]> {
         .map(|number| {
             let ask = match role {
                 Role::Owner | Role::Maintainer if rng.below(2) == 0 => {
-                    Ask::Goal { words: Box::from(&b"goal"[..]), budget: 10, priority: 1 }
+                    Ask::Goal { words: Box::from(&b"goal"[..]), budget: 10, priority: 1, deadline: None }
                 }
                 Role::Owner | Role::Maintainer | Role::Member => Ask::Chat { words: Box::from(&b"hello"[..]) },
                 Role::Observer => return Act::Pause { for_: Duration::from_millis(1) },

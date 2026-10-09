@@ -88,7 +88,14 @@ fn an_observer_is_refused_a_request_and_told_why() {
     let call = world.request(
         10,
         [3; 16],
-        Ask::SetGoal { project: 1, spec: b"goal".to_vec().into_boxed_slice(), charter: 1, budget: 1, priority: 1 },
+        Ask::SetGoal {
+            project: 1,
+            spec: b"goal".to_vec().into_boxed_slice(),
+            charter: 1,
+            budget: 1,
+            priority: 1,
+            deadline: None,
+        },
     );
     assert!(world.reply(call).is_none(), "refusal waits for its answer commit");
     world.commit_all();
@@ -122,7 +129,14 @@ fn a_service_sets_a_goal_its_role_allows_and_is_refused_a_chat() {
     let goal = world.request(
         11,
         [2; 16],
-        Ask::SetGoal { project: 1, spec: b"goal".to_vec().into_boxed_slice(), charter: 1, budget: 1, priority: 1 },
+        Ask::SetGoal {
+            project: 1,
+            spec: b"goal".to_vec().into_boxed_slice(),
+            charter: 1,
+            budget: 1,
+            priority: 1,
+            deadline: None,
+        },
     );
     world.commit_all();
     assert!(matches!(world.reply(goal), Some(Reply::Outcome(Outcome::GoalStarted { .. }))));
@@ -229,6 +243,90 @@ fn a_role_task_leaves_every_inbox_after_one_holder_takes_it() {
     world.commit_all();
     assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::PersonTaken { task })));
     world.check_role_waiting(task, [first_person, second_person], false);
+    world.assert_settled();
+}
+
+fn person_task_world(seed: u64) -> (World, u64, u64) {
+    let mut world = World::new(Settings::calm(seed));
+    let first = world.signin(10, 1);
+    let second = world.signin(11, 2);
+    world.commit_all();
+    let Reply::SignedIn { person: first, .. } = world.reply(first).expect("first sign-in") else { panic!() };
+    let Reply::SignedIn { person: second, .. } = world.reply(second).expect("second sign-in") else { panic!() };
+    world.roles(
+        1,
+        Box::new([
+            Holding { person: first, role: Role::Maintainer },
+            Holding { person: second, role: Role::Maintainer },
+        ]),
+    );
+    world.commit_all();
+    world.waiting(
+        99,
+        Box::new([Entry {
+            task: 99,
+            project: 1,
+            whom: Whom::Role { project: 1, role: 1 },
+            kind: EntryKind::PersonTask,
+            at: skein_lib::Wall::EPOCH,
+        }]),
+    );
+    (world, first, second)
+}
+
+#[test]
+fn an_answer_to_a_person_task_another_holder_took_is_refused_and_told_who() {
+    let (mut world, first, _) = person_task_world(62);
+    let take = world.request(10, [3; 16], Ask::TakePerson { project: 1, task: 99 });
+    let answer = Ask::AnswerPerson {
+        project: 1,
+        task: 99,
+        revision: 0,
+        result: jig_core_people::PersonResult::Report { words: b"answer".as_slice().into() },
+    };
+    let other = world.request(11, [4; 16], answer.clone());
+    assert_eq!(world.reply(take), None);
+    assert_eq!(world.reply(other), None);
+    world.commit_all();
+    let taken = Reply::Outcome(Outcome::Refused(Refusal::Taken { by: first }));
+    assert_eq!(world.reply(other), Some(taken));
+    world.advance(Duration::from_secs(1));
+    let at = skein_lib::Wall::from_nanos(1_000_000_000);
+    let winner = world.request(10, [5; 16], answer.clone());
+    world.commit_all();
+    assert_eq!(world.reply(winner), Some(Reply::Outcome(Outcome::PersonAnswered { task: 99 })));
+    world.restart();
+    let replay = world.request(11, [4; 16], answer.clone());
+    world.commit_all();
+    assert_eq!(world.reply(replay), Some(taken), "saved holder fact does not change after an answer");
+    let late = world.request(11, [6; 16], answer);
+    world.commit_all();
+    assert_eq!(
+        world.reply(late),
+        Some(Reply::Outcome(Outcome::Refused(Refusal::Ended {
+            how: jig_core_people::Ending::Decided { by: first, at }
+        })))
+    );
+    world.assert_settled();
+}
+
+#[test]
+fn a_person_task_handed_back_is_taken_by_another_holder() {
+    let (mut world, first, second) = person_task_world(63);
+    world.request(10, [3; 16], Ask::TakePerson { project: 1, task: 99 });
+    world.commit_all();
+    let other = world.request(11, [4; 16], Ask::HandBackPerson { project: 1, task: 99 });
+    world.commit_all();
+    assert_eq!(world.reply(other), Some(Reply::Outcome(Outcome::Refused(Refusal::Taken { by: first }))));
+    let handback = world.request(10, [5; 16], Ask::HandBackPerson { project: 1, task: 99 });
+    world.commit_all();
+    assert_eq!(world.reply(handback), Some(Reply::Outcome(Outcome::PersonHandedBack { task: 99 })));
+    world.check_role_waiting(99, [first, second], true);
+    world.restart();
+    let take = world.request(11, [6; 16], Ask::TakePerson { project: 1, task: 99 });
+    world.commit_all();
+    assert_eq!(world.reply(take), Some(Reply::Outcome(Outcome::PersonTaken { task: 99 })));
+    world.check_role_waiting(99, [first, second], false);
     world.assert_settled();
 }
 

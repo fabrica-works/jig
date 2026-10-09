@@ -723,6 +723,13 @@ pub struct Revisions {
     pub person: u64,
 }
 
+/// The first accepted person answer, independent of the temporary role claim.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct PersonAnswer {
+    pub by: u64,
+    pub at: Wall,
+}
+
 /// One waiting interval of a person task, retained through claims and restart.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct PersonWait {
@@ -788,6 +795,8 @@ pub struct TaskRecord {
     pub executor: Executor,
     /// Current role-task holder; direct-person tasks never need a claim.
     pub taken_by: Option<u64>,
+    /// The first accepted answer, retained after the role claim is cleared.
+    pub person_answer: Option<PersonAnswer>,
     /// The interval starts when dependency and resource waits clear.
     pub person_wait: Option<PersonWait>,
     /// Durable core recurring template and last considered period.

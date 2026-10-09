@@ -651,8 +651,10 @@ pub fn result_from_row(
         requester: row.requester,
         executor: row.executor,
         chosen_by: match row.executor {
-            tasks::Executor::Person(tasks::PersonAddress::Person(person)) => Some(person),
-            tasks::Executor::Person(tasks::PersonAddress::Role(_)) => row.taken_by,
+            tasks::Executor::Person(_) => match row.person_answer {
+                Some(answer) => Some(answer.by),
+                None => None,
+            },
             tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => None,
         },
         delegates,

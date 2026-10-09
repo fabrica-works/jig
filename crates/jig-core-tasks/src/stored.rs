@@ -338,6 +338,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || !valid_escalation(task, limits)
         || !valid_proposal(task, limits)
         || !valid_followups(task)
+        || !valid_person_answer(task)
     {
         return false;
     }
@@ -590,6 +591,20 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
             task.taken_by != Some(0) && task.recurring.is_none() && person_counters(task)
         }
     }
+}
+
+fn valid_person_answer(task: &TaskRecord) -> bool {
+    let Some(answer) = task.person_answer else { return true };
+    let addressed = match task.executor {
+        Executor::Person(crate::PersonAddress::Person(person)) => answer.by == person,
+        Executor::Person(crate::PersonAddress::Role(_)) => true,
+        Executor::Agent { .. } | Executor::Procedure { .. } => false,
+    };
+    let answered = match task.phase {
+        Phase::Closing(_) | Phase::Held { was: Was::Closing(_), .. } | Phase::Ended(_) => true,
+        Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => false,
+    };
+    answer.by != 0 && task.taken_by.is_none() && addressed && answered
 }
 
 fn person_counters(task: &TaskRecord) -> bool {

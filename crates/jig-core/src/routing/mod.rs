@@ -346,6 +346,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::Activate { .. }
         | Event::PreparedAgent { .. }
         | Event::HistoricalProposal { .. }
+        | Event::HistoricalPersonTask { .. }
         | Event::HistoricalEscalation { .. }
         | Event::NamedAnswer { .. }
         | Event::NamedAction { .. }
@@ -466,6 +467,13 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         }
         Event::HistoricalProposal { request, person, project, proposer, proposal, row, busy } => {
             route_historical_proposal(core, work, request, person, project, proposer, proposal, row, busy)
+        }
+        Event::HistoricalPersonTask { request, person, project, task, row, busy } => {
+            let outcome = core.person_task_ended(person, project, task, row, busy);
+            work.push(Event::People(people::Event::Decided { request, outcome }));
+            let mut out = Queue::with_capacity(1);
+            out.push(Request::Decided);
+            Requests::Out(out)
         }
         Event::HistoricalEscalation { request, person, project, task, revision, row, busy } => {
             route_historical_escalation(core, env, work, request, person, project, task, revision, row, busy)

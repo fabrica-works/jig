@@ -15,6 +15,7 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         people::Refusal::Limit { which } => application::Refusal::Limit { which: limit_kind(which) },
         people::Refusal::Moved { now } => application::Refusal::Moved { now: moved(now) },
         people::Refusal::Ended { how } => application::Refusal::Ended { how: ending(how) },
+        people::Refusal::Taken { by } => application::Refusal::Taken { by },
         people::Refusal::NotWaiting => application::Refusal::NotWaiting,
         people::Refusal::NoFurther => application::Refusal::NoFurther,
         people::Refusal::Unknown => application::Refusal::Unknown,

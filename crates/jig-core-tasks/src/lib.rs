@@ -95,10 +95,11 @@ pub use batch::{bounded_batch, valid_authority, valid_contract, valid_spec};
 pub use boundary::{
     Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor, Hold,
     HoldKind, Holding, InvalidResult, Key, Kind, MessageKind, Name, New, NewsClass, NoticeState, Parameter, Party,
-    PersonAddress, PersonStallNotice, PersonWait, Phase, PoolSlots, Problem, ProcedureDecision, QuestionCredit,
-    RecurringOverlap, RecurringState, RecurringTemplate, Refusal, Request, ResourceAccess, ResultFollowups, ResultKind,
-    ResultsWake, Revisions, RunContext, SavedResource, Spec, Stage, Status, Stored, Stub, Subscription,
-    SubscriptionKind, Taken, TaskRecord, TaskResult, Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
+    PersonAddress, PersonAnswer, PersonStallNotice, PersonWait, Phase, PoolSlots, Problem, ProcedureDecision,
+    QuestionCredit, RecurringOverlap, RecurringState, RecurringTemplate, Refusal, Request, ResourceAccess,
+    ResultFollowups, ResultKind, ResultsWake, Revisions, RunContext, SavedResource, Spec, Stage, Status, Stored, Stub,
+    Subscription, SubscriptionKind, Taken, TaskRecord, TaskResult, Verdict, WakePolicy, WakeRule, Was, Word, Writer,
+    WriterSlot,
 };
 pub use control::{Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings};
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};

@@ -187,6 +187,7 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
         Refusal::Role { .. }
         | Refusal::Authority { .. }
         | Refusal::Moved { .. }
+        | Refusal::Taken { .. }
         | Refusal::Ended { .. }
         | Refusal::NotWaiting
         | Refusal::NoFurther

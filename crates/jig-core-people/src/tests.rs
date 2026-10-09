@@ -212,7 +212,14 @@ fn owner_makes_a_service_which_can_request_work_but_cannot_start_a_chat() {
     let routed = test.request(
         21,
         3,
-        Ask::SetGoal { project: 1, spec: b"work".as_slice().into(), charter: 1, budget: 1, priority: 1 },
+        Ask::SetGoal {
+            project: 1,
+            spec: b"work".as_slice().into(),
+            charter: 1,
+            budget: 1,
+            priority: 1,
+            deadline: None,
+        },
     );
     let mut service_routed = false;
     for row in &routed {
@@ -1449,4 +1456,26 @@ fn read_position_room_pressure_keeps_scoped_identity_without_a_project() {
         }
     );
     assert_eq!(capacity::permanent(Outcome::MarkedSeen { seen }), None);
+}
+
+#[test]
+fn a_goal_deadline_is_retained_under_its_key() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let ask = Ask::SetGoal {
+        project: 1,
+        spec: b"deadline".as_slice().into(),
+        charter: 1,
+        budget: 1,
+        priority: 1,
+        deadline: Some(Wall::from_nanos(1_000_000_000)),
+    };
+    let request = route(&test.request(10, 1, ask.clone()));
+    let outcome = Outcome::GoalStarted { task: 7 };
+    test.send(Event::Decided { request, outcome });
+    assert_eq!(reply(&test.request(10, 1, ask.clone())), Reply::Outcome(outcome));
+    let Ask::SetGoal { project, spec, charter, budget, priority, .. } = ask else { panic!() };
+    let changed =
+        Ask::SetGoal { project, spec, charter, budget, priority, deadline: Some(Wall::from_nanos(2_000_000_000)) };
+    assert_eq!(reply(&test.request(10, 1, changed)), Reply::Refused(Refusal::KeyConflict));
 }

@@ -385,6 +385,23 @@ impl World {
                             valid: Duration::from_secs(60),
                         })));
                     }
+                    root::Request::Now(core::Now::HistoricalPersonTask { request, person, project, task }) => {
+                        let key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
+                        let row = match self.store.rows.get(&key) {
+                            Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => {
+                                Some(row.clone())
+                            }
+                            Some(_) | None => None,
+                        };
+                        self.events.push_back(root::Event::Core(core::Event::HistoricalPersonTask {
+                            request,
+                            person,
+                            project,
+                            task,
+                            row,
+                            busy: false,
+                        }));
+                    }
                     root::Request::Now(now) => {
                         if let Some(watches) = &mut self.watches {
                             watches.now(&now);
@@ -521,10 +538,15 @@ impl World {
             }
             root::Delivery::Core(core::Held::PeopleReply {
                 sign_in: Some(sign_in),
-                reply: people::Reply::SignedIn { .. },
+                reply: reply @ people::Reply::SignedIn { .. },
                 ..
             }) => {
+                let initial = self.sign_in.is_none();
                 self.sign_in = Some(sign_in);
+                self.people_answers.push(reply);
+                if !initial {
+                    return;
+                }
                 self.events.push_back(root::Event::Core(core::Event::People(people::Event::Ask {
                     reply_to: ReplyTo::new(Token::new(102)),
                     sign_in,

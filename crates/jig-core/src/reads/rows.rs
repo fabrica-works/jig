@@ -321,9 +321,8 @@ fn result_actor(row: &tasks::TaskRecord) -> Option<tasks::Party> {
     match &row.phase {
         tasks::Phase::Ended(tasks::Ending::Cancelled { by, .. }) => Some(*by),
         tasks::Phase::Ended(tasks::Ending::Done(_) | tasks::Ending::Failed { .. }) => match row.executor {
-            tasks::Executor::Person(tasks::PersonAddress::Person(person)) => Some(tasks::Party::Person(person)),
-            tasks::Executor::Person(tasks::PersonAddress::Role(_)) => match row.taken_by {
-                Some(person) => Some(tasks::Party::Person(person)),
+            tasks::Executor::Person(_) => match row.person_answer {
+                Some(answer) => Some(tasks::Party::Person(answer.by)),
                 None => None,
             },
             tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => None,

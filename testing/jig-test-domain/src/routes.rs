@@ -490,7 +490,8 @@ fn route_now(
         | core::Now::RestoreRefused => {
             unreachable!("this route awaits the testing application's scripted peer");
         }
-        other @ (core::Now::SettledCallRefused { .. }
+        other @ (core::Now::HistoricalPersonTask { .. }
+        | core::Now::SettledCallRefused { .. }
         | core::Now::Call { .. }
         | core::Now::DropCall { .. }
         | core::Now::EffectAnswer { .. }

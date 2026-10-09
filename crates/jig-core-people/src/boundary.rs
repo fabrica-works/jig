@@ -229,7 +229,7 @@ pub enum Ask {
     /// Adopt a connector resource as a durable keyed owner request.
     Adopt { project: u32, adoption: Adoption },
     /// Start a tracked goal at the requested charter, budget and priority.
-    SetGoal { project: u32, spec: Box<[u8]>, charter: u32, budget: u64, priority: u32 },
+    SetGoal { project: u32, spec: Box<[u8]>, charter: u32, budget: u64, priority: u32, deadline: Option<Wall> },
     /// Hold a live run for this person's decision, cancelling its current claim.
     Stop { project: u32, task: u64 },
     /// Cancel a task and its descendants with a bounded reason.

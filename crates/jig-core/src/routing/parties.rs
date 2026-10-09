@@ -139,12 +139,14 @@ pub(super) fn begin_goal_creation(
     charter: u32,
     budget: u64,
     priority: u32,
+    deadline: Option<skein_lib::Wall>,
 ) {
     if core.projections.len() >= env.limits.tasks.tasks {
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::LiveTasks });
         return;
     }
-    let admitted = match core.goal_start(project, person, role, charter, budget, env.limits.tasks.tree_tasks) {
+    let admitted = match core.goal_start(project, person, role, charter, budget, deadline, env.limits.tasks.tree_tasks)
+    {
         Ok(admitted) => admitted,
         Err(why) => {
             pool_refused(work, request, why);

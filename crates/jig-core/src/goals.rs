@@ -6,7 +6,7 @@ use jig_core_authority as authority;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 use skein_lib::Queue;
-use skein_lib::{ReplyTo, Token};
+use skein_lib::{ReplyTo, Token, Wall};
 
 use crate::{Core, translate};
 
@@ -138,6 +138,7 @@ impl Core {
 
     /// Decide whether a person goal starts directly or is offered as a
     /// proposal, before either route allocates its durable number.
+    #[expect(clippy::too_many_arguments, reason = "a goal carries its requested authority and deadline")]
     pub fn goal_start(
         &self,
         project: u32,
@@ -145,6 +146,7 @@ impl Core {
         role: people::Role,
         charter: u32,
         budget: u64,
+        deadline: Option<Wall>,
         tasks_left: u32,
     ) -> Result<GoalStart, people::Refusal> {
         let Some(policy) = self.authority.policy(project) else { return Err(people::Refusal::Unknown) };
@@ -156,6 +158,7 @@ impl Core {
         }
         let mut given = self.settings.chat_authority.clone();
         given.budget.spend = budget;
+        given.budget.deadline = deadline;
         if charter != self.settings.charter {
             return Err(people::Refusal::NotOffered);
         }
@@ -180,7 +183,15 @@ impl Core {
             }])),
         };
         let checked = authority::check_request(&self.authority, &ask, &mut findings);
+        let deadline_beyond = match role_policy.authority.budget.deadline {
+            Some(ceiling) => match deadline {
+                Some(asked) => asked > ceiling,
+                None => true,
+            },
+            None => false,
+        };
         let beyond = budget > role_policy.authority.budget.spend
+            || deadline_beyond
             || budget
                 > numbers
                     .budget

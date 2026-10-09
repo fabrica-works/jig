@@ -2,7 +2,7 @@
 //! under current authority (`domain/people.md`, section 5.1).
 
 use super::refusals::pool_refused;
-use crate::{Core, Event, Limits, PersonTaskRoute};
+use crate::{Core, Event, Limits, Now, PersonTaskRoute, Request};
 use alloc::boxed::Box;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
@@ -108,15 +108,22 @@ pub(super) fn amend_route(
     }));
 }
 
+#[expect(clippy::too_many_arguments, reason = "one authenticated person-task route carries its output queue")]
 pub(super) fn person_task_request(
     core: &mut Core,
     work: &mut Queue<Event>,
+    out: &mut Queue<Request>,
     request: Token,
     person: u64,
     project: u32,
     role: Option<people::Role>,
     ask: people::Ask,
 ) {
+    let task = crate::person_task::number(&ask);
+    if core.tasks.task(task).is_none() {
+        out.push(Request::Now(Box::new(Now::HistoricalPersonTask { request, person, project, task })));
+        return;
+    }
     match core.person_task(request, person, project, role, ask) {
         Ok(event) => work.push(Event::Tasks(event)),
         Err(why) => {

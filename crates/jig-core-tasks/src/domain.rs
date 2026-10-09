@@ -1080,6 +1080,7 @@ pub(crate) fn make_admitted(
                 depth,
                 executor: new.executor,
                 taken_by: None,
+                person_answer: None,
                 person_wait: None,
                 result_followups: Box::new([]),
                 tracked: new.tracked,

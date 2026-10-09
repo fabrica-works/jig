@@ -2554,3 +2554,49 @@ fn deployment_capacity_carries_keyed_refusal_identity_time_and_bounded_omissions
     assert_eq!(document.person_room_refusals_forgotten, 0);
     assert_eq!(document.person_answer_retention, limits.people.request_retention);
 }
+
+#[test]
+fn goal_deadlines_are_checked_against_the_role_and_policy() {
+    let (mut core, _) = core();
+    let deadline = Wall::from_nanos(2_000_000_000);
+    let earlier = Wall::from_nanos(1_000_000_000);
+    let later = Wall::from_nanos(3_000_000_000);
+    let mut policy = core.authority.policy(1).expect("configured project").clone();
+    policy.roles[0].authority.budget.deadline = Some(deadline);
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy: policy.clone() }, &mut out);
+    let started = core.goal_start(1, 1, people::Role::Owner, 1, 10, Some(earlier), 2).expect("within role");
+    assert!(started.direct);
+    assert_eq!(started.authority.budget.deadline, Some(earlier));
+    assert!(!core.goal_start(1, 1, people::Role::Owner, 1, 10, Some(later), 2).expect("proposed deadline").direct);
+    assert!(!core.goal_start(1, 1, people::Role::Owner, 1, 10, None, 2).expect("unbounded deadline proposed").direct);
+    policy.ceiling.budget.deadline = Some(deadline);
+    while out.pop().is_some() {}
+    authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(
+        core.goal_start(1, 1, people::Role::Owner, 1, 10, Some(later), 2).expect_err("beyond policy"),
+        people::Refusal::Authority { lacking: people::Lack::Deadline }
+    );
+}
+
+#[test]
+fn a_person_result_document_uses_the_durable_answer_instead_of_the_cleared_claim() {
+    let (core, limits) = make_tree();
+    let mut row = core.tasks.task(3).expect("task").clone();
+    row.executor = tasks::Executor::Person(tasks::PersonAddress::Role(0));
+    row.phase =
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: b"chosen".as_slice().into() }));
+    row.taken_by = None;
+    row.person_answer = Some(tasks::PersonAnswer { by: 1, at: Wall::from_nanos(9) });
+    assert_eq!(result_from_row(&core, &limits, 1, &row).expect("role answer").chosen_by, Some(1));
+    row.executor = tasks::Executor::Person(tasks::PersonAddress::Person(1));
+    assert_eq!(result_from_row(&core, &limits, 1, &row).expect("direct answer").chosen_by, Some(1));
+    row.person_answer = None;
+    row.phase = tasks::Phase::Ended(tasks::Ending::Cancelled {
+        by: tasks::Party::Person(1),
+        at: Wall::from_nanos(10),
+        reason: Box::new([]),
+        result: None,
+    });
+    assert_eq!(result_from_row(&core, &limits, 1, &row).expect("cancelled").chosen_by, None);
+}

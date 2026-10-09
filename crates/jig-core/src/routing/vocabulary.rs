@@ -228,6 +228,8 @@ pub enum Now {
     StartPreparation { task: u64, transcript_waiter: Option<Token> },
     /// Load one proposal decision that has left live task memory.
     HistoricalProposal { request: Token, person: u64, project: u32, proposer: u64, proposal: u64 },
+    /// Load the ended owner row for a person-task act whose live row is gone.
+    HistoricalPersonTask { request: Token, person: u64, project: u32, task: u64 },
     /// Assemble connector-held sections for a still-current brief.
     CompleteBrief { brief: Token, order: Box<[brief::GatherPlaced]> },
     /// Core-owned sections are ready; the root may append its connector sections.
@@ -429,6 +431,15 @@ pub enum Event {
         proposer: u64,
         proposal: u64,
         row: Option<crate::ProposalDecisionRecord>,
+        busy: bool,
+    },
+    /// Ended owner row loaded for an authenticated person-task act.
+    HistoricalPersonTask {
+        request: Token,
+        person: u64,
+        project: u32,
+        task: u64,
+        row: Option<Box<tasks::TaskRecord>>,
         busy: bool,
     },
     /// One archived held-chat decision, translated from the root's store row.

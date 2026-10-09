@@ -14,6 +14,8 @@ pub enum Refusal {
     Moved { now: Moved },
     /// The subject ended with the stated outcome.
     Ended { how: Ending },
+    /// Another party holds the role-addressed person task.
+    Taken { by: u64 },
     /// The proposal or escalation waits for someone else.
     NotWaiting,
     /// The final holder cannot pass further.

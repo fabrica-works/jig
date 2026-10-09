@@ -1161,7 +1161,9 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
             };
             work.push(Work::Core(core::Event::RefusedPayload { request, problem, payload }));
         }
-        load @ (core::Now::HistoricalProposal { .. } | core::Now::HistoricalEscalation { .. }) => {
+        load @ (core::Now::HistoricalProposal { .. }
+        | core::Now::HistoricalEscalation { .. }
+        | core::Now::HistoricalPersonTask { .. }) => {
             now(domain, Output::CoreLoad(load));
         }
         core::Now::ProcedureDelegateOutcome { .. } => {}

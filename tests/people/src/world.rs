@@ -97,7 +97,8 @@ struct Commit {
     changes: Vec<Change>,
     tasks: Vec<(RequestKey, u64)>,
     proposals: Vec<((u64, u64), Winner)>,
-    cleared_waiting: Vec<u64>,
+    person_claims: Vec<(u64, Option<u64>)>,
+    person_answers: Vec<(u64, u64, Wall)>,
     sayings: Vec<(u64, u64, Box<[u8]>, bool)>,
     resolved: Vec<(u64, bool)>,
     amendments: Vec<(u64, u64, bool)>,
@@ -108,6 +109,19 @@ struct Commit {
 enum Change {
     Save(Stored),
     Erase(Key),
+}
+
+#[derive(Debug)]
+struct PersonClaim {
+    holder: Option<u64>,
+    answer: Option<(u64, Wall)>,
+}
+
+#[derive(Debug)]
+struct PersonTask {
+    entries: Box<[Entry]>,
+    holder: Option<u64>,
+    answer: Option<(u64, Wall)>,
 }
 
 #[derive(Debug)]
@@ -132,6 +146,7 @@ pub struct World {
     pub executor_outcomes: Vec<(u64, bool)>,
     specs: BTreeMap<u64, u64>,
     pending_amendments: BTreeMap<(u64, u64), Option<u64>>,
+    person_tasks: BTreeMap<u64, PersonTask>,
     commits: VecDeque<Commit>,
     held: VecDeque<Held>,
     calls: BTreeSet<u64>,
@@ -180,6 +195,7 @@ impl World {
             executor_outcomes: Vec::new(),
             specs: BTreeMap::new(),
             pending_amendments: BTreeMap::new(),
+            person_tasks: BTreeMap::new(),
             commits: VecDeque::new(),
             held: VecDeque::new(),
             calls: BTreeSet::new(),
@@ -328,7 +344,34 @@ impl World {
     }
 
     pub fn waiting(&mut self, task: u64, entries: Box<[Entry]>) {
+        if entries.iter().any(|entry| entry.kind == people::EntryKind::PersonTask) {
+            self.person_tasks.entry(task).or_insert_with(|| PersonTask {
+                entries: entries.clone(),
+                holder: None,
+                answer: None,
+            });
+        }
         self.send(Event::Waiting { task, entries });
+    }
+
+    fn person_state(&self, task: u64) -> Option<PersonClaim> {
+        let saved = self.person_tasks.get(&task)?;
+        let mut holder = saved.holder;
+        let mut answer = saved.answer;
+        for commit in &self.commits {
+            for &(number, next) in &commit.person_claims {
+                if number == task {
+                    holder = next;
+                }
+            }
+            for &(number, by, at) in &commit.person_answers {
+                if number == task {
+                    holder = None;
+                    answer = Some((by, at));
+                }
+            }
+        }
+        Some(PersonClaim { holder, answer })
     }
 
     #[must_use]
@@ -408,7 +451,8 @@ impl World {
         let mut changes = Vec::new();
         let mut tasks = Vec::new();
         let mut proposals = Vec::new();
-        let mut cleared_waiting = Vec::new();
+        let mut person_claims = Vec::new();
+        let mut person_answers = Vec::new();
         let mut sayings = Vec::new();
         let mut resolved = Vec::new();
         let mut amendments = Vec::new();
@@ -436,7 +480,9 @@ impl World {
                         Ask::SetGoal { .. } => RouteKind::Goal,
                         Ask::MakeService { .. } => RouteKind::Service,
                         Ask::DecideProposal { .. } => RouteKind::Proposal,
-                        Ask::TakePerson { .. } => RouteKind::TakePerson,
+                        Ask::TakePerson { .. } | Ask::HandBackPerson { .. } | Ask::AnswerPerson { .. } => {
+                            RouteKind::TakePerson
+                        }
                         Ask::MarkSeen { .. } | Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => {
                             RouteKind::Control
                         }
@@ -444,8 +490,6 @@ impl World {
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
                         | Ask::Cancel { .. }
-                        | Ask::HandBackPerson { .. }
-                        | Ask::AnswerPerson { .. }
                         | Ask::Move { .. }
                         | Ask::AnswerQuestion { .. }
                         | Ask::Prioritise { .. }
@@ -632,9 +676,55 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::TakePerson { task, .. } => {
-                                let outcome = Outcome::PersonTaken { task };
-                                cleared_waiting.push(task);
+                            act @ (Ask::TakePerson { task, .. }
+                            | Ask::HandBackPerson { task, .. }
+                            | Ask::AnswerPerson { task, .. }) => {
+                                let outcome = match self.person_state(task) {
+                                    Some(PersonClaim { answer: Some((by, at)), .. }) => {
+                                        Outcome::Refused(Refusal::Ended { how: people::Ending::Decided { by, at } })
+                                    }
+                                    Some(PersonClaim { holder: Some(by), answer: None }) if by != person => {
+                                        Outcome::Refused(Refusal::Taken { by })
+                                    }
+                                    Some(PersonClaim { holder, answer: None }) => match act {
+                                        Ask::TakePerson { .. } if holder.is_none() => {
+                                            person_claims.push((task, Some(person)));
+                                            Outcome::PersonTaken { task }
+                                        }
+                                        Ask::HandBackPerson { .. } if holder == Some(person) => {
+                                            person_claims.push((task, None));
+                                            Outcome::PersonHandedBack { task }
+                                        }
+                                        Ask::AnswerPerson { .. } if holder == Some(person) => {
+                                            person_answers.push((task, person, self.env.wall));
+                                            Outcome::PersonAnswered { task }
+                                        }
+                                        Ask::TakePerson { .. }
+                                        | Ask::HandBackPerson { .. }
+                                        | Ask::AnswerPerson { .. } => Outcome::Refused(Refusal::NotWaiting),
+                                        Ask::MarkSeen { .. }
+                                        | Ask::Application { .. }
+                                        | Ask::EditNote { .. }
+                                        | Ask::MakeService { .. }
+                                        | Ask::Adopt { .. }
+                                        | Ask::SetGoal { .. }
+                                        | Ask::Stop { .. }
+                                        | Ask::Cancel { .. }
+                                        | Ask::Release { .. }
+                                        | Ask::Move { .. }
+                                        | Ask::DecideProposal { .. }
+                                        | Ask::Say { .. }
+                                        | Ask::AnswerQuestion { .. }
+                                        | Ask::Prioritise { .. }
+                                        | Ask::Amend { .. }
+                                        | Ask::SetRoles { .. }
+                                        | Ask::ChangePolicy { .. }
+                                        | Ask::SetPool { .. }
+                                        | Ask::DecideEscalation { .. }
+                                        | Ask::StartChat { .. } => unreachable!("person task act"),
+                                    },
+                                    None => Outcome::Refused(Refusal::Unknown),
+                                };
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
@@ -646,8 +736,6 @@ impl World {
                             | Ask::Adopt { .. }
                             | Ask::Stop { .. }
                             | Ask::Cancel { .. }
-                            | Ask::HandBackPerson { .. }
-                            | Ask::AnswerPerson { .. }
                             | Ask::Move { .. }
                             | Ask::AnswerQuestion { .. }
                             | Ask::Prioritise { .. }
@@ -667,14 +755,20 @@ impl World {
                 Request::RestoreRefused { .. } => panic!("valid world records must restore"),
             }
         }
-        if !changes.is_empty() || !tasks.is_empty() || !proposals.is_empty() || !cleared_waiting.is_empty() {
+        if !changes.is_empty()
+            || !tasks.is_empty()
+            || !proposals.is_empty()
+            || !person_claims.is_empty()
+            || !person_answers.is_empty()
+        {
             self.issued += 1;
             self.commits.push_back(Commit {
                 number: self.issued,
                 changes,
                 tasks,
                 proposals,
-                cleared_waiting,
+                person_claims,
+                person_answers,
                 sayings,
                 resolved,
                 amendments,
@@ -727,7 +821,16 @@ impl World {
                     self.holds.remove(&task);
                 }
             }
-            for task in commit.cleared_waiting {
+            for (task, holder) in commit.person_claims {
+                let saved = self.person_tasks.get_mut(&task).expect("known person task");
+                saved.holder = holder;
+                let entries = if holder.is_none() { saved.entries.clone() } else { Box::new([]) };
+                self.waiting(task, entries);
+            }
+            for (task, by, at) in commit.person_answers {
+                let saved = self.person_tasks.get_mut(&task).expect("known person task");
+                saved.holder = None;
+                saved.answer = Some((by, at));
                 self.waiting(task, Box::new([]));
             }
             self.release();

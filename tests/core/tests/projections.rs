@@ -26,6 +26,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
             charter: 1,
             budget: 20,
             priority: 1,
+            deadline: None,
         },
     })));
     let goal = world
@@ -220,6 +221,7 @@ fn a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_f
             charter: 1,
             budget: 300,
             priority: 1,
+            deadline: None,
         },
     })));
     let goal = {

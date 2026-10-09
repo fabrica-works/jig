@@ -106,6 +106,7 @@ pub(crate) fn answer(
     };
     let row = &mut task_mut(domain, number).expect("live person task").record;
     row.taken_by = None;
+    row.person_answer = Some(crate::PersonAnswer { by: person, at: env.wall });
     row.phase = Phase::Closing(Closing { stage: Stage::Delegates, ending });
     publish(domain, env, number, out);
     out.push(Request::Done { reply_to: to });

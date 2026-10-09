@@ -494,6 +494,21 @@ impl World {
                         valid: Duration::from_secs(60),
                     })));
                 }
+                root::Request::Now(core::Now::HistoricalPersonTask { request, person, project, task }) => {
+                    let key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
+                    let row = match self.store.rows.get(&key) {
+                        Some(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => Some(row.clone()),
+                        Some(_) | None => None,
+                    };
+                    self.events.push_back(root::Event::Core(core::Event::HistoricalPersonTask {
+                        request,
+                        person,
+                        project,
+                        task,
+                        row,
+                        busy: false,
+                    }));
+                }
                 root::Request::Now(_) => {}
                 root::Request::Restart(_) => panic!("walking fixture uses restored markers"),
                 root::Request::Stop => panic!("testing root stopped: {:?}", self.trace),
@@ -572,6 +587,7 @@ impl World {
                         charter: 1,
                         budget: 100,
                         priority: 1,
+                        deadline: None,
                     },
                 };
                 self.events.push_back(root::Event::Core(core::Event::People(people::Event::Ask {

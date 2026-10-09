@@ -178,7 +178,7 @@ pub(super) fn tag_people(
                     ask @ (people::Ask::TakePerson { .. }
                     | people::Ask::HandBackPerson { .. }
                     | people::Ask::AnswerPerson { .. }) => {
-                        person_task_request(core, work, request, person, project, role, ask);
+                        person_task_request(core, work, &mut out, request, person, project, role, ask);
                     }
                     ask @ people::Ask::Stop { .. } => {
                         stop_request(core, env, work, request, person, project, role, ask);
@@ -218,7 +218,7 @@ pub(super) fn tag_people(
                     people::Ask::DecideEscalation { task, revision, decision, .. } => escalation_request(
                         core, env, work, request, person, project, role, &mut out, task, revision, decision,
                     ),
-                    people::Ask::SetGoal { spec, charter, budget, priority, .. } => begin_goal_creation(
+                    people::Ask::SetGoal { spec, charter, budget, priority, deadline, .. } => begin_goal_creation(
                         core,
                         env,
                         &mut out,
@@ -231,6 +231,7 @@ pub(super) fn tag_people(
                         charter,
                         budget,
                         priority,
+                        deadline,
                     ),
                     people::Ask::MarkSeen { seen } => {
                         let outcome = match seen {

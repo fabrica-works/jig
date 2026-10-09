@@ -5,15 +5,28 @@ use skein_lib::Wall;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
     /// The held role does not permit this request here.
-    Role { held: Option<u32> },
+    Role {
+        held: Option<u32>,
+    },
     /// The request lacks the stated authority.
-    Authority { lacking: Lack },
+    Authority {
+        lacking: Lack,
+    },
     /// The stated admission bound was reached.
-    Limit { which: LimitKind },
+    Limit {
+        which: LimitKind,
+    },
     /// The decided subject changed since it was observed.
-    Moved { now: Moved },
+    Moved {
+        now: Moved,
+    },
     /// The subject ended with the stated outcome.
-    Ended { how: Ending },
+    Ended {
+        how: Ending,
+    },
+    Taken {
+        by: u64,
+    },
     /// The proposal or escalation waits for someone else.
     NotWaiting,
     /// The final holder cannot pass further.
