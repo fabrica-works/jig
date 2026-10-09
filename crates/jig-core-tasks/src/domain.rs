@@ -755,6 +755,10 @@ pub(crate) fn publish(domain: &mut Domain, env: &Env<Limits>, number: u64, out: 
         Phase::Held { .. } | Phase::Closing(_) | Phase::Ended(_) => true,
         Phase::Waiting | Phase::Active(_) => false,
     };
+    if became_held {
+        task.record.revisions.hold = task.record.revisions.hold.checked_add(1).expect("hold revision room");
+        task.record.escalation = crate::Escalation::Unheld { revision: task.record.revisions.hold };
+    }
     task.observed_hold = held;
     let escalation = crate::escalation::begin(&mut task.record);
     let until = match task.record.phase {
@@ -976,6 +980,7 @@ pub(crate) fn make_admitted(
                 created_at: env.wall,
                 ended_at: None,
                 revision: 0,
+                revisions: crate::Revisions { hold: 0, spec: 0, person: 0 },
                 milestone: 0,
                 narrowing: false,
                 result_position: 0,

@@ -439,6 +439,7 @@ fn waiting_restore_requests_recheck_once_and_identical_recipient_changes_nothing
             let mut record = record.clone();
             if let Stored::Live(task) = &mut record {
                 task.phase = Phase::Held { was: Was::Active(Active::Due), why: Hold::Deadline };
+                task.revisions.hold = 4;
                 task.escalation = if rejected {
                     Escalation::Rejected { revision: 4, by: 1, reason: b"no".as_slice().into() }
                 } else {

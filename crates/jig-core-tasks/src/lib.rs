@@ -41,7 +41,20 @@
 //! A held person chat owns one bounded semantic escalation revision/recipient
 //! or rejected reason. Root authenticates its read/decision route, resolves
 //! eligibility and owns immutable transport history; this child accepts/rejects/
-//! passes only the authorized exact revision.
+//! passes only the authorized hold revision. A hold revision changes when the
+//! task is held anew or its reason changes; passing changes only its recipient.
+//! Task spec and person revisions are kept in live and ended rows separately
+//! from history (client/domain/contract.md, section 5.2).
+//!
+//! | Kept state | Event | Next state | Emits |
+//! |---|---|---|---|
+//! | unheld | hold begins | hold revision + 1, routing | save, escalation needed |
+//! | held | reason changes | hold revision + 1, routing | save, escalation needed |
+//! | waiting escalation | pass or reroute | same revision, new recipient | save, wake |
+//! | current spec | changed amendment | spec revision + 1 | history, save, message |
+//! | person question | changed spec/dependencies | person revision + 1 | save, message |
+//! | person inputs | dependency result arrives | person revision + 1 | save |
+//! | any revisions | spend, turn, priority, delegate phase | same revisions | ordinary outputs |
 //! Agent and procedure executors are routed. The root checks historical inputs
 //! before delegation.
 #![cfg_attr(not(test), no_std)]
@@ -81,9 +94,9 @@ pub use boundary::{
     Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor, Hold,
     HoldKind, Holding, InvalidResult, Key, Kind, MessageKind, Name, New, NewsClass, NoticeState, Parameter, Party,
     PersonAddress, Phase, PoolSlots, Problem, ProcedureDecision, QuestionCredit, RecurringOverlap, RecurringState,
-    RecurringTemplate, Refusal, Request, ResourceAccess, ResultFollowups, ResultKind, ResultsWake, RunContext,
-    SavedResource, Spec, Stage, Status, Stored, Stub, Subscription, SubscriptionKind, Taken, TaskRecord, TaskResult,
-    Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
+    RecurringTemplate, Refusal, Request, ResourceAccess, ResultFollowups, ResultKind, ResultsWake, Revisions,
+    RunContext, SavedResource, Spec, Stage, Status, Stored, Stub, Subscription, SubscriptionKind, Taken, TaskRecord,
+    TaskResult, Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
 };
 pub use control::{Amendment, Change, Control, History, Milestone};
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};

@@ -3,7 +3,8 @@
 //! remains here, and ending a task does not replay its result after restart.
 use crate::domain::{Domain, activate, fact, publish, record, snapshot, task_mut};
 use crate::{
-    Active, Closing, Ending, Fact, Hold, Key, Limits, Party, Phase, Request, Stage, Status, Stored, TaskResult, Was,
+    Active, Closing, Ending, Executor, Fact, Hold, Key, Limits, Party, Phase, Request, Stage, Status, Stored,
+    TaskResult, Was,
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue};
@@ -340,6 +341,13 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
             }
         }
         task.record.waiting_on = remaining.into_boxed();
+        match task.record.executor {
+            Executor::Person(_) => {
+                task.record.revisions.person =
+                    task.record.revisions.person.checked_add(1).expect("person input revision room");
+            }
+            Executor::Agent { .. } | Executor::Procedure { .. } => {}
+        }
         match status {
             Status::Done => {}
             Status::Failed | Status::Cancelled => match &task.record.phase {

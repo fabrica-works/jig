@@ -17,3 +17,5 @@ fn exponential_equal_jitter_saturates_without_overflow_and_replays() {
         assert_eq!(pause, backoff(times, retry, &mut second), "same seed replays backoff");
     }
 }
+
+mod revisions;

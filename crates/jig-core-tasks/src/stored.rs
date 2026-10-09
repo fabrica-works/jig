@@ -235,6 +235,9 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
 }
 
 fn valid_escalation(task: &TaskRecord, limits: &Limits) -> bool {
+    if task.revisions.hold != task.escalation.revision() {
+        return false;
+    }
     let held = match task.phase {
         Phase::Held { .. } => true,
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,

@@ -452,15 +452,19 @@ pub(crate) fn hold(domain: &mut Domain, env: &Env<Limits>, number: u64, why: Hol
         return;
     };
     match task.phase {
-        Phase::Held { .. } | Phase::Ended(_) => return,
-        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) => {}
+        Phase::Held { why: current, .. } if current == why => return,
+        Phase::Ended(_) => return,
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Held { .. } => {}
     }
     if let Some(attempt) = run_attempt(&task.phase) {
         out.push(Request::Stop { task: number, attempt });
     }
     let task = task_mut(domain, number).expect("hold names live task");
     let old = core::mem::replace(&mut task.record.phase, Phase::Waiting);
-    task.record.phase = Phase::Held { was: was(old), why };
+    task.record.phase = match old {
+        Phase::Held { was, .. } => Phase::Held { was, why },
+        Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => Phase::Held { was: was(old), why },
+    };
     publish(domain, env, number, out);
     fact(domain, Fact::Held { task: number, why });
 }

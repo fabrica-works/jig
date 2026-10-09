@@ -151,7 +151,7 @@ pub enum EscalationHolder {
 pub enum Escalation {
     /// No current held decision; retain the last revision to prevent reuse
     Unheld {
-        /// Zero initially; checked revision advances on each hold/pass
+        /// Zero initially; checked revision advances on each new hold or changed reason
         revision: u64,
     },
     /// Root owes an eligible requester or final policy role in this same atomic
@@ -206,7 +206,7 @@ pub enum EscalationDecision {
         /// At most `result_bytes`, checked before mutation.
         reason: Box<[u8]>,
     },
-    /// Persist the root-verified final policy role and advance revision; a role
+    /// Persist the root-verified final policy role with the same hold revision; a role
     /// holder cannot pass further.
     Pass {
         /// Final policy role, checked by root and structurally by tasks
@@ -224,7 +224,7 @@ pub enum EscalationOutcome {
     Rejected,
     /// Waiting moved to the final policy role.
     Passed {
-        /// New checked pending revision.
+        /// Unchanged hold revision at the new recipient.
         revision: u64,
     },
     /// No exact live pending revision; root may read its own historical outcome
@@ -299,9 +299,7 @@ pub(crate) fn begin(record: &mut crate::TaskRecord) -> bool {
         Escalation::Unheld { revision } => revision,
         Escalation::Routing { .. } | Escalation::Waiting { .. } | Escalation::Rejected { .. } => return false,
     };
-    record.escalation = Escalation::Routing {
-        revision: revision.checked_add(1).expect("release and restore reserve the next revision"),
-    };
+    record.escalation = Escalation::Routing { revision };
     true
 }
 
@@ -326,13 +324,6 @@ pub(crate) fn routed(
     if old == Some(holder) {
         return;
     }
-    let revision = match old {
-        Some(_) => match revision.checked_add(1) {
-            Some(revision) => revision,
-            None => return,
-        },
-        None => revision,
-    };
     let valid = match holder {
         EscalationHolder::Task(parent) => parent != number && parent != 0,
         EscalationHolder::Person(person) => {
@@ -421,12 +412,7 @@ pub(crate) fn decide(
             }
             EscalationDecision::Pass { holder } => {
                 let entry = entry.expect("root-numbered next holder entry");
-                task.record.escalation = Escalation::Waiting {
-                    revision: revision.checked_add(1).expect("pass preflight"),
-                    holder,
-                    entry,
-                    since: env.wall,
-                }
+                task.record.escalation = Escalation::Waiting { revision, holder, entry, since: env.wall }
             }
         }
         publish(domain, env, number, out);
@@ -490,10 +476,7 @@ fn validate(
                 }
                 EscalationHolder::Task(_) | EscalationHolder::Person(_) | EscalationHolder::Role { .. } => {}
             }
-            match task.escalation.revision().checked_add(1) {
-                Some(revision) => EscalationOutcome::Passed { revision },
-                None => EscalationOutcome::Limit,
-            }
+            EscalationOutcome::Passed { revision: task.revisions.hold }
         }
     }
 }

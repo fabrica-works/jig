@@ -162,6 +162,31 @@ pub(crate) fn amend(
     } else if stop_run {
         return refused(to, Some(number), Refusal::State, out);
     }
+    let spec_changed = match &amendment.spec {
+        Some(spec) => *spec != old.spec,
+        None => false,
+    };
+    let dependencies_changed = match &amendment.dependencies {
+        Some(dependencies) => *dependencies != old.dependencies,
+        None => false,
+    };
+    let changed = spec_changed
+        || dependencies_changed
+        || match &amendment.wake {
+            Some(wake) => *wake != old.wake,
+            None => false,
+        }
+        || match &amendment.authority {
+            Some(authority) => *authority != old.authority,
+            None => false,
+        };
+    let person_changed = match old.executor {
+        crate::Executor::Person(_) => spec_changed || dependencies_changed,
+        crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => false,
+    };
+    if (changed && old.revisions.spec == u64::MAX) || (person_changed && old.revisions.person == u64::MAX) {
+        return refused(to, Some(number), Refusal::State, out);
+    }
     let attempt = if stop_run { crate::run::run_attempt(&old.phase) } else { None };
     let next_revision = old.revision.checked_add(1).expect("revision preflighted");
     let word = Word {
@@ -199,6 +224,13 @@ pub(crate) fn amend(
     }
     if let Some(authority) = amendment.authority {
         task.record.authority = authority;
+    }
+    if changed {
+        task.record.revisions.spec = task.record.revisions.spec.checked_add(1).expect("spec revision preflighted");
+    }
+    if person_changed {
+        task.record.revisions.person =
+            task.record.revisions.person.checked_add(1).expect("person revision preflighted");
     }
     task.record.last_message = message;
     task.record.inbox = prepared.inbox;

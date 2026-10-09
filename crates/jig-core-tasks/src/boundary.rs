@@ -703,11 +703,25 @@ pub struct New {
     pub tracked: Option<u32>,
 }
 
+/// Revisions of the individual things a party decides, independent of history,
+/// spend and executor progress (client/domain/contract.md, section 5.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Revisions {
+    /// Moves when a hold begins or its reason changes, never when it passes up.
+    pub hold: u64,
+    /// Moves when an amendment changes the task's specification or policy.
+    pub spec: u64,
+    /// Moves when a person task's question or displayed results change.
+    pub person: u64,
+}
+
 /// Owned durable task state emitted to root storage; root uses `RunContext` for preparation and
 /// does not maintain a mutable copy of this ledger. (domain/tasks.md, sections 3 and 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent durable lifecycle facts are explicit")]
 pub struct TaskRecord {
+    /// Independent revisions retained in live and ended records.
+    pub revisions: Revisions,
     /// Injected creation time used to order active person tasks in derived inboxes.
     pub created_at: Wall,
     /// Injected time of the durable ending, used for newest-first result pages.
@@ -1285,10 +1299,10 @@ pub enum Event {
         task: u64,
     },
     /// Authorized notification preserving prior state and issuing `Stop` for any live run;
-    /// absent/already-held inputs have no output.
+    /// absent tasks and unchanged reasons have no output.
     Hold {
-        /// `Live` task to hold while retaining its prior phase; absent/already-held tasks are
-        /// ignored.
+        /// `Live` task to hold while retaining its prior phase; a changed reason
+        /// replaces the current hold, and advances its revision.
         task: u64,
         /// Authorized or root-classified hold reason; tasks judges no policy here.
         why: Hold,

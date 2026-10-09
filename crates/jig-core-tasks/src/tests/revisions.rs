@@ -1,0 +1,390 @@
+//! Entry-point tests use ordinary Rust to script the parent and inspect outputs.
+#![allow(
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::wildcard_enum_match_arm,
+    clippy::match_like_matches_macro,
+    reason = "unit-test parent scripts are ordinary Rust under programming-model.md section 10.2"
+)]
+use crate::{
+    Amendment, Authority, Budget, Contract, Control, Delegation, Domain, EscalationDecision, EscalationHolder,
+    EscalationOutcome, Event, Executor, Funder, Hold, Key, Limits, New, Numbers, Parameter, Party, PersonAddress,
+    Request, Retries, Retry, Revisions, Scopes, Spec, Stored, TaskResult, Tools, WakePolicy, max_out, step,
+};
+use alloc::{boxed::Box, collections::BTreeMap};
+use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
+
+const RETRY: Retry = Retry { retries: 2, base: Duration::from_millis(10), max: Duration::from_secs(1) };
+
+const LIMITS: Limits = Limits {
+    tasks: 16,
+    funders: 32,
+    project_tasks: 16,
+    tree_tasks: 16,
+    depth: 4,
+    delegates: 8,
+    references: 8,
+    subscriptions: 8,
+    batch: 8,
+    dependencies: 8,
+    holdings: 4,
+    hold_kinds: 4,
+    resource_reports: 64,
+    pools: 8,
+    hold_segments: 4,
+    hold_bytes: 64,
+    hold_waiters: 8,
+    hold_wait: Duration::from_secs(10),
+    inputs: 4,
+    spec_bytes: 64,
+    parameters: 4,
+    result_bytes: 32,
+    inbox_messages: 8,
+    inbox_bytes: 128,
+    message_bytes: 32,
+    proposal_stall: Duration::from_millis(10),
+    escalation_stall: Duration::from_secs(3600),
+    saved_resources: 2,
+    contract_choices: 4,
+    charters: 2,
+    authority_grants: 4,
+    authority_segments: 4,
+    authority_bytes: 64,
+    executor_kinds: 3,
+    retries: Retries { transient: RETRY, permanent: RETRY, run: RETRY, agent: RETRY, lost: RETRY, invalid: RETRY },
+    facts: 16,
+};
+
+#[must_use]
+fn authority() -> Authority {
+    Authority {
+        tools: Tools(0),
+        grants: Box::new([]),
+        delegation: Delegation { kinds: Box::new([]), tasks: 16, depth: 4 },
+        budget: Budget { spend: 100, deadline: None },
+        notes: Scopes(0),
+        note_resources: Box::new([]),
+    }
+}
+
+#[must_use]
+fn task(number: u64, dependencies: &[u64]) -> New {
+    New {
+        number,
+        project: 1,
+        executor: Executor::Agent { charter: 1 },
+        spec: Spec { words: Box::new([1]), parameters: Box::new([]), inputs: Box::new([]) },
+        contract: Contract::Report { words: 32 },
+        authority: authority(),
+        numbers: Numbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
+        funder: Funder::Period { project: 1, period: 0 },
+        dependencies: dependencies.into(),
+        holdings: Box::new([]),
+        wake: WakePolicy::DEFAULT,
+        recurring: None,
+        tracked: None,
+    }
+}
+
+struct Harness {
+    domain: Domain,
+    env: Env<Limits>,
+    stored: BTreeMap<Key, Stored>,
+}
+
+fn to() -> ReplyTo {
+    ReplyTo::new(Token::new(1))
+}
+
+impl Harness {
+    fn new() -> Self {
+        let mut test = Self {
+            domain: Domain::new(&LIMITS, 91, Box::new([1])),
+            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS },
+            stored: BTreeMap::new(),
+        };
+        test.send(Event::Restored);
+        test.send(Event::OpenPeriod { reply_to: to(), project: 1, period: 0, budget: 10_000 });
+        test
+    }
+
+    fn send(&mut self, event: Event) -> Vec<Request> {
+        let mut out = Queue::with_capacity(max_out(&LIMITS));
+        step(&mut self.domain, &self.env, event, &mut out);
+        let mut requests = Vec::new();
+        while let Some(request) = out.pop() {
+            match &request {
+                Request::Save { record } => {
+                    self.stored.insert(record.key(), record.clone());
+                }
+                Request::Erase { key } => {
+                    self.stored.remove(key);
+                }
+                _ => {}
+            }
+            requests.push(request);
+        }
+        requests
+    }
+
+    fn make(&mut self, batch: Vec<New>) {
+        let out = self.send(Event::Make { reply_to: to(), creator: Party::Person(9), batch: batch.into_boxed_slice() });
+        assert!(
+            out.iter().any(|request| match request {
+                Request::Made { .. } => true,
+                _ => false,
+            }),
+            "{out:?}"
+        );
+    }
+
+    fn revisions(&self, number: u64) -> Revisions {
+        self.domain.task(number).expect("task live").revisions
+    }
+
+    fn amend(&mut self, number: u64, amendment: Amendment) {
+        let message = self.domain.task(number).unwrap().last_message.checked_add(1).expect("test message room");
+        let out = self.send(Event::Amend {
+            reply_to: to(),
+            by: Party::Person(9),
+            task: number,
+            message,
+            stop_run: false,
+            amendment,
+        });
+        assert!(
+            out.iter().any(|request| match request {
+                Request::Done { .. } => true,
+                _ => false,
+            }),
+            "{out:?}"
+        );
+    }
+
+    fn route(&mut self, number: u64, holder: EscalationHolder, entry: u64) {
+        let revision = self.revisions(number).hold;
+        self.send(Event::RoutedEscalation { task: number, revision, holder, entry });
+    }
+
+    fn restart(&mut self) {
+        self.domain = Domain::new(&LIMITS, 91, Box::new([1]));
+        let rows: Vec<_> = self
+            .stored
+            .values()
+            .filter(|row| match row {
+                Stored::Live(_) | Stored::Ledger(_) | Stored::Stub(_) => true,
+                _ => false,
+            })
+            .cloned()
+            .collect();
+        for stored in rows {
+            let out = self.send(Event::Restore { record: stored });
+            assert!(
+                !out.iter().any(|request| match request {
+                    Request::RestoreRefused { .. } => true,
+                    _ => false,
+                }),
+                "{out:?}"
+            );
+        }
+        let out = self.send(Event::Restored);
+        assert!(
+            !out.iter().any(|request| match request {
+                Request::RestoreRefused { .. } => true,
+                _ => false,
+            }),
+            "{out:?}"
+        );
+    }
+}
+
+fn amendment() -> Amendment {
+    Amendment { spec: None, wake: None, dependencies: None, authority: None, reason: Box::new([1]) }
+}
+
+#[test]
+fn a_hold_changes_revision_for_a_new_hold_or_reason_but_not_a_pass() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[])]);
+    test.send(Event::Hold { task: 1, why: Hold::Stopped });
+    let first = test.revisions(1);
+    assert_eq!(first, Revisions { hold: 1, spec: 0, person: 0 });
+    test.route(1, EscalationHolder::Person(9), 1);
+    let out = test.send(Event::DecideEscalation {
+        reply_to: to(),
+        task: 1,
+        revision: first.hold,
+        by: 9,
+        entry: Some(2),
+        decision: EscalationDecision::Pass { holder: EscalationHolder::Role { project: 1, role: 7 } },
+    });
+    assert!(out.iter().any(|request| match request {
+        Request::EscalationDecided { outcome: EscalationOutcome::Passed { revision: 1 }, .. } => true,
+        _ => false,
+    }));
+    assert_eq!(test.revisions(1), first);
+    test.restart();
+    assert_eq!(test.revisions(1), first);
+    test.send(Event::Hold { task: 1, why: Hold::Stopped });
+    assert_eq!(test.revisions(1), first);
+    let out = test.send(Event::Hold { task: 1, why: Hold::Budget });
+    assert!(out.iter().any(|request| match request {
+        Request::EscalationNeeded { context } if context.escalation.revision() == 2 => true,
+        _ => false,
+    }));
+    assert_eq!(test.revisions(1), Revisions { hold: 2, ..first });
+    test.route(1, EscalationHolder::Person(9), 3);
+    test.send(Event::Control { reply_to: to(), by: Party::Person(9), task: 1, control: Control::Release });
+    assert_eq!(test.revisions(1), Revisions { hold: 2, ..first });
+    test.send(Event::Hold { task: 1, why: Hold::Budget });
+    assert_eq!(test.revisions(1), Revisions { hold: 3, ..first });
+}
+
+#[test]
+fn amendments_move_only_the_spec_and_changed_person_question() {
+    let mut test = Harness::new();
+    let mut person = task(1, &[]);
+    person.executor = Executor::Person(PersonAddress::Person(10));
+    test.make(vec![person]);
+    test.amend(1, amendment());
+    assert_eq!(test.revisions(1), Revisions { hold: 0, spec: 0, person: 0 });
+    let mut change = amendment();
+    change.spec = Some(Spec { words: Box::new([2]), parameters: Box::new([]), inputs: Box::new([]) });
+    test.amend(1, change.clone());
+    assert_eq!(test.revisions(1), Revisions { hold: 0, spec: 1, person: 1 });
+    test.amend(1, change);
+    assert_eq!(test.revisions(1), Revisions { hold: 0, spec: 1, person: 1 });
+    let mut change = amendment();
+    let mut narrowed = authority();
+    narrowed.tools = Tools(1);
+    change.authority = Some(narrowed);
+    test.amend(1, change);
+    assert_eq!(test.revisions(1), Revisions { hold: 0, spec: 2, person: 1 });
+    test.restart();
+    assert_eq!(test.revisions(1), Revisions { hold: 0, spec: 2, person: 1 });
+}
+
+#[test]
+fn priority_spend_delegate_phase_and_run_turn_do_not_move_decision_revisions() {
+    let mut test = Harness::new();
+    let mut root = task(1, &[]);
+    root.numbers.budget = 1000;
+    root.authority.budget.spend = 1000;
+    root.tracked = Some(1);
+    test.make(vec![root]);
+    let before = test.revisions(1);
+    test.send(Event::Prioritise { reply_to: to(), project: 1, by: Party::Person(9), goals: Box::new([(1, 2)]) });
+    test.send(Event::ChargeEffect { funder: Funder::Task(1), maximum: 1 });
+    let mut child = task(2, &[]);
+    child.funder = Funder::Task(1);
+    let out = test.send(Event::Make { reply_to: to(), creator: Party::Task(1), batch: Box::new([child]) });
+    assert!(
+        out.iter().any(|request| match request {
+            Request::Made { .. } => true,
+            _ => false,
+        }),
+        "{out:?}"
+    );
+    test.send(Event::Hold { task: 2, why: Hold::Budget });
+    assert_eq!(test.revisions(1), before);
+    test.send(Event::Prepare { reply_to: to(), task: 1 });
+    let out = test.send(Event::Claim { reply_to: to(), task: 1, attempt: 1, budget: 10, writes: Box::new([]) });
+    assert!(
+        out.iter().any(|request| match request {
+            Request::Done { .. } => true,
+            _ => false,
+        }),
+        "{out:?}"
+    );
+    test.send(Event::Started { task: 1, attempt: 1 });
+    let out = test.send(Event::Turn {
+        reply_to: to(),
+        task: 1,
+        attempt: 1,
+        turn: 1,
+        read: None,
+        offered: None,
+        cumulative: 1,
+    });
+    assert!(
+        out.iter().any(|request| match request {
+            Request::TurnAcknowledged { .. } => true,
+            _ => false,
+        }),
+        "{out:?}"
+    );
+    assert_eq!(test.revisions(1), before);
+}
+
+#[test]
+fn a_dependency_result_moves_only_its_person_tasks_revision_and_ended_rows_keep_it() {
+    let mut test = Harness::new();
+    let mut input = task(1, &[]);
+    input.executor = Executor::Person(PersonAddress::Person(10));
+    let mut dependent = task(2, &[1]);
+    dependent.executor = Executor::Person(PersonAddress::Person(10));
+    test.make(vec![input, dependent]);
+    let out = test.send(Event::AnswerPerson {
+        reply_to: to(),
+        task: 1,
+        person: 10,
+        result: TaskResult::Report { words: Box::new([1]) },
+    });
+    assert!(
+        out.iter().any(|request| match request {
+            Request::Done { .. } => true,
+            _ => false,
+        }),
+        "{out:?}"
+    );
+    test.send(Event::EffectsSettled { task: 1 });
+    test.send(Event::Settled { task: 1 });
+    assert_eq!(test.revisions(2), Revisions { hold: 0, spec: 0, person: 1 });
+    test.restart();
+    assert_eq!(test.revisions(2), Revisions { hold: 0, spec: 0, person: 1 });
+    let out = test.send(Event::AnswerPerson {
+        reply_to: to(),
+        task: 2,
+        person: 10,
+        result: TaskResult::Report { words: Box::new([1]) },
+    });
+    assert!(
+        out.iter().any(|request| match request {
+            Request::Done { .. } => true,
+            _ => false,
+        }),
+        "{out:?}"
+    );
+    test.send(Event::EffectsSettled { task: 2 });
+    let out = test.send(Event::Settled { task: 2 });
+    assert!(out.iter().any(|request| match request {
+        Request::Save { record: Stored::Ended(row) } if row.revisions == Revisions { hold: 0, spec: 0, person: 1 } =>
+            true,
+        _ => false,
+    }));
+}
+
+#[test]
+fn parameters_wake_policy_and_dependencies_each_move_only_the_spec() {
+    let mut test = Harness::new();
+    test.make(vec![task(1, &[]), task(2, &[1])]);
+    let mut change = amendment();
+    change.spec = Some(Spec {
+        words: Box::new([1]),
+        parameters: Box::new([Parameter::Number { name: 1, value: 2 }]),
+        inputs: Box::new([]),
+    });
+    test.amend(2, change);
+    assert_eq!(test.revisions(2), Revisions { hold: 0, spec: 1, person: 0 });
+    let mut change = amendment();
+    let mut wake = WakePolicy::DEFAULT;
+    wake.answers = !wake.answers;
+    change.wake = Some(wake);
+    test.amend(2, change);
+    assert_eq!(test.revisions(2), Revisions { hold: 0, spec: 2, person: 0 });
+    let mut change = amendment();
+    change.dependencies = Some(Box::new([]));
+    test.amend(2, change);
+    assert_eq!(test.revisions(2), Revisions { hold: 0, spec: 3, person: 0 });
+}
