@@ -666,7 +666,7 @@ impl Payload for jig_client::contract::TaskContractDocument {
         }
     }
 }
-fields!(Question { task, message, words, since, acts, ending });
+fields!(Question { task, from, message, words, since, acts, ending });
 fields!(PersonTask {
     task,
     revision,
@@ -1270,3 +1270,6 @@ fields!(jig_client::contract::OwnerPhaseCounts {
     failed,
     cancelled
 });
+
+#[cfg(test)]
+mod question;

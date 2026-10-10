@@ -503,6 +503,7 @@ pub struct ProposedTask {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Question {
     pub task: Chip,
+    pub from: Option<super::OwnerRequester>,
     pub message: u64,
     pub words: Text,
     pub since: Wall,

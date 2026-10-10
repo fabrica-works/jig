@@ -86,9 +86,10 @@ fn proposal(action: ProposalAction) -> Proposal {
         ending: None,
     }
 }
-fn question() -> Question {
+pub(super) fn question() -> Question {
     Question {
         task: chip(),
+        from: None,
         message: 1,
         words: text(b"whole question"),
         since: Wall::EPOCH,
@@ -172,11 +173,11 @@ fn loaded_with_watch(key: ObjectKey, value: ReadValue) -> (Domain, Id<Object>, s
     let id = d.objects().find(key).unwrap();
     (d, id, inbox)
 }
-fn loaded(key: ObjectKey, value: ReadValue) -> (Domain, Id<Object>) {
+pub(super) fn loaded(key: ObjectKey, value: ReadValue) -> (Domain, Id<Object>) {
     let (d, id, _) = loaded_with_watch(key, value);
     (d, id)
 }
-fn render(d: &Domain, id: Id<Object>, words: &crate::words::Words, bindings: &mut JigBindings) -> Tree {
+pub(super) fn render(d: &Domain, id: Id<Object>, words: &crate::words::Words, bindings: &mut JigBindings) -> Tree {
     bindings.begin();
     let mut b = Builder::new(&limits());
     b.open(Role::Page);

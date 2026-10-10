@@ -2,6 +2,7 @@
 use crate::{Builder, JigBindings, phrases::jig::JigPhrase, words::Words};
 use jig_client::{
     Domain,
+    contract::OwnerRequester,
     fields::Purpose,
     objects::{Object, question::facts},
 };
@@ -26,6 +27,14 @@ pub fn question(
         return false;
     }
     super::chip::chip(b, client, &document.task, words, bindings);
+    if let Some(from) = document.from {
+        let (phrase, number) = match from {
+            OwnerRequester::Task(number) => (JigPhrase::QuestionFromTask, number),
+            OwnerRequester::Person(number) => (JigPhrase::QuestionFromPerson, number),
+            OwnerRequester::Deployment { project } => (JigPhrase::QuestionFromDeployment, u64::from(project)),
+        };
+        words.text(b, phrase, &[crate::phrases::Hole::Number(number)]);
+    }
     crate::markdown::read(document.words.bytes(), 2, b);
     words.waiting(b, client.wall(), document.since);
     if super::common::answering(client, object) {

@@ -107,6 +107,7 @@ pub(super) fn proposal() -> Proposal {
 pub(super) fn question() -> Question {
     Question {
         task: chip(8),
+        from: None,
         message: 1,
         words: text(b"whole question"),
         since: Wall::EPOCH,

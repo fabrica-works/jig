@@ -128,7 +128,7 @@ pub fn person_task_nodes(limits: &Limits) -> Option<u32> {
 /// Whole question, including the answer field and retained answer.
 #[must_use]
 pub fn question_nodes(limits: &Limits) -> Option<u32> {
-    frame_of_card(limits)?.checked_add(chip_nodes(limits)?)?.checked_add(markdown(limits)?)?.checked_add(5)
+    frame_of_card(limits)?.checked_add(chip_nodes(limits)?)?.checked_add(markdown(limits)?)?.checked_add(6)
 }
 /// Whole escalation with failed attempts, prior result, spend and trail.
 #[must_use]

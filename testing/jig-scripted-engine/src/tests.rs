@@ -191,6 +191,7 @@ fn nested_chip_payload_bounds(chip: &Chip) {
             ObjectKey::Question { task: 8, message: 1 },
             ReadValue::Question(Box::new(Question {
                 task: invalid_chip,
+                from: None,
                 message: 1,
                 words: text(b"question"),
                 since: Wall::EPOCH,
@@ -2271,4 +2272,5 @@ mod task_budget;
 
 mod history_pages;
 
+mod question_sender;
 mod task_ending;
