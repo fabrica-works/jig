@@ -125,6 +125,9 @@ fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_k
                     assert!(contains(&tree, b"Part number 18446744073709551615"));
                 }
             }
+            bindings.begin();
+            assert_eq!(bindings.owner_part(slot.token), None, "a departed tree's exact part token is retired");
+            assert_eq!(crate::decode(&mut bindings, slot.token, crate::Act::Press), None);
         }
     }
 }
