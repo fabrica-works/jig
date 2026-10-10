@@ -8,7 +8,7 @@ use jig_client::{
     Domain,
     action::Act,
     action::End,
-    contract::{InboxGroup, Recipient},
+    contract::{InboxGroup, InboxReadGroup, Recipient},
     pages::inbox::{Filter, needs},
 };
 /// Render the bounded, already ordered inbox, filters and both window edges.
@@ -67,45 +67,59 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
             }
         }
         b.close();
+        let parent = if group { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
+        if page.filter.kind.is_none_or(|kind| InboxReadGroup::of(kind) == parent) {
+            let window = page.window(parent);
+            if window.reading.is_some() {
+                words.status(b, JigPhrase::Looking, &[]);
+            }
+            if window.more {
+                words.status(b, JigPhrase::MoreRows, &[]);
+            }
+            for end in [End::Before, End::After] {
+                let more = match end {
+                    End::Before => window.before.is_some(),
+                    End::After => window.after.is_some() || window.more,
+                };
+                if more {
+                    crate::frame::control(
+                        b,
+                        words,
+                        bindings,
+                        Role::Button,
+                        match end {
+                            End::Before => JigPhrase::ReadEarlier,
+                            End::After => JigPhrase::ReadLater,
+                        },
+                        &[],
+                        Act::More {
+                            window: skein_lib::Token::new(if group {
+                                jig_client::pages::conversations::INBOX_WINDOW
+                            } else {
+                                jig_client::pages::conversations::INBOX_UPDATES_WINDOW
+                            }),
+                            end,
+                        },
+                    );
+                } else {
+                    words.text(
+                        b,
+                        match end {
+                            End::Before => JigPhrase::WindowStart,
+                            End::After => JigPhrase::WindowEnd,
+                        },
+                        &[],
+                    );
+                }
+            }
+        }
         b.close();
+    }
+    if page.live_more {
+        words.status(b, JigPhrase::MoreRows, &[]);
     }
     if let Some(refusal) = &page.refusal {
         words.refusal(b, refusal);
-    }
-    if page.reading.is_some() {
-        words.status(b, JigPhrase::Looking, &[]);
-    }
-    if page.more {
-        words.status(b, JigPhrase::MoreRows, &[]);
-    }
-    for end in [End::Before, End::After] {
-        let more = match end {
-            End::Before => page.before.is_some(),
-            End::After => page.after.is_some() || page.more,
-        };
-        if more {
-            crate::frame::control(
-                b,
-                words,
-                bindings,
-                Role::Button,
-                match end {
-                    End::Before => JigPhrase::ReadEarlier,
-                    End::After => JigPhrase::ReadLater,
-                },
-                &[],
-                Act::More { window: skein_lib::Token::new(jig_client::pages::conversations::INBOX_WINDOW), end },
-            );
-        } else {
-            words.text(
-                b,
-                match end {
-                    End::Before => JigPhrase::WindowStart,
-                    End::After => JigPhrase::WindowEnd,
-                },
-                &[],
-            );
-        }
     }
     super::excess(b, client, words);
 }

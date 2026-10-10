@@ -2,8 +2,8 @@
 use crate::{Bounds, Engine, Invalid, Up, payload};
 use jig_client::contract::{
     ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryLine,
-    HistoryPage, InboxEntry, InboxGroup, InboxPage, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Read, ReadNone,
-    ReadResult, ReadValue, Result, SpendPage, SpendPeriod, Text,
+    HistoryPage, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Note, NotePage, NoteScope, ObjectKey, ObjectPage,
+    Read, ReadNone, ReadResult, ReadValue, Result, SpendPage, SpendPeriod, Text,
 };
 use skein_lib::{List, Time, Token};
 
@@ -82,7 +82,7 @@ impl Rows {
             (Self::Ended(_), Read::Ended { .. })
                 | (Self::History(_), Read::History { .. })
                 | (Self::Activity(_), Read::Activity { .. })
-                | (Self::Inbox(_), Read::Inbox { .. } | Read::InboxGroup { .. })
+                | (Self::Inbox(_), Read::Inbox { .. })
                 | (Self::Conversations(_), Read::Conversations { .. })
                 | (Self::Goals(_), Read::Goals { .. })
                 | (Self::Spend(_), Read::Spend { .. })
@@ -144,7 +144,6 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
     let position = match &mut read {
         Read::Ended { after, .. }
         | Read::History { after, .. }
-        | Read::InboxGroup { after, .. }
         | Read::Inbox { after, .. }
         | Read::Conversations { after, .. }
         | Read::Goals { after, .. }
@@ -209,7 +208,6 @@ impl<A: crate::Application> Engine<A> {
             Read::Ended { .. }
             | Read::History { .. }
             | Read::Activity { .. }
-            | Read::InboxGroup { .. }
             | Read::Inbox { .. }
             | Read::Conversations { .. }
             | Read::Goals { .. }
@@ -263,10 +261,10 @@ impl<A: crate::Application> Engine<A> {
         }
     }
     pub(crate) fn rows_for(&self, party: u64, query: &Read) -> Rows {
-        let broad = if matches!(query, Read::Inbox { .. } | Read::InboxGroup { .. }) {
-            Read::Inbox { project: None, kind: None, goal: None, after: None }
+        let broad = if let Read::Inbox { group, .. } = query {
+            Read::Inbox { group: *group, project: None, kind: None, goal: None, after: None }
         } else if matches!(query, Read::Conversations { .. }) {
-            Read::Conversations { project: None, after: None }
+            Read::Conversations { after: None }
         } else {
             query.clone()
         };
@@ -287,23 +285,28 @@ impl<A: crate::Application> Engine<A> {
             |source| source.rows.clone(),
         );
         match rows {
-            Rows::Inbox(rows) => Rows::Inbox(rows.into_iter().filter(|row| {
+            Rows::Inbox(rows) => { let mut rows: Vec<_> = rows.into_iter().filter(|row| {
                 if !self.truth.visible(party,row.project) { return false; }
                 match query {
-                    Read::Inbox { project, kind, goal, .. } => project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
-                    Read::InboxGroup { project, group, .. } => project.is_none_or(|p| p == row.project) && *group == row.group,
+                    Read::Inbox { group, project, kind, goal, .. } => *group == InboxReadGroup::of(row.group) && project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
                     Read::Frame | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
                     | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. }
                     | Read::Conversations { .. } | Read::Goals { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
                 }
-            }).collect()),
+            }).collect();
+                rows.sort_by(|a, b| {
+                    let order = if jig_client::pages::inbox::needs(a.group) { a.at.cmp(&b.at) } else { b.at.cmp(&a.at) };
+                    order.then(a.object.cmp(&b.object))
+                });
+                Rows::Inbox(rows)
+            },
             Rows::Conversations(rows) => Rows::Conversations(rows.into_iter().filter(|row| {
-                self.truth.visible(party,row.project) && matches!(query, Read::Conversations { project, .. } if project.is_none_or(|p| p == row.project))
+                self.truth.visible(party,row.project) && matches!(query, Read::Conversations { .. })
             }).collect()),
             Rows::Notes(rows) => Rows::Notes(rows.into_iter().filter(|row| {
                 matches!(query, Read::Notes { scope, description, .. } if *scope == row.scope && description.as_ref().is_none_or(|needle| needle.bytes().is_empty() || row.description.bytes().windows(needle.bytes().len()).any(|window| window == needle.bytes())))
             }).collect()),
-            Rows::Goals(rows) => Rows::Goals(rows.into_iter().filter(|row| matches!(query, Read::Goals { ended, .. } if *ended == matches!(row.chip.phase,jig_client::contract::Phase::Done | jig_client::contract::Phase::Failed | jig_client::contract::Phase::Cancelled))).collect()),
+            Rows::Goals(rows) => Rows::Goals(rows),
             Rows::Ended(rows) => Rows::Ended(rows), Rows::History(rows) => Rows::History(rows),
             Rows::Activity(rows) => Rows::Activity(rows), Rows::Spend(rows) => Rows::Spend(rows),
         }
@@ -326,7 +329,7 @@ impl<A: crate::Application> Engine<A> {
             Read::Project { project } | Read::Goals { project, .. } | Read::Spend { project, .. } => {
                 return self.truth.visible(party, *project);
             }
-            Read::InboxGroup { project, .. } | Read::Inbox { project, .. } | Read::Conversations { project, .. } => {
+            Read::Inbox { project, .. } => {
                 return project.is_none_or(|p| self.truth.visible(party, p));
             }
             Read::Notes { scope, .. } => {
@@ -340,7 +343,7 @@ impl<A: crate::Application> Engine<A> {
                     }
                 };
             }
-            Read::Frame => return self.truth.frames.contains_key(&party),
+            Read::Frame | Read::Conversations { .. } => return self.truth.frames.contains_key(&party),
             Read::Deployment => return self.truth.frames.get(&party).is_some_and(|f| f.deployment_role.is_some()),
         };
         key.and_then(|key| self.truth.project(key)).is_some_and(|project| self.truth.visible(party, project))
@@ -351,7 +354,7 @@ fn empty(read: &Read) -> Rows {
         Read::Ended { .. } => Rows::Ended(vec![]),
         Read::History { .. } => Rows::History(vec![]),
         Read::Activity { .. } => Rows::Activity(vec![]),
-        Read::Inbox { .. } | Read::InboxGroup { .. } => Rows::Inbox(vec![]),
+        Read::Inbox { .. } => Rows::Inbox(vec![]),
         Read::Conversations { .. } => Rows::Conversations(vec![]),
         Read::Goals { .. } => Rows::Goals(vec![]),
         Read::Spend { .. } => Rows::Spend(vec![]),

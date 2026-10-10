@@ -5,7 +5,7 @@
 //! See client/domain/pages.md, 3, and contract.md, 3.2 and 6–7.
 use crate::{
     address::{Address, ProjectSection},
-    contract::{Count, Cursor, InboxEntry, InboxGroup, Needs, ObjectKey},
+    contract::{Count, Cursor, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Needs, ObjectKey},
 };
 use skein_lib::List;
 /// An inbox filter, shared by live rows and historical reads.
@@ -15,18 +15,61 @@ pub struct Filter {
     pub kind: Option<InboxGroup>,
     pub goal: Option<u64>,
 }
-/// Context rows name cards in the one working set.
+/// One read group's bounded window and independent continuation.
+#[derive(Debug)]
+pub struct InboxWindow {
+    rows: List<InboxEntry>,
+    pub before: Option<Cursor>,
+    pub after: Option<Cursor>,
+    pub more: bool,
+    pub reading: Option<skein_lib::Token>,
+}
+impl InboxWindow {
+    fn new(rows: u32) -> Self {
+        Self { rows: List::with_capacity(rows), before: None, after: None, more: false, reading: None }
+    }
+    // Read rows past the watch remain; duplicate snapshots never resurrect a removed live key.
+    fn past(&mut self, live: &List<InboxEntry>) {
+        if self.rows.is_empty() {
+            return;
+        }
+        let capacity = self.rows.capacity();
+        let rows = core::mem::replace(&mut self.rows, List::with_capacity(capacity));
+        for row in rows.into_boxed() {
+            let mut watched = false;
+            for current in live {
+                if current.object == row.object {
+                    watched = true;
+                    break;
+                }
+            }
+            if !watched {
+                self.rows.push(row).expect("retained read rows fit their original capacity");
+            }
+        }
+    }
+    fn clear(&mut self) {
+        self.rows.clear();
+        self.before = None;
+        self.after = None;
+        self.more = false;
+        self.reading = None;
+    }
+}
+/// Context rows merge the live watch and both read groups by object key.
+/// A watched row wins; each source is bounded by one document's row limit.
 #[derive(Debug)]
 pub struct Inbox {
     pub rows: List<InboxEntry>,
     pub filter: Filter,
     pub needs: Needs,
     pub updates: Count,
-    pub before: Option<Cursor>,
-    pub after: Option<Cursor>,
-    pub more: bool,
+    live: List<InboxEntry>,
+    /// The shared live watch has rows beyond its window; read cursors remain independent.
+    pub live_more: bool,
+    pub needs_window: InboxWindow,
+    pub updates_window: InboxWindow,
     pub refusal: Option<crate::contract::Refusal>,
-    pub reading: Option<skein_lib::Token>,
     pub opening_updates: bool,
     pub marked_results: u64,
     /// The committed read position; pending mark-seen requests do not advance it.
@@ -37,15 +80,15 @@ impl Inbox {
     #[must_use]
     pub fn new(rows: u32) -> Self {
         Self {
-            rows: List::with_capacity(rows),
+            rows: List::with_capacity(rows.checked_mul(3).expect("inbox source rows fit")),
             filter: Filter { project: None, kind: None, goal: None },
             needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
             updates: Count { value: 0, limited: false },
-            before: None,
-            after: None,
-            more: false,
+            live: List::with_capacity(rows),
+            live_more: false,
+            needs_window: InboxWindow::new(rows),
+            updates_window: InboxWindow::new(rows),
             refusal: None,
-            reading: None,
             opening_updates: false,
             marked_results: 0,
             results_seen: 0,
@@ -58,12 +101,73 @@ impl Inbox {
             && (self.filter.kind.is_none() || self.filter.kind == Some(entry.group))
             && (self.filter.goal.is_none() || self.filter.goal == entry.goal)
     }
-    /// A bounded whole replacement, ordered without changing card state.
-    pub(crate) fn replace(&mut self, entries: List<InboxEntry>) {
+    /// Leaving a page discards every source and its pending cursor.
+    pub(crate) fn clear(&mut self) {
+        self.live.clear();
+        self.live_more = false;
+        self.needs_window.clear();
+        self.updates_window.clear();
         self.rows.clear();
-        for entry in entries.into_boxed() {
-            if self.includes(&entry) && self.rows.push(entry).is_err() {
-                break;
+    }
+    /// Changing filters retains the current live source and starts each query anew.
+    pub(crate) fn filter(&mut self, filter: Filter) {
+        self.filter = filter;
+        self.needs_window.clear();
+        self.updates_window.clear();
+        self.merge();
+    }
+    /// Read window for exactly one parent group.
+    #[must_use]
+    pub const fn window(&self, group: InboxReadGroup) -> &InboxWindow {
+        match group {
+            InboxReadGroup::Needs => &self.needs_window,
+            InboxReadGroup::Updates => &self.updates_window,
+        }
+    }
+    pub(crate) const fn window_mut(&mut self, group: InboxReadGroup) -> &mut InboxWindow {
+        match group {
+            InboxReadGroup::Needs => &mut self.needs_window,
+            InboxReadGroup::Updates => &mut self.updates_window,
+        }
+    }
+    /// The whole live watch replaces its own source, preserving read windows.
+    pub(crate) fn replace(&mut self, entries: List<InboxEntry>, more: bool) {
+        self.live = entries;
+        self.live_more = more;
+        self.needs_window.past(&self.live);
+        self.updates_window.past(&self.live);
+        self.merge();
+    }
+    /// A read terminal moves only its group's rows and cursor.
+    pub(crate) fn page(&mut self, group: InboxReadGroup, page: InboxPage) {
+        let window = self.window_mut(group);
+        window.rows = page.rows;
+        window.before = page.before;
+        window.after = page.after;
+        window.more = window.after.is_some();
+        match group {
+            InboxReadGroup::Needs => self.needs_window.past(&self.live),
+            InboxReadGroup::Updates => self.updates_window.past(&self.live),
+        }
+        self.merge();
+    }
+    fn merge(&mut self) {
+        self.rows.clear();
+        for entries in [&self.live, &self.needs_window.rows, &self.updates_window.rows] {
+            for entry in entries {
+                if !self.includes(entry) {
+                    continue;
+                }
+                let mut known = false;
+                for current in &self.rows {
+                    if current.object == entry.object {
+                        known = true;
+                        break;
+                    }
+                }
+                if !known {
+                    self.rows.push(entry.clone()).expect("three bounded inbox sources fit");
+                }
             }
         }
         for first in 0..self.rows.len() {

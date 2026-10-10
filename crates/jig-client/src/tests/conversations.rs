@@ -232,7 +232,8 @@ fn routed_conversation() {
     use skein_lib::Time;
     let mut domain = Domain::new(&LIMITS, 21);
     let f = start(&mut domain, List::with_capacity(0));
-    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    super::pages::finish_initial_inbox_reads(&mut domain, &initial);
     let opened = drive(
         &mut domain,
         Time::ZERO,

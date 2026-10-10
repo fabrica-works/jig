@@ -39,8 +39,8 @@ fn source(domain: &Domain, fallback: Source, conversations: bool) -> Source {
 
 pub(crate) fn inbox(domain: &mut Domain, env: &Env<crate::Limits>, incoming: Source, out: &mut Queue<Request>) {
     let source = source(domain, incoming, false);
-    let mut keys = List::with_capacity(env.limits.rows);
-    let mut contexts = List::with_capacity(env.limits.rows);
+    let mut keys = List::with_capacity(domain.inbox.rows.capacity());
+    let mut contexts = List::with_capacity(domain.inbox.rows.capacity());
     for entry in &domain.inbox.rows {
         if keys.push(entry.object).is_err() {
             break;

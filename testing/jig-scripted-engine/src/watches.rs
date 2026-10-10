@@ -218,10 +218,16 @@ impl<A: crate::Application> Engine<A> {
                 Delivery::Chips(list(&chips))
             }
             Subject::Inbox { window } => {
-                let read = Read::Inbox { project: None, kind: None, goal: None, after: None };
-                let Rows::Inbox(entries) = self.rows_for(party, &read) else {
-                    unreachable!("inbox rows");
-                };
+                let mut entries = Vec::new();
+                for group in
+                    [jig_client::contract::InboxReadGroup::Needs, jig_client::contract::InboxReadGroup::Updates]
+                {
+                    let read = Read::Inbox { group, project: None, kind: None, goal: None, after: None };
+                    let Rows::Inbox(rows) = self.rows_for(party, &read) else {
+                        unreachable!("inbox rows");
+                    };
+                    entries.extend(rows);
+                }
                 let count = entries.len().min((*window).min(self.bounds.rows) as usize);
                 let frame = &self.truth.frames[&party];
                 Delivery::Inbox(Box::new(Inbox {
@@ -234,11 +240,10 @@ impl<A: crate::Application> Engine<A> {
                 }))
             }
             Subject::Goals { project } => {
-                let Rows::Goals(rows) =
-                    self.rows_for(party, &Read::Goals { project: *project, ended: false, after: None })
-                else {
+                let Rows::Goals(rows) = self.rows_for(party, &Read::Goals { project: *project, after: None }) else {
                     unreachable!("goal rows");
                 };
+                let rows: Vec<_> = rows.into_iter().filter(|line| !ended(line.chip.phase)).collect();
                 let count = rows.len().min(self.bounds.rows as usize);
                 Delivery::Goals(Box::new(Goals {
                     project: *project,
@@ -247,9 +252,7 @@ impl<A: crate::Application> Engine<A> {
                 }))
             }
             Subject::Conversations => {
-                let Rows::Conversations(rows) =
-                    self.rows_for(party, &Read::Conversations { project: None, after: None })
-                else {
+                let Rows::Conversations(rows) = self.rows_for(party, &Read::Conversations { after: None }) else {
                     unreachable!("conversation rows");
                 };
                 let live: Vec<_> = rows.into_iter().filter(|line| !ended(line.chip.phase)).collect();

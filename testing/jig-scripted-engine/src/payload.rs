@@ -729,16 +729,11 @@ impl Payload for Read {
                 sum(&[task.heap(bounds), subtree.heap(bounds), after.heap(bounds)])
             }
             Self::Activity { task, before } => sum(&[task.heap(bounds), before.heap(bounds)]),
-            Self::InboxGroup { group, project, after } => {
-                sum(&[group.heap(bounds), project.heap(bounds), after.heap(bounds)])
-            }
-            Self::Inbox { project, kind, goal, after } => {
+            Self::Inbox { group: _, project, kind, goal, after } => {
                 sum(&[project.heap(bounds), kind.heap(bounds), goal.heap(bounds), after.heap(bounds)])
             }
-            Self::Conversations { project, after } => sum(&[project.heap(bounds), after.heap(bounds)]),
-            Self::Goals { project, ended, after } => {
-                sum(&[project.heap(bounds), ended.heap(bounds), after.heap(bounds)])
-            }
+            Self::Conversations { after } => sum(&[after.heap(bounds)]),
+            Self::Goals { project, after } => sum(&[project.heap(bounds), after.heap(bounds)]),
             Self::Spend { project, after } => sum(&[project.heap(bounds), after.heap(bounds)]),
             Self::Project { project } => sum(&[project.heap(bounds)]),
             Self::Notes { scope, description, after } => {

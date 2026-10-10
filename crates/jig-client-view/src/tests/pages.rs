@@ -138,6 +138,21 @@ fn inbox_edges(words: &crate::words::Words) {
             more: true,
         })),
     );
+    for request in &out {
+        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+            drive(
+                &mut d,
+                Event::Read {
+                    read: *read,
+                    result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        rows: List::with_capacity(0),
+                        before: None,
+                        after: Some(Cursor { value: text(b"next") }),
+                    }))),
+                },
+            );
+        }
+    }
     let (tree, mut bindings) = build(&d, 0, words);
     for label in [
         b"4294967296 need you".as_slice(),
@@ -203,11 +218,11 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
     deliver(&mut d, page, Delivery::Inbox(Box::new(committed)));
     assert!(!contains(&build(&d, 0, words).0, b"New"));
     let filter = jig_client::pages::inbox::Filter { project: None, kind: None, goal: None };
-    let out = drive(&mut d, Event::Act { act: jig_client::action::Act::FilterInbox { filter } });
+    drive(&mut d, Event::Act { act: jig_client::action::Act::FilterInbox { filter } });
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Inbox { .. } } => Some(*read),
+            Request::Read { read, what: Read::Inbox { group: InboxReadGroup::Updates, .. } } => Some(*read),
             _ => None,
         })
         .unwrap();
@@ -376,4 +391,60 @@ fn pages_show_non_work_states_inbox_edges_and_the_offered_conversation_form() {
     inbox_committed_read_position(&words);
     conversations_form(&words);
     conversation_states(&words);
+}
+
+#[test]
+fn inbox_group_controls_decode_independent_windows() {
+    let words = words();
+    let (mut d, frame) = start();
+    let out = deliver(&mut d, frame, Delivery::Frame(Box::new(document())));
+    for request in &out {
+        if let Request::Read { read, what: Read::Inbox { group, .. } } = request {
+            drive(
+                &mut d,
+                Event::Read {
+                    read: *read,
+                    result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        rows: List::with_capacity(0),
+                        before: None,
+                        after: Some(Cursor {
+                            value: text(if *group == InboxReadGroup::Needs { b"needs" } else { b"updates" }),
+                        }),
+                    }))),
+                },
+            );
+        }
+    }
+    let (tree, mut bindings) = build(&d, 0, &words);
+    let mut acts = Vec::new();
+    for node in tree.nodes() {
+        if node.name.as_deref() == Some(b"Read later".as_slice()) {
+            acts.push(crate::decode(&mut bindings, node.binding.unwrap().token, crate::Act::Press).unwrap());
+        }
+    }
+    assert_eq!(
+        acts,
+        vec![
+            jig_client::action::Act::More {
+                window: Token::new(jig_client::pages::conversations::INBOX_WINDOW),
+                end: jig_client::action::End::After
+            },
+            jig_client::action::Act::More {
+                window: Token::new(jig_client::pages::conversations::INBOX_UPDATES_WINDOW),
+                end: jig_client::action::End::After
+            }
+        ]
+    );
+    let more = drive(&mut d, Event::Act { act: acts[1].clone() });
+    let reads: Vec<_> = more
+        .iter()
+        .filter_map(|request| match request {
+            Request::Read { what: Read::Inbox { group, after, .. }, .. } => Some((*group, after.clone().unwrap())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(reads.len(), 1);
+    assert_eq!(reads[0].0, InboxReadGroup::Updates);
+    assert_eq!(reads[0].1.value.bytes(), b"updates");
+    assert_eq!(d.inbox().needs_window.after.as_ref().unwrap().value.bytes(), b"needs");
 }

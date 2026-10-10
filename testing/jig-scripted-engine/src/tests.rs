@@ -654,7 +654,13 @@ fn scenario_byte_bound_pages_and_watch_windows() {
         .collect();
     setup.truth.sources.push(Source {
         party: 1,
-        read: Read::Inbox { project: None, kind: None, goal: None, after: None },
+        read: Read::Inbox {
+            group: jig_client::contract::InboxReadGroup::Updates,
+            project: None,
+            kind: None,
+            goal: None,
+            after: None,
+        },
         rows: Rows::Inbox(entries),
     });
     let mut engine = Engine::new(setup, 9).expect("each whole reply row fits");
@@ -708,10 +714,22 @@ fn scenario_all_read_shapes_and_reverse_activity() {
         Read::Result { task: 8 },
         Read::Ended { task: 8, after: None },
         Read::History { task: 8, subtree: true, after: None },
-        Read::InboxGroup { group: InboxGroup::Replies, project: None, after: None },
-        Read::Inbox { project: Some(1), kind: Some(InboxGroup::Questions), goal: None, after: None },
-        Read::Conversations { project: Some(1), after: None },
-        Read::Goals { project: 1, ended: false, after: None },
+        Read::Inbox {
+            group: jig_client::contract::InboxReadGroup::Updates,
+            kind: Some(InboxGroup::Replies),
+            goal: None,
+            project: None,
+            after: None,
+        },
+        Read::Inbox {
+            group: jig_client::contract::InboxReadGroup::Needs,
+            project: Some(1),
+            kind: Some(InboxGroup::Questions),
+            goal: None,
+            after: None,
+        },
+        Read::Conversations { after: None },
+        Read::Goals { project: 1, after: None },
         Read::Spend { project: 1, after: None },
         Read::Project { project: 1 },
         Read::Notes { scope: NoteScope::Project(1), description: Some(text(b"match")), after: None },
@@ -752,7 +770,13 @@ fn scenario_all_read_shapes_and_reverse_activity() {
     };
     setup.truth.sources.push(Source {
         party: 1,
-        read: Read::Inbox { project: None, kind: None, goal: None, after: None },
+        read: Read::Inbox {
+            group: jig_client::contract::InboxReadGroup::Updates,
+            project: None,
+            kind: None,
+            goal: None,
+            after: None,
+        },
         rows: Rows::Inbox(vec![entry]),
     });
     assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Identity), "reply task identity is whole and authoritative");
@@ -1171,4 +1195,157 @@ fn whole_specification_prices_parameter_and_input_capacity_and_refuses_partial_v
         .clone_from(&Parameter::Bytes { name: 7, value: text(b"longer") });
     bounds.document_bytes = u64::MAX;
     assert!(!crate::payload::fits(&too_long, &bounds), "whole opaque bytes parameter is never clipped");
+}
+
+#[test]
+fn inbox_group_cursors_keep_exact_filters_and_whole_query_order() {
+    let mut setup = live_script();
+    setup.bounds.rows = 1;
+    let entry = |number, kind, at, goal| InboxEntry {
+        object: match kind {
+            InboxGroup::Questions => ObjectKey::Question { task: number, message: 1 },
+            InboxGroup::Results => ObjectKey::Result(number),
+            InboxGroup::PersonTasks => ObjectKey::PersonTask(number),
+            _ => unreachable!("fixture kinds"),
+        },
+        group: kind,
+        project: 1,
+        lineage: list(vec![]),
+        goal,
+        recipient: None,
+        stall: None,
+        reply: None,
+        position: number,
+        at: Wall::from_nanos(at),
+    };
+    for (group, rows) in [
+        (
+            InboxReadGroup::Needs,
+            vec![
+                entry(6, InboxGroup::PersonTasks, 1, Some(9)),
+                entry(8, InboxGroup::Questions, 3, Some(9)),
+                entry(7, InboxGroup::Questions, 2, Some(9)),
+                entry(5, InboxGroup::Questions, 0, Some(8)),
+            ],
+        ),
+        (
+            InboxReadGroup::Updates,
+            vec![entry(10, InboxGroup::Results, 4, Some(9)), entry(11, InboxGroup::Results, 5, Some(9))],
+        ),
+    ] {
+        setup.truth.sources.push(Source {
+            party: 1,
+            read: Read::Inbox { group, project: None, kind: None, goal: None, after: None },
+            rows: Rows::Inbox(rows),
+        });
+    }
+    let mut engine = Engine::new(setup, 92).expect("whole owner collections fit");
+    let needs = Read::Inbox {
+        group: InboxReadGroup::Needs,
+        project: Some(1),
+        kind: Some(InboxGroup::Questions),
+        goal: Some(9),
+        after: None,
+    };
+    let updates = Read::Inbox {
+        group: InboxReadGroup::Updates,
+        project: Some(1),
+        kind: Some(InboxGroup::Results),
+        goal: Some(9),
+        after: None,
+    };
+    engine.read(Time::ZERO, 11, Token::new(1), needs.clone()).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Read { terminal: ReadResult::Value(ReadValue::Inbox(page)), .. } = &up[0] else {
+        panic!("needs page");
+    };
+    assert_eq!(
+        page.rows.get(0).unwrap().object,
+        ObjectKey::Question { task: 7, message: 1 },
+        "filter before bounded page slicing"
+    );
+    let needs_cursor = page.after.clone().unwrap();
+    engine.read(Time::ZERO, 11, Token::new(2), updates.clone()).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Read { terminal: ReadResult::Value(ReadValue::Inbox(page)), .. } = &up[0] else {
+        panic!("updates page");
+    };
+    assert_eq!(page.rows.get(0).unwrap().object, ObjectKey::Result(11));
+    let updates_cursor = page.after.clone().unwrap();
+    for (token, mut query, cursor, wanted) in [
+        (3, needs.clone(), needs_cursor.clone(), ObjectKey::Question { task: 8, message: 1 }),
+        (4, updates.clone(), updates_cursor, ObjectKey::Result(10)),
+    ] {
+        if let Read::Inbox { after, .. } = &mut query {
+            *after = Some(cursor);
+        }
+        engine.read(Time::ZERO, 11, Token::new(token), query).unwrap();
+        let up = engine.poll(Time::ZERO);
+        let Up::Read { terminal: ReadResult::Value(ReadValue::Inbox(page)), .. } = &up[0] else {
+            panic!("independent continuation");
+        };
+        assert_eq!(page.rows.get(0).unwrap().object, wanted);
+        assert!(page.after.is_none());
+    }
+    let mut wrong = updates;
+    if let Read::Inbox { after, .. } = &mut wrong {
+        *after = Some(needs_cursor);
+    }
+    engine.read(Time::ZERO, 11, Token::new(5), wrong).unwrap();
+    assert!(matches!(engine.poll(Time::ZERO)[0], Up::Read { terminal: ReadResult::None(ReadNone::Gone), .. }));
+    engine.open(Time::ZERO, 11, Token::new(6), Subject::Inbox { window: 1 }).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Watch { event: WatchEvent::Delivered(Delivery::Inbox(value)), .. } = &up[1] else {
+        panic!("shared live watch");
+    };
+    assert_eq!(
+        value.entries.get(0).unwrap().object,
+        ObjectKey::Question { task: 5, message: 1 },
+        "live watch remains unfiltered"
+    );
+    assert!(value.more);
+}
+
+#[test]
+fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
+    let mut setup = live_script();
+    let goal = |number, ended| {
+        let mut chip = task().chip;
+        chip.task = number;
+        if ended {
+            chip.phase = Phase::Done;
+            chip.details = Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH });
+        }
+        GoalLine {
+            chip,
+            priority: 1,
+            progress: PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            budget: budget(),
+            deadline: None,
+            held_below: 0,
+            changed: Wall::EPOCH,
+        }
+    };
+    setup.truth.sources.push(Source {
+        party: 1,
+        read: Read::Goals { project: 1, after: None },
+        rows: Rows::Goals(vec![goal(8, false), goal(9, true)]),
+    });
+    let mut engine = Engine::new(setup, 93).unwrap();
+    engine.read(Time::ZERO, 11, Token::new(1), Read::Goals { project: 1, after: None }).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Read { terminal: ReadResult::Value(ReadValue::Goals(page)), .. } = &up[0] else {
+        panic!("one goal list from start");
+    };
+    assert_eq!(page.rows.len(), 2);
+    assert_eq!(page.rows.get(0).unwrap().chip.task, 8);
+    assert_eq!(page.rows.get(1).unwrap().chip.phase, Phase::Done);
+    engine.open(Time::ZERO, 11, Token::new(2), Subject::Goals { project: 1 }).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Watch { event: WatchEvent::Delivered(Delivery::Goals(value)), .. } = &up[1] else {
+        panic!("live board");
+    };
+    assert_eq!(value.rows.len(), 1);
+    assert_eq!(value.rows.get(0).unwrap().chip.task, 8);
+    assert!(!value.more);
 }

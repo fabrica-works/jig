@@ -158,7 +158,7 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
             changes: vec![
                 jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
                     party: 7,
-                    read: Read::Conversations { project: None, after: None },
+                    read: Read::Conversations { after: None },
                     rows: jig_scripted_engine::Rows::Conversations(vec![ConversationLine {
                         runtime: task.runtime.clone(),
                         delegates: 0,
@@ -343,7 +343,13 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
         },
         jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
             party: 7,
-            read: Read::Inbox { project: None, kind: None, goal: None, after: None },
+            read: Read::Inbox {
+                group: jig_client::contract::InboxReadGroup::Needs,
+                project: None,
+                kind: None,
+                goal: None,
+                after: None,
+            },
             rows: jig_scripted_engine::Rows::Inbox(vec![InboxEntry {
                 reply: None,
                 lineage: list([]),
@@ -459,7 +465,13 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
                 jig_scripted_engine::Change::Source(after),
                 jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
                     party: 7,
-                    read: Read::Inbox { project: None, kind: None, goal: None, after: None },
+                    read: Read::Inbox {
+                        group: jig_client::contract::InboxReadGroup::Needs,
+                        project: None,
+                        kind: None,
+                        goal: None,
+                        after: None,
+                    },
                     rows: jig_scripted_engine::Rows::Inbox(vec![]),
                 }),
             ],

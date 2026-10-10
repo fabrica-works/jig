@@ -170,10 +170,31 @@ fn inbox(entries: List<InboxEntry>) -> Inbox {
         more: false,
     }
 }
+pub(super) fn finish_initial_inbox_reads(domain: &mut Domain, out: &[Request]) {
+    for request in out {
+        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+            drive(
+                domain,
+                Time::ZERO,
+                Event::Read {
+                    read: *read,
+                    result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        rows: List::with_capacity(0),
+                        before: None,
+                        after: None,
+                    }))),
+                },
+            );
+        }
+    }
+    domain.reclaim();
+}
 fn live_inbox(seed: u64) -> (Domain, skein_lib::Token) {
     let mut domain = Domain::new(&LIMITS, seed);
     let f = start(&mut domain, List::with_capacity(0));
-    let page = open_token(&delivered(&mut domain, Time::ZERO, f, frame(7)));
+    let out = delivered(&mut domain, Time::ZERO, f, frame(7));
+    let page = open_token(&out);
+    finish_initial_inbox_reads(&mut domain, &out);
     (domain, page)
 }
 fn inbox_delivery(domain: &mut Domain, page: skein_lib::Token, entries: List<InboxEntry>) -> Box<[Request]> {
@@ -222,14 +243,22 @@ fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_h
         ] {
             let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter } });
             assert!(domain.inbox().rows.is_empty());
+            let mut groups = List::with_capacity(2);
             for request in &out {
-                if let Request::Read { what, .. } = request {
-                    assert_eq!(
-                        *what,
-                        Read::Inbox { project: filter.project, kind: filter.kind, goal: filter.goal, after: None }
-                    );
+                if let Request::Read { what: Read::Inbox { group, project, kind, goal, after }, .. } = request {
+                    assert_eq!(*project, filter.project);
+                    assert_eq!(*kind, filter.kind);
+                    assert_eq!(*goal, filter.goal);
+                    assert!(after.is_none());
+                    groups.push(*group).unwrap();
                 }
             }
+            assert_eq!(groups.len(), if filter.kind.is_some() { 1 } else { 2 });
+            assert_eq!(*groups.get(0).unwrap(), InboxReadGroup::Needs);
+            if filter.kind.is_none() {
+                assert_eq!(*groups.get(1).unwrap(), InboxReadGroup::Updates);
+            }
+            finish_initial_inbox_reads(&mut domain, &out);
         }
     }
     for party in [7, 8] {
@@ -309,7 +338,7 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
     let mut found = false;
     for request in &out {
         if let Request::Read { what, .. } = request {
-            assert_eq!(*what, Read::Conversations { project: None, after: Some(cursor.clone()) });
+            assert_eq!(*what, Read::Conversations { after: Some(cursor.clone()) });
             found = true;
         }
     }
@@ -412,7 +441,8 @@ fn task_sections_and_activity_sources_follow_the_executor() {
         assert!(!task::offered(&sections, TaskSection::Plan));
         let mut domain = Domain::new(&LIMITS, 22);
         let f = start(&mut domain, List::with_capacity(0));
-        delivered(&mut domain, Time::ZERO, f, frame(7));
+        let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+        finish_initial_inbox_reads(&mut domain, &initial);
         let opened = drive(
             &mut domain,
             Time::ZERO,
@@ -494,7 +524,8 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
     assert_eq!(domain.task_page().plan.nodes.len(), 2);
     let mut domain = Domain::new(&LIMITS, 22);
     let f = start(&mut domain, List::with_capacity(0));
-    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
     let opened = drive(
         &mut domain,
         Time::ZERO,
@@ -562,7 +593,8 @@ fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
     };
     let mut domain = Domain::new(&LIMITS, 22);
     let f = start(&mut domain, List::with_capacity(0));
-    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
     let opened = drive(
         &mut domain,
         Time::ZERO,
@@ -608,7 +640,8 @@ fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
     use crate::address::TaskSection;
     let mut domain = Domain::new(&LIMITS, 22);
     let f = start(&mut domain, List::with_capacity(0));
-    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
     let opened = drive(
         &mut domain,
         Time::ZERO,
@@ -687,7 +720,8 @@ fn project_open(section: ProjectSection) -> (Domain, Box<[Request]>) {
     role.goals.push(Charter { number: 1, name: text(b"lead") }).unwrap();
     value.projects = List::with_capacity(1);
     value.projects.push(role).unwrap();
-    delivered(&mut domain, Time::ZERO, f, value);
+    let out = delivered(&mut domain, Time::ZERO, f, value);
+    finish_initial_inbox_reads(&mut domain, &out);
     let opened =
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Project { project: 1, section }) });
     (domain, opened)
@@ -766,7 +800,9 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
         },
     );
     assert_eq!(domain.project_page().goals.as_slice()[0].chip.task, 9);
-    let Request::Read { read, .. } = opened[3] else { panic!("ended goals read") };
+    let Request::Read { read, what } = &opened[3] else { panic!("goals read from start") };
+    assert_eq!(*what, Read::Goals { project: 1, after: None });
+    let read = *read;
     let mut rows = List::with_capacity(2);
     rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
     rows.push(goal_line(9, 2, Phase::Done, 2)).unwrap();
@@ -784,6 +820,11 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
         },
     );
     assert_eq!(domain.project_page().ended.as_slice()[0].chip.task, 9);
+    assert_eq!(domain.project_page().listed_goals.len(), 2);
+    let winner = domain.project_page().listed_goals.as_slice()[0].clone();
+    assert_eq!(winner.chip.task, 9);
+    assert_eq!(winner.priority, 2, "live watch row wins over the read duplicate");
+    assert_eq!(winner.chip.phase, Phase::Running);
     domain.reclaim();
     let more = drive(
         &mut domain,
@@ -791,7 +832,7 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
         Event::Act { act: Act::More { window: skein_lib::Token::new(GOALS_WINDOW), end: End::After } },
     );
     let Request::Read { what, .. } = &more[0] else { panic!("ended goals continuation") };
-    assert_eq!(*what, Read::Goals { project: 1, ended: true, after: Some(cursor) });
+    assert_eq!(*what, Read::Goals { project: 1, after: Some(cursor) });
     project_task_filters_and_spend_pages();
 }
 fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
@@ -1240,7 +1281,35 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     domain.reclaim();
     let filter = Filter { project: Some(1), kind: Some(InboxGroup::Replies), goal: None };
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterInbox { filter } });
-    let what = Read::Inbox { project: filter.project, kind: filter.kind, goal: filter.goal, after: None };
+    let what = Read::Inbox {
+        group: filter.kind.map_or(InboxReadGroup::Needs, InboxReadGroup::of),
+        project: filter.project,
+        kind: filter.kind,
+        goal: filter.goal,
+        after: None,
+    };
+    let mut rows = List::with_capacity(1);
+    rows.push(reply_entry(8, 6, 9)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &what),
+            result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                rows,
+                before: Some(Cursor { value: text(b"back") }),
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(
+        domain.objects().get(id).unwrap().reply.as_ref().unwrap().first_unread,
+        5,
+        "live watch row wins over read duplicate"
+    );
+    inbox_delivery(&mut domain, page, List::with_capacity(0));
+    domain.reclaim();
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterInbox { filter } });
     let mut rows = List::with_capacity(1);
     rows.push(reply_entry(8, 6, 9)).unwrap();
     drive(
@@ -1287,7 +1356,7 @@ fn live_conversation_page(seed: u64) -> (Domain, skein_lib::Token, skein_lib::To
     let entered =
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
     let watch = open_token(&entered);
-    let first_read = read_named(&entered, &Read::Conversations { project: None, after: None });
+    let first_read = read_named(&entered, &Read::Conversations { after: None });
     (domain, watch, first_read)
 }
 #[test]
@@ -1364,7 +1433,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
         &mut domain,
         Time::ZERO,
         Event::Read {
-            read: read_named(&out, &Read::Conversations { project: None, after: Some(cursor) }),
+            read: read_named(&out, &Read::Conversations { after: Some(cursor) }),
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
                 rows,
                 before: Some(Cursor { value: text(b"back") }),
@@ -1439,4 +1508,218 @@ fn specification(words: Text) -> SpecificationDocument {
         specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
         cut: false,
     }
+}
+
+#[test]
+fn goal_read_from_start_merges_live_watch_by_key() {
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let watch = open_token(&opened);
+    let mut live = List::with_capacity(1);
+    live.push(goal_line(9, 2, Phase::Running, 2)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows: live, more: false }))),
+        },
+    );
+    let query = Read::Goals { project: 1, after: None };
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(9, 99, Phase::Running, 1)).unwrap();
+    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&opened, &query),
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage { rows, before: None, after: None }))),
+        },
+    );
+    assert_eq!(domain.project_page().listed_goals.len(), 2);
+    assert_eq!(domain.project_page().listed_goals.get(0).unwrap().chip.task, 9);
+    assert_eq!(domain.project_page().listed_goals.get(0).unwrap().priority, 2);
+    assert_eq!(domain.project_page().listed_goals.get(1).unwrap().chip.phase, Phase::Done);
+    let Some(crate::objects::Body::Chip(chip)) =
+        &domain.objects().get(domain.objects().find(ObjectKey::Task(9)).unwrap()).unwrap().body
+    else {
+        panic!("live goal chip");
+    };
+    assert_eq!(chip.phase, Phase::Running);
+}
+#[test]
+fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
+    use crate::{
+        action::{Act, End},
+        pages::conversations::{INBOX_UPDATES_WINDOW, INBOX_WINDOW},
+        pages::inbox::Filter,
+    };
+    let mut limits = LIMITS;
+    limits.rows = 4;
+    limits.objects = 8;
+    limits.reads = 16;
+    let send = |domain: &mut Domain, event| {
+        let mut out = skein_lib::Queue::with_capacity(crate::max_out(&limits));
+        crate::step(domain, &skein_lib::Env { now: Time::ZERO, wall: skein_lib::Wall::EPOCH, limits }, event, &mut out);
+        super::spine::drain(out)
+    };
+    let row = |number, group, at| {
+        let mut row = entry(number, group, at);
+        row.object = match group {
+            InboxGroup::Escalations => ObjectKey::Escalation(number),
+            InboxGroup::Questions => ObjectKey::Question { task: number, message: 1 },
+            InboxGroup::Results => ObjectKey::Result(number),
+            InboxGroup::Proposals | InboxGroup::PersonTasks | InboxGroup::Replies => unreachable!("fixture kinds"),
+        };
+        row
+    };
+    let mut domain = Domain::new(&limits, 88);
+    let f = open_token(&send(
+        &mut domain,
+        Event::Start {
+            address: Address::Inbox { project: None },
+            kept: List::with_capacity(0),
+            offset: crate::boundary::Offset { minutes: 0 },
+        },
+    ));
+    let entered =
+        send(&mut domain, Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) });
+    let watch = open_token(&entered);
+    let mut live = List::with_capacity(1);
+    live.push(row(7, InboxGroup::Escalations, 1)).unwrap();
+    send(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(live)))) });
+    let mut needs_query =
+        Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: None, after: None };
+    let mut updates_query =
+        Read::Inbox { group: InboxReadGroup::Updates, project: None, kind: None, goal: None, after: None };
+    let mut needs = List::with_capacity(3);
+    needs.push(row(7, InboxGroup::Escalations, 99)).unwrap();
+    needs.push(row(9, InboxGroup::Questions, 3)).unwrap();
+    needs.push(row(8, InboxGroup::Questions, 2)).unwrap();
+    let mut updates = List::with_capacity(2);
+    updates.push(row(10, InboxGroup::Results, 4)).unwrap();
+    updates.push(row(11, InboxGroup::Results, 5)).unwrap();
+    let needs_after = Cursor { value: text(b"needs-next") };
+    let updates_after = Cursor { value: text(b"updates-next") };
+    for (query, rows, cursor) in [(&needs_query, needs, &needs_after), (&updates_query, updates, &updates_after)] {
+        send(
+            &mut domain,
+            Event::Read {
+                read: read_named(&entered, query),
+                result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                    rows,
+                    before: None,
+                    after: Some(cursor.clone()),
+                }))),
+            },
+        );
+    }
+    assert_eq!(domain.inbox().rows.len(), 5);
+    for (index, key) in [
+        (0, ObjectKey::Escalation(7)),
+        (1, ObjectKey::Question { task: 8, message: 1 }),
+        (2, ObjectKey::Question { task: 9, message: 1 }),
+        (3, ObjectKey::Result(11)),
+        (4, ObjectKey::Result(10)),
+    ] {
+        assert_eq!(domain.inbox().rows.get(index).unwrap().object, key);
+    }
+    assert_eq!(domain.inbox().rows.get(0).unwrap().at, skein_lib::Wall::from_nanos(1));
+    domain.reclaim();
+    let out = send(
+        &mut domain,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(INBOX_WINDOW), end: End::After } },
+    );
+    if let Read::Inbox { after, .. } = &mut needs_query {
+        *after = Some(needs_after);
+    }
+    assert!(out.iter().any(|request| matches!(request, Request::Read { what, .. } if *what == needs_query)));
+    assert!(!out.iter().any(|request| matches!(
+        request,
+        Request::Read { what: Read::Inbox { group: InboxReadGroup::Updates, .. }, .. }
+    )));
+    assert_eq!(domain.inbox().updates_window.after, Some(updates_after.clone()));
+    send(
+        &mut domain,
+        Event::Read {
+            read: read_named(&out, &needs_query),
+            result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                rows: List::with_capacity(0),
+                before: Some(Cursor { value: text(b"needs-back") }),
+                after: None,
+            }))),
+        },
+    );
+    assert!(!domain.inbox().needs_window.more);
+    assert!(domain.inbox().updates_window.more);
+    assert_eq!(domain.inbox().rows.len(), 3);
+    domain.reclaim();
+    let out = send(
+        &mut domain,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(INBOX_UPDATES_WINDOW), end: End::After } },
+    );
+    if let Read::Inbox { after, .. } = &mut updates_query {
+        *after = Some(updates_after);
+    }
+    assert!(out.iter().any(|request| matches!(request, Request::Read { what, .. } if *what == updates_query)));
+    assert!(!out.iter().any(|request| matches!(
+        request,
+        Request::Read { what: Read::Inbox { group: InboxReadGroup::Needs, .. }, .. }
+    )));
+    let out = send(
+        &mut domain,
+        Event::Act {
+            act: Act::FilterInbox {
+                filter: Filter { project: Some(1), kind: Some(InboxGroup::Results), goal: Some(9) },
+            },
+        },
+    );
+    assert!(out.iter().any(|request| matches!(
+        request,
+        Request::Read {
+            what: Read::Inbox {
+                group: InboxReadGroup::Updates,
+                project: Some(1),
+                kind: Some(InboxGroup::Results),
+                goal: Some(9),
+                after: None
+            },
+            ..
+        }
+    )));
+    assert!(!out.iter().any(|request| matches!(
+        request,
+        Request::Read { what: Read::Inbox { group: InboxReadGroup::Needs, .. }, .. }
+    )));
+    send(
+        &mut domain,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(List::with_capacity(0))))) },
+    );
+}
+#[test]
+fn conversations_address_project_preselects_form_without_filtering_rows() {
+    let (mut domain, _) = live_inbox(89);
+    let entered =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: Some(1) }) });
+    let query = Read::Conversations { after: None };
+    let mut rows = List::with_capacity(2);
+    rows.push(list_entry(7, Phase::Idle, 1)).unwrap();
+    let mut other = list_entry(8, Phase::Idle, 2);
+    other.project = 2;
+    rows.push(other).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&entered, &query),
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                rows,
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.len(), 2);
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().project, 2);
+    assert_eq!(domain.address, Address::Conversations { project: Some(1) });
 }

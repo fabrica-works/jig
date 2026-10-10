@@ -177,7 +177,6 @@ fn key(what: &Read) -> Option<ObjectKey> {
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::InboxGroup { .. }
         | Read::Conversations { .. }
         | Read::Goals { .. }
         | Read::Spend { .. }

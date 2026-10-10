@@ -106,7 +106,13 @@ fn own_script() -> Script {
         );
         setup.truth.object_projects.insert(entry.object, 1);
     }
-    let read = Read::Inbox { project: None, kind: None, goal: None, after: None };
+    let read = Read::Inbox {
+        group: jig_client::contract::InboxReadGroup::Updates,
+        project: None,
+        kind: None,
+        goal: None,
+        after: None,
+    };
     setup.truth.frames.get_mut(&1).expect("frame").updates.value = 3;
     setup.truth.sources.push(Source { party: 1, read: read.clone(), rows: Rows::Inbox(entries.clone()) });
     for through in 1..=3 {

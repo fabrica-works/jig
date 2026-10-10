@@ -306,12 +306,16 @@ pub(crate) fn unknown(domain: &mut Domain, request: Token) {
     }
 }
 /// Running goals precede waiting goals; priority descends within each group.
-pub(crate) fn order(rows: &mut List<GoalLine>, ended: bool) {
+pub(crate) fn order(rows: &mut List<GoalLine>) {
     for first in 0..rows.len() {
         for second in first.checked_add(1).expect("row index fits")..rows.len() {
             let a = rows.get(first).expect("row exists");
             let b = rows.get(second).expect("row exists");
-            let before = if ended {
+            let a_live = crate::pages::conversations::live(a.chip.phase);
+            let b_live = crate::pages::conversations::live(b.chip.phase);
+            let before = if a_live != b_live {
+                b_live
+            } else if !a_live {
                 b.changed > a.changed || (b.changed == a.changed && b.chip.task < a.chip.task)
             } else {
                 (a.chip.phase == Phase::Waiting && b.chip.phase != Phase::Waiting)

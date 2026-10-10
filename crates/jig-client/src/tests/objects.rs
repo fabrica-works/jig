@@ -189,7 +189,9 @@ fn inbox(keys: &[ObjectKey]) -> Delivery {
 pub(super) fn live() -> (Domain, Token) {
     let mut domain = Domain::new(&LIMITS, 10);
     let f = start(&mut domain, List::with_capacity(0));
-    let page = open_token(&delivered(&mut domain, Time::ZERO, f, frame(7)));
+    let out = delivered(&mut domain, Time::ZERO, f, frame(7));
+    let page = open_token(&out);
+    super::pages::finish_initial_inbox_reads(&mut domain, &out);
     (domain, page)
 }
 fn watched(domain: &mut Domain, page: Token, keys: &[ObjectKey]) -> Box<[Request]> {

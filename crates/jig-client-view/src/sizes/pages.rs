@@ -11,9 +11,9 @@ fn runtime(l: &Limits) -> Option<u32> {
 pub fn inbox_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     card_nodes(l)?
         .checked_add(14)?
-        .checked_mul(l.rows)?
+        .checked_mul(l.rows.checked_mul(3)?)?
         .checked_add(l.projects.checked_mul(2)?)?
-        .checked_add(64)?
+        .checked_add(80)?
         .checked_add(slot_nodes)
 }
 /// Chat rows, every runtime alternative and all offered project forms.

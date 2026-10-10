@@ -37,10 +37,7 @@ pub fn edit(form: GoalForm, field: Field, value: &[u8]) -> Option<Act> {
 pub(super) fn goals(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
     words.text(b, JigPhrase::PriorityMeaning, &[]);
     b.open(Role::List);
-    for goal in &client.project_page().goals {
-        line(b, client, goal, words, bindings);
-    }
-    for goal in &client.project_page().ended {
+    for goal in &client.project_page().listed_goals {
         line(b, client, goal, words, bindings);
     }
     b.close();

@@ -1,5 +1,5 @@
 //! One-terminal reads, bounded pages and opaque cursors; client/domain/contract.md, 6.
-//! A cursor is never decoded by the client. Ended work is read, live work watched.
+//! A cursor is never decoded by the client. Live watches may overlap retained read pages.
 use super::{
     ActivityLine, ConversationLine, Deployment, Escalation, Frame, GoalLine, HistoryLine, InboxEntry, InboxGroup, Note,
     NoteScope, PersonTask, Project, Proposal, ProposalKey, Question, Result, Task, Text,
@@ -10,6 +10,27 @@ use skein_lib::List;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Cursor {
     pub value: Text,
+}
+
+/// One inbox query order; the two groups carry independent opaque cursors.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum InboxReadGroup {
+    /// Work waiting on the party, oldest first.
+    Needs,
+    /// Results and chat replies, newest first.
+    Updates,
+}
+impl InboxReadGroup {
+    /// A kind belongs to exactly one of the two query groups.
+    #[must_use]
+    pub const fn of(kind: InboxGroup) -> Self {
+        match kind {
+            InboxGroup::Questions | InboxGroup::Proposals | InboxGroup::Escalations | InboxGroup::PersonTasks => {
+                Self::Needs
+            }
+            InboxGroup::Results | InboxGroup::Replies => Self::Updates,
+        }
+    }
 }
 
 /// A document or a bounded page requested without a key.
@@ -35,14 +56,18 @@ pub enum Read {
     History { task: u64, subtree: bool, after: Option<Cursor> },
     /// Activity read from the end.
     Activity { task: u64, before: Option<Cursor> },
-    /// A filtered inbox group.
-    InboxGroup { group: InboxGroup, project: Option<u32>, after: Option<Cursor> },
-    /// A filtered inbox window, including a goal subtree filter.
-    Inbox { project: Option<u32>, kind: Option<InboxGroup>, goal: Option<u64>, after: Option<Cursor> },
+    /// One filtered inbox group, with its own continuation. A kind implies its group.
+    Inbox {
+        group: InboxReadGroup,
+        project: Option<u32>,
+        kind: Option<InboxGroup>,
+        goal: Option<u64>,
+        after: Option<Cursor>,
+    },
     /// Party conversations.
-    Conversations { project: Option<u32>, after: Option<Cursor> },
-    /// Live or ended goals.
-    Goals { project: u32, ended: bool, after: Option<Cursor> },
+    Conversations { after: Option<Cursor> },
+    /// Project goals, live then ended from the start of one list.
+    Goals { project: u32, after: Option<Cursor> },
     /// Project spend by period, with an opaque continuation.
     Spend { project: u32, after: Option<Cursor> },
     /// One project.

@@ -32,12 +32,31 @@ fn start(domain: &mut Domain, limits: &Limits, kept: List<Record>) -> (Token, To
         Time::ZERO,
         Event::Start { address: Address::Inbox { project: None }, kept, offset: Offset { minutes: 0 } },
     ));
-    let page = open_token(&drive(
+    let initial = drive(
         domain,
         limits,
         Time::ZERO,
         Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
-    ));
+    );
+    let page = open_token(&initial);
+    for request in &initial {
+        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+            drive(
+                domain,
+                limits,
+                Time::ZERO,
+                Event::Read {
+                    read: *read,
+                    result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        rows: List::with_capacity(0),
+                        before: None,
+                        after: None,
+                    }))),
+                },
+            );
+        }
+    }
+    domain.reclaim();
     (f, page)
 }
 fn text(bytes: &[u8]) -> Text {

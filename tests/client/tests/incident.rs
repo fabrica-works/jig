@@ -60,7 +60,13 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
                 },
                 Change::Source(Source {
                     party: 7,
-                    read: Read::Inbox { project: None, kind: None, goal: None, after: None },
+                    read: Read::Inbox {
+                        group: jig_client::contract::InboxReadGroup::Needs,
+                        project: None,
+                        kind: None,
+                        goal: None,
+                        after: None,
+                    },
                     rows: Rows::Inbox(vec![]),
                 }),
             ],

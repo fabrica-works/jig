@@ -15,7 +15,8 @@ use crate::{
     action::End,
     address::{Address, Place, TaskSection},
     contract::{
-        self, Answer, Ask, ConversationLine, InboxGroup, Limit, Made, ObjectKey, Outcome, Read, Refusal, Seen, Text,
+        self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, Made, ObjectKey, Outcome, Read,
+        Refusal, Seen, Text,
     },
     fields::Purpose,
     intents::Origin,
@@ -286,53 +287,88 @@ pub(crate) fn filter_inbox(domain: &mut Domain, filter: Filter, out: &mut Queue<
         | Page::OutOfDate
         | Page::SomeoneElse => return,
     }
-    if domain.inbox.filter == filter && domain.inbox.reading.is_some() {
+    if domain.inbox.filter == filter
+        && (domain.inbox.needs_window.reading.is_some() || domain.inbox.updates_window.reading.is_some())
+    {
         return;
     }
-    domain.inbox.filter = filter;
-    domain.inbox.reading = None;
-    domain.inbox.rows.clear();
-    domain.inbox.before = None;
-    domain.inbox.after = None;
-    let what = Read::Inbox { project: filter.project, kind: filter.kind, goal: filter.goal, after: None };
-    ask_read(domain, 10, what, out);
+    domain.inbox.filter(filter);
+    start_inbox(domain, out);
     domain.changed();
+}
+pub(crate) fn start_inbox(domain: &mut Domain, out: &mut Queue<Request>) {
+    let filter = domain.inbox.filter;
+    for group in [InboxReadGroup::Needs, InboxReadGroup::Updates] {
+        if let Some(kind) = filter.kind {
+            if InboxReadGroup::of(kind) != group {
+                continue;
+            }
+        }
+        ask_read(
+            domain,
+            inbox_number(group),
+            Read::Inbox { group, project: filter.project, kind: filter.kind, goal: filter.goal, after: None },
+            out,
+        );
+    }
+}
+const fn inbox_number(group: InboxReadGroup) -> u16 {
+    match group {
+        InboxReadGroup::Needs => 10,
+        InboxReadGroup::Updates => 12,
+    }
+}
+pub(crate) const fn inbox_group(number: u16) -> Option<InboxReadGroup> {
+    match number {
+        10 => Some(InboxReadGroup::Needs),
+        12 => Some(InboxReadGroup::Updates),
+        _ => None,
+    }
 }
 fn ask_read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
     for (id, ()) in &domain.reads.ids {
         let reading = domain.reads.slab.get(*id).expect("registered read exists");
         if reading.what == what && reading.generation == domain.generation && !reading.abandoned {
-            if number == 10 {
-                domain.inbox.reading = Some(id.token());
+            if let Some(group) = inbox_group(number) {
+                domain.inbox.window_mut(group).reading = Some(id.token());
             }
             return;
         }
     }
     match domain.reads.ask(domain.generation, Source::Window { generation: domain.generation, number }, what, out) {
         Some(id) => {
-            if number == 10 {
-                domain.inbox.reading = Some(id.token());
+            if let Some(group) = inbox_group(number) {
+                domain.inbox.window_mut(group).reading = Some(id.token());
             }
         }
         None => crate::pages::routing::refuse(domain, Limit::Reads),
     }
 }
-/// Stable window numbers decoded from jig's own view bindings.
+/// The Needs window's binding number.
 pub const INBOX_WINDOW: u64 = 10;
+/// The Updates window's independent binding number.
+pub const INBOX_UPDATES_WINDOW: u64 = 12;
 /// The conversations window's binding number.
 pub const CONVERSATIONS_WINDOW: u64 = 11;
 pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue<Request>) {
-    if window == Token::new(INBOX_WINDOW) {
-        let cursor = match end {
-            End::Before => domain.inbox.before.clone(),
-            End::After => domain.inbox.after.clone(),
-        };
+    if window == Token::new(INBOX_WINDOW) || window == Token::new(INBOX_UPDATES_WINDOW) {
+        let group = if window == Token::new(INBOX_WINDOW) { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
         let filter = domain.inbox.filter;
-        if cursor.is_some() || domain.inbox.more {
+        if let Some(kind) = filter.kind {
+            if InboxReadGroup::of(kind) != group {
+                return;
+            }
+        }
+        let selected = domain.inbox.window(group);
+        let cursor = match end {
+            End::Before => selected.before.clone(),
+            End::After => selected.after.clone(),
+        };
+        if cursor.is_some() || selected.more {
             ask_read(
                 domain,
-                10,
-                Read::Inbox { project: filter.project, kind: filter.kind, goal: filter.goal, after: cursor },
+                inbox_number(group),
+                Read::Inbox { group, project: filter.project, kind: filter.kind, goal: filter.goal, after: cursor },
                 out,
             );
         }
@@ -343,13 +379,13 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
         };
         match edge {
             Edge::More(cursor) => {
-                let project = match domain.address {
-                    Address::Conversations { project } => project,
+                match domain.address {
+                    Address::Conversations { .. } => {}
                     Address::Inbox { .. } | Address::Task { .. } | Address::Project { .. } | Address::Deployment => {
                         return;
                     }
-                };
-                ask_read(domain, 11, Read::Conversations { project, after: Some(cursor.clone()) }, out);
+                }
+                ask_read(domain, 11, Read::Conversations { after: Some(cursor.clone()) }, out);
             }
             Edge::End => {}
         }
@@ -391,8 +427,12 @@ pub const fn live(phase: contract::Phase) -> bool {
 /// Heap for inbox lineage and whole reply-line context, cursors and the chat form.
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
+    limits.rows.checked_mul(3)?;
     List::<contract::InboxEntry>::worst_case(limits.rows)?
-        .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(2)?)?
-        .checked_add(u64::from(limits.text).checked_mul(2)?)?
+        .checked_mul(7)?
+        .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(6)?)?
+        .checked_add(List::<ObjectKey>::worst_case(limits.rows.checked_mul(3)?)?)?
+        .checked_add(List::<crate::objects::Context>::worst_case(limits.rows.checked_mul(3)?)?)?
+        .checked_add(u64::from(limits.text).checked_mul(4)?)?
         .checked_add(limits.document_bytes)
 }

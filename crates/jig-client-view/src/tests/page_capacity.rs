@@ -367,6 +367,28 @@ fn inbox(words: &Words) {
             replies_seen: list([ReplyPosition { chat: 8, through: 0 }, ReplyPosition { chat: 9, through: 0 }]),
         })),
     );
+    for request in &out {
+        if let Request::Read { read, what: Read::Inbox { group, .. } } = request {
+            let mut first = entry(if *group == InboxReadGroup::Needs { 10 } else { 12 });
+            let mut second = entry(if *group == InboxReadGroup::Needs { 11 } else { 13 });
+            if *group == InboxReadGroup::Updates {
+                first.group = InboxGroup::Results;
+                second.group = InboxGroup::Results;
+            }
+            drive(
+                &mut d,
+                Event::Read {
+                    read: *read,
+                    result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        rows: list([first, second]),
+                        before: Some(Cursor { value: full() }),
+                        after: Some(Cursor { value: full() }),
+                    }))),
+                },
+            );
+        }
+    }
+    assert_eq!(d.inbox().rows.len(), 6);
     render(&d, words);
 }
 fn not_the_work(words: &Words) {

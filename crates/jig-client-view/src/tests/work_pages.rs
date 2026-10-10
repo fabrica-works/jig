@@ -40,7 +40,23 @@ pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     let mut frame = document();
     frame.projects.get_mut(0).unwrap().goals = list([Charter { number: 2, name: text(b"Guide") }]);
     frame.projects.get_mut(0).unwrap().pool.left = 20;
-    deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
+    let initial = deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
+    for request in &initial {
+        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+            drive(
+                &mut d,
+                Event::Read {
+                    read: *read,
+                    result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        rows: List::with_capacity(0),
+                        before: None,
+                        after: None,
+                    }))),
+                },
+            );
+        }
+    }
+    d.reclaim();
     let out = drive(&mut d, Event::Went { place: Place::Jig(address) });
     (d, out)
 }

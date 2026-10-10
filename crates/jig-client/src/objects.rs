@@ -535,7 +535,6 @@ fn read_key(what: &crate::contract::Read) -> Option<ObjectKey> {
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
-        | Read::InboxGroup { .. }
         | Read::Inbox { .. }
         | Read::Conversations { .. }
         | Read::Spend { .. }

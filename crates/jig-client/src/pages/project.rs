@@ -33,7 +33,10 @@ pub struct NoteFilter {
 pub struct ProjectPage {
     pub document: Option<Box<Project>>,
     pub goals: List<GoalLine>,
+    /// The current read window, which may include both live and ended goals.
     pub ended: List<GoalLine>,
+    /// Keyed display merge; the board's current row wins over a read row.
+    pub listed_goals: List<GoalLine>,
     pub goals_more: bool,
     pub ended_before: Option<Cursor>,
     pub ended_after: Option<Cursor>,
@@ -57,6 +60,7 @@ impl ProjectPage {
             document: None,
             goals: List::with_capacity(rows),
             ended: List::with_capacity(rows),
+            listed_goals: List::with_capacity(rows.checked_mul(2).expect("goal source rows fit")),
             goals_more: false,
             ended_before: None,
             ended_after: None,
@@ -78,6 +82,7 @@ impl ProjectPage {
         self.document = None;
         self.goals.clear();
         self.ended.clear();
+        self.listed_goals.clear();
         self.goals_more = false;
         self.ended_before = None;
         self.ended_after = None;
@@ -117,7 +122,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         }
         ProjectSection::Goals => {
             open(domain, env, contract::Subject::Goals { project }, out);
-            ask(domain, 20, Read::Goals { project, ended: true, after: None }, out);
+            ask(domain, 20, Read::Goals { project, after: None }, out);
         }
         ProjectSection::Tasks => tasks(domain, env, domain.project_page.task_filter, out),
         ProjectSection::Notes => {
@@ -268,7 +273,7 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
             End::After => domain.project_page.ended_after.clone(),
         };
         if let Some(cursor) = cursor {
-            ask(domain, 20, Read::Goals { project, ended: true, after: Some(cursor) }, out);
+            ask(domain, 20, Read::Goals { project, after: Some(cursor) }, out);
         }
     } else if window == Token::new(NOTES_WINDOW) {
         let cursor = match end {
@@ -298,18 +303,37 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
 /// Whole documents, nested bounded rows, note handles, cursors and pending goal words.
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
+    limits.rows.checked_mul(2)?;
     u64::from(limits.rows)
         .checked_mul(limits.document_bytes)?
-        .checked_mul(4)?
+        .checked_mul(6)?
         .checked_add(limits.document_bytes.checked_mul(2)?)?
         .checked_add(List::<u16>::worst_case(limits.rows)?)?
-        .checked_add(List::<GoalLine>::worst_case(limits.rows)?.checked_mul(2)?)?
+        .checked_add(List::<GoalLine>::worst_case(limits.rows)?.checked_mul(4)?)?
         .checked_add(List::<TaskLine>::worst_case(limits.rows)?)?
         .checked_add(List::<Id<Object>>::worst_case(limits.rows)?)?
         .checked_add(List::<contract::SpendPeriod>::worst_case(limits.rows)?)?
         .checked_add(u64::from(limits.text).checked_mul(10)?)
 }
 
+fn merge_goals(page: &mut ProjectPage) {
+    page.listed_goals.clear();
+    for rows in [&page.goals, &page.ended] {
+        for row in rows {
+            let mut known = false;
+            for current in &page.listed_goals {
+                if current.chip.task == row.chip.task {
+                    known = true;
+                    break;
+                }
+            }
+            if !known {
+                page.listed_goals.push(row.clone()).expect("two bounded goal sources fit");
+            }
+        }
+    }
+    goals::order(&mut page.listed_goals);
+}
 pub(crate) fn board(domain: &mut Domain, goals: contract::Goals) {
     if number(domain) != Some(goals.project) {
         return;
@@ -322,7 +346,8 @@ pub(crate) fn board(domain: &mut Domain, goals: contract::Goals) {
         }
         domain.project_page.goals.push(row).expect("goal row fits");
     }
-    goals::order(&mut domain.project_page.goals, false);
+    goals::order(&mut domain.project_page.goals);
+    merge_goals(&mut domain.project_page);
     domain.changed();
 }
 pub(crate) fn ended(
@@ -341,13 +366,24 @@ pub(crate) fn ended(
         }
         domain.project_page.ended.push(row).expect("ended row fits");
     }
-    goals::order(&mut domain.project_page.ended, true);
+    goals::order(&mut domain.project_page.ended);
+    merge_goals(&mut domain.project_page);
     let mut keys = List::with_capacity(env.limits.rows);
     for goal in &domain.project_page.ended {
         keys.push(contract::ObjectKey::Task(goal.chip.task)).expect("keys fit row window");
     }
     crate::pages::routing::names(domain, env, source, keys, out);
     for goal in &domain.project_page.ended {
+        let mut watched = false;
+        for current in &domain.project_page.goals {
+            if current.chip.task == goal.chip.task {
+                watched = true;
+                break;
+            }
+        }
+        if watched {
+            continue;
+        }
         if !domain.objects.put(contract::ObjectKey::Task(goal.chip.task), crate::objects::Body::Chip(goal.chip.clone()))
         {
             break;
