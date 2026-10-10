@@ -132,5 +132,5 @@ pub fn timers(limits: &Limits) -> Option<u32> {
 
 /// One task and every bounded proposal name per retained tree row.
 pub(crate) fn tree_names(limits: &Limits) -> Option<u32> {
-    limits.rows.checked_mul(limits.rows.checked_add(1)?)
+    limits.rows.checked_mul(limits.rows.checked_add(1)?)?.checked_add(1)
 }

@@ -38,6 +38,8 @@ pub enum Delivery {
     Task(Box<Task>),
     /// A subtree.
     Tree(Box<Tree>),
+    /// Whole subtree owner facts.
+    OwnerTree(Box<super::OwnerTree>),
     /// The named chips.
     Chips(List<Chip>),
     /// The inbox.

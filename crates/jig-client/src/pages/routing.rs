@@ -283,6 +283,7 @@ pub(crate) fn delivery(
             one(domain, source, key, Body::Task(task));
             crate::pages::task::document(domain, env, out);
         }
+        Delivery::OwnerTree(tree) => owner_tree_delivery(domain, env, watch, source, tree, out),
         Delivery::Tree(tree) => {
             crate::pages::task::tree(domain, *tree);
             let mut keys = List::with_capacity(crate::limits::tree_names(&env.limits).expect("tree names are bounded"));
@@ -691,4 +692,74 @@ fn received_value(
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => read_value(domain, env, source, value, out),
     }
+}
+
+fn owner_tree_delivery(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    watch: Id<Watch>,
+    source: Source,
+    tree: Box<contract::OwnerTree>,
+    out: &mut Queue<Request>,
+) {
+    let Some(watch) = domain.watches.get(watch) else {
+        return;
+    };
+    match &watch.subject {
+        Subject::Tree { task, .. } => {
+            if *task != tree.root.task {
+                return;
+            }
+        }
+        Subject::Frame
+        | Subject::Task { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Tasks { .. }
+        | Subject::Conversations
+        | Subject::Run { .. }
+        | Subject::Deployment => return,
+    }
+    crate::pages::task::owner_tree(domain, tree);
+    let owner = domain.task_page.plan.owner.as_ref().expect("whole tree retained");
+    let mut keys = List::with_capacity(crate::limits::tree_names(&env.limits).expect("tree names bounded"));
+    keys.push(ObjectKey::Task(owner.root.task)).expect("root fits");
+    for row in &owner.rows {
+        let key = ObjectKey::Task(row.chip.task);
+        if !keys.as_slice().contains(&key) {
+            keys.push(key).expect("tree row names fit");
+        }
+        for proposal in &row.proposals {
+            let key = ObjectKey::Proposal(*proposal);
+            if !keys.as_slice().contains(&key) {
+                keys.push(key).expect("tree proposal names fit");
+            }
+        }
+    }
+    names(domain, env, source, keys, out);
+    let owner = domain.task_page.plan.owner.as_ref().expect("whole tree retained");
+    let root = ObjectKey::Task(owner.root.task);
+    let mut put_root = true;
+    if let Some(id) = domain.objects.find(root)
+        && let Some(body) = &domain.objects.get(id).expect("named root exists").body
+    {
+        match body {
+            Body::Task(_) => put_root = false,
+            Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Escalation(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. } => {}
+        }
+    }
+    if put_root {
+        let _stored = domain.objects.put(root, Body::Chip(owner.root.clone()));
+    }
+    for row in &owner.rows {
+        let _stored = domain.objects.put(ObjectKey::Task(row.chip.task), Body::Chip(row.chip.clone()));
+    }
+    domain.changed();
 }

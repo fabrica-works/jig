@@ -114,6 +114,7 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
         Delivery::Frame(_)
         | Delivery::Task(_)
         | Delivery::Tree(_)
+        | Delivery::OwnerTree(_)
         | Delivery::Goals(_)
         | Delivery::Tasks(_)
         | Delivery::Conversations(_)

@@ -25,6 +25,19 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
     ] {
         super::super::work::control(b, words, bindings, phrase, Act::FilterPlan { filter }, plan.filter == filter);
     }
+    if let Some(owner) = &plan.owner {
+        crate::owner_tree::render(b, owner, plan, client, words, bindings);
+        super::super::cut(b, words, client.task_page().ended_cut);
+        super::super::work::cursors(
+            b,
+            words,
+            bindings,
+            client.task_page().ended_before.as_ref(),
+            client.task_page().ended_after.as_ref(),
+            jig_client::pages::task::ENDED_WINDOW,
+        );
+        return;
+    }
     b.open(Role::Tree);
     b.name(&words.say(JigPhrase::Plan, &[]));
     let count = plan.nodes.len();
@@ -145,5 +158,7 @@ fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words
 
 /// Temporary visits and membership while emitting a retained tree.
 pub(super) fn scratch(rows: u32) -> Option<u64> {
-    Stack::<Visit>::worst_case(rows.checked_mul(2)?)?.checked_add(Set::<u64>::worst_case(rows)?)
+    Stack::<Visit>::worst_case(rows.checked_mul(2)?)?
+        .checked_add(Set::<u64>::worst_case(rows)?)?
+        .checked_add(crate::owner_tree::scratch(rows)?)
 }

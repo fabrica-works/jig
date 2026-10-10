@@ -450,6 +450,22 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
             }
             Some(false)
         }
+        Delivery::OwnerTree(tree) => {
+            if key == ObjectKey::Task(tree.root.task) {
+                return Some(true);
+            }
+            for row in &tree.rows {
+                if key == ObjectKey::Task(row.chip.task) {
+                    return Some(true);
+                }
+                for proposal in &row.proposals {
+                    if key == ObjectKey::Proposal(*proposal) {
+                        return Some(true);
+                    }
+                }
+            }
+            Some(false)
+        }
         Delivery::Tree(tree) => {
             for node in &tree.nodes {
                 if key == ObjectKey::Task(node.chip.task) {
@@ -816,6 +832,7 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
         crate::contract::Delivery::Frame(_)
         | crate::contract::Delivery::Task(_)
         | crate::contract::Delivery::Tree(_)
+        | crate::contract::Delivery::OwnerTree(_)
         | crate::contract::Delivery::Chips(_)
         | crate::contract::Delivery::Goals(_)
         | crate::contract::Delivery::Conversations(_)

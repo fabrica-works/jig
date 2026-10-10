@@ -791,6 +791,36 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
     match event {
         WatchEvent::Opened | WatchEvent::Alive => {}
         WatchEvent::Delivered(delivery) => {
+            match &delivery {
+                Delivery::OwnerTree(value) => match &watch.subject {
+                    Subject::Tree { task, .. } => {
+                        if *task != value.root.task {
+                            return;
+                        }
+                    }
+                    Subject::Frame
+                    | Subject::Task { .. }
+                    | Subject::Chips { .. }
+                    | Subject::Inbox { .. }
+                    | Subject::Goals { .. }
+                    | Subject::Tasks { .. }
+                    | Subject::Conversations
+                    | Subject::Run { .. }
+                    | Subject::Deployment => return,
+                },
+                Delivery::Frame(_)
+                | Delivery::Task(_)
+                | Delivery::Tree(_)
+                | Delivery::Chips(_)
+                | Delivery::Inbox(_)
+                | Delivery::OwnerInbox(_)
+                | Delivery::Goals(_)
+                | Delivery::Tasks(_)
+                | Delivery::Conversations(_)
+                | Delivery::Run(_)
+                | Delivery::RunState(_)
+                | Delivery::Deployment(_) => {}
+            }
             watch.state = Following::Live;
             watch.behind = false;
             match owner {
@@ -803,6 +833,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                     Delivery::Frame(frame) => frame_delivery(domain, env, *frame, out),
                     Delivery::Task(_)
                     | Delivery::Tree(_)
+                    | Delivery::OwnerTree(_)
                     | Delivery::Chips(_)
                     | Delivery::Inbox(_)
                     | Delivery::OwnerInbox(_)

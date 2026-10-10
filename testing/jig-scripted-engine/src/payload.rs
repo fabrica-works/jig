@@ -1088,6 +1088,7 @@ impl Payload for Delivery {
             Self::Frame(value0) => sum(&[value0.heap(bounds)]),
             Self::Task(value0) => sum(&[value0.heap(bounds)]),
             Self::Tree(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerTree(value0) => sum(&[value0.heap(bounds)]),
             Self::Chips(value0) => sum(&[value0.heap(bounds)]),
             Self::Inbox(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerInbox(value0) => sum(&[value0.heap(bounds)]),

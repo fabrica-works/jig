@@ -334,6 +334,7 @@ impl<A: crate::Application> Engine<A> {
             }
             match &mut value {
                 Delivery::OwnerInbox(_) => return Err(WatchEnd::Unknown),
+                Delivery::OwnerTree(_) => return Err(WatchEnd::Busy),
                 Delivery::Inbox(doc) => {
                     if !shorten(&mut doc.entries) {
                         return Err(WatchEnd::Busy);

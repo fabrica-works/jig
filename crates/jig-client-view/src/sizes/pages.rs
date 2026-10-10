@@ -50,13 +50,14 @@ pub fn conversation_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     rows.checked_add(live)?.checked_add(l.conversation_words.checked_mul(9)?)?.checked_add(34)?.checked_add(slot_nodes)
 }
 fn plan(l: &Limits) -> Option<u32> {
-    card_nodes(l)?
+    let older = card_nodes(l)?
         .checked_mul(l.rows.checked_add(1)?)?
         .checked_add(chip_nodes(l)?)?
         .checked_add(l.rows.checked_mul(2)?)?
         .checked_add(18)?
         .checked_mul(l.rows)?
-        .checked_add(26)
+        .checked_add(26)?;
+    Some(older.max(crate::owner_tree::max_nodes(l)?.checked_add(6)?))
 }
 fn overview(l: &Limits) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?

@@ -18,6 +18,7 @@ use crate::{
     objects::{Body, Object, Source},
     watches::Owner,
 };
+use alloc::boxed::Box;
 use skein_lib::{Env, Id, List, Map, Queue, Token};
 /// Which plan rows a person has asked to see.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -38,6 +39,8 @@ pub struct Sections {
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "fold choices change only through admitted page actions")]
 pub struct Plan {
+    /// Whole supplied owner tree, independent of older node fixtures.
+    pub owner: Option<Box<contract::OwnerTree>>,
     pub nodes: List<TreeNode>,
     pub folded: PhaseCounts,
     pub held_below: u32,
@@ -61,11 +64,12 @@ impl TaskPage {
         Self {
             header: None,
             plan: Plan {
+                owner: None,
                 nodes: List::with_capacity(rows),
                 folded: counts(),
                 held_below: 0,
                 filter: PlanFilter::All,
-                folds: Map::with_capacity(rows),
+                folds: Map::with_capacity(rows.checked_add(1).expect("root fold fits")),
             },
             subtree_history: false,
             ended_cut: false,
@@ -76,6 +80,7 @@ impl TaskPage {
     }
     pub(crate) fn clear(&mut self) {
         self.header = None;
+        self.plan.owner = None;
         self.plan.nodes.clear();
         self.plan.folded = counts();
         self.plan.held_below = 0;
@@ -157,6 +162,7 @@ pub fn offered(sections: &Sections, section: TaskSection) -> bool {
 /// the owner's total held count so a held descendant cannot disappear.
 pub(crate) fn tree(domain: &mut Domain, tree: Tree) {
     let plan = &mut domain.task_page.plan;
+    plan.owner = None;
     plan.nodes.clear();
     plan.folded = tree.folded;
     plan.held_below = tree.held_below;
@@ -184,6 +190,28 @@ pub(crate) fn tree(domain: &mut Domain, tree: Tree) {
     }
     domain.changed();
 }
+/// Moves the complete owner envelope; local choices do not alter source rows.
+pub(crate) fn owner_tree(domain: &mut Domain, tree: Box<contract::OwnerTree>) {
+    let plan = &mut domain.task_page.plan;
+    plan.nodes.clear();
+    plan.folded = counts();
+    plan.held_below = 0;
+    let mut removed = List::with_capacity(plan.folds.len());
+    for (task, _) in &plan.folds {
+        let mut retained = tree.root.task == *task;
+        for row in &tree.rows {
+            retained |= row.chip.task == *task;
+        }
+        if !retained {
+            removed.push(*task).expect("fold keys fit");
+        }
+    }
+    for task in &removed {
+        let _open = plan.folds.remove(task);
+    }
+    plan.owner = Some(tree);
+    domain.changed();
+}
 fn add(counts: &mut PhaseCounts, phase: Phase) {
     let value = match phase {
         Phase::Waiting | Phase::Idle => &mut counts.waiting,
@@ -200,6 +228,31 @@ fn add(counts: &mut PhaseCounts, phase: Phase) {
     *value = value.checked_add(1).expect("a bounded tree count fits u32");
 }
 impl Plan {
+    /// Existing local fold choice, defaulting to the supplied chip phase.
+    #[must_use]
+    pub fn owner_expanded(&self, chip: &contract::Chip) -> bool {
+        match self.folds.get(&chip.task) {
+            Some(open) => *open,
+            None => crate::pages::conversations::live(chip.phase),
+        }
+    }
+    /// Source folds carry held work even when their parent is locally filtered.
+    #[must_use]
+    pub fn owner_visible(&self, row: &contract::OwnerTreeRow) -> bool {
+        match self.filter {
+            PlanFilter::All => true,
+            PlanFilter::Live => crate::pages::conversations::live(row.chip.phase),
+            PlanFilter::Held => {
+                let mut held = row.chip.phase == Phase::Held;
+                if let Some(owner) = &self.owner {
+                    for fold in &owner.folded {
+                        held |= fold.parent == row.chip.task && fold.held_below > 0;
+                    }
+                }
+                held
+            }
+        }
+    }
     /// Live subtrees begin open; ended subtrees begin folded to their line.
     #[must_use]
     pub fn expanded(&self, node: &TreeNode) -> bool {
@@ -425,6 +478,16 @@ pub(crate) fn fold(domain: &mut Domain, object: Token, open: bool) {
         | ObjectKey::Note { .. } => return,
     };
     let plan = &mut domain.task_page.plan;
+    if let Some(owner) = &plan.owner {
+        let mut retained = owner.root.task == task;
+        for row in &owner.rows {
+            retained |= row.chip.task == task;
+        }
+        if retained && plan.folds.insert(task, open).is_ok() {
+            domain.changed();
+        }
+        return;
+    }
     for node in &plan.nodes {
         if node.chip.task == task {
             if plan.folds.insert(task, open).is_ok() {
@@ -462,6 +525,12 @@ pub(crate) fn open_ended(domain: &mut Domain, task: u64, out: &mut Queue<Request
         | Address::Deployment => return,
     }
     let mut found = false;
+    if let Some(owner) = &domain.task_page.plan.owner {
+        found = owner.root.task == task;
+        for row in &owner.rows {
+            found |= row.chip.task == task;
+        }
+    }
     for node in &domain.task_page.plan.nodes {
         if node.chip.task == task {
             found = true;
@@ -521,10 +590,11 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, 
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     List::<TreeNode>::worst_case(limits.rows)?
-        .checked_add(Map::<u64, bool>::worst_case(limits.rows)?)?
-        .checked_add(List::<u64>::worst_case(limits.rows)?)?
+        .checked_add(Map::<u64, bool>::worst_case(limits.rows.checked_add(1)?)?)?
+        .checked_add(List::<u64>::worst_case(limits.rows.checked_add(1)?)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(2)?)?
-        .checked_add(u64::from(limits.text).checked_mul(2)?)
+        .checked_add(u64::from(limits.text).checked_mul(2)?)?
+        .checked_add(limits.document_bytes)
 }
 
 pub(crate) fn ended(domain: &mut Domain, before: Option<contract::Cursor>, after: Option<contract::Cursor>) {
