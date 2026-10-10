@@ -72,7 +72,9 @@ fn completed(
 fn settle(agent: &mut Agent, env: &Env<Limits>, out: &mut Queue<Request>, requests: &mut Vec<Request>) {
     for _ in 0..16 {
         reclaim(agent);
-        if !agent.is_ready() { return; }
+        if !agent.is_ready() {
+            return;
+        }
         resume(agent, env, out);
         requests.extend(drain(out));
     }
