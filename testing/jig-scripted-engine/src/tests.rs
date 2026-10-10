@@ -199,7 +199,7 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     let mut setup = script();
     let chip = Chip {
         task: 8,
-        title: jig_client::contract::DocumentText::complete(text(b"held")),
+        title: DocumentText::complete(text(b"held")),
         executor: Executor::Agent { charter: 1 },
         phase: Phase::Held,
         details: Box::new(ChipPhase::Held {
@@ -320,7 +320,7 @@ fn task() -> Task {
     Task {
         chip: Chip {
             task: 8,
-            title: jig_client::contract::DocumentText::complete(text(b"chat")),
+            title: DocumentText::complete(text(b"chat")),
             executor: Executor::Agent { charter: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Running { attempt: 1, since: Wall::EPOCH, tool: None }),
@@ -405,7 +405,7 @@ fn scenario_pages_and_read_barriers() {
     });
     let mut engine = Engine::new(setup, 4).expect("source rows span pages");
     let mut changed = task();
-    changed.chip.title = jig_client::contract::DocumentText::complete(text(b"latest"));
+    changed.chip.title = DocumentText::complete(text(b"latest"));
     engine
         .act(
             Time::ZERO,
@@ -495,7 +495,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
         "idle run has no fabricated turn"
     );
     let mut changed = task();
-    changed.chip.title = jig_client::contract::DocumentText::complete(text(b"one"));
+    changed.chip.title = DocumentText::complete(text(b"one"));
     engine
         .act(
             Time::ZERO,
@@ -503,7 +503,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
             Change::Object { project: 1, key: ObjectKey::Task(8), value: ReadValue::Task(Box::new(changed.clone())) },
         )
         .expect("one");
-    changed.chip.title = jig_client::contract::DocumentText::complete(text(b"two"));
+    changed.chip.title = DocumentText::complete(text(b"two"));
     engine
         .act(
             at(1),
@@ -975,7 +975,7 @@ fn recurring_optional_boundaries_keep_whole_value_and_allocated_list_limits() {
     let mut bounds = Bounds { rows: 2, ..Bounds::default() };
     for next in [None, Some(Wall::from_nanos(u64::MAX))] {
         let mut chip = task().chip;
-        chip.title = jig_client::contract::DocumentText::complete(text(b"job"));
+        chip.title = DocumentText::complete(text(b"job"));
         chip.details = Box::new(ChipPhase::Starting);
         let mut row = Recurring {
             chip,

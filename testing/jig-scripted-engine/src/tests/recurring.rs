@@ -41,7 +41,7 @@ fn template(number: u64, words: &[u8]) -> ProposedTask {
 
 fn recurring() -> Recurring {
     let mut chip = task().chip;
-    chip.title = jig_client::contract::DocumentText::complete(text(b"job"));
+    chip.title = DocumentText::complete(text(b"job"));
     chip.details = Box::new(ChipPhase::Starting);
     Recurring {
         chip,

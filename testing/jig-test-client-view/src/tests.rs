@@ -207,7 +207,7 @@ fn task() -> Task {
     Task {
         chip: Chip {
             task: 9,
-            title: jig_client::contract::DocumentText::complete(text(&[b't'; 32])),
+            title: DocumentText::complete(text(&[b't'; 32])),
             executor: Executor::Procedure { connector: jig_test_client_domain::FIRST, kind: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Procedure {

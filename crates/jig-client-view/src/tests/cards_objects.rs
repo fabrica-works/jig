@@ -21,7 +21,7 @@ fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
 fn chip() -> Chip {
     Chip {
         task: 8,
-        title: jig_client::contract::DocumentText::complete(text(b"Review")),
+        title: DocumentText::complete(text(b"Review")),
         executor: Executor::Party { party: 1 },
         phase: Phase::Held,
         details: Box::new(ChipPhase::Held {
@@ -594,7 +594,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
         .unwrap();
     let mut dependency = chip();
     dependency.task = 9;
-    dependency.title = jig_client::contract::DocumentText::complete(text(b"Live dependency"));
+    dependency.title = DocumentText::complete(text(b"Live dependency"));
     dependency.phase = Phase::Running;
     *dependency.details = ChipPhase::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) };
     let conversation = ConversationLine {

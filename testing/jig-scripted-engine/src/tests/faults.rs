@@ -3,7 +3,7 @@ fn making_script() -> (Script, Ask) {
     let mut setup = live_script();
     let ask = Ask::StartChat { project: 1, words: text(b"hello") };
     let mut made = task();
-    made.chip.title = jig_client::contract::DocumentText::complete(text(b"made"));
+    made.chip.title = DocumentText::complete(text(b"made"));
     setup.rules.push(Rule {
         party: Some(1),
         ask: ask.clone(),

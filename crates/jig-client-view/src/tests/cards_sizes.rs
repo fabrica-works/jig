@@ -30,7 +30,7 @@ fn full_wake() -> WakePolicy {
 fn full_chip(task: u64) -> Chip {
     Chip {
         task,
-        title: jig_client::contract::DocumentText::complete(full_name()),
+        title: DocumentText::complete(full_name()),
         executor: Executor::Party { party: 1 },
         phase: Phase::Waiting,
         details: Box::new(ChipPhase::Waiting {
@@ -229,7 +229,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     let failure = AttemptFailure { attempt: 1, class: FailureClass::Permanent, reason: full_name(), at: Wall::EPOCH };
     let reason = HoldReason::Tries { failures: list([failure.clone(), failure]) };
     let mut escalation_value = escalation_doc(reason, &[ActKind::Release, ActKind::AmendRelease]);
-    escalation_value.task.title = jig_client::contract::DocumentText::complete(full_name());
+    escalation_value.task.title = DocumentText::complete(full_name());
     escalation_value.hold.result = Some(full_value());
     escalation_value.trail = full_trail();
     escalation_value.steering.spec = specification(full_text());

@@ -148,7 +148,7 @@ pub fn task() -> Task {
     Task {
         chip: Chip {
             task: 9,
-            title: jig_client::contract::DocumentText::complete(text(b"Chat nine")),
+            title: DocumentText::complete(text(b"Chat nine")),
             executor: Executor::Agent { charter: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Procedure {
@@ -721,7 +721,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
 fn incident_delegate() -> Task {
     let mut delegate = task();
     delegate.chip.task = 10;
-    delegate.chip.title = jig_client::contract::DocumentText::complete(text(b"Delegate ten"));
+    delegate.chip.title = DocumentText::complete(text(b"Delegate ten"));
     delegate.chip.details =
         Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 } });
     delegate.requester = Actor::Task(9);

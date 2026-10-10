@@ -26,7 +26,7 @@ fn edges() -> Edges {
 fn chip(task: u64) -> Chip {
     Chip {
         task,
-        title: crate::contract::DocumentText::complete(text(b"title")),
+        title: DocumentText::complete(text(b"title")),
         executor: Executor::Party { party: 7 },
         phase: Phase::Idle,
         details: Box::new(super::objects::phase_details(Phase::Idle)),

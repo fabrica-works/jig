@@ -25,7 +25,7 @@ fn full() -> Text {
 }
 fn full_chip(number: u64) -> Chip {
     let mut value = chip(number);
-    value.title = jig_client::contract::DocumentText::complete(full());
+    value.title = DocumentText::complete(full());
     value
 }
 fn parts() -> List<Part> {

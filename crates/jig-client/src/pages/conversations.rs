@@ -95,12 +95,12 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
         return;
     };
     let (project, title) = match &object.body {
-        Some(Body::Task(task)) => (Some(task.project), Some(task.chip.title.clone())),
-        Some(Body::Chip(chip)) => (None, Some(chip.title.clone())),
-        Some(Body::Escalation(value)) => (None, Some(value.task.title.clone())),
-        Some(Body::Question(value)) => (None, Some(value.task.title.clone())),
-        Some(Body::PersonTask(value)) => (None, Some(value.task.title.clone())),
-        Some(Body::Result(value)) => (None, Some(value.task.title.clone())),
+        Some(Body::Task(task)) => (Some(task.project), Some(task.chip.title.bytes.clone())),
+        Some(Body::Chip(chip)) => (None, Some(chip.title.bytes.clone())),
+        Some(Body::Escalation(value)) => (None, Some(value.task.title.bytes.clone())),
+        Some(Body::Question(value)) => (None, Some(value.task.title.bytes.clone())),
+        Some(Body::PersonTask(value)) => (None, Some(value.task.title.bytes.clone())),
+        Some(Body::Result(value)) => (None, Some(value.task.title.bytes.clone())),
         Some(Body::Proposal(value)) => (Some(value.project), Some(value.why.clone())),
         Some(Body::Note { project, document }) => (Some(*project), Some(document.description.bytes.clone())),
         None => (None, None),

@@ -12,7 +12,7 @@ pub(super) fn text(bytes: &[u8]) -> Text {
 pub(super) fn chip(task: u64) -> Chip {
     Chip {
         task,
-        title: crate::contract::DocumentText::complete(text(b"title")),
+        title: DocumentText::complete(text(b"title")),
         executor: Executor::Party { party: 7 },
         phase: Phase::Held,
         details: Box::new(phase_details(Phase::Held)),

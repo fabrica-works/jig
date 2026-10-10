@@ -335,7 +335,7 @@ fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mu
     lineage
         .push(Chip {
             task: 6,
-            title: jig_client::contract::DocumentText::complete(text(b"Ancestor")),
+            title: DocumentText::complete(text(b"Ancestor")),
             executor: Executor::Party { party: 1 },
             phase: Phase::Done,
             details: Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH }),

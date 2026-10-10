@@ -40,7 +40,7 @@ fn words() -> Words {
 fn chip() -> Chip {
     Chip {
         task: u64::MAX,
-        title: jig_client::contract::DocumentText::complete(Text::new(copy_of(b"supplied title"), 128).unwrap()),
+        title: DocumentText::complete(Text::new(copy_of(b"supplied title"), 128).unwrap()),
         executor: Executor::Agent { charter: u32::MAX },
         phase: Phase::Due,
         details: Box::new(ChipPhase::Starting),

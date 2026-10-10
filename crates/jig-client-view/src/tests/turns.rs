@@ -197,7 +197,7 @@ fn replacement(words: &Words) {
     assert!(!contains(&build(&d, 3, words).0, b"whole private input"));
     let mut doc = super::cards_objects::task_doc(&[ActKind::Write]);
     doc.chip.executor = Executor::Agent { charter: 2 };
-    doc.chip.title = jig_client::contract::DocumentText::complete(text(b"Updated live task"));
+    doc.chip.title = DocumentText::complete(text(b"Updated live task"));
     doc.activity = 2;
     deliver(&mut d, task, Delivery::Task(Box::new(doc)));
     assert!(contains(&build(&d, 3, words).0, b"Updated live task"));
