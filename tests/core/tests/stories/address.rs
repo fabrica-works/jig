@@ -10,7 +10,7 @@ fn a_person_task_is_readdressed_after_durability_and_the_previous_taker_cannot_a
     let mut child = member(&w, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"check the report");
     child.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
     let task = delegate(&mut w, parent, 1, child);
-    let first_sign_in = w.sign_in.unwrap();
+    let first_sign_in = w.sign_in.expect("person signed in");
     let tasks::Party::Person(first) = live_row(&w, parent.0).requester else { panic!("requester") };
     ask(&mut w, 186, people::Ask::TakePerson { project: 1, task });
     let before = task_document(&mut w, task, 80_001);
@@ -24,7 +24,7 @@ fn a_person_task_is_readdressed_after_durability_and_the_previous_taker_cannot_a
             name: b"new addressee".as_slice().into(),
         },
     }));
-    let second_sign_in = w.sign_in.unwrap();
+    let second_sign_in = w.sign_in.expect("person signed in");
     let Some(people::Reply::SignedIn { person: second, .. }) = w.people_answers.last().copied() else {
         panic!("sign-in")
     };
