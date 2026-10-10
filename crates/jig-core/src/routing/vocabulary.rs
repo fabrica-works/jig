@@ -371,8 +371,16 @@ pub enum Event {
     Delivered { watcher: Token },
     /// The protocol took one provisional stream delivery.
     StreamDelivered { watcher: Token },
-    /// A live host's text, fenced by its attempt and named turn.
-    RunText { run: Token, attempt: Token, turn: u32, offset: u32, text: Box<[u8]>, call: Option<views::Call> },
+    /// A live host's text or no-text start, named by its activation turn and supplied retry.
+    RunText {
+        run: Token,
+        attempt: Token,
+        turn: u32,
+        retry: u32,
+        offset: u32,
+        text: Box<[u8]>,
+        call: Option<views::Call>,
+    },
     /// Task lifecycle or hub work.
     Tasks(tasks::Event),
     /// An application asks for one admitted recurring core procedure.

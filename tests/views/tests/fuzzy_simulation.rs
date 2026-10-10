@@ -24,7 +24,7 @@ fn run(seed: u64) -> Vec<String> {
         } else {
             None
         };
-        world.text(7, TurnName { attempt: 1, turn }, &[u8::try_from(state % 256).expect("byte"); 7], call);
+        world.text(7, TurnName { attempt: 1, turn, retry: 0 }, &[u8::try_from(state % 256).expect("byte"); 7], call);
         for watcher in 1..=4 {
             if state.rotate_left(u32::try_from(watcher).expect("small")).is_multiple_of(3) {
                 world.delivered(watcher);

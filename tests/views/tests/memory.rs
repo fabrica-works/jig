@@ -37,7 +37,7 @@ fn full_watches_runs_calls_and_retired_slots_fit_the_declared_worst_case() {
                     &mut out,
                     Event::Text {
                         run: Token::new(u64::from(run)),
-                        turn: TurnName { attempt: 1, turn: 1 },
+                        turn: TurnName { attempt: 1, turn: 1, retry: 0 },
                         offset,
                         text: vec![1; usize::try_from(LIMITS.text_bytes).expect("text bound")].into_boxed_slice(),
                         call: Some(Call {

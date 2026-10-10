@@ -52,7 +52,7 @@ fn corrupted_provisional_bytes_fail_the_referee() {
     assert!(
         std::panic::catch_unwind(|| {
             let mut world = World::default();
-            let turn = TurnName { attempt: 1, turn: 1 };
+            let turn = TurnName { attempt: 1, turn: 1, retry: 0 };
             world.watch_from(1, 7, Some(Follow { run: Token::new(7), turn: None, offset: 0 }));
             world.text(7, turn, b"abc", None);
             world.stream_delivered(1);

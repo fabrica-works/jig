@@ -428,8 +428,8 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::Unwatch { watcher } => route_view(core, env, views::Event::Unwatch { watcher }),
         Event::Delivered { watcher } => route_view(core, env, views::Event::Delivered { watcher }),
         Event::StreamDelivered { watcher } => view_routes::stream_delivered(core, env, watcher),
-        Event::RunText { run, attempt, turn, offset, text, call } => {
-            view_routes::run_text(core, env, run, attempt, turn, offset, text, call)
+        Event::RunText { run, attempt, turn, retry, offset, text, call } => {
+            view_routes::run_text(core, env, run, attempt, turn, retry, offset, text, call)
         }
         Event::Tasks(event) => route_tasks(core, env, work, event),
         Event::StartRecurring { project, authority, template } => {

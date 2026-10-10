@@ -448,7 +448,7 @@ impl World {
 
     fn route_inline(&mut self, request: inline::Request) {
         match request {
-            inline::Request::Content { .. } => {}
+            inline::Request::Content { .. } | inline::Request::CompletionStarted { .. } => {}
             inline::Request::Lower { client, request } => self.route_lower(client, request),
             inline::Request::Host(request) => match request {
                 agent_host::Request::Started { client, agent } => {

@@ -27,10 +27,22 @@ pub(crate) struct Run {
     logical_run: Token,
     relays: Map<Token, Relay>,
     completions: Map<Token, bool>,
+    main: Option<MainCompletion>,
+    next_turn: Option<u32>,
     messages: Queue<Token>,
     read: Option<Token>,
     cancel_deadline: Option<Time>,
     answered: bool,
+}
+
+/// The opaque main session's issued source name, kept through content capture.
+/// The activation turn advances only on Smith's host-facing Turn request.
+#[derive(Debug)]
+struct MainCompletion {
+    owner: Token,
+    name: smith::llm::CompletionName,
+    turn: u32,
+    offset: Option<u32>,
 }
 
 /// Bounded collection of independent composed Smith runs.
@@ -141,6 +153,8 @@ fn spawn(agent: &mut Agent, env: &Env<Limits>, client: Token, start: host::Start
         logical_run,
         relays: Map::with_capacity(env.limits.smith.run.calls),
         completions: Map::with_capacity(env.limits.smith.run.conversations),
+        main: None,
+        next_turn: Some(1),
         messages: Queue::with_capacity(env.limits.smith.run.messages),
         read: None,
         cancel_deadline: None,
@@ -326,7 +340,9 @@ fn route(agent: &mut Agent, env: &Env<Limits>, client: Token, out: &mut Queue<Re
     // first, so the parent names it before routing that terminal's turn.
     for _ in 0..env.limits.smith.session.facts {
         let Some(content) = agent.pop_content(client) else { break };
-        out.push(Request::Content { client, content });
+        let run = agent.runs.get_mut(&client).expect("content belongs to live run");
+        let provisional = observed(run, &content);
+        out.push(Request::Content { client, provisional, content });
     }
     for _ in 0..smith::max_out(&env.limits.smith) {
         let Some(request) = agent.lower.pop() else { break };
@@ -339,6 +355,7 @@ fn route(agent: &mut Agent, env: &Env<Limits>, client: Token, out: &mut Queue<Re
             }
             smith::Request::Turn { host_run, number, read, spent, turn, .. } => {
                 assert_eq!(run.logical_run, host_run, "turn belongs to the hosted scope");
+                agent.runs.get_mut(&client).expect("live run").next_turn = number.checked_add(1);
                 self::read(agent, client, read);
                 let body = protocol::encode_turn(&turn, &env.limits.transcript, &agent.names)
                     .expect("Smith turn fits configured transcript codec");
@@ -400,7 +417,19 @@ fn route(agent: &mut Agent, env: &Env<Limits>, client: Token, out: &mut Queue<Re
                 out.push(Request::Host(host::Request::Answered { client, answer }));
                 finish(agent, client, out);
             }
-            request @ smith::Request::Complete { owner, .. } => {
+            request @ smith::Request::Complete { owner, name, .. } => {
+                let run = agent.runs.get_mut(&client).expect("live run");
+                let main = match &run.main {
+                    Some(main) => main.owner == owner,
+                    None => true,
+                };
+                if main {
+                    // Main opens before any nested session exists. Compare its
+                    // opaque owner thereafter; never interpret the owner's bits.
+                    let turn = run.next_turn.expect("Smith admitted the next activation turn");
+                    run.main = Some(MainCompletion { owner, name, turn, offset: Some(0) });
+                    out.push(Request::CompletionStarted { client, turn, retry: name.retry });
+                }
                 assert!(
                     agent
                         .runs
@@ -441,6 +470,31 @@ fn route(agent: &mut Agent, env: &Env<Limits>, client: Token, out: &mut Queue<Re
             | smith::Request::Abort { .. } => unreachable!("inline charter has no workspace"),
         }
     }
+}
+
+fn observed(run: &mut Run, content: &smith::Content) -> Option<crate::Provisional> {
+    let (owner, name, bytes) = match content {
+        smith::Content::Text { owner, completion, text } => (*owner, *completion, text.len()),
+        smith::Content::Call { owner, completion, .. } | smith::Content::Usage { owner, completion, .. } => {
+            (*owner, *completion, 0)
+        }
+        smith::Content::Tool { .. } => return None,
+    };
+    let main = run.main.as_mut()?;
+    if main.owner != owner || main.name != name {
+        return None;
+    }
+    let offset = main.offset?;
+    let length = match u32::try_from(bytes) {
+        Ok(length) => length,
+        Err(_) => {
+            main.offset = None;
+            return None;
+        }
+    };
+    main.offset = offset.checked_add(length);
+    main.offset?;
+    Some(crate::Provisional { turn: main.turn, retry: name.retry, offset })
 }
 
 fn finish(agent: &mut Agent, client: Token, out: &mut Queue<Request>) {

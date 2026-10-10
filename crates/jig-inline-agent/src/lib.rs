@@ -22,6 +22,6 @@ mod translation;
 #[cfg(test)]
 mod tests;
 
-pub use boundary::{Completion, Request};
+pub use boundary::{Completion, Provisional, Request};
 pub use domain::{Agent, fire, max_out, next_deadline, reclaim, resume, step, terminal};
 pub use limits::{Limits, worst_case};

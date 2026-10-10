@@ -26,7 +26,7 @@ fn newly_opened_run_watches_resume_at_independent_named_offsets() {
     let (mut core, limits) = watch_core();
     open_run_watch(&mut core, &limits, 30);
     run_text_outputs(&mut core, &limits, 7, 1, 0, b"abcdefgh");
-    let turn = views::TurnName { attempt: 7, turn: 1 };
+    let turn = views::TurnName { attempt: 7, turn: 1, retry: 0 };
     for (watcher, offset, suffix) in [(31, 2, b"cdefgh".as_slice()), (32, 5, b"fgh".as_slice())] {
         let out = resumed(&mut core, &limits, watcher, Some(turn), offset);
         assert_stream(stream(&out), watcher, turn, offset, 8, suffix, false);
@@ -48,12 +48,20 @@ fn a_resumed_run_offset_applies_only_to_its_exact_turn_and_attempt() {
     open_run_watch(&mut core, &limits, 30);
     run_text_outputs(&mut core, &limits, 7, 2, 0, b"new turn");
     for (watcher, recalled) in [
-        (31, Some(views::TurnName { attempt: 7, turn: 1 })),
-        (32, Some(views::TurnName { attempt: 6, turn: 2 })),
+        (31, Some(views::TurnName { attempt: 7, turn: 1, retry: 0 })),
+        (32, Some(views::TurnName { attempt: 6, turn: 2, retry: 0 })),
         (33, None),
     ] {
         let out = resumed(&mut core, &limits, watcher, recalled, 4);
-        assert_stream(stream(&out), watcher, views::TurnName { attempt: 7, turn: 2 }, 0, 8, b"new turn", false);
+        assert_stream(
+            stream(&out),
+            watcher,
+            views::TurnName { attempt: 7, turn: 2, retry: 0 },
+            0,
+            8,
+            b"new turn",
+            false,
+        );
     }
 }
 
@@ -68,7 +76,7 @@ fn a_resumed_run_reports_a_cut_when_its_acknowledged_prefix_was_discarded() {
     let text = text.into_boxed();
     run_text_outputs(&mut core, &limits, 7, 1, 0, &text);
     run_text_outputs(&mut core, &limits, 7, 1, limits.views.text_bytes, &text);
-    let turn = views::TurnName { attempt: 7, turn: 1 };
+    let turn = views::TurnName { attempt: 7, turn: 1, retry: 0 };
     let out = resumed(&mut core, &limits, 31, Some(turn), 1);
     assert_stream(stream(&out), 31, turn, limits.views.text_bytes, limits.views.text_bytes * 2, &text, true);
 }

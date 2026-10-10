@@ -42,11 +42,13 @@ pub enum Made {
     Gone { why: End },
 }
 
-/// A provisional turn, fenced by its attempt and number within that attempt.
+/// A provisional retry, fenced by its attempt and activation turn.
+/// `client/domain/contract.md`, section 7.3.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct TurnName {
     pub attempt: u64,
     pub turn: u32,
+    pub retry: u32,
 }
 
 /// A tool call being made, within the configured provisional byte bound.

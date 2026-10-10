@@ -139,7 +139,7 @@ fn text(domain: &mut Domain, turn: u32, offset: u32, text: &[u8]) -> Box<[Reques
         domain,
         Event::Text {
             run: Token::new(7),
-            turn: TurnName { attempt: 1, turn },
+            turn: TurnName { attempt: 1, turn, retry: 0 },
             offset,
             text: Box::from(text),
             call: None,
@@ -149,7 +149,7 @@ fn text(domain: &mut Domain, turn: u32, offset: u32, text: &[u8]) -> Box<[Reques
 fn stream(watcher: u64, turn: u32, from: u32, to: u32, text: &[u8], cut: bool) -> Request {
     Request::Stream {
         watcher: Token::new(watcher),
-        turn: TurnName { attempt: 1, turn },
+        turn: TurnName { attempt: 1, turn, retry: 0 },
         from,
         to,
         text: Box::from(text),
@@ -160,7 +160,7 @@ fn stream(watcher: u64, turn: u32, from: u32, to: u32, text: &[u8], cut: bool) -
 #[test]
 fn each_watcher_reads_a_turn_from_its_own_offset() {
     let mut domain = Domain::new(&LIMITS);
-    let turn = TurnName { attempt: 1, turn: 1 };
+    let turn = TurnName { attempt: 1, turn: 1, retry: 0 };
     follow(&mut domain, 1, 7, Some(turn), 0);
     follow(&mut domain, 2, 7, Some(turn), 3);
     assert_eq!(
@@ -237,7 +237,7 @@ fn ending_a_run_discards_text_and_a_new_attempt_can_write() {
         &mut domain,
         Event::Text {
             run: Token::new(7),
-            turn: TurnName { attempt: 2, turn: 1 },
+            turn: TurnName { attempt: 2, turn: 1, retry: 0 },
             offset: 0,
             text: Box::from(&b"new"[..]),
             call: None,
@@ -247,7 +247,7 @@ fn ending_a_run_discards_text_and_a_new_attempt_can_write() {
         out.as_ref(),
         &[Request::Stream {
             watcher: Token::new(1),
-            turn: TurnName { attempt: 2, turn: 1 },
+            turn: TurnName { attempt: 2, turn: 1, retry: 0 },
             from: 0,
             to: 3,
             text: Box::from(&b"new"[..]),
@@ -265,7 +265,7 @@ fn current_calls_are_bounded_and_paced_with_the_stream() {
         &mut domain,
         Event::Text {
             run: Token::new(7),
-            turn: TurnName { attempt: 1, turn: 1 },
+            turn: TurnName { attempt: 1, turn: 1, retry: 0 },
             offset: 0,
             text: Box::new([]),
             call: Some(call),
@@ -275,7 +275,7 @@ fn current_calls_are_bounded_and_paced_with_the_stream() {
         out.as_ref(),
         &[Request::Stream {
             watcher: Token::new(1),
-            turn: TurnName { attempt: 1, turn: 1 },
+            turn: TurnName { attempt: 1, turn: 1, retry: 0 },
             from: 0,
             to: 0,
             text: Box::new([]),

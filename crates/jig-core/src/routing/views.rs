@@ -459,31 +459,6 @@ fn watch_document(
     }
 }
 
-impl Core {
-    /// Position for a host whose content facts omit the turn and offset.
-    /// The root reports this fallback; hosts should eventually name their turns.
-    #[must_use]
-    pub fn provisional_position(&self, run: Token, attempt: Token) -> Option<(views::TurnName, u32)> {
-        if !self.views.follows(run) {
-            return None;
-        }
-        let proof = self.proofs.get(&run.raw())?;
-        if proof.attempt != attempt.raw() || proof.terminal.is_some() {
-            return None;
-        }
-        let turn = match proof.turn {
-            Some(turn) => turn.turn.checked_add(1)?,
-            None => 1,
-        };
-        let name = views::TurnName { attempt: attempt.raw(), turn };
-        let offset = match views::position(&self.views, run) {
-            Some((turn, to)) if turn == name => to,
-            Some(_) | None => 0,
-        };
-        Some((name, offset))
-    }
-}
-
 #[expect(clippy::too_many_arguments, reason = "a live host reports its fenced turn, offset, text and call")]
 pub(super) fn run_text(
     core: &mut Core,
@@ -491,6 +466,7 @@ pub(super) fn run_text(
     run: Token,
     attempt: Token,
     turn: u32,
+    retry: u32,
     offset: u32,
     text: Box<[u8]>,
     call: Option<views::Call>,
@@ -514,7 +490,13 @@ pub(super) fn run_text(
             route_view(
                 core,
                 env,
-                views::Event::Text { run, turn: views::TurnName { attempt: attempt.raw(), turn }, offset, text, call },
+                views::Event::Text {
+                    run,
+                    turn: views::TurnName { attempt: attempt.raw(), turn, retry },
+                    offset,
+                    text,
+                    call,
+                },
             ),
             &mut out,
         );

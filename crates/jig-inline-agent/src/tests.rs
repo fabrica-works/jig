@@ -81,6 +81,7 @@ fn inline_spawn_routes_admission_and_provider_request_then_grace_settles() {
     step(&mut agent, &env, host::Event::Spawn { client, start }, &mut out);
     assert_eq!(out.pop(), Some(Request::Host(host::Request::Started { client, agent: client })));
     assert_eq!(out.pop(), Some(Request::Host(host::Request::Admitted { client })));
+    assert_eq!(out.pop(), Some(Request::CompletionStarted { client, turn: 1, retry: 0 }));
     match out.pop() {
         Some(Request::Lower { client: seen, request: smith::Request::Complete { .. } }) => assert_eq!(seen, client),
         other => panic!("expected a completion request, got {other:?}"),
@@ -191,7 +192,7 @@ fn observed_provider_content_precedes_the_turn_emitted_for_it() {
     let mut turn_seen = false;
     while let Some(item) = out.pop() {
         match item {
-            Request::Content { client: seen, content: smith::Content::Text { text, .. } } => {
+            Request::Content { client: seen, provisional: _, content: smith::Content::Text { text, .. } } => {
                 assert_eq!(seen, client);
                 assert_eq!(text.as_ref(), b"live turn");
                 assert!(!turn_seen);
@@ -201,7 +202,7 @@ fn observed_provider_content_precedes_the_turn_emitted_for_it() {
                 assert!(content_seen);
                 turn_seen = true;
             }
-            Request::Content { .. } | Request::Host(_) | Request::Lower { .. } => {}
+            Request::Content { .. } | Request::CompletionStarted { .. } | Request::Host(_) | Request::Lower { .. } => {}
         }
     }
     assert!(content_seen);

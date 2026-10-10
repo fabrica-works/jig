@@ -2102,6 +2102,7 @@ fn run_text_outputs(
         core,
         limits,
         Event::RunText {
+            retry: 0,
             run: Token::new(1),
             attempt: Token::new(attempt),
             turn,
@@ -2129,7 +2130,7 @@ fn two_watchers_of_one_run_advance_independent_turn_offsets() {
     for watcher in [30, 31] {
         open_run_watch(&mut core, &limits, watcher);
     }
-    let turn = views::TurnName { attempt: 7, turn: 1 };
+    let turn = views::TurnName { attempt: 7, turn: 1, retry: 0 };
     let first = run_text_outputs(&mut core, &limits, 7, 1, 0, b"abc");
     assert_stream(&first[0], 30, turn, 0, 3, b"abc", false);
     assert_stream(&first[1], 31, turn, 0, 3, b"abc", false);
@@ -2156,10 +2157,10 @@ fn turn_three_writing_follows_committed_turn_two_and_fences_old_attempts() {
     assert_eq!(run_text_outputs(&mut core, &limits, 6, 3, 0, b"stale").len(), 1);
     assert_eq!(run_text_outputs(&mut core, &limits, 7, 2, 0, b"committed").len(), 1);
     let out = run_text_outputs(&mut core, &limits, 7, 3, 0, b"third");
-    assert_stream(&out[0], 30, views::TurnName { attempt: 7, turn: 3 }, 0, 5, b"third", false);
+    assert_stream(&out[0], 30, views::TurnName { attempt: 7, turn: 3, retry: 0 }, 0, 5, b"third", false);
     assert_eq!(
         core.provisional_position(Token::new(1), Token::new(7)),
-        Some((views::TurnName { attempt: 7, turn: 3 }, 5))
+        Some((views::TurnName { attempt: 7, turn: 3, retry: 0 }, 5))
     );
     core.proofs.get_mut(&1).unwrap().turn = Some(TurnProof { turn: 3, cumulative: 0, read: None });
     finish_watch_outputs(&mut core, &limits);
@@ -2190,7 +2191,7 @@ fn a_slow_run_stream_reports_the_bounded_suffix_and_cut_offset() {
     assert_stream(
         &out[0],
         30,
-        views::TurnName { attempt: 7, turn: 1 },
+        views::TurnName { attempt: 7, turn: 1, retry: 0 },
         limits.views.text_bytes * 2,
         limits.views.text_bytes * 3,
         &a,
@@ -2219,7 +2220,7 @@ fn a_run_watch_stays_open_between_attempts_and_the_new_attempt_starts_at_zero() 
     proof.turn = None;
     proof.terminal = None;
     let next = run_text_outputs(&mut core, &limits, 8, 1, 0, b"new");
-    assert_stream(&next[0], 30, views::TurnName { attempt: 8, turn: 1 }, 0, 3, b"new", false);
+    assert_stream(&next[0], 30, views::TurnName { attempt: 8, turn: 1, retry: 0 }, 0, 3, b"new", false);
 }
 
 #[test]

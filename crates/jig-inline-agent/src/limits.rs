@@ -40,6 +40,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
 #[must_use]
 pub const fn max_out(limits: &Limits) -> u32 {
     smith::max_out(&limits.smith)
+        .saturating_add(smith::max_out(&limits.smith))
         .saturating_add(limits.smith.session.facts)
         .saturating_add(limits.smith.run.calls)
         .saturating_add(limits.smith.run.conversations)
