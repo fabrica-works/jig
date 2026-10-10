@@ -42,23 +42,38 @@ pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request
         Executor::Agent { .. } => {}
         Executor::Procedure { .. } | Executor::Party { .. } | Executor::Role { .. } => return,
     }
-    domain.conversation.run_finished = match &task.runtime {
-        Runtime::Active(value) => active_finished(value),
-        Runtime::Running { .. } | Runtime::WaitingForWords { .. } => false,
-        Runtime::Closing(value) => closing_finished(value),
-        Runtime::Held { was } => match was {
-            Some(crate::contract::HeldRuntime::Waiting) => true,
-            Some(crate::contract::HeldRuntime::Active(value)) => active_finished(value),
-            Some(crate::contract::HeldRuntime::Closing(value)) => closing_finished(value),
-            None => false,
+    domain.conversation.run_finished = match &task.context {
+        Some(context) => match &context.runtime {
+            Runtime::Active(value) => active_finished(&value.stage),
+            Runtime::Running { .. } | Runtime::WaitingForWords { .. } => false,
+            Runtime::Closing(value) => closing_finished(value.stage),
+            Runtime::Held { was } => match was {
+                Some(crate::contract::HeldRuntime::Waiting) => true,
+                Some(crate::contract::HeldRuntime::Active(value)) => active_finished(&value.stage),
+                Some(crate::contract::HeldRuntime::Closing(value)) => closing_finished(value.stage),
+                None => false,
+            },
+            Runtime::Waiting { .. }
+            | Runtime::Idle
+            | Runtime::Starting
+            | Runtime::BackingOff { .. }
+            | Runtime::Procedure { .. }
+            | Runtime::Person { .. }
+            | Runtime::Ended => true,
         },
-        Runtime::Waiting { .. }
-        | Runtime::Idle
-        | Runtime::Starting
-        | Runtime::BackingOff { .. }
-        | Runtime::Procedure { .. }
-        | Runtime::Person { .. }
-        | Runtime::Ended => true,
+        None => match task.chip.details.as_ref() {
+            crate::contract::ChipPhase::Owner { phase, details } => owner_finished(phase, details.hold.as_ref()),
+            crate::contract::ChipPhase::Waiting { .. }
+            | crate::contract::ChipPhase::Idle { .. }
+            | crate::contract::ChipPhase::Starting
+            | crate::contract::ChipPhase::Running { .. }
+            | crate::contract::ChipPhase::BackingOff { .. }
+            | crate::contract::ChipPhase::Procedure { .. }
+            | crate::contract::ChipPhase::Person { .. }
+            | crate::contract::ChipPhase::Closing(_)
+            | crate::contract::ChipPhase::Held { .. }
+            | crate::contract::ChipPhase::Ended { .. } => false,
+        },
     };
     let what = domain.conversation.moved(task.activity);
     ask(domain, what, out);
@@ -102,8 +117,8 @@ fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Re
     let parts = domain.conversation.parts(env.limits.parts);
     crate::pages::routing::parts(domain, env, parts.as_slice(), out);
 }
-fn active_finished(value: &crate::contract::ActiveRun) -> bool {
-    match value.stage {
+fn active_finished(stage: &crate::contract::RunStage) -> bool {
+    match stage {
         crate::contract::RunStage::Claimed { .. } | crate::contract::RunStage::Running { .. } => false,
         crate::contract::RunStage::Idle
         | crate::contract::RunStage::Due
@@ -112,8 +127,8 @@ fn active_finished(value: &crate::contract::ActiveRun) -> bool {
     }
 }
 // Absence of the joined closing stage is not evidence that the live run ended.
-fn closing_finished(value: &crate::contract::Closing) -> bool {
-    match value.stage {
+fn closing_finished(stage: Option<crate::contract::ClosingStage>) -> bool {
+    match stage {
         None | Some(crate::contract::ClosingStage::Run { .. }) => false,
         Some(
             crate::contract::ClosingStage::Delegates
@@ -121,6 +136,24 @@ fn closing_finished(value: &crate::contract::Closing) -> bool {
             | crate::contract::ClosingStage::Releases
             | crate::contract::ClosingStage::Settled,
         ) => true,
+    }
+}
+// Only the supplied lifecycle and prior stages attest whether the live run finished.
+fn owner_finished(phase: &crate::contract::OwnerChipPhase, hold: Option<&crate::contract::OwnerChipHold>) -> bool {
+    match phase {
+        crate::contract::OwnerChipPhase::Active(stage) => active_finished(stage),
+        crate::contract::OwnerChipPhase::Closing(stage) => closing_finished(Some(*stage)),
+        crate::contract::OwnerChipPhase::Held { .. } => match hold {
+            Some(hold) => match hold.before {
+                crate::contract::OwnerPriorPhase::Waiting => true,
+                crate::contract::OwnerPriorPhase::Active(stage) => active_finished(&stage),
+                crate::contract::OwnerPriorPhase::Closing(stage) => closing_finished(Some(stage)),
+            },
+            None => false,
+        },
+        crate::contract::OwnerChipPhase::Waiting { .. }
+        | crate::contract::OwnerChipPhase::Person { .. }
+        | crate::contract::OwnerChipPhase::Ended => true,
     }
 }
 fn finish(domain: &mut Domain) {

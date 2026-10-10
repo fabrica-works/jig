@@ -204,35 +204,38 @@ pub fn task() -> Task {
         },
         authority: owner_authority(),
         hold: None,
-        escalation: None,
         proposals: list([]),
         activity: 0,
         changed: Wall::EPOCH,
         acts: list([Offered { act: ActKind::Write, admission: Admission::Allowed }]),
-        parts: list([]),
-        closing: None,
-        spend: list([]),
         result: None,
-        runtime: Runtime::Idle,
-        impact: Impact {
-            tasks: PhaseCounts {
-                ended: 0,
-                waiting: 0,
-                running: 0,
-                held: 0,
-                closing: 0,
-                done: 0,
-                failed: 0,
-                cancelled: 0,
-            },
-            live_runs: 0,
-            proposals: 0,
-            effects_pending: 0,
-            effects_settling: 0,
-            takeover_budget: 0,
-        },
         delegates: list([]),
-        writer_slots: list([]),
+
+        context: Some(Box::new(jig_client::contract::TaskContext {
+            escalation: None,
+            parts: list([]),
+            closing: None,
+            spend: list([]),
+            runtime: Runtime::Idle,
+            impact: Impact {
+                tasks: PhaseCounts {
+                    ended: 0,
+                    waiting: 0,
+                    running: 0,
+                    held: 0,
+                    closing: 0,
+                    done: 0,
+                    failed: 0,
+                    cancelled: 0,
+                },
+                live_runs: 0,
+                proposals: 0,
+                effects_pending: 0,
+                effects_settling: 0,
+                takeover_budget: 0,
+            },
+            writer_slots: list([]),
+        })),
     }
 }
 
@@ -254,7 +257,7 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
                     read: Read::Conversations { after: None },
                     rows: jig_scripted_engine::Rows::Conversations(vec![ConversationLine {
                         cached_replies: 0,
-                        runtime: Some(task.runtime.clone()),
+                        runtime: Some(task.context.as_ref().expect("supplied task context").runtime.clone()),
                         delegates: 0,
                         budget: task.budget.clone(),
                         chip: task.chip.clone(),
@@ -425,7 +428,7 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
     lead.proposals = list([p.key]);
     if delegate_chip {
         lead.delegates = list([LiveDelegate { chip: incident_delegate().chip, takeover_budget: 1 }]);
-        lead.impact.tasks.running = 1;
+        lead.context.as_mut().expect("supplied task context").impact.tasks.running = 1;
     }
     for change in [
         jig_scripted_engine::Change::Object {
@@ -593,7 +596,7 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
     held.chip.phase = Phase::Held;
     held.chip.details =
         Box::new(ChipPhase::Held { reason, since: Wall::EPOCH, revision: Revision { value: 4 }, was: None });
-    held.runtime = Runtime::Held { was: None };
+    held.context.as_mut().expect("supplied task context").runtime = Runtime::Held { was: None };
     held.acts = list([Offered { act: ActKind::Release, admission: Admission::Allowed }]);
     world
         .front()
@@ -750,7 +753,8 @@ fn incident_delegate() -> Task {
     delegate.chip.details =
         Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 } });
     delegate.requester = OwnerRequester::Task(9);
-    delegate.parts = list([Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 }]);
+    delegate.context.as_mut().expect("supplied task context").parts =
+        list([Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 }]);
     delegate.proposals = list([proposal().key]);
     delegate
 }
@@ -762,7 +766,7 @@ pub fn incident_world(seed: u64) -> World<Test, Scripted> {
     let delegate = incident_delegate();
     let mut lead = task();
     lead.delegates = list([LiveDelegate { chip: delegate.chip.clone(), takeover_budget: 1 }]);
-    lead.impact.tasks.running = 1;
+    lead.context.as_mut().expect("supplied task context").impact.tasks.running = 1;
     let counts =
         PhaseCounts { ended: 0, waiting: 0, running: 2, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
     for change in [
@@ -843,7 +847,7 @@ pub fn incident() -> RootAddress {
 pub fn reported(mut task: Task, report: &[u8]) -> Task {
     task.chip.phase = Phase::Done;
     task.chip.details = Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH });
-    task.runtime = Runtime::Ended;
+    task.context.as_mut().expect("supplied task context").runtime = Runtime::Ended;
     task.acts = list([]);
     task.proposals = list([]);
     task.result = Some(jig_client::contract::TaskResult::Document(Box::new(Result {

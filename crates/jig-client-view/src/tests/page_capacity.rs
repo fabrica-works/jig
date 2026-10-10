@@ -187,8 +187,8 @@ fn task_pages(words: &Words) {
         doc.dependencies = doc.inputs.clone();
         doc.references = doc.inputs.clone();
         doc.resources = list(parts().as_slice().iter().cloned().map(TaskResource::Part));
-        doc.parts = parts();
-        doc.writer_slots = list([
+        doc.context.as_mut().expect("supplied task context").parts = parts();
+        doc.context.as_mut().expect("supplied task context").writer_slots = list([
             WriterSlot { resource: part(), task: 9, attempt: Some(1) },
             WriterSlot { resource: part(), task: 10, attempt: Some(2) },
         ]);
@@ -196,12 +196,13 @@ fn task_pages(words: &Words) {
             Subscription { number: 1, kind: SubscriptionKind::Topic { connector: 2, topic: 1 } },
             Subscription { number: 2, kind: SubscriptionKind::Task { target: u64::MAX, held: true, result: true } },
         ]);
-        doc.spend = list([
+        doc.context.as_mut().expect("supplied task context").spend = list([
             SpendLine { task: 9, attempt: Some(1), spent: u64::MAX },
             SpendLine { task: 10, attempt: None, spent: u64::MAX },
         ]);
         doc.activity = 2;
-        doc.runtime = Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: Some(full()) };
+        doc.context.as_mut().expect("supplied task context").runtime =
+            Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: Some(full()) };
         let mut sources = deliver(&mut d, watch, Delivery::Task(Box::new(doc)));
         sources.extend(out);
         for request in sources {

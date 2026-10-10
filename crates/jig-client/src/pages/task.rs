@@ -105,16 +105,22 @@ fn counts() -> PhaseCounts {
 /// Whether a section has content for this executor and its current facts.
 #[must_use]
 pub fn sections(task: &Task) -> Sections {
-    let plan = !task.delegates.is_empty()
-        || task.impact.tasks.waiting > 0
-        || task.impact.tasks.running > 0
-        || task.impact.tasks.held > 0
-        || task.impact.tasks.closing > 0
-        || task.impact.tasks.done > 0
-        || task.impact.tasks.failed > 0
-        || task.impact.tasks.cancelled > 0
-        || task.impact.tasks.ended > 0;
-    let panels = !task.parts.is_empty()
+    let (impact, panels) = match &task.context {
+        Some(context) => (
+            context.impact.tasks.waiting > 0
+                || context.impact.tasks.running > 0
+                || context.impact.tasks.held > 0
+                || context.impact.tasks.closing > 0
+                || context.impact.tasks.done > 0
+                || context.impact.tasks.failed > 0
+                || context.impact.tasks.cancelled > 0
+                || context.impact.tasks.ended > 0,
+            !context.parts.is_empty(),
+        ),
+        None => (false, false),
+    };
+    let plan = !task.delegates.is_empty() || impact;
+    let panels = panels
         || !task.resources.is_empty()
         || match task.chip.executor {
             Executor::Procedure { .. } => true,
@@ -294,14 +300,16 @@ pub fn parts(task: &Task, section: TaskSection, limit: u32) -> List<Part> {
             }
         }
         TaskSection::Panels => {
-            if let Some(closing) = &task.closing
-                && let Some(connectors) = &closing.connectors
-            {
-                for connector in connectors {
-                    push(&mut parts, Part::Panel { connector: *connector, task: task.chip.task });
+            if let Some(context) = &task.context {
+                if let Some(closing) = &context.closing
+                    && let Some(connectors) = &closing.connectors
+                {
+                    for connector in connectors {
+                        push(&mut parts, Part::Panel { connector: *connector, task: task.chip.task });
+                    }
                 }
+                append(&mut parts, &context.parts);
             }
-            append(&mut parts, &task.parts);
             for resource in &task.resources {
                 if let Some(part) = resource.part() {
                     push(&mut parts, part.clone());

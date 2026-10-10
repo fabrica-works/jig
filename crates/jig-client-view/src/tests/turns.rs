@@ -43,7 +43,8 @@ fn ready_task(task: u64) -> (Domain, Token, Token, Token) {
     doc.chip.executor = Executor::Agent { charter: 2 };
     doc.chip.phase = Phase::Running;
     *doc.chip.details = ChipPhase::Running { attempt: 2, since: Wall::EPOCH, tool: None };
-    doc.runtime = Runtime::Running { attempt: 2, since: Wall::EPOCH, tool: None };
+    doc.context.as_mut().expect("supplied task context").runtime =
+        Runtime::Running { attempt: 2, since: Wall::EPOCH, tool: None };
     doc.hold = None;
     doc.activity = 2;
     let out = deliver(&mut d, watch, Delivery::Task(Box::new(doc)));
@@ -445,7 +446,7 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
     ] {
         let mut doc = super::cards_objects::task_doc(&[]);
         doc.chip.executor = Executor::Agent { charter: 2 };
-        doc.runtime = runtime;
+        doc.context.as_mut().expect("supplied task context").runtime = runtime;
         doc.activity = 2;
         deliver(&mut d, task_watch, Delivery::Task(Box::new(doc)));
         assert!(!d.conversation().run_finished);
@@ -453,7 +454,7 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
     }
     let mut doc = super::cards_objects::task_doc(&[]);
     doc.chip.executor = Executor::Agent { charter: 2 };
-    doc.runtime = Runtime::Ended;
+    doc.context.as_mut().expect("supplied task context").runtime = Runtime::Ended;
     doc.activity = 2;
     deliver(&mut d, task_watch, Delivery::Task(Box::new(doc)));
     assert!(d.conversation().run_finished);

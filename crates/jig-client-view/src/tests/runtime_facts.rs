@@ -40,7 +40,7 @@ fn ready(runtime: Runtime, details: ChipPhase, phase: Phase) -> Domain {
     task.chip.executor = Executor::Agent { charter: 2 };
     task.chip.phase = phase;
     *task.chip.details = details;
-    task.runtime = runtime;
+    task.context.as_mut().expect("supplied task context").runtime = runtime;
     task.hold = None;
     deliver(&mut d, watch, Delivery::Task(Box::new(task)));
     d

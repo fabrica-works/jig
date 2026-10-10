@@ -375,10 +375,12 @@ impl<A: crate::Application> Engine<A> {
                 ReadValue::Escalation(v) => v.ending = Some(terminal),
                 ReadValue::Task(v) => {
                     v.hold = None;
-                    v.escalation = None;
+                    if let Some(context) = &mut v.context {
+                        context.escalation = None;
+                        context.runtime = Runtime::Starting;
+                    }
                     v.chip.phase = Phase::Due;
                     *v.chip.details = ChipPhase::Starting;
-                    v.runtime = Runtime::Starting;
                 }
                 ReadValue::Frame(_)
                 | ReadValue::Question(_)

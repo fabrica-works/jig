@@ -229,7 +229,9 @@ fn parts(body: &Body, limit: u32) -> Parts {
                     push(&mut parts, part.clone());
                 }
             }
-            append(&mut parts, task.parts.as_slice());
+            if let Some(context) = &task.context {
+                append(&mut parts, context.parts.as_slice());
+            }
         }
         Body::Proposal(proposal) => match &proposal.action {
             contract::ProposalAction::Effect { part } => push(&mut parts, part.clone()),

@@ -378,26 +378,29 @@ fn task() -> Task {
         },
         authority: owner_authority(),
         hold: None,
-        escalation: None,
         proposals: list(vec![]),
         activity: 0,
         changed: Wall::EPOCH,
         acts: list(vec![]),
-        parts: list(vec![]),
-        closing: None,
-        spend: list(vec![]),
         result: None,
-        runtime: Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: None },
-        impact: Impact {
-            tasks: counts(),
-            live_runs: 1,
-            proposals: 0,
-            effects_pending: 0,
-            effects_settling: 0,
-            takeover_budget: 0,
-        },
         delegates: list(vec![]),
-        writer_slots: list(vec![]),
+
+        context: Some(Box::new(jig_client::contract::TaskContext {
+            escalation: None,
+            parts: list(vec![]),
+            closing: None,
+            spend: list(vec![]),
+            runtime: Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: None },
+            impact: Impact {
+                tasks: counts(),
+                live_runs: 1,
+                proposals: 0,
+                effects_pending: 0,
+                effects_settling: 0,
+                takeover_budget: 0,
+            },
+            writer_slots: list(vec![]),
+        })),
     }
 }
 fn live_script() -> Script {
@@ -565,7 +568,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
     let mut changed = task();
     changed.chip.phase = Phase::Done;
     *changed.chip.details = ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH };
-    changed.runtime = Runtime::Ended;
+    changed.context.as_mut().expect("supplied task context").runtime = Runtime::Ended;
     engine
         .act(
             at(1_010_000_001),
@@ -1683,7 +1686,7 @@ fn activation_observations_and_prior_closing_are_admitted_whole_with_their_alloc
         }),
     };
     *row.chip.details = ChipPhase::Active(active.clone());
-    row.runtime = Runtime::Active(active.clone());
+    row.context.as_mut().expect("supplied task context").runtime = Runtime::Active(active.clone());
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
     assert!(Engine::new(setup.clone(), 1).is_ok());
     active.observation.as_mut().unwrap().work = RunWork::Tool {
@@ -1694,10 +1697,10 @@ fn activation_observations_and_prior_closing_are_admitted_whole_with_their_alloc
         },
         tool: text(b"tool"),
     };
-    row.runtime = Runtime::Active(active);
+    row.context.as_mut().expect("supplied task context").runtime = Runtime::Active(active);
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
     assert_eq!(Engine::new(setup.clone(), 1).err(), Some(Invalid::Payload));
-    row.runtime = Runtime::Held {
+    row.context.as_mut().expect("supplied task context").runtime = Runtime::Held {
         was: Some(HeldRuntime::Closing(Closing {
             delegates: 0,
             connectors: Some(List::with_capacity(setup.bounds.rows + 1)),

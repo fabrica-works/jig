@@ -351,7 +351,10 @@ fn release_owner(b: &mut Builder, facts: &OwnerChipHold, words: &Words, bindings
 }
 fn impact(object: &Object) -> Option<&Impact> {
     match &object.body {
-        Some(Body::Task(doc)) => Some(&doc.impact),
+        Some(Body::Task(doc)) => match &doc.context {
+            Some(context) => Some(&context.impact),
+            None => None,
+        },
         Some(Body::Escalation(doc)) => Some(&doc.impact),
         Some(
             Body::Chip(_)

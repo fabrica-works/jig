@@ -78,26 +78,29 @@ pub(super) fn task() -> Task {
         },
         authority: owner_authority(),
         hold: Some(TaskHold::Document(Box::new(escalation().hold))),
-        escalation: None,
         proposals: List::with_capacity(0),
         activity: 0,
         changed: Wall::EPOCH,
         acts: List::with_capacity(0),
-        parts: List::with_capacity(0),
-        closing: None,
-        spend: List::with_capacity(0),
         result: None,
-        runtime: Runtime::Held { was: None },
-        impact: Impact {
-            tasks: counts(),
-            live_runs: 0,
-            proposals: 0,
-            effects_pending: 0,
-            effects_settling: 0,
-            takeover_budget: 0,
-        },
-        writer_slots: List::with_capacity(0),
         delegates: List::with_capacity(0),
+
+        context: Some(Box::new(crate::contract::TaskContext {
+            escalation: None,
+            parts: List::with_capacity(0),
+            closing: None,
+            spend: List::with_capacity(0),
+            runtime: Runtime::Held { was: None },
+            impact: Impact {
+                tasks: counts(),
+                live_runs: 0,
+                proposals: 0,
+                effects_pending: 0,
+                effects_settling: 0,
+                takeover_budget: 0,
+            },
+            writer_slots: List::with_capacity(0),
+        })),
     }
 }
 fn sent(rows: &[Request]) -> &Ask {

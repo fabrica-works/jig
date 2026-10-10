@@ -803,19 +803,22 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         },
         authority: owner_authority(),
         hold: Some(TaskHold::Document(Box::new(escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[]).hold))),
-        escalation: None,
         proposals: list([]),
         activity: 0,
         changed: Wall::EPOCH,
         acts: list(acts.iter().map(|act| Offered { act: *act, admission: Admission::Allowed })),
-        parts: list([]),
-        closing: None,
-        spend: list([]),
         result: None,
-        runtime: Runtime::Held { was: None },
-        impact: impact(),
         delegates: list([LiveDelegate { chip: chip(), takeover_budget: 13 }]),
-        writer_slots: list([]),
+
+        context: Some(Box::new(jig_client::contract::TaskContext {
+            escalation: None,
+            parts: list([]),
+            closing: None,
+            spend: list([]),
+            runtime: Runtime::Held { was: None },
+            impact: impact(),
+            writer_slots: list([]),
+        })),
     }
 }
 fn input(tree: &Tree, label: &[u8], value: &[u8], bindings: &mut JigBindings) -> Action {

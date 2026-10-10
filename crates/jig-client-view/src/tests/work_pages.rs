@@ -74,7 +74,7 @@ pub(super) fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Req
     let mut doc = super::cards_objects::task_doc(&[ActKind::Cancel]);
     doc.chip.executor = executor;
     doc.resources = list([TaskResource::Part(part())]);
-    doc.parts = list([part()]);
+    doc.context.as_mut().expect("supplied task context").parts = list([part()]);
     doc.inputs = list([OwnerTaskLink::Live(chip(9))]);
     doc.dependencies = list([OwnerTaskLink::Live(chip(9))]);
     let mut outputs = deliver(&mut d, watch, Delivery::Task(Box::new(doc)));

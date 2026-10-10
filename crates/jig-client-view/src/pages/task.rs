@@ -108,10 +108,14 @@ pub(super) const fn section_phrase(section: TaskSection) -> JigPhrase {
     }
 }
 fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindings: &mut JigBindings) {
+    let context_parts = match &doc.context {
+        Some(context) => context.parts.len(),
+        None => 0,
+    };
     let count = doc
         .resources
         .len()
-        .checked_add(doc.parts.len())
+        .checked_add(context_parts)
         .expect("bounded task parts")
         .checked_add(doc.authority.authority.grants.len().checked_mul(2).expect("bounded grants"))
         .expect("bounded task parts")
@@ -163,19 +167,21 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
     if let Some(result) = &doc.result {
         crate::task_result::render(b, client, result, words, bindings);
     }
-    for slot in &doc.writer_slots {
-        cards::common::part(b, &slot.resource, words, bindings);
-        crate::frame::control(
-            b,
-            words,
-            bindings,
-            Role::Link,
-            JigPhrase::ContextTask,
-            &[Hole::Number(slot.task)],
-            Act::Go { address: Address::task(slot.task) },
-        );
-        if let Some(attempt) = slot.attempt {
-            words.text(b, JigPhrase::Attempt, &[Hole::Number(attempt)]);
+    if let Some(context) = &doc.context {
+        for slot in &context.writer_slots {
+            cards::common::part(b, &slot.resource, words, bindings);
+            crate::frame::control(
+                b,
+                words,
+                bindings,
+                Role::Link,
+                JigPhrase::ContextTask,
+                &[Hole::Number(slot.task)],
+                Act::Go { address: Address::task(slot.task) },
+            );
+            if let Some(attempt) = slot.attempt {
+                words.text(b, JigPhrase::Attempt, &[Hole::Number(attempt)]);
+            }
         }
     }
     slots(b, doc, TaskSection::Overview, words, bindings);
@@ -213,7 +219,9 @@ fn task_link(
 fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
     match doc.chip.executor {
         Executor::Agent { .. } => {
-            super::conversations::runtime(b, client, &doc.runtime, words, bindings);
+            if let Some(context) = &doc.context {
+                super::conversations::runtime(b, client, &context.runtime, words, bindings);
+            }
             crate::turns::conversation(b, client, words, bindings);
         }
         Executor::Procedure { .. } => slots(b, doc, TaskSection::Activity, words, bindings),
@@ -229,14 +237,16 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
 }
 fn budget(b: &mut Builder, doc: &Task, words: &Words, _bindings: &mut JigBindings) {
     crate::owner_budget::render(b, &doc.budget, words);
-    for spend in &doc.spend {
-        match spend.attempt {
-            Some(attempt) => words.text(
-                b,
-                JigPhrase::SpentRun,
-                &[Hole::Number(spend.task), Hole::Number(attempt), Hole::Amount(spend.spent)],
-            ),
-            None => words.text(b, JigPhrase::SpentDelegate, &[Hole::Number(spend.task), Hole::Amount(spend.spent)]),
+    if let Some(context) = &doc.context {
+        for spend in &context.spend {
+            match spend.attempt {
+                Some(attempt) => words.text(
+                    b,
+                    JigPhrase::SpentRun,
+                    &[Hole::Number(spend.task), Hole::Number(attempt), Hole::Amount(spend.spent)],
+                ),
+                None => words.text(b, JigPhrase::SpentDelegate, &[Hole::Number(spend.task), Hole::Amount(spend.spent)]),
+            }
         }
     }
     match doc.chip.executor {
