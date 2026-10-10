@@ -105,7 +105,7 @@ pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words,
     b.close();
 }
 /// Changes retain the before/after facts instead of interpreting instructions.
-pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &mut JigBindings) {
+pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, _bindings: &mut JigBindings) {
     if let Some(to) = &change.addressed {
         address_change(b, to, words);
     }

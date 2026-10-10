@@ -421,7 +421,7 @@ fn bounded_amendment_dimensions() {
     facts.delegation.depth = 3;
     facts.delegation.tasks = 5;
     facts.deadline = Some(Wall::from_nanos(100));
-    facts.tools = 1 << 7;
+    facts.tools = 1_u64 << 7_u32;
     facts.delegation.kinds = List::with_capacity(1);
     facts.delegation.kinds.push(OwnerAuthorityExecutor::Role(4)).unwrap();
     facts.notes = 1;
@@ -460,7 +460,7 @@ fn bounded_amendment_dimensions() {
             1 => outside.delegation.depth = 4,
             2 => outside.delegation.tasks = 6,
             3 => outside.deadline = Some(Wall::from_nanos(101)),
-            4 => outside.tools = 1 << 8,
+            4 => outside.tools = 1_u64 << 8_u32,
             5 => *outside.delegation.kinds.get_mut(0).unwrap() = OwnerAuthorityExecutor::Role(5),
             6 => outside.note_resources.get_mut(0).unwrap().connector = 2,
             _ => unreachable!(),
