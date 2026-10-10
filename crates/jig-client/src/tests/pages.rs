@@ -1881,11 +1881,13 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
         assert!(domain.chats().starting.is_none());
         assert!(domain.fields().get(Purpose::NewChat).unwrap().text.bytes().is_empty());
         if away {
-            let notice = domain.notices.ids().get(0).unwrap().0;
-            assert_eq!(
-                domain.notices.get(notice).unwrap().kind,
-                Kind::Answer { object: ObjectKey::Task(u64::MAX), answer }
-            );
+            assert_eq!(domain.notices.ids().len(), 1);
+            for (notice, ()) in domain.notices.ids() {
+                assert_eq!(
+                    domain.notices.get(*notice).unwrap().kind,
+                    Kind::Answer { object: ObjectKey::Task(u64::MAX), answer: answer.clone() }
+                );
+            }
             assert_eq!(domain.page(), &Page::Elsewhere);
         } else {
             let Page::Work { address, .. } = domain.page() else { panic!("actual chat task") };
@@ -1931,8 +1933,10 @@ fn owner_goal_answers_preserve_numeric_proposals_and_late_started_task_facts() {
             assert!(domain.project_page().form.pending.is_none());
             assert!(domain.fields().get(Purpose::NewGoal).unwrap().text.bytes().is_empty());
             if away || proposed {
-                let notice = domain.notices.ids().get(0).unwrap().0;
-                assert_eq!(domain.notices.get(notice).unwrap().kind, Kind::PageAnswer { answer });
+                assert_eq!(domain.notices.ids().len(), 1);
+                for (notice, ()) in domain.notices.ids() {
+                    assert_eq!(domain.notices.get(*notice).unwrap().kind, Kind::PageAnswer { answer: answer.clone() });
+                }
                 if away {
                     assert_eq!(domain.page(), &Page::Elsewhere);
                 }

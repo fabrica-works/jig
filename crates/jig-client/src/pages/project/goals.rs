@@ -12,7 +12,9 @@
 use crate::{
     Domain, Request,
     address::{Address, Place},
-    contract::{ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Phase, Recipient, Refusal, Text},
+    contract::{
+        ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Outcome, Phase, Recipient, Refusal, Text,
+    },
     fields::Purpose,
     intents::Origin,
     pages::IntentPurpose,

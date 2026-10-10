@@ -755,9 +755,9 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
                     if cleared {
                         b"".as_slice()
                     } else if later {
-                        b"later"
+                        b"later".as_slice()
                     } else {
-                        b"submitted"
+                        b"submitted".as_slice()
                     }
                 );
                 assert_eq!(domain.objects.get(id).unwrap().answer.as_ref(), Some(&answer));
