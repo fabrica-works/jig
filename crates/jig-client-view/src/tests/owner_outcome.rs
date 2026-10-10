@@ -33,20 +33,40 @@ fn render(value: &OwnerOutcome, words: &Words) -> Tree {
     view::render(&mut b, value, words);
     let tree = b.finish();
     assert!(tree.len() <= required.nodes);
-    assert!(
-        tree.nodes().iter().flat_map(|node| &node.text).map(|run| run.text.len()).sum::<usize>()
-            <= usize::try_from(required.text_bytes).unwrap()
-    );
+    let mut bytes = 0_usize;
+    for node in tree.nodes() {
+        match &node.name {
+            Some(name) => bytes = bytes.checked_add(name.len()).unwrap(),
+            None => {}
+        }
+        for run in &node.text {
+            bytes = bytes.checked_add(run.text.len()).unwrap();
+        }
+    }
+    assert!(bytes <= usize::try_from(required.text_bytes).unwrap());
     tree
 }
 fn has(tree: &Tree, wanted: &[u8]) -> bool {
-    tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.as_ref() == wanted))
+    for node in tree.nodes() {
+        for run in &node.text {
+            if run.text.as_ref() == wanted {
+                return true;
+            }
+        }
+    }
+    false
 }
 fn expect_lines(tree: &Tree, lines: &[&[u8]]) {
     for line in lines {
         assert!(has(tree, line), "supplied fact is present");
     }
-    assert_eq!(tree.nodes().iter().filter(|node| node.role == Role::Text).count(), lines.len());
+    let mut text_nodes = 0_usize;
+    for node in tree.nodes() {
+        if node.role == Role::Text {
+            text_nodes = text_nodes.checked_add(1).unwrap();
+        }
+    }
+    assert_eq!(text_nodes, lines.len());
 }
 #[expect(clippy::too_many_lines, reason = "closed fixture lists every owner variant and independent expected facts")]
 fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 26] {
@@ -322,4 +342,67 @@ fn selected_outcome_language_is_checked_and_maximum_fragment_fits() {
         Phrasebook::load(phrases::shapes(), Box::new([wrong]), &phrase_limits()).unwrap_err(),
         Invalid::Holes { id: phrases::OutcomePhrase::Revision.id() }
     );
+}
+
+#[test]
+fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
+    use crate::phrases::{english, jig};
+    use skein_lib::List;
+
+    let normal_shapes = jig::shapes(super::cards::CLIENT.text);
+    assert_eq!(normal_shapes.len(), usize::try_from(crate::owner_words::phrase_count()).unwrap());
+    for outcome in phrases::ALL {
+        let mut copies = 0_u32;
+        for shape in &normal_shapes {
+            if shape.id == outcome.id() {
+                copies = copies.checked_add(1).unwrap();
+            }
+        }
+        assert_eq!(copies, 1, "each owner outcome shape is registered once");
+    }
+    let limits = PhraseLimits {
+        languages: 2,
+        phrases: crate::owner_words::phrase_count(),
+        holes: 3,
+        segments: 5000,
+        text_bytes: 200_000,
+        hole_bytes: super::cards::CLIENT.text,
+    };
+    let mut selected = english::language();
+    for phrase in &mut selected.phrases {
+        if phrase.id == phrases::OutcomePhrase::Rejected.id() {
+            phrase.forms[0].segments[0] = Segment::Text(Box::new([b'R'; 2048]));
+        }
+    }
+    let book = Phrasebook::load(normal_shapes, Box::new([english::language(), selected]), &limits).unwrap();
+    for outcome in phrases::ALL {
+        assert!(book.capacity(outcome.id()).is_some());
+    }
+    let words = Words { book, language: 1, offset_minutes: 1 };
+    let fragment = view::required(&words).unwrap();
+    assert!(fragment.text_per_node >= 2048);
+    assert!(crate::Limits::of_words(&super::cards::CLIENT, &words).unwrap().text_per_node >= 2048);
+    let value = OwnerOutcome::ProposalDecided {
+        proposal: ProposalKey { proposer: Proposer::Party(u64::MAX), number: 17 },
+        by: 23,
+        at: Wall::EPOCH,
+        choice: OwnerProposalChoice::Rejected,
+    };
+    let tree = render(&value, &words);
+    assert_eq!(tree.len(), fragment.nodes);
+    assert!(has(&tree, &[b'R'; 2048]));
+    assert!(has(&tree, b"Proposing party: 18446744073709551615"));
+    assert!(has(&tree, b"Proposal number: 17"));
+    assert!(has(&tree, b"Decided by person: 23"));
+    assert!(!has(&tree, b"Rejected"));
+
+    let mut incomplete = english::language();
+    let mut kept = List::with_capacity(crate::owner_words::phrase_count());
+    for phrase in incomplete.phrases {
+        if phrase.id != phrases::OutcomePhrase::ReleasedYes.id() {
+            kept.push(phrase).unwrap();
+        }
+    }
+    incomplete.phrases = kept.into_boxed();
+    assert!(Phrasebook::load(jig::shapes(super::cards::CLIENT.text), Box::new([incomplete]), &limits).is_err());
 }
