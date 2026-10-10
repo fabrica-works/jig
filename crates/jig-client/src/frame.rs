@@ -31,29 +31,40 @@ impl FrameState {
 /// documents arrive within the decoding owner's `document_bytes` budget.
 #[must_use]
 pub fn fits(frame: &Frame, limits: &crate::Limits) -> bool {
-    if !frame.party.name.fits(limits.text) || frame.projects.capacity() > limits.projects {
+    if !frame.party.name.bytes.fits(limits.text)
+        || !frame.party.login.bytes.fits(limits.text)
+        || frame.projects.capacity() > limits.projects
+        || frame.charters.capacity() > limits.projects
+    {
         return false;
     }
     for project in &frame.projects {
-        if !project.name.fits(limits.text)
-            || project.roles.capacity() > limits.roles
-            || project.chats.capacity() > limits.charters
-            || project.goals.capacity() > limits.charters
-        {
+        if !name_fits(project.name.as_ref(), limits.text) {
+            return false;
+        }
+    }
+    for project in &frame.charters {
+        if project.chats.capacity() > limits.charters || project.goals.capacity() > limits.charters {
             return false;
         }
         for charter in &project.chats {
-            if !charter.name.fits(limits.text) {
+            if !name_fits(charter.name.as_ref(), limits.text) {
                 return false;
             }
         }
         for charter in &project.goals {
-            if !charter.name.fits(limits.text) {
+            if !name_fits(charter.name.as_ref(), limits.text) {
                 return false;
             }
         }
     }
     true
+}
+fn name_fits(name: Option<&crate::contract::DocumentText>, text: u32) -> bool {
+    match name {
+        Some(name) => name.bytes.fits(text),
+        None => true,
+    }
 }
 
 /// Facts on every page's frame, with exact needs and bounded unread updates.
@@ -80,13 +91,7 @@ impl FrameState {
         };
         if let Some(frame) = &self.document {
             summary.party = Some(frame.party.number);
-            summary.needs = u64::from(frame.needs.questions)
-                .checked_add(u64::from(frame.needs.proposals))
-                .expect("two u32 counts fit u64")
-                .checked_add(u64::from(frame.needs.escalations))
-                .expect("three u32 counts fit u64")
-                .checked_add(u64::from(frame.needs.person_tasks))
-                .expect("four u32 counts fit u64");
+            summary.needs = u64::from(frame.needs_total);
             summary.updates = crate::contract::Count {
                 value: frame.updates.value.min(limit),
                 limited: frame.updates.limited || frame.updates.value > limit,

@@ -7,10 +7,10 @@ use jig_client::contract::{
     Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase,
     Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider,
     Decision, Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending, Escalation,
-    Executor, FailureClass, FieldRule, Frame, GoalExecutor, GoalLine, GoalPage, GoalProcedure, Goals, Grant, HeldRole,
+    Executor, FailureClass, FieldRule, Frame, FrameParty, GoalExecutor, GoalLine, GoalPage, GoalProcedure, Goals, Grant, HeldRole,
     HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host,
     Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs, Note,
-    NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter, ParameterDocument, Part,
+    NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OfferedCharters, OptionLine, Outcome, Parameter, ParameterDocument, Part,
     PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool,
     Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, Question, Read,
     ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
@@ -365,9 +365,22 @@ impl Payload for Decision {
 }
 fields!(TurnName { attempt, number });
 fields!(Count { value, limited });
-fields!(Frame { party, projects, needs, updates, retention, deployment_role });
+fields!(Frame {
+    party,
+    projects,
+    needs,
+    needs_total,
+    updates,
+    results_seen,
+    charters,
+    cut,
+    retention,
+    deployment_role
+});
+fields!(FrameParty { number, kind, login, name });
 fields!(Needs { questions, proposals, escalations, person_tasks });
-fields!(ProjectRole { project, name, roles, chats, goals, pool, chat_budget });
+fields!(ProjectRole { project, name, role, pool, chat_budget });
+fields!(OfferedCharters { project, chats, goals, cut });
 fields!(Charter { number, name });
 fields!(Budget { total, own, ended, reserved, left, funder });
 fields!(Chip { task, title, executor, phase, details });

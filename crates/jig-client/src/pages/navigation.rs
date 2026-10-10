@@ -54,7 +54,7 @@ impl Navigation {
             Destination::Jig(address) => match address {
                 Address::Inbox { .. } | Address::Task { .. } => true,
                 Address::Conversations { project } => {
-                    for offered in &frame.projects {
+                    for offered in &frame.charters {
                         if !offered.chats.is_empty() && (project.is_none() || project == Some(offered.project)) {
                             return true;
                         }

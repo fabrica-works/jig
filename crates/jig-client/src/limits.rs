@@ -110,12 +110,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(List::<Record>::worst_case(limits.records)?.checked_mul(2)?)?;
     total = total.checked_add(u64::from(limits.records).checked_mul(u64::from(limits.text))?)?;
     total = total.checked_add(u64::try_from(size_of::<Frame>()).ok()?)?;
-    total = total.checked_add(u64::from(limits.text))?;
+    total = total.checked_add(u64::from(limits.text).checked_mul(2)?)?;
     total = total.checked_add(List::<ProjectRole>::worst_case(limits.projects)?)?;
+    total = total.checked_add(List::<crate::contract::OfferedCharters>::worst_case(limits.projects)?)?;
     let charters = List::<Charter>::worst_case(limits.charters)?
         .checked_add(u64::from(limits.charters).checked_mul(u64::from(limits.text))?)?
         .checked_mul(2)?;
-    let project = charters.checked_add(List::<u16>::worst_case(limits.roles)?)?.checked_add(u64::from(limits.text))?;
+    let project = charters.checked_add(u64::from(limits.text))?;
     total = total.checked_add(u64::from(limits.projects).checked_mul(project)?)?;
     // Chips subjects own at most one configured task-number list each.
     total.checked_add(u64::from(limits.watches).checked_mul(List::<u64>::worst_case(limits.rows)?)?)

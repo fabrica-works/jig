@@ -50,7 +50,7 @@ pub fn start(domain: &mut Domain, _env: &Env<crate::Limits>, project: u32, out: 
     };
     let mut offered = false;
     if let Some(frame) = &domain.frame.document {
-        for role in &frame.projects {
+        for role in &frame.charters {
             if role.project == project && !role.chats.is_empty() {
                 offered = true;
             }

@@ -127,6 +127,14 @@ fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission,
     if let Some(frame) = &domain.frame.document {
         for project in &frame.projects {
             if project.project == form.project {
+                pool = match &project.pool {
+                    Some(ledger) => Some(ledger.left),
+                    None => None,
+                };
+            }
+        }
+        for project in &frame.charters {
+            if project.project == form.project {
                 match form.executor {
                     GoalExecutor::Charter(number) => {
                         for charter in &project.goals {
@@ -137,7 +145,6 @@ fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission,
                     }
                     GoalExecutor::Procedure { .. } => {}
                 }
-                pool = Some(project.pool.left);
             }
         }
     }

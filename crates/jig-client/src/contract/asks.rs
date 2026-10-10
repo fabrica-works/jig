@@ -1,7 +1,7 @@
 //! Each visible act is one ask; client/domain/contract.md, 3.2 and 4.
 //! Requests carry jig facts alone and their outcomes are durable.
 //! Adoption uses the connector's application request (client/domain/pages.md, 6.5).
-use super::{Actor, Authority, Decision, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
+use super::{Actor, Authority, Decision, HeldRole, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 /// Executors the engine supports for a tracked goal; domain/people.md, 5.1.
@@ -82,7 +82,7 @@ pub enum Seen {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Holding {
     pub party: u64,
-    pub role: u16,
+    pub role: HeldRole,
 }
 
 /// The project policy as facts.
@@ -170,7 +170,7 @@ pub enum Ask {
     /// Replace project roles.
     SetRoles { project: u32, holdings: List<Holding> },
     /// Make a service with a project role.
-    MakeService { project: u32, name: Text, role: u16 },
+    MakeService { project: u32, name: Text, role: HeldRole },
     /// Set a party pool preserving spend and reservations.
     SetPool { project: u32, party: u64, budget: u64 },
 }
