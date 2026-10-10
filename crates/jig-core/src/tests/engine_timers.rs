@@ -81,9 +81,9 @@ fn people_timer_expires_signins_durably_and_later_replies_wait_for_that_commit()
     env.wall = Wall::from_nanos(due.as_nanos());
     let mut journal = journal();
     assert_eq!(accept(&mut journal, fire(&mut core, &env, Timer::People)), 1);
-    let commit = journal.commit().unwrap();
+    let mut commit = journal.commit().unwrap();
     assert_eq!(commit.writes.len(), 1);
-    assert!(matches!(commit.writes.get(0), Some(Write::Erase(Key::People(people::Key::SignIn(10))))));
+    assert!(matches!(commit.writes.pop(), Some(Write::Erase(Key::People(people::Key::SignIn(10))))));
     assert!(core.people.is_due(env.now), "the second expiration remains for a later bounded fire");
     let reply = step(
         &mut core,
@@ -92,7 +92,7 @@ fn people_timer_expires_signins_durably_and_later_replies_wait_for_that_commit()
             reply_to: ReplyTo::new(Token::new(50)),
             sign_in: 10,
             key: [5; 16],
-            ask: Box::new(people::Ask::Stop { project: 1, task: 1 }),
+            ask: people::Ask::Stop { project: 1, task: 1 },
         }),
     );
     assert_eq!(accept(&mut journal, reply), 0);
@@ -126,10 +126,10 @@ fn people_timer_erases_retained_answers_then_signins_one_decision_at_a_time() {
         let Requests::Out(out) = fire(&mut core, &env, Timer::People);
         assert_eq!(out.len(), 2, "one bounded erase and its decided mark");
         assert_eq!(accept(&mut journal, Requests::Out(out)), 1);
-        let commit = journal.commit().unwrap();
+        let mut commit = journal.commit().unwrap();
         assert_eq!(commit.writes.len(), 1);
-        let Some(Write::Erase(Key::People(erased))) = commit.writes.get(0) else { panic!("typed timer erase") };
-        assert_eq!(*erased, key);
+        let Some(Write::Erase(Key::People(erased))) = commit.writes.pop() else { panic!("typed timer erase") };
+        assert_eq!(erased, key);
         let mut released = Queue::with_capacity(4);
         assert_eq!(journal.release(&mut released), Released::None);
         journal.committed(commit.number);
