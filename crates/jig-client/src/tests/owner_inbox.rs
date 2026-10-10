@@ -4,7 +4,7 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs inspect bounded source values and scripted requests"
 )]
-//! Exact owner Inbox proofs independent of legacy fixture projections.
+//! Exact owner Inbox proofs independent of existing supplied fixture projections.
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::{
     Domain, Event, Request,
