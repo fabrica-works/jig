@@ -34,12 +34,14 @@ fn task_overview_shows_only_supplied_ending_facts_with_opaque_state_loss_and_raw
         assert!(contains(&tree, b"Cancelled at:"));
         assert!(!contains(&tree, b"Result time was not supplied"));
         assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
+        let mut fragment_slots = 0;
         match result {
             Some(ResultValue::Approved { .. }) => {
                 let escaped = "\\xFF".repeat(32);
                 assert!(contains(&tree, escaped.as_bytes()));
             }
             Some(ResultValue::Change { .. }) => {
+                fragment_slots = 1;
                 let mut found = 0_u32;
                 for node in tree.nodes() {
                     if let Some(slot) = node.slot {
@@ -48,7 +50,7 @@ fn task_overview_shows_only_supplied_ending_facts_with_opaque_state_loss_and_raw
                         found += 1;
                     }
                 }
-                assert_eq!(found, 1);
+                assert_eq!(found, 2, "shared card and overview each retain the whole raw part");
                 assert!(contains(&tree, b"a/b"));
                 assert!(contains(&tree, b"\\xFF\\x00"));
             }
@@ -73,6 +75,12 @@ fn task_overview_shows_only_supplied_ending_facts_with_opaque_state_loss_and_raw
         let tree = builder.finish();
         assert!(tree.len() <= crate::task_result::nodes(&CLIENT).unwrap());
         assert!(contains(&tree, b"source reason"));
+        let slots: Vec<_> = tree.nodes().iter().filter_map(|node| node.slot).collect();
+        assert_eq!(slots.len(), fragment_slots);
+        for slot in slots {
+            assert_eq!(bindings.owner_part(slot.token), Some(&part));
+            assert_eq!(bindings.part(slot.token), None);
+        }
     }
 }
 
