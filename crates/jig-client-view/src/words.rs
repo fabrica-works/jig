@@ -10,7 +10,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::{
-    contract::{Actor, Decision, Ending, Executor, Made, Outcome},
+    contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome},
     intents::Progress,
     link::Link,
 };
@@ -71,6 +71,17 @@ impl Words {
             Executor::Role { .. } => JigPhrase::RoleExecutor,
         };
         self.text(b, phrase, &[]);
+    }
+    /// Say the complete requested goal executor, with only supplied numbers.
+    pub fn goal_executor(&self, b: &mut Builder, executor: GoalExecutor) {
+        match executor {
+            GoalExecutor::Charter(number) => self.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(number))]),
+            GoalExecutor::Procedure { connector, code } => self.text(
+                b,
+                JigPhrase::GoalProcedure,
+                &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(code))],
+            ),
+        }
     }
     /// Show an amount in the engine's units.
     pub fn amount(&self, b: &mut Builder, amount: u64) {

@@ -1,7 +1,7 @@
 //! Compare concrete drafts with the engine's numbers and lists.
 //! The engine owns authorization; no role or policy is interpreted here.
 //! See client/domain/pages.md, 6.2, and objects.md, 11.
-use super::{Admission, Amendment, Authority, Beyond, Bounds, Refusal};
+use super::{Admission, Amendment, Authority, Beyond, Bounds, GoalExecutor, Refusal};
 use skein_lib::Wall;
 
 fn beyond(value: &Beyond) -> Admission {
@@ -23,14 +23,33 @@ fn deadline(draft: Option<Wall>, latest: Option<Wall>) -> bool {
 
 /// Explain the selected goal using only its current offer's factual bounds.
 #[must_use]
-pub fn goal(offer: &Admission, charter: u32, budget: u64, at: Option<Wall>) -> Admission {
+pub fn goal(offer: &Admission, executor: GoalExecutor, budget: u64, at: Option<Wall>) -> Admission {
     match offer {
         Admission::Bounded { within, beyond: outside } => match within {
-            Bounds::Goal { pool_left: _, charters, latest, budget: allowed, maximum_budget, maximum_deadline } => {
+            Bounds::Goal {
+                pool_left: _,
+                charters,
+                procedures,
+                latest,
+                budget: allowed,
+                maximum_budget,
+                maximum_deadline,
+            } => {
                 let mut listed = false;
-                for number in charters {
-                    if *number == charter {
-                        listed = true;
+                match executor {
+                    GoalExecutor::Charter(charter) => {
+                        for number in charters {
+                            if *number == charter {
+                                listed = true;
+                            }
+                        }
+                    }
+                    GoalExecutor::Procedure { connector, code } => {
+                        for procedure in procedures {
+                            if procedure.connector == connector && procedure.code == code {
+                                listed = true;
+                            }
+                        }
                     }
                 }
                 if !listed || budget > *maximum_budget || !deadline(at, *maximum_deadline) {

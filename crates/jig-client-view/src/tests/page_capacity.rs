@@ -191,6 +191,26 @@ fn project_pages(words: &Words) {
         let (mut d, out) = entered(Address::Project { project: 4, section });
         let mut doc = project_doc();
         doc.name = full();
+        if section == ProjectSection::Goals {
+            doc.acts = list([Offered {
+                act: ActKind::SetGoal,
+                admission: Admission::Bounded {
+                    within: Bounds::Goal {
+                        pool_left: u64::MAX,
+                        charters: list([1, 2]),
+                        procedures: list([
+                            GoalProcedure { connector: u16::MAX, code: u32::MAX },
+                            GoalProcedure { connector: u16::MAX, code: u32::MAX.checked_sub(1).unwrap() },
+                        ]),
+                        latest: None,
+                        budget: 0,
+                        maximum_budget: u64::MAX,
+                        maximum_deadline: None,
+                    },
+                    beyond: Beyond::Proposed { to: Recipient::Roles { project: 4, roles: list([1, 2]) } },
+                },
+            }]);
+        }
         doc.resources = parts();
         doc.parts = parts();
         doc.policy.ceiling = authority();
@@ -245,7 +265,7 @@ fn project_pages(words: &Words) {
                     act: Act::GoalForm {
                         form: jig_client::pages::project::goals::GoalForm {
                             project: 4,
-                            charter: 1,
+                            executor: GoalExecutor::Charter(1),
                             budget: u64::MAX,
                             deadline: Some(Wall::from_nanos(u64::MAX)),
                             priority: u32::MAX,

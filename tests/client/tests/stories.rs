@@ -232,3 +232,54 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
         ));
     }
 }
+
+#[test]
+fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
+    for seed in [51, 52] {
+        let mut w = stories::procedure_goal_world(seed);
+        let c = w.client(
+            7,
+            jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
+                project: 1,
+                section: jig_client::address::ProjectSection::Goals,
+            }),
+        );
+        w.person(
+            c,
+            vec![
+                Step::See { find: Find::named(Role::TextArea, b"Goal specification"), within: WITHIN },
+                Step::Type {
+                    find: Find::named(Role::TextArea, b"Goal specification"),
+                    words: Box::from(*b"Resolve incident"),
+                },
+                Step::Press { find: Find::named(Role::Button, b"Connector 2, procedure 7") },
+                Step::Type { find: Find::named(Role::TextField, b"Goal budget"), words: Box::from(*b"2") },
+                Step::Press { find: Find::named(Role::Button, b"Set goal") },
+                Step::See { find: Find::text(b"Connector 2, procedure 7"), within: WITHIN },
+                Step::See { find: Find::text(b"proposed"), within: WITHIN },
+                Step::Press { find: Find::named(Role::Button, b"Confirm") },
+                Step::See { find: Find::text(b"Proposed by task"), within: WITHIN },
+            ],
+        );
+        let result = w.run(Until::Done);
+        assert_eq!(result.verdict, skein_world::domain::Verdict::Passed);
+        let commits = w.front().engine.commits();
+        let requests: Vec<_> = commits.iter().filter_map(|c| c.ask.as_ref()).collect();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(
+            requests[0],
+            &jig_client::contract::Ask::SetGoal {
+                project: 1,
+                spec: stories::text(b"Resolve incident"),
+                executor: jig_client::contract::GoalExecutor::Procedure { connector: 2, code: 7 },
+                budget: 2,
+                priority: 0,
+                deadline: None,
+            }
+        );
+        assert!(matches!(
+            commits.iter().find(|c| c.key.is_some()).unwrap().answer,
+            Some(jig_client::contract::Answer::Done(jig_client::contract::Outcome::Proposed { .. }))
+        ));
+    }
+}

@@ -877,6 +877,7 @@ fn bounded_offer_payloads_and_predictions() {
         let within = if variant == 0 {
             DraftBounds::Goal {
                 pool_left: 1,
+                procedures: List::with_capacity(0),
                 charters: List::with_capacity(33),
                 latest: None,
                 budget: 1,
@@ -979,6 +980,7 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
             Admission::Bounded {
                 within: jig_client::contract::Bounds::Goal {
                     pool_left: 10,
+                    procedures: List::with_capacity(0),
                     charters: list(vec![1]),
                     latest: None,
                     budget: 0,
@@ -1357,4 +1359,82 @@ fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
     assert_eq!(value.rows.len(), 1);
     assert_eq!(value.rows.get(0).unwrap().chip.task, 8);
     assert!(!value.more);
+}
+
+#[test]
+fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
+    let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let offer = Admission::Bounded {
+        within: jig_client::contract::Bounds::Goal {
+            pool_left: 100,
+            charters: list(vec![]),
+            procedures: list(vec![
+                GoalProcedure { connector: u16::MAX, code: u32::MAX },
+                GoalProcedure { connector: 7, code: u32::MAX },
+            ]),
+            latest: None,
+            budget: 3,
+            maximum_budget: 10,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Proposed { to: Recipient::Party(2) },
+    };
+    let bytes = u64::try_from(core::mem::size_of::<Admission>()).unwrap()
+        + List::<u32>::worst_case(0).unwrap()
+        + List::<GoalProcedure>::worst_case(2).unwrap();
+    let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
+    assert!(crate::payload::fits(&offer, &bounds));
+    bounds.document_bytes = bytes.checked_sub(1).unwrap();
+    assert!(!crate::payload::fits(&offer, &bounds));
+    bounds.document_bytes = u64::MAX;
+    bounds.rows = 1;
+    assert!(!crate::payload::fits(&offer, &bounds));
+    let mut room = offer.clone();
+    let Admission::Bounded { within: jig_client::contract::Bounds::Goal { procedures, .. }, .. } = &mut room else {
+        panic!("goal bounds");
+    };
+    *procedures = List::with_capacity(3);
+    bounds.rows = 2;
+    assert!(!crate::payload::fits(&room, &bounds), "unused allocated room is bounded too");
+    for (executor, budget, answer) in [
+        (exact, 3, Answer::Done(Outcome::Changed)),
+        (exact, 4, Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: 1, number: 2 } })),
+        (GoalExecutor::Procedure { connector: 6, code: u32::MAX }, 3, Answer::Refused(Refusal::NotOffered)),
+        (GoalExecutor::Procedure { connector: u16::MAX, code: 7 }, 3, Answer::Refused(Refusal::NotOffered)),
+        (GoalExecutor::Charter(1), 3, Answer::Refused(Refusal::NotOffered)),
+        (exact, 11, Answer::Refused(Refusal::NotOffered)),
+    ] {
+        let mut setup = live_script();
+        // A project-scoped ask reads only its actual project's offered facts.
+        let project = Project {
+            number: 1,
+            period: 1,
+            name: text(b"project"),
+            spend: Budget { total: 100, own: 0, ended: 0, reserved: 0, left: 100, funder: Actor::Deployment },
+            policy: Policy {
+                ceiling: authority(),
+                period: 1,
+                spend: 0,
+                roles: list(vec![]),
+                requirements: list(vec![]),
+                deciders: list(vec![]),
+            },
+            roles: list(vec![]),
+            pools: list(vec![]),
+            resources: list(vec![]),
+            services: list(vec![]),
+            recurring: list(vec![]),
+            parts: list(vec![]),
+            spend_lines: list(vec![]),
+            acts: list(vec![Offered { act: ActKind::SetGoal, admission: offer.clone() }]),
+        };
+        setup.truth.projects.insert(1, project);
+        let ask =
+            Ask::SetGoal { project: 1, spec: text(b"exact procedure"), executor, budget, priority: 8, deadline: None };
+        setup.rules.push(Rule { party: Some(1), ask: ask.clone(), answer: answer.clone(), changes: vec![] });
+        let mut engine = Engine::new(setup, 1).unwrap();
+        send(&mut engine, 0, 11, 1, 1, ask.clone());
+        assert_eq!(final_answer(&engine.poll(at(10_000_000))[0]), &answer);
+        assert_eq!(engine.commits()[0].ask, Some(ask));
+    }
 }

@@ -1126,6 +1126,12 @@ pub fn language() -> Language {
             JigPhrase::Charter => {
                 Box::new([Segment::Text(copy_of(b"Charter ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
+            JigPhrase::GoalProcedure => Box::new([
+                Segment::Text(copy_of(b"Connector ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", procedure ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
             JigPhrase::Priority => {
                 Box::new([Segment::Text(copy_of(b"Priority ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }

@@ -534,6 +534,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
         admission: Admission::Bounded {
             within: jig_client::contract::Bounds::Goal {
                 pool_left: 1,
+                procedures: list([]),
                 charters: list([1]),
                 latest: None,
                 budget: 1,
@@ -557,7 +558,75 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
             ask: Ask::SetGoal {
                 project: 1,
                 spec: text(b"Resolve incident"),
-                executor: Executor::Agent { charter: 1 },
+                executor: GoalExecutor::Charter(1),
+                budget: 2,
+                priority: 0,
+                deadline: None,
+            },
+            answer: Answer::Done(Outcome::Proposed { proposal: p.key }),
+            changes: vec![jig_scripted_engine::Change::Object {
+                project: 1,
+                key: ObjectKey::Proposal(p.key),
+                value: ReadValue::Proposal(Box::new(p)),
+            }],
+        })
+        .expect("proposed goal rule fits");
+    world
+}
+
+/// A procedure-only goal form using the exact supplied pair and offered judgment.
+#[must_use]
+pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
+    let mut world = world(seed);
+    let mut procedure_frame = frame(7);
+    procedure_frame.projects.get_mut(0).expect("project exists").goals = list([]);
+    world
+        .front()
+        .engine
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Frame(procedure_frame))
+        .expect("procedure-only frame fits");
+    let mut doc = project();
+    doc.acts = list([Offered {
+        act: ActKind::SetGoal,
+        admission: Admission::Bounded {
+            within: jig_client::contract::Bounds::Goal {
+                pool_left: 1,
+                procedures: list([GoalProcedure { connector: 2, code: 7 }]),
+                charters: list([]),
+                latest: None,
+                budget: 1,
+                maximum_budget: 100,
+                maximum_deadline: None,
+            },
+            beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
+        },
+    }]);
+    world
+        .front()
+        .engine
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Project(Box::new(doc)))
+        .expect("project facts fit");
+    let mut p = proposal();
+    match &mut p.action {
+        ProposalAction::Batch { tasks, .. } => {
+            let row = tasks.get_mut(0).expect("one proposed goal");
+            row.executor = Executor::Procedure { connector: 2, kind: 7 };
+            row.spec = text(b"Resolve incident");
+            row.budget = 2;
+        }
+        ProposalAction::Amend { .. } | ProposalAction::Effect { .. } | ProposalAction::Widen { .. } => {
+            panic!("goal fixture is a batch")
+        }
+    }
+    world
+        .front()
+        .engine
+        .script(jig_scripted_engine::Rule {
+            party: Some(7),
+            ask: Ask::SetGoal {
+                project: 1,
+                spec: text(b"Resolve incident"),
+                executor: GoalExecutor::Procedure { connector: 2, code: 7 },
                 budget: 2,
                 priority: 0,
                 deadline: None,

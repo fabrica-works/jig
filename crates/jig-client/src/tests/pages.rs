@@ -678,6 +678,7 @@ fn project_document() -> Project {
         admission: Admission::Bounded {
             within: Bounds::Goal {
                 pool_left: 20,
+                procedures: List::with_capacity(0),
                 charters,
                 latest: None,
                 budget: 20,
@@ -845,7 +846,7 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
         Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project_document()))) },
     );
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"new goal") } });
-    let form = GoalForm { project: 1, charter: 1, budget: 21, deadline: None, priority: 2 };
+    let form = GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 2 };
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
     let opened = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
     assert!(opened.is_empty());
@@ -872,7 +873,7 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
         Ask::SetGoal {
             project: 1,
             spec: text(b"new goal"),
-            executor: Executor::Agent { charter: 1 },
+            executor: GoalExecutor::Charter(1),
             budget: 21,
             priority: 2,
             deadline: None
@@ -911,6 +912,7 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
     doc.acts.get_mut(0).unwrap().admission = Admission::Bounded {
         within: Bounds::Goal {
             pool_left: 20,
+            procedures: List::with_capacity(0),
             charters: {
                 let mut rows = List::with_capacity(1);
                 rows.push(99).unwrap();
@@ -933,7 +935,7 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
         (99, 3, Some(Wall::from_nanos(101)), false),
         (99, 3, None, false),
     ] {
-        let form = GoalForm { project: 1, charter, budget, deadline, priority: 1 };
+        let form = GoalForm { project: 1, executor: GoalExecutor::Charter(charter), budget, deadline, priority: 1 };
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
         assert_eq!(domain.project_page().form.confirmation.is_some(), allowed);
@@ -953,7 +955,8 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
             assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
         }
     }
-    let form = GoalForm { project: 1, charter: 99, budget: 3, deadline: Some(latest), priority: 1 };
+    let form =
+        GoalForm { project: 1, executor: GoalExecutor::Charter(99), budget: 3, deadline: Some(latest), priority: 1 };
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
     assert!(domain.project_page().form.confirmation.is_some());
@@ -982,6 +985,7 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
     refused.acts.get_mut(0).unwrap().admission = Admission::Bounded {
         within: Bounds::Goal {
             pool_left: 20,
+            procedures: List::with_capacity(0),
             charters: {
                 let mut rows = List::with_capacity(1);
                 rows.push(99).unwrap();
@@ -995,7 +999,8 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
         beyond: Beyond::Refused(nobody.clone()),
     };
     crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), refused, &mut out);
-    let form = GoalForm { project: 1, charter: 99, budget: 4, deadline: Some(latest), priority: 1 };
+    let form =
+        GoalForm { project: 1, executor: GoalExecutor::Charter(99), budget: 4, deadline: Some(latest), priority: 1 };
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
     let emitted = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
     assert!(emitted.is_empty());
@@ -1481,7 +1486,7 @@ fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
         Time::ZERO,
         Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"collective") } },
     );
-    let form = GoalForm { project: 1, charter: 1, budget: 21, deadline: None, priority: 1 };
+    let form = GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 1 };
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
     let open = domain.project_page().form.confirmation.as_ref().unwrap();
@@ -1495,7 +1500,7 @@ fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
         Ask::SetGoal {
             project: 1,
             spec: text(b"collective"),
-            executor: Executor::Agent { charter: 1 },
+            executor: GoalExecutor::Charter(1),
             budget: 21,
             priority: 1,
             deadline: None,
@@ -1721,4 +1726,115 @@ fn conversations_address_project_preselects_form_without_filtering_rows() {
     assert_eq!(domain.conversation_rows().rows.len(), 2);
     assert_eq!(domain.conversation_rows().rows.get(0).unwrap().project, 2);
     assert_eq!(domain.address, Address::Conversations { project: Some(1) });
+}
+
+#[test]
+fn procedure_goal_pairs_and_current_bounds_control_confirmation_and_exact_departure() {
+    use crate::{action::Act, fields::Purpose, pages::project::goals::GoalForm};
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    let mut doc = project_document();
+    let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let until = skein_lib::Wall::from_nanos(100);
+    doc.acts.get_mut(0).unwrap().admission = Admission::Bounded {
+        within: Bounds::Goal {
+            pool_left: 50,
+            charters: List::with_capacity(0),
+            procedures: {
+                let mut pairs = List::with_capacity(2);
+                pairs.push(GoalProcedure { connector: u16::MAX, code: u32::MAX }).unwrap();
+                pairs.push(GoalProcedure { connector: 7, code: u32::MAX }).unwrap();
+                pairs
+            },
+            latest: Some(until),
+            budget: 3,
+            maximum_budget: 10,
+            maximum_deadline: Some(skein_lib::Wall::from_nanos(200)),
+        },
+        beyond: Beyond::Proposed { to: Recipient::Party(9) },
+    };
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"numeric procedure") } },
+    );
+    for (executor, budget, deadline, predicted) in [
+        (exact, 3, Some(until), Admission::Allowed),
+        (exact, 4, Some(until), Admission::Proposed { to: Recipient::Party(9) }),
+        (exact, 3, Some(skein_lib::Wall::from_nanos(101)), Admission::Proposed { to: Recipient::Party(9) }),
+        (
+            GoalExecutor::Procedure { connector: 6, code: u32::MAX },
+            3,
+            Some(until),
+            Admission::Refused(Refusal::NotOffered),
+        ),
+        (
+            GoalExecutor::Procedure { connector: u16::MAX, code: 7 },
+            3,
+            Some(until),
+            Admission::Refused(Refusal::NotOffered),
+        ),
+        (GoalExecutor::Charter(1), 3, Some(until), Admission::Refused(Refusal::NotOffered)),
+        (exact, 11, Some(until), Admission::Refused(Refusal::NotOffered)),
+        (exact, 3, None, Admission::Refused(Refusal::NotOffered)),
+    ] {
+        let form = GoalForm { project: 1, executor, budget, deadline, priority: 8 };
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } }).is_empty());
+        match predicted {
+            Admission::Allowed => assert!(!domain.project_page().form.confirmation.as_ref().unwrap().proposed),
+            Admission::Proposed { to } => {
+                assert_eq!(domain.project_page().form.confirmation.as_ref().unwrap().to, Some(to))
+            }
+            Admission::Refused(why) => {
+                assert_eq!(domain.project_page().form.refusal, Some(why));
+                assert!(domain.project_page().form.confirmation.is_none());
+                assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+            }
+            Admission::Bounded { .. } => panic!("concrete prediction"),
+        }
+    }
+    let form = GoalForm { project: 1, executor: exact, budget: 4, deadline: Some(until), priority: 8 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let mut moved = domain.project_page().document.as_ref().unwrap().clone();
+    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
+        &mut moved.acts.get_mut(0).unwrap().admission
+    else {
+        panic!("goal bounds");
+    };
+    procedures.clear();
+    procedures.push(GoalProcedure { connector: 7, code: u32::MAX }).unwrap();
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), moved, &mut out);
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    let mut restored = domain.project_page().document.as_ref().unwrap().clone();
+    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
+        &mut restored.acts.get_mut(0).unwrap().admission
+    else {
+        panic!("goal bounds");
+    };
+    procedures.push(GoalProcedure { connector: u16::MAX, code: u32::MAX }).unwrap();
+    crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), restored, &mut out);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert_eq!(sent.len(), 1);
+    let Request::Send { ask, .. } = &sent[0] else {
+        panic!("goal request");
+    };
+    assert_eq!(
+        **ask,
+        Ask::SetGoal {
+            project: 1,
+            spec: text(b"numeric procedure"),
+            executor: exact,
+            budget: 4,
+            priority: 8,
+            deadline: Some(until)
+        }
+    );
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
 }

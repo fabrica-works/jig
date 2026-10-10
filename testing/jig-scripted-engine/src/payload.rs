@@ -6,7 +6,7 @@ use jig_client::contract::{
     Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, AdmissionLimit, Amendment, Answer, Ask,
     AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing,
     ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider, Decision, Delivery,
-    Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, FieldRule, Frame, GoalLine,
+    Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, FieldRule, Frame, GoalExecutor, GoalProcedure, GoalLine,
     GoalPage, Goals, Grant, HeldRole, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure,
     HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made,
     Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter,
@@ -244,6 +244,15 @@ impl Payload for Actor {
         }
     }
 }
+fields!(GoalProcedure { connector, code });
+impl Payload for GoalExecutor {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Charter(charter) => charter.heap(bounds),
+            Self::Procedure { connector, code } => sum(&[connector.heap(bounds), code.heap(bounds)]),
+        }
+    }
+}
 impl Payload for Executor {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -454,9 +463,10 @@ impl Payload for Admission {
 impl Payload for jig_client::contract::Bounds {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Goal { pool_left, charters, latest, budget, maximum_budget, maximum_deadline } => sum(&[
+            Self::Goal { pool_left, charters, procedures, latest, budget, maximum_budget, maximum_deadline } => sum(&[
                 pool_left.heap(bounds),
                 charters.heap(bounds),
+                procedures.heap(bounds),
                 latest.heap(bounds),
                 budget.heap(bounds),
                 maximum_budget.heap(bounds),

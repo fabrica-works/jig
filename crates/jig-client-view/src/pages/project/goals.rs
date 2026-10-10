@@ -7,7 +7,7 @@ use crate::{
 use jig_client::{
     Domain,
     action::Act,
-    contract::{GoalLine, ObjectKey, Project},
+    contract::{ActKind, Admission, Bounds, GoalExecutor, GoalLine, ObjectKey, Project},
     fields::Purpose,
     pages::project::goals::GoalForm,
 };
@@ -58,7 +58,7 @@ fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings
     let state = &client.project_page().form;
     if let Some(frame) = &client.frame().document {
         for role in &frame.projects {
-            if role.project != doc.number || role.goals.is_empty() {
+            if role.project != doc.number {
                 continue;
             }
             let mut pool_left = role.pool.left;
@@ -67,70 +67,28 @@ fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings
                     pool_left = pool.budget.left;
                 }
             }
-            let current = match state.form {
-                Some(form) if form.project == doc.number => Some(form),
-                Some(_) | None => None,
-            };
+            let mut bounds = None;
+            for offer in &doc.acts {
+                if offer.act == ActKind::SetGoal {
+                    bounds = match &offer.admission {
+                        Admission::Bounded { within: Bounds::Goal { pool_left: left, .. }, .. } => {
+                            pool_left = *left;
+                            Some(&offer.admission)
+                        }
+                        Admission::Allowed
+                        | Admission::Proposed { .. }
+                        | Admission::Refused(_)
+                        | Admission::Bounded { within: Bounds::Amend { .. }, .. } => None,
+                    };
+                }
+            }
+            if bounds.is_none() && role.goals.is_empty() {
+                continue;
+            }
             words.text(b, JigPhrase::PoolLeft, &[Hole::Amount(pool_left)]);
             cards::common::field(b, client, Purpose::NewGoal, JigPhrase::GoalWords, words, bindings);
-            for charter in &role.goals {
-                let form = current.unwrap_or(GoalForm {
-                    project: doc.number,
-                    charter: charter.number,
-                    budget: pool_left,
-                    deadline: None,
-                    priority: 0,
-                });
-                let form = GoalForm { charter: charter.number, ..form };
-                crate::frame::control(
-                    b,
-                    words,
-                    bindings,
-                    Role::Button,
-                    JigPhrase::Charter,
-                    &[Hole::Number(u64::from(charter.number))],
-                    Act::GoalForm { form },
-                );
-                b.text(crate::Run::Plain, charter.name.bytes());
-            }
-            if let Some(form) = current {
-                for (field, phrase) in [
-                    (Field::Budget, JigPhrase::GoalBudget),
-                    (Field::Deadline, JigPhrase::GoalDeadline),
-                    (Field::Priority, JigPhrase::GoalPriority),
-                ] {
-                    b.open(Role::TextField);
-                    b.name(&words.say(phrase, &[]));
-                    match field {
-                        Field::Budget => b.value(skein_lib::Decimal::of(form.budget).as_bytes(), state.writes),
-                        Field::Priority => {
-                            b.value(skein_lib::Decimal::of(u64::from(form.priority)).as_bytes(), state.writes);
-                        }
-                        Field::Deadline => match form.deadline {
-                            Some(at) => b.value(&date(at), state.writes),
-                            None => b.value(&[], state.writes),
-                        },
-                    }
-                    b.bind(bindings.insert(JigMeaning::GoalField { form, field }));
-                    b.close();
-                }
-                words.text(b, JigPhrase::Budget, &[Hole::Amount(form.budget)]);
-                words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(form.priority))]);
-                if let Some(deadline) = form.deadline {
-                    words.deadline(b, deadline);
-                }
-                if form.budget > pool_left {
-                    words.text(b, JigPhrase::GoalPropose, &[]);
-                }
-                super::super::work::control(
-                    b,
-                    words,
-                    bindings,
-                    JigPhrase::ActSetGoal,
-                    Act::Submit { field: Purpose::NewGoal },
-                    false,
-                );
-            }
+            choices(b, client, doc, words, bindings, pool_left, bounds);
+            inputs(b, client, doc, words, bindings, pool_left);
         }
     }
     if let Some(submission) = &state.pending {
@@ -147,6 +105,181 @@ fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings
     }
     if let Some(answer) = &state.answer {
         words.outcome(b, answer);
+    }
+}
+/// Bounds supply the whole choice list; Frame supplies only actual charter names.
+fn choices(
+    b: &mut Builder,
+    client: &Domain,
+    doc: &Project,
+    words: &Words,
+    bindings: &mut JigBindings,
+    pool_left: u64,
+    offer: Option<&Admission>,
+) {
+    match offer {
+        Some(Admission::Bounded { within: Bounds::Goal { charters, procedures, .. }, .. }) => {
+            for charter in charters {
+                choice(b, client, words, bindings, doc.number, GoalExecutor::Charter(*charter), pool_left);
+            }
+            for procedure in procedures {
+                choice(
+                    b,
+                    client,
+                    words,
+                    bindings,
+                    doc.number,
+                    GoalExecutor::Procedure { connector: procedure.connector, code: procedure.code },
+                    pool_left,
+                );
+            }
+        }
+        None
+        | Some(
+            Admission::Allowed
+            | Admission::Proposed { .. }
+            | Admission::Refused(_)
+            | Admission::Bounded { within: Bounds::Amend { .. }, .. },
+        ) => {
+            if let Some(frame) = &client.frame().document {
+                for role in &frame.projects {
+                    if role.project == doc.number {
+                        for charter in &role.goals {
+                            choice(
+                                b,
+                                client,
+                                words,
+                                bindings,
+                                doc.number,
+                                GoalExecutor::Charter(charter.number),
+                                pool_left,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+fn choice(
+    b: &mut Builder,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+    project: u32,
+    executor: GoalExecutor,
+    pool_left: u64,
+) {
+    let form = match client.project_page().form.form {
+        Some(form) if form.project == project => GoalForm { executor, ..form },
+        Some(_) | None => GoalForm { project, executor, budget: pool_left, deadline: None, priority: 0 },
+    };
+    match executor {
+        GoalExecutor::Charter(number) => crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::Charter,
+            &[Hole::Number(u64::from(number))],
+            Act::GoalForm { form },
+        ),
+        GoalExecutor::Procedure { connector, code } => crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::GoalProcedure,
+            &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(code))],
+            Act::GoalForm { form },
+        ),
+    }
+    match executor {
+        GoalExecutor::Charter(number) => {
+            if let Some(frame) = &client.frame().document {
+                for role in &frame.projects {
+                    if role.project == project {
+                        for charter in &role.goals {
+                            if charter.number == number {
+                                b.text(crate::Run::Plain, charter.name.bytes());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        GoalExecutor::Procedure { .. } => {}
+    }
+}
+fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings, pool_left: u64) {
+    let state = &client.project_page().form;
+    if let Some(form) = state.form {
+        if form.project != doc.number {
+            return;
+        }
+        for (field, phrase) in [
+            (Field::Budget, JigPhrase::GoalBudget),
+            (Field::Deadline, JigPhrase::GoalDeadline),
+            (Field::Priority, JigPhrase::GoalPriority),
+        ] {
+            b.open(Role::TextField);
+            b.name(&words.say(phrase, &[]));
+            match field {
+                Field::Budget => b.value(skein_lib::Decimal::of(form.budget).as_bytes(), state.writes),
+                Field::Priority => {
+                    b.value(skein_lib::Decimal::of(u64::from(form.priority)).as_bytes(), state.writes);
+                }
+                Field::Deadline => match form.deadline {
+                    Some(at) => b.value(&date(at), state.writes),
+                    None => b.value(&[], state.writes),
+                },
+            }
+            b.bind(bindings.insert(JigMeaning::GoalField { form, field }));
+            b.close();
+        }
+        words.text(b, JigPhrase::Budget, &[Hole::Amount(form.budget)]);
+        words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(form.priority))]);
+        if let Some(deadline) = form.deadline {
+            words.deadline(b, deadline);
+        }
+        let mut offered = None;
+        for offer in &doc.acts {
+            if offer.act == ActKind::SetGoal {
+                offered = Some(&offer.admission);
+            }
+        }
+        match offered {
+            Some(Admission::Bounded { .. }) => {
+                match jig_client::contract::admission::goal(
+                    offered.expect("bounded offer above"),
+                    form.executor,
+                    form.budget,
+                    form.deadline,
+                ) {
+                    Admission::Proposed { to } => {
+                        let phrase =
+                            if form.budget > pool_left { JigPhrase::GoalPropose } else { JigPhrase::WillPropose };
+                        words.text(b, phrase, &[]);
+                        cards::common::recipient(b, &to, words);
+                    }
+                    Admission::Refused(why) => words.refusal(b, &why),
+                    Admission::Allowed | Admission::Bounded { .. } => {}
+                }
+            }
+            None | Some(Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_)) => {
+                if form.budget > pool_left {
+                    words.text(b, JigPhrase::GoalPropose, &[]);
+                }
+            }
+        }
+        super::super::work::control(
+            b,
+            words,
+            bindings,
+            JigPhrase::ActSetGoal,
+            Act::Submit { field: Purpose::NewGoal },
+            false,
+        );
     }
 }
 pub(super) fn line(b: &mut Builder, client: &Domain, goal: &GoalLine, words: &Words, bindings: &mut JigBindings) {

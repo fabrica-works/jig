@@ -587,6 +587,8 @@ pub enum JigPhrase {
     NoteBody,
     /// Charter (0).
     Charter,
+    /// Connector (0), procedure code (1), supplied by the goal bounds.
+    GoalProcedure,
     /// Priority (0).
     Priority,
     /// Notice.
@@ -1243,6 +1245,7 @@ impl JigPhrase {
             Self::NoteDescription => 268,
             Self::NoteBody => 269,
             Self::Charter => 270,
+            Self::GoalProcedure => 510,
             Self::Priority => 271,
             Self::Notice => 272,
             Self::UnknownAction => 273,
@@ -1952,6 +1955,7 @@ impl JigPhrase {
             | Self::Closing
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::SpecificationNumber
+            | Self::GoalProcedure
             | Self::RequiredJudgeMissing
             | Self::FailedJudge
             | Self::UnguardedJudge
@@ -2322,6 +2326,7 @@ pub const ALL: [JigPhrase; 515] = [
     JigPhrase::NoteDescription,
     JigPhrase::NoteBody,
     JigPhrase::Charter,
+    JigPhrase::GoalProcedure,
     JigPhrase::Priority,
     JigPhrase::Notice,
     JigPhrase::UnknownAction,

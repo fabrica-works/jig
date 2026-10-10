@@ -42,7 +42,7 @@ pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         words.text(b, JigPhrase::WillGoal, &[]);
         crate::markdown::read(open.words.bytes(), 2, b);
         words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(open.form.project))]);
-        words.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(open.form.charter))]);
+        words.goal_executor(b, open.form.executor);
         words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(open.form.priority))]);
         words.text(b, JigPhrase::Budget, &[Hole::Amount(open.form.budget)]);
         if let Some(deadline) = open.form.deadline {

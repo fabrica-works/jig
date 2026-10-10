@@ -958,7 +958,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
             act: Action::GoalForm {
                 form: jig_client::pages::project::goals::GoalForm {
                     project: 4,
-                    charter: 1,
+                    executor: GoalExecutor::Charter(1),
                     budget: 21,
                     deadline: Some(Wall::EPOCH),
                     priority: 2,

@@ -13,7 +13,7 @@ use crate::{
     Domain, Request,
     address::{Address, Place},
     contract::{
-        ActKind, Admission, Answer, Ask, Bounds, Executor, GoalLine, Made, Outcome, Phase, Recipient, Refusal, Text,
+        ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Made, Outcome, Phase, Recipient, Refusal, Text,
     },
     fields::Purpose,
     intents::Origin,
@@ -21,11 +21,11 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, Token, Wall};
-/// Goal options chosen from the project's offered charters and party pool.
+/// Goal options chosen from the project's offered executors and party pool.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GoalForm {
     pub project: u32,
-    pub charter: u32,
+    pub executor: GoalExecutor,
     pub budget: u64,
     pub deadline: Option<Wall>,
     pub priority: u32,
@@ -127,10 +127,15 @@ fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission,
     if let Some(frame) = &domain.frame.document {
         for project in &frame.projects {
             if project.project == form.project {
-                for charter in &project.goals {
-                    if charter.number == form.charter {
-                        offered = true;
+                match form.executor {
+                    GoalExecutor::Charter(number) => {
+                        for charter in &project.goals {
+                            if charter.number == number {
+                                offered = true;
+                            }
+                        }
                     }
+                    GoalExecutor::Procedure { .. } => {}
                 }
                 pool = Some(project.pool.left);
             }
@@ -162,7 +167,7 @@ fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission,
             }
         }
     }
-    Some((crate::contract::admission::goal(&admission, form.charter, form.budget, form.deadline), pool?))
+    Some((crate::contract::admission::goal(&admission, form.executor, form.budget, form.deadline), pool?))
 }
 /// Refresh an unsent draft when the supplied project facts move.
 pub(crate) fn sync(domain: &mut Domain) {
@@ -206,7 +211,7 @@ pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
     let ask = Ask::SetGoal {
         project: open.form.project,
         spec: open.words.clone(),
-        executor: Executor::Agent { charter: open.form.charter },
+        executor: open.form.executor,
         budget: open.form.budget,
         priority: open.form.priority,
         deadline: open.form.deadline,

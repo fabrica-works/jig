@@ -1,9 +1,17 @@
 //! Each visible act is one ask; client/domain/contract.md, 3.2 and 4.
 //! Requests carry jig facts alone and their outcomes are durable.
 //! Adoption uses the connector's application request (client/domain/pages.md, 6.5).
-use super::{Actor, Authority, Decision, Executor, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
+use super::{Actor, Authority, Decision, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
+/// Executors the engine supports for a tracked goal; domain/people.md, 5.1.
+/// Numeric identities stay whole; procedure names and parameters are not supplied.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum GoalExecutor {
+    Charter(u32),
+    Procedure { connector: u16, code: u32 },
+}
+
 /// A task change whose spec revision the request names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Amendment {
@@ -129,7 +137,7 @@ pub enum Ask {
     /// Become a task requester and fund it.
     TakeOver { project: u32, task: u64, reason: Text },
     /// Make or propose a goal.
-    SetGoal { project: u32, spec: Text, executor: Executor, budget: u64, priority: u32, deadline: Option<Wall> },
+    SetGoal { project: u32, spec: Text, executor: GoalExecutor, budget: u64, priority: u32, deadline: Option<Wall> },
     /// Change goal priorities together.
     Prioritise { project: u32, goals: List<Priority> },
     /// Move a read position explicitly.

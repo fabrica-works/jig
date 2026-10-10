@@ -247,9 +247,9 @@ impl<A: crate::Application> Engine<A> {
         let bounded = matches!(admission, Some(Admission::Bounded { .. }));
         let prediction = admission.map(|offer| match offer {
             Admission::Bounded { .. } => match ask {
-                Ask::SetGoal {
-                    executor: jig_client::contract::Executor::Agent { charter }, budget, deadline, ..
-                } => jig_client::contract::admission::goal(offer, *charter, *budget, *deadline),
+                Ask::SetGoal { executor, budget, deadline, .. } => {
+                    jig_client::contract::admission::goal(offer, *executor, *budget, *deadline)
+                }
                 Ask::Amend { task, change, .. } => match self.truth.objects.get(&ObjectKey::Task(*task)) {
                     Some(ReadValue::Task(before)) => {
                         jig_client::contract::admission::amendment(offer, change, &before.authority)
@@ -274,7 +274,6 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::Cancel { .. }
                 | Ask::Close { .. }
                 | Ask::TakeOver { .. }
-                | Ask::SetGoal { .. }
                 | Ask::Prioritise { .. }
                 | Ask::MarkSeen { .. }
                 | Ask::EditNote { .. }

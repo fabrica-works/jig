@@ -396,8 +396,13 @@ fn project_sections(words: &Words) {
 }
 fn goal_form(words: &Words) {
     let (mut d, _) = project(ProjectSection::Goals);
-    let form =
-        jig_client::pages::project::goals::GoalForm { project: 4, charter: 2, budget: 30, deadline: None, priority: 1 };
+    let form = jig_client::pages::project::goals::GoalForm {
+        project: 4,
+        executor: GoalExecutor::Charter(2),
+        budget: 30,
+        deadline: None,
+        priority: 1,
+    };
     drive(&mut d, Event::Act { act: Act::GoalForm { form } });
     let (tree, mut bindings) = build(&d, 3, words);
     assert!(contains(&tree, b"this will be proposed"));
@@ -535,4 +540,89 @@ fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Word
             assert!(!contains(&tree, b"Deadline"));
         }
     }
+}
+
+#[test]
+fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
+    use jig_client::pages::project::goals::GoalForm;
+    let words = words();
+    let (mut d, f) = start();
+    let mut frame = document();
+    frame.projects.get_mut(0).unwrap().goals = List::with_capacity(0);
+    deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
+    let out = drive(
+        &mut d,
+        Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Goals }) },
+    );
+    let read = out
+        .iter()
+        .find_map(|r| match r {
+            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    let mut doc = project_doc();
+    doc.acts = list([Offered {
+        act: ActKind::SetGoal,
+        admission: Admission::Bounded {
+            within: Bounds::Goal {
+                pool_left: 30,
+                charters: list([99]),
+                procedures: list([
+                    GoalProcedure { connector: 7, code: u32::MAX },
+                    GoalProcedure { connector: u16::MAX, code: u32::MAX },
+                ]),
+                latest: None,
+                budget: 3,
+                maximum_budget: 50,
+                maximum_deadline: None,
+            },
+            beyond: Beyond::Proposed { to: Recipient::Party(9) },
+        },
+    }]);
+    drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    let (tree, mut bindings) = build(&d, 3, &words);
+    for (label, executor) in [
+        (b"Charter 99".as_slice(), GoalExecutor::Charter(99)),
+        (b"Connector 7, procedure 4294967295".as_slice(), GoalExecutor::Procedure { connector: 7, code: u32::MAX }),
+        (
+            b"Connector 65535, procedure 4294967295".as_slice(),
+            GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
+        ),
+    ] {
+        let action = crate::decode(&mut bindings, named_binding(&tree, label), crate::Act::Press).unwrap();
+        assert_eq!(
+            action,
+            Act::GoalForm { form: GoalForm { project: 4, executor, budget: 30, deadline: None, priority: 0 } }
+        );
+    }
+    assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Charter 2")));
+    let choice =
+        crate::decode(&mut bindings, named_binding(&tree, b"Connector 65535, procedure 4294967295"), crate::Act::Press)
+            .unwrap();
+    drive(&mut d, Event::Act { act: choice });
+    let (tree, mut bindings) = build(&d, 3, &words);
+    let edit = crate::decode(
+        &mut bindings,
+        named_binding(&tree, b"Goal budget"),
+        crate::Act::Input { value: Box::from(b"4".as_slice()) },
+    )
+    .unwrap();
+    let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    assert_eq!(
+        edit,
+        Act::GoalForm { form: GoalForm { project: 4, executor: exact, budget: 4, deadline: None, priority: 0 } }
+    );
+    drive(&mut d, Event::Act { act: edit });
+    drive(
+        &mut d,
+        Event::Act { act: Act::Edit { field: jig_client::fields::Purpose::NewGoal, text: text(b"procedure words") } },
+    );
+    let (tree, _) = build(&d, 3, &words);
+    assert!(contains(&tree, b"proposed"));
+    drive(&mut d, Event::Act { act: Act::Submit { field: jig_client::fields::Purpose::NewGoal } });
+    let (tree, _) = build(&d, 3, &words);
+    assert!(contains(&tree, b"Connector 65535, procedure 4294967295"));
+    assert!(contains(&tree, b"procedure words"));
+    assert!(!contains(&tree, b"Charter 65535"));
 }

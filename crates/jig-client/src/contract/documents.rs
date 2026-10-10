@@ -214,6 +214,14 @@ pub enum Admission {
     Refused(Refusal),
 }
 
+/// One actual procedure alternative supplied for the fixed goal form.
+/// See domain/people.md, 5.1, and client/domain/contract.md, 3.2.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GoalProcedure {
+    pub connector: u16,
+    pub code: u32,
+}
+
 /// Numbers and lists supplied by the engine, never policy inferred by the client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Bounds {
@@ -221,6 +229,7 @@ pub enum Bounds {
     Goal {
         pool_left: u64,
         charters: List<u32>,
+        procedures: List<GoalProcedure>,
         latest: Option<Wall>,
         /// Largest directly made budget; pool balance alone is not role authority.
         budget: u64,

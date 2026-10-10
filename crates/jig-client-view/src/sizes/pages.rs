@@ -79,7 +79,13 @@ pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
 }
 fn goals(l: &Limits) -> Option<u32> {
     let board = card_nodes(l)?.checked_add(chip_nodes(l)?)?.checked_add(20)?.checked_mul(l.rows)?.checked_mul(2)?;
-    let form = l.charters.max(l.rows).checked_mul(3)?.checked_add(24)?.checked_mul(l.projects.max(l.rows))?;
+    // A bounded goal offers whole charter and procedure lists independently.
+    let choices = l.charters.max(l.rows).checked_add(l.rows)?;
+    let form = choices
+        .checked_mul(3)?
+        .checked_add(l.rows.checked_mul(3)?)?
+        .checked_add(32)?
+        .checked_mul(l.projects.max(l.rows))?;
     board.checked_add(form)?.checked_add(32)
 }
 fn tasks(l: &Limits) -> Option<u32> {
