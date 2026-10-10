@@ -305,11 +305,29 @@ fn observation(b: &mut Builder, value: &OwnerChipObservation, words: &Words) {
         None => text(b, words, P::StartUnknown, &[]),
     }
 }
+fn result(b: &mut Builder, value: &ResultValue, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    match value {
+        ResultValue::Approved { state, words: explanation } => {
+            words.text(b, crate::phrases::jig::JigPhrase::ApprovalExpected, &[]);
+            crate::literal_segment::render(b, state);
+            if let Some(explanation) = explanation {
+                document(b, explanation, words);
+            }
+        }
+        ResultValue::Report(_)
+        | ResultValue::Words(_)
+        | ResultValue::Failure(_)
+        | ResultValue::Verdict { .. }
+        | ResultValue::Connector { .. }
+        | ResultValue::Change { .. }
+        | ResultValue::Choice { .. } => crate::cards::result::value_nodes(b, client, value, words, bindings),
+    }
+}
 fn ending(b: &mut Builder, value: &OwnerChipEnding, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     match value {
         OwnerChipEnding::Done(result) => {
             text(b, words, P::Done, &[]);
-            crate::cards::result::value_nodes(b, client, result, words, bindings);
+            self::result(b, result, client, words, bindings);
         }
         OwnerChipEnding::Failed(reason) => {
             text(b, words, P::Failed, &[]);
@@ -325,7 +343,7 @@ fn ending(b: &mut Builder, value: &OwnerChipEnding, client: &Domain, words: &Wor
             }
             wall(b, words, P::CancelledAt, *at);
             if let Some(result) = result {
-                crate::cards::result::value_nodes(b, client, result, words, bindings);
+                self::result(b, result, client, words, bindings);
             }
         }
     }

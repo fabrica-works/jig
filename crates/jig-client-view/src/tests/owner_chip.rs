@@ -79,7 +79,21 @@ fn phrase_limits() -> PhraseLimits {
 }
 fn words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
-    WORDS.get_or_init(|| Words { book: crate::phrases::english::english(256).unwrap(), language: 0, offset_minutes: 0 })
+    WORDS.get_or_init(|| {
+        let mut language = crate::phrases::english::language();
+        language.wall = crate::phrases::WallFormat::Nanos;
+        language.span_unit = crate::phrases::SpanUnit::Nanos;
+        Words {
+            book: crate::phrases::Phrasebook::load(
+                crate::phrases::jig::shapes(256),
+                Box::new([language]),
+                &phrase_limits(),
+            )
+            .unwrap(),
+            language: 0,
+            offset_minutes: 0,
+        }
+    })
 }
 fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::ChipFragment) {
     let client = Domain::new(&client_limits(), 1);
@@ -394,7 +408,7 @@ fn complete_chip_endings_keep_result_requester_and_each_independent_reason_loss(
     let tree = build(&value, words()).0;
     assert!(has(&tree, b"whole result"));
     assert!(has(&tree, b"Completed with result"));
-    assert!(contains(&tree, b"omitted") || contains(&tree, b"incomplete"));
+    assert!(has(&tree, b"Only part of this text was supplied"));
     for (by, label) in [
         (OwnerRequester::Task(u64::MAX), b"Cancellation requester task: 18446744073709551615".as_slice()),
         (OwnerRequester::Person(u64::MAX), b"Cancellation requester person: 18446744073709551615"),
