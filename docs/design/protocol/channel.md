@@ -16,7 +16,8 @@ What is still open is listed in section 14.
 - **One channel per worker,** which the worker dials and keeps open: the
   worker's link. The engine never connects to a worker. Between hosts the
   link runs over TLS, which the engine terminates; on one host it may run
-  in plaintext over loopback, and nowhere else.
+  in plaintext over loopback, and in one process over an in-memory stream
+  (`README.md`, section 4), and nowhere else.
 - **skein's channel underneath.** Framing, the opening that agrees a
   version, each side's largest bodies, unknown kinds skipped, reading as a
   demand and measured writes are skein's (skein's `channel.md`). jig gives
@@ -346,8 +347,16 @@ answer, and a **notice** is not answered.
   grants (smith's `protocol/hosts.md`, section 2). No root sees a value.
 - **Validity crosses as a duration,** the time left on the writer's
   clock, which the reader turns into a deadline on its own.
-- **Grants cross only over TLS, or in plaintext over loopback,** as the
-  worker's secret does (section 1).
+- **An application's credentials** for a workspace's systems (a token
+  for fetching and pushing) are granted the same way: named in the
+  application's records by its own number and a generation, their values
+  held in the application's table on the engine, filled in as an
+  assignment or a grant record is encoded, and taken out on the worker
+  into the application's table there. A grant record names whose table
+  its value comes from: jig's accounts' or the application's. A worker's
+  configuration holds no credential but its own secret.
+- **Grants cross only over TLS, in plaintext over loopback, or in one
+  process,** as the worker's secret does (section 1).
 - **An entry goes** when its token has expired on the holder's clock, or a
   newer generation pushes it out. Nothing tells a table to forget.
 
@@ -536,11 +545,6 @@ tests in the default suite, randomized ones in the fuzzy suite.
 
 ## 14. Open questions
 
-- **Upgrading without stopping:** an engine and its workers speak one
-  version and one application payload version, so an upgrade stops both.
-  skein's channel already agrees a version from both sides' ranges; what
-  limits it is one current version per family of records (skein's
-  `codec.md`, section 5), and the application's payloads' translation.
 - **A worker's name in views:** the fleet knows workers by channel; the
   deployment's document may want their names, which would cross in the
   hello and be carried by the fleet.
@@ -552,11 +556,3 @@ tests in the default suite, randomized ones in the fuzzy suite.
   document.
 - **The liveness timings** are starting values, to be tuned on real
   networks.
-- **An application's credentials for a worker:** a workspace may need one
-  to reach its system (a token for fetching and pushing). Either each
-  worker's configuration holds it, or the engine grants it with the
-  assignment, as an LLM account's is granted: named by a number of the
-  application's and a generation, its value filled from the
-  application's own table, never inside the application's payloads.
-  The second keeps every credential on the engine; it needs the grant
-  record to name whose table a grant's value comes from.

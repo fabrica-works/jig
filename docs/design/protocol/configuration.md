@@ -91,7 +91,10 @@ the application's main (its shell)
 | agent | the agent program and its configuration, which smith's host half starts, with the endpoints its runs' charters name, by the same names as the engine's (smith's `protocol/hosts.md`, section 3; `llm.md`, section 4) |
 | limits | a profile, and overrides |
 
-The worker's workspace's configuration is the application's.
+The worker's workspace's configuration is the application's. Workers are
+alike: every worker's configuration is the same but for its name and
+secret, and every credential its runs need comes with their assignments
+(`channel.md`, section 8).
 
 ## 5. Periods
 

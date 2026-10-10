@@ -109,6 +109,14 @@ By `../domain/hosts.md`, section 3's shapes:
 
 An application that mixes the last two has both.
 
+- **One process,** for one person's machine, development and tests: the
+  engine and a worker in one process, with a client too when its shell
+  runs there, each with its own root and protocol layer, joined by
+  in-memory streams where sockets would be (section 10). The same
+  components, codecs and channels run over them, with no TLS, and the
+  agents run in the worker's process (smith's `domain/host.md`,
+  section 9). It is the first shape built.
+
 ## 5. Components
 
 | Crate | Kind | In | What it does |
@@ -164,8 +172,11 @@ of an inline run's LLM calls.
 
 - **Pre-release: one version at a time.** Each of jig's encodings has one
   current version. A reader refuses another, saying so, and nothing is
-  translated (skein's `codec.md`, section 5). jig's versioning across
-  releases and applications is open (`../README.md`, section 14).
+  translated (skein's `codec.md`, section 5).
+- **Upgrades come later.** Everything that crosses a boundary or outlives
+  a process carries its version, which is what an upgrade will need. Until
+  upgrades are designed, an upgrade stops the engine and its workers
+  together, and a store written by another version refuses to open.
 - **The channel** is versioned whole, agreed at its opening; the
   application's payloads inside it by the payload version a worker's
   credential carries (`channel.md`, 4.1 and 6.2).
@@ -206,8 +217,9 @@ of an inline run's LLM calls.
   its secret handed to the client. A crash between them leaves at worst a
   record nobody uses, or a sign-in no client holds a secret for: never a
   name with two values, or a secret the engine does not know.
-- **Across hosts, only over TLS** or in plaintext over loopback, and
-  validity as durations, never times.
+- **Across hosts, only over TLS,** in plaintext over loopback, or over an
+  in-memory stream in one process, and validity as durations, never
+  times.
 
 ## 9. The store
 
@@ -245,14 +257,20 @@ of an inline run's LLM calls.
 
 Each is generic, and says nothing about jig.
 
+- **In-memory streams in one process:** a pair of streams joined inside
+  the process, each end owned by a component as a socket is, with the
+  same stream vocabulary (skein's `lib.md`, 7), backpressure and ends, for the
+  one-process shape (section 4).
 - **TLS's server side with independent output,** for the engine's
   listeners: workers' links between hosts, and clients' HTTPS (skein's
-  `tls.md`, section 8; skein's `channel.md`, section 12).
-- **Contained process trees,** for a worker's agents: spawned within a
+  `tls.md`, section 8; skein's `channel.md`, section 12). Not needed in
+  one process.
+- **Contained process trees,** for workers' agents: spawned within a
   deadline, with an environment given whole and only named directories
   writable, stopped politely, then terminated, then killed, and proved
   empty (`../domain/hosts.md`, section 10; skein's `draft/process.md`;
-  smith's `protocol/README.md`, section 9 asks the same).
+  smith's `protocol/README.md`, section 9 asks the same). Not needed in
+  one process, which keeps skein's process groups.
 - **Private files read at startup:** the startup kit's whole-file read
   refusing a file that is not private to the process's user, for
   configuration's secrets (skein's `shell.md`, 6.1; skein's `io.md`,
@@ -356,6 +374,14 @@ section 6), and the client's protocol's are its own.
   (`configuration.md`).
 - **The store designed separately,** as jig's subset of its first
   application's store design (section 9).
+- **Workers are alike:** configured the same but for their name and
+  secret, keeping nothing between runs that the engine does not hand them
+  again. Every credential a run needs, an LLM account's or an
+  application's for its workspace's systems, is the engine's, granted
+  with the assignment (`channel.md`, section 8).
+- **Upgrades later, and no rolling upgrades** (section 7).
+- **One process first** (section 4): in-memory streams in place of
+  sockets, with no TLS.
 
 ## 14. Open questions
 
@@ -365,9 +391,6 @@ section 6), and the client's protocol's are its own.
   world, which settles the contract they encode
   (`../client/domain/contract.md`, section 10).
 - **The store,** from `../draft/store.md`.
-- **Versioning** across releases and applications (`../README.md`,
-  section 14), for the channel, the store's records and the client's
-  documents alike.
 - **Several roots in one process,** for one person's machine
   (`service.md`, section 9).
 - **Signing an LLM account in through a client** (`llm.md`, section 10).

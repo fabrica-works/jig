@@ -175,9 +175,9 @@ when a chat is forgotten is the domain's (section 6).
   section 5); a store of another format refuses to open. A deployment that
   must keep its data across a release needs an upgrade: old shapes read
   and upgraded as they load, or a pass at opening that rewrites them.
-  **For the user:** when jig first promises that a deployment's store
-  survives an upgrade, and whether old shapes are upgraded as read or
-  rewritten at opening (section 7).
+  Upgrades come later (`../protocol/README.md`, section 7): every record
+  carries its version, and until then a store of another version refuses
+  to open.
 
 ## 6. What the domain may owe
 
@@ -193,10 +193,3 @@ Each waits for the store's design, which decides it:
 5. **Families ordered live first,** within each child, so a restart reads
    one interval per child (the tasks child's keys today put history
    first).
-
-## 7. For the user
-
-- **Store upgrades** (5.6): when a deployment's data must survive a
-  release, and how. The leaning: refuse until the first deployment that
-  must keep its data; then upgrade as read, with each old shape's
-  generated reader kept until a pass has rewritten its rows.
