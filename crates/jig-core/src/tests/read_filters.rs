@@ -159,6 +159,34 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
     let (mut core, mut limits) = watch_core();
     limits.people.inbox_entries = 8;
     limits.documents.rows = 2;
+    let reply_to = || ReplyTo::new(Token::new(1));
+    send_task(&mut core, &limits, tasks::Event::Prepare { reply_to: reply_to(), task: 1 });
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Claim {
+            reply_to: reply_to(),
+            task: 1,
+            attempt: 7,
+            resumed: false,
+            budget: 10,
+            writes: Box::new([]),
+        },
+    );
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Turn {
+            reply_to: reply_to(),
+            task: 1,
+            attempt: 7,
+            turn: 1,
+            read: None,
+            offered: None,
+            cumulative: 1,
+        },
+    );
+    assert_eq!(core.tasks.task(1).unwrap().replies.len(), 1, "the reply has an owner-issued activity position");
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let kinds = [
         people::EntryKind::Proposal { number: 1 },
@@ -191,13 +219,13 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
         1,
         people::ResultRef { task: 100, project: 1, at: Wall::from_nanos(6), position: 1 },
     );
-    for group in [
-        reads::Group::Proposals,
-        reads::Group::Escalations,
-        reads::Group::Questions,
-        reads::Group::PersonTasks,
-        reads::Group::Results,
-        reads::Group::Replies,
+    for (group, expected) in [
+        (reads::Group::Proposals, InboxObject::Proposal { proposer: Proposer::Task(1), number: 1 }),
+        (reads::Group::Escalations, InboxObject::Escalation { revision: 1 }),
+        (reads::Group::Questions, InboxObject::Question { message: 1 }),
+        (reads::Group::PersonTasks, InboxObject::PersonTask),
+        (reads::Group::Results, InboxObject::Result { position: 1 }),
+        (reads::Group::Replies, InboxObject::Reply { message: 1 }),
     ] {
         let mut from = None;
         let mut found = Vec::new();
@@ -218,8 +246,7 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
                 break;
             }
         }
-        assert_eq!(found.len(), 1, "{group:?} selects exactly one owner kind");
-        assert!(group.includes(found[0]));
+        assert_eq!(found, [expected], "{group:?} selects its exact owner kind");
     }
 }
 
@@ -234,7 +261,7 @@ fn stored_inbox_kind_filter_keeps_an_empty_page_cursor_and_refuses_a_different_k
     owner.ended_at = Some(Wall::from_nanos(10));
     let object = InboxObject::Result { position: 1 };
     let mut row = stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(owner.clone()))), Some(owner));
-    row.inbox = Some(documents::Cursor::Inbox { task: 100, object, at: Some(Wall::from_nanos(10)) });
+    row.inbox = Some(Cursor::Inbox { task: 100, object, at: Some(Wall::from_nanos(10)) });
     let position = reads::row_key(&row).unwrap();
     let filter = reads::Filter { project: Some(1), goal: None };
     let scope = reads::Scope::Inbox { group: reads::Group::Replies, filter };

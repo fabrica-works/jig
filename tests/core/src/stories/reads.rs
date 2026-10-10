@@ -163,7 +163,11 @@ pub fn scoped_description_search_pages_durable_notes_after_restart() {
             ask(
                 &mut world,
                 300 + number + u64::from(restart) * 10,
-                reads::Read::ScopedNotes { scope: scope.clone(), description: Some(b"warm".as_slice().into()), from },
+                reads::Read::ScopedNotes {
+                    scope: scope.clone(),
+                    description: Some(b"warm".as_slice().into()),
+                    from: from.take(),
+                },
             );
             let reads::Answer::Page(page) = latest(&world) else { panic!("scoped note page") };
             assert!(page.rows.len() <= 2);
@@ -215,7 +219,7 @@ pub fn result_and_reply_filters_page_their_own_retained_updates() {
             ask(
                 &mut world,
                 400 + number + if group == reads::Group::Replies { 20 } else { 0 },
-                reads::Read::Inbox { group, filter: reads::Filter { project: Some(1), goal: None }, from },
+                reads::Read::Inbox { group, filter: reads::Filter { project: Some(1), goal: None }, from: from.take() },
             );
             let reads::Answer::Page(page) = latest(&world) else { panic!("filtered inbox page") };
             assert!(page.rows.len() <= 2);

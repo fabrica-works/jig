@@ -162,6 +162,22 @@ impl Parties {
                     "watch tokens are independent admissions"
                 );
             }
+            root::Event::Core(core::Event::WatchRun { watcher, task, .. }) => {
+                assert!(
+                    self.consumers
+                        .insert(
+                            watcher.raw(),
+                            Consumer {
+                                subject: Watched::Jig(Subject::Run { task: *task }),
+                                fence: Fence::opened(self.made),
+                                automatic: self.automatic,
+                                queued: false,
+                            }
+                        )
+                        .is_none(),
+                    "run positions belong to independent watch admissions"
+                );
+            }
             root::Event::Core(core::Event::Delivered { watcher }) => {
                 if let Some(consumer) = self.consumers.get_mut(&watcher.raw()) {
                     consumer.queued = false;
