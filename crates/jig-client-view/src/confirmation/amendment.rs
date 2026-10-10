@@ -109,20 +109,7 @@ pub fn form(
     words.text(b, JigPhrase::Before, &[]);
     proposal::amendment(b, &before, words, bindings);
     loss(b, object, words);
-    match &object.body {
-        Some(Body::Task(doc)) if doc.cut => words.text(b, JigPhrase::TaskListsCut, &[]),
-        Some(
-            Body::Task(_)
-            | Body::Chip(_)
-            | Body::Proposal(_)
-            | Body::Escalation(_)
-            | Body::Question(_)
-            | Body::PersonTask(_)
-            | Body::Result(_)
-            | Body::Note { .. },
-        )
-        | None => {}
-    }
+    task_loss(b, object, words);
     let empty = empty();
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     let value = values(&before, change);
@@ -204,6 +191,22 @@ pub fn form(
     };
     if let Some(funding) = funding {
         words.actor(b, funding.funder);
+    }
+}
+fn task_loss(b: &mut Builder, object: &Object, words: &Words) {
+    match &object.body {
+        Some(Body::Task(doc)) if doc.cut => words.text(b, JigPhrase::TaskListsCut, &[]),
+        Some(
+            Body::Task(_)
+            | Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Escalation(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => {}
     }
 }
 fn loss(b: &mut Builder, object: &Object, words: &Words) {
