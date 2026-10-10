@@ -37,7 +37,7 @@ fn retry(agent: &mut Agent, env: &mut Env<Limits>, owner: Token, out: &mut Queue
         out,
     );
     assert!(out.is_empty(), "failed whole completion supplies no partial text or synthetic start");
-    env.now = agent.next_deadline().expect("actual Smith retry deadline");
+    env.now = crate::next_deadline(agent).expect("actual Smith retry deadline");
     fire(agent, env, out);
     drain(out)
 }
