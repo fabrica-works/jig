@@ -135,7 +135,7 @@ fn question_sender_selected_language_keeps_reordered_numeric_holes_whole_words_a
     assert!(!contains(&tree(&d, id, &w), b"/source"));
 }
 #[test]
-fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_legacy_endings() {
+fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_endings() {
     let w = selected();
     for ending in [
         None,
@@ -179,13 +179,29 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_legacy
         assert!(contains(&shown, value.words.bytes()));
         assert!(contains(&shown, value.task.title.bytes.bytes()));
         assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
-        if value.ending.is_some() {
-            assert!(
-                !shown
-                    .nodes()
-                    .iter()
-                    .any(|node| node.role == crate::Role::Button && node.name.as_deref() == Some(b"Answer"))
-            );
+        let mut older = value.clone();
+        older.from = None;
+        let (old_d, old_id) = loaded(
+            ObjectKey::Question { task: older.task.task, message: older.message },
+            ReadValue::Question(Box::new(older)),
+        );
+        let old = tree(&old_d, old_id, &w);
+        let buttons = |t: &Tree| {
+            t.nodes()
+                .iter()
+                .filter(|node| node.role == crate::Role::Button)
+                .map(|node| node.name.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(buttons(&shown), buttons(&old), "sender never changes independently supplied ending/act controls");
+        if let Some(ending) = &value.ending {
+            let mut ending_builder = Builder::new(&Limits::of_words(&CLIENT, &w).unwrap());
+            w.ending(&mut ending_builder, ending);
+            for node in ending_builder.finish().nodes() {
+                for run in &node.text {
+                    assert!(contains(&shown, &run.text));
+                }
+            }
         }
     }
     for phrase in [JigPhrase::QuestionFromTask, JigPhrase::QuestionFromPerson, JigPhrase::QuestionFromDeployment] {
