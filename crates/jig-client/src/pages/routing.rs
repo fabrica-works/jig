@@ -91,6 +91,7 @@ pub(crate) fn navigate(
     domain.conversation_rows.rows.clear();
     domain.conversation_rows.cut = false;
     domain.conversation_rows.edges = blank_edges();
+    domain.conversation_rows.owner_after = None;
     let rows = domain.conversation.lines.rows.capacity();
     let words = domain.conversation.words.rows.capacity();
     domain.conversation = crate::conversation::Conversation::new(0, rows);
@@ -351,6 +352,7 @@ pub(crate) fn delivery(
         Delivery::Conversations(conversations) => {
             domain.chats.more = conversations.more;
             if domain.conversation_rows.edges.reaches(End::Before) {
+                domain.conversation_rows.owner_after = Some(conversations.after.clone());
                 // A current live snapshot replaces live rows, while retained past rows
                 // still belong to the read window. An overlapping watch row wins whole.
                 let capacity = domain.conversation_rows.rows.capacity();
@@ -536,7 +538,11 @@ fn read_value(
             let mut rows = page.rows;
             crate::pages::conversations::order(&mut rows);
             let end = super::conversations::read_end(source);
-            let dropped = domain.conversation_rows.slide(rows, edges, end);
+            let dropped = if super::conversations::is_replay(source) {
+                domain.conversation_rows.replay(rows, edges)
+            } else {
+                domain.conversation_rows.slide(rows, edges, end)
+            };
             if dropped > 0 {
                 domain.changed();
             }

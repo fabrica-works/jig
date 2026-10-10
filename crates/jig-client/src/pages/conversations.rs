@@ -342,6 +342,15 @@ pub const INBOX_UPDATES_WINDOW: u64 = 12;
 pub const CONVERSATIONS_WINDOW: u64 = 11;
 /// The read source for the conversations window's reverse edge.
 pub(crate) const CONVERSATIONS_BEFORE: u16 = 14;
+/// Captures an original read of the supplied watch continuation, even if a
+/// newer snapshot arrives before its terminal. Public action bindings stay 11.
+pub(crate) const CONVERSATIONS_REPLAY: u16 = 17;
+pub(crate) const fn is_replay(source: Source) -> bool {
+    match source {
+        Source::Window { number: CONVERSATIONS_REPLAY, .. } => true,
+        Source::Window { .. } | Source::Watch(_) | Source::Card(_) => false,
+    }
+}
 /// Recovers the requested sliding end from this domain's read source.
 pub(crate) const fn read_end(source: Source) -> End {
     match source {
@@ -386,7 +395,10 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
                 }
                 let number = match end {
                     End::Before => CONVERSATIONS_BEFORE,
-                    End::After => 11,
+                    End::After => match &domain.conversation_rows.owner_after {
+                        Some(owner) if owner == cursor => CONVERSATIONS_REPLAY,
+                        Some(_) | None => 11,
+                    },
                 };
                 ask_read(domain, number, Read::Conversations { after: Some(cursor.clone()) }, out);
             }

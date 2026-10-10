@@ -519,6 +519,7 @@ pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &cra
         | crate::contract::Delivery::Deployment(_)
         | crate::contract::Delivery::Task(_)
         | crate::contract::Delivery::Tree(_)
+        | crate::contract::Delivery::OwnerTree(_)
         | crate::contract::Delivery::Chips(_)
         | crate::contract::Delivery::Inbox(_)
         | crate::contract::Delivery::OwnerInbox(_)

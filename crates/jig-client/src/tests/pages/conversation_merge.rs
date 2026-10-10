@@ -559,5 +559,28 @@ fn a_short_owner_restart_places_its_prefix_before_the_retained_past() {
     let next = cursor(b"owner-after14");
     page_three(&mut domain, read, &[past(14)], Some(cursor(b"owner-live-tail")), Some(next.clone()));
     assert_eq!(domain.conversation_rows().rows.as_slice(), &[eight, past(14), past(13)]);
+    assert_eq!(domain.conversation_rows().edges.after, Edge::More(next.clone()));
+    let read = more_three(&mut domain, End::After, &next);
+    page_three(&mut domain, read, &[past(13), past(12)], Some(cursor(b"owner-before13")), None);
+    assert_eq!(domain.conversation_rows().rows.as_slice(), &[past(14), past(13), past(12)]);
+    assert!(domain.conversation_rows().edges.reaches(End::After));
+}
+
+#[test]
+fn an_in_flight_owner_replay_keeps_its_original_provenance_across_watch_changes() {
+    let (mut domain, watch, first) = three();
+    let eight = list_entry(8, Phase::Idle, 10);
+    let original = cursor(b"\xfforiginal-owner");
+    watch_three(&mut domain, watch, core::slice::from_ref(&eight), &original);
+    page_three(&mut domain, first, &[eight.clone(), past(13), past(12)], None, Some(cursor(b"after12")));
+    watch_three(&mut domain, watch, &[list_entry(10, Phase::Idle, 11), eight.clone()], &original);
+    let read = more_three(&mut domain, End::After, &original);
+    let changed = cursor(b"\x00new-watch-owner");
+    watch_three(&mut domain, watch, &[list_entry(11, Phase::Idle, 12), eight.clone()], &changed);
+    let next = cursor(b"original-after14");
+    page_three(&mut domain, read, &[past(14)], Some(cursor(b"original-live-prefix")), Some(next.clone()));
+    assert_eq!(domain.conversation_rows().rows.as_slice(), &[eight, past(14), past(13)]);
     assert_eq!(domain.conversation_rows().edges.after, Edge::More(next));
+    assert_eq!(reply(&domain, 8).first_words.bytes(), b"help checkout");
+    assert_eq!(reply(&domain, 8).first_unread, 3);
 }

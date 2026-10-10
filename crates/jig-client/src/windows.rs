@@ -135,17 +135,22 @@ pub struct ConversationWindow {
     pub cut: bool,
     pub rows: List<ConversationLine>,
     pub edges: Edges,
+    /// Original opaque owner continuation supplied by an admitted live snapshot.
+    pub(crate) owner_after: Option<Cursor>,
 }
 impl ConversationWindow {
     /// Allocates a fixed row capacity and starts at both list ends.
     #[must_use]
     pub fn new(capacity: u32) -> Self {
-        Self { cut: false, rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
+        Self {
+            cut: false,
+            rows: List::with_capacity(capacity),
+            edges: Edges { before: Edge::End, after: Edge::End },
+            owner_after: None,
+        }
     }
     /// Merges by task key before sliding; a retained row wins over a read overlap.
     pub fn slide(&mut self, incoming: List<ConversationLine>, incoming_edges: Edges, end: End) -> u32 {
-        let capacity = self.rows.capacity();
-        let empty = self.rows.is_empty();
         let key_capacity = self.rows.len().checked_add(incoming.len()).expect("admitted row counts fit");
         let mut keys = List::with_capacity(key_capacity);
         let old_count = conversation_count(&self.rows);
@@ -156,6 +161,32 @@ impl ConversationWindow {
                 conversation_keys(&incoming, &mut keys);
             }
         }
+        self.merge(incoming, incoming_edges, end, keys, old_count)
+    }
+    /// The supplied watch continuation starts a source prefix before retained past.
+    pub(crate) fn replay(&mut self, incoming: List<ConversationLine>, incoming_edges: Edges) -> u32 {
+        let key_capacity = self.rows.len().checked_add(incoming.len()).expect("admitted row counts fit");
+        let mut keys = List::with_capacity(key_capacity);
+        for row in &self.rows {
+            if crate::pages::conversations::live(row.chip.phase) {
+                conversation_key(&mut keys, row.chip.task);
+            }
+        }
+        conversation_keys(&incoming, &mut keys);
+        conversation_keys(&self.rows, &mut keys);
+        let old_count = conversation_count(&self.rows);
+        self.merge(incoming, incoming_edges, End::After, keys, old_count)
+    }
+    fn merge(
+        &mut self,
+        incoming: List<ConversationLine>,
+        incoming_edges: Edges,
+        end: End,
+        keys: List<u64>,
+        old_count: u32,
+    ) -> u32 {
+        let capacity = self.rows.capacity();
+        let empty = self.rows.is_empty();
         let new_count = keys.len().checked_sub(old_count).expect("keys only append");
         let slide = plan(old_count, new_count, capacity, end);
         let mut rows = List::with_capacity(capacity);
@@ -423,5 +454,6 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     total
         .checked_mul(2)?
         .checked_add(List::<u64>::worst_case(limits.rows.checked_mul(2)?)?)?
+        .checked_add(u64::from(limits.text))?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(6)?)
 }
