@@ -1548,3 +1548,45 @@ fn activation_observations_and_prior_closing_are_admitted_whole_with_their_alloc
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
     assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload));
 }
+
+#[test]
+fn full_width_typed_makers_remain_distinct_in_scripted_reads_decisions_and_keyed_replays() {
+    let mut setup = script();
+    let keys = [
+        ProposalKey { proposer: Proposer::Task(u64::MAX), number: u64::MAX },
+        ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX },
+    ];
+    for (index, key) in keys.iter().enumerate() {
+        let mut row = proposal();
+        row.key = *key;
+        row.proposer = key.proposer;
+        row.why = text(if index == 0 { b"task maker" } else { b"party maker" });
+        setup.truth.objects.insert(ObjectKey::Proposal(*key), ReadValue::Proposal(Box::new(row)));
+    }
+    let mut engine = Engine::new(setup, 197).unwrap();
+    for (index, key) in keys.iter().enumerate() {
+        engine.read(Time::ZERO, 11, Token::new(index as u64 + 1), Read::Proposal { proposal: *key }).unwrap();
+        let rows = engine.poll(Time::ZERO);
+        let Up::Read { terminal: ReadResult::Value(ReadValue::Proposal(row)), .. } = &rows[0] else {
+            panic!("exact typed read")
+        };
+        assert_eq!(row.key, *key);
+        assert_eq!(row.proposer, key.proposer);
+        assert_eq!(row.why.bytes(), if index == 0 { b"task maker".as_slice() } else { b"party maker".as_slice() });
+    }
+    let asks = keys.map(|proposal| Ask::DecideProposal { project: 1, proposal, decision: Decision::Accepted });
+    send(&mut engine, 0, 11, 1, 10, asks[0].clone());
+    send(&mut engine, 1, 11, 2, 11, asks[1].clone());
+    let answers = engine.poll(Time::from_nanos(10_000_001));
+    assert_eq!(answers.len(), 2);
+    assert_eq!(engine.commits().len(), 2);
+    assert_eq!(engine.commits()[0].ask, Some(asks[0].clone()));
+    assert_eq!(engine.commits()[1].ask, Some(asks[1].clone()));
+    send(&mut engine, 20_000_000, 11, 1, 12, asks[1].clone());
+    assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), &Answer::Refused(Refusal::KeyConflict));
+    send(&mut engine, 20_000_000, 11, 1, 13, asks[0].clone());
+    assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), final_answer(&answers[0]));
+    send(&mut engine, 20_000_000, 11, 2, 14, asks[1].clone());
+    assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), final_answer(&answers[1]));
+    assert_eq!(engine.commits().len(), 2);
+}

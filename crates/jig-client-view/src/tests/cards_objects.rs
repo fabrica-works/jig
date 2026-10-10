@@ -1521,3 +1521,81 @@ fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_
 
 #[path = "amendment_presence.rs"]
 mod amendment_presence;
+#[test]
+fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
+    let words = words();
+    let mut shown = Vec::new();
+    for (maker, kind, label) in [
+        (Proposer::Task(u64::MAX), 1, b"By task 18446744073709551615".as_slice()),
+        (Proposer::Party(u64::MAX), 29, b"By party 18446744073709551615".as_slice()),
+    ] {
+        let mut row = proposal(ProposalAction::Widen { before: authority(), after: authority() });
+        row.key = ProposalKey { proposer: maker, number: u64::MAX };
+        row.proposer = maker;
+        let key = ObjectKey::Proposal(row.key);
+        let (mut d, id) = loaded(key, ReadValue::Proposal(Box::new(row)));
+        let mut bindings = JigBindings::new(64, CLIENT.text);
+        let tree = render(&d, id, &words, &mut bindings);
+        assert!(contains(&tree, label));
+        let expected = crate::Key { owner: crate::Owner::Jig, kind, a: u64::MAX, b: u64::MAX };
+        assert!(tree.nodes().iter().any(|node| node.role == Role::Item && node.key == Some(expected)));
+        assert_eq!(crate::pages::object_key(key), expected);
+        shown.push(expected);
+        let action = press(&tree, b"Accept", &mut bindings);
+        drive(&mut d, Event::Act { act: action });
+        let tree = render(&d, id, &words, &mut bindings);
+        assert!(contains(&tree, label));
+        let action = press(&tree, b"Confirm", &mut bindings);
+        let sent = drive(&mut d, Event::Act { act: action });
+        assert_eq!(sent.len(), 1);
+        let Request::Send { ask, .. } = &sent[0] else { panic!("one typed proposal request") };
+        assert_eq!(
+            ask.as_ref(),
+            &Ask::DecideProposal {
+                project: 4,
+                proposal: ProposalKey { proposer: maker, number: u64::MAX },
+                decision: Decision::Accepted,
+            }
+        );
+    }
+    assert_ne!(shown[0], shown[1]);
+}
+
+#[test]
+fn proposed_outcomes_and_effect_parts_keep_the_supplied_maker_kind_and_full_numbers() {
+    let words = words();
+    for (maker, outcome, part) in [
+        (
+            Proposer::Task(u64::MAX),
+            b"Proposed by task 18446744073709551615, proposal 18446744073709551615".as_slice(),
+            b"Proposal by task 18446744073709551615, number 18446744073709551615".as_slice(),
+        ),
+        (
+            Proposer::Party(u64::MAX),
+            b"Proposed by party 18446744073709551615, proposal 18446744073709551615".as_slice(),
+            b"Proposal by party 18446744073709551615, number 18446744073709551615".as_slice(),
+        ),
+    ] {
+        let key = ProposalKey { proposer: maker, number: u64::MAX };
+        let mut b = Builder::new(&limits());
+        b.open(Role::Page);
+        words.outcome(&mut b, &Outcome::Proposed { proposal: key });
+        words.refusal(
+            &mut b,
+            &Refusal::Moved {
+                now: Revision { value: u64::MAX },
+                what: Moved::Hold {
+                    reason: Some(CurrentHold::Reason(HoldReason::EffectFailed {
+                        part: Part::Effect { connector: u16::MAX, proposal: key },
+                    })),
+                },
+            },
+        );
+        b.close();
+        let tree = b.finish();
+        assert!(contains(&tree, outcome));
+        assert!(contains(&tree, part));
+        assert_eq!(contains(&tree, b"by party"), matches!(maker, Proposer::Party(_)));
+        assert_eq!(contains(&tree, b"by task"), matches!(maker, Proposer::Task(_)));
+    }
+}

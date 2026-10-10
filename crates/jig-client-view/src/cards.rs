@@ -9,7 +9,7 @@ use crate::{
 use jig_client::{
     Domain,
     action::Act,
-    contract::{Chip, ObjectKey},
+    contract::Chip,
     objects::{Card, Left, Object},
 };
 use skein_lib::{Id, List};

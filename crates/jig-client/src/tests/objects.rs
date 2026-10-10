@@ -377,3 +377,96 @@ fn specification(words: Text) -> SpecificationDocument {
         inputs: List::with_capacity(0),
     })
 }
+
+#[test]
+fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_cards() {
+    let (mut domain, _) = live();
+    let mut pending = List::with_capacity(2);
+    for maker in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
+        let mut row = proposal();
+        row.key = ProposalKey { proposer: maker, number: u64::MAX };
+        row.proposer = maker;
+        row.acts = List::with_capacity(1);
+        row.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+        let key = ObjectKey::Proposal(row.key);
+        let id = domain.objects.name(key, Source::Window { generation: 0, number: 4 }).unwrap();
+        assert!(domain.objects.put(key, objects::Body::Proposal(Box::new(row.clone()))));
+        domain.objects.get_mut(id).unwrap().project = Some(row.project);
+        assert!(
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } }
+            )
+            .is_empty()
+        );
+        let sent = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm });
+        assert_eq!(sent.len(), 1);
+        let Request::Send { request, ask, .. } = &sent[0] else { panic!("one keyed decision") };
+        assert_eq!(
+            ask.as_ref(),
+            &Ask::DecideProposal { project: row.project, proposal: row.key, decision: Decision::Accepted }
+        );
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm }).is_empty());
+        pending.push((key, id, *request)).unwrap();
+    }
+    assert_ne!(pending.get(0).unwrap().0, pending.get(1).unwrap().0);
+    assert_ne!(pending.get(0).unwrap().1, pending.get(1).unwrap().1);
+    assert_ne!(pending.get(0).unwrap().2, pending.get(1).unwrap().2);
+    let outcome = Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH };
+    let answer = Answer::Done(outcome.clone());
+    assert!(
+        drive(&mut domain, Time::ZERO, Event::Answered { request: pending.get(0).unwrap().2, answer: answer.clone() })
+            .is_empty()
+    );
+    assert_eq!(
+        domain.objects.get(pending.get(0).unwrap().1).unwrap().card,
+        Card::Leaving { how: Left::Answered { outcome: outcome.clone() }, until: Time::from_nanos(5_000_000_000) }
+    );
+    assert_eq!(
+        domain.objects.get(pending.get(1).unwrap().1).unwrap().card,
+        Card::Deciding { request: Some(pending.get(1).unwrap().2), progress: Progress::InFlight }
+    );
+    assert_eq!(domain.objects.get(pending.get(0).unwrap().1).unwrap().answer, Some(answer.clone()));
+    assert!(
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Answered { request: pending.get(0).unwrap().2, answer: Answer::Refused(Refusal::KeyConflict) }
+        )
+        .is_empty()
+    );
+    assert_eq!(domain.objects.get(pending.get(0).unwrap().1).unwrap().answer, Some(answer.clone()));
+    assert!(
+        drive(&mut domain, Time::ZERO, Event::Answered { request: pending.get(1).unwrap().2, answer: answer.clone() })
+            .is_empty()
+    );
+    assert_eq!(domain.objects.get(pending.get(1).unwrap().1).unwrap().answer, Some(answer));
+    assert_eq!(
+        domain.objects.get(pending.get(1).unwrap().1).unwrap().card,
+        Card::Leaving { how: Left::Answered { outcome }, until: Time::from_nanos(5_000_000_000) }
+    );
+    for (key, id, _) in pending {
+        assert_eq!(domain.objects.find(key), Some(id));
+    }
+}
+
+#[test]
+fn a_party_proposal_maker_does_not_supply_a_task_address() {
+    for number in [0, u64::MAX] {
+        assert_eq!(
+            crate::pages::inbox::address(ObjectKey::Proposal(ProposalKey {
+                proposer: Proposer::Task(number),
+                number: u64::MAX,
+            })),
+            Some(crate::address::Address::task(number))
+        );
+        assert_eq!(
+            crate::pages::inbox::address(ObjectKey::Proposal(ProposalKey {
+                proposer: Proposer::Party(number),
+                number: u64::MAX,
+            })),
+            None
+        );
+    }
+}

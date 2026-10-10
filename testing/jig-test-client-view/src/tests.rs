@@ -536,3 +536,57 @@ fn outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
         }
     }
 }
+
+#[test]
+fn effect_family_keys_keep_equal_task_and_party_makers_in_distinct_public_items() {
+    let keys = [
+        ProposalKey { proposer: Proposer::Task(u64::MAX), number: u64::MAX },
+        ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX },
+    ];
+    let mut root = ready();
+    let opened =
+        drive(&mut root, Event::Went { place: Place::Address(Address::Jig(jig_client::address::Address::Deployment)) });
+    let watch = opened
+        .iter()
+        .find_map(|row| match row {
+            Request::Jig(JigOut::Open { watch, subject: Subject::Deployment }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let parts = list(keys.map(|proposal| Part::Effect { connector: jig_test_client_domain::FIRST, proposal }));
+    let reads = drive(
+        &mut root,
+        Event::Jig(jig_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                hosts: list([]),
+                accounts: list([]),
+                capacity: list([]),
+                proposals: 0,
+                refusals: list([]),
+                parts,
+            }))),
+        }),
+    );
+    let subjects: Vec<_> = reads
+        .iter()
+        .filter_map(|row| match row {
+            Request::First(first::Out::Read { subject, .. }) => Some(*subject),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(subjects.len(), 2);
+    for (index, subject) in subjects.iter().enumerate() {
+        assert_eq!(subject.kind, family::Kind::Effect(keys[index]));
+    }
+    let mut view = view();
+    patches(&mut view, &root);
+    let public: Vec<_> = subjects.iter().map(crate::family_key).collect();
+    assert_ne!(public[0], public[1]);
+    for key in public {
+        assert_eq!((key.a, key.b), (u64::MAX, u64::MAX));
+        assert!(view.tree().nodes().iter().any(|node| node.key == Some(key)));
+    }
+    assert!(view.tree().len() <= view.limits().tree.nodes);
+    assert!(patches(&mut view, &root).is_empty());
+}
