@@ -137,8 +137,10 @@ secret, and every credential its runs need comes with their assignments
 | a sign-in provider's client secret | a confidential client's | a file (`client.md`, section 8) |
 | a connector's credentials | the application's | the application's files, or its own secrets' records |
 
-- **Read at startup,** each within its bound, from a private file: a file
-  readable by anyone but the process's user refuses the start, naming it.
+- **Read at startup,** each within its bound, from a private file, with
+  skein's `read_private_file` (skein's `shell.md`, 6.1): a file readable
+  by anyone but the process's user, or reached through a link, refuses
+  the start, naming it.
 - **Held by the protocol layer,** never the domain: the domains name
   secrets by number (`../domain/engine.md`, section 12).
 - **What changes while the engine runs** is kept by its owner, never

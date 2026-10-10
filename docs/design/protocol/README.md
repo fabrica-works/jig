@@ -285,16 +285,16 @@ Each is generic, and says nothing about jig.
   exist, commands and checks run as smith's machine component runs them,
   in every shape, under skein's process groups; the first shape built
   does not wait for them.
-- **Private files read at startup:** the startup kit's whole-file read
-  refusing a file that is not private to the process's user, for
-  configuration's secrets (skein's `shell.md`, 6.1; skein's `io.md`,
-  5.3).
+- **Private files read at startup:** the startup kit's
+  `read_private_file`, refusing a file that is not private to the
+  process's user, or reached through a link, for configuration's secrets
+  (skein's `shell.md`, 6.1; skein's `io.md`, 5.3).
 - **For the client's WebAssembly and its records:** skein-lib, skein-codec
   and skein-http's machines built for `wasm32-unknown-unknown`, checked by
-  skein's gate; a bounded base64 module in skein-lib, for records in
-  server-sent events (`client.md`, section 1); and secret bytes in
-  generated records, whose `Debug` shows their length only, for
-  credentials' values (section 8).
+  skein's gate; skein-lib's bounded `base64`, for records in server-sent
+  events (`client.md`, section 1); and skein-lib's `Secret`, the
+  generator's `secret` type, whose `Debug` shows its length only, for
+  credentials' values (section 8; skein's `codec.md`, section 3).
 - **What it has, as it is:** the framed channel, codecs and their
   generator, the JSON reader and writer, the key-value store, the LLM
   client and connection component and their fake peer, OAuth's client and
