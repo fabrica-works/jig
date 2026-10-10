@@ -1,5 +1,9 @@
 //! Generic delegate executor and symbolic-grant decisions owned by the core
 //! (domain/engine.md, 4.4).
+#![expect(
+    clippy::result_large_err,
+    reason = "bounded owner refusal keeps exact revision and capacity facts inline instead of allocating on refusal"
+)]
 
 use alloc::boxed::Box;
 use jig_core_authority as authority;
