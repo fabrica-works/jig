@@ -255,7 +255,7 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
                     rows: jig_scripted_engine::Rows::Conversations(vec![ConversationLine {
                         runtime: task.runtime.clone(),
                         delegates: 0,
-                        budget: task.budget,
+                        budget: task.budget.clone(),
                         chip: task.chip.clone(),
                         project: 1,
                         first_words: text(b"Hello"),
@@ -394,7 +394,6 @@ pub fn deployment() -> Deployment {
 /// Immutable delegate proposal shared by inbox, plan, two-tab and incident stories.
 #[must_use]
 pub fn proposal() -> Proposal {
-    let task = task();
     let key = ProposalKey { proposer: Proposer::Task(10), number: 1 };
     Proposal {
         key,
