@@ -134,7 +134,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
     let mut restart = task();
     restart.chip.task = 10;
     restart.chip.title = DocumentText::complete(text(b"R restart checkout"));
-    restart.requester = Actor::Task(9);
+    restart.requester = OwnerRequester::Task(9);
     restart.proposals = list([p.key]);
     restart.chip.executor = Executor::Procedure { connector: number(Connector::Infrastructure), kind: 1 };
     *restart.chip.details =

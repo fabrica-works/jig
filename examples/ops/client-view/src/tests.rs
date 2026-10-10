@@ -408,7 +408,7 @@ fn task() -> Task {
         lineage_chips: list([]),
         inputs: list([]),
         project: 1,
-        requester: Actor::Party(7),
+        requester: OwnerRequester::Person(7),
         lineage: list([]),
         spec: SpecificationDocument::complete(Specification {
             words: text(b"spec"),
@@ -423,6 +423,7 @@ fn task() -> Task {
         result_contract: ResultContract::Report,
         dependencies: list([]),
         references: list([]),
+        cut: false,
         resources: list([]),
         budget: budget(),
         authority: authority(),
