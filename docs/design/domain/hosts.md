@@ -373,10 +373,13 @@ happens.
 - **Past the grace,** the hub cancels them itself, saving their work
   first, and keeps their turns and answers for the next channel.
 - **The stop bound** the worker says at its hello is the longest it may
-  take to stop a run it lost contact for: its grace, then the longer of
-  its cancel's grace and a delivery's deadline, then a save. The
-  engine's grace is strictly longer (engine.md, section 8), so no next
-  attempt starts while this one may still write.
+  take to stop a run it lost contact for, counted from the last moment
+  the engine may have heard from it: the time its link takes to notice
+  the loss, then its grace, then the longer of its cancel's grace and a
+  delivery's deadline, then a save. The engine's grace, counted from when
+  the engine notices the loss, is strictly longer (engine.md, section 8),
+  so no next attempt starts while this one may still write, however each
+  side's link notices a partition (`../protocol/channel.md`, 10.1).
 
 ### 6.7 Shutting down
 
@@ -446,10 +449,12 @@ The hub carries the charter as bytes it never reads.
   | a delivery, by its result contract or mid-run | smith's `deliver`, when the run has a workspace that delivers |
 
   Each host tool's schema and description are written once, with the
-  function that decodes its calls; a call's input is decoded into the
-  core's or the connector's typed request, or answered as an error naming
-  what is wrong. The engine's protocol layer uses it for calls from
-  workers, and the engine's root for calls from the engine's hub.
+  function that decodes its calls and the one that renders its answers;
+  a call's input is decoded into the core's or the connector's typed
+  request, or answered as an error naming what is wrong. The engine's
+  protocol layer decodes every call the fleet has admitted, from workers
+  and from the engine's own hub alike, so no domain parses a call's input
+  (`../protocol/channel.md`, 6.3).
 - **Result contracts** become smith's (smith's `run.md`, 7.1): a report;
   a verdict, with its labels, fields and follow-ups; a delivery, which
   the run must make through its workspace before it finishes, with the

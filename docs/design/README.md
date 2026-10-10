@@ -117,9 +117,11 @@ systems   what the application's connectors drive
 - **Every process is the application's.** The application writes the
   root, the protocol layer, `iterate` and `main`, as with any service on
   skein. jig supplies the parts beneath its roots, and the pieces of its
-  protocol layers that speak jig's vocabularies: the store's encoding of
-  jig's records, the engine's side of the workers' channel when it has
-  workers, and the client's wire documents.
+  protocol layers that speak jig's vocabularies: both sides of the
+  workers' channel, the LLM accounts', the host tools' translation, the
+  client's wire and connection, and the store's encoding of jig's records,
+  whose component the store's design settles (`protocol/README.md`,
+  sections 5 and 9).
 
 ## 4. The application owns the root
 
@@ -399,8 +401,8 @@ and the conformance world crashes the application at every commit.
     by key, and each connector's own state;
   - the root's keys, records and writes, which wrap both jig's records
     and its own;
-  - the store's protocol layer, which composes jig's encoding with its
-    own.
+  - its families' encodings, composed with jig's as the store's design
+    settles (`protocol/README.md`, section 9).
 - **One commit spans both,** through the journal. The live records of
   both are loaded by the core's restart script (6.4). skein-kv is
   underneath, inside the engine (`domain/engine.md`, section 5).
@@ -533,8 +535,9 @@ and the conformance world crashes the application at every commit.
 | the core and its children | jig |
 | connectors: their domains, protocol layers and fakes | the application |
 | the journal | skein (skein-lib) |
-| the store's encoding: of jig's records / of the application's, and their composition | jig / the application |
-| the engine's protocol layer, `iterate` and `main` | the application, from jig's and skein's pieces |
+| the store's encoding: of jig's records / of the application's, and their composition | jig / the application (`protocol/README.md`, section 9) |
+| the protocol layers' components for jig's vocabularies: the workers' channel, accounts, host tools, configuration, the client's / its connectors' protocols, its parts' encodings | jig / the application (`protocol/README.md`, sections 5 and 6) |
+| the engine's protocol layer's routing, `iterate` and `main` | the application, copied from the reference (`protocol/service.md`) |
 | agents' hosts: the hub, the inline agent, the charter's translation / the worker's root, kinds of workspace, `main` (none without agents) | jig / the application |
 | the agent / its charters | smith / the application |
 | the client domain, views, wire and shells / its families and its client and view roots | jig / the application |
@@ -564,8 +567,14 @@ application as its first user.
   order, the names, and the decisions it took.
 - **examples.md:** the example application, `ops`, and the reference
   root.
-- **Below the domain,** to come with the protocol layers: the store's
-  encoding of jig's records, the workers' channel, the client's protocol.
+- **`protocol/`:** jig's protocol layer: the components an application's
+  protocol layers own, the engine's and the worker's services, the
+  workers' channel, LLM calls and accounts in the engine, and
+  configuration. Its `README.md` gives the reading order, the names, what
+  jig needs from skein and smith, and what the domain owes. The store's
+  design and the client's protocol join it.
+- **`draft/`:** drafts, not contract: ideas and inputs gathered for a
+  design to come, such as the store's.
 
 ## 13. Conventions
 

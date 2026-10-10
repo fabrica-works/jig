@@ -1,0 +1,371 @@
+# jig's protocol layer
+
+Provisional, 2026-10-10. The design of what lies between jig's domains and
+bytes: the components an application's protocol layers own to carry jig's
+vocabularies to the store, to workers, to LLM providers and to clients;
+what an application writes around them; their versions; the secrets they
+hold; and what they need from skein and smith. jig as a whole is
+`../README.md`, whose section 3 says every process is the application's
+and jig supplies the pieces that speak jig's vocabularies. The mechanics
+are those of skein's `programming-model.md`, section 4. What is still
+open is listed in section 14.
+
+## 1. In one page
+
+- **Translation, nothing else.** jig's protocol components turn bytes
+  into jig's domain vocabularies and back. Every decision stays the
+  domain's: the core's, the hub's, the client's. A component runs the
+  timers and the exchanges the domain asks for, and its own deadlines,
+  and says what happened (programming-model.md, section 4).
+- **Components, owned by the application.** Each component is a child of
+  a process's protocol layer, with its own limits, worst case, deadlines
+  and most outputs per entry point, as a child domain is of a root. The
+  application's protocol layer owns jig's components beside smith's,
+  skein's and its own connectors', and routes between them, io and its
+  root (`service.md`).
+- **Five boundaries in the engine** (section 4): the store, workers,
+  LLM providers and accounts, clients, and connectors' systems. The
+  first four are jig's, each with components of jig's; connectors'
+  protocols are the application's.
+- **Generic mechanisms are skein's,** as for smith: framed channels,
+  codecs generated from schemas, the key-value store, LLM connections,
+  OAuth, HTTP and server-sent events, TLS, contained processes. jig keeps
+  what is about its own vocabularies.
+- **smith's records stay smith's.** jig carries smith's charter, turns and
+  results as smith's own versioned bytes, written and read with smith's
+  codecs, in the places `../domain/hosts.md`, section 8 names.
+- **The application's parts stay the application's.** Where jig's records
+  carry an application's value (a workspace's items, what a run left, an
+  application's documents), they carry it as bytes the application
+  encodes, versions and decodes in its own protocol layer.
+- **Nothing is parsed in a domain.** Host tools' calls are decoded, and
+  their answers rendered, in the engine's protocol layer, for runs on
+  workers and in the engine alike (`channel.md`, 6.3).
+- **The store is designed on its own,** as jig's subset of the store
+  design its first application already has, which applications extend
+  with their own families (section 9). The other components rely only on
+  the boundary section 9 states.
+- **Secrets never reach a domain.** A domain names a secret by number and
+  generation; components hold values in tables and in the store's
+  secrets' records, and fill them in where they leave (section 8).
+- **Configuration is read once, before the loop,** strict, composed per
+  child as the root is (`configuration.md`).
+
+## 2. Reading order
+
+1. **README.md:** this page.
+2. **service.md:** the engine's and the worker's services: the protocol
+   layer as a parent of components, `iterate`, starting and ending, and
+   `ops` as the reference.
+3. **channel.md:** jig's channel between the engine and its workers, and
+   where host tools' calls are decoded.
+4. **llm.md:** LLM calls for runs in the engine, and LLM accounts:
+   refreshes, the records kept, the table of access tokens, credential
+   grants.
+5. **configuration.md:** what an engine and a worker are told at start.
+
+The store is designed from `../draft/store.md`, and the client's protocol
+beside the client domain's joint world (section 14).
+
+## 3. Names
+
+| Name | What it is |
+|---|---|
+| protocol layer | a process's layer between its root and io: its components, and the application's routing between them (programming-model.md, section 4) |
+| component | a crate of a protocol layer that the application's protocol layer owns as a child and routes to |
+| codec crate | a crate of records generated from a schema, used by components at both ends (skein's `codec.md`) |
+| record | a value of a protocol's vocabulary, encoded to its schema |
+| service | a process's `iterate` with its root and protocol layer; its `main` is its shell |
+| worker's link | a worker's one channel with its engine, dialled and redialled (`channel.md`); the hub's link to the core, over a channel |
+| worker's credential | what a worker's opening carries: its name, its secret, the application's payload version (`channel.md`, 4.1) |
+| payload version | the number an application gives jig's components for its own encodings carried inside jig's records |
+| credential grant | an LLM account's credential, named by account and generation, with how long it is valid; its value is beside it (section 8). Not the authority's grant (`../domain/README.md`, section 4) |
+| table | a component's holding of secrets' values, by account and generation |
+| secrets' records | what the store keeps of secrets that change while the engine runs: accounts' records, sign-ins' and services' digests |
+| profile | a named set of every limit jig takes, consistent with one another (`configuration.md`, section 6) |
+
+The domain's names (`../domain/README.md`, section 4) and the client's
+(`../client/domain/README.md`, section 4) keep their meaning here; the
+client's link is a client's reach of the engine, not a worker's link.
+
+## 4. The processes
+
+```
+engine     the root (../domain/root.md) and its protocol layer:
+           the store, workers' channels, LLM calls and accounts, host tools, clients, connectors' systems
+worker     if any: the worker's root (jig-host, smith's host domain, a workspace) and its protocol layer:
+           the link to the engine, agents' processes and their channels, the workspace's io
+client     the client root and view (../client/domain/) and its protocol layer:
+           the connection to the engine, the small store, the shell
+```
+
+By `../domain/hosts.md`, section 3's shapes:
+
+| Shape | The engine's protocol layer has | Workers |
+|---|---|---|
+| no agents | the store, clients, connectors | none |
+| agents in the engine | and LLM calls, accounts, host tools | none |
+| agents on workers | and workers' channels, accounts, host tools | the link, agents' processes, workspaces |
+
+An application that mixes the last two has both.
+
+## 5. Components
+
+| Crate | Kind | In | What it does |
+|---|---|---|---|
+| `jig-channel` | codecs | engine, worker | the channel's records and a worker's credential (`channel.md`) |
+| `jig-engine-channel` | component | engine | workers' channels: opening, authentication, liveness, translation to and from the hub's vocabulary (`channel.md`) |
+| `jig-worker-channel` | component | worker | the link: dialling, liveness, the grace's clock, relays across channels, translation to and from the hub's vocabulary (`channel.md`) |
+| `jig-charter` | translation | engine | the core's charter put into smith's, and a run's result read back (`../domain/hosts.md`, section 8) |
+| `jig-engine-tools` | translation | engine | the core's host tools: their schemas and descriptions, their calls decoded into the core's typed requests, their answers rendered as text (`channel.md`, 6.3) |
+| `jig-engine-accounts` | component | engine | LLM accounts' refreshes, their records kept, the table of access tokens (`llm.md`) |
+| `jig-config` | parsing | engine, worker | jig's part of a configuration, parsed and checked (`configuration.md`) |
+| the store's | component, codecs | engine | the store's design (section 9) |
+| the client's | codecs, components, shells | engine, client | `jig-client-wire`, the engine's and the client's sides of the connection, `jig-client-transcript`, and the shells (`../client/domain/README.md`, section 2) |
+
+Beside them, an engine that runs agents in its process owns smith's
+`smith-protocol-llm`, with skein's `skein-llm-connection` beneath it
+(`llm.md`), and a worker owns smith's `smith-host-protocol` and skein's
+contained processes (smith's `protocol/hosts.md`).
+
+- **Each crate is step code** under the subset (programming-model.md,
+  section 10), as every crate of jig's is but its test kits and the
+  client's shells.
+- **Each depends** on skein-lib, io's vocabulary, the skein components it
+  drives, its codec crate, and the domain vocabulary it translates: the
+  hub's for the channel's sides, the core's (or a child's) for the
+  engine's others. None depends on an application's crate, and none names
+  a system.
+- **None links smith but those that carry smith's records' meaning:**
+  `jig-charter`, and the client's decoding of turns. jig's channel carries
+  smith's bytes without decoding them, and `jig-engine-tools` gives its
+  schemas as bytes the charter declares.
+
+## 6. What an application writes
+
+| Part | In | Written |
+|---|---|---|
+| the protocol layer's routing: io's tokens, events to the root, outputs to components, values between components, timers | each process | copied from `ops` (`service.md`) |
+| `iterate` and `main` | each process | copied from `ops` |
+| its configuration's own members, and their parsing | each process | its own |
+| its connectors' protocols: their systems' clients, credentials, webhooks | the engine | its own |
+| its connectors' host tools: schemas, decoding, rendering | the engine | beside each tool, as `jig-engine-tools` is for the core's (`../domain/hosts.md`, section 8) |
+| its parts' encodings: workspace items, left and saved work, delivery evidence, with its payload version | engine and worker | its own codecs (`channel.md`, 6.2) |
+| its periods' source | the engine | a child of its root (`configuration.md`, section 5) |
+| the worker's root, its workspace and its io | the worker | its own (`../domain/hosts.md`, section 7) |
+| its store's families' encodings | the engine | the store's design |
+| its documents' and requests' wire, its sign-in providers' exchanges | engine and client | the client's protocol |
+
+It writes no codec of jig's records, none of the channel's rules, none of
+the core's tools' decoding, no OAuth exchange of an LLM account, and none
+of an inline run's LLM calls.
+
+## 7. Versions
+
+- **Pre-release: one version at a time.** Each of jig's encodings has one
+  current version. A reader refuses another, saying so, and nothing is
+  translated (skein's `codec.md`, section 5). jig's versioning across
+  releases and applications is open (`../README.md`, section 14).
+- **The channel** is versioned whole, agreed at its opening; the
+  application's payloads inside it by the payload version a worker's
+  credential carries (`channel.md`, 4.1 and 6.2).
+- **smith's charter, turns and results** carry smith's versions (smith's
+  `protocol/README.md`, section 8). The engine writes charters in the
+  version its release's smith writes, and its workers, of the same
+  release, read them.
+- **What outlives a process** carries its version: the store's records,
+  per shape (the store's design), and the client's small store
+  (`../client/domain/client.md`, section 11).
+- **The client's documents and requests are the exception:** they are
+  versioned per owner, jig's by jig and the application's by the
+  application, and the engine serves a range of versions, so a client
+  that does not come from the engine may lag it
+  (`../client/domain/contract.md`, section 8).
+- **Configuration** has no version: unknown fields refuse the start
+  (`configuration.md`, section 9).
+
+## 8. Secrets
+
+| Secret | Held by | Kept | Reaches |
+|---|---|---|---|
+| an LLM account's record: its generation, its access token and expiry, its refresh token | the engine's accounts' component | the store's secrets' records, on every refresh, before the access token is lent (`llm.md`, 5.2) | the refresh token, nobody; the access token, inline runs through smith's LLM component, and workers through credential grants, then their agents through smith's host half (`llm.md`, section 6) |
+| a worker's secret | the worker; its digest on the engine | configuration's files | the opening of the worker's link, over TLS or loopback (`channel.md`, 4.1) |
+| a sign-in's secret | the client's shell; its digest on the engine | the store's secrets' records | each of the party's requests, checked by the engine's client protocol (`../domain/people.md`, section 3) |
+| a service's credential | the service; its digest on the engine | the store's secrets' records | likewise |
+| a TLS key, a provider's client secret | the engine | configuration's files | its exchanges |
+| a connector's credentials | the application's protocol layer | its files, or its own records in the secrets' store | its system |
+
+- **Names in the domain, values beside it.** A domain names a secret by
+  number and generation (`../domain/engine.md`, sections 5.4 and 12); no
+  domain state, fact, record of the main store or log holds a value.
+  Values move between components through the protocol layer's routing,
+  never through a root.
+- **Kept before used.** An account's record is durable before the access
+  token it bought is lent. A sign-in is committed first, which gives it
+  its number; its digest is then kept under that number; and only then is
+  its secret handed to the client. A crash between them leaves at worst a
+  record nobody uses, or a sign-in no client holds a secret for: never a
+  name with two values, or a secret the engine does not know.
+- **Across hosts, only over TLS** or in plaintext over loopback, and
+  validity as durations, never times.
+
+## 9. The store
+
+- **jig's store is a subset of an existing design, made generic.** jig's
+  first application designed its engine's store on skein's key-value
+  store (skein's `kv.md`), in its own process, with transcripts beside it
+  and secrets in a second store. jig takes the parts of that design that
+  are about the engine's own records (its families, their keys and
+  encoding, versions, commits and loads, transcripts, secrets, opening,
+  growth and retention), and leaves the application's families to the
+  application, which adds them beside jig's, in the same commits.
+- **Designed on its own.** `../draft/store.md` collects what that design
+  takes as input: the records jig keeps, the questions it settles, and
+  what this design asks of it.
+- **What the rest of the protocol layer relies on,** whatever that design
+  settles:
+  - **commits** numbered as the journal numbers them, applied in order,
+    each answered once durable, which makes every earlier one durable; a
+    failed commit, or one the store refuses, answered failed, after which
+    nothing is answered and the engine stops (`../domain/engine.md`, 5.1
+    and 5.5);
+  - **loads** by the domain's ranges, in bounded pages, seeing every
+    commit answered before they were asked;
+  - **transcripts** appended with the commit that accepts their turns, and
+    read from either end;
+  - **secrets' records** in a store of their own, in a directory only the
+    engine's user may read, written by components alone, durable on
+    request before what they protect is used, read at start;
+  - **opening** before the root starts, refusing a store of another
+    format, or one whose records disagree with its own header.
+
+## 10. What jig needs from skein
+
+Each is generic, and says nothing about jig.
+
+- **TLS's server side with independent output,** for the engine's
+  listeners: workers' links between hosts, and clients' HTTPS (skein's
+  `tls.md`, section 8; skein's `channel.md`, section 12).
+- **Contained process trees,** for a worker's agents: spawned within a
+  deadline, with an environment given whole and only named directories
+  writable, stopped politely, then terminated, then killed, and proved
+  empty (`../domain/hosts.md`, section 10; skein's `draft/process.md`;
+  smith's `protocol/README.md`, section 9 asks the same).
+- **Private files read at startup:** the startup kit's whole-file read
+  refusing a file that is not private to the process's user, for
+  configuration's secrets (skein's `shell.md`, 6.1; skein's `io.md`,
+  5.3).
+- **What it has, as it is:** the framed channel, codecs and their
+  generator, the JSON reader and writer, the key-value store, the LLM
+  client and connection component and their fake peer, OAuth's client and
+  fake issuer, HTTP's server and client, server-sent events.
+- **The store's design** names what it needs of skein-kv.
+
+## 11. What jig needs from smith
+
+- **A run's text as content, by turn and offset:** smith's LLM component
+  hands its domain the text as it arrives, not only its count; its
+  domain's text facts name the turn they belong to and their offset; and
+  its channel carries them as content when the host asks for them
+  (`channel.md`, section 13).
+- **What it has, as it is:** the charter's, the transcript's and the
+  result's codecs and versions; the LLM component, serving many runs'
+  completions in one process with one table of grants; the host half and
+  the host domain.
+
+## 12. What the domain owes
+
+Changes this design asks of jig's domain, each with a proposal:
+
+1. **The engine stopping.** The views can end a watch saying the engine is
+   stopping, but nothing tells the core so. Proposal: the core hears that
+   the engine is stopping, from its root, and from then on takes nothing
+   that would make a commit: a party's request answered not ready; a
+   run's turn, answer or call answered busy, so its host keeps it; a
+   connector's events and outcomes held by the connector, as when the
+   journal is full; no run placed and no procedure stepped. It ends every
+   watch saying the engine is stopping (`../client/domain/contract.md`,
+   7.2), and says when nothing it holds waits for a commit, so the service
+   can close its components (`service.md`, section 5).
+   `../domain/engine.md` gains it beside restart, in section 6.
+2. **Credential grants pushed and resent.** The core lends a new
+   generation to every live attempt whose account it is, on whatever host
+   (`../domain/engine.md`, section 12), and the fleet sends each attempt
+   it keeps its current grant when its worker says hello, or when it
+   adopts the attempt (`channel.md`, 5.3).
+3. **A completion's contract.** The inline agent hands up, with each
+   completion its run asks for, the run's result contract in smith's
+   terms, which smith's LLM component needs (`llm.md`, section 3).
+4. **The hub's link vocabulary, whole.** The channel's components speak
+   `jig-host`'s boundary, which must carry `../domain/hosts.md`, section 2
+   whole, as one vocabulary toward the engine: the hello as one value
+   (slots, stop bound, workstreams, runs hosted and kept), assembled by the
+   worker's root from the hub, its workspace and its link's graces;
+   rejected and exhausted notices, relayed from the agent capability; and
+   facts as outputs, best effort, as well as by query. The engine's own hub
+   speaks the same, its root translating it to the fleet's
+   (`channel.md`, section 1).
+
+The store's domain questions (transcripts' vocabulary, retention and fill,
+indexes for paged reads) are the store's design's (`../draft/store.md`,
+section 6), and the client's protocol's are its own.
+
+## 13. Decisions this design takes
+
+- **jig ships components, not references to copy,** for its boundaries
+  whose vocabulary is jig's: the channel's two sides, accounts, host
+  tools, configuration, the client's sides. What is generic is skein's,
+  what is the application's is the application's; the hard parts of
+  jig's own boundaries (authentication, liveness, keeping secrets before
+  use, decoding the LLM's calls) are written once. The store's design
+  settles its own component, and leans the same way (`../draft/store.md`,
+  5.1).
+- **Records from schemas,** with skein's generator, for jig's channel and
+  its other codecs, as smith's are.
+- **The channel on skein's channel,** one per worker, dialled by the
+  worker, TLS between hosts and plaintext only over loopback, a name and a
+  secret authenticating the worker, and the application's payload
+  version checked at the opening (`channel.md`, section 4).
+- **The hub's vocabulary on both ends of the channel,** so the engine's
+  root routes a worker's link as it routes its own hub (`channel.md`,
+  section 1).
+- **The worker's link policy is its component's:** dialling, redialling
+  with backoff, liveness and the grace's clock; its stop bound counted
+  from the engine's view of the link (`channel.md`, 10.1).
+- **Host tools' calls decoded in the protocol layer,** after the fleet has
+  fenced them, by `jig-engine-tools` for the core's tools and by the
+  application's code for its connectors' (`channel.md`, 6.3). It is a
+  deliberate exception to decoding before the domain
+  (programming-model.md, section 4): smith's domain carries a host tool's
+  input as the LLM wrote it, so a call from a run in the engine is inside
+  the domain before anything could decode it, and only the fleet can tell
+  a live attempt's call from a stale one. One path serves both shapes:
+  fenced, then handed out to be decoded, and handed back typed.
+- **A run's text crosses with its turn and offset,** which smith gives;
+  gaps mark the turn cut (`channel.md`, 6.4).
+- **smith's LLM component for inline runs,** one per engine, over skein's
+  connections, with no LLM code of jig's (`llm.md`, section 3).
+- **Accounts' exchanges with skein's OAuth client,** driven by the
+  accounts child, each refresh's whole record kept before lending, not
+  skein's accounts driver, whose own refresh schedule would be a second
+  policy (`llm.md`, section 5).
+- **Configuration as strict JSON,** read once before the loop, composed
+  per child, secrets in private files, limits by profile
+  (`configuration.md`).
+- **The store designed separately,** as jig's subset of its first
+  application's store design (section 9).
+
+## 14. Open questions
+
+- **The client's protocol:** its wire, the connection, envelopes, sign-ins,
+  the small store's encoding, an application's documents on the same
+  connection, and the shells, designed beside the client domain's joint
+  world, which settles the contract they encode
+  (`../client/domain/contract.md`, section 10).
+- **The store,** from `../draft/store.md`.
+- **Versioning** across releases and applications (`../README.md`,
+  section 14), for the channel, the store's records and the client's
+  documents alike.
+- **Several roots in one process,** for one person's machine
+  (`service.md`, section 9).
+- **Signing an LLM account in through a client** (`llm.md`, section 10).
