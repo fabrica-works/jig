@@ -189,7 +189,7 @@ fn holder(b: &mut Builder, value: OwnerHistoryHolder, words: &Words) {
 fn retained_amendment(b: &mut Builder, value: &OwnerRetainedAmendment, words: &Words) {
     match value.addressed {
         Some(address) => {
-            saying(b, words, P::AddressRevision, &[Hole::Number(address.revision)]);
+            saying(b, words, P::AddressRevision, &[Hole::Number(address.revision.value)]);
             match address.address {
                 PersonAddress::Party(number) => saying(b, words, P::Party, &[Hole::Number(number)]),
                 PersonAddress::Role(number) => saying(b, words, P::Role, &[Hole::Number(u64::from(number))]),

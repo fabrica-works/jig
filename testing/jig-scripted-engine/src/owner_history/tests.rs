@@ -79,7 +79,7 @@ fn state() -> OwnerAmendmentState {
 fn delta() -> OwnerRetainedAmendment {
     let source = state();
     OwnerRetainedAmendment {
-        addressed: Some(AddressChange { revision: 12, address: PersonAddress::Party(u64::MAX) }),
+        addressed: Some(AddressChange { revision: Revision { value: 12 }, address: PersonAddress::Party(u64::MAX) }),
         instructions: Some(doc(b"", false)),
         release: Some(4),
         spec: Some(source.spec),
@@ -174,7 +174,7 @@ fn owner_history_whole_bytes_charge_boxes_reserved_lists_and_nested_opaque_alloc
         let source = value.clone();
         let expected = u64::try_from(size_of::<OwnerHistoryLine>()).unwrap()
             + 6
-            + value.proposal.as_ref().unwrap().heap(&bounds()).unwrap()
+            + expected_action(&value.proposal.as_ref().unwrap().action)
             + crate::owner_amendment::bytes(&state(), &bounds()).unwrap() * 2;
         assert_eq!(bytes(&value, &bounds()), Some(expected));
         for (limit, admitted) in [(expected - 1, false), (expected, true), (expected + 1, true)] {
@@ -258,7 +258,7 @@ fn owner_history_snapshot_optional_overrides_and_independent_retained_losses_are
     changed.reason.cut = true;
     changed.spec.as_mut().unwrap().cut = true;
     changed.authority.as_mut().unwrap().cut = true;
-    assert_eq!(changed.addressed.unwrap().revision, 12);
+    assert_eq!(changed.addressed.unwrap().revision.value, 12);
     assert_eq!(changed.release, Some(4));
     assert_eq!(line().revision, 6);
     assert_eq!(changed.dependencies.as_ref().unwrap().as_slice(), &[u64::MAX, 7]);
@@ -271,4 +271,39 @@ fn owner_history_snapshot_optional_overrides_and_independent_retained_losses_are
     );
     assert_eq!(values[0].amendment.as_ref().unwrap().0.instructions, None);
     assert_eq!(values[1].amendment.as_ref().unwrap().0.instructions.as_ref().unwrap().bytes(), b"");
+}
+
+fn expected_action(action: &OwnerRetainedAction) -> u64 {
+    let authority = List::<OwnerGrant>::worst_case(3).unwrap()
+        + List::<OwnerResourceScope>::worst_case(3).unwrap()
+        + List::<OwnerAuthorityExecutor>::worst_case(3).unwrap()
+        + List::<Box<[u8]>>::worst_case(3).unwrap()
+        + 3
+        + 2
+        + 4
+        + 1;
+    let spec = List::<ParameterDocument>::worst_case(3).unwrap() + List::<u64>::worst_case(3).unwrap() + 4 + 5;
+    let path = List::<Box<[u8]>>::worst_case(3).unwrap() + 3 + 2;
+    match action {
+        OwnerRetainedAction::Batch(_) => {
+            List::<ProposedTask>::worst_case(3).unwrap()
+                + 3 * (spec
+                    + authority
+                    + 8
+                    + path
+                    + List::<u64>::worst_case(3).unwrap()
+                    + List::<OwnerPart>::worst_case(3).unwrap()
+                    + path)
+        }
+        OwnerRetainedAction::Effect { .. } => path + authority,
+        OwnerRetainedAction::Amend { .. } => {
+            u64::try_from(size_of::<OwnerRetainedAmendment>()).unwrap()
+                + spec
+                + authority
+                + List::<u64>::worst_case(3).unwrap()
+                + 5
+        }
+        OwnerRetainedAction::Widen { .. } => authority,
+        OwnerRetainedAction::Release { .. } => 0,
+    }
 }

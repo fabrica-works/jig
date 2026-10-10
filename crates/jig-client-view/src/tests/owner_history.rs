@@ -64,7 +64,7 @@ fn state() -> OwnerAmendmentState {
                 grants,
                 delegation: OwnerDelegation { kinds, tasks: u32::MAX, depth: u32::MAX },
                 spend: u64::MAX,
-                deadline: Some(skein_lib::Wall::from_nanos(u64::MAX)),
+                deadline: Some(Wall::from_nanos(u64::MAX)),
                 notes: u8::MAX,
                 note_resources: resources,
             },
@@ -86,7 +86,7 @@ fn state() -> OwnerAmendmentState {
 fn delta() -> OwnerRetainedAmendment {
     let source = state();
     OwnerRetainedAmendment {
-        addressed: Some(AddressChange { revision: 12, address: PersonAddress::Party(u64::MAX) }),
+        addressed: Some(AddressChange { revision: Revision { value: 12 }, address: PersonAddress::Party(u64::MAX) }),
         instructions: Some(doc(b"", false)),
         release: Some(4),
         spec: Some(source.spec),
@@ -151,7 +151,7 @@ fn proposal(action: OwnerRetainedAction) -> OwnerProposalHistory {
         as_holder: true,
         state: OwnerProposalHistoryState::Pending {
             holder: OwnerHistoryHolder::Task(u64::MAX),
-            since: skein_lib::Wall::from_nanos(7),
+            since: Wall::from_nanos(7),
         },
     }
 }
@@ -174,7 +174,7 @@ fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;
-    let languages = if selected {
+    let languages: Box<[crate::phrases::Language]> = if selected {
         let mut translated = english.clone();
         for phrase in &mut translated.phrases {
             for form in &mut phrase.forms {
@@ -185,9 +185,9 @@ fn words(selected: bool) -> Words {
                 }
             }
         }
-        Box::new([english, translated]) as Box<[_]>
+        Box::new([english, translated])
     } else {
-        Box::new([english]) as Box<[_]>
+        Box::new([english])
     };
     Words {
         book: Phrasebook::load(
@@ -301,12 +301,8 @@ fn owner_history_all_ten_changes_keep_category_collisions_full_width_identity_an
             OwnerHistoryChange::ProposalRejected => P::Rejected,
             OwnerHistoryChange::ProposalWithdrawn => P::Withdrawn,
         };
-        saying(
-            &tree,
-            words,
-            expected,
-            if expected == P::Prioritised { &[Hole::Number(u64::from(u32::MAX))] } else { &[] },
-        );
+        let priority = [Hole::Number(u64::from(u32::MAX))];
+        saying(&tree, words, expected, if expected == P::Prioritised { &priority } else { &[] });
         assert!(
             !tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.windows(9).any(|w| w == b"position:"))),
             "no history commit position invented"
@@ -541,7 +537,10 @@ fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_bindi
             })
             .collect();
         assert!(words.book.say(1, phrase.id(), &holes).unwrap().text.starts_with(b"selected history: "));
-        assert!(matches!(words.book.say(1, phrase.id(), &[Hole::Name(b"wrong")]), Err(Invalid::Hole { .. })));
+        assert!(matches!(
+            words.book.say(1, phrase.id(), &[Hole::Name(copy_of(b"wrong"))]),
+            Err(Invalid::Values { .. })
+        ));
     }
     for action in actions() {
         let value = OwnerHistoryLine {
