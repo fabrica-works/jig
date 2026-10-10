@@ -179,18 +179,26 @@ pub struct Task {
     pub budget: super::OwnerBudget,
     pub authority: super::OwnerAuthorityDocument,
     pub hold: Option<super::TaskHold>,
-    pub escalation: Option<Escalation>,
     pub proposals: List<ProposalKey>,
     pub activity: u64,
     pub changed: Wall,
     pub acts: List<Offered>,
+    pub result: Option<super::TaskResult>,
+    pub delegates: List<LiveDelegate>,
+    /// Separately supplied context; the task owner document supplies none.
+    pub context: Option<Box<TaskContext>>,
+}
+
+/// Whole separately supplied task context (client/domain/contract.md, 5.1).
+/// Absence supplies no runtime, impact, spend, panel, slot or escalation facts.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TaskContext {
+    pub escalation: Option<Escalation>,
     pub parts: List<Part>,
     pub closing: Option<Closing>,
     pub spend: List<SpendLine>,
-    pub result: Option<super::TaskResult>,
     pub runtime: Runtime,
     pub impact: Impact,
-    pub delegates: List<LiveDelegate>,
     pub writer_slots: List<WriterSlot>,
 }
 
