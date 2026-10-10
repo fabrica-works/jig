@@ -59,6 +59,7 @@ fn plan(l: &Limits) -> Option<u32> {
 }
 fn overview(l: &Limits) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?
+        .checked_add(crate::task_result::nodes(l)?)?
         .checked_add(crate::specification::nodes(l)?)?
         .checked_add(crate::instructions::nodes(l)?)?
         .checked_add(crate::proposed_task::contract_nodes(l)?)?

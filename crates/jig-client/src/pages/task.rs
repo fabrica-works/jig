@@ -274,19 +274,22 @@ fn push(out: &mut List<Part>, part: Part) {
 }
 fn result(out: &mut List<Part>, task: &Task) {
     if let Some(result) = &task.result {
-        match &result.value {
-            Some(contract::ResultValue::Connector { part, .. }) => push(out, part.clone()),
-            Some(
-                contract::ResultValue::Report(_)
-                | contract::ResultValue::Verdict { .. }
-                | contract::ResultValue::OwnerVerdict { .. }
-                | contract::ResultValue::Change { .. }
-                | contract::ResultValue::Choice { .. }
-                | contract::ResultValue::Approved { .. }
-                | contract::ResultValue::Failure(_)
-                | contract::ResultValue::Words(_),
-            )
-            | None => {}
+        match result {
+            contract::TaskResult::Ending(_) => {}
+            contract::TaskResult::Document(result) => match &result.value {
+                Some(contract::ResultValue::Connector { part, .. }) => push(out, part.clone()),
+                Some(
+                    contract::ResultValue::Report(_)
+                    | contract::ResultValue::Verdict { .. }
+                    | contract::ResultValue::OwnerVerdict { .. }
+                    | contract::ResultValue::Change { .. }
+                    | contract::ResultValue::Choice { .. }
+                    | contract::ResultValue::Approved { .. }
+                    | contract::ResultValue::Failure(_)
+                    | contract::ResultValue::Words(_),
+                )
+                | None => {}
+            },
         }
     }
 }

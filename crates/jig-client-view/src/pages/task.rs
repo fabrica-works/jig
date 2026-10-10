@@ -148,7 +148,7 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
         }
     }
     if let Some(result) = &doc.result {
-        cards::result::facts(b, client, result, words, bindings);
+        crate::task_result::render(b, client, result, words, bindings);
     }
     for slot in &doc.writer_slots {
         cards::common::part(b, &slot.resource, words, bindings);
@@ -209,7 +209,7 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
                 cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
             }
             if let Some(result) = &doc.result {
-                cards::result::facts(b, client, result, words, bindings);
+                crate::task_result::render(b, client, result, words, bindings);
             }
         }
     }

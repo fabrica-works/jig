@@ -26,6 +26,7 @@ pub mod proposed_task;
 pub mod proposed_task_words;
 pub mod specification;
 pub mod styles;
+mod task_result;
 pub mod turns;
 pub use styles::JigStyle;
 mod chip_phase;

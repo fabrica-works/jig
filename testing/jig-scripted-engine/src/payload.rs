@@ -703,6 +703,14 @@ impl Payload for ResultContract {
         }
     }
 }
+impl Payload for jig_client::contract::TaskResult {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Document(value) => value.heap(bounds),
+            Self::Ending(value) => value.heap(bounds),
+        }
+    }
+}
 impl Payload for ResultValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {

@@ -392,23 +392,16 @@ fn result_value(b: &mut Builder, value: &ResultValue, client: &Domain, words: &W
         | ResultValue::Choice { .. } => crate::cards::result::value_nodes(b, client, value, words, bindings),
     }
 }
-pub(crate) fn ending(
-    b: &mut Builder,
-    value: &OwnerChipEnding,
-    client: &Domain,
-    words: &Words,
-    bindings: &mut JigBindings,
-) {
+/// The departure caption and its supplied reason, author and time.
+/// The complete result payload is rendered by the document's content below this state.
+pub(crate) fn ending_summary(b: &mut Builder, value: &OwnerChipEnding, words: &Words) {
     match value {
-        OwnerChipEnding::Done(result) => {
-            text(b, words, P::Done, &[]);
-            result_value(b, result, client, words, bindings);
-        }
+        OwnerChipEnding::Done(_) => text(b, words, P::Done, &[]),
         OwnerChipEnding::Failed(reason) => {
             text(b, words, P::Failed, &[]);
             document(b, reason, words);
         }
-        OwnerChipEnding::Cancelled { reason, result, by, at } => {
+        OwnerChipEnding::Cancelled { reason, by, at, .. } => {
             text(b, words, P::Cancelled, &[]);
             document(b, reason, words);
             match by {
@@ -417,6 +410,21 @@ pub(crate) fn ending(
                 OwnerRequester::Deployment { project } => number(b, words, P::RequesterDeployment, u64::from(*project)),
             }
             wall(b, words, P::CancelledAt, *at);
+        }
+    }
+}
+pub(crate) fn ending(
+    b: &mut Builder,
+    value: &OwnerChipEnding,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    ending_summary(b, value, words);
+    match value {
+        OwnerChipEnding::Done(result) => result_value(b, result, client, words, bindings),
+        OwnerChipEnding::Failed(_) => {}
+        OwnerChipEnding::Cancelled { result, .. } => {
             if let Some(result) = result {
                 result_value(b, result, client, words, bindings);
             }

@@ -41,6 +41,7 @@ fn frame_of_card(limits: &Limits) -> Option<u32> {
     // lineage is additional chips. The page's other cards are not here.
     chip_nodes(limits)?
         .checked_mul(limits.rows)?
+        .checked_add(markdown(limits)?.checked_add(6)?)?
         .checked_add(outcome(limits)?.checked_mul(2)?)?
         .checked_add(acts(limits)?)?
         .checked_add(12)
@@ -164,7 +165,12 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
             .max(result_nodes(limits)?)
             .max(reply_nodes(limits)?)
             .max(escalation_nodes(limits)?)
-            .max(refusal_nodes(limits)?),
+            .max(refusal_nodes(limits)?)
+            .max(
+                frame_of_card(limits)?
+                    .checked_add(chip_nodes(limits)?)?
+                    .checked_add(crate::task_result::nodes(limits)?)?,
+            ),
     )
 }
 /// Full frame, behind status, project switching, navigation and its fallback.

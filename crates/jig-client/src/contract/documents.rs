@@ -187,7 +187,7 @@ pub struct Task {
     pub parts: List<Part>,
     pub closing: Option<Closing>,
     pub spend: List<SpendLine>,
-    pub result: Option<Result>,
+    pub result: Option<super::TaskResult>,
     pub runtime: Runtime,
     pub impact: Impact,
     pub delegates: List<LiveDelegate>,

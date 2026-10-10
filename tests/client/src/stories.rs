@@ -846,7 +846,7 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
     task.runtime = Runtime::Ended;
     task.acts = list([]);
     task.proposals = list([]);
-    task.result = Some(Result {
+    task.result = Some(jig_client::contract::TaskResult::Document(Box::new(Result {
         task: task.chip.clone(),
         ending: Ending::Done,
         value: Some(ResultValue::Report(DocumentText::complete(text(report)))),
@@ -854,7 +854,7 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
         acts: list([]),
 
         details: None,
-    });
+    })));
     task
 }
 

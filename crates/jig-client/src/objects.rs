@@ -66,6 +66,8 @@ pub enum Left {
     Answered { outcome: Outcome },
     /// Its terminal document says how it ended.
     Ended { how: Ending },
+    /// Its task owner supplies the complete ending independently of a result document.
+    OwnerEnded { how: Box<crate::contract::OwnerChipEnding> },
     /// Its terminal facts are no longer available.
     Unknown,
 }
@@ -171,7 +173,10 @@ impl Objects {
                         | Card::Deciding { .. }
                         | Card::Refused { .. }
                         | Card::Unknown { .. }
-                        | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => {}
+                        | Card::Leaving {
+                            how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+                            ..
+                        } => {}
                     }
                     return Some(id);
                 }
@@ -299,7 +304,10 @@ impl Objects {
                 | Card::Deciding { .. }
                 | Card::Refused { .. }
                 | Card::Unknown { .. }
-                | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => {}
+                | Card::Leaving {
+                    how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+                    ..
+                } => {}
             }
         }
         for (_, id) in &self.index {
@@ -507,7 +515,7 @@ pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queu
         let looking = match &object.card {
             Card::Leaving { how, .. } => match how {
                 Left::Looking => true,
-                Left::Answered { .. } | Left::Ended { .. } | Left::Unknown => false,
+                Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown => false,
             },
             Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Unknown { .. } => false,
         };
@@ -566,7 +574,10 @@ pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
                 | Card::Deciding { .. }
                 | Card::Refused { .. }
                 | Card::Unknown { .. }
-                | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => false,
+                | Card::Leaving {
+                    how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+                    ..
+                } => false,
             }
         }
     }
@@ -605,7 +616,10 @@ pub(crate) fn read_card(
         Card::Leaving { how: Left::Looking, .. } => true,
         Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Deciding { request: None, .. } => false,
         Card::Deciding { request: Some(_), .. }
-        | Card::Leaving { how: Left::Answered { .. } | Left::Ended { .. } | Left::Unknown, .. } => return,
+        | Card::Leaving {
+            how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+            ..
+        } => return,
     };
     let body = match result {
         ReadResult::Value(value) => read_body(key, value),
@@ -626,13 +640,12 @@ pub(crate) fn read_card(
     }
     if !leaving {
         let ending = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
-            Some(body) => body.ending().cloned(),
+            Some(body) => body.terminal(),
             None => None,
         };
         if let Some(how) = ending {
             let until = domain.now.saturating_add(domain.linger);
-            domain.objects.get_mut(id).expect("terminal card exists").card =
-                Card::Leaving { how: Left::Ended { how }, until };
+            domain.objects.get_mut(id).expect("terminal card exists").card = Card::Leaving { how, until };
             domain.timers.arm(crate::domain::Timer::Linger(id), until).expect("one linger timer per object fits");
             domain.changed();
             return;
@@ -650,8 +663,8 @@ pub(crate) fn read_card(
         return;
     }
     let how = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
-        Some(body) => match body.ending() {
-            Some(ending) => Left::Ended { how: ending.clone() },
+        Some(body) => match body.terminal() {
+            Some(ending) => ending,
             None => Left::Unknown,
         },
         None => Left::Unknown,
@@ -715,12 +728,34 @@ impl Body {
             Self::Note { project, document } => ObjectKey::Note { project: *project, note: document.number },
         }
     }
+    /// Complete departure facts from the supplied document, never inferred from phase.
+    #[must_use]
+    pub fn terminal(&self) -> Option<Left> {
+        match self {
+            Self::Task(task) => match &task.result {
+                Some(crate::contract::TaskResult::Ending(how)) => Some(Left::OwnerEnded { how: how.clone() }),
+                Some(crate::contract::TaskResult::Document(result)) => Some(Left::Ended { how: result.ending.clone() }),
+                None => None,
+            },
+            Self::Chip(_)
+            | Self::Proposal(_)
+            | Self::Escalation(_)
+            | Self::Question(_)
+            | Self::PersonTask(_)
+            | Self::Result(_)
+            | Self::Note { .. } => match self.ending() {
+                Some(how) => Some(Left::Ended { how: how.clone() }),
+                None => None,
+            },
+        }
+    }
     /// The ending a terminal document supplies, never inferred from its phase.
     #[must_use]
     pub fn ending(&self) -> Option<&Ending> {
         match self {
             Self::Task(task) => match &task.result {
-                Some(result) => Some(&result.ending),
+                Some(crate::contract::TaskResult::Document(result)) => Some(&result.ending),
+                Some(crate::contract::TaskResult::Ending(_)) => None,
                 None => None,
             },
             Self::Proposal(proposal) => proposal.ending.as_ref(),

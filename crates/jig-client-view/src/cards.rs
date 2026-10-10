@@ -101,6 +101,7 @@ pub fn state(b: &mut Builder, card: &Card, object: Id<Object>, words: &Words, bi
                 Left::Looking => words.text(b, JigPhrase::Looking, &[]),
                 Left::Answered { outcome } => words.outcome(b, outcome),
                 Left::Ended { how } => words.ending(b, how),
+                Left::OwnerEnded { how } => crate::owner_chip::ending_summary(b, how, words),
                 Left::Unknown => words.text(b, JigPhrase::GoneUnknown, &[]),
             }
             b.close();
@@ -167,7 +168,7 @@ pub fn card(
             if open(b, client, object, place, &title, words, bindings) {
                 chip::chip(b, client, &task.chip, words, bindings);
                 if let Some(result) = &task.result {
-                    result::facts(b, client, result, words, bindings);
+                    crate::task_result::render(b, client, result, words, bindings);
                 }
                 common::acts(b, &facts.card, &task.acts, object, words, bindings);
                 close(b);
