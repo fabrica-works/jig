@@ -224,7 +224,11 @@ pub fn parts(task: &Task, section: TaskSection, limit: u32) -> List<Part> {
     let mut parts = List::with_capacity(limit);
     match section {
         TaskSection::Overview => {
-            append(&mut parts, &task.resources);
+            for resource in &task.resources {
+                if let Some(part) = resource.part() {
+                    push(&mut parts, part.clone());
+                }
+            }
             result(&mut parts, task);
         }
         TaskSection::Activity => match task.chip.executor {
@@ -245,7 +249,11 @@ pub fn parts(task: &Task, section: TaskSection, limit: u32) -> List<Part> {
                 }
             }
             append(&mut parts, &task.parts);
-            append(&mut parts, &task.resources);
+            for resource in &task.resources {
+                if let Some(part) = resource.part() {
+                    push(&mut parts, part.clone());
+                }
+            }
             match task.chip.executor {
                 Executor::Procedure { connector, .. } => {
                     push(&mut parts, Part::Panel { connector, task: task.chip.task });

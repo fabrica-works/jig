@@ -223,7 +223,11 @@ fn parts(body: &Body, limit: u32) -> Parts {
         Body::Chip(chip) => chip_parts(&mut parts, chip),
         Body::Task(task) => {
             chip_parts(&mut parts, &task.chip);
-            append(&mut parts, task.resources.as_slice());
+            for resource in &task.resources {
+                if let Some(part) = resource.part() {
+                    push(&mut parts, part.clone());
+                }
+            }
             append(&mut parts, task.parts.as_slice());
         }
         Body::Proposal(proposal) => match &proposal.action {

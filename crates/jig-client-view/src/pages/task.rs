@@ -120,6 +120,19 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
     for part in &jig_client::pages::task::parts(doc, section, count) {
         cards::common::part(b, part, words, bindings);
     }
+    match section {
+        TaskSection::Overview | TaskSection::Panels => {
+            for resource in &doc.resources {
+                match resource {
+                    jig_client::contract::TaskResource::Owner(value) => {
+                        crate::owner_chip::resource(b, value, words, bindings);
+                    }
+                    jig_client::contract::TaskResource::Part(_) => {}
+                }
+            }
+        }
+        TaskSection::Activity | TaskSection::Plan | TaskSection::History | TaskSection::Budget => {}
+    }
 }
 fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
     if let jig_client::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {

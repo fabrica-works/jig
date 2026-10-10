@@ -175,7 +175,7 @@ pub struct Task {
     pub references: List<super::OwnerTaskLink>,
     /// At least one task list was omitted; this does not identify which list.
     pub cut: bool,
-    pub resources: List<Part>,
+    pub resources: List<super::TaskResource>,
     pub budget: super::OwnerBudget,
     pub authority: super::OwnerAuthorityDocument,
     pub hold: Option<Hold>,

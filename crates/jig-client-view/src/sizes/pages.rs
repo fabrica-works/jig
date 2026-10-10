@@ -60,6 +60,7 @@ fn plan(l: &Limits) -> Option<u32> {
 }
 fn overview(l: &Limits) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?
+        .checked_add(l.rows.checked_add(20)?.checked_mul(l.rows)?)?
         .checked_add(crate::task_result::nodes(l)?)?
         .checked_add(crate::specification::nodes(l)?)?
         .checked_add(crate::instructions::nodes(l)?)?
@@ -84,7 +85,12 @@ pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
         .checked_add(l.rows.checked_mul(4)?)?
         .checked_add(4)?;
     let activity = conversation_nodes(l, 0)?.checked_add(runtime(l)?)?.checked_add(card_nodes(l)?.checked_mul(2)?)?;
-    let panels = l.rows.checked_mul(4)?.checked_add(2)?.checked_mul(5)?;
+    let panels = l
+        .rows
+        .checked_mul(4)?
+        .checked_add(2)?
+        .checked_mul(5)?
+        .checked_add(l.rows.checked_add(20)?.checked_mul(l.rows)?)?;
     let section = plan(l)?.max(overview(l)?).max(history(l)?).max(budget).max(activity).max(panels);
     card_nodes(l)?
         .checked_add(chip_nodes(l)?.checked_mul(l.rows)?)?

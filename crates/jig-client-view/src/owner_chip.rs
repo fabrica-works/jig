@@ -224,7 +224,7 @@ fn document(b: &mut Builder, value: &DocumentText, words: &Words) {
         text(b, words, P::Cut, &[]);
     }
 }
-fn resource(b: &mut Builder, value: &OwnerResourceLine, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn resource(b: &mut Builder, value: &OwnerResourceLine, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Region);
     crate::proposed_task::part(b, &value.part, words, bindings);
     number(b, words, P::Kind, u64::from(value.kind));

@@ -323,7 +323,7 @@ fn outbox_parts_keep_their_owner_scope_in_pages_and_retained_application_objects
         }
         let read = task_read.unwrap();
         let mut task = super::confirmation::task();
-        task.resources = rows([part.clone()]);
+        task.resources = rows([TaskResource::Part(part.clone())]);
         let shown = drive(
             &mut domain,
             Time::ZERO,

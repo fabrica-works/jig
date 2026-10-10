@@ -73,7 +73,7 @@ pub(super) fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Req
         .unwrap();
     let mut doc = super::cards_objects::task_doc(&[ActKind::Cancel]);
     doc.chip.executor = executor;
-    doc.resources = list([part()]);
+    doc.resources = list([TaskResource::Part(part())]);
     doc.parts = list([part()]);
     doc.inputs = list([OwnerTaskLink::Live(chip(9))]);
     doc.dependencies = list([OwnerTaskLink::Live(chip(9))]);

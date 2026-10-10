@@ -186,7 +186,7 @@ fn task_pages(words: &Words) {
         doc.inputs = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
         doc.dependencies = doc.inputs.clone();
         doc.references = doc.inputs.clone();
-        doc.resources = parts();
+        doc.resources = list(parts().as_slice().iter().cloned().map(TaskResource::Part));
         doc.parts = parts();
         doc.writer_slots = list([
             WriterSlot { resource: part(), task: 9, attempt: Some(1) },

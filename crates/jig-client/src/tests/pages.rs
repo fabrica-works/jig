@@ -682,7 +682,7 @@ fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
     let mut document = super::confirmation::task();
     document.resources = List::with_capacity(1);
     let resource = Part::Resource { connector: 2, path: resource_path(b"resource") };
-    document.resources.push(resource.clone()).unwrap();
+    document.resources.push(TaskResource::Part(resource.clone())).unwrap();
     document.parts = List::with_capacity(1);
     document.parts.push(Part::Panel { connector: 3, task: 8 }).unwrap();
     let requests = drive(
@@ -2049,8 +2049,8 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
     assert_ne!(one, two, "equal concatenated bytes are different segmented names");
     let mut doc = super::confirmation::task();
     doc.resources = List::with_capacity(2);
-    doc.resources.push(one.clone()).unwrap();
-    doc.resources.push(two.clone()).unwrap();
+    doc.resources.push(TaskResource::Part(one.clone())).unwrap();
+    doc.resources.push(TaskResource::Part(two.clone())).unwrap();
     doc.authority.authority.grants = List::with_capacity(1);
     doc.authority
         .authority
