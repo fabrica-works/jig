@@ -123,12 +123,12 @@ fn task() -> ProposedTask {
         cut: false,
     }
 }
-fn actions() -> Vec<OwnerRetainedAction> {
+fn actions() -> [OwnerRetainedAction; 5] {
     let mut batch = List::with_capacity(3);
-    for _ in 0..3 {
+    for _ in 0_u32..3 {
         batch.push(task()).unwrap();
     }
-    vec![
+    [
         OwnerRetainedAction::Batch(batch),
         OwnerRetainedAction::Effect {
             part: part(),
@@ -235,14 +235,14 @@ fn build(value: &OwnerHistoryLine, words: &Words) -> (Tree, JigBindings) {
     let mut slots = 0_u32;
     for node in tree.nodes() {
         assert!(node.text_bytes() <= f.text_per_node);
-        total += u64::from(node.text_bytes());
+        total = total.checked_add(u64::from(node.text_bytes())).unwrap();
         if let Some(name) = &node.name {
-            assert!(name.len() <= f.text_per_node as usize);
-            total += name.len() as u64;
+            assert!(name.len() <= usize::try_from(f.text_per_node).unwrap());
+            total = total.checked_add(u64::try_from(name.len()).unwrap()).unwrap();
         }
         assert!(node.binding.is_none());
         if node.slot.is_some() {
-            slots += 1;
+            slots = slots.checked_add(1).unwrap();
         }
     }
     assert!(total <= u64::from(f.text_bytes));
@@ -308,7 +308,7 @@ fn owner_history_all_ten_changes_keep_category_collisions_full_width_identity_an
             "no history commit position invented"
         );
     }
-    let mut trees = Vec::new();
+    let mut trees: List<Tree> = List::with_capacity(6);
     for by in [
         OwnerRequester::Task(0),
         OwnerRequester::Person(0),
@@ -319,9 +319,9 @@ fn owner_history_all_ten_changes_keep_category_collisions_full_width_identity_an
     ] {
         let (tree, _) = build(&OwnerHistoryLine { by, task: 0, revision: 0, ..line() }, words);
         for other in &trees {
-            assert_ne!(tree.nodes(), other);
+            assert_ne!(tree.nodes(), other.nodes());
         }
-        trees.push(tree.nodes().to_vec());
+        trees.push(tree).unwrap();
     }
 }
 #[test]
@@ -356,16 +356,16 @@ fn owner_history_all_retained_actions_keep_whole_batches_raw_effect_coordinates_
         let value = OwnerHistoryLine { proposal: Some(proposal(action)), ..line() };
         let (tree, bindings) = build(&value, words);
         assert_eq!(value.proposal.as_ref().unwrap().action, original);
-        let slots: Vec<_> = tree.nodes().iter().filter_map(|n| n.slot).collect();
+        let slots = tree.nodes().iter().filter_map(|n| n.slot).count();
         assert_eq!(
-            slots.len(),
+            slots,
             match index {
                 0 => 6,
                 1 => 1,
                 _ => 0,
             }
         );
-        for slot in slots {
+        for slot in tree.nodes().iter().filter_map(|n| n.slot) {
             assert_eq!(bindings.owner_part(slot.token), Some(&part()));
             assert!(bindings.part(slot.token).is_none());
         }
@@ -392,7 +392,7 @@ fn owner_history_all_retained_actions_keep_whole_batches_raw_effect_coordinates_
 #[test]
 fn owner_history_retained_optional_delta_keeps_revision_channels_empty_presence_order_and_independent_losses() {
     let words = normal_words();
-    for flag in 0..6 {
+    for flag in 0_u32..6 {
         let mut delta = delta();
         match flag {
             0 => delta.reason.cut = true,
@@ -449,7 +449,9 @@ fn owner_history_retained_optional_delta_keeps_revision_channels_empty_presence_
 #[test]
 fn owner_history_all_states_holders_policy_kinds_raw_proposer_and_pending_clock_remain_independent() {
     let words = normal_words();
-    let mut holders = vec![OwnerHistoryHolder::Task(0), OwnerHistoryHolder::Person(0)];
+    let mut holders = List::with_capacity(7);
+    holders.push(OwnerHistoryHolder::Task(0)).unwrap();
+    holders.push(OwnerHistoryHolder::Person(0)).unwrap();
     for kind in [
         OwnerMessageProposalKind::Batch,
         OwnerMessageProposalKind::Effect,
@@ -457,7 +459,7 @@ fn owner_history_all_states_holders_policy_kinds_raw_proposer_and_pending_clock_
         OwnerMessageProposalKind::Widen,
         OwnerMessageProposalKind::Release,
     ] {
-        holders.push(OwnerHistoryHolder::Policy { project: u32::MAX, kind });
+        holders.push(OwnerHistoryHolder::Policy { project: u32::MAX, kind }).unwrap();
     }
     for holder in holders {
         for as_holder in [false, true] {
@@ -488,7 +490,12 @@ fn owner_history_all_states_holders_policy_kinds_raw_proposer_and_pending_clock_
         },
         OwnerProposalHistoryState::Withdrawn,
     ] {
-        let rejected = matches!(state, OwnerProposalHistoryState::Rejected { .. });
+        let rejected = match &state {
+            OwnerProposalHistoryState::Rejected { .. } => true,
+            OwnerProposalHistoryState::Pending { .. }
+            | OwnerProposalHistoryState::Accepted { .. }
+            | OwnerProposalHistoryState::Withdrawn => false,
+        };
         let value = OwnerHistoryLine {
             proposal: Some(OwnerProposalHistory { state, ..proposal(OwnerRetainedAction::Release { task: 0 }) }),
             ..line()
@@ -503,7 +510,7 @@ fn owner_history_all_states_holders_policy_kinds_raw_proposer_and_pending_clock_
 fn owner_history_whole_view_admission_checks_nested_reserved_capacities_and_text_boundaries_without_clipping() {
     let words = normal_words();
     let source = OwnerHistoryLine {
-        proposal: Some(proposal(actions().remove(0))),
+        proposal: Some(proposal(actions().into_iter().next().unwrap())),
         amendment: Some((Box::new(state()), Box::new(state()))),
         ..line()
     };
@@ -527,20 +534,23 @@ fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_bindi
     let words = words(true);
     for phrase in data::ALL {
         let shape = data::shapes().into_vec().into_iter().find(|s| s.id == phrase.id()).unwrap();
-        let holes: Vec<_> = shape
-            .holes
-            .iter()
-            .map(|h| match h.kind {
+        let mut holes = List::with_capacity(1);
+        for hole in &shape.holes {
+            let value = match hole.kind {
                 crate::phrases::HoleKind::Number => Hole::Number(u64::MAX),
                 crate::phrases::HoleKind::Wall => Hole::Wall(Wall::from_nanos(u64::MAX)),
-                _ => unreachable!(),
-            })
-            .collect();
-        assert!(words.book.say(1, phrase.id(), &holes).unwrap().text.starts_with(b"selected history: "));
-        assert!(matches!(
-            words.book.say(1, phrase.id(), &[Hole::Name(copy_of(b"wrong"))]),
-            Err(Invalid::Values { .. })
-        ));
+                crate::phrases::HoleKind::Amount
+                | crate::phrases::HoleKind::Span
+                | crate::phrases::HoleKind::Name
+                | crate::phrases::HoleKind::Chip => unreachable!(),
+            };
+            holes.push(value).unwrap();
+        }
+        assert!(words.book.say(1, phrase.id(), holes.as_slice()).unwrap().text.starts_with(b"selected history: "));
+        assert_eq!(
+            words.book.say(1, phrase.id(), &[Hole::Name(copy_of(b"wrong"))]).unwrap_err(),
+            Invalid::Values { id: phrase.id() }
+        );
     }
     for action in actions() {
         let value = OwnerHistoryLine {
@@ -554,4 +564,76 @@ fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_bindi
             assert_eq!(bindings.owner_part(slot.token), Some(&part()));
         }
     }
+}
+
+fn full_state() -> OwnerAmendmentState {
+    let mut value = state();
+    value.instructions = Some(doc(&[255; 8], true));
+    value.spec.specification.words = doc(b"**x** y!", true);
+    value.spec.cut = true;
+    value.spec.specification.parameters.clear();
+    value.spec.specification.inputs.clear();
+    value.dependencies.clear();
+    value.authority.authority.grants.clear();
+    value.authority.authority.note_resources.clear();
+    for n in 0_u32..3 {
+        value
+            .spec
+            .specification
+            .parameters
+            .push(ParameterDocument::Bytes { name: n, value: doc(&[254; 8], true) })
+            .unwrap();
+        value.spec.specification.inputs.push(u64::from(n)).unwrap();
+        value.dependencies.push(u64::from(n)).unwrap();
+        let mut segments = List::with_capacity(3);
+        for _ in 0_u32..3 {
+            segments.push(copy_of(&[255; 8])).unwrap();
+        }
+        let pattern = OwnerPattern { segments, last: OwnerPatternEnd::Open(copy_of(&[253; 8])) };
+        value
+            .authority
+            .authority
+            .grants
+            .push(OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern: pattern.clone() })
+            .unwrap();
+        value.authority.authority.note_resources.push(OwnerResourceScope { connector: u16::MAX, pattern }).unwrap();
+    }
+    value.authority.cut = true;
+    value.cut = true;
+    value
+}
+#[test]
+fn owner_history_full_row_and_byte_nested_batch_hits_exact_raw_slot_capacity_with_selected_words() {
+    let words = words(true);
+    let source = full_state();
+    let mut batch = List::with_capacity(3);
+    for _ in 0_u32..3 {
+        let mut value = task();
+        value.spec = source.spec.clone();
+        value.authority = source.authority.clone();
+        value.dependencies = source.dependencies.clone();
+        value.resources.clear();
+        for _ in 0_u32..3 {
+            value.resources.push(part()).unwrap();
+        }
+        batch.push(value).unwrap();
+    }
+    let value = OwnerHistoryLine {
+        reason: doc(&[255; 8], true),
+        proposal: Some(proposal(OwnerRetainedAction::Batch(batch))),
+        amendment: Some((Box::new(source.clone()), Box::new(source))),
+        ..line()
+    };
+    let source = value.clone();
+    let f = view::required(&value, &client_limits(), &words).unwrap();
+    let (tree, bindings) = build(&value, &words);
+    let mut slots = 0_u32;
+    for slot in tree.nodes().iter().filter_map(|n| n.slot) {
+        slots = slots.checked_add(1).unwrap();
+        assert_eq!(bindings.owner_part(slot.token), Some(&part()));
+    }
+    assert_eq!(slots, 12);
+    assert_eq!(slots, f.bindings);
+    assert_eq!(slots, f.slots);
+    assert_eq!(value, source);
 }

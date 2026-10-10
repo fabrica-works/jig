@@ -1,7 +1,14 @@
 //! Immutable semantic history (client/domain/objects.md, 11; domain/tasks.md, 7;
 //! view.md, 7 and 10). Stored overrides are not historical effective defaults.
 use crate::{Builder, JigBindings, Role, Run, owner_history_words::HistoryPhrase as P, phrases::Hole, words::Words};
-use jig_client::{Limits, contract::*};
+use jig_client::{
+    Limits,
+    contract::{
+        DocumentText, OwnerHistoryChange, OwnerHistoryHolder, OwnerHistoryLine, OwnerMessageProposalKind,
+        OwnerProposalHistoryState, OwnerRetainedAction, OwnerRetainedAmendment, ParameterDocument, PersonAddress,
+        ProposedTask, SpecificationDocument, TaskContractDocument,
+    },
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HistoryFragment {
@@ -78,10 +85,10 @@ fn amendment_fits(value: &OwnerRetainedAmendment, limits: &Limits) -> Option<()>
     if let Some(authority) = &value.authority {
         crate::owner_amendment::authority_fits(authority, limits)?;
     }
-    if let Some(dependencies) = &value.dependencies {
-        if dependencies.capacity() > limits.rows {
-            return None;
-        }
+    if let Some(dependencies) = &value.dependencies
+        && dependencies.capacity() > limits.rows
+    {
+        return None;
     }
     text_fits(&value.reason, limits)
 }

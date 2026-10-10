@@ -2,7 +2,10 @@
 //! client/domain/objects.md, 11). No shortened history or batch is returned.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_client::contract::*;
+use jig_client::contract::{
+    FieldRule, OwnerAuthorityDocument, OwnerHistoryLine, OwnerPart, OwnerProposalHistory, OwnerProposalHistoryState,
+    OwnerRetainedAction, OwnerRetainedAmendment, ParameterDocument, ProposedTask, VerdictChoice,
+};
 use skein_lib::List;
 
 impl Payload for OwnerRetainedAmendment {

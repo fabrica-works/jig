@@ -192,62 +192,61 @@ impl HistoryPhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::History => None,
-            Self::Task => Some(HoleKind::Number),
-            Self::Revision => Some(HoleKind::Number),
-            Self::Cancelled => None,
-            Self::Released => None,
-            Self::Amended => None,
-            Self::Prioritised => Some(HoleKind::Number),
-            Self::Moved => None,
-            Self::Proposed => None,
-            Self::Passed => None,
-            Self::Accepted => None,
-            Self::Rejected => None,
-            Self::Withdrawn => None,
-            Self::Reason => None,
-            Self::At => Some(HoleKind::Wall),
-            Self::AtAbsent => None,
-            Self::SnapshotsAbsent => None,
-            Self::Stored => None,
-            Self::Before => None,
-            Self::After => None,
-            Self::Proposal => Some(HoleKind::Number),
-            Self::Proposer => Some(HoleKind::Number),
-            Self::AsHolder => None,
-            Self::NotAsHolder => None,
-            Self::Pending => None,
-            Self::Since => Some(HoleKind::Wall),
-            Self::HolderTask => Some(HoleKind::Number),
-            Self::HolderPerson => Some(HoleKind::Number),
-            Self::HolderPolicy => Some(HoleKind::Number),
-            Self::Batch => None,
-            Self::Effect => None,
-            Self::Amend => None,
-            Self::Widen => None,
-            Self::Release => None,
-            Self::Attempt => Some(HoleKind::Number),
-            Self::Completion => Some(HoleKind::Number),
-            Self::Position => Some(HoleKind::Number),
-            Self::Purpose => Some(HoleKind::Number),
-            Self::AddressRevision => Some(HoleKind::Number),
-            Self::Party => Some(HoleKind::Number),
-            Self::Role => Some(HoleKind::Number),
-            Self::AddressAbsent => None,
-            Self::Instructions => None,
-            Self::InstructionsAbsent => None,
-            Self::HoldRevision => Some(HoleKind::Number),
-            Self::ReleaseAbsent => None,
-            Self::Spec => None,
-            Self::SpecAbsent => None,
-            Self::Authority => None,
-            Self::AuthorityAbsent => None,
-            Self::Wake => None,
-            Self::WakeAbsent => None,
-            Self::Dependencies => None,
-            Self::Dependency => Some(HoleKind::Number),
-            Self::DependenciesAbsent => None,
-            Self::DependenciesCut => None,
+            Self::History
+            | Self::Cancelled
+            | Self::Released
+            | Self::Amended
+            | Self::Moved
+            | Self::Proposed
+            | Self::Passed
+            | Self::Accepted
+            | Self::Rejected
+            | Self::Withdrawn
+            | Self::Reason
+            | Self::AtAbsent
+            | Self::SnapshotsAbsent
+            | Self::Stored
+            | Self::Before
+            | Self::After
+            | Self::AsHolder
+            | Self::NotAsHolder
+            | Self::Pending
+            | Self::Batch
+            | Self::Effect
+            | Self::Amend
+            | Self::Widen
+            | Self::Release
+            | Self::AddressAbsent
+            | Self::Instructions
+            | Self::InstructionsAbsent
+            | Self::ReleaseAbsent
+            | Self::Spec
+            | Self::SpecAbsent
+            | Self::Authority
+            | Self::AuthorityAbsent
+            | Self::Wake
+            | Self::WakeAbsent
+            | Self::Dependencies
+            | Self::DependenciesAbsent
+            | Self::DependenciesCut => None,
+            Self::Task
+            | Self::Revision
+            | Self::Prioritised
+            | Self::Proposal
+            | Self::Proposer
+            | Self::HolderTask
+            | Self::HolderPerson
+            | Self::HolderPolicy
+            | Self::Attempt
+            | Self::Completion
+            | Self::Position
+            | Self::Purpose
+            | Self::AddressRevision
+            | Self::Party
+            | Self::Role
+            | Self::HoldRevision
+            | Self::Dependency => Some(HoleKind::Number),
+            Self::At | Self::Since => Some(HoleKind::Wall),
         }
     }
     fn label(self) -> &'static [u8] {
