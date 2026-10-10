@@ -434,7 +434,12 @@ fn task() -> Task {
         references: list([]),
         cut: false,
         resources: list([]),
-        budget: budget(),
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 1, spent: 0, spent_below: 0, reserved: 0 },
+            left: 1,
+            funder: Funder::Pool { project: 1, person: 7, period: 3 },
+            deadline: None,
+        },
         authority: OwnerAuthorityDocument {
             authority: OwnerAuthority {
                 tools: 0,
@@ -451,7 +456,6 @@ fn task() -> Task {
         escalation: None,
         proposals: list([]),
         activity: 0,
-        deadline: None,
         changed: Wall::EPOCH,
         acts: list([]),
         parts: list([]),
