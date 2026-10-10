@@ -166,11 +166,12 @@ pub fn received(event: &Event) -> Vec<Receipt> {
 #[must_use]
 pub fn jig_received(event: &jig_client::Event) -> Vec<Receipt> {
     match event {
+        jig_client::Event::Start { .. } => vec![Receipt::Started],
         jig_client::Event::Hello { versions } => {
             if versions.contains(jig_client::contract::CLIENT_VERSION) {
                 vec![]
             } else {
-                vec![Receipt::Parked]
+                vec![Receipt::OutOfDate]
             }
         }
         jig_client::Event::Read { result: ReadResult::Value(value), .. } => read(value),
@@ -179,8 +180,7 @@ pub fn jig_received(event: &jig_client::Event) -> Vec<Receipt> {
         jig_client::Event::SignedOut
         | jig_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
         | jig_client::Event::Ended { end: WatchEnd::SignedOut, .. } => vec![Receipt::Parked],
-        jig_client::Event::Start { .. }
-        | jig_client::Event::Kept { .. }
+        jig_client::Event::Kept { .. }
         | jig_client::Event::KeptGone { .. }
         | jig_client::Event::Went { .. }
         | jig_client::Event::Act { .. }

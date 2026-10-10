@@ -33,6 +33,7 @@ pub struct Rules {
     clients: BTreeSet<ClientId>,
     reachable: Option<bool>,
     parked: BTreeSet<ClientId>,
+    out_of_date: BTreeSet<ClientId>,
     durable: BTreeSet<u64>,
     made: BTreeMap<RequestKey, u64>,
     requests: BTreeMap<RequestKey, Pending>,
@@ -58,6 +59,7 @@ impl Rules {
             clients: BTreeSet::new(),
             reachable: None,
             parked: BTreeSet::new(),
+            out_of_date: BTreeSet::new(),
             durable: BTreeSet::from([0]),
             made: BTreeMap::new(),
             requests: BTreeMap::new(),
@@ -188,7 +190,7 @@ impl Rules {
                 }
             }
             Receipt::Party { party } => {
-                if self.parked.remove(&client) && self.reachable == Some(true) {
+                if !self.out_of_date.contains(&client) && self.parked.remove(&client) && self.reachable == Some(true) {
                     judge.rearm(Deadline::Online(client), self.link_within);
                 }
                 for (key, pending) in &self.requests {
@@ -196,6 +198,13 @@ impl Rules {
                         judge.withdraw(&Deadline::Request(key.0, key.1));
                     }
                 }
+            }
+            Receipt::Started => {
+                self.out_of_date.remove(&client);
+            }
+            Receipt::OutOfDate => {
+                self.out_of_date.insert(client);
+                self.delivered(client, Receipt::Parked, judge);
             }
             Receipt::Parked => {
                 self.parked.insert(client);

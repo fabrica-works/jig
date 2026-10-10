@@ -391,3 +391,37 @@ fn previously_sent_words_cannot_leave_later_activity() {
 fn ending_the_task_discharges_word_retention() {
     run::<12>();
 }
+
+#[test]
+fn a_business_frame_cannot_unpark_an_out_of_date_stream_before_the_client_restarts() {
+    let mut referee = skein_world::domain::Referee::new(referee::Rules::new(
+        Duration::from_millis(10),
+        Duration::from_millis(10),
+        Duration::from_millis(10),
+    ));
+    let client = ClientId(0);
+    let mut out = Vec::new();
+    referee.observe(Time::ZERO, Observation::Client { client }, &mut out);
+    referee.observe(Time::ZERO, Observation::Truth(Observed::Reachable { live: true }), &mut out);
+    referee.observe(Time::ZERO, Observation::Delivered { client, receipt: Receipt::OutOfDate }, &mut out);
+    referee.observe(Time::ZERO, Observation::Delivered { client, receipt: Receipt::Party { party: 7 } }, &mut out);
+    referee.fire(Time::from_nanos(20_000_000), &mut out);
+    assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
+    referee.observe(
+        Time::from_nanos(20_000_000),
+        Observation::Delivered { client, receipt: Receipt::Started },
+        &mut out,
+    );
+    referee.observe(
+        Time::from_nanos(20_000_000),
+        Observation::Delivered { client, receipt: Receipt::Party { party: 7 } },
+        &mut out,
+    );
+    assert_eq!(referee.next_deadline(), Some(Time::from_nanos(30_000_000)));
+    referee.observe(
+        Time::from_nanos(20_000_000),
+        Observation::Shown { client, seen: vec![Seen::Link { live: true }] },
+        &mut out,
+    );
+    assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
+}

@@ -48,6 +48,10 @@ pub enum Receipt {
     Answer { attempt: Token, final_answer: bool, words: Option<(u64, u64)> },
     /// The frame confirms the party of this sign-in.
     Party { party: u64 },
+    /// A newly started client can receive a fresh protocol hello.
+    Started,
+    /// The stream hello requires updating this client; business Frames cannot lift it.
+    OutOfDate,
     /// Requests park until the party can sign in again.
     Parked,
 }
