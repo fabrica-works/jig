@@ -78,8 +78,9 @@ fn whole_history_page_prices_all_typed_boxes_stored_presence_and_reserved_rows_w
         match value {
             HistoryRow::Change(line) => expected += crate::owner_history::bytes(line, &bounds).unwrap(),
             HistoryRow::Milestone(line) => expected += crate::owner_milestone::bytes(line, &bounds).unwrap(),
-            HistoryRow::Legacy(line) => {
-                expected += u64::try_from(size_of::<HistoryLine>()).unwrap() + line.heap(&bounds).unwrap();
+            HistoryRow::Legacy(_) => {
+                // The supplied Made row has only inline scalar fields; its one box is charged once.
+                expected += u64::try_from(size_of::<HistoryLine>()).unwrap();
             }
         }
     }
