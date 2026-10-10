@@ -4,10 +4,10 @@ use jig_client::{
     contract::{ObjectKey, ReadValue},
 };
 use jig_client_view::Role;
-use jig_client_world::Until;
+use jig_client_world::{Until, harness::App};
 use jig_fake_person::{Find, Step};
 use jig_ops_client_domain::{Address, observability as obs};
-use jig_ops_world::client::stories;
+use jig_ops_world::client::{Ops, stories};
 use skein_lib::Duration;
 use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]
@@ -57,7 +57,9 @@ fn p_accepts_a_restart_from_the_incidents_page() {
             vec![
                 see(b"Restart checkout in production"),
                 see(b"Accepted"),
-                Step::Pause { span: Duration::from_secs(6) },
+                Step::Pause { span: Duration::from_millis(50) },
+                see(b"Accepted"),
+                Step::Pause { span: Ops::limits().jig.linger.saturating_add(Duration::from_millis(100)) },
                 Step::Gone { find: Find::text(b"Restart checkout in production"), within: WITHIN },
             ],
         );

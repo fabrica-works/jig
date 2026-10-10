@@ -22,7 +22,8 @@ pub fn limits() -> domain::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
-            linger: Duration::from_secs(5),
+            // A finite fixture keeps the same before/after-linger behavior at a short scale.
+            linger: Duration::from_millis(250),
             save_delay: Duration::from_millis(10),
             intents: 2,
             fields: 4,
