@@ -417,6 +417,13 @@ impl<A: App, F: Front<A>> World<A, F> {
             c.at += 1;
         }
     }
+    fn platform_went(&mut self, id: ClientId, address: A::Address) {
+        // History changed on the platform; report Went through the normal callback.
+        self.schedule.send(
+            self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
+            Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(address) },
+        );
+    }
     fn observe(&mut self, observation: Observation) {
         self.referee.observe(self.now, observation, &mut Vec::new());
         self.referee.assert_holding(self.settings.seed);
@@ -496,7 +503,8 @@ impl<A: App, F: Front<A>> World<A, F> {
             // A Show is navigation even when the chosen address is already current.
             self.observe(Observation::LeftPage { client: id });
             self.clients[id.0].acted_card = None;
-            self.history(id, address, replace);
+            self.history(id, address.clone(), replace);
+            self.platform_went(id, address);
         }
         for back in signs {
             self.front.sign_in(id, self.now, env.wall);
@@ -705,5 +713,33 @@ impl<A: App, F: Front<A>> World<A, F> {
             heap_peak: self.heap_peak,
             heap_bound: self.heap_bound * u64::try_from(self.clients.len()).expect("client count fits"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Until;
+    use jig_client_view::Role;
+    use jig_fake_person::{Find, Step};
+    use skein_lib::Duration;
+    use skein_world::domain::Verdict;
+
+    #[test]
+    fn a_public_family_link_delivers_the_platform_went_callback() {
+        let mut world = crate::stories::incident_world(5090);
+        let client = world.client(7, crate::stories::inbox());
+        let within = Duration::from_secs(1);
+        world.person(
+            client,
+            vec![
+                Step::See { find: Find::named(Role::Link, b"Family"), within },
+                Step::Press { find: Find::named(Role::Link, b"Family") },
+                Step::See { find: Find::text(b"Item 1"), within },
+                Step::See { find: Find::text(b"Chat nine"), within },
+            ],
+        );
+        let outcome = world.run(Until::Done);
+        assert_eq!(outcome.verdict, Verdict::Passed);
+        assert!(outcome.judged.0 > 0);
     }
 }
