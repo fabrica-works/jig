@@ -319,21 +319,7 @@ impl Conversation {
             return true;
         }
         if self.replacing {
-            let mut kept = List::with_capacity(self.live.capacity());
-            let old = core::mem::replace(&mut self.live, List::with_capacity(0));
-            for held in old.into_boxed() {
-                if held.name.turn() != value.turn.turn() {
-                    kept.push(held).expect("replacement preserves bounded earlier turns");
-                }
-            }
-            self.live = kept;
-            if let Some(current) = self.current
-                && current.turn() == value.turn.turn()
-            {
-                self.current = None;
-                self.stream_offset = 0;
-            }
-            self.replacing = false;
+            self.reopened(value.turn);
         }
         let mut index = None;
         for at in 0..self.live.len() {
@@ -408,20 +394,40 @@ impl Conversation {
                 self.live.push(live).expect("live turn room checked");
             }
         }
+        self.followed(value.turn, value.through);
+        self.prune_folds();
+        true
+    }
+    fn reopened(&mut self, name: ProvisionalTurnName) {
+        let mut kept = List::with_capacity(self.live.capacity());
+        let old = core::mem::replace(&mut self.live, List::with_capacity(0));
+        for held in old.into_boxed() {
+            if held.name.turn() != name.turn() {
+                kept.push(held).expect("replacement preserves bounded earlier turns");
+            }
+        }
+        self.live = kept;
+        if let Some(current) = self.current
+            && current.turn() == name.turn()
+        {
+            self.current = None;
+            self.stream_offset = 0;
+        }
+        self.replacing = false;
+    }
+    fn followed(&mut self, name: ProvisionalTurnName, through: u32) {
         match self.current {
             Some(current) => {
-                if value.turn >= current {
-                    self.current = Some(value.turn);
-                    self.stream_offset = value.through;
+                if name >= current {
+                    self.current = Some(name);
+                    self.stream_offset = through;
                 }
             }
             None => {
-                self.current = Some(value.turn);
-                self.stream_offset = value.through;
+                self.current = Some(name);
+                self.stream_offset = through;
             }
         }
-        self.prune_folds();
-        true
     }
     /// Keeps text during a brief offline interval, replacing it on the next delivery.
     pub fn interrupted(&mut self) {
