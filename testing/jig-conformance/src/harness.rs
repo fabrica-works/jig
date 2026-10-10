@@ -365,15 +365,25 @@ impl<A: Application> Harness<A> {
     }
 
     fn inspect(&mut self) -> Result<(), Violation> {
-        let observations = A::observed(&mut self.peers, &self.systems, &self.store, self.clock);
-        let policy = A::policy(&self.peers);
+        Self::inspect_outside(&mut self.peers, &self.systems, &self.store, &mut self.referee, self.clock)
+    }
+
+    fn inspect_outside(
+        peers: &mut A::Peers,
+        systems: &A::Systems,
+        store: &Store<A::Key, A::Record>,
+        referee: &mut Referee,
+        clock: Clock,
+    ) -> Result<(), Violation> {
+        let observations = A::observed(peers, systems, store, clock);
+        let policy = A::policy(peers);
         // Keep an independent snapshot; copy a new value only when scenario
         // policy changes, before processing this inspection's observations.
-        if self.referee.policy != *policy {
-            self.referee.policy.clone_from(policy);
+        if referee.policy != *policy {
+            referee.policy.clone_from(policy);
         }
         for observed in observations {
-            self.referee.observe(self.clock.now, observed)?;
+            referee.observe(clock.now, observed)?;
         }
         Ok(())
     }
@@ -482,10 +492,23 @@ where
     ///
     /// # Errors
     /// Returns the same missing receipt or broken promise as `crash`.
-    pub fn from_snapshot(snapshot: ColdSnapshot<A>) -> Result<Self, Violation> {
+    pub fn from_snapshot(mut snapshot: ColdSnapshot<A>) -> Result<Self, Violation> {
         let meter = skein_world::domain::heap::Meter::new();
+        // Exactly crash's outside sequence, before constructing its one new root.
+        snapshot.crashes.push(snapshot.store.applied);
+        snapshot.referee.observe(snapshot.clock.now, Observed::Restart)?;
+        snapshot.store.crash();
+        A::cold(&mut snapshot.peers, &snapshot.store, snapshot.clock);
+        Self::inspect_outside(
+            &mut snapshot.peers,
+            &snapshot.systems,
+            &snapshot.store,
+            &mut snapshot.referee,
+            snapshot.clock,
+        )?;
         let domain = A::build(&snapshot.config);
-        let mut world = Self {
+        let events = A::start(&snapshot.config, &mut snapshot.store).into_iter().map(Input::Event).collect();
+        Ok(Self {
             domain,
             systems: snapshot.systems,
             peers: snapshot.peers,
@@ -496,7 +519,7 @@ where
             configuration_heap: snapshot.configuration_heap,
             config: snapshot.config,
             seed: snapshot.seed,
-            events: VecDeque::new(),
+            events,
             outputs: Vec::new(),
             meter,
             clock: snapshot.clock,
@@ -505,8 +528,6 @@ where
             cut: Cut::None,
             crashes: snapshot.crashes,
             commit_hook: None,
-        };
-        world.crash()?;
-        Ok(world)
+        })
     }
 }
