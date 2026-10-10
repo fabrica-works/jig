@@ -49,3 +49,6 @@ pub use turns::conversation;
 
 #[cfg(test)]
 mod tests;
+
+pub mod owner_authority;
+pub mod owner_authority_words;

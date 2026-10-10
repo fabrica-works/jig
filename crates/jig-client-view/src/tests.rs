@@ -20,3 +20,5 @@ mod page_capacity;
 
 mod owner_wake;
 mod refusal_facts;
+
+mod owner_authority;

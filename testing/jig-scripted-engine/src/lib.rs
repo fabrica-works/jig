@@ -413,3 +413,5 @@ impl<A: Application> Engine<A> {
 }
 #[cfg(test)]
 mod tests;
+
+pub mod owner_authority;

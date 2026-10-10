@@ -26,3 +26,6 @@ pub use specification::*;
 pub use turn::*;
 pub use versions::*;
 pub use watches::*;
+
+pub mod owner_authority;
+pub use owner_authority::*;
