@@ -400,13 +400,15 @@ fn connector_values_view_selected_checked_language_covers_owner_values_and_reord
         }
     }
     let count = u32::try_from(normal.phrases.len()).unwrap();
+    let mut segments = 0_u32;
     let mut text_bytes = 0_u32;
     for language in [&normal, &selected] {
         for phrase in &language.phrases {
             for form in &phrase.forms {
+                segments = segments.checked_add(u32::try_from(form.segments.len()).unwrap()).unwrap();
                 for segment in &form.segments {
                     if let Segment::Text(bytes) = segment {
-                        text_bytes += u32::try_from(bytes.len()).unwrap();
+                        text_bytes = text_bytes.checked_add(u32::try_from(bytes.len()).unwrap()).unwrap();
                     }
                 }
             }
@@ -415,7 +417,7 @@ fn connector_values_view_selected_checked_language_covers_owner_values_and_reord
     let book = Phrasebook::load(
         words::shapes(phrases::jig::shapes(64)),
         Box::new([normal, selected]),
-        &PhraseLimits { languages: 2, phrases: count, holes: 4, segments: 3000, text_bytes, hole_bytes: 64 },
+        &PhraseLimits { languages: 2, phrases: count, holes: 4, segments, text_bytes, hole_bytes: 64 },
     )
     .unwrap();
     let mut words = jig_client_view::words::Words { book, language: 1, offset_minutes: 0 };
@@ -457,6 +459,50 @@ fn connector_values_view_selected_checked_language_covers_owner_values_and_reord
         &PhraseLimits { languages: 1, phrases: count, holes: 4, segments: 3000, text_bytes: 30000, hole_bytes: 64 },
     )
     .unwrap_err();
+}
+#[test]
+fn connector_values_composed_whole_languages_admit_exact_segments_and_refuse_one_under() {
+    let normal = words::language(phrases::english::language());
+    let mut segments = 0_u32;
+    let mut text_bytes = 0_u32;
+    for phrase in &normal.phrases {
+        for form in &phrase.forms {
+            segments = segments.checked_add(u32::try_from(form.segments.len()).unwrap()).unwrap();
+            for segment in &form.segments {
+                if let Segment::Text(bytes) = segment {
+                    text_bytes = text_bytes.checked_add(u32::try_from(bytes.len()).unwrap()).unwrap();
+                }
+            }
+        }
+    }
+    let count = u32::try_from(normal.phrases.len()).unwrap();
+    let shapes = words::shapes(phrases::jig::shapes(64));
+    let languages = Box::new([normal.clone(), normal]);
+    let limits = PhraseLimits {
+        languages: 2,
+        phrases: count,
+        holes: 4,
+        segments: segments.checked_mul(2).unwrap(),
+        text_bytes: text_bytes.checked_mul(2).unwrap(),
+        hole_bytes: 64,
+    };
+    let mut short = limits;
+    short.segments = short.segments.checked_sub(1).unwrap();
+    assert_eq!(Phrasebook::load(shapes.clone(), languages.clone(), &short).unwrap_err(), phrases::Invalid::Limit);
+    for admitted in [limits.segments, limits.segments.checked_add(1).unwrap()] {
+        let mut capacity = limits;
+        capacity.segments = admitted;
+        let book = Phrasebook::load(shapes.clone(), languages.clone(), &capacity).unwrap();
+        for language in 0..2 {
+            assert_eq!(
+                book.say(language, Word::Value.id(), &[phrases::Hole::Number(3)]).unwrap().text.as_ref(),
+                b"Value: 3"
+            );
+        }
+    }
+    let mut short_holes = limits;
+    short_holes.holes = 3;
+    assert_eq!(Phrasebook::load(shapes, languages, &short_holes).unwrap_err(), phrases::Invalid::Limit);
 }
 #[test]
 fn connector_values_view_the_capacity_envelope_covers_full_rows_paths_and_escaped_segments() {
