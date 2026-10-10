@@ -2,15 +2,15 @@ use super::*;
 use crate::payload::{self, Payload};
 use core::mem::size_of;
 
-fn whole_budget_fits<T: Payload + Clone + PartialEq + core::fmt::Debug>(row: T) {
+fn whole_budget_fits<T: Payload + Clone + PartialEq + core::fmt::Debug>(row: &T) {
     let before = row.clone();
     let mut bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
     let whole = u64::try_from(size_of::<T>()).unwrap() + row.heap(&bounds).unwrap();
     bounds.document_bytes = whole;
-    assert!(payload::fits(&row, &bounds));
+    assert!(payload::fits(row, &bounds));
     bounds.document_bytes = whole - 1;
-    assert!(!payload::fits(&row, &bounds));
-    assert_eq!(row, before);
+    assert!(!payload::fits(row, &bounds));
+    assert_eq!(row, &before);
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
             };
             let mut row = task();
             row.budget = budget.clone();
-            whole_budget_fits(row.clone());
+            whole_budget_fits(&row);
             let conversation = ConversationLine {
                 chip: row.chip.clone(),
                 project: row.project,
@@ -43,7 +43,7 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
                 delegates: 0,
                 budget: budget.clone(),
             };
-            whole_budget_fits(conversation);
+            whole_budget_fits(&conversation);
             let goal = GoalLine {
                 chip: row.chip,
                 priority: u32::MAX,
@@ -52,7 +52,7 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
                 held_below: u32::MAX,
                 changed: Wall::EPOCH,
             };
-            whole_budget_fits(goal);
+            whole_budget_fits(&goal);
         }
     }
 }
