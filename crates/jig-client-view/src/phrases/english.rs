@@ -13,13 +13,9 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
-            JigPhrase::FrameProjectNumber => {
-                Box::new([Segment::Text(copy_of(b"Project ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
-            }
             JigPhrase::FrameLogin => {
                 Box::new([Segment::Text(copy_of(b"Login: ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
             }
-            JigPhrase::FramePerson => Box::new([Segment::Text(copy_of(b"Person"))]),
             JigPhrase::FrameService => Box::new([Segment::Text(copy_of(b"Service"))]),
             JigPhrase::FrameResultsSeen => Box::new([
                 Segment::Text(copy_of(b"Results read through ")),
@@ -394,7 +390,7 @@ pub fn language() -> Language {
             JigPhrase::PartKind => {
                 Box::new([Segment::Text(copy_of(b"Kind ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
-            JigPhrase::PartProject => {
+            JigPhrase::PartProject | JigPhrase::FrameProjectNumber => {
                 Box::new([Segment::Text(copy_of(b"Project ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
             JigPhrase::OutboxEntry => {
@@ -846,7 +842,7 @@ pub fn language() -> Language {
             ]),
             JigPhrase::Agent => Box::new([Segment::Text(copy_of(b"Agent"))]),
             JigPhrase::Procedure => Box::new([Segment::Text(copy_of(b"Procedure"))]),
-            JigPhrase::Person => Box::new([Segment::Text(copy_of(b"Person"))]),
+            JigPhrase::Person | JigPhrase::FramePerson => Box::new([Segment::Text(copy_of(b"Person"))]),
             JigPhrase::RoleExecutor => Box::new([Segment::Text(copy_of(b"Person holding a role"))]),
             JigPhrase::KindMissing => Box::new([Segment::Text(copy_of(b"Executor kind not allowed"))]),
             JigPhrase::LimitLive => Box::new([

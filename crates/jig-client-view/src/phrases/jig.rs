@@ -1647,26 +1647,22 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::FrameProjectNumber => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::FrameLogin => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::FramePerson => Box::new([]),
-            Self::FrameService => Box::new([]),
-            Self::FrameResultsSeen => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::FrameNeedsKinds => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::FrameProjectsCut => Box::new([]),
-            Self::FrameChartersCut => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::FramePoolUnopened => Box::new([]),
             Self::PolicyJudge | Self::PolicyPermission | Self::SpecificationResource => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::PolicyRequirements
+            Self::FramePerson
+            | Self::FrameService
+            | Self::FrameProjectsCut
+            | Self::FramePoolUnopened
+            | Self::PolicyRequirements
             | Self::PolicyProjections
             | Self::PolicyPermissions
             | Self::PolicyGuarded
@@ -2044,7 +2040,8 @@ impl JigPhrase {
             | Self::ClaimedPhase
             | Self::ActivePhase
             | Self::ClosingPhase => Box::new([]),
-            Self::PartResource
+            Self::FrameLogin
+            | Self::PartResource
             | Self::ResourceScope
             | Self::OpaqueDialect
             | Self::OpenCall
@@ -2064,7 +2061,10 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::PolicyEditRole
+            Self::FrameProjectNumber
+            | Self::FrameResultsSeen
+            | Self::FrameChartersCut
+            | Self::PolicyEditRole
             | Self::PolicyRequests
             | Self::PolicyDecides
             | Self::PolicyObserved

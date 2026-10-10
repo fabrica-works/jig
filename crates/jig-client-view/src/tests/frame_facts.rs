@@ -5,7 +5,7 @@ use jig_client::{Domain, Event, contract::*};
 use skein_lib::{List, Token, Wall};
 fn tree(domain: &Domain) -> Tree {
     let mut sized = limits();
-    sized.nodes = crate::frame_nodes(&CLIENT).unwrap() + 1;
+    sized.nodes = crate::frame_nodes(&CLIENT).unwrap().checked_add(1).unwrap();
     let mut builder = Builder::new(&sized);
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     builder.open(Role::Page);

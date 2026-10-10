@@ -61,11 +61,10 @@ fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings
     let mut offered = false;
     if let Some(frame) = &client.frame().document {
         for role in &frame.projects {
-            if role.project == doc.number {
-                pool_left = match &role.pool {
-                    Some(ledger) => Some(ledger.left),
-                    None => None,
-                };
+            if role.project == doc.number
+                && let Some(ledger) = &role.pool
+            {
+                pool_left = Some(ledger.left);
             }
         }
         for pool in &doc.pools {
