@@ -69,7 +69,8 @@ pub struct Call {
     pub tool: Box<[u8]>,
     pub input: Box<[u8]>,
     pub cut: bool,
-    /// Set by views when this identity is first reported; retained on repeats.
+    /// Set by views when this call becomes current; consecutive repeats retain it.
+    /// A different current identity restarts the clock, including A -> B -> A.
     /// An ingress supplies None. No provider or adapter invents this clock.
     pub began: Option<skein_lib::Wall>,
 }
