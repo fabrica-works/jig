@@ -229,7 +229,7 @@ pub fn parts(task: &Task, section: TaskSection, limit: u32) -> List<Part> {
             Executor::Agent { .. } | Executor::Party { .. } | Executor::Role { .. } => {}
         },
         TaskSection::Budget => {
-            for grant in &task.authority.grants {
+            for grant in &task.authority.authority.grants {
                 push(&mut parts, Part::Kind { connector: grant.connector, kind: grant.kind });
             }
         }

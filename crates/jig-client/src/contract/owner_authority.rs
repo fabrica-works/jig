@@ -62,3 +62,10 @@ pub struct OwnerAuthorityDocument {
     pub authority: OwnerAuthority,
     pub cut: bool,
 }
+impl OwnerAuthorityDocument {
+    /// A whole replacement exists only when this owner projection is complete.
+    #[must_use]
+    pub fn whole(&self) -> Option<OwnerAuthority> {
+        if self.cut { None } else { Some(self.authority.clone()) }
+    }
+}

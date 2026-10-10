@@ -38,7 +38,7 @@ pub fn edit(before: &Amendment, selected: &Amendment, field: Field, value: Box<[
         Field::Instructions => change.instructions = Some(Text::new(value, text_limit).ok()?),
         Field::Budget => {
             let mut authority = selected.authority.clone().or(before.authority.clone())?;
-            authority.budget = crate::number(&value)?;
+            authority.spend = crate::number(&value)?;
             change.authority = Some(authority);
         }
         Field::Deadline => {
@@ -112,6 +112,7 @@ pub fn form(
     proposal::amendment(b, &before, words, bindings);
     loss(b, object, words);
     task_loss(b, object, words);
+    authority_loss(b, object, words);
     let empty = empty();
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     let value = values(&before, change);
@@ -121,8 +122,10 @@ pub fn form(
         input(b, &value, open, Field::Words, JigPhrase::NewSpec, words, bindings);
     }
     input(b, &value, open, Field::Instructions, JigPhrase::NewInstructions, words, bindings);
-    input(b, &value, open, Field::Budget, JigPhrase::NewBudget, words, bindings);
-    input(b, &value, open, Field::Deadline, JigPhrase::NewDeadline, words, bindings);
+    if value.authority.is_some() {
+        input(b, &value, open, Field::Budget, JigPhrase::NewBudget, words, bindings);
+        input(b, &value, open, Field::Deadline, JigPhrase::NewDeadline, words, bindings);
+    }
     if let Some(to) = &value.addressed {
         proposal::address_change(b, to, words);
         input(b, &value, open, Field::Party, JigPhrase::AddressParty, words, bindings);
@@ -199,6 +202,26 @@ pub fn form(
     };
     if let Some(funding) = funding {
         words.actor(b, funding.funder);
+    }
+}
+fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
+    let document = match &object.body {
+        Some(Body::Task(doc)) => Some(&doc.authority),
+        Some(Body::Escalation(doc)) => Some(&doc.steering.authority),
+        Some(
+            Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => None,
+    };
+    if let Some(document) = document
+        && document.cut
+    {
+        crate::owner_authority::document_words(b, document, words);
     }
 }
 fn task_loss(b: &mut Builder, object: &Object, words: &Words) {
@@ -306,7 +329,7 @@ fn input(
         }
         Field::Budget => {
             if let Some(authority) = &value.authority {
-                b.value(&words.say(JigPhrase::Amount, &[Hole::Amount(authority.budget)]), open.writes);
+                b.value(&words.say(JigPhrase::Amount, &[Hole::Amount(authority.spend)]), open.writes);
             }
         }
         Field::Deadline | Field::Party | Field::Role => b.value(&[], open.writes),
@@ -327,7 +350,7 @@ fn before(object: &Object) -> Option<Amendment> {
             instructions: crate::instructions::whole(doc.instructions.as_ref()),
             wake: Some(doc.wake),
             dependencies: if doc.cut { None } else { Some(numbers(&doc.dependencies)) },
-            authority: Some(doc.authority.clone()),
+            authority: doc.authority.whole(),
         },
         Some(Body::Escalation(doc)) => Amendment {
             addressed: recipient_address(doc.steering.person_revision, doc.steering.addressed.as_ref(), object.project),
@@ -335,7 +358,7 @@ fn before(object: &Object) -> Option<Amendment> {
             instructions: crate::instructions::whole(doc.steering.instructions.as_ref()),
             wake: Some(doc.steering.wake),
             dependencies: Some(doc.steering.dependencies.clone()),
-            authority: Some(doc.steering.authority.clone()),
+            authority: doc.steering.authority.whole(),
         },
         Some(
             Body::Chip(_)

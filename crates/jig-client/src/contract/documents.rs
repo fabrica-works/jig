@@ -177,7 +177,7 @@ pub struct Task {
     pub cut: bool,
     pub resources: List<Part>,
     pub budget: Budget,
-    pub authority: Authority,
+    pub authority: super::OwnerAuthorityDocument,
     pub hold: Option<Hold>,
     pub escalation: Option<Escalation>,
     pub proposals: List<ProposalKey>,
@@ -308,11 +308,11 @@ pub enum Bounds {
     /// Additional budget and complete held grants for an amendment.
     Amend {
         budget_left: u64,
-        grants: List<super::Grant>,
+        grants: List<super::OwnerGrant>,
         /// Complete numbers and lists for directly made widening.
-        authority: Box<Authority>,
+        authority: Box<super::OwnerAuthorityDocument>,
         /// Hard envelope of supported form choices.
-        ceiling: Box<Authority>,
+        ceiling: Box<super::OwnerAuthorityDocument>,
     },
 }
 
@@ -438,7 +438,7 @@ pub struct Steering {
     pub instructions: Option<DocumentText>,
     pub wake: super::OwnerWakePolicy,
     pub dependencies: List<u64>,
-    pub authority: Authority,
+    pub authority: super::OwnerAuthorityDocument,
     pub budget: Budget,
 }
 

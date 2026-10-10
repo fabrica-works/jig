@@ -50,7 +50,7 @@ fn amendment(limits: &Limits) -> Option<u32> {
     crate::specification::nodes(limits)?
         .checked_add(crate::instructions::nodes(limits)?)?
         .checked_add(crate::owner_wake::policy_nodes())?
-        .checked_add(authority(limits)?)?
+        .checked_add(crate::owner_authority::document_nodes(limits.rows)?)?
         .checked_add(limits.rows.checked_mul(5)?)?
         .checked_add(5)
 }

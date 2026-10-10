@@ -27,7 +27,7 @@ pub struct Amendment {
     pub spec: Option<super::Specification>,
     pub wake: Option<super::OwnerWakePolicy>,
     pub dependencies: Option<List<u64>>,
-    pub authority: Option<Authority>,
+    pub authority: Option<super::OwnerAuthority>,
     pub instructions: Option<Text>,
 }
 

@@ -113,7 +113,7 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
         .len()
         .checked_add(doc.parts.len())
         .expect("bounded task parts")
-        .checked_add(doc.authority.grants.len().checked_mul(2).expect("bounded grants"))
+        .checked_add(doc.authority.authority.grants.len().checked_mul(2).expect("bounded grants"))
         .expect("bounded task parts")
         .checked_add(1)
         .expect("result slot fits");
@@ -231,7 +231,7 @@ fn budget(b: &mut Builder, doc: &Task, words: &Words, bindings: &mut JigBindings
     }
     match doc.chip.executor {
         Executor::Agent { .. } | Executor::Procedure { .. } => {
-            cards::common::authority(b, &doc.authority, words, bindings);
+            crate::owner_authority::document_words(b, &doc.authority, words);
         }
         Executor::Party { .. } | Executor::Role { .. } => {}
     }

@@ -71,7 +71,8 @@ fn history(l: &Limits) -> Option<u32> {
 /// Task header, lineage and the largest available executor section.
 #[must_use]
 pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
-    let budget = authority(l)?.checked_add(l.rows.checked_mul(4)?)?.checked_add(12)?;
+    let budget =
+        crate::owner_authority::document_nodes(l.rows)?.checked_add(l.rows.checked_mul(4)?)?.checked_add(12)?;
     let activity = conversation_nodes(l, 0)?.checked_add(runtime(l)?)?.checked_add(card_nodes(l)?.checked_mul(2)?)?;
     let panels = l.rows.checked_mul(4)?.checked_add(2)?.checked_mul(5)?;
     let section = plan(l)?.max(overview(l)?).max(history(l)?).max(budget).max(activity).max(panels);

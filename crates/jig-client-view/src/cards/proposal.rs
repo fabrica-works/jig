@@ -124,7 +124,7 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &
         }
     }
     if let Some(authority) = &change.authority {
-        super::common::authority(b, authority, words, bindings);
+        crate::owner_authority::render_words(b, authority, words);
     }
     b.open(Role::Separator);
     b.close();
