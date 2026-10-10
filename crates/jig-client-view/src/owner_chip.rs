@@ -84,10 +84,10 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
             Some(OwnerHoldEscalation::Routing | OwnerHoldEscalation::Waiting { .. }) | None => {}
         }
     }
-    if let Some(connectors) = &value.closing_connectors {
-        if connectors.capacity() > limits.rows {
-            return None;
-        }
+    if let Some(connectors) = &value.closing_connectors
+        && connectors.capacity() > limits.rows
+    {
+        return None;
     }
     if let Some(observation) = &value.observation {
         match &observation.work {
@@ -104,7 +104,7 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
             | OwnerChipWork::Ending => {}
         }
     }
-    let resource_nodes = limits.rows.checked_add(20)?.checked_mul(u32::try_from(value.resources.len()).ok()?)?;
+    let resource_nodes = limits.rows.checked_add(20)?.checked_mul(value.resources.len())?;
     let mut nodes = 120_u32
         .checked_add(resource_nodes)?
         .checked_add(limits.rows.checked_add(6)?.checked_mul(2)?)?
@@ -371,7 +371,7 @@ pub fn render(b: &mut Builder, value: &OwnerChipDetails, client: &Domain, words:
             );
         }
         Some(RetryNotice::Refused { count }) => {
-            words.text(b, crate::phrases::jig::JigPhrase::RunRetryRefused, &[Hole::Number(u64::from(count))])
+            words.text(b, crate::phrases::jig::JigPhrase::RunRetryRefused, &[Hole::Number(u64::from(count))]);
         }
         None => {}
     }

@@ -369,8 +369,9 @@ fn held_prior_stages_have_no_invented_clocks_and_escalations_keep_holder_scope_a
         assert!(has(&tree, label));
         assert!(has(&tree, b"Escalation entry: 18446744073709551615"));
         assert!(has(&tree, b"Escalation waiting since: 100"));
-        if matches!(holder, OwnerEscalationHolder::Role { .. }) {
-            assert!(has(&tree, b"Escalation holder project: 4294967295"));
+        match holder {
+            OwnerEscalationHolder::Role { .. } => assert!(has(&tree, b"Escalation holder project: 4294967295")),
+            OwnerEscalationHolder::Task(_) | OwnerEscalationHolder::Person(_) => {}
         }
     }
     value.hold.as_mut().unwrap().escalation =
@@ -439,7 +440,7 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
     value.hold.as_mut().unwrap().source = Some(part());
     value.procedure = Some(part());
     value.resources = List::with_capacity(4);
-    for _ in 0..4 {
+    for _ in 0_u32..4 {
         value
             .resources
             .push(OwnerResourceLine {
@@ -454,7 +455,7 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
     }
     value.resources_cut = true;
     value.closing_connectors = Some(List::with_capacity(4));
-    for _ in 0..4 {
+    for _ in 0_u32..4 {
         value.closing_connectors.as_mut().unwrap().push(u16::MAX).unwrap();
     }
     value.hold.as_mut().unwrap().escalation =
@@ -503,12 +504,12 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
     assert!(!has(&selected_tree, b"Run work unobserved"));
     let mut language = data::language();
     language.phrases[0].id = ChipPhrase::PhaseSince.id();
-    assert!(matches!(
-        crate::phrases::Phrasebook::load(data::shapes(), Box::new([language]), &phrase_limits()),
-        Err(Invalid::Duplicate { .. })
-    ));
-    assert!(matches!(
-        OwnerChipWords::load(Box::new([crate::phrases::english::language()]), &phrase_limits(), 1, 0),
-        Err(Invalid::Language)
-    ));
+    assert_eq!(
+        crate::phrases::Phrasebook::load(data::shapes(), Box::new([language]), &phrase_limits()).err(),
+        Some(Invalid::Duplicate { id: ChipPhrase::PhaseSince.id() })
+    );
+    assert_eq!(
+        OwnerChipWords::load(Box::new([crate::phrases::english::language()]), &phrase_limits(), 1, 0).err(),
+        Some(Invalid::Language)
+    );
 }

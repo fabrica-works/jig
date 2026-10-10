@@ -215,6 +215,7 @@ pub const ALL: [ChipPhrase; 99] = [
 ];
 impl ChipPhrase {
     #[must_use]
+    #[expect(clippy::too_many_lines, reason = "one total table keeps the closed phrase identities together")]
     pub fn id(self) -> PhraseId {
         let number = match self {
             Self::Project => 7000,
@@ -319,107 +320,212 @@ impl ChipPhrase {
         };
         PhraseId { owner: Owner::Jig, number }
     }
+    #[expect(clippy::too_many_lines, reason = "one total table keeps the closed phrase shapes together")]
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Project => Some(HoleKind::Number),
-            Self::PhaseSince => Some(HoleKind::Wall),
-            Self::Placement => Some(HoleKind::Wall),
-            Self::Attempt => Some(HoleKind::Number),
-            Self::Activity => Some(HoleKind::Number),
-            Self::LiveDelegates => Some(HoleKind::Number),
-            Self::ConnectorsUnknown => None,
-            Self::ConnectorsEmpty => None,
-            Self::Connector => Some(HoleKind::Number),
-            Self::EndedAt => Some(HoleKind::Wall),
-            Self::ResourcesObserved => None,
-            Self::ResourcesUnobserved => None,
-            Self::ResourcesCut => None,
-            Self::Procedure => None,
-            Self::Kind => Some(HoleKind::Number),
-            Self::Taken => None,
-            Self::NotTaken => None,
-            Self::Holder => Some(HoleKind::Number),
-            Self::WriterTask => Some(HoleKind::Number),
-            Self::WriterAttempt => Some(HoleKind::Number),
-            Self::WriterEffect => Some(HoleKind::Number),
-            Self::WriterLost => None,
-            Self::WriterKept => None,
-            Self::WaitSince => Some(HoleKind::Wall),
+            Self::Project
+            | Self::Attempt
+            | Self::Activity
+            | Self::LiveDelegates
+            | Self::Connector
+            | Self::Kind
+            | Self::Holder
+            | Self::WriterTask
+            | Self::WriterAttempt
+            | Self::WriterEffect
+            | Self::NoticeMessage
+            | Self::NoticeActivity
+            | Self::Revision
+            | Self::PriorClaimed
+            | Self::PriorRunning
+            | Self::PriorClosingRun
+            | Self::EscalationTask
+            | Self::EscalationPerson
+            | Self::EscalationProject
+            | Self::EscalationRole
+            | Self::Entry
+            | Self::RejectedBy
+            | Self::TransientTries
+            | Self::PermanentTries
+            | Self::RunTries
+            | Self::AgentTries
+            | Self::LostTries
+            | Self::InvalidTries
+            | Self::RequesterTask
+            | Self::RequesterPerson
+            | Self::RequesterDeployment
+            | Self::Dependency
+            | Self::StoppedBy
+            | Self::Uncertain
+            | Self::PoolLost => Some(HoleKind::Number),
+            Self::PhaseSince
+            | Self::Placement
+            | Self::EndedAt
+            | Self::WaitSince
+            | Self::Deadline
+            | Self::NoticeAt
+            | Self::HoldWaitSince
+            | Self::PriorBackingOff
+            | Self::EscalationSince
+            | Self::CancelledAt
+            | Self::ObservedSince
+            | Self::ReportedAt
+            | Self::Started => Some(HoleKind::Wall),
+            Self::ConnectorsUnknown
+            | Self::ConnectorsEmpty
+            | Self::ResourcesObserved
+            | Self::ResourcesUnobserved
+            | Self::ResourcesCut
+            | Self::Procedure
+            | Self::Taken
+            | Self::NotTaken
+            | Self::WriterLost
+            | Self::WriterKept
+            | Self::PriorWaiting
+            | Self::PriorIdle
+            | Self::PriorDue
+            | Self::PriorPreparing
+            | Self::PriorDelegates
+            | Self::PriorEffects
+            | Self::PriorReleases
+            | Self::PriorSettled
+            | Self::Routing
+            | Self::Done
+            | Self::Failed
+            | Self::Cancelled
+            | Self::Unobserved
+            | Self::Preparing
+            | Self::Starting
+            | Self::Active
+            | Self::Writing
+            | Self::Tool
+            | Self::Waiting
+            | Self::Ending
+            | Self::StartUnknown
+            | Self::Cut
+            | Self::Failures
+            | Self::Transient
+            | Self::Permanent
+            | Self::RunFailure
+            | Self::AgentFailure
+            | Self::Lost
+            | Self::InvalidFailure
+            | Self::Stalled
+            | Self::Stopped
+            | Self::Drift
+            | Self::Effects
+            | Self::EffectFailed
+            | Self::Budget
+            | Self::HoldDeadline
+            | Self::HoldsWaited
+            | Self::ResourceUnavailable
+            | Self::ResourceAccess
+            | Self::HoldProcedure => None,
             Self::Stall => Some(HoleKind::Span),
-            Self::Deadline => Some(HoleKind::Wall),
-            Self::NoticeMessage => Some(HoleKind::Number),
-            Self::NoticeAt => Some(HoleKind::Wall),
-            Self::NoticeActivity => Some(HoleKind::Number),
-            Self::Revision => Some(HoleKind::Number),
-            Self::HoldWaitSince => Some(HoleKind::Wall),
-            Self::PriorWaiting => None,
-            Self::PriorIdle => None,
-            Self::PriorDue => None,
-            Self::PriorPreparing => None,
-            Self::PriorClaimed => Some(HoleKind::Number),
-            Self::PriorRunning => Some(HoleKind::Number),
-            Self::PriorBackingOff => Some(HoleKind::Wall),
-            Self::PriorClosingRun => Some(HoleKind::Number),
-            Self::PriorDelegates => None,
-            Self::PriorEffects => None,
-            Self::PriorReleases => None,
-            Self::PriorSettled => None,
-            Self::Routing => None,
-            Self::EscalationTask => Some(HoleKind::Number),
-            Self::EscalationPerson => Some(HoleKind::Number),
-            Self::EscalationProject => Some(HoleKind::Number),
-            Self::EscalationRole => Some(HoleKind::Number),
-            Self::Entry => Some(HoleKind::Number),
-            Self::EscalationSince => Some(HoleKind::Wall),
-            Self::RejectedBy => Some(HoleKind::Number),
-            Self::TransientTries => Some(HoleKind::Number),
-            Self::PermanentTries => Some(HoleKind::Number),
-            Self::RunTries => Some(HoleKind::Number),
-            Self::AgentTries => Some(HoleKind::Number),
-            Self::LostTries => Some(HoleKind::Number),
-            Self::InvalidTries => Some(HoleKind::Number),
-            Self::Done => None,
-            Self::Failed => None,
-            Self::Cancelled => None,
-            Self::RequesterTask => Some(HoleKind::Number),
-            Self::RequesterPerson => Some(HoleKind::Number),
-            Self::RequesterDeployment => Some(HoleKind::Number),
-            Self::CancelledAt => Some(HoleKind::Wall),
-            Self::Unobserved => None,
-            Self::Preparing => None,
-            Self::Starting => None,
-            Self::Active => None,
-            Self::Writing => None,
-            Self::Tool => None,
-            Self::Waiting => None,
-            Self::Ending => None,
-            Self::ObservedSince => Some(HoleKind::Wall),
-            Self::ReportedAt => Some(HoleKind::Wall),
-            Self::Started => Some(HoleKind::Wall),
-            Self::StartUnknown => None,
-            Self::Cut => None,
-            Self::Failures => None,
-            Self::Transient => None,
-            Self::Permanent => None,
-            Self::RunFailure => None,
-            Self::AgentFailure => None,
-            Self::Lost => None,
-            Self::InvalidFailure => None,
-            Self::Stalled => None,
-            Self::Dependency => Some(HoleKind::Number),
-            Self::Stopped => None,
-            Self::StoppedBy => Some(HoleKind::Number),
-            Self::Drift => None,
-            Self::Effects => None,
-            Self::EffectFailed => None,
-            Self::Uncertain => Some(HoleKind::Number),
-            Self::Budget => None,
-            Self::HoldDeadline => None,
-            Self::HoldsWaited => None,
-            Self::ResourceUnavailable => None,
-            Self::ResourceAccess => None,
-            Self::PoolLost => Some(HoleKind::Number),
-            Self::HoldProcedure => None,
+        }
+    }
+    #[expect(clippy::too_many_lines, reason = "one total table keeps the closed owner labels together")]
+    fn label(self) -> &'static [u8] {
+        match self {
+            Self::Project => b"Project: ",
+            Self::PhaseSince => b"Phase since: ",
+            Self::Placement => b"Placed or adopted: ",
+            Self::Attempt => b"Attempt: ",
+            Self::Activity => b"Activity through: ",
+            Self::LiveDelegates => b"Live delegates: ",
+            Self::ConnectorsUnknown => b"Closing connectors unavailable",
+            Self::ConnectorsEmpty => b"No closing connectors",
+            Self::Connector => b"Closing connector: ",
+            Self::EndedAt => b"Ended at: ",
+            Self::ResourcesObserved => b"Resource holder and writer facts observed",
+            Self::ResourcesUnobserved => b"Resource holder and writer facts unavailable",
+            Self::ResourcesCut => b"Resource list incomplete",
+            Self::Procedure => b"Procedure reference",
+            Self::Kind => b"Resource kind: ",
+            Self::Taken => b"Resource taken",
+            Self::NotTaken => b"Resource not taken",
+            Self::Holder => b"Holder task: ",
+            Self::WriterTask => b"Writer task: ",
+            Self::WriterAttempt => b"Writer attempt: ",
+            Self::WriterEffect => b"Writer effect: ",
+            Self::WriterLost => b"Writer lost",
+            Self::WriterKept => b"Writer not lost",
+            Self::WaitSince => b"Person wait began: ",
+            Self::Stall => b"Person stall span: ",
+            Self::Deadline => b"Person stall deadline: ",
+            Self::NoticeMessage => b"Stall notice message: ",
+            Self::NoticeAt => b"Stall notice at: ",
+            Self::NoticeActivity => b"Stall notice activity: ",
+            Self::Revision => b"Hold revision: ",
+            Self::HoldWaitSince => b"Hold wait began: ",
+            Self::PriorWaiting => b"Prior stage waiting",
+            Self::PriorIdle => b"Prior stage idle",
+            Self::PriorDue => b"Prior stage due",
+            Self::PriorPreparing => b"Prior stage preparing",
+            Self::PriorClaimed => b"Prior stage claimed attempt: ",
+            Self::PriorRunning => b"Prior stage running attempt: ",
+            Self::PriorBackingOff => b"Prior retry at: ",
+            Self::PriorClosingRun => b"Prior closing run attempt: ",
+            Self::PriorDelegates => b"Prior closing delegates",
+            Self::PriorEffects => b"Prior closing effects",
+            Self::PriorReleases => b"Prior closing releases",
+            Self::PriorSettled => b"Prior closing settled",
+            Self::Routing => b"Escalation routing",
+            Self::EscalationTask => b"Escalation holder task: ",
+            Self::EscalationPerson => b"Escalation holder person: ",
+            Self::EscalationProject => b"Escalation holder project: ",
+            Self::EscalationRole => b"Escalation holder role: ",
+            Self::Entry => b"Escalation entry: ",
+            Self::EscalationSince => b"Escalation waiting since: ",
+            Self::RejectedBy => b"Left held by: ",
+            Self::TransientTries => b"Transient tries: ",
+            Self::PermanentTries => b"Permanent tries: ",
+            Self::RunTries => b"Run tries: ",
+            Self::AgentTries => b"Agent tries: ",
+            Self::LostTries => b"Lost tries: ",
+            Self::InvalidTries => b"Invalid tries: ",
+            Self::Done => b"Completed with result",
+            Self::Failed => b"Failed with reason",
+            Self::Cancelled => b"Cancelled with reason",
+            Self::RequesterTask => b"Cancellation requester task: ",
+            Self::RequesterPerson => b"Cancellation requester person: ",
+            Self::RequesterDeployment => b"Cancellation requester deployment project: ",
+            Self::CancelledAt => b"Cancelled at: ",
+            Self::Unobserved => b"Run work unobserved",
+            Self::Preparing => b"Reported work preparing",
+            Self::Starting => b"Reported work starting",
+            Self::Active => b"Reported work active",
+            Self::Writing => b"Reported work writing",
+            Self::Tool => b"Reported tool call",
+            Self::Waiting => b"Reported work waiting",
+            Self::Ending => b"Reported work ending",
+            Self::ObservedSince => b"Current work since: ",
+            Self::ReportedAt => b"Work reported at: ",
+            Self::Started => b"Actual run start: ",
+            Self::StartUnknown => b"Actual run start unavailable",
+            Self::Cut => b"Supplied words incomplete",
+            Self::Failures => b"Failure tries exhausted",
+            Self::Transient => b"Transient failure",
+            Self::Permanent => b"Permanent failure",
+            Self::RunFailure => b"Run failure",
+            Self::AgentFailure => b"Agent failure",
+            Self::Lost => b"Lost failure",
+            Self::InvalidFailure => b"Invalid failure",
+            Self::Stalled => b"Held stalled",
+            Self::Dependency => b"Held dependency task: ",
+            Self::Stopped => b"Held stopped",
+            Self::StoppedBy => b"Held stopped by party: ",
+            Self::Drift => b"Held drift",
+            Self::Effects => b"Held effects",
+            Self::EffectFailed => b"Held effect failed",
+            Self::Uncertain => b"Held uncertain entry: ",
+            Self::Budget => b"Held budget",
+            Self::HoldDeadline => b"Held deadline",
+            Self::HoldsWaited => b"Held waited holds",
+            Self::ResourceUnavailable => b"Held resource unavailable",
+            Self::ResourceAccess => b"Held resource access",
+            Self::PoolLost => b"Held lost pool: ",
+            Self::HoldProcedure => b"Held procedure",
         }
     }
 }
@@ -439,107 +545,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 pub fn language() -> Language {
     let mut values = List::with_capacity(99);
     for phrase in ALL {
-        let label: &[u8] = match phrase {
-            ChipPhrase::Project => b"Project: ",
-            ChipPhrase::PhaseSince => b"Phase since: ",
-            ChipPhrase::Placement => b"Placed or adopted: ",
-            ChipPhrase::Attempt => b"Attempt: ",
-            ChipPhrase::Activity => b"Activity through: ",
-            ChipPhrase::LiveDelegates => b"Live delegates: ",
-            ChipPhrase::ConnectorsUnknown => b"Closing connectors unavailable",
-            ChipPhrase::ConnectorsEmpty => b"No closing connectors",
-            ChipPhrase::Connector => b"Closing connector: ",
-            ChipPhrase::EndedAt => b"Ended at: ",
-            ChipPhrase::ResourcesObserved => b"Resource holder and writer facts observed",
-            ChipPhrase::ResourcesUnobserved => b"Resource holder and writer facts unavailable",
-            ChipPhrase::ResourcesCut => b"Resource list incomplete",
-            ChipPhrase::Procedure => b"Procedure reference",
-            ChipPhrase::Kind => b"Resource kind: ",
-            ChipPhrase::Taken => b"Resource taken",
-            ChipPhrase::NotTaken => b"Resource not taken",
-            ChipPhrase::Holder => b"Holder task: ",
-            ChipPhrase::WriterTask => b"Writer task: ",
-            ChipPhrase::WriterAttempt => b"Writer attempt: ",
-            ChipPhrase::WriterEffect => b"Writer effect: ",
-            ChipPhrase::WriterLost => b"Writer lost",
-            ChipPhrase::WriterKept => b"Writer not lost",
-            ChipPhrase::WaitSince => b"Person wait began: ",
-            ChipPhrase::Stall => b"Person stall span: ",
-            ChipPhrase::Deadline => b"Person stall deadline: ",
-            ChipPhrase::NoticeMessage => b"Stall notice message: ",
-            ChipPhrase::NoticeAt => b"Stall notice at: ",
-            ChipPhrase::NoticeActivity => b"Stall notice activity: ",
-            ChipPhrase::Revision => b"Hold revision: ",
-            ChipPhrase::HoldWaitSince => b"Hold wait began: ",
-            ChipPhrase::PriorWaiting => b"Prior stage waiting",
-            ChipPhrase::PriorIdle => b"Prior stage idle",
-            ChipPhrase::PriorDue => b"Prior stage due",
-            ChipPhrase::PriorPreparing => b"Prior stage preparing",
-            ChipPhrase::PriorClaimed => b"Prior stage claimed attempt: ",
-            ChipPhrase::PriorRunning => b"Prior stage running attempt: ",
-            ChipPhrase::PriorBackingOff => b"Prior retry at: ",
-            ChipPhrase::PriorClosingRun => b"Prior closing run attempt: ",
-            ChipPhrase::PriorDelegates => b"Prior closing delegates",
-            ChipPhrase::PriorEffects => b"Prior closing effects",
-            ChipPhrase::PriorReleases => b"Prior closing releases",
-            ChipPhrase::PriorSettled => b"Prior closing settled",
-            ChipPhrase::Routing => b"Escalation routing",
-            ChipPhrase::EscalationTask => b"Escalation holder task: ",
-            ChipPhrase::EscalationPerson => b"Escalation holder person: ",
-            ChipPhrase::EscalationProject => b"Escalation holder project: ",
-            ChipPhrase::EscalationRole => b"Escalation holder role: ",
-            ChipPhrase::Entry => b"Escalation entry: ",
-            ChipPhrase::EscalationSince => b"Escalation waiting since: ",
-            ChipPhrase::RejectedBy => b"Left held by: ",
-            ChipPhrase::TransientTries => b"Transient tries: ",
-            ChipPhrase::PermanentTries => b"Permanent tries: ",
-            ChipPhrase::RunTries => b"Run tries: ",
-            ChipPhrase::AgentTries => b"Agent tries: ",
-            ChipPhrase::LostTries => b"Lost tries: ",
-            ChipPhrase::InvalidTries => b"Invalid tries: ",
-            ChipPhrase::Done => b"Completed with result",
-            ChipPhrase::Failed => b"Failed with reason",
-            ChipPhrase::Cancelled => b"Cancelled with reason",
-            ChipPhrase::RequesterTask => b"Cancellation requester task: ",
-            ChipPhrase::RequesterPerson => b"Cancellation requester person: ",
-            ChipPhrase::RequesterDeployment => b"Cancellation requester deployment project: ",
-            ChipPhrase::CancelledAt => b"Cancelled at: ",
-            ChipPhrase::Unobserved => b"Run work unobserved",
-            ChipPhrase::Preparing => b"Reported work preparing",
-            ChipPhrase::Starting => b"Reported work starting",
-            ChipPhrase::Active => b"Reported work active",
-            ChipPhrase::Writing => b"Reported work writing",
-            ChipPhrase::Tool => b"Reported tool call",
-            ChipPhrase::Waiting => b"Reported work waiting",
-            ChipPhrase::Ending => b"Reported work ending",
-            ChipPhrase::ObservedSince => b"Current work since: ",
-            ChipPhrase::ReportedAt => b"Work reported at: ",
-            ChipPhrase::Started => b"Actual run start: ",
-            ChipPhrase::StartUnknown => b"Actual run start unavailable",
-            ChipPhrase::Cut => b"Supplied words incomplete",
-            ChipPhrase::Failures => b"Failure tries exhausted",
-            ChipPhrase::Transient => b"Transient failure",
-            ChipPhrase::Permanent => b"Permanent failure",
-            ChipPhrase::RunFailure => b"Run failure",
-            ChipPhrase::AgentFailure => b"Agent failure",
-            ChipPhrase::Lost => b"Lost failure",
-            ChipPhrase::InvalidFailure => b"Invalid failure",
-            ChipPhrase::Stalled => b"Held stalled",
-            ChipPhrase::Dependency => b"Held dependency task: ",
-            ChipPhrase::Stopped => b"Held stopped",
-            ChipPhrase::StoppedBy => b"Held stopped by party: ",
-            ChipPhrase::Drift => b"Held drift",
-            ChipPhrase::Effects => b"Held effects",
-            ChipPhrase::EffectFailed => b"Held effect failed",
-            ChipPhrase::Uncertain => b"Held uncertain entry: ",
-            ChipPhrase::Budget => b"Held budget",
-            ChipPhrase::HoldDeadline => b"Held deadline",
-            ChipPhrase::HoldsWaited => b"Held waited holds",
-            ChipPhrase::ResourceUnavailable => b"Held resource unavailable",
-            ChipPhrase::ResourceAccess => b"Held resource access",
-            ChipPhrase::PoolLost => b"Held lost pool: ",
-            ChipPhrase::HoldProcedure => b"Held procedure",
-        };
+        let label = phrase.label();
         let segments: Box<[Segment]> = match phrase.hole() {
             Some(kind) => Box::new([Segment::Text(copy_of(label)), Segment::Hole { index: 0, kind }]),
             None => Box::new([Segment::Text(copy_of(label))]),
