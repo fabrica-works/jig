@@ -803,6 +803,10 @@ pub struct HistoryLine {
 }
 
 /// The change one history line describes.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "a whole inline hold includes its retained result and is priced recursively"
+)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HistoryChange {
     /// Made in a batch.
