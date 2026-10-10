@@ -265,6 +265,14 @@ fn released_flags_and_question_message_identities_remain_independent() {
     let proposed = render(&OwnerOutcome::GoalProposed { proposal: 19 }, &words);
     expect_lines(&proposed, &[b"Goal proposed", b"Proposal number: 19"]);
 }
+#[test]
+fn closing_counts_and_pool_person_remain_distinct_from_chat_and_project() {
+    let words = words();
+    let closing = render(&OwnerOutcome::Closing { chat: 7, cancelled: 11, kept: 19 }, &words);
+    expect_lines(&closing, &[b"Chat closed", b"Chat: 7", b"Cancelled delegates: 11", b"Kept delegates: 19"]);
+    let pool = render(&OwnerOutcome::PoolSet { project: 13, person: 23 }, &words);
+    expect_lines(&pool, &[b"Person pool set", b"Project: 13", b"Person: 23"]);
+}
 fn selected_language() -> Language {
     let mut language = phrases::english();
     for phrase in &mut language.phrases {
