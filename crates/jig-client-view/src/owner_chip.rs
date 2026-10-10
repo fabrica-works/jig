@@ -49,14 +49,59 @@ fn text_fits(value: &DocumentText, limits: &Limits) -> Option<()> {
 }
 fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> {
     match value {
-        ResultValue::Verdict { .. } => crate::result_nodes(limits),
-        ResultValue::Connector { .. } | ResultValue::Choice { .. } => {
+        ResultValue::Verdict { words, fields, tasks, .. } => {
+            text_fits(words, limits)?;
+            if fields.capacity() > limits.rows || tasks.capacity() > limits.rows {
+                return None;
+            }
+            for field in fields {
+                if u32::try_from(field.name.len()).ok()? > limits.text
+                    || u32::try_from(field.value.len()).ok()? > limits.text
+                {
+                    return None;
+                }
+            }
+            for task in tasks {
+                if !task.title.fits(limits.text) {
+                    return None;
+                }
+            }
+            crate::result_nodes(limits)
+        }
+        ResultValue::Connector { summary, part } => {
+            text_fits(summary, limits)?;
+            if let jig_client::contract::Part::Resource { path, .. } = part
+                && !path.fits(limits.text)
+            {
+                return None;
+            }
             crate::markdown::max_nodes(limits.text)?.checked_add(8)
         }
-        ResultValue::Change { .. } => crate::markdown::max_nodes(limits.text)?
-            .checked_add(crate::proposed_task::part_nodes(limits)?)?
-            .checked_add(4),
-        ResultValue::Report(_) | ResultValue::Failure(_) | ResultValue::Words(_) | ResultValue::Approved { .. } => {
+        ResultValue::Choice { by, reason, .. } => {
+            text_fits(reason, limits)?;
+            if !by.name.fits(limits.text) {
+                return None;
+            }
+            crate::markdown::max_nodes(limits.text)?.checked_add(8)
+        }
+        ResultValue::Change { part, words, .. } => {
+            text_fits(words, limits)?;
+            part_fits(part, limits)?;
+            crate::markdown::max_nodes(limits.text)?
+                .checked_add(crate::proposed_task::part_nodes(limits)?)?
+                .checked_add(4)
+        }
+        ResultValue::Report(words) | ResultValue::Failure(words) | ResultValue::Words(words) => {
+            text_fits(words, limits)?;
+            crate::markdown::max_nodes(limits.text)?.checked_add(4)
+        }
+        ResultValue::Approved { state, words } => {
+            if u32::try_from(state.len()).ok()? > limits.text {
+                return None;
+            }
+            if let Some(words) = words {
+                text_fits(words, limits)?;
+            }
             crate::markdown::max_nodes(limits.text)?.checked_add(4)
         }
     }

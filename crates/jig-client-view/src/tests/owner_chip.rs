@@ -432,6 +432,31 @@ fn complete_chip_endings_keep_result_requester_and_each_independent_reason_loss(
     let tree = build(&value, words()).0;
     assert!(has(&tree, b"terminal failure"));
     assert!(!has(&tree, b"Supplied words incomplete"));
+    value.ending = Some(OwnerChipEnding::Failed(doc(b"terminal failure", true)));
+    assert!(has(&build(&value, words()).0, b"Supplied words incomplete"));
+    value.ending = Some(OwnerChipEnding::Cancelled {
+        reason: doc(b"reason", false),
+        result: None,
+        by: OwnerRequester::Task(7),
+        at: Wall::from_nanos(150),
+    });
+    let tree = build(&value, words()).0;
+    assert!(!has(&tree, b"prior result"));
+    assert!(!has(&tree, b"Supplied words incomplete"));
+    let mut absent_nodes = None;
+    for explanation in [None, Some(doc(b"", false)), Some(doc(b"approval explanation", true))] {
+        let supplied = explanation.is_some();
+        let lost = explanation.as_ref().is_some_and(|value| value.cut);
+        value.ending =
+            Some(OwnerChipEnding::Done(ResultValue::Approved { state: copy_of(&[255, 0, 254]), words: explanation }));
+        let tree = build(&value, words()).0;
+        assert!(has(&tree, b"\\xFF\\x00\\xFE"));
+        if supplied {
+            assert_eq!(tree.nodes().len(), absent_nodes.unwrap() + if lost { 2 } else { 1 });
+        } else {
+            absent_nodes = Some(tree.nodes().len());
+        }
+    }
 }
 #[test]
 fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_arithmetic_bounds() {
@@ -486,6 +511,15 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
     }
     assert!(view::required(&value, &jig_client::Limits { text: u32::MAX, ..client_limits() }, words()).is_none());
     assert!(view::required(&value, &jig_client::Limits { rows: u32::MAX, ..client_limits() }, words()).is_none());
+    let smaller = jig_client::Limits { text: 1, ..client_limits() };
+    let mut terminal = details();
+    terminal.ending = Some(OwnerChipEnding::Done(ResultValue::Approved { state: copy_of(&[255, 0]), words: None }));
+    assert!(view::required(&terminal, &smaller, words()).is_none());
+    terminal.ending =
+        Some(OwnerChipEnding::Done(ResultValue::Change { kind: 1, part: part(), words: doc(b"", false) }));
+    assert!(view::required(&terminal, &smaller, words()).is_none());
+    terminal.ending = Some(OwnerChipEnding::Done(ResultValue::Report(doc(b"too large", false))));
+    assert!(view::required(&terminal, &smaller, words()).is_none());
     let mut translated = crate::phrases::english::language();
     for phrase in &mut translated.phrases {
         for form in &mut phrase.forms {
