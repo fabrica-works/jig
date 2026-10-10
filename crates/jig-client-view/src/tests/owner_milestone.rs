@@ -191,7 +191,7 @@ fn owner_milestone_all_sixteen_hold_categories_and_six_failures_preserve_prior_w
         let tree = build(&value, &w).0;
         assert!(has(&tree, label));
         assert!(has(&tree, b"Failure tries exhausted"));
-        assert!(has(&tree, b"Prior running attempt: 18446744073709551615"));
+        assert!(has(&tree, b"Prior stage running attempt: 18446744073709551615"));
     }
     let value = line(OwnerMilestonePhase::Held {
         before: OwnerPriorPhase::Closing(ClosingStage::Run { attempt: u64::MAX }),
@@ -226,6 +226,16 @@ fn owner_milestone_task_and_position_are_full_width_and_optional_time_is_separat
                 assert_eq!(value.position, position);
                 assert_eq!(value.at, at);
                 assert_eq!(has(&tree, b"Milestone time not supplied"), at.is_none());
+                if let Some(at) = at {
+                    assert!(has(
+                        &tree,
+                        if at.as_nanos() == 0 {
+                            b"Milestone time: 0".as_slice()
+                        } else {
+                            b"Milestone time: 18446744073709551615"
+                        }
+                    ));
+                }
                 assert!(!contains(&tree, b"Revision"));
                 if task == u64::MAX {
                     assert!(has(&tree, b"Task: 18446744073709551615"));
@@ -381,6 +391,7 @@ fn owner_milestone_second_checked_language_and_full_fragment_preserve_raw_slots_
     }
     assert_eq!(slots, 2);
     let id = crate::owner_milestone_words::MilestonePhrase::Position.id();
-    assert!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).is_ok());
+    let saying = w.book.say(1, id, &[Hole::Number(u64::MAX)]).expect("checked numeric hole");
+    assert_eq!(saying.text.as_ref(), b"second 18446744073709551615");
     assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::from_nanos(0))]).err(), Some(Invalid::Values { id }));
 }

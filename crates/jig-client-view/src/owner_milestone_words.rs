@@ -94,29 +94,24 @@ impl MilestonePhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Milestone => None,
-            Self::Task => Some(HoleKind::Number),
-            Self::Position => Some(HoleKind::Number),
-            Self::At => Some(HoleKind::Wall),
-            Self::AtAbsent => None,
-            Self::Waiting => None,
-            Self::Active => None,
-            Self::Closing => None,
-            Self::Held => None,
-            Self::Ended => None,
-            Self::Idle => None,
-            Self::Due => None,
-            Self::Preparing => None,
-            Self::Claimed => Some(HoleKind::Number),
-            Self::Running => Some(HoleKind::Number),
-            Self::BackingOff => Some(HoleKind::Wall),
-            Self::Run => Some(HoleKind::Number),
-            Self::Delegates => None,
-            Self::Effects => None,
-            Self::Releases => None,
-            Self::Settled => None,
-            Self::SourceAbsent => None,
-            Self::EndingAbsent => None,
+            Self::Task | Self::Position | Self::Claimed | Self::Running | Self::Run => Some(HoleKind::Number),
+            Self::At | Self::BackingOff => Some(HoleKind::Wall),
+            Self::Milestone
+            | Self::AtAbsent
+            | Self::Waiting
+            | Self::Active
+            | Self::Closing
+            | Self::Held
+            | Self::Ended
+            | Self::Idle
+            | Self::Due
+            | Self::Preparing
+            | Self::Delegates
+            | Self::Effects
+            | Self::Releases
+            | Self::Settled
+            | Self::SourceAbsent
+            | Self::EndingAbsent => None,
         }
     }
     fn label(self) -> &'static [u8] {
