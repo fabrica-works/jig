@@ -515,8 +515,8 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     use super::cards::CLIENT;
     let words = words();
     let (mut d, _, run, _) = ready();
-    let tool = Text::new(vec![0xff; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(), CLIENT.text).unwrap();
-    let input = Text::new(vec![0xfe; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(), CLIENT.text).unwrap();
+    let tool = full_raw_byte(0xff);
+    let input = full_raw_byte(0xfe);
     for number in 1..=CLIENT.rows {
         let name = TurnName { attempt: u64::MAX, number };
         let call = CurrentCall { number: u64::MAX, tool: tool.clone(), input: input.clone(), cut: true };
@@ -529,8 +529,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
                 turn: name,
                 from: 0,
                 through: CLIENT.text,
-                text: Text::new(vec![b'x'; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(), CLIENT.text)
-                    .unwrap(),
+                text: full_raw_byte(b'x'),
                 cut: true,
                 call: Some(LiveCall::Raw(call)),
             })),
@@ -562,7 +561,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     let tree = b.finish();
     access(&tree);
     assert!(u32::try_from(tree.nodes().len()).unwrap() <= limits.nodes);
-    let mut escaped = vec![];
+    let mut escaped = Vec::new();
     for _ in 0..CLIENT.text {
         escaped.extend_from_slice(b"\\xFE");
     }
@@ -618,7 +617,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
             phrases: crate::owner_words::phrase_count(),
             holes: 4,
             segments: 8000,
-            text_bytes: 100000,
+            text_bytes: 100_000,
             hole_bytes: CLIENT.text,
         },
     )
@@ -659,4 +658,10 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
     assert!(contains(&opened, b"input"));
     let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
     assert!(limits.text_per_node >= words.book.capacity(LiveCallPhrase::OpenCurrentCallInput.id()).unwrap());
+}
+
+fn full_raw_byte(byte: u8) -> Text {
+    let mut bytes = Vec::new();
+    bytes.resize(usize::try_from(super::cards::CLIENT.text).unwrap(), byte);
+    Text::new(bytes.into_boxed_slice(), super::cards::CLIENT.text).unwrap()
 }
