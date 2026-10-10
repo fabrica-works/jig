@@ -338,10 +338,12 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
         let event = match core.proofs.get(&token.raw()) {
             Some(proof) if proof.terminal.is_none() => match position {
                 Some((writing, _)) if writing.attempt != proof.attempt => Some(views::Event::RunEnded { run: *token }),
-                Some((writing, _)) => proof
-                    .turn
-                    .filter(|kept| writing.turn <= kept.turn)
-                    .map(|kept| views::Event::TurnCommitted { run: *token, attempt: proof.attempt, turn: kept.turn }),
+                Some((writing, _)) => match proof.turn {
+                    Some(kept) if writing.turn <= kept.turn => {
+                        Some(views::Event::TurnCommitted { run: *token, attempt: proof.attempt, turn: kept.turn })
+                    }
+                    Some(_) | None => None,
+                },
                 None => None,
             },
             Some(_) | None => Some(views::Event::RunEnded { run: *token }),

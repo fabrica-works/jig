@@ -57,10 +57,10 @@ pub(crate) fn written(
     out: &mut Queue<Request>,
 ) {
     let limits = &env.limits;
-    if let Some(call) = &call {
-        if !fits(call, limits.text_bytes) {
-            return;
-        }
+    if let Some(call) = &call
+        && !fits(call, limits.text_bytes)
+    {
+        return;
     }
     let Ok(length) = u32::try_from(text.len()) else {
         return;
@@ -75,7 +75,10 @@ pub(crate) fn written(
     // stream terminal can arrive after the run's end and before its successor.
     for (_, id) in &domain.names {
         let watch = domain.watchers.get(*id).expect("named watch");
-        if watch.follow.is_some_and(|follow| follow.run == token) && watch.ended_turn.is_some_and(|ended| turn <= ended)
+        if let Some(follow) = watch.follow
+            && follow.run == token
+            && let Some(ended) = watch.ended_turn
+            && turn <= ended
         {
             return;
         }
@@ -155,18 +158,18 @@ pub(crate) fn written(
 }
 
 fn fits(call: &Call, capacity: u32) -> bool {
-    call.identity
-        .id
-        .len()
-        .checked_add(call.tool.len())
-        .and_then(|bytes| bytes.checked_add(call.input.len()))
-        .is_some_and(|bytes| bytes <= usize::try_from(capacity).expect("byte capacity"))
+    let Some(bytes) = call.identity.id.len().checked_add(call.tool.len()) else { return false };
+    let Some(bytes) = bytes.checked_add(call.input.len()) else { return false };
+    bytes <= usize::try_from(capacity).expect("byte capacity")
 }
 fn timed(mut call: Call, previous: Option<&Call>, wall: Wall) -> Call {
-    call.began = previous
-        .filter(|previous| previous.identity == call.identity)
-        .and_then(|previous| previous.began)
-        .or(Some(wall));
+    call.began = match previous {
+        Some(previous) if previous.identity == call.identity => match previous.began {
+            Some(began) => Some(began),
+            None => Some(wall),
+        },
+        Some(_) | None => Some(wall),
+    };
     call
 }
 
@@ -183,7 +186,9 @@ pub(crate) fn called(domain: &mut Domain, env: &Env<Limits>, token: Token, call:
     run.revision = run.revision.checked_add(1).expect("provisional revision space");
     for (_, id) in &domain.names {
         let watch = domain.watchers.get_mut(*id).expect("named watch");
-        if watch.follow.is_some_and(|follow| follow.run == token) {
+        if let Some(follow) = watch.follow
+            && follow.run == token
+        {
             offer(watch, run, out);
         }
     }
@@ -191,7 +196,9 @@ pub(crate) fn called(domain: &mut Domain, env: &Env<Limits>, token: Token, call:
 
 pub(crate) fn committed(domain: &mut Domain, token: Token, attempt: u64, turn: u32) {
     if let Some(run) = domain.runs.get_mut(&token)
-        && run.turn.is_some_and(|name| name.attempt == attempt && name.turn <= turn)
+        && let Some(name) = run.turn
+        && name.attempt == attempt
+        && name.turn <= turn
     {
         run.committed = true;
         run.from = 0;
@@ -216,10 +223,10 @@ fn bounded_call(call: Option<Call>, capacity: u32) -> Option<Call> {
 
 pub(crate) fn offer_one(domain: &mut Domain, id: Id<Watcher>, out: &mut Queue<Request>) {
     let watch = domain.watchers.get_mut(id).expect("named watch");
-    if let Some(follow) = watch.follow {
-        if let Some(run) = domain.runs.get(&follow.run) {
-            offer(watch, run, out);
-        }
+    if let Some(follow) = watch.follow
+        && let Some(run) = domain.runs.get(&follow.run)
+    {
+        offer(watch, run, out);
     }
 }
 fn offer(watch: &mut Watcher, run: &Run, out: &mut Queue<Request>) {
@@ -279,7 +286,9 @@ pub(crate) fn ended(domain: &mut Domain, token: Token) {
     if let Some(run) = domain.runs.remove(&token) {
         for (_, id) in &domain.names {
             let watch = domain.watchers.get_mut(*id).expect("named watch");
-            if watch.follow.is_some_and(|follow| follow.run == token) {
+            if let Some(follow) = watch.follow
+                && follow.run == token
+            {
                 watch.ended_turn = run.turn;
                 watch.revision = None;
             }

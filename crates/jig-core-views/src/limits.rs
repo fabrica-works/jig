@@ -43,6 +43,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<Token, Id<Watcher>>::worst_case(limits.watchers)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)?
         .checked_add(List::<Token>::worst_case(limits.subjects_per_change)?)?
-        .checked_add(List::<Id<Watcher>>::worst_case(limits.watchers)?)
-        .and_then(|bytes| bytes.checked_add(List::<Token>::worst_case(limits.runs)?))
+        .checked_add(List::<Id<Watcher>>::worst_case(limits.watchers)?)?
+        .checked_add(List::<Token>::worst_case(limits.runs)?)
 }

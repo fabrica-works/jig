@@ -48,7 +48,9 @@ impl Domain {
     #[must_use]
     pub fn follows(&self, run: Token) -> bool {
         for (_, id) in &self.names {
-            if self.watchers.get(*id).expect("named watch").follow.is_some_and(|follow| follow.run == run) {
+            if let Some(follow) = self.watchers.get(*id).expect("named watch").follow
+                && follow.run == run
+            {
                 return true;
             }
         }

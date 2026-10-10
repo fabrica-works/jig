@@ -506,8 +506,10 @@ pub(super) fn run_text(
 }
 
 pub(super) fn run_call(core: &mut Core, env: &Env<Limits>, run: Token, attempt: Token, call: views::Call) -> Requests {
-    let live =
-        core.proofs.get(&run.raw()).is_some_and(|proof| proof.attempt == attempt.raw() && proof.terminal.is_none());
+    let live = match core.proofs.get(&run.raw()) {
+        Some(proof) => proof.attempt == attempt.raw() && proof.terminal.is_none(),
+        None => false,
+    };
     if live {
         route_view(core, env, views::Event::Called { run, call })
     } else {
