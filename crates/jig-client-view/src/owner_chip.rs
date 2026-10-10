@@ -333,7 +333,7 @@ fn escalation(b: &mut Builder, value: &OwnerHoldEscalation, words: &Words) {
         }
     }
 }
-fn hold(b: &mut Builder, value: &OwnerChipHold, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn hold(b: &mut Builder, value: &OwnerChipHold, words: &Words, bindings: &mut JigBindings) {
     if let Some(source) = &value.source {
         crate::proposed_task::part(b, source, words, bindings);
     }
