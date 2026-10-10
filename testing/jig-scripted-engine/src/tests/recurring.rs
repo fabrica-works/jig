@@ -93,6 +93,48 @@ fn recurring_checks_allocated_batch_last_batch_and_nested_member_capacities() {
     row.batch.get_mut(1).unwrap().dependencies = skein_lib::List::with_capacity(3);
     assert!(!fits(&row, &bounds));
     let mut row = recurring();
+    row.batch.get_mut(1).unwrap().resources = skein_lib::List::with_capacity(3);
+    assert!(!fits(&row, &bounds), "the final member's allocated resource capacity is checked");
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().resources = list(vec![OwnerPart {
+        connector: 9,
+        kind: OwnerPartKind::Resource,
+        key: OwnerPartKey::Path(skein_lib::List::with_capacity(3)),
+    }]);
+    assert!(!fits(&row, &bounds), "an empty nested path still owns its allocated capacity");
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().authority.authority.grants = skein_lib::List::with_capacity(3);
+    assert!(!fits(&row, &bounds));
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().authority.authority.delegation.kinds = skein_lib::List::with_capacity(3);
+    assert!(!fits(&row, &bounds));
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().authority.authority.note_resources = list(vec![OwnerResourceScope {
+        connector: 9,
+        pattern: OwnerPattern {
+            segments: skein_lib::List::with_capacity(3),
+            last: OwnerPatternEnd::Exact(b"last".as_slice().into()),
+        },
+    }]);
+    assert!(!fits(&row, &bounds), "the final member's nested authority pattern is checked");
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().contract = TaskContractDocument::Verdict {
+        choices: list(vec![VerdictChoice {
+            code: 1,
+            words: 2,
+            followups: 3,
+            fields: skein_lib::List::with_capacity(3),
+        }]),
+        cut: false,
+    };
+    assert!(!fits(&row, &bounds), "the final member's verdict field capacity is checked");
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().contract = TaskContractDocument::Approval {
+        state: vec![0; 4097].into_boxed_slice(),
+        part: OwnerPart { connector: 9, kind: OwnerPartKind::Resource, key: OwnerPartKey::Number(7) },
+    };
+    assert!(!fits(&row, &bounds), "the final member's opaque approval bytes are admitted whole");
+    let mut row = recurring();
     row.chip.details = Box::new(ChipPhase::Waiting { dependencies: skein_lib::List::with_capacity(3), hold: None });
     assert!(!fits(&row, &bounds));
     let mut row = recurring();

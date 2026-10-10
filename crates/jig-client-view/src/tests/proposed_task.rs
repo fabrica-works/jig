@@ -23,6 +23,60 @@ fn finish(mut builder: Builder) -> Tree {
     builder.finish()
 }
 
+pub(super) fn full_template(number: u64) -> ProposedTask {
+    let bytes: Box<[u8]> = vec![0xff; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice();
+    let pattern =
+        OwnerPattern { segments: list([bytes.clone(), bytes.clone()]), last: OwnerPatternEnd::Open(bytes.clone()) };
+    let grant = OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern: pattern.clone() };
+    let note = OwnerResourceScope { connector: u16::MAX, pattern };
+    let resource = OwnerPart {
+        connector: u16::MAX,
+        kind: OwnerPartKind::Resource,
+        key: OwnerPartKey::Path(list([bytes.clone(), bytes.clone()])),
+    };
+    let field = FieldRule { name: bytes, max: u32::MAX };
+    let choice =
+        VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields: list([field.clone(), field]) };
+    let mut task = super::work_pages::recurring_task(number, &vec![b'x'; usize::try_from(CLIENT.text).unwrap()]);
+    task.executor = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    task.contract = TaskContractDocument::Verdict {
+        choices: list([choice.clone(), VerdictChoice { code: 2, ..choice }]),
+        cut: true,
+    };
+    task.authority = OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: u64::MAX,
+            grants: list([grant.clone(), grant]),
+            delegation: OwnerDelegation {
+                kinds: list([OwnerAuthorityExecutor::Procedure(u32::MAX), OwnerAuthorityExecutor::Role(u32::MAX)]),
+                tasks: u32::MAX,
+                depth: u32::MAX,
+            },
+            spend: u64::MAX,
+            deadline: Some(skein_lib::Wall::from_nanos(u64::MAX)),
+            notes: u8::MAX,
+            note_resources: list([note.clone(), note]),
+        },
+        cut: true,
+    };
+    task.budget = u64::MAX;
+    task.funder = Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX };
+    task.dependencies = list([u64::MAX, 9]);
+    task.resources = list([resource.clone(), resource]);
+    task.wake = OwnerWakePolicy {
+        words: WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::from_nanos(u64::MAX) },
+        notices: WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::from_nanos(u64::MAX) },
+        news: WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::from_nanos(u64::MAX) },
+        results: ResultsWake::LastOrFailure,
+        questions: true,
+        answers: true,
+        timers: true,
+    };
+    task.priority = Some(u32::MAX);
+    task.cut = true;
+    task
+}
+
 #[test]
 fn exact_part_slots_keep_separate_literal_segments_all_owner_kinds_and_numeric_keys() {
     let words = words();
@@ -160,4 +214,64 @@ fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
     assert_eq!(words.adjusted_wall(skein_lib::Wall::EPOCH).as_nanos(), 3_600_000_000_000);
     words.offset_minutes = -60;
     assert_eq!(words.adjusted_wall(skein_lib::Wall::from_nanos(7_200_000_000_000)).as_nanos(), 3_600_000_000_000);
+}
+
+#[test]
+fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_language() {
+    use crate::phrases::{PhraseLimits, Phrasebook, Segment, english, jig::shapes};
+    let mut selected = english::language();
+    for phrase in &mut selected.phrases {
+        if phrase.id.number >= 3000 {
+            for form in &mut phrase.forms {
+                form.segments[0] = Segment::Text(b"Selected owner fact: ".as_slice().into());
+            }
+        }
+    }
+    let mut long = vec![b'L'; 1024];
+    long.extend_from_slice(b": ");
+    selected
+        .phrases
+        .iter_mut()
+        .find(|phrase| phrase.id == crate::proposed_task_words::ProposedPhrase::ExecutorCharter.id())
+        .unwrap()
+        .forms[0]
+        .segments[0] = Segment::Text(long.into_boxed_slice());
+    let limits = PhraseLimits {
+        languages: 2,
+        phrases: crate::owner_words::phrase_count(),
+        holes: 3,
+        segments: 5000,
+        text_bytes: 200_000,
+        hole_bytes: CLIENT.text,
+    };
+    let mut incomplete = selected.clone();
+    incomplete.phrases = incomplete
+        .phrases
+        .into_vec()
+        .into_iter()
+        .filter(|phrase| phrase.id != crate::owner_wake_words::WakePhrase::Policy.id())
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+    assert!(Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), incomplete]), &limits).is_err());
+    let words = crate::words::Words {
+        book: Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), selected]), &limits).unwrap(),
+        language: 1,
+        offset_minutes: 60,
+    };
+    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    assert!(limits.text_per_node >= 2048, "owner saying capacities contribute to normal tree limits");
+    let mut b = Builder::new(&limits);
+    b.open(Role::Page);
+    let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
+    let task = super::work_pages::recurring_task(u64::MAX, b"whole template words");
+    crate::cards::proposal::proposed_task(&mut b, &task, &words, &mut bindings);
+    b.close();
+    let tree = b.finish();
+    assert!(contains(&tree, b"whole template words"));
+    assert!(contains(&tree, b"Selected owner fact: "));
+    assert!(contains(&tree, &[b'L'; 1024]));
+    assert!(!contains(&tree, b"Wake policy"));
+    assert!(!contains(&tree, b"Funded by recurring task"));
+    assert!(!contains(&tree, b"Agent charter"));
+    assert!(!contains(&tree, b"Allowed tool family bits"));
 }
