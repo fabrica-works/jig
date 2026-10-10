@@ -119,10 +119,11 @@ fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority) -> bool {
         fits &= facts.delegation.kinds.as_slice().contains(kind);
     }
     for scope in &draft.note_resources {
-        fits &= facts
-            .note_resources
-            .iter()
-            .any(|given| given.connector == scope.connector && pattern_at_most(&scope.pattern, &given.pattern));
+        let mut listed = false;
+        for given in &facts.note_resources {
+            listed |= given.connector == scope.connector && pattern_at_most(&scope.pattern, &given.pattern);
+        }
+        fits &= listed;
     }
     fits
 }
