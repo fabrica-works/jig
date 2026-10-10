@@ -1282,7 +1282,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     let filter = Filter { project: Some(1), kind: Some(InboxGroup::Replies), goal: None };
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterInbox { filter } });
     let what = Read::Inbox {
-        group: filter.kind.map_or(InboxReadGroup::Needs, InboxReadGroup::of),
+        group: InboxReadGroup::Updates,
         project: filter.project,
         kind: filter.kind,
         goal: filter.goal,
@@ -1547,6 +1547,20 @@ fn goal_read_from_start_merges_live_watch_by_key() {
     };
     assert_eq!(chip.phase, Phase::Running);
 }
+fn assert_only_inbox_read(requests: &[Request], expected: &Read) {
+    let mut count = 0;
+    for request in requests {
+        if let Request::Read { what: query @ Read::Inbox { .. }, .. } = request {
+            assert_eq!(query, expected);
+            count += 1;
+        }
+    }
+    assert_eq!(count, 1, "only the selected group's exact query is emitted");
+}
+#[expect(
+    clippy::too_many_lines,
+    reason = "one scenario follows both independent cursor positions and watch precedence"
+)]
 #[test]
 fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
     use crate::{
@@ -1633,11 +1647,7 @@ fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
     if let Read::Inbox { after, .. } = &mut needs_query {
         *after = Some(needs_after);
     }
-    assert!(out.iter().any(|request| matches!(request, Request::Read { what, .. } if *what == needs_query)));
-    assert!(!out.iter().any(|request| matches!(
-        request,
-        Request::Read { what: Read::Inbox { group: InboxReadGroup::Updates, .. }, .. }
-    )));
+    assert_only_inbox_read(&out, &needs_query);
     assert_eq!(domain.inbox().updates_window.after, Some(updates_after.clone()));
     send(
         &mut domain,
@@ -1661,11 +1671,7 @@ fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
     if let Read::Inbox { after, .. } = &mut updates_query {
         *after = Some(updates_after);
     }
-    assert!(out.iter().any(|request| matches!(request, Request::Read { what, .. } if *what == updates_query)));
-    assert!(!out.iter().any(|request| matches!(
-        request,
-        Request::Read { what: Read::Inbox { group: InboxReadGroup::Needs, .. }, .. }
-    )));
+    assert_only_inbox_read(&out, &updates_query);
     let out = send(
         &mut domain,
         Event::Act {
@@ -1674,23 +1680,16 @@ fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
             },
         },
     );
-    assert!(out.iter().any(|request| matches!(
-        request,
-        Request::Read {
-            what: Read::Inbox {
-                group: InboxReadGroup::Updates,
-                project: Some(1),
-                kind: Some(InboxGroup::Results),
-                goal: Some(9),
-                after: None
-            },
-            ..
-        }
-    )));
-    assert!(!out.iter().any(|request| matches!(
-        request,
-        Request::Read { what: Read::Inbox { group: InboxReadGroup::Needs, .. }, .. }
-    )));
+    assert_only_inbox_read(
+        &out,
+        &Read::Inbox {
+            group: InboxReadGroup::Updates,
+            project: Some(1),
+            kind: Some(InboxGroup::Results),
+            goal: Some(9),
+            after: None,
+        },
+    );
     send(
         &mut domain,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(List::with_capacity(0))))) },

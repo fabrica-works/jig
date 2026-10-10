@@ -18,7 +18,7 @@ pub struct Filter {
 /// One read group's bounded window and independent continuation.
 #[derive(Debug)]
 pub struct InboxWindow {
-    rows: List<InboxEntry>,
+    pub rows: List<InboxEntry>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
     pub more: bool,
@@ -64,7 +64,7 @@ pub struct Inbox {
     pub filter: Filter,
     pub needs: Needs,
     pub updates: Count,
-    live: List<InboxEntry>,
+    pub live: List<InboxEntry>,
     /// The shared live watch has rows beyond its window; read cursors remain independent.
     pub live_more: bool,
     pub needs_window: InboxWindow,

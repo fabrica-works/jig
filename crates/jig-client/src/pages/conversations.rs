@@ -299,10 +299,10 @@ pub(crate) fn filter_inbox(domain: &mut Domain, filter: Filter, out: &mut Queue<
 pub(crate) fn start_inbox(domain: &mut Domain, out: &mut Queue<Request>) {
     let filter = domain.inbox.filter;
     for group in [InboxReadGroup::Needs, InboxReadGroup::Updates] {
-        if let Some(kind) = filter.kind {
-            if InboxReadGroup::of(kind) != group {
-                continue;
-            }
+        if let Some(kind) = filter.kind
+            && InboxReadGroup::of(kind) != group
+        {
+            continue;
         }
         ask_read(
             domain,
@@ -354,10 +354,10 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
     if window == Token::new(INBOX_WINDOW) || window == Token::new(INBOX_UPDATES_WINDOW) {
         let group = if window == Token::new(INBOX_WINDOW) { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
         let filter = domain.inbox.filter;
-        if let Some(kind) = filter.kind {
-            if InboxReadGroup::of(kind) != group {
-                return;
-            }
+        if let Some(kind) = filter.kind
+            && InboxReadGroup::of(kind) != group
+        {
+            return;
         }
         let selected = domain.inbox.window(group);
         let cursor = match end {
