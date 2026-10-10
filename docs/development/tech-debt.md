@@ -174,3 +174,41 @@ That evidence is now the gate alone, with the workspace's serial totals
 once per session, a slowest-test report, and a warning past four fifths
 of a budget. If a later plan reaches for heavier evidence again, profile
 first. The cost is usually in one place.
+
+## 9. Integration came last
+
+The client plan built the client against the scripted engine. It made
+the joint world's translation the only place where the client's and the
+engine's vocabularies meet, and scheduled it near the end, after the
+client's world and its view. That let both sides go on in parallel while
+the engine's watches, reads and people's requests were still being
+built. `client/domain/testing.md` points the same way: the client's
+world "comes first", and the joint world "is the check".
+
+The cost:
+
+- **The scripted engine agrees with the client by construction.** It is
+  written in the client's vocabulary.
+- **Nothing showed drift on either side** (section 2) until the
+  translation was written. Then it came at once, as a burst of design
+  questions and supplementary increments (section 3).
+
+A full joint world needed both sides far along, but two things did not:
+
+- **the translation,** exhaustive both ways, started as soon as both
+  sides had types. Every increment that adds a variant on either side
+  extends it, so drift is a build error the day it happens;
+- **one thin story end to end,** such as signing in and starting a
+  chat, as soon as the engine can answer it, and extended by each later
+  increment.
+
+The fake also needs keeping honest: **the scripted engine's scenarios
+run against the real engine too.** That way the fake cannot agree with
+the client where the engine does not.
+
+**Recommendation:**
+
+- Integrate a client from its first increment: jig's protocol layer,
+  `ops`'s, and temper's client.
+- In `client/domain/testing.md`, the joint world runs from the start,
+  and the scripted engine is checked against the engine.
