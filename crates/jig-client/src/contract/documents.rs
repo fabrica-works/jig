@@ -109,7 +109,7 @@ pub struct Task {
     /// Exact current taker identity; a display name is not required.
     pub taken_by: Option<u64>,
     /// Supplied instruction text; absence supplies no effective text.
-    pub instructions: Option<super::DocumentText>,
+    pub instructions: Option<DocumentText>,
     pub wake: WakePolicy,
     pub result_contract: ResultContract,
     pub dependencies: List<Chip>,
@@ -374,7 +374,7 @@ pub struct Steering {
     pub revision: Revision,
     pub spec: super::SpecificationDocument,
     /// Supplied context only; absent retained text is not a current default.
-    pub instructions: Option<super::DocumentText>,
+    pub instructions: Option<DocumentText>,
     pub wake: WakePolicy,
     pub dependencies: List<u64>,
     pub authority: Authority,
