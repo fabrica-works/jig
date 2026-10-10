@@ -8,13 +8,13 @@ use jig_client::{
     contract::*,
 };
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
-fn drive(domain: &mut Domain, event: Event) -> Vec<Request> {
+fn drive(domain: &mut Domain, event: Event) -> List<Request> {
     let limits = fixture::client_limits();
     let mut out = Queue::with_capacity(jig_client::max_out(&limits));
     jig_client::step(domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
-    let mut values = Vec::new();
+    let mut values = List::with_capacity(jig_client::max_out(&limits));
     while let Some(request) = out.pop() {
-        values.push(request);
+        values.push(request).unwrap();
     }
     values
 }
@@ -33,7 +33,7 @@ fn history_page() -> HistoryPage {
     after.instructions = Some(DocumentText::complete(cards::text(b"")));
     after.cut = true;
     let mut batch = List::with_capacity(3);
-    for _ in 0..3 {
+    for _ in 0_u32..3 {
         batch.push(super::owner_history::task()).unwrap();
     }
     let mut value = fixture::line();
@@ -78,14 +78,15 @@ fn populated() -> Domain {
             offset: Offset { minutes: 0 },
         },
     );
-    let Request::Open { watch, subject: Subject::Frame } = out[0] else { panic!("explicit frame watch") };
+    let Request::Open { watch, subject: Subject::Frame } = out.as_slice()[0] else { panic!("explicit frame watch") };
     drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
     let opened = drive(
         &mut domain,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(cards::document()))) },
     );
-    let _original_read = history_read(&opened);
+    let _original_read = history_read(opened.as_slice());
     let task_watch = opened
+        .as_slice()
         .iter()
         .find_map(|request| {
             if let Request::Open { watch, subject: Subject::Task { task: 8 }, .. } = request {
@@ -101,8 +102,9 @@ fn populated() -> Domain {
         &mut domain,
         Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) },
     );
-    let read =
-        history_read(&drive(&mut domain, Event::Act { act: jig_client::action::Act::HistoryScope { subtree: true } }));
+    let read = history_read(
+        drive(&mut domain, Event::Act { act: jig_client::action::Act::HistoryScope { subtree: true } }).as_slice(),
+    );
     drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::History(Box::new(history_page()))) });
     domain
 }
@@ -136,12 +138,15 @@ fn whole_history_page_keeps_three_distinct_keys_stored_overrides_and_raw_slots_i
                 assert!(region.name.as_ref().is_some_and(|name| !name.is_empty()));
             }
         }
-        let slots: Vec<_> = tree.nodes().iter().filter_map(|node| node.slot).collect();
-        assert_eq!(slots.len(), 7);
-        for slot in slots {
-            assert_eq!(bindings.owner_part(slot.token), Some(&fixture::part()));
-            assert!(bindings.part(slot.token).is_none());
+        let mut slot_count = 0_u32;
+        for node in tree.nodes() {
+            if let Some(slot) = node.slot {
+                slot_count += 1;
+                assert_eq!(bindings.owner_part(slot.token), Some(&fixture::part()));
+                assert!(bindings.part(slot.token).is_none());
+            }
         }
+        assert_eq!(slot_count, 7);
         assert!(!cards::contains(&tree, b"now"), "stored snapshots do not borrow the current override");
         assert!(cards::contains(&tree, b"a/b"));
         assert!(cards::contains(&tree, b"\\xFF\\x00"));

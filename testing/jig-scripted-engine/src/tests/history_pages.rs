@@ -125,7 +125,7 @@ fn scripted_history_pages_keep_all_owner_and_legacy_rows_under_opaque_source_con
         let Up::Read { terminal: ReadResult::Value(ReadValue::History(page)), .. } = &out[0] else {
             panic!("whole supplied history page");
         };
-        assert_eq!(page.rows.as_slice(), &[expected.clone()]);
+        assert_eq!(page.rows.as_slice(), core::slice::from_ref(expected));
         assert_eq!(page.before.is_some(), index != 0);
         assert_eq!(page.after.is_some(), index != 2);
         assert!(!page.cut);

@@ -114,12 +114,12 @@ fn owner_history_original_scope_cursors_and_page_loss_survive_continuation_and_r
         Event::Act { act: Act::More { window: Token::new(crate::pages::task::HISTORY_WINDOW), end: End::After } },
     );
     let continued = history_read(&more);
-    let mut matching_reads = 0;
+    let mut matching_reads = 0_u32;
     for request in &more {
-        if let Request::Read { what, .. } = request {
-            if *what == (Read::History { task: 8, subtree: true, after: Some(cursor.clone()) }) {
-                matching_reads += 1;
-            }
+        if let Request::Read { what, .. } = request
+            && *what == (Read::History { task: 8, subtree: true, after: Some(cursor.clone()) })
+        {
+            matching_reads += 1;
         }
     }
     assert_eq!(matching_reads, 1);
