@@ -33,10 +33,11 @@ fn facts(tree: &Tree, source: &Option<DocumentText>) {
         source.as_ref().is_some_and(|value| value.bytes().is_empty() && !value.cut)
     );
     assert_eq!(contains(tree, b"Only part of this text was supplied"), source.as_ref().is_some_and(|value| value.cut));
-    if let Some(value) = source {
-        if !value.bytes().is_empty() {
-            assert!(contains(tree, value.bytes()));
-        }
+    let Some(value) = source else {
+        return;
+    };
+    if !value.bytes().is_empty() {
+        assert!(contains(tree, value.bytes()));
     }
 }
 fn baseline(tree: &Tree, source: &Option<DocumentText>) {
