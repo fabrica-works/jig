@@ -61,3 +61,6 @@ pub use owner_chip::*;
 
 pub mod owner_amendment;
 pub use owner_amendment::OwnerAmendmentState;
+
+pub mod owner_activity;
+pub use owner_activity::*;
