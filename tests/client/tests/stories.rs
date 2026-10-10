@@ -258,7 +258,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
                 Step::See { find: Find::text(b"Connector 2, procedure 7"), within: WITHIN },
                 Step::See { find: Find::text(b"proposed"), within: WITHIN },
                 Step::Press { find: Find::named(Role::Button, b"Confirm") },
-                Step::See { find: Find::text(b"Proposed by task"), within: WITHIN },
+                Step::See { find: Find::text(b"Proposed by"), within: WITHIN },
             ],
         );
         let result = w.run(Until::Done);

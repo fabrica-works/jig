@@ -607,17 +607,23 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
         .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Project(Box::new(doc)))
         .expect("project facts fit");
     let mut p = proposal();
-    match &mut p.action {
-        ProposalAction::Batch { tasks, .. } => {
-            let row = tasks.get_mut(0).expect("one proposed goal");
-            row.executor = Executor::Procedure { connector: 2, kind: 7 };
-            row.spec = text(b"Resolve incident");
-            row.budget = 2;
-        }
-        ProposalAction::Amend { .. } | ProposalAction::Effect { .. } | ProposalAction::Widen { .. } => {
-            panic!("goal fixture is a batch")
-        }
-    }
+    p.key = ProposalKey { proposer: 7, number: 1 };
+    p.proposer = Actor::Party(7);
+    p.waiting = Recipient::Role { project: 1, role: 1 };
+    p.needs.budget = 2;
+    p.funding = Budget { total: 2, own: 0, ended: 0, reserved: 0, left: 2, funder: Actor::Party(7) };
+    p.action = ProposalAction::Batch {
+        tasks: list([ProposedTask {
+            local: 1,
+            spec: specification(text(b"Resolve incident")),
+            executor: Executor::Procedure { connector: 2, kind: 7 },
+            budget: 2,
+            deadline: None,
+            dependencies: list([]),
+            grants: list([]),
+        }]),
+        own: true,
+    };
     world
         .front()
         .engine

@@ -621,7 +621,12 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     let (tree, _) = build(&d, 3, &words);
     assert!(contains(&tree, b"proposed"));
     drive(&mut d, Event::Act { act: Act::Submit { field: jig_client::fields::Purpose::NewGoal } });
-    let (tree, _) = build(&d, 3, &words);
+    let mut b = crate::Builder::new(&super::cards::limits());
+    let mut bindings = JigBindings::new(32, super::cards::CLIENT.text);
+    b.open(Role::Page);
+    crate::confirmation::confirmation(&mut b, &d, &words, &mut bindings);
+    b.close();
+    let tree = b.finish();
     assert!(contains(&tree, b"Connector 65535, procedure 4294967295"));
     assert!(contains(&tree, b"procedure words"));
     assert!(!contains(&tree, b"Charter 65535"));

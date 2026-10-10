@@ -202,6 +202,7 @@ fn choice(
                         for charter in &role.goals {
                             if charter.number == number {
                                 b.text(crate::Run::Plain, charter.name.bytes());
+                                return;
                             }
                         }
                     }
