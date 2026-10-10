@@ -1737,8 +1737,8 @@ fn agent_out(
     }
 }
 
-/// The inline child supplies the main completion's activation turn, retry and
-/// offset. Nested content has no main provisional position.
+/// Text uses the inline child's supplied main completion position. Every call
+/// carries its opaque source identity independently, including nested calls.
 /// `client/domain/contract.md`, 7.3.
 fn inline_content(
     domain: &mut Domain,
@@ -1749,10 +1749,10 @@ fn inline_content(
     provisional: Option<agent::Provisional>,
     content: smith_domain::Content,
 ) {
-    let Some(mut provisional) = provisional else { return };
     let Some(hosting) = domain.host.hosting(client) else { return };
     match content {
         smith_domain::Content::Text { text, .. } => {
+            let Some(mut provisional) = provisional else { return };
             let bound = usize::try_from(env.limits.core.views.text_bytes).expect("stream byte limit");
             for chunk in text.chunks(bound) {
                 inline_report(
@@ -1769,18 +1769,25 @@ fn inline_content(
                 provisional.offset = provisional.offset.checked_add(length).expect("inline supplied text position");
             }
         }
-        smith_domain::Content::Call { name, input, .. } => {
-            let bound = usize::try_from(env.limits.core.views.text_bytes).expect("stream byte limit");
-            let tool_bytes = name.len().min(bound);
-            let input_bytes = input.len().min(bound.checked_sub(tool_bytes).expect("bounded tool"));
+        smith_domain::Content::Call { owner, completion, id, name, input } => {
             let call = jig_core_views::Call {
-                // Provider content is descriptive; no engine call has been admitted yet.
-                number: 0,
-                tool: skein_lib::bytes::copy_of(name.get(..tool_bytes).expect("tool prefix")),
-                input: skein_lib::bytes::copy_of(input.get(..input_bytes).expect("input prefix")),
-                cut: tool_bytes != name.len() || input_bytes != input.len(),
+                identity: jig_core_views::CallIdentity {
+                    owner,
+                    sequence: completion.sequence,
+                    retry: completion.retry,
+                    id,
+                },
+                tool: name,
+                input,
+                cut: false,
+                began: None,
             };
-            inline_report(domain, env, decision, work, hosting, provisional, Box::new([]), Some(call));
+            let requests = core::step(
+                &mut domain.core,
+                &Env { now: env.now, wall: env.wall, limits: env.limits.core },
+                core::Event::RunCall { run: hosting.run, attempt: hosting.attempt, call },
+            );
+            core_out(domain, env, decision, requests, work);
         }
         smith_domain::Content::Tool { .. } | smith_domain::Content::Usage { .. } => {}
     }
