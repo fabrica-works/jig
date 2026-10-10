@@ -43,11 +43,13 @@ fn frame_identity_waits_for_a_genuine_hello_before_confirmation_or_live_link() {
     let address = Address::Inbox { project: None };
     assert_eq!(
         drive(&mut domain, Event::Went { place: Place::Jig(address) }).as_ref(),
-        &[Request::PartsLeft { generation }, Request::Show { address, replace: false }]
+        &[Request::PartsLeft { generation }, Request::Show { address, replace: true }]
     );
     assert_eq!(domain.page(), &Page::Starting);
     assert_eq!(domain.link(), Link::Starting);
-    let out = drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    let versions = VersionRange { first: 1, last: u32::MAX };
+    let out = drive(&mut domain, Event::Hello { versions });
+    assert_eq!(domain.versions, Some(versions));
     assert_eq!(out[0], Request::Confirmed { party: Some(7) });
     assert_eq!(out[1], Request::Retention { retention: frame.retention });
     assert_eq!(out[2], Request::Link { link: Link::Live });

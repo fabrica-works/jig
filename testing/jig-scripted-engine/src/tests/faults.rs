@@ -108,6 +108,11 @@ fn scenario_busy_not_ready_loss_sign_out_versions_and_watch_faults() {
     assert!(engine.commits().is_empty(), "a hello range is protocol configuration, not a business commit");
     assert!(engine.poll(at(9_999_999)).is_empty());
     assert!(engine.poll(at(10_000_000)).is_empty(), "changing hello never rewrites Frame");
+    let versions = VersionRange { first: u32::MAX, last: u32::MAX };
+    engine.fault(at(10_000_000), Fault::Versions(versions));
+    assert_eq!(engine.versions(), versions);
+    assert!(engine.commits().is_empty(), "full-width ranges remain protocol facts");
+    assert!(engine.poll(at(10_000_000)).is_empty(), "a full-width range leaves Frame unchanged");
     engine.fault(at(10_000_000), Fault::DropWatch { watch: Token::new(1) });
     assert_eq!(engine.poll(at(10_000_000)), vec![Up::Ended { token: Token::new(1), why: WatchEnd::Dropped }]);
     engine.open(at(10_000_000), 11, Token::new(2), Subject::Frame).expect("new frame");
