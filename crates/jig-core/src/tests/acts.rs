@@ -901,7 +901,8 @@ fn a_historical_proposal_decision_requires_the_exact_typed_maker() {
         for other_store in [false, true] {
             let (mut core, limits) = make_tree();
             sign_in(&mut core, &limits);
-            // Allocate the archived proposal number through the real deployment family.
+            // Allocate the archived decider and proposal through their real deployment families.
+            assert_eq!(fresh(&mut core.counters, Family::Person), Some(1));
             for _ in 0..10 {
                 fresh(&mut core.counters, Family::Message).unwrap();
             }
