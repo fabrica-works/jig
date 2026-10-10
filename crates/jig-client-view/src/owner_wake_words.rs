@@ -128,17 +128,13 @@ impl WakePhrase {
             | Self::ResultYes
             | Self::ResultNo
             | Self::Once => Box::new([]),
-            Self::Batch => Box::new([
+            Self::Batch | Self::Topic => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::Number | Self::Task => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Timer => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Period => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Topic => Box::new([
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-            ]),
+            Self::Number | Self::Task | Self::Timer | Self::Period => {
+                Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }])
+            }
         };
         PhraseShape { id: self.id(), holes, plural: None }
     }

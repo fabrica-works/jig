@@ -34,6 +34,20 @@ fn full_wake() -> OwnerWakePolicy {
         timers: true,
     }
 }
+fn full_subscriptions() -> Subscriptions {
+    Subscriptions {
+        entries: list([
+            Subscription { number: u64::MAX, kind: SubscriptionKind::Topic { connector: u16::MAX, topic: u64::MAX } },
+            Subscription {
+                number: 2,
+                kind: SubscriptionKind::Timer {
+                    at: Wall::from_nanos(u64::MAX),
+                    period: Some(Duration::from_nanos(u64::MAX)),
+                },
+            },
+        ]),
+    }
+}
 fn full_chip(task: u64) -> Chip {
     Chip {
         task,
@@ -287,16 +301,8 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     task.spec = specification(full_text());
     task.instructions = Some(DocumentText { bytes: full_text(), cut: true });
     task.wake = full_wake();
-    task.subscriptions.entries = list([
-        Subscription { number: u64::MAX, kind: SubscriptionKind::Topic { connector: u16::MAX, topic: u64::MAX } },
-        Subscription {
-            number: 2,
-            kind: SubscriptionKind::Timer {
-                at: Wall::from_nanos(u64::MAX),
-                period: Some(Duration::from_nanos(u64::MAX)),
-            },
-        },
-    ]);
+    task.subscriptions = full_subscriptions();
+
     task.authority = full_authority();
     task.dependencies = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
     task.delegates = list([
