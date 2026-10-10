@@ -47,7 +47,7 @@ fn deadlines(first: usize) -> Harness {
                 row.last_message = 1;
                 row.inbox = Box::new([Word {
                     number: 1,
-                    from: Party::Person(9),
+                    from: Party::Task(1),
                     kind: MessageKind::Words,
                     words: Box::new([1]),
                     at: h.env.wall,

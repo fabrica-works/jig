@@ -103,10 +103,7 @@ fn people_timer_expires_signins_durably_and_later_replies_wait_for_that_commit()
     assert_eq!(journal.release(&mut released), Released::Some);
     assert_eq!(released.len(), 1);
     let held = released.pop().unwrap();
-    assert!(matches!(
-        held.as_ref(),
-        Held::PeopleReply { reply: people::Reply::Outcome(people::Outcome::SignedOut), .. }
-    ));
+    assert!(matches!(held.as_ref(), Held::PeopleReply { reply: people::Reply::SignedOut, .. }));
 }
 
 #[test]
