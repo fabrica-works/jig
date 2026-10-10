@@ -164,7 +164,22 @@ fn owner_tree_view_preserves_all_link_metadata_without_fabricated_stored_chip_or
 }
 #[test]
 fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_envelopes() {
-    let value = source();
+    let mut value = source();
+    let first = value.rows.get_mut(0).unwrap();
+    first.proposals.push(ProposalKey { proposer: Proposer::Task(u64::MAX), number: u64::MAX }).unwrap();
+    first.dependencies.push(OwnerTaskLink::Retained { chip: chip(17), at: Some(Wall::EPOCH) }).unwrap();
+    let mut second = first.clone();
+    second.chip.task = 10;
+    second.parent = 9;
+    second.depth = 2;
+    value.rows.push(second).unwrap();
+    let mut metadata = super::owner_chip::details();
+    metadata.closing_connectors = Some(List::with_capacity(CLIENT.rows));
+    value.root.details = Box::new(ChipPhase::Owner {
+        phase: OwnerChipPhase::Active(RunStage::Running { attempt: u64::MAX }),
+        details: Box::new(metadata),
+    });
+    value.root.phase = Phase::Running;
     let d = domain(&value);
     let english = crate::phrases::english::language();
     let mut selected = english.clone();
@@ -207,6 +222,30 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
     assert_eq!(build(&value, &d, &w, Some(exact)).len(), exact);
     let fail = std::panic::catch_unwind(|| build(&value, &d, &w, Some(exact.checked_sub(1).unwrap())));
     assert!(fail.is_err());
+    let mut bytes = 0_u32;
+    for node in tree.nodes() {
+        assert!(node.value.is_none() && node.external.is_none() && node.drawing.is_none());
+        if let Some(name) = &node.name {
+            bytes += u32::try_from(name.len()).unwrap();
+        }
+        for run in &node.text {
+            bytes += u32::try_from(run.text.len()).unwrap();
+        }
+    }
+    let mut cap = crate::Limits::of_words(&CLIENT, &w).unwrap();
+    cap.nodes = exact;
+    cap.depth = f.depth;
+    cap.text_bytes = bytes;
+    cap.text_per_node = f.text_per_node;
+    let render = |cap: crate::Limits| {
+        let mut b = Builder::new(&cap);
+        let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
+        view::render(&mut b, &value, &d.task_page().plan, &d, &w, &mut bindings);
+        b.finish()
+    };
+    assert_eq!(render(cap).len(), exact);
+    cap.text_bytes = bytes.checked_sub(1).unwrap();
+    assert!(std::panic::catch_unwind(|| render(cap)).is_err());
     let mut invalid = value.clone();
     invalid.rows = List::with_capacity(CLIENT.rows + 1);
     assert!(view::required(&invalid, &CLIENT, &w).is_none());

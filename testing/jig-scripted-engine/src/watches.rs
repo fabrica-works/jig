@@ -334,7 +334,6 @@ impl<A: crate::Application> Engine<A> {
             }
             match &mut value {
                 Delivery::OwnerInbox(_) => return Err(WatchEnd::Unknown),
-                Delivery::OwnerTree(_) => return Err(WatchEnd::Busy),
                 Delivery::Inbox(doc) => {
                     if !shorten(&mut doc.entries) {
                         return Err(WatchEnd::Busy);
@@ -368,6 +367,7 @@ impl<A: crate::Application> Engine<A> {
                     doc.nodes = list(&nodes[..nodes.len() - 1]);
                 }
                 Delivery::Frame(_)
+                | Delivery::OwnerTree(_)
                 | Delivery::Task(_)
                 | Delivery::Chips(_)
                 | Delivery::Run(_)

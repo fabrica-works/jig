@@ -91,28 +91,24 @@ impl TreePhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Tree => None,
-            Self::Root => Some(HoleKind::Number),
-            Self::Parent => Some(HoleKind::Number),
-            Self::Depth => Some(HoleKind::Number),
+            Self::Root
+            | Self::Parent
+            | Self::Depth
+            | Self::Held
+            | Self::Waiting
+            | Self::Idle
+            | Self::Starting
+            | Self::Running
+            | Self::BackingOff
+            | Self::Closing
+            | Self::HeldCount
+            | Self::Done
+            | Self::Failed
+            | Self::Cancelled => Some(HoleKind::Number),
             Self::Spent => Some(HoleKind::Amount),
-            Self::Dependencies => None,
-            Self::Proposals => None,
-            Self::RowCut => None,
-            Self::Fold => None,
-            Self::Held => Some(HoleKind::Number),
-            Self::Next => None,
-            Self::End => None,
-            Self::Waiting => Some(HoleKind::Number),
-            Self::Idle => Some(HoleKind::Number),
-            Self::Starting => Some(HoleKind::Number),
-            Self::Running => Some(HoleKind::Number),
-            Self::BackingOff => Some(HoleKind::Number),
-            Self::Closing => Some(HoleKind::Number),
-            Self::HeldCount => Some(HoleKind::Number),
-            Self::Done => Some(HoleKind::Number),
-            Self::Failed => Some(HoleKind::Number),
-            Self::Cancelled => Some(HoleKind::Number),
+            Self::Tree | Self::Dependencies | Self::Proposals | Self::RowCut | Self::Fold | Self::Next | Self::End => {
+                None
+            }
         }
     }
 }

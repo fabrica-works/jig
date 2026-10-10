@@ -1,3 +1,9 @@
+#![expect(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::wildcard_enum_match_arm,
+    reason = "ordinary tests script public events and inspect retained source values"
+)]
 //! Public subtree deliveries preserve source facts across page lifecycles.
 use super::spine::{LIMITS, delivered, frame, start};
 use crate::{
