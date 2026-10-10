@@ -278,7 +278,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
             }
         );
         assert!(matches!(
-            commits.iter().find(|c| c.key.is_some()).unwrap().answer,
+            commits.iter().find(|c| c.key.is_some()).expect("the procedure goal has one keyed commit").answer,
             Some(jig_client::contract::Answer::Done(jig_client::contract::Outcome::Proposed { .. }))
         ));
     }
