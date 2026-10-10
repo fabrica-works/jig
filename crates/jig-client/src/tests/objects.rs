@@ -46,7 +46,7 @@ pub(super) fn phase_details(phase: Phase) -> ChipPhase {
             ending: None,
         }),
         Phase::Held => ChipPhase::Held {
-            reason: HoldReason::Stopped { by: frame(7).party, at: Wall::EPOCH },
+            reason: HoldReason::Stopped { by: super::spine::party(7), at: Wall::EPOCH },
             since: Wall::EPOCH,
             revision: Revision { value: 3 },
             was: None,
@@ -102,7 +102,7 @@ pub(super) fn escalation() -> Escalation {
         task: chip(8),
         hold: Hold {
             revision: Revision { value: 3 },
-            reason: HoldReason::Stopped { by: frame(7).party, at: Wall::EPOCH },
+            reason: HoldReason::Stopped { by: super::spine::party(7), at: Wall::EPOCH },
             before: Phase::Running,
             since: Wall::EPOCH,
             result: None,
@@ -307,7 +307,7 @@ fn a_deciding_card_survives_a_drop_until_its_durable_answer_then_lingers() {
         Card::Deciding { request: Some(request), progress: Progress::InFlight }
     );
     assert!(domain.notices().ids().is_empty());
-    let outcome = Outcome::DecidedFirst { by: frame(9).party, how: Decision::Accepted, at: Wall::EPOCH };
+    let outcome = Outcome::DecidedFirst { by: super::spine::party(9), how: Decision::Accepted, at: Wall::EPOCH };
     drive(&mut domain, Time::from_nanos(20), Event::Answered { request, answer: Answer::Done(outcome.clone()) });
     assert_eq!(
         domain.objects.get(id).unwrap().card,
@@ -351,7 +351,7 @@ fn a_drop_reads_how_the_card_ended_and_a_preexisting_read_can_supply_the_termina
         assert_eq!(*how, Left::Looking);
         let ending = Ending::Decided {
             by: frame(9).party.number,
-            party: Some(frame(9).party),
+            party: Some(super::spine::party(9)),
             how: Some(Decision::Accepted),
             at: Wall::EPOCH,
         };

@@ -407,3 +407,11 @@ fn work_page(domain: &Domain) -> bool {
         }
     }
 }
+
+pub(super) fn party(number: u64) -> crate::contract::Party {
+    crate::contract::Party {
+        number,
+        kind: PartyKind::Person,
+        name: crate::contract::Text::new(Box::from(*b"Pat"), 32).unwrap(),
+    }
+}

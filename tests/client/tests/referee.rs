@@ -355,7 +355,7 @@ fn the_test_clients_sent_words_are_found_in_committed_activity() {
                 rows: jig_scripted_engine::Rows::Activity(vec![ActivityLine {
                     position: 1,
                     at: Wall::EPOCH,
-                    event: Activity::Words { by: stories::frame(7).party, message: 1, words: stories::text(b"Words") },
+                    event: Activity::Words { by: stories::party(7), message: 1, words: stories::text(b"Words") },
                 }]),
             })],
         })

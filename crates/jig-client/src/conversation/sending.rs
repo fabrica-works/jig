@@ -3,7 +3,7 @@
 //! the submitted words and their read position. See client/domain/client.md, 10.
 use crate::{
     Domain,
-    contract::{Answer, Ask, Limit, Party, Text},
+    contract::{Answer, Ask, FrameParty, Limit, Text},
     intents::Intent,
 };
 use skein_lib::{Id, Token};
@@ -64,7 +64,7 @@ pub(crate) fn pending(domain: &mut Domain, id: Id<Intent>) {
         return;
     };
     let by = author(domain);
-    let kept = domain.conversation.words.begin(id.token(), by, text.clone());
+    let kept = domain.conversation.words.begin_frame(id.token(), by, text.clone());
     assert!(kept, "new writes check room; restored pending intents fit their paired capacity");
     domain.changed();
 }
@@ -78,7 +78,7 @@ pub(crate) fn restore(domain: &mut Domain) {
             && !domain.conversation.words.pending(id.token())
             && let Some(text) = words(&intent.ask, domain.conversation.task)
         {
-            let kept = domain.conversation.words.begin(id.token(), by.clone(), text.clone());
+            let kept = domain.conversation.words.begin_frame(id.token(), by.clone(), text.clone());
             assert!(kept, "pending intents restore before activity within their paired capacity");
         }
     }
@@ -114,7 +114,7 @@ pub(crate) fn answered(domain: &mut Domain, request: Token, answer: &Answer) {
     domain.changed();
 }
 
-fn author(domain: &Domain) -> Option<Party> {
+fn author(domain: &Domain) -> Option<FrameParty> {
     let frame = domain.frame.document.as_ref()?;
     Some(frame.party.clone())
 }

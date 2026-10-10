@@ -389,7 +389,7 @@ fn words_keep_the_submitted_snapshot_and_restore_sent_messages_until_read() {
     assert!(words.rows.is_empty());
     let mut joined = KeptWords::new(2);
     assert!(joined.begin(a, None, text(b"original")));
-    assert!(joined.restore(super::spine::frame(7).party, 3, text(b"activity copy")));
+    assert!(joined.restore(super::spine::party(7), 3, text(b"activity copy")));
     assert!(joined.sent(a, 3));
     assert_eq!(joined.rows.len(), 1);
     assert_eq!(joined.rows.get(0).unwrap().words, text(b"original"));
@@ -417,7 +417,7 @@ fn words_page() -> ActivityPage {
         rows.push(ActivityLine {
             position: message,
             at: Wall::EPOCH,
-            event: Activity::Words { by: super::spine::frame(7).party, message, words: text(words) },
+            event: Activity::Words { by: super::spine::party(7), message, words: text(words) },
         })
         .unwrap();
     }

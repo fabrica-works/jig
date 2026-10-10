@@ -11,7 +11,7 @@
 //! | being sent | refused or unknown | absent; the draft owner keeps the words |
 //! | sent | committed read-through | read |
 //! | absent | activity words | sent or read |
-use crate::contract::{Activity, ActivityPage, Party, Text};
+use crate::contract::{Activity, ActivityPage, FrameParty, Party, Text};
 use skein_lib::{List, Token};
 /// Where a person's words are relative to the engine's committed turns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -28,6 +28,8 @@ pub enum Words {
 pub struct Sent {
     pub request: Option<Token>,
     pub by: Option<Party>,
+    /// Name loss supplied by the local Frame; historical Party has no such fact.
+    pub by_name_cut: Option<bool>,
     pub words: Text,
     pub state: Words,
 }
@@ -83,7 +85,27 @@ impl KeptWords {
         if !self.admits() {
             return false;
         }
-        self.rows.push(Sent { request: Some(request), by, words, state: Words::BeingSent }).expect("word room checked");
+        self.rows
+            .push(Sent { request: Some(request), by, by_name_cut: None, words, state: Words::BeingSent })
+            .expect("word room checked");
+        true
+    }
+    /// Keeps the supplied local author label and its independent document loss.
+    pub fn begin_frame(&mut self, request: Token, by: Option<FrameParty>, words: Text) -> bool {
+        if self.pending(request) {
+            return true;
+        }
+        let cut = by.as_ref().map(|party| party.name.cut);
+        let by = by.map(|party| Party { number: party.number, kind: party.kind, name: party.name.bytes });
+        if !self.begin(request, by, words) {
+            return false;
+        }
+        for row in &mut self.rows {
+            if row.request == Some(request) {
+                row.by_name_cut = cut;
+                break;
+            }
+        }
         true
     }
     /// Applies a durable message number once; an activity copy is joined by number.
@@ -153,7 +175,9 @@ impl KeptWords {
             return false;
         }
         let state = self.state(message);
-        self.rows.push(Sent { request: None, by: Some(by), words, state }).expect("word room checked");
+        self.rows
+            .push(Sent { request: None, by: Some(by), by_name_cut: None, words, state })
+            .expect("word room checked");
         true
     }
     /// Restores a whole activity page; its read positions precede its words even

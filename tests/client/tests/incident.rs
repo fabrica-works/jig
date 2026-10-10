@@ -37,7 +37,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
     } else {
         Ending::Decided {
             by: stories::frame(7).party.number,
-            party: Some(stories::frame(7).party),
+            party: Some(stories::party(7)),
             how: Some(Decision::Accepted),
             at: Wall::EPOCH,
         }

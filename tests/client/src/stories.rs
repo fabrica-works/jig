@@ -475,7 +475,7 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
     let mut decided = p.clone();
     decided.ending = Some(Ending::Decided {
         by: frame(7).party.number,
-        party: Some(frame(7).party),
+        party: Some(party(7)),
         how: Some(Decision::Accepted),
         at: Wall::EPOCH,
     });
@@ -547,7 +547,7 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
 pub fn held_chat(seed: u64) -> World<Test, Scripted> {
     let mut world = world(seed);
     let mut held = task();
-    let reason = HoldReason::Stopped { by: frame(7).party, at: Wall::EPOCH };
+    let reason = HoldReason::Stopped { by: party(7), at: Wall::EPOCH };
     held.hold = Some(Hold {
         revision: Revision { value: 4 },
         reason: reason.clone(),
@@ -829,4 +829,8 @@ fn specification(words: jig_client::contract::Text) -> jig_client::contract::Spe
         parameters: skein_lib::List::with_capacity(0),
         inputs: skein_lib::List::with_capacity(0),
     })
+}
+
+pub fn party(number: u64) -> Party {
+    Party { number, kind: PartyKind::Person, name: text(b"Pat") }
 }

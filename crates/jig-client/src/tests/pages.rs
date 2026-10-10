@@ -96,7 +96,7 @@ fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     value.charters = List::with_capacity(2);
     value.charters.push(offers(1, false)).unwrap();
     value.charters.push(offers(2, true)).unwrap();
-    value.deployment_role = Some(1);
+    value.deployment_role = Some(HeldRole::Policy { role: 1 });
     delivered(&mut domain, Time::ZERO, f, value);
     assert!(domain.navigation().offered(chat, domain.frame().document.as_ref()));
     assert!(

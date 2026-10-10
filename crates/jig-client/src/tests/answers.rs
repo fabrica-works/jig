@@ -1,7 +1,7 @@
 use super::{
     confirmation::task,
     objects::{live, person, proposal},
-    spine::{LIMITS, drain, drive, frame},
+    spine::{LIMITS, drain, drive},
 };
 use crate::{
     Domain, Event, Request,
@@ -68,7 +68,7 @@ fn durable_outcomes_remain_on_open_cards_and_decided_first_leaves_with_all_facts
     let (mut domain, _) = live();
     let id = install(&mut domain, Body::Proposal(Box::new(proposal())));
     let request = send(&mut domain, ObjectKey::Proposal(proposal().key));
-    let outcome = Outcome::DecidedFirst { by: frame(9).party, how: Decision::Accepted, at: Wall::EPOCH };
+    let outcome = Outcome::DecidedFirst { by: super::spine::party(9), how: Decision::Accepted, at: Wall::EPOCH };
     answered(&mut domain, request, Answer::Done(outcome.clone()));
     assert_eq!(
         domain.objects.get(id).unwrap().card,

@@ -112,6 +112,9 @@ fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
         b.name(&words.say(JigPhrase::Person, &[]));
         if let Some(by) = &sent.by {
             party(b, by, words);
+            if sent.by_name_cut == Some(true) {
+                words.text(b, JigPhrase::DocumentTextCut, &[]);
+            }
         }
         b.text(Run::Plain, sent.words.bytes());
         word_state(b, sent.state, words);
