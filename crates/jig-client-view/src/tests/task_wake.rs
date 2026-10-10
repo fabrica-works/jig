@@ -86,6 +86,7 @@ fn task_overview_renders_numbered_standing_interests_independently_of_activation
             })
             .unwrap();
         let mut row = task_doc(&[]);
+        row.spec.specification.words = DocumentText::complete(text(b""));
         row.wake = OwnerWakePolicy {
             words: WakeRule::Batch { count: u32::MAX, age: Duration::from_nanos(u64::MAX) },
             notices: WakeRule::Never,

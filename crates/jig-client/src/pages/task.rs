@@ -138,7 +138,8 @@ pub fn sections(task: &Task) -> Sections {
         || task.result.is_some()
         || !task.resources.is_empty()
         || !task.inputs.is_empty()
-        || !task.dependencies.is_empty();
+        || !task.dependencies.is_empty()
+        || !task.subscriptions.entries.is_empty();
     let mut offered = List::with_capacity(6);
     for section in [
         TaskSection::Overview,
