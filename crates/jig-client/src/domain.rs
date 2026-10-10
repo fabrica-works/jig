@@ -202,6 +202,7 @@ impl Domain {
                             | crate::objects::Body::Escalation(_)
                             | crate::objects::Body::Question(_)
                             | crate::objects::Body::PersonTask(_)
+                            | crate::objects::Body::OwnerPersonTask(_)
                             | crate::objects::Body::Result(_)
                             | crate::objects::Body::Note { .. },
                         )

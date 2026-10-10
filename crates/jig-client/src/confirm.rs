@@ -176,6 +176,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_),
         )
         | None => None,
@@ -280,6 +281,7 @@ fn answer_field(open: &Confirmation, object: &Object) -> Result<Option<Purpose>,
     } else {
         match &object.body {
             Some(Body::Question(_)) => Some(Purpose::Answer),
+            Some(Body::OwnerPersonTask(_)) => None,
             Some(Body::PersonTask(document)) => match &document.contract {
                 PersonContract::Words => Some(Purpose::Answer),
                 PersonContract::Choice { options } => {
@@ -324,6 +326,7 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
         | Body::Escalation(_)
         | Body::Question(_)
         | Body::PersonTask(_)
+        | Body::OwnerPersonTask(_)
         | Body::Result(_)
         | Body::Note { .. } => return Some(Missing::Refused { why: Refusal::NotOffered }),
     };
@@ -375,6 +378,7 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -405,6 +409,7 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
                     | Body::OwnerProposal(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
+                    | Body::OwnerPersonTask(_)
                     | Body::Result(_)
                     | Body::Note { .. },
                 )
@@ -439,12 +444,38 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
 }
 
 fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Missing> {
-    if object.project.is_none() {
+    if object.project.is_none()
+        || matches!(&object.body, Some(Body::OwnerPersonTask(document)) if document.project().is_none())
+    {
         return Some(Missing::Context);
     }
     match draft_admission(object, open) {
         Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => {}
         Admission::Refused(why) => return Some(Missing::Refused { why }),
+    }
+    if open.act == ActKind::Answer
+        && !open.choices.cannot
+        && let Some(Body::OwnerPersonTask(document)) = &object.body
+    {
+        if crate::objects::person_task::answer(document, open.choices.option, &domain.fields).is_some() {
+            return None;
+        }
+        return Some(match &document.contract {
+            crate::contract::TaskContractDocument::Verdict { choices, .. } => {
+                let mut selectable = false;
+                if let Some(option) = open.choices.option {
+                    for choice in choices {
+                        if choice.code == option && choice.fields.is_empty() {
+                            selectable = true;
+                        }
+                    }
+                }
+                if selectable { Missing::Words { field: Purpose::Reason } } else { Missing::Choice }
+            }
+            crate::contract::TaskContractDocument::Report { .. } => Missing::Words { field: Purpose::Answer },
+            crate::contract::TaskContractDocument::Approval { .. }
+            | crate::contract::TaskContractDocument::Change { .. } => Missing::Refused { why: Refusal::NotOffered },
+        });
     }
     let field = match open.act {
         ActKind::Reject | ActKind::LeaveHeld | ActKind::Cancel | ActKind::TakeOver => Some(Purpose::Reason),

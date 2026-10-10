@@ -71,6 +71,7 @@ fn kept(client: &Domain, task: u64) -> Option<&Chip> {
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )

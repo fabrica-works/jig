@@ -43,6 +43,7 @@ pub fn task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )

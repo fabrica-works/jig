@@ -442,3 +442,4 @@ pub mod owner_inbox;
 pub mod owner_tree;
 
 pub mod owner_proposal;
+pub mod owner_person_task;

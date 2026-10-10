@@ -104,6 +104,7 @@ fn context(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bin
         Some(Body::Escalation(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::Question(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::PersonTask(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
+        Some(Body::OwnerPersonTask(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::Result(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::Proposal(doc)) => words.proposer(b, doc.proposer),
         Some(Body::OwnerProposal(doc)) => words.proposer(b, doc.key.proposer),
@@ -137,6 +138,7 @@ fn action(
                     | Body::Escalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
+                    | Body::OwnerPersonTask(_)
                     | Body::Result(_)
                     | Body::Note { .. },
                 )
@@ -172,6 +174,9 @@ fn action(
                     common::field(b, client, Purpose::Answer, JigPhrase::AnswerField, words, bindings);
                 }
                 Some(Body::PersonTask(doc)) => person::contract(b, client, open.object, &doc.contract, words, bindings),
+                Some(Body::OwnerPersonTask(doc)) => {
+                    crate::owner_person_task::form(b, client, open.object, &doc.contract, words, bindings)
+                }
                 Some(
                     Body::Task(_)
                     | Body::Chip(_)
@@ -301,6 +306,7 @@ fn held(object: &Object) -> bool {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -321,6 +327,7 @@ fn release_object(b: &mut Builder, client: &Domain, object: &Object, words: &Wor
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -367,6 +374,7 @@ fn impact(object: &Object) -> Option<&Impact> {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -467,6 +475,7 @@ fn delegates(
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )

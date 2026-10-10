@@ -106,6 +106,7 @@ fn attach(domain: &mut Domain, source: Source, line: ConversationLine) {
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         ) => false,

@@ -252,6 +252,7 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
         ReadValue::Escalation(v) => Some(ObjectKey::Escalation(v.task.task)),
         ReadValue::Question(v) => Some(ObjectKey::Question { task: v.task.task, message: v.message }),
         ReadValue::PersonTask(v) => Some(ObjectKey::PersonTask(v.task.task)),
+        ReadValue::OwnerPersonTask(v) => Some(ObjectKey::PersonTask(v.task.task)),
         ReadValue::Result(v) => Some(ObjectKey::Result(v.task.task)),
         ReadValue::Frame(_)
         | ReadValue::Ended(_)
@@ -273,6 +274,7 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         ReadValue::Task(v) => Some(v.project),
         ReadValue::Proposal(v) => Some(v.project),
         ReadValue::OwnerProposal(v) => Some(v.project),
+        ReadValue::OwnerPersonTask(v) => v.project(),
         ReadValue::Frame(_)
         | ReadValue::Escalation(_)
         | ReadValue::Question(_)

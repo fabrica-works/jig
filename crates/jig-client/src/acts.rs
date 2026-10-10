@@ -23,6 +23,7 @@ pub fn offered(object: &Object, act: ActKind) -> Admission {
         Some(Body::Escalation(document)) => &document.acts,
         Some(Body::Question(document)) => &document.acts,
         Some(Body::PersonTask(document)) => &document.acts,
+        Some(Body::OwnerPersonTask(document)) => &document.acts,
         Some(Body::Result(document)) => &document.acts,
         Some(Body::Note { document, .. }) => &document.acts,
         Some(Body::Chip(_)) | None => return Admission::Refused(Refusal::NotOffered),
@@ -50,6 +51,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
                 | Body::OwnerProposal(_)
                 | Body::Question(_)
                 | Body::PersonTask(_)
+                | Body::OwnerPersonTask(_)
                 | Body::Result(_)
                 | Body::Note { .. },
             )
@@ -64,6 +66,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
                 | Body::OwnerProposal(_)
                 | Body::Question(_)
                 | Body::PersonTask(_)
+                | Body::OwnerPersonTask(_)
                 | Body::Result(_)
                 | Body::Note { .. },
             )
@@ -71,6 +74,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
         },
         ActKind::Answer => match &object.body {
             Some(Body::PersonTask(document)) => Some(document.revision),
+            Some(Body::OwnerPersonTask(document)) => Some(document.revision),
             Some(
                 Body::Chip(_)
                 | Body::Task(_)
@@ -93,6 +97,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
                 | Body::Escalation(_)
                 | Body::Question(_)
                 | Body::PersonTask(_)
+                | Body::OwnerPersonTask(_)
                 | Body::Result(_),
             )
             | None => None,
@@ -133,6 +138,7 @@ pub fn hold_revision(object: &Object) -> Option<Revision> {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -145,7 +151,20 @@ fn words(fields: &Fields, purpose: Purpose) -> Option<Text> {
 /// Builds one request after the confirmation has checked its current facts and fields.
 #[must_use]
 pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Option<Ask> {
-    let project = object.project?;
+    let project = match &object.body {
+        Some(Body::OwnerPersonTask(document)) => document.project()?,
+        Some(
+            Body::Chip(_)
+            | Body::Task(_)
+            | Body::Proposal(_)
+            | Body::Escalation(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => object.project?,
+    };
     let task = match object.key {
         ObjectKey::Task(task)
         | ObjectKey::Escalation(task)
@@ -301,6 +320,14 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
             message: question.message,
             words: words(fields, Purpose::Answer)?,
         }),
+        Some(Body::OwnerPersonTask(document)) => {
+            let answer = if choices.cannot {
+                PersonAnswer::Cannot { reason: words(fields, Purpose::Reason)? }
+            } else {
+                crate::objects::person_task::answer(document, choices.option, fields)?
+            };
+            Some(Ask::AnswerPerson { project, task, revision: confirmation.revision?, answer })
+        }
         Some(Body::PersonTask(document)) => {
             let answer = if choices.cannot {
                 PersonAnswer::Cannot { reason: words(fields, Purpose::Reason)? }

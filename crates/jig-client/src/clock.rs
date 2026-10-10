@@ -33,6 +33,7 @@ fn showing(domain: &Domain) -> bool {
                     | Body::Escalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
+                    | Body::OwnerPersonTask(_)
                     | Body::Result(_)
                     | Body::Note { .. },
                 ) => return true,

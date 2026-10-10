@@ -120,6 +120,7 @@ pub(super) fn reread(domain: &mut Domain, body: Body, what: Read) {
         Body::Escalation(document) => ReadValue::Escalation(document),
         Body::Task(document) => ReadValue::Task(document),
         Body::PersonTask(document) => ReadValue::PersonTask(document),
+        Body::OwnerPersonTask(document) => ReadValue::OwnerPersonTask(document),
         Body::Proposal(_)
         | Body::OwnerProposal(_)
         | Body::Question(_)

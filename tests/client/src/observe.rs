@@ -103,6 +103,9 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         ReadValue::PersonTask(p) => {
             vec![Receipt::Card { key: key(ObjectKey::PersonTask(p.task.task)), revisions: vec![(3, p.revision.value)] }]
         }
+        ReadValue::OwnerPersonTask(p) => {
+            vec![Receipt::Card { key: key(ObjectKey::PersonTask(p.task.task)), revisions: vec![(3, p.revision.value)] }]
+        }
         ReadValue::Notes(p) => p
             .rows
             .iter()

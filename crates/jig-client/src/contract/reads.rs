@@ -165,6 +165,8 @@ pub enum ReadValue {
     Question(Box<Question>),
     /// A person task.
     PersonTask(Box<PersonTask>),
+    /// Pending person work with owner contract and optional shown results.
+    OwnerPersonTask(Box<super::OwnerPersonTask>),
     /// A result.
     Result(Box<Result>),
     /// Ended delegate results.

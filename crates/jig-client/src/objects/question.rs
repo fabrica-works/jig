@@ -13,6 +13,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Question> {
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )

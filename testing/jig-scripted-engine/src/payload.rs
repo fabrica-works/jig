@@ -946,6 +946,7 @@ impl Payload for ReadValue {
             Self::Escalation(value0) => sum(&[value0.heap(bounds)]),
             Self::Question(value0) => sum(&[value0.heap(bounds)]),
             Self::PersonTask(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerPersonTask(value) => value.heap(bounds),
             Self::Result(value0) => sum(&[value0.heap(bounds)]),
             Self::Ended(value0) => sum(&[value0.heap(bounds)]),
             Self::History(value0) => sum(&[value0.heap(bounds)]),

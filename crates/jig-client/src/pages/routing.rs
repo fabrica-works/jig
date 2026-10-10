@@ -490,6 +490,10 @@ fn read_value(
             let key = ObjectKey::Question { task: question.task.task, message: question.message };
             read_body(domain, key, Body::Question(question));
         }
+        ReadValue::OwnerPersonTask(task) => {
+            let key = ObjectKey::PersonTask(task.task.task);
+            read_body(domain, key, Body::OwnerPersonTask(task));
+        }
         ReadValue::PersonTask(task) => {
             let key = ObjectKey::PersonTask(task.task.task);
             read_body(domain, key, Body::PersonTask(task));
@@ -582,6 +586,7 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
             | ReadValue::Escalation(_)
             | ReadValue::Question(_)
             | ReadValue::PersonTask(_)
+            | ReadValue::OwnerPersonTask(_)
             | ReadValue::Result(_)
             | ReadValue::Ended(_)
             | ReadValue::History(_)
@@ -685,6 +690,7 @@ fn received_value(
         | ReadValue::Escalation(_)
         | ReadValue::Question(_)
         | ReadValue::PersonTask(_)
+        | ReadValue::OwnerPersonTask(_)
         | ReadValue::Result(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
@@ -757,6 +763,7 @@ fn owner_tree_delivery(
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. } => {}
         }

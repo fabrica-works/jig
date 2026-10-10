@@ -196,6 +196,7 @@ pub fn form(
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -212,6 +213,7 @@ fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -234,6 +236,7 @@ fn task_loss(b: &mut Builder, object: &Object, words: &Words) {
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -250,6 +253,7 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -264,6 +268,7 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
@@ -368,6 +373,7 @@ fn before(object: &Object) -> Option<Amendment> {
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )

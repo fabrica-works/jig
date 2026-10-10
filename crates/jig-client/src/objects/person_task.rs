@@ -7,7 +7,8 @@ pub fn facts(object: &Object) -> Option<&crate::contract::PersonTask> {
     match &object.body {
         Some(Body::PersonTask(document)) => Some(document),
         Some(
-            Body::Chip(_)
+            Body::OwnerPersonTask(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
@@ -24,4 +25,52 @@ pub fn facts(object: &Object) -> Option<&crate::contract::PersonTask> {
 pub fn revision(object: &Object) -> Option<crate::contract::Revision> {
     let document = facts(object)?;
     Some(document.revision)
+}
+
+/// The separate pending owner envelope in this working-set object.
+#[must_use]
+pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerPersonTask> {
+    if let Some(Body::OwnerPersonTask(document)) = &object.body { Some(document) } else { None }
+}
+/// Positive forms the current person answer schema can express.
+#[must_use]
+pub fn answer(
+    document: &crate::contract::OwnerPersonTask,
+    option: Option<u32>,
+    fields: &crate::fields::Fields,
+) -> Option<crate::contract::PersonAnswer> {
+    use crate::{
+        contract::{PersonAnswer, TaskContractDocument, Text},
+        fields::Purpose,
+    };
+    match &document.contract {
+        TaskContractDocument::Approval { state, .. } => Some(PersonAnswer::Approved {
+            state: state.clone(),
+            words: fields.get(Purpose::Reason).map(|field| field.text.clone()),
+        }),
+        TaskContractDocument::Report { words } => {
+            let field = fields.get(Purpose::Answer)?;
+            if !field.text.fits(*words) {
+                return None;
+            }
+            Some(PersonAnswer::Words(field.text.clone()))
+        }
+        TaskContractDocument::Verdict { choices, .. } => {
+            let option = option?;
+            for choice in choices {
+                if choice.code == option && choice.fields.is_empty() {
+                    let reason = match fields.get(Purpose::Reason) {
+                        Some(field) => field.text.clone(),
+                        None => Text::new(alloc::boxed::Box::from([]), 0).expect("empty text fits"),
+                    };
+                    if !reason.fits(choice.words) {
+                        return None;
+                    }
+                    return Some(PersonAnswer::Choice { option, reason });
+                }
+            }
+            None
+        }
+        TaskContractDocument::Change { .. } => None,
+    }
 }

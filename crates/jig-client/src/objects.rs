@@ -53,6 +53,8 @@ pub enum Body {
     Question(Box<Question>),
     /// A person task.
     PersonTask(Box<PersonTask>),
+    /// Pending owner person work.
+    OwnerPersonTask(Box<crate::contract::OwnerPersonTask>),
     /// A result.
     Result(Box<Result>),
     /// A note and the routing project of its page.
@@ -225,6 +227,7 @@ impl Objects {
             Body::Task(task) => object.project = Some(task.project),
             Body::Proposal(proposal) => object.project = Some(proposal.project),
             Body::OwnerProposal(proposal) => object.project = Some(proposal.project),
+            Body::OwnerPersonTask(task) => object.project = task.project(),
             Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {}
             Body::Note { project, .. } => object.project = Some(*project),
         }
@@ -238,6 +241,7 @@ impl Objects {
                     | Body::Escalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
+                    | Body::OwnerPersonTask(_)
                     | Body::Result(_)
                     | Body::Note { .. },
                 )
@@ -249,6 +253,7 @@ impl Objects {
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. } => object.body = Some(body),
         }
@@ -737,6 +742,7 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
         ReadValue::Escalation(escalation) => Some(Body::Escalation(escalation)),
         ReadValue::Question(question) => Some(Body::Question(question)),
         ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
+        ReadValue::OwnerPersonTask(task) => Some(Body::OwnerPersonTask(task)),
         ReadValue::Result(result) => Some(Body::Result(result)),
         ReadValue::Frame(_)
         | ReadValue::Inbox(_)
@@ -781,6 +787,7 @@ impl Body {
             Self::Escalation(escalation) => ObjectKey::Escalation(escalation.task.task),
             Self::Question(question) => ObjectKey::Question { task: question.task.task, message: question.message },
             Self::PersonTask(task) => ObjectKey::PersonTask(task.task.task),
+            Self::OwnerPersonTask(task) => ObjectKey::PersonTask(task.task.task),
             Self::Result(result) => ObjectKey::Result(result.task.task),
             Self::Note { project, document } => ObjectKey::Note { project: *project, note: document.number },
         }
@@ -800,6 +807,7 @@ impl Body {
             | Self::Escalation(_)
             | Self::Question(_)
             | Self::PersonTask(_)
+            | Self::OwnerPersonTask(_)
             | Self::Result(_)
             | Self::Note { .. } => {
                 let how = self.ending()?;
@@ -820,7 +828,7 @@ impl Body {
             Self::PersonTask(task) => task.ending.as_ref(),
             Self::Result(result) => Some(&result.ending),
             Self::Escalation(escalation) => escalation.ending.as_ref(),
-            Self::Chip(_) | Self::OwnerProposal(_) | Self::Note { .. } => None,
+            Self::Chip(_) | Self::OwnerProposal(_) | Self::OwnerPersonTask(_) | Self::Note { .. } => None,
         }
     }
 }
@@ -877,7 +885,21 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
 pub(crate) fn apply_contexts(domain: &mut crate::Domain, rows: List<Context>) {
     for row in rows.into_boxed() {
         if let Some(id) = domain.objects.find(row.object) {
-            domain.objects.get_mut(id).expect("indexed object exists").project = Some(row.project);
+            let object = domain.objects.get_mut(id).expect("indexed object exists");
+            object.project = match &object.body {
+                Some(Body::OwnerPersonTask(document)) => document.project(),
+                Some(
+                    Body::Chip(_)
+                    | Body::Task(_)
+                    | Body::Proposal(_)
+                    | Body::Escalation(_)
+                    | Body::Question(_)
+                    | Body::PersonTask(_)
+                    | Body::Result(_)
+                    | Body::Note { .. },
+                )
+                | None => Some(row.project),
+            };
         }
     }
 }

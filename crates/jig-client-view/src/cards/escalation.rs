@@ -31,6 +31,7 @@ pub fn escalation(
             | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )

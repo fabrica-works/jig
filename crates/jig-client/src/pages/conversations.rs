@@ -100,6 +100,7 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
         Some(Body::Escalation(value)) => (None, Some(value.task.title.bytes.clone())),
         Some(Body::Question(value)) => (None, Some(value.task.title.bytes.clone())),
         Some(Body::PersonTask(value)) => (None, Some(value.task.title.bytes.clone())),
+        Some(Body::OwnerPersonTask(value)) => (value.project(), Some(value.task.title.bytes.clone())),
         Some(Body::Result(value)) => (None, Some(value.task.title.bytes.clone())),
         Some(Body::Proposal(value)) => (Some(value.project), Some(value.why.clone())),
         Some(Body::OwnerProposal(value)) => (Some(value.project), Some(value.reason.bytes.clone())),

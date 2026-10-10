@@ -158,6 +158,7 @@ pub(crate) fn read_result(
             ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out),
             ReadValue::Question(document) => put(domain, env, key, Body::Question(document), out),
             ReadValue::PersonTask(document) => put(domain, env, key, Body::PersonTask(document), out),
+            ReadValue::OwnerPersonTask(document) => put(domain, env, key, Body::OwnerPersonTask(document), out),
             ReadValue::Result(document) => put(domain, env, key, Body::Result(document), out),
             ReadValue::Frame(_)
             | ReadValue::Ended(_)
@@ -204,6 +205,7 @@ fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body
         Body::Task(task) => Some(task.project),
         Body::Proposal(proposal) => Some(proposal.project),
         Body::OwnerProposal(proposal) => Some(proposal.project),
+        Body::OwnerPersonTask(person) => person.project(),
         Body::Note { project, .. } => Some(*project),
         Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {
             object_project(domain, key)
@@ -253,6 +255,7 @@ fn parts(body: &Body, limit: u32) -> Parts {
         }
         Body::Question(question) => chip_parts(&mut parts, &question.task),
         Body::PersonTask(person) => chip_parts(&mut parts, &person.task),
+        Body::OwnerPersonTask(person) => chip_parts(&mut parts, &person.task),
         Body::Result(result) => {
             chip_parts(&mut parts, &result.task);
             match &result.value {

@@ -102,7 +102,7 @@ fn result_value(limits: &Limits) -> Option<u32> {
     let change = markdown(limits)?.checked_add(crate::proposed_task::part_nodes(limits)?)?.checked_add(2)?;
     Some(verdict.max(markdown(limits)?.checked_add(3)?).max(change))
 }
-fn result_facts(limits: &Limits) -> Option<u32> {
+pub(crate) fn result_facts(limits: &Limits) -> Option<u32> {
     chip_nodes(limits)?
         .checked_add(result_value(limits)?)?
         .checked_add(crate::owner_result::nodes(limits)?)?
@@ -169,6 +169,11 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
             .max(proposal_nodes(limits)?)
             .max(question_nodes(limits)?)
             .max(person_task_nodes(limits)?)
+            .max(
+                frame_of_card(limits)?
+                    .checked_add(crate::owner_person_task::max_nodes(limits)?)?
+                    .checked_add(crate::owner_person_task::form_nodes(limits)?)?,
+            )
             .max(result_nodes(limits)?)
             .max(reply_nodes(limits)?)
             .max(escalation_nodes(limits)?)
@@ -204,6 +209,7 @@ pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
             form.max(proposal_action(limits)?)
                 .max(crate::owner_proposal::max_nodes(limits)?)
                 .max(person_contract(limits)?)
+                .max(crate::owner_person_task::form_nodes(limits)?)
                 .max(markdown(limits)?),
         )?
         .checked_add(delegates)?

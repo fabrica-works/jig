@@ -149,6 +149,9 @@ pub fn card(
         Some(jig_client::objects::Body::Question(_)) => {
             question::question(b, client, object, place, words, bindings);
         }
+        Some(jig_client::objects::Body::OwnerPersonTask(_)) => {
+            crate::owner_person_task::card(b, client, object, place, words, bindings);
+        }
         Some(jig_client::objects::Body::PersonTask(_)) => {
             person::person_task(b, client, object, place, words, bindings);
         }
