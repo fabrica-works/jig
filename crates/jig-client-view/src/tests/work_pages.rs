@@ -213,7 +213,6 @@ pub(super) fn recurring_task(number: u64, words: &[u8]) -> ProposedTask {
     }
 }
 pub(super) fn project_doc() -> Project {
-    let doc = super::cards_objects::task_doc(&[]);
     Project {
         period: 3,
         spend_lines: list([TaskSpend { chip: chip(8), spent: 5 }]),
@@ -233,8 +232,12 @@ pub(super) fn project_doc() -> Project {
             deciders: list([Decider { kind: 2, role: 1 }]),
         },
         roles: list([Holding { party: 1, role: HeldRole::Policy { role: 1 } }]),
-        spend: doc.budget,
-        pools: list([Pool { party: 1, period: 3, budget: doc.budget }]),
+        spend: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) },
+        pools: list([Pool {
+            party: 1,
+            period: 3,
+            budget: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) },
+        }]),
         resources: list([part()]),
         services: list([Party { number: 2, kind: PartyKind::Service, name: text(b"Notifier") }]),
         recurring: list([Recurring {
@@ -349,8 +352,7 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                             chip: chip(8),
                             priority: 2,
                             progress: counts(),
-                            budget: doc.budget,
-                            deadline: Some(Wall::EPOCH),
+                            budget: OwnerBudget { deadline: Some(Wall::EPOCH), ..doc.budget },
                             held_below: 1,
                             changed: Wall::EPOCH,
                         }]),

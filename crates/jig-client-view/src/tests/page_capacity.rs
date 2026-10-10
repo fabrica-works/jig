@@ -386,7 +386,12 @@ fn conversations(words: &Words) {
     let line = |number| ConversationLine {
         runtime: Runtime::Waiting { dependencies: list([8, 9]), hold: Some(part()) },
         delegates: u32::MAX,
-        budget: project_doc().spend,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: None,
+        },
         chip: full_chip(number),
         project: 4,
         first_words: full(),
@@ -652,7 +657,7 @@ fn fill_history(d: &mut Domain, read: Token) {
     );
 }
 
-fn fill_goals(d: &mut Domain, watch: Token, doc: &Project) {
+fn fill_goals(d: &mut Domain, watch: Token, _doc: &Project) {
     let goal = |number| GoalLine {
         changed: Wall::EPOCH,
         chip: full_chip(number),
@@ -667,13 +672,17 @@ fn fill_goals(d: &mut Domain, watch: Token, doc: &Project) {
             failed: 2,
             cancelled: 2,
         },
-        budget: doc.spend,
-        deadline: Some(Wall::from_nanos(u64::MAX)),
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: Some(Wall::from_nanos(u64::MAX)),
+        },
         held_below: 2,
     };
     deliver(d, watch, Delivery::Goals(Box::new(Goals { project: 4, rows: list([goal(8), goal(9)]), more: true })));
 }
-fn fill_ended_goals(d: &mut Domain, read: Token, doc: &Project) {
+fn fill_ended_goals(d: &mut Domain, read: Token, _doc: &Project) {
     let goal = |number| GoalLine {
         changed: Wall::EPOCH,
         chip: full_chip(number),
@@ -688,8 +697,12 @@ fn fill_ended_goals(d: &mut Domain, read: Token, doc: &Project) {
             failed: 2,
             cancelled: 2,
         },
-        budget: doc.spend,
-        deadline: Some(Wall::from_nanos(u64::MAX)),
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: Some(Wall::from_nanos(u64::MAX)),
+        },
         held_below: 2,
     };
     drive(

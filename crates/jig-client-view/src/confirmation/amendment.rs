@@ -187,9 +187,9 @@ pub fn form(
         );
     }
     // Funding is kept with the document and may change independently of its spec revision.
-    let funding = match &object.body {
-        Some(Body::Task(doc)) => Some(&doc.budget),
-        Some(Body::Escalation(doc)) => Some(&doc.steering.budget),
+    match &object.body {
+        Some(Body::Task(doc)) => crate::proposed_task::funder(b, &doc.budget.funder, words),
+        Some(Body::Escalation(doc)) => words.actor(b, doc.steering.budget.funder),
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
@@ -198,10 +198,7 @@ pub fn form(
             | Body::Result(_)
             | Body::Note { .. },
         )
-        | None => None,
-    };
-    if let Some(funding) = funding {
-        words.actor(b, funding.funder);
+        | None => {}
     }
 }
 fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {

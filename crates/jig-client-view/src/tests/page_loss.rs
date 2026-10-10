@@ -191,7 +191,12 @@ fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_c
     let row = ConversationLine {
         runtime: Runtime::Idle,
         delegates: 0,
-        budget: project_doc().spend,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: None,
+        },
         chip,
         project: 4,
         first_words: text(b"whole first words"),

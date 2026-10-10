@@ -70,13 +70,17 @@ pub(super) fn task() -> Task {
         cut: false,
         references: List::with_capacity(0),
         resources: List::with_capacity(0),
-        budget: proposal().funding,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 10, spent: 0, spent_below: 0, reserved: 0 },
+            left: 10,
+            funder: Funder::Pool { project: 1, person: 7, period: 3 },
+            deadline: None,
+        },
         authority: owner_authority(),
         hold: Some(escalation().hold),
         escalation: None,
         proposals: List::with_capacity(0),
         activity: 0,
-        deadline: None,
         changed: Wall::EPOCH,
         acts: List::with_capacity(0),
         parts: List::with_capacity(0),
@@ -285,7 +289,7 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
     let id = install(&mut domain, Body::Task(Box::new(row.clone())));
     intend(&mut domain, id, ActKind::Amend);
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
-    row.budget.own = 5;
+    row.budget.numbers.spent = 5;
     reread(&mut domain, Body::Task(Box::new(row)), Read::Task { task: 8 });
     let open = domain.confirmation().unwrap();
     assert!(!open.changed);

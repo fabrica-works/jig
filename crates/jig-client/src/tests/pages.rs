@@ -237,7 +237,12 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
         changed: skein_lib::Wall::from_nanos(changed),
         runtime: Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH },
         delegates: 2,
-        budget: Budget { total: 20, own: 5, ended: 1, reserved: 2, left: 12, funder: Actor::Party(7) },
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 5, spent_below: 1, reserved: 2 },
+            left: 12,
+            funder: Funder::Pool { project: 1, person: 7, period: 3 },
+            deadline: None,
+        },
     }
 }
 fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder() {
@@ -340,7 +345,7 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
     );
     assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, 8);
     assert_eq!(domain.conversation_rows().rows.get(0).unwrap().delegates, 2);
-    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().budget.own, 5);
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().budget.numbers.spent, 5);
     domain.reclaim();
     let out = drive(
         &mut domain,
@@ -768,8 +773,12 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine
         chip,
         priority,
         progress: empty_phase_counts(),
-        budget: budget(),
-        deadline: None,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            funder: Funder::Pool { project: 1, person: 7, period: 3 },
+            deadline: None,
+        },
         held_below: 2,
         changed: skein_lib::Wall::from_nanos(changed),
     }

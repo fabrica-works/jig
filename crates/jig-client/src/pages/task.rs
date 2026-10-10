@@ -118,7 +118,10 @@ pub fn sections(task: &Task) -> Sections {
     let budget = match task.chip.executor {
         Executor::Agent { .. } | Executor::Procedure { .. } => true,
         Executor::Party { .. } | Executor::Role { .. } => {
-            task.budget.total > 0 || task.budget.own > 0 || task.budget.ended > 0 || task.budget.reserved > 0
+            task.budget.numbers.budget > 0
+                || task.budget.numbers.spent > 0
+                || task.budget.numbers.spent_below > 0
+                || task.budget.numbers.reserved > 0
         }
     };
     // The mandatory result contract supplies overview content even with an empty spec.

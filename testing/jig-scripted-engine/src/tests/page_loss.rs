@@ -10,7 +10,12 @@ fn a_page_loss_flag_is_independent_of_row_text_loss_and_whole_cursor_bytes() {
             chip
         },
         delegates: 0,
-        budget: budget(),
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
+            left: 100,
+            funder: Funder::Period { project: 1, period: 3 },
+            deadline: None,
+        },
         first_words: text(b"words"),
         runtime: Runtime::Idle,
         last_reply: 4,

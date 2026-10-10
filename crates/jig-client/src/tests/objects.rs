@@ -293,7 +293,12 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
     let line = ConversationLine {
         runtime: Runtime::Idle,
         delegates: 0,
-        budget: Budget { total: 0, own: 0, ended: 0, reserved: 0, left: 0, funder: Actor::Party(7) },
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
+            left: 0,
+            funder: Funder::Pool { project: 1, person: 7, period: 3 },
+            deadline: None,
+        },
         chip: chip(9),
         project: 1,
         first_words: text(b"first words"),

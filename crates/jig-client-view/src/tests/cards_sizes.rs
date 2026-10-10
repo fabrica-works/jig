@@ -412,7 +412,12 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
             hold: Some(Part::Resource { connector: 2, path: full_path() }),
         },
         delegates: 0,
-        budget: Budget { total: 10, own: 10, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 10, spent: 10, spent_below: 0, reserved: 0 },
+            left: 0,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: None,
+        },
     };
     let entry = InboxEntry {
         reply: Some(Box::new(reply)),

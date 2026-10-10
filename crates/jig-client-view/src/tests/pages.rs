@@ -350,7 +350,12 @@ fn conversation_states(words: &crate::words::Words) {
             rows.push(ConversationLine {
                 runtime: runtime.clone(),
                 delegates: 2,
-                budget: Budget { total: 20, own: 5, ended: 1, reserved: 2, left: 12, funder: Actor::Party(1) },
+                budget: OwnerBudget {
+                    numbers: OwnerNumbers { budget: 20, spent: 5, spent_below: 1, reserved: 2 },
+                    left: 12,
+                    funder: Funder::Pool { project: 4, person: 1, period: 3 },
+                    deadline: None,
+                },
                 chip: Chip {
                     task,
                     title: DocumentText::complete(text(b"Help")),

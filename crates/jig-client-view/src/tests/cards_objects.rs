@@ -621,7 +621,12 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
         changed: Wall::EPOCH,
         runtime: Runtime::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) },
         delegates: 0,
-        budget: Budget { total: 0, own: 0, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
+            left: 0,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: None,
+        },
     };
     drive(
         &mut d,
@@ -787,13 +792,17 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         cut: false,
         references: list([]),
         resources: list([]),
-        budget: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) },
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: None,
+        },
         authority: owner_authority(),
         hold: Some(escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[]).hold),
         escalation: None,
         proposals: list([]),
         activity: 0,
-        deadline: None,
         changed: Wall::EPOCH,
         acts: list(acts.iter().map(|act| Offered { act: *act, admission: Admission::Allowed })),
         parts: list([]),
