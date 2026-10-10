@@ -83,6 +83,41 @@ fn authority() -> Authority {
         note_scopes: list([]),
     }
 }
+fn batch_task(number: u64, spec: SpecificationDocument, executor: OwnerExecutor, budget: u64) -> ProposedTask {
+    ProposedTask {
+        number,
+        spec,
+        executor,
+        contract: TaskContractDocument::Report { words: 32 },
+        authority: OwnerAuthorityDocument {
+            authority: OwnerAuthority {
+                tools: 0,
+                grants: list([]),
+                delegation: OwnerDelegation { kinds: list([]), tasks: 1, depth: 1 },
+                spend: budget,
+                deadline: None,
+                notes: 0,
+                note_resources: list([]),
+            },
+            cut: false,
+        },
+        budget,
+        funder: Funder::Period { project: 1, period: 3 },
+        dependencies: list([]),
+        resources: list([]),
+        wake: OwnerWakePolicy {
+            words: WakeRule::Never,
+            notices: WakeRule::Never,
+            news: WakeRule::Never,
+            results: ResultsWake::Never,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        priority: None,
+        cut: false,
+    }
+}
 fn budget() -> Budget {
     Budget { total: 1, own: 0, ended: 0, reserved: 0, left: 1, funder: Actor::Party(7) }
 }
@@ -219,14 +254,18 @@ pub fn project() -> Project {
     let task = task();
     let role = RolePolicy { number: 1, authority: task.authority.clone(), allotment: 10, decisions: list([1, 2]) };
     let recurring = Recurring {
-        number: 1,
-        spec: text(&[b'r'; 32]),
-        period: 3,
+        chip: task.chip.clone(),
+        key: 1,
+        batch: list([batch_task(1, specification(text(&[b'r'; 32])), OwnerExecutor::Agent { charter: 1 }, 10)]),
         budget: 10,
-        last: list([8, 9]),
+        overlap: Overlap::Skip,
         current_period: 3,
         began: Some(Wall::EPOCH),
         next: Some(Wall::EPOCH),
+        last_period: 2,
+        pending_period: None,
+        last_batch: list([8, 9]),
+        cut: false,
     };
     let part = Part::Project { connector: jig_test_client_domain::FIRST, project: 1 };
     Project {
@@ -253,7 +292,7 @@ pub fn project() -> Project {
             Party { number: 1, kind: PartyKind::Service, name: text(&[b's'; 32]) },
             Party { number: 2, kind: PartyKind::Service, name: text(&[b's'; 32]) },
         ]),
-        recurring: list([recurring.clone(), Recurring { number: 2, ..recurring }]),
+        recurring: list([recurring.clone(), Recurring { key: 2, ..recurring }]),
         parts: list([part.clone(), part]),
         acts: list([Offered { act: ActKind::SetGoal, admission: Admission::Allowed }]),
     }
@@ -614,15 +653,12 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     p.needs.budget = 2;
     p.funding = Budget { total: 2, own: 0, ended: 0, reserved: 0, left: 2, funder: Actor::Party(7) };
     p.action = ProposalAction::Batch {
-        tasks: list([ProposedTask {
-            local: 1,
-            spec: specification(text(b"Resolve incident")),
-            executor: Executor::Procedure { connector: 2, kind: 7 },
-            budget: 2,
-            deadline: None,
-            dependencies: list([]),
-            grants: list([]),
-        }]),
+        tasks: list([batch_task(
+            1,
+            specification(text(b"Resolve incident")),
+            OwnerExecutor::Procedure { connector: 2, code: 7 },
+            2,
+        )]),
         own: true,
     };
     world
