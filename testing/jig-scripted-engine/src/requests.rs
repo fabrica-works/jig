@@ -187,9 +187,9 @@ impl<A: crate::Application> Engine<A> {
             }
             let waiting = match value {
                 ReadValue::Proposal(value) => Some(&value.waiting),
-                ReadValue::OwnerProposal(_) => None,
                 ReadValue::Escalation(value) => Some(&value.waiting),
-                ReadValue::Frame(_)
+                ReadValue::OwnerProposal(_)
+                | ReadValue::Frame(_)
                 | ReadValue::Task(_)
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)
@@ -467,12 +467,12 @@ fn ending(value: &ReadValue) -> Option<Ending> {
             jig_client::contract::TaskResult::Ending(ending) => Some(Ending::Task(ending.clone())),
         },
         ReadValue::Proposal(v) => v.ending.clone(),
-        ReadValue::OwnerProposal(_) => None,
         ReadValue::Escalation(v) => v.ending.clone(),
         ReadValue::Question(v) => v.ending.clone(),
         ReadValue::PersonTask(v) => v.ending.clone(),
         ReadValue::Result(v) => Some(v.ending.clone()),
-        ReadValue::Frame(_)
+        ReadValue::OwnerProposal(_)
+        | ReadValue::Frame(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
         | ReadValue::Activity(_)

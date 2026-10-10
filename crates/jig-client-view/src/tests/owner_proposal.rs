@@ -29,9 +29,9 @@ fn part() -> OwnerPart {
 fn authority() -> OwnerAuthorityDocument {
     let mut grants = List::with_capacity(3);
     let mut notes = List::with_capacity(3);
-    for _ in 0..3 {
+    for _ in 0_u32..3 {
         let mut segments = List::with_capacity(3);
-        for _ in 0..3 {
+        for _ in 0_u32..3 {
             segments.push(copy_of(&[255; 32])).unwrap();
         }
         let pattern = OwnerPattern { segments, last: OwnerPatternEnd::Open(copy_of(&[0; 32])) };
@@ -65,7 +65,7 @@ fn state(words: &[u8], cut: bool) -> OwnerAmendmentState {
     let mut dependencies = List::with_capacity(3);
     for n in 0..3 {
         parameters.push(ParameterDocument::Bytes { name: n, value: doc(&[255; 32], true) }).unwrap();
-        inputs.push(u64::MAX - u64::from(n)).unwrap();
+        inputs.push(u64::MAX.checked_sub(u64::from(n)).unwrap()).unwrap();
         dependencies.push(u64::from(n)).unwrap();
     }
     OwnerAmendmentState {
@@ -132,8 +132,8 @@ fn words(selected: bool) -> Words {
                 languages: 2,
                 phrases: crate::owner_words::phrase_count(),
                 holes: 4,
-                segments: 10000,
-                text_bytes: 200000,
+                segments: 10_000,
+                text_bytes: 200_000,
                 hole_bytes: 256,
             },
         )
@@ -184,7 +184,7 @@ fn batch() -> List<ProposedTask> {
     for n in 0..3 {
         let a = state(b"task effective context", true);
         let mut resources = List::with_capacity(3);
-        for _ in 0..3 {
+        for _ in 0_u32..3 {
             resources.push(part()).unwrap();
         }
         tasks
@@ -249,12 +249,12 @@ fn owner_proposal_five_whole_actions_keep_effect_coordinates_release_hold_links_
         assert!(has(&tree, b"Proposal project: 4294967295"));
         assert!(has(&tree, b"whole proposal reason"));
         for node in tree.nodes() {
-            if let Some(slot) = node.slot {
-                if let Some(raw) = bindings.owner_part(slot.token) {
-                    assert_eq!(raw.connector, u16::MAX);
-                    assert_eq!(raw.kind, OwnerPartKind::Outbox);
-                    assert_eq!(raw, &part());
-                }
+            if let Some(slot) = node.slot
+                && let Some(raw) = bindings.owner_part(slot.token)
+            {
+                assert_eq!(raw.connector, u16::MAX);
+                assert_eq!(raw.kind, OwnerPartKind::Outbox);
+                assert_eq!(raw, &part());
             }
         }
         match &v.action {
@@ -381,18 +381,16 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     assert!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..limits() }).is_none());
     assert!(view::worst_case(&jig_client::Limits { text: u32::MAX, ..limits() }, &w).is_none());
     let id = crate::owner_proposal_words::ProposalPhrase::Attempt.id();
-    assert!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).is_err());
-    assert!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).is_ok());
+    assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), crate::phrases::Invalid::Values { id });
+    assert_eq!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
     let short = crate::Limits { nodes: tree.len() - 1, ..capacity(f) };
-    assert!(
-        std::panic::catch_unwind(|| {
-            let mut b = Builder::new(&short);
-            let mut bindings = JigBindings::new(f.bindings, 256);
-            view::render(&mut b, &Domain::new(&limits(), 1), &v, &w, &mut bindings);
-            b.finish()
-        })
-        .is_err()
-    );
+    let _refusal = std::panic::catch_unwind(|| {
+        let mut b = Builder::new(&short);
+        let mut bindings = JigBindings::new(f.bindings, 256);
+        view::render(&mut b, &Domain::new(&limits(), 1), &v, &w, &mut bindings);
+        b.finish()
+    })
+    .unwrap_err();
 }
 #[test]
 fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current_facts_and_checked_confirmation() {
@@ -425,7 +423,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             }
         }
     }
-    let mut maker_keys = Vec::new();
+    let mut maker_keys = List::with_capacity(2);
     for maker in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
         let mut v = source(OwnerProposalAction::Release {
             task: OwnerTaskLink::Stored { number: 8, status: None },
@@ -460,7 +458,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             }
             assert_eq!(jig_client::objects::proposal::owner_facts(client.objects().get(id).unwrap()), Some(&v));
         }
-        maker_keys.push(expected.unwrap());
+        maker_keys.push(expected.unwrap()).unwrap();
         super::cards::drive(&mut client, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Accept } });
         assert_eq!(client.confirmation().unwrap().revision, None);
         let mut b = Builder::new(&crate::Limits { nodes: f.nodes + 100, ..capacity(f) });
@@ -473,5 +471,5 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
         super::cards::drive(&mut client, Event::Act { act: Act::Dismiss });
         assert!(client.confirmation().is_none());
     }
-    assert_ne!(maker_keys[0], maker_keys[1]);
+    assert_ne!(maker_keys.get(0).unwrap(), maker_keys.get(1).unwrap());
 }

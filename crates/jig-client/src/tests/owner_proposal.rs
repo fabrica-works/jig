@@ -1,3 +1,8 @@
+#![expect(
+    clippy::disallowed_methods,
+    clippy::wildcard_enum_match_arm,
+    reason = "ordinary native proofs query original keyed requests and select the three offered decisions"
+)]
 use super::{
     objects::{live, read_token, text, watched},
     spine::drive,
@@ -69,7 +74,10 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
         for (id, request) in pending.into_boxed() {
             drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() });
             assert_eq!(domain.objects.get(id).unwrap().answer, Some(answer.clone()));
-            assert!(matches!(domain.objects.get(id).unwrap().card, Card::Leaving { .. }));
+            assert!(match domain.objects.get(id).unwrap().card {
+                Card::Leaving { .. } => true,
+                Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Deciding { .. } => false,
+            });
             drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Refused(Refusal::KeyConflict) });
             assert_eq!(domain.objects.get(id).unwrap().answer, Some(answer.clone()));
         }
@@ -87,7 +95,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
         Time::ZERO,
         Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(original.clone()))) },
     );
-    assert!(!out.iter().any(|r| matches!(r, Request::ShowPart { .. } | Request::Send { .. })));
+    assert!(!out.iter().any(|r| side_or_send(r)));
     let id = domain.objects.find(key).unwrap();
     assert_eq!(objects::proposal::owner_facts(domain.objects.get(id).unwrap()), Some(&original));
     let mut changed = original.clone();
@@ -118,7 +126,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
     changed.acts = List::with_capacity(2);
     assert!(domain.objects.put(key, Body::OwnerProposal(Box::new(changed.clone()))));
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-    assert!(!out.iter().any(|r| matches!(r, Request::Send { .. })));
+    assert!(!out.iter().any(|r| sent(r)));
     assert_eq!(objects::proposal::owner_facts(domain.objects.get(id).unwrap()), Some(&changed));
     assert_eq!(
         domain.confirmation().unwrap().missing,
@@ -139,11 +147,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
     drive(&mut control, Time::ZERO, Event::Act { act: Act::Intend { object: old_id.token(), act: ActKind::Accept } });
     old.acts.clear();
     assert!(control.objects.put(old_key, Body::Proposal(Box::new(old))));
-    assert!(
-        !drive(&mut control, Time::ZERO, Event::Act { act: Act::Confirm })
-            .iter()
-            .any(|r| matches!(r, Request::Send { .. }))
-    );
+    assert!(!drive(&mut control, Time::ZERO, Event::Act { act: Act::Confirm }).iter().any(|r| sent(r)));
     assert_eq!(control.confirmation().unwrap().missing, domain.confirmation().unwrap().missing);
     assert_eq!(control.objects.get(old_id).unwrap().card, domain.objects.get(id).unwrap().card);
     for admission in
@@ -152,11 +156,14 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
         changed.acts.push(Offered { act: ActKind::Reject, admission }).unwrap();
         assert!(domain.objects.put(key, Body::OwnerProposal(Box::new(changed.clone()))));
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Reject } });
-        assert!(
-            !drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })
-                .iter()
-                .any(|r| matches!(r, Request::Send { .. }))
-        );
+        assert!(!drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).iter().any(|r| sent(r)));
         changed.acts.clear();
     }
+}
+
+fn sent(request: &Request) -> bool {
+    if let Request::Send { .. } = request { true } else { false }
+}
+fn side_or_send(request: &Request) -> bool {
+    if let Request::ShowPart { .. } = request { true } else { sent(request) }
 }
