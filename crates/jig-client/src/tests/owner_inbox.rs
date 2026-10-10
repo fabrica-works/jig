@@ -299,3 +299,62 @@ fn owner_inbox_superseded_query_terminal_retires_without_replacing_the_new_filte
     assert!(!domain.inbox().needs_window.cut);
     assert_eq!(domain.inbox().needs_window.query, None);
 }
+
+#[test]
+fn owner_inbox_live_supplied_cursor_roots_control_membership_without_reinterpreting_historical_context() {
+    let mut page = PageInbox::new(2);
+    let mut a = entry(3, OwnerInboxObject::Question { message: 5 });
+    a.cursor = OwnerInboxCursor::Inbox { task: 3, object: a.object, at: None };
+    let mut b = entry(4, OwnerInboxObject::Escalation { revision: u64::MAX });
+    b.cursor = OwnerInboxCursor::Number { number: 4 };
+    let mut source = whole(list([a.clone(), b.clone()]), List::with_capacity(2));
+    source.selection = Some(list([
+        OwnerInboxSelection { cursor: a.cursor, goals: list([3, 77, 88, u64::MAX]) },
+        OwnerInboxSelection { cursor: b.cursor, goals: List::with_capacity(4) },
+    ]));
+    for goal in [3, 77, 88, u64::MAX] {
+        page.filter(Filter { project: None, kind: None, goal: Some(goal) });
+        page.owner(Box::new(source.clone()));
+        assert!(!page.goal_context_pending);
+        assert_eq!(page.rows.as_slice(), &[InboxRow::Owner(Box::new(a.clone()))]);
+    }
+    page.filter(Filter { project: None, kind: None, goal: Some(4) });
+    assert!(!page.goal_context_pending);
+    assert!(page.rows.is_empty()); // b's task number supplies no inferred membership.
+    page.filter(Filter { project: None, kind: None, goal: Some(77) });
+    let query = Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: Some(77), after: None };
+    let mut stored = entry(9, OwnerInboxObject::Question { message: 1 });
+    stored.cursor = OwnerInboxCursor::Number { number: 9 };
+    let retained = list([OwnerInboxSelection { cursor: stored.cursor, goals: list([9, 77]) }]);
+    page.owner_page(
+        InboxReadGroup::Needs,
+        query.clone(),
+        OwnerInboxPage {
+            selection: Some(retained.clone()),
+            cut: true,
+            rows: list([stored.clone()]),
+            before: None,
+            after: None,
+        },
+    );
+    assert_eq!(page.rows.len(), 2);
+    assert_eq!(page.needs_window.selection, Some(retained.clone()));
+    let mut conflicting = whole(list([stored.clone()]), List::with_capacity(2));
+    conflicting.selection = Some(list([OwnerInboxSelection { cursor: stored.cursor, goals: list([9, 88]) }]));
+    page.owner(Box::new(conflicting));
+    assert!(!page.goal_context_pending);
+    assert!(page.rows.is_empty()); // Current watch is an actual negative, not a guessed one.
+    assert!(page.needs_window.rows.is_empty());
+    assert_eq!(page.needs_window.query, Some(query));
+    assert_eq!(page.needs_window.selection, Some(retained));
+    source.selection = Some(list([OwnerInboxSelection {
+        cursor: OwnerInboxCursor::Inbox { task: 3, object: a.object, at: Some(Wall::EPOCH) },
+        goals: list([77]),
+    }]));
+    page.owner(Box::new(source));
+    assert!(page.goal_context_pending); // Equal raw identity does not replace the original cursor association.
+    assert!(page.rows.is_empty());
+    page.owner(Box::new(whole(List::with_capacity(2), List::with_capacity(2))));
+    assert!(!page.goal_context_pending);
+    assert!(page.rows.is_empty());
+}

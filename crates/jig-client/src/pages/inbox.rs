@@ -7,7 +7,7 @@ use crate::{
     address::{Address, ProjectSection},
     contract::{
         Count, Cursor, InboxDocument, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, InboxRow, Needs, ObjectKey,
-        OwnerInbox, OwnerInboxPage, OwnerInboxSelection, Read,
+        OwnerInbox, OwnerInboxEntry, OwnerInboxPage, OwnerInboxSelection, Read,
     },
 };
 use alloc::boxed::Box;
@@ -47,7 +47,7 @@ impl InboxWindow {
         }
     }
     // Read rows past the watch remain; duplicate snapshots never resurrect a removed live key.
-    fn past(&mut self, live: &List<InboxRow>, goal: Option<u64>) {
+    fn past(&mut self, live: &List<InboxRow>, goal: Option<u64>, document: Option<&InboxDocument>) {
         if self.rows.is_empty() {
             return;
         }
@@ -58,7 +58,7 @@ impl InboxWindow {
             for current in live {
                 let membership_known = match current {
                     InboxRow::Entry(_) => true,
-                    InboxRow::Owner(_) => goal.is_none(),
+                    InboxRow::Owner(value) => owner_membership(value, goal, document).is_some(),
                 };
                 if current.identity() == row.identity() && membership_known {
                     watched = true;
@@ -89,7 +89,7 @@ pub struct Inbox {
     pub filter: Filter,
     /// Whole latest source; exact owner aggregates never become four counters.
     pub document: Option<InboxDocument>,
-    /// Live owner goal membership awaits a separately supplied source context.
+    /// A selected live goal has no supplied context for at least one row.
     pub goal_context_pending: bool,
     pub needs: Needs,
     pub updates: Count,
@@ -130,9 +130,7 @@ impl Inbox {
     pub fn includes(&self, entry: &InboxRow) -> bool {
         let membership = match entry {
             InboxRow::Entry(value) => self.filter.goal.is_none() || self.filter.goal == value.goal,
-            // Absence of source ancestry is never asserted to be non-membership.
-            // This incomplete live path is explicitly exposed to the view.
-            InboxRow::Owner(_) => self.filter.goal.is_none(),
+            InboxRow::Owner(value) => owner_membership(value, self.filter.goal, self.document.as_ref()) == Some(true),
         };
         (self.filter.project.is_none() || self.filter.project == entry.project())
             && (self.filter.kind.is_none() || self.filter.kind == Some(entry.group()))
@@ -176,8 +174,8 @@ impl Inbox {
             self.live.push(InboxRow::Entry(Box::new(entry))).expect("whole live source fits");
         }
         self.live_more = more;
-        self.needs_window.past(&self.live, self.filter.goal);
-        self.updates_window.past(&self.live, self.filter.goal);
+        self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref());
+        self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref());
         self.merge();
     }
     /// A read terminal moves only its group's rows and cursor.
@@ -193,8 +191,8 @@ impl Inbox {
         window.after = page.after;
         window.more = window.after.is_some();
         match group {
-            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal),
-            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal),
+            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref()),
+            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref()),
         }
         self.merge();
     }
@@ -210,8 +208,8 @@ impl Inbox {
             }
         }
         self.document = Some(InboxDocument::Owner(value));
-        self.needs_window.past(&self.live, self.filter.goal);
-        self.updates_window.past(&self.live, self.filter.goal);
+        self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref());
+        self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref());
         self.merge();
     }
     /// The source selected these rows using the original query; no guessed goal
@@ -229,8 +227,8 @@ impl Inbox {
         window.more = window.after.is_some();
         window.query = Some(query);
         match group {
-            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal),
-            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal),
+            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref()),
+            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref()),
         }
         self.merge();
     }
@@ -239,7 +237,10 @@ impl Inbox {
         self.goal_context_pending = false;
         for entry in &self.live {
             match entry {
-                InboxRow::Owner(_) => self.goal_context_pending |= self.filter.goal.is_some(),
+                InboxRow::Owner(value) => {
+                    self.goal_context_pending |=
+                        owner_membership(value, self.filter.goal, self.document.as_ref()).is_none();
+                }
                 InboxRow::Entry(_) => {}
             }
             if self.includes(entry) {
@@ -281,6 +282,30 @@ impl Inbox {
             }
         }
     }
+}
+// Match the original cursor, never the card key, Chip, or current requester tree.
+// A missing association remains unknown; an associated empty root list is a
+// supplied negative membership answer. Historical pages keep their own query.
+fn owner_membership(entry: &OwnerInboxEntry, goal: Option<u64>, document: Option<&InboxDocument>) -> Option<bool> {
+    let goal = match goal {
+        Some(goal) => goal,
+        None => return Some(true),
+    };
+    let selection = match document {
+        Some(InboxDocument::Owner(value)) => value.selection.as_ref()?,
+        Some(InboxDocument::Entry(_)) | None => return None,
+    };
+    for context in selection {
+        if context.cursor == entry.cursor {
+            for root in &context.goals {
+                if *root == goal {
+                    return Some(true);
+                }
+            }
+            return Some(false);
+        }
+    }
+    None
 }
 /// Whether an inbox kind holds work up.
 #[must_use]
