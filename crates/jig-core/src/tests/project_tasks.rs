@@ -159,3 +159,87 @@ fn filtered_task_watches_coalesce_enter_leave_and_ending_then_revoke_visibility(
     let Held::WatchEnded { why, .. } = held.as_ref() else { panic!("watch ended") };
     assert_eq!(*why, views::End::NotAllowed);
 }
+
+#[test]
+fn supplied_ended_filter_preserves_its_owner_facts_and_returns_an_empty_live_project_list() {
+    let (core, limits) = fixture();
+    let owner =
+        TaskFilter { executor: Some(tasks::Executor::Agent { charter: 1 }), goal: Some(1), asked_by_me: true, ..ALL };
+    let live = rows(&core, &limits, owner, window());
+    assert_eq!(live.rows.len(), 1);
+    assert_eq!(live.rows.get(0).expect("live goal").chip.number, 1);
+    assert!(!live.more);
+
+    let ended = TaskFilter { phase: Some(TaskPhase::Ended), ..owner };
+    let subject = Subject::Tasks { project: 1, filter: ended };
+    for phase in [TaskPhase::Ended, TaskPhase::Done, TaskPhase::Failed, TaskPhase::Cancelled] {
+        let filter = TaskFilter { phase: Some(phase), ..owner };
+        let selected = Subject::Tasks { project: 1, filter };
+        assert_eq!(subject == selected, phase == TaskPhase::Ended, "selectors keep their own identity");
+        for after in [None, Some(Cursor::Number { number: 3 })] {
+            let value = rows(&core, &limits, filter, Window { rows: 2, after });
+            assert_eq!(value.project, 1);
+            assert_eq!(value.filter, filter, "the complete supplied filter is returned unchanged");
+            assert!(value.rows.is_empty());
+            assert!(!value.more, "the live list has no terminal page to continue");
+        }
+    }
+    assert_eq!(
+        make(&core, &limits, 1, &Subject::Tasks { project: 2, filter: ended }, &window()),
+        Err(Missing::NotAllowed),
+    );
+}
+
+#[test]
+fn an_ended_task_watch_stays_empty_when_a_live_task_ends() {
+    let (mut core, limits) = fixture();
+    let watcher = Token::new(30);
+    let filter = TaskFilter { phase: Some(TaskPhase::Ended), ..ALL };
+    let initial = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch {
+            watcher,
+            sign_in: 10,
+            subject: Subject::Tasks { project: 1, filter },
+            window: Window { rows: 2, after: None },
+        },
+    );
+    let Request::Held(held) = &initial[0] else { panic!("held document") };
+    let Held::Delivery { watcher: delivered, document } = held.as_ref() else { panic!("delivery") };
+    assert_eq!(*delivered, watcher);
+    let Document::Tasks(value) = document.as_ref() else { panic!("tasks") };
+    assert_eq!(value.filter, filter);
+    assert!(value.rows.is_empty());
+    assert!(!value.more);
+
+    at(
+        &mut core,
+        &limits,
+        50,
+        Event::Tasks(tasks::Event::Control {
+            reply_to: ReplyTo::new(Token::new(60)),
+            by: tasks::Party::Person(1),
+            task: 3,
+            control: tasks::Control::Cancel { reason: Box::new([]) },
+        }),
+    );
+    at(&mut core, &limits, 60, Event::Tasks(tasks::Event::EffectsSettled { task: 3 }));
+    at(&mut core, &limits, 70, Event::Tasks(tasks::Event::Settled { task: 3 }));
+    finish_watch_outputs(&mut core, &limits);
+    let live = rows(&core, &limits, ALL, Window { rows: 3, after: None });
+    assert_eq!(live.rows.len(), 2);
+    for row in &live.rows {
+        assert_ne!(row.chip.number, 3);
+    }
+
+    let current = watch_outputs(&mut core, &limits, Event::Delivered { watcher });
+    let Request::Held(held) = &current[0] else { panic!("held current document") };
+    let Held::Delivery { watcher: delivered, document } = held.as_ref() else { panic!("current delivery") };
+    assert_eq!(*delivered, watcher);
+    let Document::Tasks(value) = document.as_ref() else { panic!("tasks") };
+    assert_eq!(value.project, 1);
+    assert_eq!(value.filter, filter, "the generic selector stays generic after cancellation");
+    assert!(value.rows.is_empty(), "ending does not turn the live collection into history");
+    assert!(!value.more);
+}

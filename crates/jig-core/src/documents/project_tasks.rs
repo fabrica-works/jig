@@ -30,6 +30,8 @@ pub enum TaskPhase {
     Closing,
     /// A hold prevents progress.
     Held,
+    /// Ended without selecting a terminal outcome; absent from the live list.
+    Ended,
     /// Successfully ended; absent from the live list.
     Done,
     /// Failed; absent from the live list.
