@@ -272,6 +272,17 @@ fn owner_amendment_address_taker_spec_wake_and_opaque_authority_keep_full_indepe
             .map(|r| r.text.as_ref())
             .collect();
         assert_eq!(input_order.as_ref(), [b"Input task 9".as_slice(), b"Input task 18446744073709551615"].as_slice());
+        for text in [
+            b"Connector: 65535".as_slice(),
+            b"Kind: 65535",
+            b"Connector: 7",
+            b"Deadline: 18446744073709551615",
+            b"Does not wake",
+            b"Wakes immediately",
+            b"Wakes after 4294967295 messages or 18446744073709551615 ns of oldest message age",
+        ] {
+            assert!(has(&tree, text), "each nested authority and wake scalar is displayed whole");
+        }
         assert_eq!(value.clone().addressed, Some(address));
         assert_eq!(
             value.authority.authority.grants.get(0).unwrap().pattern.segments.get(1).unwrap().as_ref(),
