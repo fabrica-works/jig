@@ -104,7 +104,7 @@ fn answer(value: ApplicationOutcome, words: &jig_client_view::words::Words) -> T
     render::answer(&mut b, &ConnectorAnswer { value }, words);
     b.close();
     let tree = b.finish();
-    assert!(tree.len() <= render::answer_nodes() + 1);
+    assert!(tree.len() <= render::answer_nodes().saturating_add(1));
     tree
 }
 fn contains(tree: &Tree, value: &[u8]) -> bool {
@@ -439,14 +439,12 @@ fn connector_values_view_selected_checked_language_covers_owner_values_and_reord
             }]);
         }
     }
-    assert!(
-        Phrasebook::load(
-            words::shapes(phrases::jig::shapes(64)),
-            Box::new([invalid]),
-            &PhraseLimits { languages: 1, phrases: count, holes: 3, segments: 3000, text_bytes: 30000, hole_bytes: 64 }
-        )
-        .is_err()
-    );
+    Phrasebook::load(
+        words::shapes(phrases::jig::shapes(64)),
+        Box::new([invalid]),
+        &PhraseLimits { languages: 1, phrases: count, holes: 3, segments: 3000, text_bytes: 30000, hole_bytes: 64 },
+    )
+    .unwrap_err();
 }
 #[test]
 fn connector_values_view_the_capacity_envelope_covers_full_rows_paths_and_escaped_segments() {
@@ -454,7 +452,7 @@ fn connector_values_view_the_capacity_envelope_covers_full_rows_paths_and_escape
     let full_path = || Path::new(list(2, [Box::<[u8]>::from([0xff; 16]), Box::<[u8]>::from([0xff; 16])]), 16).unwrap();
     let mut resources = List::with_capacity(3);
     let mut effects = List::with_capacity(3);
-    for _ in 0..3 {
+    for _ in 0_u32..3 {
         let mut value = resource();
         value.path = full_path();
         resources.push(value).unwrap();
@@ -486,46 +484,43 @@ fn connector_values_view_exact_core_refusals_cover_all_admission_categories_and_
     use application_core::{DisposalIssue, Lack, LimitKind, Refusal};
     let words = words::english(64).unwrap();
     for (which, label) in [
-        (LimitKind::Words, "words"),
-        (LimitKind::Identity, "identity"),
-        (LimitKind::Roles, "roles"),
-        (LimitKind::Arithmetic, "arithmetic"),
-        (LimitKind::Duplicate, "duplicate"),
-        (LimitKind::Empty, "empty"),
-        (LimitKind::Batch, "batch"),
-        (LimitKind::ProjectLiveTasks, "project live tasks"),
-        (LimitKind::LiveTasks, "live tasks"),
-        (LimitKind::Tree, "tree"),
-        (LimitKind::Depth, "depth"),
-        (LimitKind::Delegates, "delegates"),
-        (LimitKind::Subscription, "subscription"),
-        (LimitKind::Dependencies, "dependencies"),
-        (LimitKind::Cycle, "cycle"),
-        (LimitKind::Spec, "spec"),
-        (LimitKind::Contract, "contract"),
-        (LimitKind::Authority, "authority"),
-        (LimitKind::Inputs, "inputs"),
-        (LimitKind::Attempts, "attempts"),
-        (LimitKind::LiveDelegates, "live delegates"),
-        (LimitKind::Restore, "restore"),
-        (LimitKind::Read, "read"),
-        (LimitKind::Turn, "turn"),
-        (LimitKind::HoldKind, "hold kind"),
-        (LimitKind::HoldTaken, "hold taken"),
-        (LimitKind::Holds, "holds"),
-        (LimitKind::InboxFull, "inbox full"),
-        (LimitKind::Notes, "notes"),
-        (LimitKind::Revision, "revision"),
-        (LimitKind::Question, "question"),
-        (LimitKind::Priority, "priority"),
-        (LimitKind::Policy, "policy"),
-        (LimitKind::Resource, "resource"),
-        (LimitKind::Service, "service"),
+        (LimitKind::Words, "Engine admission limit: words"),
+        (LimitKind::Identity, "Engine admission limit: identity"),
+        (LimitKind::Roles, "Engine admission limit: roles"),
+        (LimitKind::Arithmetic, "Engine admission limit: arithmetic"),
+        (LimitKind::Duplicate, "Engine admission limit: duplicate"),
+        (LimitKind::Empty, "Engine admission limit: empty"),
+        (LimitKind::Batch, "Engine admission limit: batch"),
+        (LimitKind::ProjectLiveTasks, "Engine admission limit: project live tasks"),
+        (LimitKind::LiveTasks, "Engine admission limit: live tasks"),
+        (LimitKind::Tree, "Engine admission limit: tree"),
+        (LimitKind::Depth, "Engine admission limit: depth"),
+        (LimitKind::Delegates, "Engine admission limit: delegates"),
+        (LimitKind::Subscription, "Engine admission limit: subscription"),
+        (LimitKind::Dependencies, "Engine admission limit: dependencies"),
+        (LimitKind::Cycle, "Engine admission limit: cycle"),
+        (LimitKind::Spec, "Engine admission limit: spec"),
+        (LimitKind::Contract, "Engine admission limit: contract"),
+        (LimitKind::Authority, "Engine admission limit: authority"),
+        (LimitKind::Inputs, "Engine admission limit: inputs"),
+        (LimitKind::Attempts, "Engine admission limit: attempts"),
+        (LimitKind::LiveDelegates, "Engine admission limit: live delegates"),
+        (LimitKind::Restore, "Engine admission limit: restore"),
+        (LimitKind::Read, "Engine admission limit: read"),
+        (LimitKind::Turn, "Engine admission limit: turn"),
+        (LimitKind::HoldKind, "Engine admission limit: hold kind"),
+        (LimitKind::HoldTaken, "Engine admission limit: hold taken"),
+        (LimitKind::Holds, "Engine admission limit: holds"),
+        (LimitKind::InboxFull, "Engine admission limit: inbox full"),
+        (LimitKind::Notes, "Engine admission limit: notes"),
+        (LimitKind::Revision, "Engine admission limit: revision"),
+        (LimitKind::Question, "Engine admission limit: question"),
+        (LimitKind::Priority, "Engine admission limit: priority"),
+        (LimitKind::Policy, "Engine admission limit: policy"),
+        (LimitKind::Resource, "Engine admission limit: resource"),
+        (LimitKind::Service, "Engine admission limit: service"),
     ] {
-        expect(
-            &answer(ApplicationOutcome::CoreRefused { why: Refusal::Limit { which } }, &words),
-            &[format!("Engine admission limit: {label}").as_bytes()],
-        );
+        expect(&answer(ApplicationOutcome::CoreRefused { why: Refusal::Limit { which } }, &words), &[label.as_bytes()]);
     }
     for (proposable, label) in [
         (None, b"Proposal eligibility not supplied".as_slice()),
@@ -568,6 +563,7 @@ fn connector_values_view_exact_core_refusals_cover_all_admission_categories_and_
 #[test]
 fn connector_values_view_all_sparse_authority_categories_keep_absent_requested_facts_absent() {
     use application_core::{Lack, Refusal};
+    use jig_client::contract::{Lacking, Refusal as ClientRefusal};
     let words = words::english(64).unwrap();
     let cases = [
         (Lack::Approver, b"Proposal approval authority is missing".as_slice()),
@@ -598,7 +594,6 @@ fn connector_values_view_all_sparse_authority_categories_keep_absent_requested_f
         assert!(!contains(&tree, b"Requires effect kind"), "a raw kind carries no invented connector/path grant");
         assert!(!contains(&tree, b"Needs 0 tasks"));
     }
-    use jig_client::contract::{Lacking, Refusal as ClientRefusal};
     assert_eq!(
         crate::connector_values_refusal::refusal(Refusal::Authority {
             lacking: Lack::Tasks { left: 9 },
