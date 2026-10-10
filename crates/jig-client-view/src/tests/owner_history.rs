@@ -646,9 +646,9 @@ fn owner_history_composed_normal_book_prices_every_entry_segment_literal_and_che
     let entries = u32::try_from(language.phrases.len()).unwrap();
     let mut segments = 0_u32;
     let mut literals = 0_u32;
-    let mut holes = 0_u8;
+    let mut holes = 0_u16;
     for shape in &shapes {
-        holes = holes.max(u8::try_from(shape.holes.len()).unwrap());
+        holes = holes.max(u16::try_from(shape.holes.len()).unwrap());
     }
     for phrase in &language.phrases {
         for form in &phrase.forms {
