@@ -173,6 +173,8 @@ pub enum ReadValue {
     Activity(Box<ActivityPage>),
     /// Inbox entries.
     Inbox(Box<InboxPage>),
+    /// Exact owner Inbox rows selected under the original query.
+    OwnerInbox(Box<super::OwnerInboxPage>),
     /// Conversations.
     Conversations(Box<ConversationPage>),
     /// Goals.

@@ -42,6 +42,8 @@ pub enum Delivery {
     Chips(List<Chip>),
     /// The inbox.
     Inbox(Box<Inbox>),
+    /// Whole exact owner Inbox, preserving both allocated groups.
+    OwnerInbox(Box<super::OwnerInbox>),
     /// The live goals.
     Goals(Box<Goals>),
     /// Filtered live project tasks.
