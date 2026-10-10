@@ -10,4 +10,4 @@ pub use harness::{App, ClientId, Fault, Front, FrontFault, Outcome, Settings, Un
 pub use scripted::Scripted;
 pub use test::Test;
 
-mod observe;
+pub mod observe;

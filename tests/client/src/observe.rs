@@ -1,4 +1,4 @@
-//! The test application's public document and accessibility vocabulary.
+//! Shared jig observations and the Test application's family vocabulary.
 #![allow(clippy::wildcard_imports, reason = "boundary adapter covers the owner vocabulary")]
 use crate::harness::{CardKey, CardSeen, Receipt, Seen, Sent};
 use jig_client::contract::*;
@@ -7,6 +7,7 @@ use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_test_client_domain::{self as domain, Event, Request, family};
 use skein_lib::RequestEnvelope;
 
+#[must_use]
 pub fn key(object: ObjectKey) -> CardKey {
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
@@ -19,6 +20,7 @@ pub fn key(object: ObjectKey) -> CardKey {
     };
     CardKey::of(Key { owner: Owner::Jig, kind, a, b })
 }
+#[must_use]
 pub fn sent(request: &Request) -> Option<Sent> {
     let Request::Send { attempt, key: k, ask } = request else {
         return None;
@@ -32,40 +34,46 @@ pub fn sent(request: &Request) -> Option<Sent> {
             Some((0, revision.value)),
             None,
         ),
-        domain::Ask::Jig(ask) => match ask.as_ref() {
-            Ask::Write { task, words, .. } | Ask::AnswerQuestion { task, words, .. } => {
-                (None, None, Some((*task, words.bytes().to_vec())))
-            }
-            Ask::AnswerPerson { task, revision, .. } => {
-                (Some(key(ObjectKey::PersonTask(*task))), Some((3, revision.value)), None)
-            }
-            Ask::Release { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((2, revision.value)), None),
-            Ask::DecideEscalation { task, revision, .. } => {
-                (Some(key(ObjectKey::Escalation(*task))), Some((2, revision.value)), None)
-            }
-            Ask::Amend { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((1, revision.value)), None),
-            Ask::EditNote { project, note, revision, .. } | Ask::DeleteNote { project, note, revision } => {
-                (Some(key(ObjectKey::Note { project: *project, note: *note })), Some((4, revision.value)), None)
-            }
-            Ask::DecideProposal { proposal, .. } => (Some(key(ObjectKey::Proposal(*proposal))), None, None),
-            Ask::StartChat { .. }
-            | Ask::Take { .. }
-            | Ask::HandBack { .. }
-            | Ask::Stop { .. }
-            | Ask::Cancel { .. }
-            | Ask::Close { .. }
-            | Ask::TakeOver { .. }
-            | Ask::SetGoal { .. }
-            | Ask::Prioritise { .. }
-            | Ask::MarkSeen { .. }
-            | Ask::Adopt { .. }
-            | Ask::ChangePolicy { .. }
-            | Ask::SetRoles { .. }
-            | Ask::MakeService { .. }
-            | Ask::SetPool { .. } => (None, None, None),
-        },
+        domain::Ask::Jig(ask) => return Some(jig_sent(*attempt, *k, ask)),
     };
     Some(Sent { attempt: *attempt, key: *k, card, revision, words })
+}
+/// Observe a keyed jig send without consulting an application's root state.
+#[must_use]
+pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> Sent {
+    let (card, revision, words) = match ask {
+        Ask::Write { task, words, .. } | Ask::AnswerQuestion { task, words, .. } => {
+            (None, None, Some((*task, words.bytes().to_vec())))
+        }
+        Ask::AnswerPerson { task, revision, .. } => {
+            (Some(key(ObjectKey::PersonTask(*task))), Some((3, revision.value)), None)
+        }
+        Ask::Release { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((2, revision.value)), None),
+        Ask::DecideEscalation { task, revision, .. } => {
+            (Some(key(ObjectKey::Escalation(*task))), Some((2, revision.value)), None)
+        }
+        Ask::Amend { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((1, revision.value)), None),
+        Ask::EditNote { project, note, revision, .. } | Ask::DeleteNote { project, note, revision } => {
+            (Some(key(ObjectKey::Note { project: *project, note: *note })), Some((4, revision.value)), None)
+        }
+        Ask::DecideProposal { proposal, .. } => (Some(key(ObjectKey::Proposal(*proposal))), None, None),
+        Ask::StartChat { .. }
+        | Ask::Take { .. }
+        | Ask::HandBack { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Close { .. }
+        | Ask::TakeOver { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Prioritise { .. }
+        | Ask::MarkSeen { .. }
+        | Ask::Adopt { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetRoles { .. }
+        | Ask::MakeService { .. }
+        | Ask::SetPool { .. } => (None, None, None),
+    };
+    Sent { attempt, key: request_key, card, revision, words }
 }
 fn task(t: &Task) -> Receipt {
     let mut revisions = vec![(1, t.spec_revision.value)];
@@ -127,6 +135,7 @@ fn family(doc: &family::Document) -> Receipt {
         revisions: vec![(0, revision.value)],
     }
 }
+#[must_use]
 pub fn received(event: &Event) -> Vec<Receipt> {
     match event {
         Event::Answer { attempt, envelope, answer } => {
@@ -142,25 +151,46 @@ pub fn received(event: &Event) -> Vec<Receipt> {
                 vec![Receipt::Answer { attempt: *attempt, final_answer: *envelope == RequestEnvelope::Final, words }]
             }
         }
-        Event::Jig(jig_client::Event::Read { result: ReadResult::Value(v), .. }) => read(v),
-        Event::Jig(jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(t)), .. }) => vec![task(t)],
-        Event::Jig(jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Frame(f)), .. }) => frame(f),
+        Event::Jig(event) => jig_received(event),
         Event::First(
             domain::first::Event::Read { result: family::ReadResult::Value(doc), .. }
             | domain::first::Event::Watch { event: family::WatchEvent::Delivered(doc), .. },
         ) => vec![family(doc)],
         Event::SignedOut
-        | Event::Jig(
-            jig_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
-            | jig_client::Event::Ended { end: WatchEnd::SignedOut, .. },
-        )
         | Event::First(
             domain::first::Event::Read { result: family::ReadResult::SignedOut, .. }
             | domain::first::Event::Ended { end: family::WatchEnd::SignedOut, .. },
         ) => vec![Receipt::Parked],
-        Event::Start { .. } | Event::Went { .. } | Event::Act { .. } | Event::Jig(_) | Event::First(_) => vec![],
+        Event::Start { .. } | Event::Went { .. } | Event::Act { .. } | Event::First(_) => vec![],
     }
 }
+/// Observe delivered jig documents and sign-in state before the root callback.
+#[must_use]
+pub fn jig_received(event: &jig_client::Event) -> Vec<Receipt> {
+    match event {
+        jig_client::Event::Read { result: ReadResult::Value(value), .. } => read(value),
+        jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => vec![task(value)],
+        jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Frame(value)), .. } => frame(value),
+        jig_client::Event::SignedOut
+        | jig_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
+        | jig_client::Event::Ended { end: WatchEnd::SignedOut, .. } => vec![Receipt::Parked],
+        jig_client::Event::Start { .. }
+        | jig_client::Event::Kept { .. }
+        | jig_client::Event::KeptGone { .. }
+        | jig_client::Event::Went { .. }
+        | jig_client::Event::Act { .. }
+        | jig_client::Event::Ask { .. }
+        | jig_client::Event::Progress { .. }
+        | jig_client::Event::Answered { .. }
+        | jig_client::Event::Read { .. }
+        | jig_client::Event::Watch { .. }
+        | jig_client::Event::Ended { .. }
+        | jig_client::Event::ShowObjects { .. }
+        | jig_client::Event::ObjectsLeft
+        | jig_client::Event::Frame { .. } => vec![],
+    }
+}
+
 fn contains(tree: &Tree, start: usize, end: usize, role: Role, name: &[u8]) -> bool {
     let Some(mut face) = TreeFace::subtree(tree, tree.nodes()[start].id) else {
         return false;
@@ -172,7 +202,9 @@ fn contains(tree: &Tree, start: usize, end: usize, role: Role, name: &[u8]) -> b
             };
             at < end
                 && !tree.nodes()[start + 1..=at].iter().enumerate().any(|(offset, n)| {
-                    n.key.is_some_and(card_key) && start + 1 + offset + usize::try_from(n.size).expect("subtree") > at
+                    (n.key.is_some_and(card_key)
+                        || (n.role == Role::Item && n.key.is_some_and(|key| matches!(key.owner, Owner::Side { .. }))))
+                        && start + 1 + offset + usize::try_from(n.size).expect("subtree") > at
                 })
         }
         Found::Absent | Found::Pending => false,
@@ -198,18 +230,36 @@ fn card_key(k: Key) -> bool {
         Owner::Other { .. } => false,
     }
 }
+#[must_use]
 pub fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
+    enclosing_card(tree, node, card_key)
+}
+/// Find a jig card using only its stable public key and tree ancestry.
+#[must_use]
+pub fn jig_card(tree: &Tree, node: NodeId) -> Option<CardKey> {
+    enclosing_card(tree, node, |key| key.owner == Owner::Jig && key.kind <= 6)
+}
+fn enclosing_card(tree: &Tree, node: NodeId, admits: fn(Key) -> bool) -> Option<CardKey> {
     let at = tree.nodes().iter().position(|n| n.id == node)?;
     tree.nodes()
         .iter()
         .enumerate()
         .take(at + 1)
         .filter(|(i, n)| *i + usize::try_from(n.size).expect("subtree") > at)
-        .filter_map(|(_, n)| n.key.filter(|k| card_key(*k)))
+        .filter_map(|(_, n)| n.key.filter(|k| admits(*k)))
         .next_back()
         .map(CardKey::of)
 }
+#[must_use]
 pub fn seen(tree: &Tree) -> Vec<Seen> {
+    visible(tree, true)
+}
+/// Observe jig cards, delivered words and shell state in a composed public tree.
+#[must_use]
+pub fn jig_seen(tree: &Tree) -> Vec<Seen> {
+    visible(tree, false)
+}
+fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
     let mut seen = Vec::new();
     if [b"Sign in".as_slice(), b"Someone else's work", b"Page missing", b"Client out of date"].iter().any(|name| {
         tree.nodes().iter().any(|n| {
@@ -231,7 +281,9 @@ pub fn seen(tree: &Tree) -> Vec<Seen> {
         };
         let end = at + usize::try_from(node.size).expect("subtree");
         // Plan tree items reuse object identity, but only Item nodes are cards.
-        if card_key(k) && (k.owner != Owner::Jig || node.role == Role::Item) {
+        if (k.owner == Owner::Jig && k.kind <= 6 && node.role == Role::Item)
+            || (include_test_family && k.owner != Owner::Jig && card_key(k))
+        {
             let deciding = contains(tree, at, end, Role::Status, b"In flight")
                 || contains(tree, at, end, Role::Status, b"Retrying")
                 || contains(tree, at, end, Role::Status, b"Parked")
@@ -277,6 +329,7 @@ pub fn seen(tree: &Tree) -> Vec<Seen> {
 }
 
 /// Only decoded public person acts explain changing the displayed window (QUESTIONS 34).
+#[must_use]
 pub fn window_changed(event: &Event) -> bool {
     let act = match event {
         Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_client::Event::Act { act }) => act,
@@ -288,6 +341,11 @@ pub fn window_changed(event: &Event) -> bool {
         | Event::First(_)
         | Event::SignedOut => return false,
     };
+    jig_window_changed(act)
+}
+/// Only decoded jig person acts explain a changed displayed window (QUESTIONS 34).
+#[must_use]
+pub fn jig_window_changed(act: &jig_client::action::Act) -> bool {
     matches!(
         act,
         jig_client::action::Act::Go { .. }
@@ -303,4 +361,46 @@ pub fn window_changed(event: &Event) -> bool {
             | jig_client::action::Act::OpenEnded { .. }
             | jig_client::action::Act::OpenUpdates
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CardKey, CardSeen, Key, Owner, Role, Seen, jig_seen};
+    use jig_client_view::View;
+    use skein_lib::Queue;
+
+    #[test]
+    fn a_nested_application_status_cannot_decide_a_jig_card() {
+        let limits = jig_client_view::Limits {
+            nodes: 16,
+            depth: 4,
+            text_per_node: 64,
+            text_bytes: 1024,
+            drawing_bytes: 0,
+            styles_per_node: 0,
+            patches: 128,
+            bindings: 0,
+            slots: 0,
+            markdown_depth: 1,
+        };
+        let mut view = View::new(&limits);
+        let mut builder = view.builder();
+        let card = Key { owner: Owner::Jig, kind: 0, a: 9, b: 0 };
+        builder.open(Role::Page);
+        builder.open(Role::Item);
+        builder.key(card);
+        builder.open(Role::Item);
+        builder.key(Key { owner: Owner::Side { connector: 77 }, kind: 2, a: 1, b: 5 });
+        builder.open(Role::Status);
+        builder.name(b"Gone");
+        builder.close();
+        builder.close();
+        builder.close();
+        builder.close();
+        view.finish(builder, 1, &mut Queue::with_capacity(limits.patches));
+        let seen = jig_seen(view.tree());
+        assert!(
+            matches!(seen.as_slice(), [Seen::Card { key, state: CardSeen::Waiting, revision: None }] if *key == CardKey::of(card))
+        );
+    }
 }
