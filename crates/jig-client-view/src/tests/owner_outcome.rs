@@ -187,7 +187,7 @@ fn all_committed_owner_outcomes_render_supplied_maximum_numbers() {
     }
 }
 #[test]
-fn proposal_decisions_keep_both_typed_makers_and_every_closed_choice_without_explanation() {
+fn proposal_decisions_keep_both_makers_and_every_closed_choice_without_explanation() {
     let words = words();
     for proposer in [Proposer::Task(9), Proposer::Party(9)] {
         for (choice, wanted) in [
