@@ -1,5 +1,13 @@
-use super::{objects, spine::drive};
-use crate::{Event, Request, contract::*, objects::Body};
+use super::{
+    objects,
+    spine::{drive, open_token},
+};
+use crate::{
+    Event, Request,
+    address::{Address, Place, TaskSection},
+    contract::*,
+    objects::Body,
+};
 use skein_lib::{List, Time};
 
 #[test]
@@ -35,7 +43,19 @@ fn whole_owner_task_resources_survive_reads_without_invented_scope_while_referen
             Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(row))) },
         );
         let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
-        assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(exact))));
+        assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(exact.clone()))));
+        assert!(output.is_empty(), "object reads retain facts without selecting application parts");
+        let opened = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Overview }) },
+        );
+        let watch = open_token(&opened);
+        let output = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(exact))) },
+        );
         if include_reference {
             assert_eq!(
                 output.as_ref(),

@@ -226,6 +226,11 @@ fn document(b: &mut Builder, value: &DocumentText, words: &Words) {
 }
 pub(crate) fn resource(b: &mut Builder, value: &OwnerResourceLine, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Region);
+    let name = words
+        .book
+        .say(words.language, P::Kind.id(), &[Hole::Number(u64::from(value.kind))])
+        .expect("checked resource kind and exact supplied number");
+    b.name(&name.text);
     crate::proposed_task::part(b, &value.part, words, bindings);
     number(b, words, P::Kind, u64::from(value.kind));
     text(b, words, if value.taken { P::Taken } else { P::NotTaken }, &[]);
