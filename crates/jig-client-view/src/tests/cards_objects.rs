@@ -707,7 +707,15 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
             revision: Revision { value: 6 },
             spec: specification(text(b"held specification")),
             instructions: Some(DocumentText::complete(text(b"held instructions"))),
-            wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
+            wake: OwnerWakePolicy {
+                words: WakeRule::Immediate,
+                notices: WakeRule::Never,
+                news: WakeRule::Never,
+                results: ResultsWake::Each,
+                questions: false,
+                answers: false,
+                timers: false,
+            },
             dependencies: list([9]),
             authority: authority(),
             budget: Budget { total: 10, own: 10, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
@@ -750,7 +758,16 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         person_revision: None,
         taken_by: None,
         instructions: Some(DocumentText::complete(text(b"whole task instructions"))),
-        wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
+        wake: OwnerWakePolicy {
+            words: WakeRule::Immediate,
+            notices: WakeRule::Never,
+            news: WakeRule::Never,
+            results: ResultsWake::Each,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        subscriptions: Subscriptions { entries: List::with_capacity(0) },
         result_contract: ResultContract::Report,
         dependencies: list([]),
         cut: false,
@@ -1801,3 +1818,6 @@ mod note_facts;
 
 #[path = "task_links.rs"]
 mod task_links;
+
+#[path = "task_wake.rs"]
+mod task_wake;

@@ -23,9 +23,16 @@ fn full_authority() -> Authority {
     value.note_scopes = list([scope.clone(), scope]);
     value
 }
-fn full_wake() -> WakePolicy {
-    let part = Part::Resource { connector: 2, path: full_path() };
-    WakePolicy { words: true, results: true, topics: list([1, 2]), subscriptions: list([part.clone(), part]) }
+fn full_wake() -> OwnerWakePolicy {
+    OwnerWakePolicy {
+        words: WakeRule::Batch { count: u32::MAX, age: Duration::from_nanos(u64::MAX) },
+        notices: WakeRule::Immediate,
+        news: WakeRule::Batch { count: u32::MAX, age: Duration::from_nanos(u64::MAX) },
+        results: ResultsWake::LastOrFailure,
+        questions: true,
+        answers: true,
+        timers: true,
+    }
 }
 fn full_chip(task: u64) -> Chip {
     Chip {
@@ -280,6 +287,16 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     task.spec = specification(full_text());
     task.instructions = Some(DocumentText { bytes: full_text(), cut: true });
     task.wake = full_wake();
+    task.subscriptions.entries = list([
+        Subscription { number: u64::MAX, kind: SubscriptionKind::Topic { connector: u16::MAX, topic: u64::MAX } },
+        Subscription {
+            number: 2,
+            kind: SubscriptionKind::Timer {
+                at: Wall::from_nanos(u64::MAX),
+                period: Some(Duration::from_nanos(u64::MAX)),
+            },
+        },
+    ]);
     task.authority = full_authority();
     task.dependencies = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
     task.delegates = list([

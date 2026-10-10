@@ -8,7 +8,16 @@ fn full_task() -> jig_client::contract::Task {
     let mut task = stories::task();
     task.chip.title = jig_client::contract::DocumentText::complete(stories::text(&[b't'; 32]));
     task.lineage = jig_client_world::test::list([8, 7]);
-    task.wake.topics = jig_client_world::test::list([1, 2]);
+    task.subscriptions.entries = jig_client_world::test::list([
+        jig_client::contract::Subscription {
+            number: 1,
+            kind: jig_client::contract::SubscriptionKind::Topic { connector: jig_test_client_domain::FIRST, topic: 1 },
+        },
+        jig_client::contract::Subscription {
+            number: 2,
+            kind: jig_client::contract::SubscriptionKind::Topic { connector: jig_test_client_domain::SECOND, topic: 2 },
+        },
+    ]);
     task.parts = jig_client_world::test::list(
         (1..=8).map(|n| jig_client::contract::Part::Panel { connector: jig_test_client_domain::FIRST, task: n }),
     );

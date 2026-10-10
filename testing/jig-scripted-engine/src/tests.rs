@@ -228,11 +228,14 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
             revision: Revision { value: 1 },
             spec: specification(text(b"held work")),
             instructions: Some(DocumentText::complete(text(b""))),
-            wake: WakePolicy {
-                words: true,
-                results: true,
-                topics: List::with_capacity(0),
-                subscriptions: List::with_capacity(0),
+            wake: OwnerWakePolicy {
+                words: WakeRule::Immediate,
+                notices: WakeRule::Never,
+                news: WakeRule::Never,
+                results: ResultsWake::Each,
+                questions: false,
+                answers: false,
+                timers: false,
             },
             dependencies: List::with_capacity(0),
             authority: authority(),
@@ -337,7 +340,16 @@ fn task() -> Task {
         person_revision: None,
         taken_by: None,
         instructions: Some(DocumentText::complete(text(b"instructions"))),
-        wake: WakePolicy { words: true, results: true, topics: list(vec![]), subscriptions: list(vec![]) },
+        wake: OwnerWakePolicy {
+            words: WakeRule::Immediate,
+            notices: WakeRule::Never,
+            news: WakeRule::Never,
+            results: ResultsWake::Each,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        subscriptions: Subscriptions { entries: List::with_capacity(0) },
         result_contract: ResultContract::Report,
         dependencies: list(vec![]),
         cut: false,
@@ -1735,7 +1747,7 @@ fn optional_instruction_sources_price_whole_task_and_steering_at_byte_and_text_b
             revision: Revision { value: 6 },
             spec: row.spec.clone(),
             instructions: None,
-            wake: row.wake.clone(),
+            wake: row.wake,
             dependencies: List::with_capacity(0),
             authority: row.authority.clone(),
             budget: budget(),
@@ -2135,3 +2147,62 @@ mod resource_facts;
 mod note_facts;
 
 mod task_links;
+
+#[test]
+fn task_subscription_capacity_is_priced_separately_from_whole_activation_replacements() {
+    use crate::payload::Payload;
+    let mut row = task();
+    let original = row.clone();
+    let bounds = Bounds::default();
+    let baseline = row.heap(&bounds).unwrap();
+    row.subscriptions.entries = List::with_capacity(4);
+    for kind in [
+        SubscriptionKind::Task { target: u64::MAX, held: true, result: false },
+        SubscriptionKind::Topic { connector: u16::MAX, topic: u64::MAX },
+        SubscriptionKind::Timer { at: Wall::EPOCH, period: None },
+        SubscriptionKind::Timer {
+            at: Wall::from_nanos(u64::MAX),
+            period: Some(skein_lib::Duration::from_nanos(u64::MAX)),
+        },
+    ] {
+        row.subscriptions.entries.push(Subscription { number: u64::MAX, kind }).unwrap();
+    }
+    assert_eq!(row.heap(&bounds).unwrap(), baseline + List::<Subscription>::worst_case(4).unwrap());
+    let exact = u64::try_from(core::mem::size_of::<Task>()).unwrap() + row.heap(&bounds).unwrap();
+    let mut limited = Bounds { document_bytes: exact, ..bounds.clone() };
+    assert!(crate::payload::fits(&row, &limited));
+    limited.document_bytes -= 1;
+    assert!(!crate::payload::fits(&row, &limited));
+    limited.document_bytes = u64::MAX;
+    limited.rows = 3;
+    assert!(!crate::payload::fits(&row, &limited));
+    let mut reserved = original;
+    reserved.subscriptions.entries = List::with_capacity(4);
+    assert_eq!(reserved.heap(&bounds).unwrap(), row.heap(&bounds).unwrap());
+    for results in [ResultsWake::Never, ResultsWake::Each, ResultsWake::LastOrFailure] {
+        let mut change = Amendment {
+            addressed: None,
+            spec: None,
+            wake: Some(OwnerWakePolicy {
+                words: WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::from_nanos(u64::MAX) },
+                notices: WakeRule::Immediate,
+                news: WakeRule::Never,
+                results,
+                questions: true,
+                answers: false,
+                timers: true,
+            }),
+            dependencies: None,
+            authority: None,
+            instructions: None,
+        };
+        let heap = change.heap(&bounds).unwrap();
+        assert_eq!(heap, 0);
+        let size = u64::try_from(core::mem::size_of::<Amendment>()).unwrap();
+        assert!(crate::payload::fits(&change, &Bounds { document_bytes: size, ..bounds.clone() }));
+        assert!(!crate::payload::fits(&change, &Bounds { document_bytes: size - 1, ..bounds.clone() }));
+        change.wake = None;
+        assert_eq!(change.heap(&bounds).unwrap(), heap);
+        assert_eq!(row.subscriptions.entries.capacity(), 4);
+    }
+}

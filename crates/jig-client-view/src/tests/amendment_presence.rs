@@ -91,10 +91,12 @@ fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_i
 fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes() {
     let mut row = task_doc(&[ActKind::Amend]);
     row.dependencies = list([OwnerTaskLink::Live(chip())]);
-    row.wake.topics = list([11, 22]);
-    row.wake.subscriptions =
-        list([Part::Resource { connector: 2, path: list([text(b"actual subscribed path").into_bytes()]) }]);
-    let initial_wake = row.wake.clone();
+    row.wake.notices = WakeRule::Batch { count: 11, age: skein_lib::Duration::from_nanos(22) };
+    row.wake.news = WakeRule::Immediate;
+    row.wake.questions = true;
+    row.subscriptions.entries =
+        list([Subscription { number: 11, kind: SubscriptionKind::Topic { connector: 2, topic: 22 } }]);
+    let initial_wake = row.wake;
     let (mut domain, _) = open(row);
     let words = words();
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
@@ -109,12 +111,12 @@ fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes()
     let tree = dialog(&domain, &words, &mut bindings);
     drive(&mut domain, Event::Act { act: press(&tree, b"Wakes on inbox messages", &mut bindings) });
     let mut wake = initial_wake;
-    wake.words = false;
-    expected.wake = Some(wake.clone());
+    wake.words = WakeRule::Never;
+    expected.wake = Some(wake);
     assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
     let tree = dialog(&domain, &words, &mut bindings);
     drive(&mut domain, Event::Act { act: press(&tree, b"Wakes on a delegate result", &mut bindings) });
-    wake.results = false;
+    wake.results = ResultsWake::Never;
     expected.wake = Some(wake);
     let tree = dialog(&domain, &words, &mut bindings);
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Drop dependency 8")));

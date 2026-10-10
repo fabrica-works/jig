@@ -163,8 +163,10 @@ fn task_pages(words: &Words) {
             WriterSlot { resource: part(), task: 9, attempt: Some(1) },
             WriterSlot { resource: part(), task: 10, attempt: Some(2) },
         ]);
-        doc.wake.topics = list([1, 2]);
-        doc.wake.subscriptions = parts();
+        doc.subscriptions.entries = list([
+            Subscription { number: 1, kind: SubscriptionKind::Topic { connector: 2, topic: 1 } },
+            Subscription { number: 2, kind: SubscriptionKind::Task { target: u64::MAX, held: true, result: true } },
+        ]);
         doc.spend = list([
             SpendLine { task: 9, attempt: Some(1), spent: u64::MAX },
             SpendLine { task: 10, attempt: None, spent: u64::MAX },

@@ -2179,3 +2179,64 @@ fn task_watch_replacements_preserve_requester_kinds_and_missing_link_facts_with_
         }
     }
 }
+
+#[test]
+fn watched_task_policies_replace_every_channel_without_merging_standing_interests() {
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut supplied = super::confirmation::task();
+    for rule in [
+        WakeRule::Never,
+        WakeRule::Immediate,
+        WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::from_nanos(u64::MAX) },
+    ] {
+        for results in [ResultsWake::Never, ResultsWake::Each, ResultsWake::LastOrFailure] {
+            supplied.wake = OwnerWakePolicy {
+                words: rule,
+                notices: rule,
+                news: rule,
+                results,
+                questions: true,
+                answers: false,
+                timers: true,
+            };
+            supplied.subscriptions.entries = List::with_capacity(2);
+            supplied
+                .subscriptions
+                .entries
+                .push(Subscription {
+                    number: u64::MAX,
+                    kind: SubscriptionKind::Topic { connector: u16::MAX, topic: u64::MAX },
+                })
+                .unwrap();
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(supplied.clone()))) },
+            );
+            let id = domain.task_page().header.unwrap();
+            let Some(crate::objects::Body::Task(document)) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole task policy");
+            };
+            assert_eq!(**document, supplied);
+            assert_eq!(document.subscriptions.entries.capacity(), 2);
+            supplied.subscriptions.entries = List::with_capacity(2);
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(supplied.clone()))) },
+            );
+            let Some(crate::objects::Body::Task(document)) = &domain.objects().get(id).unwrap().body else {
+                panic!("new empty interests");
+            };
+            assert_eq!(**document, supplied);
+            assert_eq!(document.subscriptions.entries.capacity(), 2);
+            assert!(document.subscriptions.entries.is_empty());
+            assert_eq!(document.wake.words, rule);
+        }
+    }
+}
