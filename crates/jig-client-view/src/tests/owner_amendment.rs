@@ -305,13 +305,17 @@ fn owner_amendment_address_taker_spec_wake_and_opaque_authority_keep_full_indepe
     assert!(has(&tree, b"Address not supplied"));
     assert!(has(&tree, b"Taker not supplied"));
     assert!(!has(&tree, b"Taken by party: 18446744073709551615"));
+    assert_wake_fields(&mut value, words);
+}
+
+fn assert_wake_fields(value: &mut OwnerAmendmentState, words: &Words) {
     for results in [ResultsWake::Never, ResultsWake::Each, ResultsWake::LastOrFailure] {
         for switches in 0_u8..8 {
             value.wake.results = results;
             value.wake.questions = switches & 1 != 0;
             value.wake.answers = switches & 2 != 0;
             value.wake.timers = switches & 4 != 0;
-            let tree = build(&value, words);
+            let tree = build(value, words);
             assert_eq!(tree.nodes().iter().filter(|n| n.role == crate::Role::Region).count(), 2);
             let result_label: &[u8] = match results {
                 ResultsWake::Never => b"Delegate results do not wake",
@@ -326,6 +330,7 @@ fn owner_amendment_address_taker_spec_wake_and_opaque_authority_keep_full_indepe
         }
     }
 }
+
 #[test]
 fn owner_amendment_selected_normal_words_preserve_checked_captions_numbers_and_nested_fragments() {
     let selected = words(1, true);
