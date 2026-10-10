@@ -120,7 +120,7 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
     let (owner, _) = named(&spawn(&mut agent, &env, start, &mut out));
     let (_, issued) = named(&retry(&mut agent, &mut env, owner, &mut out));
     let call = smith::llm::Said::ToolCall {
-        id: Box::from(&b"opaque-id"[..]),
+        id: Box::from(&[0xff, 0, 0x80][..]),
         name: Box::from(&b"unknown"[..]),
         input: Box::from(&b"{}"[..]),
         call: smith::llm::Decoded::Invalid { problem: smith::llm::Problem::UnknownTool },
@@ -142,7 +142,7 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
                     assert_eq!((*seen, *completion), (owner, issued));
                     assert_eq!(
                         (id.as_ref(), name.as_ref(), input.as_ref()),
-                        (&b"opaque-id"[..], &b"unknown"[..], &b"{}"[..])
+                        (&[0xff, 0, 0x80][..], &b"unknown"[..], &b"{}"[..])
                     );
                     assert_eq!(*provisional, Some(Provisional { turn: 1, retry: 1, offset: 7 }));
                     kinds.push("call");
@@ -165,6 +165,24 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
     let next = &captured;
     assert_eq!(named(&next), (owner, smith::llm::CompletionName { sequence: 2, retry: 0 }));
     assert!(next.contains(&Request::CompletionStarted { client: CLIENT, turn: 2, retry: 0 }));
+    let (_, second_name) = named(next);
+    let second = completed(
+        &mut agent,
+        &env,
+        owner,
+        Box::new([smith::llm::Said::ToolCall {
+            id: Box::from(&[0xff, 0, 0x80][..]),
+            name: Box::from(&b"unknown"[..]),
+            input: Box::from(&b"{}"[..]),
+            call: smith::llm::Decoded::Invalid { problem: smith::llm::Problem::UnknownTool },
+            replay: None,
+        }]),
+        &mut out,
+    );
+    assert_ne!(issued, second_name, "one opaque provider id in another completion names another call");
+    assert!(second.iter().any(|request| matches!(request, Request::Content {
+        content: smith::Content::Call { owner: seen, completion, id, .. }, ..
+    } if *seen == owner && *completion == second_name && id.as_ref() == [0xff, 0, 0x80])));
 }
 
 #[test]

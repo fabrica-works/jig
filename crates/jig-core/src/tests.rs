@@ -2079,6 +2079,7 @@ fn taking_a_changed_delivery_after_signin_expiry_ends_instead_of_making_a_docume
 }
 
 mod activity;
+mod completion_retry;
 mod read_filters;
 mod run_positions;
 fn open_run_watch(core: &mut Core, limits: &Limits, number: u64) {
