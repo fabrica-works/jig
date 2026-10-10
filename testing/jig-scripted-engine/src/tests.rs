@@ -1788,3 +1788,63 @@ fn result_metadata_boxes_price_unfilled_delegate_and_followup_capacity_without_i
 }
 
 mod owner_chip;
+
+#[test]
+fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_run() {
+    use crate::payload::Payload;
+    let name = TurnName { attempt: u64::MAX, number: u32::MAX };
+    let raw = CurrentCall { number: u64::MAX, tool: text(b"raw/tool\xff"), input: text(b"a/b\x00\xfe"), cut: true };
+    let run = RunText {
+        attempt: name.attempt,
+        began: None,
+        turn: name,
+        from: 0,
+        through: 4,
+        text: text(b"live"),
+        cut: false,
+        call: Some(LiveCall::Raw(raw.clone())),
+    };
+    let setup = live_script();
+    let original_bounds = original_bounds;
+    let heap = run.heap(&original_bounds).unwrap();
+    assert_eq!(heap, 18, "four streamed bytes plus nine tool and five input bytes");
+    let exact = u64::try_from(core::mem::size_of::<RunText>()).unwrap() + heap;
+    let mut bounds = original_bounds;
+    bounds.document_bytes = exact;
+    assert!(crate::payload::fits(&run, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&run, &bounds));
+    bounds.document_bytes = exact;
+    bounds.text = 8;
+    assert!(!crate::payload::fits(&run, &bounds), "the whole raw tool must fit its own bound");
+    let mut engine = Engine::new(setup, 26).unwrap();
+    engine.write_live(Time::ZERO, 8, name, None, &text(b"live"), run.call.clone()).unwrap();
+    let held = engine.runs.get(&8).unwrap().clone();
+    assert_eq!(held, run);
+    engine.bounds.document_bytes = exact - 1;
+    assert_eq!(
+        engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(b""), run.call.clone()),
+        Err(Invalid::Payload)
+    );
+    assert_eq!(engine.runs.get(&8), Some(&held));
+    engine.bounds.document_bytes = exact;
+    engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(b""), run.call.clone()).unwrap();
+    assert_eq!(engine.runs.get(&8).unwrap().began, Some(Wall::EPOCH));
+    assert_eq!(engine.runs.get(&8).unwrap().call, run.call);
+    let rich = LiveCall::Decoded(Call {
+        number: u64::MAX,
+        tool: text(b"rich"),
+        input: text(b"input"),
+        outcome: Some(text(b"result")),
+        failed: true,
+        objects: list(vec![ObjectKey::Task(8)]),
+        parts: list(vec![]),
+    });
+    let heap = rich.heap(&original_bounds).unwrap();
+    assert!(heap > 15, "rich allocated object-list capacity remains priced");
+    bounds = original_bounds;
+    bounds.document_bytes = u64::try_from(core::mem::size_of::<LiveCall>()).unwrap() + heap;
+    assert!(crate::payload::fits(&rich, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&rich, &bounds));
+}

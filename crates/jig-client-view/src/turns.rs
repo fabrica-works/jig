@@ -58,13 +58,15 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         b.open(Role::Region);
         b.name(&words.say(JigPhrase::Provisional, &[]));
         words.status(b, JigPhrase::Provisional, &[]);
-        words.wall(b, live.began);
+        if let Some(began) = live.began {
+            words.wall(b, began);
+        }
         crate::markdown::read(live.text.bytes(), 2, b);
         if live.cut {
             words.status(b, JigPhrase::TurnCut, &[]);
         }
         if let Some(value) = &live.call {
-            call::call(b, client, live.name, value, words, bindings);
+            call::live(b, client, live.name, value, words, bindings);
         }
         b.close();
         b.close();

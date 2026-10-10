@@ -5,11 +5,11 @@ use core::mem::size_of;
 use jig_client::contract::{
     Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, AddressChange, Admission, AdmissionLimit,
     Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase,
-    Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider,
+    Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentCall, CurrentHold, Cursor, Decider,
     Decision, Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending, Escalation,
     Executor, FailureClass, FieldRule, Frame, FrameParty, GoalExecutor, GoalLine, GoalPage, GoalProcedure, Goals,
     Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason,
-    Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message,
+    Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveCall, LiveDelegate, Made, Message,
     Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OfferedCharters, OptionLine, Outcome,
     Parameter, ParameterDocument, Part, PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask,
     Phase, PhaseCounts, Policy, Pool, Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey,
@@ -1024,6 +1024,15 @@ impl Payload for Delivery {
             Self::Conversations(value0) => sum(&[value0.heap(bounds)]),
             Self::Run(value0) => sum(&[value0.heap(bounds)]),
             Self::Deployment(value0) => sum(&[value0.heap(bounds)]),
+        }
+    }
+}
+fields!(CurrentCall { number, tool, input, cut });
+impl Payload for LiveCall {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Decoded(call) => call.heap(bounds),
+            Self::Raw(call) => call.heap(bounds),
         }
     }
 }

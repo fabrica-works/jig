@@ -1,8 +1,8 @@
 //! One in-flight document and a dirty mark per watch; contract.md, 7.
 use crate::{Engine, Invalid, Rows, Up, payload, reads::list};
 use jig_client::contract::{
-    Actor, Call, Conversations, Delivery, Goals, Inbox, ObjectKey, Phase, Read, ReadValue, RunText, Subject, TaskLine,
-    Tasks, Text, TurnName, WatchEnd, WatchEvent,
+    Actor, Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, Phase, Read, ReadValue, RunText, Subject,
+    TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
 };
 use skein_lib::{Time, Token, Wall};
 
@@ -375,6 +375,18 @@ impl<A: crate::Application> Engine<A> {
         began: Wall,
         bytes: &Text,
         call: Option<Call>,
+    ) -> Result<(), Invalid> {
+        self.write_live(now, task, turn, Some(began), bytes, call.map(LiveCall::Decoded))
+    }
+    /// Supplies exactly the available wall and raw or decoded provisional call.
+    pub fn write_live(
+        &mut self,
+        now: Time,
+        task: u64,
+        turn: TurnName,
+        began: Option<Wall>,
+        bytes: &Text,
+        call: Option<LiveCall>,
     ) -> Result<(), Invalid> {
         if !self.online(now) {
             return Err(Invalid::Offline);

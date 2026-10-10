@@ -1,7 +1,7 @@
 //! Level-triggered subjects and one-terminal watches; client/domain/contract.md, 7.
 //! Deliveries replace the previous document. Run text alone is offset based and
 //! provisional, and never resets text belonging to an earlier turn.
-use super::{Call, Chip, Conversations, Deployment, Frame, Goals, Inbox, Task, Text, Tree, TurnName};
+use super::{Chip, Conversations, Deployment, Frame, Goals, Inbox, LiveCall, Task, Text, Tree, TurnName};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 /// A live subject followed by one unkeyed watch.
@@ -58,13 +58,13 @@ pub enum Delivery {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RunText {
     pub attempt: u64,
-    pub began: Wall,
+    pub began: Option<Wall>,
     pub turn: TurnName,
     pub from: u32,
     pub through: u32,
     pub text: Text,
     pub cut: bool,
-    pub call: Option<Call>,
+    pub call: Option<LiveCall>,
 }
 
 /// A nonterminal watch event.

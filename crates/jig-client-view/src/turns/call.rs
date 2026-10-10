@@ -7,7 +7,7 @@ use crate::{
 use jig_client::{
     Domain,
     action::Act,
-    contract::{Call, TurnName},
+    contract::{Call, CurrentCall, LiveCall, TurnName},
     conversation::{CallName, Fold},
 };
 pub(super) fn call(
@@ -63,6 +63,52 @@ pub(super) fn call(
     }
     for part in &call.parts {
         cards::common::part(b, part, words, bindings);
+    }
+    b.close();
+}
+
+pub(super) fn live(
+    b: &mut Builder,
+    client: &Domain,
+    turn: TurnName,
+    value: &LiveCall,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    match value {
+        LiveCall::Decoded(value) => call(b, client, turn, value, words, bindings),
+        LiveCall::Raw(value) => raw(b, client, turn, value, words, bindings),
+    }
+}
+fn raw(
+    b: &mut Builder,
+    client: &Domain,
+    turn: TurnName,
+    call: &CurrentCall,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let name = CallName { attempt: turn.attempt, turn: turn.number, call: call.number };
+    let open = client.conversation().fold(name) == Fold::Open;
+    let tool = crate::literal_segment::display(call.tool.bytes());
+    b.open(Role::Region);
+    b.name(&words.say(JigPhrase::CallNumber, &[Hole::Number(call.number)]));
+    words.text(b, JigPhrase::CallNumber, &[Hole::Number(call.number)]);
+    words.text(b, JigPhrase::Tool, &[crate::words::name(&tool)]);
+    let label = words.say(if open { JigPhrase::FoldCall } else { JigPhrase::OpenCall }, &[crate::words::name(&tool)]);
+    b.open(Role::Button);
+    b.name(&label);
+    b.text(Run::Plain, &label);
+    if open {
+        b.state(State::Expanded);
+    }
+    b.bind(bindings.insert(crate::JigMeaning::Action(Act::FoldCall { name, open: !open })));
+    b.close();
+    if open {
+        crate::literal_segment::render(b, call.input.bytes());
+    }
+    if call.cut {
+        words.status(b, JigPhrase::TurnCut, &[]);
     }
     b.close();
 }

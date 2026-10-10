@@ -156,7 +156,7 @@ fn calls_fold_on_the_page_and_engine_objects_share_one_live_card() {
 fn stream(number: u32, from: u32, through: u32, bytes: &[u8], cut: bool) -> RunText {
     RunText {
         attempt: 1,
-        began: Wall::EPOCH,
+        began: Some(Wall::EPOCH),
         turn: TurnName { attempt: 1, number },
         from,
         through,
@@ -259,7 +259,7 @@ fn routed_conversation() {
     );
     assert_eq!(domain.turn_rows().rows.len(), 1);
     let mut live_call = stream(1, 0, 3, b"one", false);
-    live_call.call = Some(engine_call());
+    live_call.call = Some(crate::contract::LiveCall::Decoded(engine_call()));
     let requests = drive(
         &mut domain,
         Time::ZERO,
@@ -768,4 +768,72 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
             }
         }
     }
+}
+
+#[test]
+fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made_values() {
+    use crate::contract::{CurrentCall, LiveCall};
+    let mut c = Conversation::new(9, 4);
+    let name = TurnName { attempt: u64::MAX, number: u32::MAX - 1 };
+    let mut value = stream(name.number, 0, 3, b"one", false);
+    value.attempt = name.attempt;
+    value.turn = name;
+    value.began = None;
+    value.call = Some(LiveCall::Raw(CurrentCall {
+        number: u64::MAX,
+        tool: text(b"raw/tool\xff"),
+        input: text(b"a/b\x00\xfe"),
+        cut: true,
+    }));
+    assert!(c.stream(value.clone(), 100));
+    let held = c.live.get(0).unwrap();
+    assert_eq!(held.began, None);
+    assert_eq!(held.call, value.call);
+    assert!(c.names(4).is_empty());
+    assert!(c.parts(4).is_empty());
+    let call = CallName { attempt: name.attempt, turn: name.number, call: u64::MAX };
+    assert!(c.set_fold(call, Fold::Open));
+    assert!(!c.set_fold(CallName { attempt: 1, ..call }, Fold::Open));
+    value.began = Some(Wall::EPOCH);
+    value.call = Some(LiveCall::Raw(CurrentCall {
+        number: u64::MAX,
+        tool: text(b"raw/tool\xff"),
+        input: text(b"new literal"),
+        cut: false,
+    }));
+    assert!(c.stream(value.clone(), 100));
+    assert_eq!(c.live.get(0).unwrap().began, Some(Wall::EPOCH));
+    assert_eq!(c.live.get(0).unwrap().call, value.call);
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one");
+    value.from = 1;
+    value.through = 5;
+    value.text = text(b"ne++");
+    value.began = None;
+    assert!(c.stream(value.clone(), 100));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one++");
+    assert_eq!(c.live.get(0).unwrap().began, None);
+    assert_eq!(c.live.get(0).unwrap().call, value.call);
+    let later = TurnName { number: u32::MAX, ..name };
+    value.turn = later;
+    value.from = 0;
+    value.through = 4;
+    value.text = text(b"next");
+    assert!(c.stream(value, 100));
+    assert_eq!(c.live.len(), 2);
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one++");
+    assert!(c.moved(1).is_some());
+    let mut committed = calls(1, name.number);
+    if let Activity::Turn { name: committed_name, .. } = &mut committed.event {
+        *committed_name = name;
+    }
+    let mut rows = List::with_capacity(1);
+    rows.push(committed).unwrap();
+    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.live.len(), 1);
+    assert_eq!(c.live.get(0).unwrap().name, later);
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"next");
+    c.end_run();
+    assert!(c.live.is_empty());
+    let reloaded = Conversation::new(9, 4);
+    assert!(reloaded.live.is_empty(), "provisional facts are read again after reload");
 }

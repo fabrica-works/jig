@@ -16,7 +16,7 @@
 use crate::{
     action::End,
     contract::{
-        Activity, ActivityLine, ActivityPage, Block, Call, Cursor, ObjectKey, Part, Read, RunText, Text, TurnName,
+        Activity, ActivityLine, ActivityPage, Block, Cursor, LiveCall, ObjectKey, Part, Read, RunText, Text, TurnName,
     },
     objects::{Objects, Source},
     windows::{Edge, Edges, TurnWindow},
@@ -58,11 +58,11 @@ pub enum Reading {
 #[derive(Debug)]
 pub struct LiveTurn {
     pub name: TurnName,
-    pub began: Wall,
+    pub began: Option<Wall>,
     pub text: Text,
     pub offset: u32,
     pub cut: bool,
-    pub call: Option<Call>,
+    pub call: Option<LiveCall>,
 }
 /// Committed lines and page state for one task conversation.
 #[derive(Debug)]
@@ -286,6 +286,7 @@ impl Conversation {
                 let live = self.live.get_mut(at).expect("live row exists");
                 if value.through <= live.offset {
                     if value.through == live.offset {
+                        live.began = value.began;
                         live.call = value.call;
                     }
                     return true;
@@ -304,6 +305,7 @@ impl Conversation {
                 live.offset = value.through;
                 live.cut =
                     live.cut || value.cut || combined > usize::try_from(text_limit).expect("text bound fits usize");
+                live.began = value.began;
                 live.call = value.call;
             }
             None => {
@@ -418,8 +420,13 @@ impl Conversation {
         }
         for live in &self.live {
             if let Some(call) = &live.call {
-                for part in &call.parts {
-                    add_part(&mut parts, part);
+                match call {
+                    LiveCall::Decoded(call) => {
+                        for part in &call.parts {
+                            add_part(&mut parts, part);
+                        }
+                    }
+                    LiveCall::Raw(_) => {}
                 }
             }
         }
@@ -438,7 +445,7 @@ impl Conversation {
             if live.name.attempt == name.attempt
                 && live.name.number == name.turn
                 && let Some(call) = &live.call
-                && call.number == name.call
+                && call.number() == name.call
             {
                 return true;
             }
@@ -499,8 +506,13 @@ impl Conversation {
         }
         for live in &self.live {
             if let Some(call) = &live.call {
-                for key in &call.objects {
-                    add_name(&mut names, *key);
+                match call {
+                    LiveCall::Decoded(call) => {
+                        for key in &call.objects {
+                            add_name(&mut names, *key);
+                        }
+                    }
+                    LiveCall::Raw(_) => {}
                 }
             }
         }

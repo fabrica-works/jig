@@ -96,13 +96,13 @@ fn live(d: &mut Domain, run: Token, number: u32) {
         run,
         Delivery::Run(Box::new(RunText {
             attempt: 2,
-            began: Wall::EPOCH,
+            began: Some(Wall::EPOCH),
             turn: TurnName { attempt: 2, number },
             from: 0,
             through: length,
             text: value,
             cut: true,
-            call: if number == 1 { Some(call()) } else { None },
+            call: if number == 1 { Some(LiveCall::Decoded(call())) } else { None },
         })),
     );
 }
@@ -331,7 +331,7 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
             run,
             Delivery::Run(Box::new(RunText {
                 attempt,
-                began: Wall::EPOCH,
+                began: Some(Wall::EPOCH),
                 turn: TurnName { attempt, number: u32::MAX },
                 from: 0,
                 through: 4,
@@ -409,7 +409,7 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
         run,
         Delivery::Run(Box::new(RunText {
             attempt: u64::MAX,
-            began: Wall::EPOCH,
+            began: Some(Wall::EPOCH),
             turn: TurnName { attempt: u64::MAX, number: 1 },
             from: 0,
             through: 4,
@@ -453,4 +453,59 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
     deliver(&mut d, task_watch, Delivery::Task(Box::new(doc)));
     assert!(d.conversation().run_finished);
     assert!(d.conversation().live.is_empty());
+}
+
+#[test]
+fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_loss_and_folds() {
+    let words = words();
+    let (mut d, _, run, _) = ready();
+    let name = TurnName { attempt: u64::MAX, number: u32::MAX };
+    let raw = CurrentCall { number: u64::MAX, tool: text(b"raw/tool\xff"), input: text(b"a/b\x00\xfe"), cut: true };
+    let mut value = RunText {
+        attempt: name.attempt,
+        began: None,
+        turn: name,
+        from: 0,
+        through: 4,
+        text: text(b"live"),
+        cut: false,
+        call: Some(LiveCall::Raw(raw.clone())),
+    };
+    deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
+    assert_eq!(d.conversation().live.get(0).unwrap().began, None);
+    assert_eq!(d.conversation().live.get(0).unwrap().call, value.call);
+    let (folded, bindings) = build(&d, 3, &words);
+    access(&folded);
+    assert!(contains(&folded, b"\\x72\\x61\\x77\\x2F\\x74\\x6F\\x6F\\x6C\\xFF"));
+    assert!(!contains(&folded, b"\\x61\\x2F\\x62\\x00\\xFE"));
+    let missing_nodes = folded.nodes().len();
+    drop(bindings);
+    value.began = Some(Wall::EPOCH);
+    deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
+    let supplied = build(&d, 3, &words).0;
+    assert_eq!(supplied.nodes().len(), missing_nodes + 1, "an actual epoch gets its own wall leaf");
+    assert_eq!(d.conversation().live.get(0).unwrap().began, Some(Wall::EPOCH));
+    drive(
+        &mut d,
+        Event::Act {
+            act: Act::FoldCall {
+                name: jig_client::conversation::CallName { attempt: name.attempt, turn: name.number, call: raw.number },
+                open: true,
+            },
+        },
+    );
+    let expanded = build(&d, 3, &words).0;
+    access(&expanded);
+    assert!(contains(&expanded, b"\\x61\\x2F\\x62\\x00\\xFE"));
+    assert!(expanded.nodes().iter().any(|node| node.states.as_slice().contains(&crate::State::Expanded)));
+    assert_eq!(d.conversation().parts(4).len(), 0);
+    match value.call.as_mut().unwrap() {
+        LiveCall::Raw(call) => call.cut = false,
+        LiveCall::Decoded(_) => unreachable!(),
+    }
+    value.began = None;
+    deliver(&mut d, run, Delivery::Run(Box::new(value)));
+    let uncut = build(&d, 3, &words).0;
+    assert_eq!(uncut.nodes().len() + 2, expanded.nodes().len(), "wall and raw-call loss are independent leaves");
+    assert!(contains(&uncut, b"\\x61\\x2F\\x62\\x00\\xFE"));
 }
