@@ -81,6 +81,8 @@ pub fn part(b: &mut Builder, value: &OwnerPart, words: &Words, bindings: &mut Ji
         OwnerPartKind::Effect => ProposedPhrase::PartEffect,
         OwnerPartKind::Outbox => ProposedPhrase::PartOutbox,
     };
+    let name = words.book.say(words.language, kind.id(), &[]).expect("exact part kind words were checked");
+    b.name(&name.text);
     text(b, words, kind, &[]);
     match &value.key {
         OwnerPartKey::Number(number) => text(b, words, ProposedPhrase::PartNumber, &[Hole::Number(*number)]),

@@ -162,13 +162,13 @@ fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
 }
 /// Render a whole admitted payload using a separately reserved fragment capacity.
 pub fn render_words(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
-    b.open(Role::Region);
+    b.open(Role::Description);
     body(b, value, words);
     b.close();
 }
 /// Render a document projection and its explicit cut metadata.
 pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &Words) {
-    b.open(Role::Region);
+    b.open(Role::Description);
     body(b, &value.authority, words);
     if value.cut {
         text(b, words, AuthorityPhrase::Cut, &[]);
