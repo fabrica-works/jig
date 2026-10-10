@@ -348,7 +348,8 @@ fn conversation_states(words: &crate::words::Words) {
         let mut rows = List::with_capacity(2);
         for task in [1, 2] {
             rows.push(ConversationLine {
-                runtime: runtime.clone(),
+                cached_replies: 0,
+                runtime: Some(runtime.clone()),
                 delegates: 2,
                 budget: OwnerBudget {
                     numbers: OwnerNumbers { budget: 20, spent: 5, spent_below: 1, reserved: 2 },
@@ -364,11 +365,11 @@ fn conversation_states(words: &crate::words::Words) {
                     details: Box::new(ChipPhase::Starting),
                 },
                 project: 4,
-                first_words: text(b"Help with work"),
-                unread: Count { value: 2, limited: task == 2 },
+                first_words: jig_client::contract::DocumentText::complete(text(b"Help with work")),
+                unread: Some(Count { value: 2, limited: task == 2 }),
                 seen: 1,
                 last_reply: 3,
-                changed: skein_lib::Wall::EPOCH,
+                changed: Some(skein_lib::Wall::EPOCH),
             })
             .unwrap();
         }

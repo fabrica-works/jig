@@ -23,7 +23,7 @@ pub fn conversations_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
         .checked_add(chip_nodes(l)?)?
         .checked_add(runtime(l)?)?
         .checked_add(crate::owner_budget::budget_nodes())?
-        .checked_add(18)?
+        .checked_add(20)?
         .checked_mul(l.rows)?;
     let forms = l.charters.max(l.rows).checked_mul(3)?.checked_add(9)?.checked_mul(l.projects.max(l.rows))?;
     row.checked_add(forms)?.checked_add(66)?.checked_add(slot_nodes)
@@ -92,7 +92,7 @@ fn goals(l: &Limits) -> Option<u32> {
     let board = card_nodes(l)?
         .checked_add(chip_nodes(l)?)?
         .checked_add(crate::owner_budget::budget_nodes())?
-        .checked_add(13)?
+        .checked_add(15)?
         .checked_mul(l.rows)?
         .checked_mul(2)?;
     // A bounded goal offers whole charter and procedure lists independently.

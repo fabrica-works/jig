@@ -304,7 +304,7 @@ pub(super) fn line(b: &mut Builder, client: &Domain, goal: &GoalLine, words: &Wo
         cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
     }
     words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(goal.priority))]);
-    super::super::work::counts(b, goal.progress, words);
+    super::super::work::owner_counts(b, goal.progress, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(goal.held_below))]);
     crate::owner_budget::render(b, &goal.budget, words);
     b.close();

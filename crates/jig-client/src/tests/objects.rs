@@ -291,7 +291,8 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
         }
     }
     let line = ConversationLine {
-        runtime: Runtime::Idle,
+        cached_replies: 0,
+        runtime: Some(Runtime::Idle),
         delegates: 0,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
@@ -301,11 +302,11 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
         },
         chip: chip(9),
         project: 1,
-        first_words: text(b"first words"),
-        unread: Count { value: 2, limited: false },
+        first_words: jig_client::contract::DocumentText::complete(text(b"first words")),
+        unread: Some(Count { value: 2, limited: false }),
         seen: 5,
         last_reply: 7,
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
     };
     let id = domain.objects.reply(Source::Window { generation: 0, number: 1 }, line).unwrap();
     let reply = domain.objects.get(id).unwrap().reply.as_ref().unwrap();

@@ -21,35 +21,44 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
             &[Hole::Number(row.chip.task), crate::words::name(row.chip.title.bytes())],
             Act::OpenChat { task: row.chip.task },
         );
-        title_loss(b, &row.chip.title, &row.runtime, words);
-        words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(row.project))]);
-        b.text(Run::Plain, row.first_words.bytes());
-        runtime(b, client, &row.runtime, words, bindings);
-        match row.runtime {
-            Runtime::Held { .. } => {
-                if let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Task(row.chip.task)) {
-                    cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
-                }
-            }
-            Runtime::Ended => {
-                cards::chip::chip(b, client, &row.chip, words, bindings);
-            }
-            Runtime::Active(_)
-            | Runtime::Waiting { .. }
-            | Runtime::Idle
-            | Runtime::Starting
-            | Runtime::Running { .. }
-            | Runtime::WaitingForWords { .. }
-            | Runtime::BackingOff { .. }
-            | Runtime::Procedure { .. }
-            | Runtime::Person { .. }
-            | Runtime::Closing(_) => {}
+        if let Some(runtime) = &row.runtime {
+            title_loss(b, &row.chip.title, runtime, words);
         }
-        words.text(
-            b,
-            if row.unread.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
-            &[Hole::Number(u64::from(row.unread.value))],
-        );
+        words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(row.project))]);
+        crate::document_text::plain(b, &row.first_words, words);
+        if let Some(value) = &row.runtime {
+            runtime(b, client, value, words, bindings);
+            match value {
+                Runtime::Held { .. } => {
+                    if let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Task(row.chip.task)) {
+                        cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
+                    }
+                }
+                Runtime::Ended => {
+                    cards::chip::chip(b, client, &row.chip, words, bindings);
+                }
+                Runtime::Active(_)
+                | Runtime::Waiting { .. }
+                | Runtime::Idle
+                | Runtime::Starting
+                | Runtime::Running { .. }
+                | Runtime::WaitingForWords { .. }
+                | Runtime::BackingOff { .. }
+                | Runtime::Procedure { .. }
+                | Runtime::Person { .. }
+                | Runtime::Closing(_) => {}
+            }
+        } else {
+            cards::chip::chip(b, client, &row.chip, words, bindings);
+        }
+        if let Some(unread) = row.unread {
+            words.text(
+                b,
+                if unread.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
+                &[Hole::Number(u64::from(unread.value))],
+            );
+        }
+        words.text(b, JigPhrase::CachedReplies, &[Hole::Number(u64::from(row.cached_replies))]);
         words.text(b, JigPhrase::Delegates, &[Hole::Number(u64::from(row.delegates))]);
         crate::owner_budget::render(b, &row.budget, words);
         b.close();

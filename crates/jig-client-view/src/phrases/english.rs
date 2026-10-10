@@ -13,6 +13,20 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::CachedReplies => Box::new([
+                Segment::Text(copy_of(b"Cached replies ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::TasksIdle => {
+                Box::new([Segment::Text(copy_of(b"Idle ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::TasksStarting => {
+                Box::new([Segment::Text(copy_of(b"Starting ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::TasksBackingOff => {
+                Box::new([Segment::Text(copy_of(b"Backing off ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+
             JigPhrase::PageCut => Box::new([Segment::Text(copy_of(b"This page is incomplete"))]),
             JigPhrase::NoteWriterParty => Box::new([
                 Segment::Text(copy_of(b"Written by party ")),

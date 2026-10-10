@@ -719,16 +719,18 @@ pub struct ReplyPosition {
 /// A chat in the party conversations list.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ConversationLine {
-    pub runtime: Runtime,
+    pub runtime: Option<Runtime>,
     pub delegates: u32,
     pub budget: super::OwnerBudget,
     pub chip: Chip,
     pub project: u32,
-    pub first_words: Text,
-    pub unread: Count,
+    pub first_words: super::DocumentText,
+    pub unread: Option<Count>,
+    /// Independently supplied cached replies, never the unread count.
+    pub cached_replies: u32,
     pub seen: u64,
     pub last_reply: u64,
-    pub changed: Wall,
+    pub changed: Option<Wall>,
 }
 
 /// Live chats in a bounded watch window.
@@ -741,10 +743,10 @@ pub struct Conversations {
 /// A goal on the project board.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GoalLine {
-    pub changed: Wall,
+    pub changed: Option<Wall>,
     pub chip: Chip,
     pub priority: u32,
-    pub progress: PhaseCounts,
+    pub progress: super::OwnerPhaseCounts,
     pub budget: super::OwnerBudget,
     pub held_below: u32,
 }

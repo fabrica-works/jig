@@ -34,7 +34,8 @@ fn chip(task: u64) -> Chip {
 }
 fn conversation(task: u64) -> ConversationLine {
     ConversationLine {
-        runtime: Runtime::Idle,
+        cached_replies: 0,
+        runtime: Some(Runtime::Idle),
         delegates: 0,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
@@ -44,11 +45,11 @@ fn conversation(task: u64) -> ConversationLine {
         },
         chip: chip(task),
         project: 1,
-        first_words: text(b"words"),
-        unread: Count { value: 0, limited: false },
+        first_words: jig_client::contract::DocumentText::complete(text(b"words")),
+        unread: Some(Count { value: 0, limited: false }),
         seen: 0,
         last_reply: 0,
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
     }
 }
 fn activity(position: u64) -> ActivityLine {

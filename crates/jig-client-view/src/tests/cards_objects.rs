@@ -612,14 +612,15 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     dependency.phase = Phase::Running;
     *dependency.details = ChipPhase::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) };
     let conversation = ConversationLine {
+        cached_replies: 0,
         chip: dependency,
         project: 4,
-        first_words: text(b"whole first reply"),
-        unread: Count { value: 2, limited: false },
+        first_words: jig_client::contract::DocumentText::complete(text(b"whole first reply")),
+        unread: Some(Count { value: 2, limited: false }),
         seen: 5,
         last_reply: 7,
-        changed: Wall::EPOCH,
-        runtime: Runtime::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) },
+        changed: Some(Wall::EPOCH),
+        runtime: Some(Runtime::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) }),
         delegates: 0,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },

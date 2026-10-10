@@ -743,7 +743,19 @@ impl Payload for InboxGroup {
 fields!(InboxEntry { reply, lineage, goal, recipient, stall, object, project, group, position, at });
 fields!(Inbox { entries, needs, updates, results_seen, replies_seen, more });
 fields!(ReplyPosition { chat, through });
-fields!(ConversationLine { runtime, delegates, budget, chip, project, first_words, unread, seen, last_reply, changed });
+fields!(ConversationLine {
+    cached_replies: 0,
+    runtime,
+    delegates,
+    budget,
+    chip,
+    project,
+    first_words,
+    unread,
+    seen,
+    last_reply,
+    changed
+});
 fields!(Conversations { rows, more });
 fields!(GoalLine { changed, chip, priority, progress, budget, held_below });
 fields!(Goals { project, rows, more });
@@ -1225,3 +1237,16 @@ impl Payload for ParameterDocument {
 pub mod owner_outcome;
 
 mod owner_kind_order;
+
+fields!(jig_client::contract::OwnerPhaseCounts {
+    waiting,
+    idle,
+    starting,
+    running,
+    backing_off,
+    closing,
+    held,
+    done,
+    failed,
+    cancelled
+});

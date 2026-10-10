@@ -89,3 +89,23 @@ pub(super) fn cursors(
         window,
     );
 }
+
+// Supplied stage counts stay distinct from the locally folded PhaseCounts.
+pub(super) fn owner_counts(b: &mut Builder, counts: jig_client::contract::OwnerPhaseCounts, words: &Words) {
+    for (phrase, count) in [
+        (JigPhrase::TasksWaiting, counts.waiting),
+        (JigPhrase::TasksIdle, counts.idle),
+        (JigPhrase::TasksStarting, counts.starting),
+        (JigPhrase::TasksRunning, counts.running),
+        (JigPhrase::TasksBackingOff, counts.backing_off),
+        (JigPhrase::TasksClosing, counts.closing),
+        (JigPhrase::TasksHeld, counts.held),
+        (JigPhrase::TasksDone, counts.done),
+        (JigPhrase::TasksFailed, counts.failed),
+        (JigPhrase::TasksCancelled, counts.cancelled),
+    ] {
+        if count > 0 {
+            words.text(b, phrase, &[Hole::Number(u64::from(count))]);
+        }
+    }
+}

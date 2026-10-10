@@ -222,6 +222,7 @@ fn inbox_delivery(domain: &mut Domain, page: skein_lib::Token, entries: List<Inb
 }
 fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
     ConversationLine {
+        cached_replies: 0,
         chip: Chip {
             task,
             title: DocumentText::complete(text(b"held checkout")),
@@ -230,12 +231,12 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
             details: Box::new(super::objects::phase_details(phase)),
         },
         project: 1,
-        first_words: text(b"help checkout"),
-        unread: Count { value: 1, limited: false },
+        first_words: jig_client::contract::DocumentText::complete(text(b"help checkout")),
+        unread: Some(Count { value: 1, limited: false }),
         seen: 2,
         last_reply: 3,
-        changed: skein_lib::Wall::from_nanos(changed),
-        runtime: Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH },
+        changed: Some(skein_lib::Wall::from_nanos(changed)),
+        runtime: Some(Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH }),
         delegates: 2,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 20, spent: 5, spent_below: 1, reserved: 2 },
@@ -772,7 +773,7 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine
     GoalLine {
         chip,
         priority,
-        progress: empty_phase_counts(),
+        progress: jig_client::contract::OwnerPhaseCounts::ZERO,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
             left: 20,
@@ -780,7 +781,7 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine
             deadline: None,
         },
         held_below: 2,
-        changed: skein_lib::Wall::from_nanos(changed),
+        changed: Some(skein_lib::Wall::from_nanos(changed)),
     }
 }
 fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {

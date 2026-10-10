@@ -394,7 +394,7 @@ pub(crate) fn order(rows: &mut List<ConversationLine>) {
             let b = rows.get(second).expect("row exists");
             let a_live = live(a.chip.phase);
             let b_live = live(b.chip.phase);
-            if (b_live && !a_live) || (a_live == b_live && b.changed > a.changed) {
+            if (b_live && !a_live) || (a_live == b_live && later(b.changed, a.changed)) {
                 let b = b.clone();
                 let a = core::mem::replace(rows.get_mut(first).expect("row exists"), b);
                 *rows.get_mut(second).expect("row exists") = a;
@@ -430,4 +430,15 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(List::<crate::objects::Context>::worst_case(limits.rows.checked_mul(3)?)?)?
         .checked_add(u64::from(limits.text).checked_mul(4)?)?
         .checked_add(limits.document_bytes)
+}
+
+// No owner clock means no inferred ordering against a supplied clock.
+fn later(b: Option<skein_lib::Wall>, a: Option<skein_lib::Wall>) -> bool {
+    match b {
+        Some(b) => match a {
+            Some(a) => b > a,
+            None => false,
+        },
+        None => false,
+    }
 }

@@ -23,7 +23,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Result> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Reply {
     pub chat: u64,
-    pub first_words: crate::contract::Text,
+    pub first_words: crate::contract::DocumentText,
     pub first_unread: u64,
 }
 impl Reply {

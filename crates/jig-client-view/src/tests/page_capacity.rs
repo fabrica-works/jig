@@ -392,16 +392,17 @@ fn conversations(words: &Words) {
         })
         .unwrap();
     let line = |number| ConversationLine {
-        runtime: Runtime::Waiting { dependencies: list([8, 9]), hold: Some(part()) },
+        cached_replies: u32::MAX,
+        runtime: Some(Runtime::Waiting { dependencies: list([8, 9]), hold: Some(part()) }),
         delegates: u32::MAX,
         budget: full_owner_budget(),
         chip: full_chip(number),
         project: 4,
-        first_words: full(),
-        unread: Count { value: u32::MAX, limited: true },
+        first_words: jig_client::contract::DocumentText { text: full(), cut: true },
+        unread: Some(Count { value: u32::MAX, limited: true }),
         seen: 0,
         last_reply: u64::MAX,
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
     };
     deliver(
         &mut d,
@@ -662,11 +663,13 @@ fn fill_history(d: &mut Domain, read: Token) {
 
 fn fill_goals(d: &mut Domain, watch: Token, _doc: &Project) {
     let goal = |number| GoalLine {
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
         chip: full_chip(number),
         priority: u32::MAX,
-        progress: PhaseCounts {
-            ended: 2,
+        progress: jig_client::contract::OwnerPhaseCounts {
+            idle: 2,
+            starting: 2,
+            backing_off: 2,
             waiting: 2,
             running: 2,
             held: 2,
@@ -682,11 +685,13 @@ fn fill_goals(d: &mut Domain, watch: Token, _doc: &Project) {
 }
 fn fill_ended_goals(d: &mut Domain, read: Token, _doc: &Project) {
     let goal = |number| GoalLine {
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
         chip: full_chip(number),
         priority: u32::MAX,
-        progress: PhaseCounts {
-            ended: 2,
+        progress: jig_client::contract::OwnerPhaseCounts {
+            idle: 2,
+            starting: 2,
+            backing_off: 2,
             waiting: 2,
             running: 2,
             held: 2,

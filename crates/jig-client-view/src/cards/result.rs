@@ -145,7 +145,7 @@ pub fn reply(
         )
         | None => words.text(b, JigPhrase::ContextTask, &[Hole::Number(reply.chat)]),
     }
-    b.text(Run::Plain, reply.first_words.bytes());
+    crate::document_text::plain(b, &reply.first_words, words);
     crate::frame::control(
         b,
         words,

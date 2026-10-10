@@ -400,17 +400,18 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
 fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Words, sized: &Limits) {
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     let reply = ConversationLine {
+        cached_replies: 0,
         chip: full_chip(8),
         project: 4,
-        first_words: full_text(),
-        unread: Count { value: 2, limited: false },
+        first_words: jig_client::contract::DocumentText::complete(full_text()),
+        unread: Some(Count { value: 2, limited: false }),
         seen: 1,
         last_reply: 3,
-        changed: Wall::EPOCH,
-        runtime: Runtime::Waiting {
+        changed: Some(Wall::EPOCH),
+        runtime: Some(Runtime::Waiting {
             dependencies: list([9, 10]),
             hold: Some(Part::Resource { connector: 2, path: full_path() }),
-        },
+        }),
         delegates: 0,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 10, spent: 10, spent_below: 0, reserved: 0 },

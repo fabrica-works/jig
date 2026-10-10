@@ -6,6 +6,11 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    CachedReplies,
+    TasksIdle,
+    TasksStarting,
+    TasksBackingOff,
+
     /// A source page is incomplete; no particular row or continuation is inferred.
     PageCut,
     /// The stored party writer of a note.
@@ -1068,6 +1073,11 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::CachedReplies => 640,
+            Self::TasksIdle => 641,
+            Self::TasksStarting => 642,
+            Self::TasksBackingOff => 643,
+
             Self::NoteWriterParty => 634,
             Self::NoteWriterTask => 635,
             Self::NoteChangedNotSupplied => 636,
@@ -2170,6 +2180,10 @@ impl JigPhrase {
             | Self::TaskPage
             | Self::NoteWriterParty
             | Self::ServedGoal
+            | Self::CachedReplies
+            | Self::TasksIdle
+            | Self::TasksStarting
+            | Self::TasksBackingOff
             | Self::ByParty
             | Self::ByTask
             | Self::MadeChat
@@ -2324,7 +2338,11 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 602] = [
+pub const ALL: [JigPhrase; 606] = [
+    JigPhrase::CachedReplies,
+    JigPhrase::TasksIdle,
+    JigPhrase::TasksStarting,
+    JigPhrase::TasksBackingOff,
     JigPhrase::PageCut,
     JigPhrase::NoteWriterParty,
     JigPhrase::NoteWriterTask,

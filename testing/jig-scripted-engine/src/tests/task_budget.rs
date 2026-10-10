@@ -32,14 +32,15 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
             row.budget = budget.clone();
             whole_budget_fits(&row);
             let conversation = ConversationLine {
+                cached_replies: 0,
                 chip: row.chip.clone(),
                 project: row.project,
-                first_words: text(b"first"),
-                unread: Count { value: 0, limited: false },
+                first_words: jig_client::contract::DocumentText::complete(text(b"first")),
+                unread: Some(Count { value: 0, limited: false }),
                 seen: 0,
                 last_reply: 0,
-                changed: Wall::EPOCH,
-                runtime: row.runtime.clone(),
+                changed: Some(Wall::EPOCH),
+                runtime: Some(row.runtime.clone()),
                 delegates: 0,
                 budget: budget.clone(),
             };
@@ -47,10 +48,21 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
             let goal = GoalLine {
                 chip: row.chip,
                 priority: u32::MAX,
-                progress: row.impact.tasks,
+                progress: OwnerPhaseCounts {
+                    waiting: row.impact.tasks.waiting,
+                    running: row.impact.tasks.running,
+                    held: row.impact.tasks.held,
+                    closing: row.impact.tasks.closing,
+                    done: row.impact.tasks.done,
+                    failed: row.impact.tasks.failed,
+                    cancelled: row.impact.tasks.cancelled,
+                    idle: 0,
+                    starting: 0,
+                    backing_off: 0,
+                },
                 budget,
                 held_below: u32::MAX,
-                changed: Wall::EPOCH,
+                changed: Some(Wall::EPOCH),
             };
             whole_budget_fits(&goal);
         }

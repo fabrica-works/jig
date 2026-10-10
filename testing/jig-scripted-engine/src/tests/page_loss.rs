@@ -3,6 +3,7 @@ use super::*;
 #[test]
 fn a_page_loss_flag_is_independent_of_row_text_loss_and_whole_cursor_bytes() {
     let source = ConversationLine {
+        cached_replies: 0,
         project: 1,
         chip: {
             let mut chip = task().chip;
@@ -16,12 +17,12 @@ fn a_page_loss_flag_is_independent_of_row_text_loss_and_whole_cursor_bytes() {
             funder: Funder::Period { project: 1, period: 3 },
             deadline: None,
         },
-        first_words: text(b"words"),
-        runtime: Runtime::Idle,
+        first_words: jig_client::contract::DocumentText::complete(text(b"words")),
+        runtime: Some(Runtime::Idle),
         last_reply: 4,
         seen: 2,
-        unread: Count { value: 2, limited: false },
-        changed: Wall::EPOCH,
+        unread: Some(Count { value: 2, limited: false }),
+        changed: Some(Wall::EPOCH),
     };
     let page = ReadValue::Conversations(Box::new(ConversationPage {
         cut: false,

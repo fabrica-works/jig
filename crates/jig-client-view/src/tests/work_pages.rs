@@ -351,10 +351,10 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                         rows: list([GoalLine {
                             chip: chip(8),
                             priority: 2,
-                            progress: counts(),
+                            progress: jig_client::contract::OwnerPhaseCounts::ZERO,
                             budget: OwnerBudget { deadline: Some(Wall::EPOCH), ..doc.budget },
                             held_below: 1,
-                            changed: Wall::EPOCH,
+                            changed: Some(Wall::EPOCH),
                         }]),
                         more: true,
                     })),

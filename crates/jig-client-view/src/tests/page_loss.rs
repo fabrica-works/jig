@@ -189,7 +189,8 @@ fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_c
     let mut chip = super::work_pages::chip(8);
     chip.title.cut = true;
     let row = ConversationLine {
-        runtime: Runtime::Idle,
+        cached_replies: 0,
+        runtime: Some(Runtime::Idle),
         delegates: 0,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
@@ -199,11 +200,11 @@ fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_c
         },
         chip,
         project: 4,
-        first_words: text(b"whole first words"),
-        unread: Count { value: 0, limited: false },
+        first_words: jig_client::contract::DocumentText::complete(text(b"whole first words")),
+        unread: Some(Count { value: 0, limited: false }),
         seen: 7,
         last_reply: 7,
-        changed: skein_lib::Wall::EPOCH,
+        changed: Some(skein_lib::Wall::EPOCH),
     };
     drive(
         &mut domain,

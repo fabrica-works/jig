@@ -692,7 +692,8 @@ fn scenario_byte_bound_pages_and_watch_windows() {
     let entries = (0..2)
         .map(|position| {
             let line = ConversationLine {
-                runtime: Runtime::Idle,
+                cached_replies: 0,
+                runtime: Some(Runtime::Idle),
                 delegates: 0,
                 budget: OwnerBudget {
                     numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
@@ -702,11 +703,11 @@ fn scenario_byte_bound_pages_and_watch_windows() {
                 },
                 chip: task().chip,
                 project: 1,
-                first_words: text(&[b'x'; 1100]),
-                unread: Count { value: 1, limited: false },
+                first_words: jig_client::contract::DocumentText::complete(text(&[b'x'; 1100])),
+                unread: Some(Count { value: 1, limited: false }),
                 seen: 0,
                 last_reply: 1,
-                changed: Wall::EPOCH,
+                changed: Some(Wall::EPOCH),
             };
             InboxEntry {
                 reply: Some(Box::new(line)),
@@ -818,7 +819,8 @@ fn scenario_all_read_shapes_and_reverse_activity() {
 fn scenario_reply_identity() {
     let mut setup = live_script();
     let line = ConversationLine {
-        runtime: Runtime::Idle,
+        cached_replies: 0,
+        runtime: Some(Runtime::Idle),
         delegates: 0,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
@@ -828,11 +830,11 @@ fn scenario_reply_identity() {
         },
         chip: task().chip,
         project: 1,
-        first_words: text(b"whole reply"),
-        unread: Count { value: 1, limited: false },
+        first_words: jig_client::contract::DocumentText::complete(text(b"whole reply")),
+        unread: Some(Count { value: 1, limited: false }),
         seen: 0,
         last_reply: 1,
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
     };
     let entry = InboxEntry {
         reply: Some(Box::new(line)),
@@ -1484,8 +1486,10 @@ fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
         GoalLine {
             chip,
             priority: 1,
-            progress: PhaseCounts {
-                ended: 0,
+            progress: jig_client::contract::OwnerPhaseCounts {
+                idle: 2,
+                starting: 2,
+                backing_off: 2,
                 waiting: 0,
                 running: 0,
                 held: 0,
@@ -1501,7 +1505,7 @@ fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
                 deadline: None,
             },
             held_below: 0,
-            changed: Wall::EPOCH,
+            changed: Some(Wall::EPOCH),
         }
     };
     setup.truth.sources.push(Source {
