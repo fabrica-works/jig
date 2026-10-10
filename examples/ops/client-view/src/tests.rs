@@ -1033,10 +1033,10 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
         assert_eq!(code.iter().filter(|run| **run == bytes).count(), 2);
     }
     assert!(!code.contains(&b"a/b/c".as_slice()));
-    let full_ff = b"\\xFF".repeat(32);
-    let full_fe = b"\\xFE".repeat(32);
-    assert_eq!(code.iter().filter(|run| **run == full_ff.as_slice()).count(), 2);
-    assert_eq!(code.iter().filter(|run| **run == full_fe.as_slice()).count(), 2);
+    let escaped_maximum_byte = b"\\xFF".repeat(32);
+    let neighboring_segment_text = b"\\xFE".repeat(32);
+    assert_eq!(code.iter().filter(|run| **run == escaped_maximum_byte.as_slice()).count(), 2);
+    assert_eq!(code.iter().filter(|run| **run == neighboring_segment_text.as_slice()).count(), 2);
     assert!(tree.len() <= envelope.nodes);
     assert!(
         tree.nodes()
