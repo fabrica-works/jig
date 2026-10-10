@@ -98,7 +98,8 @@ marked new.
 | prioritise goals | a project; goals and their priorities | changed together |
 | mark seen (new) | how far the party has read: results, or one chat's replies | their read position over that moved |
 | edit or delete a note | a note; the revision recalled | changed, or refused as moved |
-| adopt a resource; change the policy, roles or services; set a party's pool | as `../../domain/people.md`, 5.2 | the project changed |
+| adopt a resource | the application's own request, its form a part in a slot (`root.md`, section 6); the engine's root makes the people request on the party's behalf | the project changed |
+| change the policy, roles or services; set a party's pool | as `../../domain/people.md`, 5.2 | the project changed |
 
 - **Proposed, not refused.** Setting a goal beyond the party's
   allotment and an amendment that widens beyond their authority become

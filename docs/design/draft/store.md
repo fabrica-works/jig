@@ -13,8 +13,8 @@ is deleted.
 
 ## 1. In one page
 
-- **The base is a design on skein-kv** (skein's `kv.md`), in the engine's
-  process: ordered keys and values in memory, an append-only log and
+- **The base is a design on skein-kv** (skein's `kv.md`), embedded in the
+  engine's process, with no store process and no wire: ordered keys and values in memory, an append-only log and
   snapshots; transcripts beside it; secrets in a second store; one
   decision, one commit; a thin protocol layer that encodes keys so that
   bytes sort as the domain's keys do, and records with a version per

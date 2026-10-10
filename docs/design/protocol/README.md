@@ -213,8 +213,10 @@ of an inline run's LLM calls.
 
 - **jig's store is a subset of an existing design, made generic.** jig's
   first application designed its engine's store on skein's key-value
-  store (skein's `kv.md`), in its own process, with transcripts beside it
-  and secrets in a second store. jig takes the parts of that design that
+  store (skein's `kv.md`), embedded in the engine's process, with
+  transcripts beside it and secrets in a second store. There is no store
+  process and no wire: the store is a component of the engine's protocol
+  layer, and its bytes are its records on disk. jig takes the parts of that design that
   are about the engine's own records (its families, their keys and
   encoding, versions, commits and loads, transcripts, secrets, opening,
   growth and retention), and leaves the application's families to the
