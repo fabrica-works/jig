@@ -11,6 +11,9 @@ fn fixture() -> (Agent, Limits, host::Start) {
     fixture_with(None, false)
 }
 fn fixture_with(facts: Option<u32>, agents: bool) -> (Agent, Limits, host::Start) {
+    fixture_resumed(facts, agents, false)
+}
+fn fixture_resumed(facts: Option<u32>, agents: bool, resumed: bool) -> (Agent, Limits, host::Start) {
     let mut smith = smith_agent_world::Settings::calm(13).limits;
     if let Some(facts) = facts {
         smith.session.facts = facts;
@@ -55,7 +58,7 @@ fn fixture_with(facts: Option<u32>, agents: bool) -> (Agent, Limits, host::Start
             resumes: true,
         },
         Box::new([charter::Section { title: Box::from(&b"Task"[..]), text: Box::from(&b"Do it"[..]) }]),
-        false,
+        resumed,
     )
     .expect("valid charter");
     let encoded = charter::encode(charter, &names, &limits.charter).expect("encodable charter");

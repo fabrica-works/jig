@@ -286,7 +286,7 @@ fn restored_source_sequence_and_retry_do_not_renumber_the_activation_turn() {
             }
         }
     }
-    let (mut restored, limits, mut start) = fixture();
+    let (mut restored, limits, mut start) = fixture_resumed(None, false, true);
     start.activation = 2;
     start.transcript = Some(Box::new([saved.expect("real encoded historical turn")]));
     let mut env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
@@ -334,7 +334,7 @@ fn nested_retry_keeps_its_opaque_owner_without_becoming_main_writing() {
     let mut requests = completed(&mut agent, &env, main, Box::new([call]), &mut out);
     settle(&mut agent, &env, &mut out, &mut requests);
     let (child, first) = named(&requests);
-    assert_ne!(child, main);
+    assert_ne!(child, main, "actual typed admission and provider requests: {requests:?}");
     assert_eq!(first, smith::llm::CompletionName { sequence: 1, retry: 0 });
     assert!(!has_start(&requests));
     let mut parent_call = false;
