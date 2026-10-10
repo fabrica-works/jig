@@ -67,9 +67,8 @@ fn charter_offers_keep_their_own_project_and_reserved_capacity_is_bounded() {
     source.charters.get_mut(0).unwrap().goals = List::with_capacity(LIMITS.charters + 1);
     assert!(!crate::frame::fits(&source, &LIMITS));
     source.charters = List::with_capacity(0);
-    source.party.login = DocumentText::complete(
-        Text::new(vec![0; LIMITS.text as usize + 1].into_boxed_slice(), LIMITS.text + 1).unwrap(),
-    );
+    assert_eq!(LIMITS.text, 32);
+    source.party.login = DocumentText::complete(Text::new(Box::from([0; 33]), 33).unwrap());
     assert!(!crate::frame::fits(&source, &LIMITS));
 }
 #[test]

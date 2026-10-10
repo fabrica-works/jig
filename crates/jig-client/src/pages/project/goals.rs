@@ -127,10 +127,9 @@ fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission,
     if let Some(frame) = &domain.frame.document {
         for project in &frame.projects {
             if project.project == form.project {
-                pool = match &project.pool {
-                    Some(ledger) => Some(ledger.left),
-                    None => None,
-                };
+                if let Some(ledger) = &project.pool {
+                    pool = Some(ledger.left);
+                }
             }
         }
         for project in &frame.charters {

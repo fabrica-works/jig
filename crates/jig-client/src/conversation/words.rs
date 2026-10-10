@@ -95,8 +95,12 @@ impl KeptWords {
         if self.pending(request) {
             return true;
         }
-        let cut = by.as_ref().map(|party| party.name.cut);
-        let by = by.map(|party| Party { number: party.number, kind: party.kind, name: party.name.bytes });
+        let (by, cut) = match by {
+            Some(party) => {
+                (Some(Party { number: party.number, kind: party.kind, name: party.name.bytes }), Some(party.name.cut))
+            }
+            None => (None, None),
+        };
         if !self.begin(request, by, words) {
             return false;
         }
