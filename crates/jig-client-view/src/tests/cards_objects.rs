@@ -1585,9 +1585,9 @@ fn proposed_outcomes_and_effect_parts_keep_the_supplied_maker_kind_and_full_numb
             &Refusal::Moved {
                 now: Revision { value: u64::MAX },
                 what: Moved::Hold {
-                    reason: Some(CurrentHold::Reason(HoldReason::EffectFailed {
+                    reason: Some(CurrentHold::Document(Box::new(HoldReason::EffectFailed {
                         part: Part::Effect { connector: u16::MAX, proposal: key },
-                    })),
+                    }))),
                 },
             },
         );
