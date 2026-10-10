@@ -103,10 +103,10 @@ fn build(value: &OwnerTree, d: &Domain, w: &Words, nodes: Option<u32>) -> Tree {
     l.depth = f.depth;
     l.text_bytes = f.text_bytes;
     l.text_per_node = f.text_per_node;
-    let mut b = Builder::new(&l);
+    let mut builder = Builder::new(&l);
     let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
-    view::render(&mut b, value, &d.task_page().plan, d, w, &mut bindings);
-    b.finish()
+    view::render(&mut builder, value, &d.task_page().plan, d, w, &mut bindings);
+    builder.finish()
 }
 #[test]
 fn owner_tree_view_names_root_parent_depth_spend_loss_proposal_and_all_ten_counts_per_parent() {
@@ -136,7 +136,7 @@ fn owner_tree_view_names_root_parent_depth_spend_loss_proposal_and_all_ten_count
         b"More descendants remain",
         b"18446744073709551615",
     ] {
-        assert!(contains(&tree, expected), "missing {}", String::from_utf8_lossy(expected));
+        assert!(contains(&tree, expected), "missing {}", core::str::from_utf8(expected).unwrap());
     }
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
@@ -158,7 +158,7 @@ fn owner_tree_view_preserves_all_link_metadata_without_fabricated_stored_chip_or
         value.rows.get_mut(0).unwrap().dependencies.push(link).unwrap();
         let d = domain(&value);
         let tree = build(&value, &d, &w, None);
-        assert!(contains(&tree, expected), "missing {}", String::from_utf8_lossy(expected));
+        assert!(contains(&tree, expected), "missing {}", core::str::from_utf8(expected).unwrap());
         assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
     }
 }
@@ -175,10 +175,10 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
     value.rows.push(second).unwrap();
     let mut metadata = super::owner_chip::details();
     metadata.closing_connectors = Some(List::with_capacity(CLIENT.rows));
-    value.root.details = Box::new(ChipPhase::Owner {
+    *value.root.details = ChipPhase::Owner {
         phase: OwnerChipPhase::Active(RunStage::Running { attempt: u64::MAX }),
         details: Box::new(metadata),
-    });
+    };
     value.root.phase = Phase::Running;
     let d = domain(&value);
     let english = crate::phrases::english::language();
@@ -203,7 +203,7 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
                 phrases: crate::owner_words::phrase_count(),
                 holes: 4,
                 segments: 5000,
-                text_bytes: 100000,
+                text_bytes: 100_000,
                 hole_bytes: 256,
             },
         )
@@ -221,7 +221,7 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
     let exact = tree.len();
     assert_eq!(build(&value, &d, &w, Some(exact)).len(), exact);
     let fail = std::panic::catch_unwind(|| build(&value, &d, &w, Some(exact.checked_sub(1).unwrap())));
-    assert!(fail.is_err());
+    let _panic = fail.unwrap_err();
     let mut bytes = 0_u32;
     for node in tree.nodes() {
         assert!(node.value.is_none() && node.external.is_none() && node.drawing.is_none());
@@ -245,7 +245,7 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
     };
     assert_eq!(render(cap).len(), exact);
     cap.text_bytes = bytes.checked_sub(1).unwrap();
-    assert!(std::panic::catch_unwind(|| render(cap)).is_err());
+    let _panic = std::panic::catch_unwind(|| render(cap)).unwrap_err();
     let mut invalid = value.clone();
     invalid.rows = List::with_capacity(CLIENT.rows + 1);
     assert!(view::required(&invalid, &CLIENT, &w).is_none());
