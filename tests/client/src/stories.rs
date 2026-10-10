@@ -96,12 +96,12 @@ fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
             tools: 0,
-            grants: List::with_capacity(0),
-            delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 1 },
+            grants: list([]),
+            delegation: OwnerDelegation { kinds: list([]), tasks: 1, depth: 1 },
             spend: 1,
             deadline: None,
             notes: 0,
-            note_resources: List::with_capacity(0),
+            note_resources: list([]),
         },
         cut: false,
     }

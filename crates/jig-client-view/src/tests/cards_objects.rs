@@ -46,7 +46,7 @@ fn owner_authority() -> OwnerAuthorityDocument {
         cut: false,
     }
 }
-fn authority() -> Authority {
+pub(super) fn authority() -> Authority {
     Authority {
         budget: 10,
         grants: list([]),
