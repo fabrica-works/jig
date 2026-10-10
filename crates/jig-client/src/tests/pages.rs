@@ -2024,7 +2024,7 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
             parts.push(part.clone()).unwrap();
         }
     }
-    assert_eq!(parts.as_ref(), &[one, two]);
+    assert_eq!(parts.as_slice(), &[one, two]);
     let budget_opened = drive(
         &mut domain,
         Time::ZERO,
@@ -2043,7 +2043,7 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
             parts.push(part.clone()).unwrap();
         }
     }
-    assert_eq!(parts.as_ref(), &[Part::Kind { connector: 2, kind: 9 }], "an open pattern is not a resource name");
+    assert_eq!(parts.as_slice(), &[Part::Kind { connector: 2, kind: 9 }], "an open pattern is not a resource name");
 }
 
 #[test]
@@ -2076,6 +2076,6 @@ fn goal_note_scope_keeps_its_supplied_project_instead_of_the_parent_page() {
             reads.push((scope.clone(), description.clone(), after.clone())).unwrap();
         }
     }
-    assert_eq!(reads.as_ref(), &[(scope.clone(), Some(text(b"supplied")), None)]);
+    assert_eq!(reads.as_slice(), &[(scope.clone(), Some(text(b"supplied")), None)]);
     assert_eq!(domain.project_page().note_filter.as_ref().unwrap().scope, scope);
 }
