@@ -227,7 +227,7 @@ fn explained(tree: &Tree, start: usize, end: usize) -> bool {
 }
 fn card_key(k: Key) -> bool {
     match k.owner {
-        Owner::Jig => (k.kind <= 6 || k.kind == 29),
+        Owner::Jig => k.kind <= 6 || k.kind == 29,
         Owner::Side { connector } => connector == domain::FIRST && ((10..=16).contains(&k.kind) || k.kind == 19),
         Owner::Other { .. } => false,
     }
