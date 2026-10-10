@@ -1863,16 +1863,14 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
         delivered(&mut domain, Time::ZERO, token, value);
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewChat, text: text(b"start") } });
         let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::StartChat { project: 1 } });
-        let request = sent
-            .iter()
-            .find_map(|request| match request {
-                Request::Send { request, ask, .. } => {
-                    assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"start") });
-                    Some(*request)
-                }
-                _ => None,
-            })
-            .unwrap();
+        let mut request = None;
+        for row in &sent {
+            if let Request::Send { request: sent, ask, .. } = row {
+                assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"start") });
+                assert!(request.replace(*sent).is_none(), "one original start request");
+            }
+        }
+        let request = request.unwrap();
         if away {
             drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
         }
