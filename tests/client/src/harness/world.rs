@@ -22,6 +22,8 @@ pub struct Settings {
     pub store_records: usize,
     pub iterations: u32,
     pub memory: bool,
+    /// Practical owned-heap guard per client, in addition to the composed envelope.
+    pub heap_bytes_per_client: u64,
     pub random_steps: u32,
     pub word_bytes: u32,
     pub faults_per_mille: u32,
@@ -38,6 +40,7 @@ impl Default for Settings {
             store_records: 32,
             iterations: 4096,
             memory: false,
+            heap_bytes_per_client: 8 * 1024 * 1024,
             random_steps: 32,
             word_bytes: 32,
             faults_per_mille: 0,
@@ -75,6 +78,7 @@ struct Client<A: App> {
     root: A::Root,
     view: A::View,
     model: Model,
+    patches: Queue<jig_client_view::Patch>,
     kept: Vec<A::Record>,
     deferred: Vec<StoreWrite<A::Record, A::Key>>,
     history: Vec<A::Address>,
@@ -124,7 +128,7 @@ impl<A: App, F: Front<A>> World<A, F> {
     /// Creates one seeded loop in front of the supplied engine boundary.
     #[must_use]
     pub fn new(settings: Settings, front: F) -> Self {
-        let heap_bound = A::worst_case(&A::limits());
+        let heap_bound = A::worst_case(&A::limits()).min(settings.heap_bytes_per_client);
         let meter = if settings.memory { Some(skein_world::domain::heap::Meter::new()) } else { None };
         Self {
             meter,
@@ -174,7 +178,9 @@ impl<A: App, F: Front<A>> World<A, F> {
         }
         let (root, view) = A::new(self.rng.next_u64());
         let id = ClientId(self.clients.len());
+        let patches = Queue::with_capacity(A::patch_limit(&view));
         self.clients.push(Client {
+            patches,
             root,
             view,
             model: Model::default(),
@@ -518,21 +524,29 @@ impl<A: App, F: Front<A>> World<A, F> {
             );
         }
         let c = &mut self.clients[id.0];
-        let old_nodes: Vec<_> = A::tree(&c.view).nodes().iter().map(|n| n.id).collect();
-        let mut patches = Queue::with_capacity(A::patch_limit(&c.view));
-        A::build(&mut c.view, &c.root, &mut patches);
-        while let Some(patch) = patches.pop() {
-            c.model.apply(patch);
-        }
-        c.model.check(A::tree(&c.view));
-        if let Some(node) = old_nodes.into_iter().find(|node| A::tree(&c.view).find(*node).is_none()) {
-            self.last_removed = Some((id, node));
-        }
-        let seen = A::seen(A::tree(&c.view));
+        A::build(&mut c.view, &c.root, &mut c.patches);
+        let changed = !c.patches.is_empty();
+        let seen = if changed {
+            // The model is still the old platform tree after the view has built.
+            let old_nodes: Vec<_> = c.model.ids().collect();
+            while let Some(patch) = c.patches.pop() {
+                c.model.apply(patch);
+            }
+            c.model.check(A::tree(&c.view));
+            if let Some(node) = old_nodes.into_iter().find(|node| A::tree(&c.view).find(*node).is_none()) {
+                self.last_removed = Some((id, node));
+            }
+            Some(A::seen(A::tree(&c.view)))
+        } else {
+            None
+        };
         self.callbacks += 1;
         self.trace.log(self.now, format!("client {} epoch {} tree {}", id.0, c.epoch, A::tree(&c.view).len()));
-        self.observe(Observation::Shown { client: id, seen });
+        if let Some(seen) = seen {
+            self.observe(Observation::Shown { client: id, seen });
+        }
     }
+
     fn check_heap(&mut self) {
         if let Some(meter) = &self.meter {
             let measured = meter.end();
@@ -540,7 +554,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 .heap_bound
                 .checked_mul(u64::try_from(self.clients.len()).expect("client count fits"))
                 .expect("world heap bound fits");
-            self.heap_peak = self.heap_peak.max(meter.check(measured, u64::MAX, &"client world iteration"));
+            self.heap_peak = self.heap_peak.max(meter.check(measured, bound, &"client world iteration"));
             self.observe(Observation::Bounded { heap: self.heap_peak, bound });
         }
     }
@@ -709,6 +723,9 @@ impl<A: App, F: Front<A>> World<A, F> {
                     .collect::<Vec<_>>())
                 .collect::<Vec<_>>()
         );
+        for client in &self.clients {
+            client.model.check(A::tree(&client.view));
+        }
         Outcome {
             verdict: self.referee.verdict(),
             judged: self.referee.judged(),

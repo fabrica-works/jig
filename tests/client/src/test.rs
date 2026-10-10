@@ -113,7 +113,7 @@ impl App for Test {
     fn new(seed: u64) -> (Self::Root, Self::View) {
         let limits = limits();
         let (words, family) = phrasebooks(&limits);
-        let bounds = view::Limits::of(&limits, &words, &family).expect("view bounds fit");
+        let bounds = view::Limits::for_world(&limits, &words, &family, 1024, 256).expect("view bounds fit");
         let mut root = domain::new(&limits, seed);
         domain::provider(&mut root, jig_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
             .expect("provider fits");
@@ -207,9 +207,9 @@ impl App for Test {
     }
     fn worst_case(limits: &Self::Limits) -> u64 {
         let (words, family) = phrasebooks(limits);
-        let bounds = view::Limits::of(limits, &words, &family).expect("view fits");
+        let bounds = view::Limits::for_world(limits, &words, &family, 1024, 256).expect("view fits");
         domain::worst_case(limits).expect("root worst case")
-            // The shell model and comparison projections are bounded by another renderer envelope.
+            // The shell model is bounded by another renderer envelope.
             + 2 * view::worst_case(&bounds, limits, &words, &family).expect("view worst case")
     }
     fn window_changed(event: &Self::Event) -> bool {

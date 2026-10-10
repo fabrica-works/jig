@@ -6,6 +6,32 @@ pub struct Limits {
     pub text: u32,
 }
 impl Limits {
+    /// Storage declared by a world, rather than every combination admitted by
+    /// the domain. Builder checks reject fixtures that exceed this profile;
+    /// `of` remains the complete composition envelope.
+    #[must_use]
+    pub fn for_world(
+        domain: &jig_test_client_domain::Limits,
+        jig: &jig_client_view::words::Words,
+        first: &words::Words,
+        nodes: u32,
+        slots: u32,
+    ) -> Option<Self> {
+        if nodes == 0 || slots > nodes {
+            return None;
+        }
+        let mut limits = Self::of(domain, jig, first)?;
+        if nodes > limits.tree.nodes {
+            return None;
+        }
+        limits.tree.nodes = nodes;
+        limits.tree.bindings = nodes;
+        limits.tree.slots = slots;
+        limits.tree.patches = nodes.checked_mul(5)?;
+        limits.tree.text_bytes = nodes.checked_mul(limits.tree.text_per_node)?;
+        worst_case(&limits, domain, jig, first)?;
+        Some(limits)
+    }
     #[must_use]
     pub fn of(
         domain: &jig_test_client_domain::Limits,

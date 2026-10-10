@@ -26,15 +26,19 @@ fn position(rows: &[Entry], id: NodeId) -> usize {
 }
 
 fn sizes(rows: &mut [Entry]) {
-    for index in (0..rows.len()).rev() {
-        let id = rows[index].node.id;
-        let mut size = 1_u32;
-        for child in rows.iter() {
-            if child.parent == id {
-                size = size.checked_add(child.node.size).expect("small tree");
-            }
+    // Preorder makes every subtree contiguous. Close each ancestor once,
+    // when its next sibling begins, rather than scanning every child.
+    let mut open: Vec<usize> = Vec::new();
+    for index in 0..rows.len() {
+        while open.last().is_some_and(|parent| rows[*parent].node.id != rows[index].parent) {
+            let parent = open.pop().expect("open ancestor");
+            rows[parent].node.size = u32::try_from(index - parent).expect("small subtree");
         }
-        rows[index].node.size = size;
+        assert!(rows[index].parent == NodeId(0) || !open.is_empty(), "preorder parent is present");
+        open.push(index);
+    }
+    while let Some(parent) = open.pop() {
+        rows[parent].node.size = u32::try_from(rows.len() - parent).expect("small subtree");
     }
 }
 
@@ -57,11 +61,13 @@ fn apply(rows: &mut Vec<Entry>, patch: Patch) {
         Patch::Insert { parent, before, nodes } => {
             let at = insertion(rows, parent, before);
             drop(rows.splice(at..at, entries(&nodes, parent)));
+            sizes(rows);
         }
         Patch::Remove { node } => {
             let at = position(rows, node);
             let end = at.checked_add(usize::try_from(rows[at].node.size).expect("small subtree")).expect("small tree");
             drop(rows.drain(at..end));
+            sizes(rows);
         }
         Patch::Move { node, parent, before } => {
             let at = position(rows, node);
@@ -71,6 +77,7 @@ fn apply(rows: &mut Vec<Entry>, patch: Patch) {
             sizes(rows);
             let to = insertion(rows, parent, before);
             drop(rows.splice(to..to, moved));
+            sizes(rows);
         }
         Patch::Text { node, text } => {
             let at = position(rows, node);
@@ -85,13 +92,37 @@ fn apply(rows: &mut Vec<Entry>, patch: Patch) {
             rows[at].node.value = value;
         }
     }
-    sizes(rows);
 }
 
 fn equal(rows: &[Entry], tree: &Tree) {
-    let model: Vec<_> = rows.iter().map(|row| row.node.clone()).collect();
-    let wanted: Vec<_> = tree.nodes().iter().map(Made::of).collect();
-    assert_eq!(model, wanted, "patches reproduce the platform-visible tree");
+    assert_eq!(rows.len(), usize::try_from(tree.len()).expect("small tree"), "platform-visible node count");
+    for (row, node) in rows.iter().zip(tree.nodes().iter()) {
+        let made = &row.node;
+        assert_eq!((made.id, made.size, &made.value), (node.id, node.size, &node.value), "platform-visible node");
+        let attribute = &made.attribute;
+        assert_eq!(
+            (
+                attribute.role,
+                &attribute.name,
+                attribute.linked,
+                &attribute.external,
+                attribute.bound,
+                &attribute.drawing
+            ),
+            (
+                node.role,
+                &node.name,
+                node.link.is_some(),
+                &node.external,
+                node.binding.is_some() || node.link.is_some(),
+                &node.drawing
+            ),
+            "platform-visible attributes"
+        );
+        assert!(attribute.states.iter().eq(node.states.iter()), "platform-visible states");
+        assert!(attribute.styles.iter().eq(node.styles.iter()), "platform-visible styles");
+        assert!(made.text.iter().eq(node.text.iter()), "platform-visible text runs");
+    }
 }
 
 /// The platform’s tree, independent of the renderer’s retained tree.
@@ -114,6 +145,10 @@ impl Model {
     /// Checks the complete platform projection against the view.
     pub fn check(&self, tree: &Tree) {
         equal(&self.rows, tree);
+    }
+    /// Node identities in the platform projection before a changed page.
+    pub fn ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.rows.iter().map(|row| row.node.id)
     }
     /// Returns the platform projection for an external observer.
     #[must_use]

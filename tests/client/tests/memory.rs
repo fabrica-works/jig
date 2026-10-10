@@ -188,3 +188,12 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
     assert!(result.heap_peak > 0, "counted every iteration");
     assert!(result.heap_peak <= result.heap_bound, "composed root, view and shell model envelope");
 }
+
+/// A real client allocation crosses a deliberately small declared budget.
+/// The same callback guard used by the full fixture must catch it.
+#[test]
+#[should_panic(expected = "client world iteration")]
+fn a_client_that_exceeds_its_declared_heap_budget_is_caught() {
+    let mut world = stories::configured(Settings { memory: true, heap_bytes_per_client: 1024, ..Settings::default() });
+    world.client(7, stories::inbox());
+}
