@@ -190,6 +190,10 @@ pub struct Task {
     pub delegates: List<super::LiveDelegate>,
     pub changed: Wall,
     pub spec_revision: u64,
+    /// Present only for a person executor; independent of spec and hold.
+    pub person_revision: Option<u64>,
+    /// The party holding a role-addressed task, if any.
+    pub taken_by: Option<u64>,
     /// Last committed immutable activity position.
     pub activity: u64,
     pub words: Text,
@@ -735,6 +739,11 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         delegates: super::live_delegates::from_row(core, limits, party, row)?,
         changed: row.changed,
         spec_revision: row.revisions.spec,
+        person_revision: match row.executor {
+            tasks::Executor::Person(_) => Some(row.revisions.person),
+            tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => None,
+        },
+        taken_by: row.taken_by,
         activity: row.activity,
         words: super::small::text(&row.spec.words, limits.documents.text_bytes),
         parameters,

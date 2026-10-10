@@ -177,6 +177,7 @@ pub(crate) fn close(
         message,
         false,
         crate::Amendment {
+            addressed: None,
             release: None,
             instructions: None,
             spec: None,

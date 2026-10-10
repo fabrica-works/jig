@@ -149,6 +149,7 @@ pub(super) fn named_proposal_accept(
                 message,
                 stop_run: false,
                 amendment: tasks::Amendment {
+                    addressed: None,
                     release: None,
                     instructions: None,
                     spec: None,

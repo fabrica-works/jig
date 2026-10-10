@@ -52,7 +52,7 @@
 //! | held | reason changes | hold revision + 1, routing | save, escalation needed |
 //! | waiting escalation | pass or reroute | same revision, new recipient | save, wake |
 //! | current spec | changed amendment | spec revision + 1 | history, save, message |
-//! | person question | changed spec/dependencies | person revision + 1 | save, message |
+//! | person question | changed spec/dependencies/address or holder released | person revision + 1 | save, message |
 //! | person inputs | dependency result arrives | person revision + 1 | save |
 //! | any revisions | spend, turn, priority, delegate phase | same revisions | ordinary outputs |
 //! Agent and procedure executors are routed. The root checks historical inputs
@@ -111,7 +111,10 @@ pub use boundary::{
 };
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
 pub use chat::{Disposal, Grace, Keep};
-pub use control::{Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, instruction_admit};
+pub use control::{
+    AddressChange, Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, address_admit,
+    instruction_admit,
+};
 pub use domain::{Domain, ViewTask, fire, max_out, step, view_phase};
 pub use escalation::{Escalation, EscalationContext, EscalationDecision, EscalationHolder, EscalationOutcome};
 pub use facts::Fact;

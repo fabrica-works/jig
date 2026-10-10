@@ -22,6 +22,9 @@ pub(super) fn person_message_refusal(core: &Core, task: Option<u64>, why: tasks:
 
 fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::Outcome {
     let refusal = match why {
+        tasks::Refusal::PersonRevision { revision } => {
+            people::Refusal::Moved { now: people::Moved::Person { revision } }
+        }
         tasks::Refusal::Busy => return people::Outcome::Again(people::Again::Busy),
         tasks::Refusal::NotReady => return people::Outcome::Again(people::Again::NotReady),
         tasks::Refusal::ResourceUnavailable => {

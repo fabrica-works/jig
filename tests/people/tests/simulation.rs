@@ -441,6 +441,7 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
         task: 7,
         revision: 1,
         amendment: jig_core_people::Amendment {
+            addressed: None,
             instructions: None,
             spec: Some(jig_core_people::Spec {
                 words: b"new words".as_slice().into(),
@@ -566,6 +567,7 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
 
 fn edit() -> jig_core_people::Amendment {
     jig_core_people::Amendment {
+        addressed: None,
         instructions: None,
         spec: Some(jig_core_people::Spec {
             words: b"changed".as_slice().into(),

@@ -89,6 +89,7 @@ pub(super) fn amend_preflight(
 ) -> Result<(), people::Refusal> {
     let row = core.tasks.task(task).ok_or(people::Refusal::Unknown)?;
     let empty = tasks::Amendment {
+        addressed: None,
         instructions: None,
         spec: None,
         wake: None,
@@ -268,6 +269,12 @@ pub(crate) fn amendment_admit(
         return Err(people::Refusal::Role { held: Some(role) });
     }
     let row = core.tasks.task(task).expect("delegation found task");
+    if let Err(why) = tasks::address_admit(row, &amendment.addressed) {
+        let people::Outcome::Refused(why) = crate::routing::refusals::person_task_refusal(core, Some(task), why) else {
+            unreachable!("address refusal is permanent");
+        };
+        return Err(why);
+    }
     if let Err(why) = tasks::instruction_admit(limits, row.executor, &amendment.instructions) {
         let people::Outcome::Refused(why) = crate::routing::refusals::person_task_refusal(core, Some(task), why) else {
             unreachable!("instruction shape refusal is permanent");

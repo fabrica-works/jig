@@ -43,6 +43,9 @@ impl Core {
             return Err(TaskAmendDenied::Refused { task: target, why: tasks::Refusal::Reference });
         }
         let row = self.tasks.task(target).expect("delegation found target");
+        if let Err(why) = tasks::address_admit(row, &amendment.addressed) {
+            return Err(TaskAmendDenied::Refused { task: target, why });
+        }
         if let Err(why) = tasks::instruction_admit(limits, row.executor, &amendment.instructions) {
             return Err(TaskAmendDenied::Refused { task: target, why });
         }
@@ -203,6 +206,16 @@ fn granted(value: people::Authority, limits: &tasks::Limits) -> Option<tasks::Au
 #[expect(clippy::manual_map, reason = "the step subset spells out both option cases without a closure")]
 pub(crate) fn translate(value: people::Amendment, limits: &tasks::Limits) -> Option<tasks::Amendment> {
     Some(tasks::Amendment {
+        addressed: match value.addressed {
+            Some(change) => Some(tasks::AddressChange {
+                revision: change.revision,
+                address: match change.address {
+                    people::PersonAddress::Person(person) => tasks::PersonAddress::Person(person),
+                    people::PersonAddress::Role(role) => tasks::PersonAddress::Role(role),
+                },
+            }),
+            None => None,
+        },
         release: None,
         instructions: value.instructions,
         spec: match value.spec {

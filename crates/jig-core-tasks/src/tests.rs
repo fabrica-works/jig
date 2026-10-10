@@ -27,4 +27,5 @@ mod last_batch;
 
 mod changed;
 
+mod address;
 mod instructions;

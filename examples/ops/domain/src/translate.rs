@@ -545,6 +545,7 @@ pub(crate) mod nested {
             None => None,
         };
         Ok(tasks::Amendment {
+            addressed: None,
             instructions,
             release: None,
             spec,

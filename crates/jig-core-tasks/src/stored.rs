@@ -192,6 +192,10 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
         }
         crate::ProposalAction::Amend { task: target, amendment } => {
             *target != 0
+                && match amendment.addressed {
+                    Some(change) => crate::control::valid_address(change.address),
+                    None => true,
+                }
                 && match &amendment.instructions {
                     Some(instructions) => {
                         instructions.len() <= usize::try_from(limits.message_bytes).expect("u32 fits usize")

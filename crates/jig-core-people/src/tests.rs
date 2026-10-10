@@ -1134,6 +1134,7 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
             task: 7,
             revision: 1,
             amendment: Amendment {
+                addressed: None,
                 instructions: None,
                 spec: None,
                 wake: None,
@@ -1393,6 +1394,7 @@ fn an_amendment_answer_keeps_the_release_fact_and_named_hold_in_its_key() {
     let mut test = Test::new(LIMITS);
     test.member();
     let change = Amendment {
+        addressed: None,
         instructions: None,
         spec: None,
         wake: None,

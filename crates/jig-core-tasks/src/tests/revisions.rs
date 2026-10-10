@@ -204,6 +204,7 @@ impl Harness {
 
 fn amendment() -> Amendment {
     Amendment {
+        addressed: None,
         release: None,
         instructions: None,
         spec: None,

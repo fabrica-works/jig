@@ -66,8 +66,8 @@ mod refusals;
 #[cfg(test)]
 mod tests;
 pub use amendment::{
-    Amendment, Authority, Delegation, Executor, Grant, Last, Parameter, Pattern, ResourceScope, ResultsWake, Spec,
-    WakePolicy, WakeRule, amendment_bytes, authority_bytes,
+    AddressChange, Amendment, Authority, Delegation, Executor, Grant, Last, Parameter, Pattern, PersonAddress,
+    ResourceScope, ResultsWake, Spec, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
     Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity,

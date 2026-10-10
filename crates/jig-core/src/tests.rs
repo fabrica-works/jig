@@ -814,6 +814,110 @@ fn documents_proposal_tracks_the_current_holder_and_funding_after_a_pass() {
 }
 
 #[test]
+fn person_address_proposals_keep_the_named_revision_and_actual_beforefacts() {
+    let (mut core, limits) = tree_core();
+    let root = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(1)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([root]),
+        },
+    );
+    let mut child = new_row(&core, 2, tasks::Funder::Task(1), None);
+    child.executor = tasks::Executor::Person(tasks::PersonAddress::Role(u32::MAX));
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(2)),
+            creator: tasks::Party::Task(1),
+            batch: Box::new([child]),
+        },
+    );
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::TakePerson { reply_to: ReplyTo::new(Token::new(3)), task: 2, person: 1 },
+    );
+    let named = tasks::AddressChange { revision: 0, address: tasks::PersonAddress::Person(2) };
+    let mut wider = core.tasks.task(2).unwrap().authority.clone();
+    wider.budget.spend = 15;
+    let edit = tasks::Amendment {
+        addressed: Some(named),
+        instructions: None,
+        release: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: Some(wider),
+        reason: b"new address".as_slice().into(),
+    };
+    let action = tasks::ProposalAction::Amend { task: 2, amendment: edit.clone() };
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Propose {
+            reply_to: ReplyTo::new(Token::new(4)),
+            proposal: tasks::Proposal {
+                number: 20,
+                proposer: 1,
+                project: 1,
+                action: action.clone(),
+                reason: b"Reason".as_slice().into(),
+                as_holder: false,
+                state: tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Person(1), since: Wall::EPOCH },
+            },
+        },
+    );
+    let Document::Proposal(doc) =
+        make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(1), number: 20 }, &window()).unwrap()
+    else {
+        panic!("proposal")
+    };
+    let ProposalAction::Amend { addressed, before, after, .. } = doc.action else { panic!("amendment") };
+    assert_eq!(addressed, Some(named));
+    assert_eq!(before.addressed, Some(tasks::PersonAddress::Role(u32::MAX)));
+    assert_eq!(before.taken_by, Some(1));
+    assert_eq!(after.addressed, Some(tasks::PersonAddress::Person(2)));
+    assert_eq!(after.taken_by, None);
+    let RetainedAction::Amend { change, .. } = retained_action(&limits, 20, &action).unwrap() else {
+        panic!("retained amendment")
+    };
+    assert_eq!(change.addressed, Some(named));
+    let mut moved = edit.clone();
+    moved.authority = None;
+    moved.addressed = Some(tasks::AddressChange { revision: 0, address: tasks::PersonAddress::Role(5) });
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Amend {
+            reply_to: ReplyTo::new(Token::new(5)),
+            by: tasks::Party::Person(1),
+            task: 2,
+            message: 21,
+            stop_run: false,
+            amendment: moved,
+        },
+    );
+    let current = core.tasks.task(2).unwrap();
+    assert_eq!(current.revisions.person, 1);
+    assert_eq!(tasks::address_admit(current, &edit.addressed), Err(tasks::Refusal::PersonRevision { revision: 1 }));
+    let Document::Proposal(doc) =
+        make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(1), number: 20 }, &window()).unwrap()
+    else {
+        panic!("pending proposal")
+    };
+    let ProposalAction::Amend { addressed, before, after, .. } = doc.action else { panic!("amendment") };
+    assert_eq!(addressed, Some(named), "the immutable named revision is not refreshed");
+    assert_eq!(before.addressed, Some(tasks::PersonAddress::Role(5)), "beforefacts are actual current owner facts");
+    assert_eq!(before.taken_by, None);
+    assert_eq!(after.addressed, Some(tasks::PersonAddress::Person(2)));
+}
+
+#[test]
 fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after() {
     let (mut core, limits) = make_tree();
     let mut changed = core.tasks.task(2).unwrap().spec.clone();
@@ -832,6 +936,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
         tasks::ProposalAction::Amend {
             task: 2,
             amendment: tasks::Amendment {
+                addressed: None,
                 release: Some(1),
                 instructions: Some(b"Use the new evidence".as_slice().into()),
                 spec: Some(changed),

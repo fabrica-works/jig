@@ -20,6 +20,8 @@ pub enum Control {
 /// Whole optional task changes; root checks any widening against its holder.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Amendment {
+    /// Whole person address change, independent of spec and hold revisions.
+    pub addressed: Option<AddressChange>,
     /// Replace the charter's instructions, delivered whole as this amendment's message.
     pub instructions: Option<Box<[u8]>>,
     /// Release this exact hold with the change; a later hold remains in place.
@@ -29,6 +31,41 @@ pub struct Amendment {
     pub dependencies: Option<Box<[u64]>>,
     pub authority: Option<Authority>,
     pub reason: Box<[u8]>,
+}
+
+/// A replacement address naming the person task revision it decides about.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AddressChange {
+    pub revision: u64,
+    pub address: crate::PersonAddress,
+}
+
+/// Shape accepted for a person task's address, as for its creation.
+pub(crate) fn valid_address(address: crate::PersonAddress) -> bool {
+    match address {
+        crate::PersonAddress::Person(person) => person != 0,
+        crate::PersonAddress::Role(_) => true,
+    }
+}
+
+/// Check the owner kind and named revision before any part of the amendment changes.
+pub fn address_admit(row: &crate::TaskRecord, addressed: &Option<AddressChange>) -> Result<(), Refusal> {
+    match addressed {
+        None => Ok(()),
+        Some(change) => {
+            match row.executor {
+                crate::Executor::Person(_) => {}
+                crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => return Err(Refusal::Executor),
+            }
+            if !valid_address(change.address) {
+                return Err(Refusal::Executor);
+            }
+            if change.revision != row.revisions.person {
+                return Err(Refusal::PersonRevision { revision: row.revisions.person });
+            }
+            Ok(())
+        }
+    }
 }
 
 /// Instruction replacements belong only to agents and must fit one whole amendment message.
@@ -67,6 +104,9 @@ pub struct History {
 /// Immutable settings before and after an admitted amendment.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Settings {
+    /// Exact person address and holder before or after the amendment.
+    pub addressed: Option<crate::PersonAddress>,
+    pub taken_by: Option<u64>,
     /// Exact task-owned override; absent means the configured charter default.
     pub instructions: Option<Box<[u8]>>,
     pub spec: Spec,
@@ -83,6 +123,11 @@ pub struct AmendmentHistory {
 
 fn settings(task: &crate::TaskRecord) -> Settings {
     Settings {
+        addressed: match task.executor {
+            crate::Executor::Person(address) => Some(address),
+            crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => None,
+        },
+        taken_by: task.taken_by,
         instructions: task.instructions.clone(),
         spec: task.spec.clone(),
         wake: task.wake,
@@ -191,6 +236,9 @@ pub(crate) fn amend(
     if amendment.reason.len() > usize::try_from(env.limits.message_bytes).expect("u32 fits usize") {
         return refused(to, Some(number), Refusal::Read, out);
     }
+    if let Err(why) = address_admit(old, &amendment.addressed) {
+        return refused(to, Some(number), why, out);
+    }
     if let Err(why) = instruction_admit(&env.limits, old.executor, &amendment.instructions) {
         return refused(to, Some(number), why, out);
     }
@@ -258,8 +306,12 @@ pub(crate) fn amend(
             Some(authority) => *authority != old.authority,
             None => false,
         };
+    let address_changed = match amendment.addressed {
+        Some(change) => old.executor != crate::Executor::Person(change.address) || old.taken_by.is_some(),
+        None => false,
+    };
     let person_changed = match old.executor {
-        crate::Executor::Person(_) => spec_changed || dependencies_changed,
+        crate::Executor::Person(_) => spec_changed || dependencies_changed || address_changed,
         crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => false,
     };
     if (changed && old.revisions.spec == u64::MAX) || (person_changed && old.revisions.person == u64::MAX) {
@@ -288,6 +340,10 @@ pub(crate) fn amend(
         crate::funders::resize(domain, env, number, authority.budget.spend, out);
     }
     let task = task_mut(domain, number).expect("amendment task live");
+    if let Some(change) = amendment.addressed {
+        task.record.executor = crate::Executor::Person(change.address);
+        task.record.taken_by = None;
+    }
     if let Some(instructions) = amendment.instructions {
         task.record.instructions = Some(instructions);
     }

@@ -1059,6 +1059,8 @@ impl Stored {
 /// (domain/tasks.md, sections 4–5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// The address edit names an older person task revision.
+    PersonRevision { revision: u64 },
     /// A required resource is unavailable in this project.
     ResourceUnavailable,
     /// Startup is restoring or failed; no mutation is admitted.

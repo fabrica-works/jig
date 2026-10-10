@@ -8,6 +8,9 @@ use jig_test_connector as connector;
 use jig_test_domain as root;
 use skein_lib::{List, Queue, ReplyTo, Token};
 
+#[path = "stories/address.rs"]
+mod address;
+
 fn ask(world: &mut World, request: u8, ask: people::Ask) {
     ask_as(world, world.sign_in.expect("signed-in person"), request, ask);
 }
@@ -94,6 +97,7 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
         action: core::NamedAction::Amend {
             target: report,
             amendment: tasks::Amendment {
+                addressed: None,
                 release: None,
                 instructions: None,
                 spec: Some(tasks::Spec {
@@ -902,6 +906,7 @@ fn live_row(world: &World, task: u64) -> &tasks::TaskRecord {
 
 fn amendment(words: &[u8]) -> people::Amendment {
     people::Amendment {
+        addressed: None,
         instructions: None,
         spec: Some(people::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }),
         wake: None,

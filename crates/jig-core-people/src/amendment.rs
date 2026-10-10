@@ -8,6 +8,8 @@ use skein_lib::{Duration, Wall};
 /// A person's whole optional task edit and bounded explanation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Amendment {
+    /// Re-address a person task, naming its displayed person-task revision.
+    pub addressed: Option<AddressChange>,
     /// Replace the agent task's instructions; an empty value clears them.
     pub instructions: Option<Box<[u8]>>,
     pub spec: Option<Spec>,
@@ -15,6 +17,22 @@ pub struct Amendment {
     pub dependencies: Option<Box<[u64]>>,
     pub authority: Option<Authority>,
     pub reason: Box<[u8]>,
+}
+
+/// A person task's whole address replacement and independent decision revision.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AddressChange {
+    pub revision: u64,
+    pub address: PersonAddress,
+}
+
+/// Who may take or answer the task in its project.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum PersonAddress {
+    /// One named party, without a role claim.
+    Person(u64),
+    /// Any holder of this project role.
+    Role(u32),
 }
 
 /// Human supplied words, parameters and historical inputs.

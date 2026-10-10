@@ -22,6 +22,7 @@ pub fn row(w: &World, task: u64) -> &tasks::TaskRecord {
 #[must_use]
 pub fn change(words: &[u8]) -> people::Amendment {
     people::Amendment {
+        addressed: None,
         instructions: Some(words.into()),
         spec: None,
         wake: None,

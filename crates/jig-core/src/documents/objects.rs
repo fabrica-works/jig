@@ -38,6 +38,8 @@ pub struct ProposedTask {
 /// The relevant task fields before and after one proposed amendment.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AmendmentState {
+    pub addressed: Option<tasks::PersonAddress>,
+    pub taken_by: Option<u64>,
     /// Known current instructions in proposals; exact retained override in history.
     pub instructions: Option<Text>,
     pub spec: SpecLine,
@@ -60,6 +62,7 @@ pub enum ProposalAction {
     },
     Amend {
         task: TaskLink,
+        addressed: Option<tasks::AddressChange>,
         before: Box<AmendmentState>,
         after: Box<AmendmentState>,
         reason: Text,
@@ -200,6 +203,7 @@ pub enum RetainedAction {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AmendmentChange {
+    pub addressed: Option<tasks::AddressChange>,
     pub instructions: Option<Text>,
     pub release: Option<u64>,
     pub spec: Option<SpecLine>,
@@ -308,6 +312,23 @@ fn amendment(
         ),
     };
     Ok(AmendmentState {
+        addressed: match change {
+            Some(change) => match change.addressed {
+                Some(change) => Some(change.address),
+                None => match row.executor {
+                    tasks::Executor::Person(address) => Some(address),
+                    tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => None,
+                },
+            },
+            None => match row.executor {
+                tasks::Executor::Person(address) => Some(address),
+                tasks::Executor::Agent { .. } | tasks::Executor::Procedure { .. } => None,
+            },
+        },
+        taken_by: match change {
+            Some(change) if change.addressed.is_some() => None,
+            Some(_) | None => row.taken_by,
+        },
         instructions: match row.executor {
             tasks::Executor::Agent { .. } => {
                 let value = match change {
@@ -357,6 +378,7 @@ fn action(
             let row = super::small::visible(core, party, *task)?;
             ProposalAction::Amend {
                 task: super::task_tree::link(core, limits, party, *task)?,
+                addressed: change.addressed,
                 before: Box::new(amendment(core, limits, row, None)?),
                 after: Box::new(amendment(core, limits, row, Some(change))?),
                 reason: super::small::text(&change.reason, limits.documents.text_bytes),
@@ -805,6 +827,7 @@ pub fn retained_action(limits: &Limits, number: u64, value: &tasks::ProposalActi
         tasks::ProposalAction::Amend { task, amendment: change } => RetainedAction::Amend {
             task: *task,
             change: Box::new(AmendmentChange {
+                addressed: change.addressed,
                 instructions: match &change.instructions {
                     Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
                     None => None,
@@ -869,6 +892,8 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Result<M
 
 fn settings(limits: &Limits, row: &tasks::Settings) -> Result<AmendmentState, Missing> {
     Ok(AmendmentState {
+        addressed: row.addressed,
+        taken_by: row.taken_by,
         instructions: match &row.instructions {
             Some(value) => Some(super::small::text(value, limits.documents.text_bytes)),
             None => None,
