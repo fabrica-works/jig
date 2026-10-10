@@ -149,7 +149,7 @@ fn a_procedure_goal_proposal_restores_and_accepts_the_original_executor() {
         91,
         people::Ask::DecideProposal {
             project: 1,
-            proposer: row.proposer,
+            proposer: people::Proposer::Party(row.proposer),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
@@ -170,7 +170,7 @@ fn a_procedure_goal_proposal_restores_and_accepts_the_original_executor() {
         94,
         people::Ask::DecideProposal {
             project: 1,
-            proposer: row.proposer,
+            proposer: people::Proposer::Party(row.proposer),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
