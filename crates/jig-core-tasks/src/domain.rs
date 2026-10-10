@@ -102,13 +102,14 @@ impl Domain {
             self.proposal_alarms.next(),
             self.escalation_alarms.next(),
             self.hold_alarms.next(),
-        ] {
-            if let Some(at) = at {
-                next = Some(match next {
-                    Some(previous) => previous.min(at),
-                    None => at,
-                });
-            }
+        ]
+        .into_iter()
+        .flatten()
+        {
+            next = Some(match next {
+                Some(previous) => previous.min(at),
+                None => at,
+            });
         }
         next
     }
