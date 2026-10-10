@@ -32,6 +32,10 @@ pub struct ChipObservation {
 /// Facts needed beside every chip, without nesting other chips or histories.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ChipDetails {
+    /// Owner context for a role address, including in a standalone retained chip.
+    pub project: u32,
+    /// Concrete owner identity; the chip's coarse executor kind remains separate.
+    pub executor: tasks::Executor,
     pub phase_since: Wall,
     /// Placement/adoption, never inferred to be actual agent start.
     pub run_since: Option<Wall>,
@@ -90,6 +94,8 @@ pub(super) fn from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<ChipD
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
     Ok(ChipDetails {
+        project: row.project,
+        executor: row.executor,
         phase_since: row.phase_since,
         run_since: row.run_since,
         attempt: if row.attempt == 0 { None } else { Some(row.attempt) },

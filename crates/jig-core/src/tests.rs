@@ -2721,3 +2721,5 @@ fn approval_documents_keep_opaque_state_whole_and_refuse_a_smaller_bound() {
     );
     assert_eq!(result_from_row(&core, &smaller, 1, &row), Err(Missing::TooLarge));
 }
+
+mod chip_executor;
