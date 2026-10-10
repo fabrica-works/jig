@@ -21,7 +21,7 @@ fn rule(b: &mut Builder, value: WakeRule, book: &Phrasebook, language: u16) {
         WakeRule::Never => text(b, book, language, WakePhrase::Never, &[]),
         WakeRule::Immediate => text(b, book, language, WakePhrase::Immediate, &[]),
         WakeRule::Batch { count, age } => {
-            text(b, book, language, WakePhrase::Batch, &[Hole::Number(u64::from(count)), Hole::Span(age)]);
+            text(b, book, language, WakePhrase::Batch, &[Hole::Number(u64::from(count)), Hole::Number(age.as_nanos())]);
         }
     }
 }
@@ -63,9 +63,9 @@ pub fn subscriptions(b: &mut Builder, value: &Subscriptions, book: &Phrasebook, 
                 text(b, book, language, result, &[]);
             }
             SubscriptionKind::Timer { at, period } => {
-                text(b, book, language, WakePhrase::Timer, &[Hole::Wall(at)]);
+                text(b, book, language, WakePhrase::Timer, &[Hole::Number(at.as_nanos())]);
                 match period {
-                    Some(period) => text(b, book, language, WakePhrase::Period, &[Hole::Span(period)]),
+                    Some(period) => text(b, book, language, WakePhrase::Period, &[Hole::Number(period.as_nanos())]),
                     None => text(b, book, language, WakePhrase::Once, &[]),
                 }
             }

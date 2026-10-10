@@ -27,7 +27,7 @@ fn whole_wake_channel_edits_preserve_batched_rules_flags_and_separate_subscripti
             let words = words();
             let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
             let tree = dialog(&domain, &words, &mut bindings);
-            assert!(contains(&tree, b"4294967295 messages"));
+            assert!(contains(&tree, b"4294967295 messages or 18446744073709551615 ns"));
             assert!(contains(&tree, b"Questions wake"));
             let action = press(&tree, b"Wakes on inbox messages", &mut bindings);
             drive(&mut domain, Event::Act { act: action });
@@ -101,9 +101,9 @@ fn task_overview_renders_numbered_standing_interests_independently_of_activation
         super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row.clone())));
         let (tree, _) = super::super::pages::build(&domain, 3, &words());
         super::super::cards_access::check(&tree);
-        assert!(contains(&tree, b"Wake policy"));
-        assert!(contains(&tree, b"Subscriptions"));
-        assert!(contains(&tree, b"4294967295 messages"));
+        assert!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Wake policy")));
+        assert!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Subscriptions")));
+        assert!(contains(&tree, b"4294967295 messages or 18446744073709551615 ns"));
         assert!(contains(&tree, b"last delegate result or a failure"));
         assert!(contains(&tree, b"Some task lists are incomplete"));
         assert!(contains(&tree, b"18446744073709551615"));

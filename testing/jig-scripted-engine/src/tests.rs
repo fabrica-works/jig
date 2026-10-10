@@ -2169,7 +2169,7 @@ fn task_subscription_capacity_is_priced_separately_from_whole_activation_replace
     }
     assert_eq!(row.heap(&bounds).unwrap(), baseline + List::<Subscription>::worst_case(4).unwrap());
     let exact = u64::try_from(core::mem::size_of::<Task>()).unwrap() + row.heap(&bounds).unwrap();
-    let mut limited = Bounds { document_bytes: exact, ..bounds.clone() };
+    let mut limited = Bounds { document_bytes: exact, ..bounds };
     assert!(crate::payload::fits(&row, &limited));
     limited.document_bytes -= 1;
     assert!(!crate::payload::fits(&row, &limited));
@@ -2199,8 +2199,8 @@ fn task_subscription_capacity_is_priced_separately_from_whole_activation_replace
         let heap = change.heap(&bounds).unwrap();
         assert_eq!(heap, 0);
         let size = u64::try_from(core::mem::size_of::<Amendment>()).unwrap();
-        assert!(crate::payload::fits(&change, &Bounds { document_bytes: size, ..bounds.clone() }));
-        assert!(!crate::payload::fits(&change, &Bounds { document_bytes: size - 1, ..bounds.clone() }));
+        assert!(crate::payload::fits(&change, &Bounds { document_bytes: size, ..bounds }));
+        assert!(!crate::payload::fits(&change, &Bounds { document_bytes: size - 1, ..bounds }));
         change.wake = None;
         assert_eq!(change.heap(&bounds).unwrap(), heap);
         assert_eq!(row.subscriptions.entries.capacity(), 4);

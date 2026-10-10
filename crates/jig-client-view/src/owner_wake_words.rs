@@ -128,12 +128,13 @@ impl WakePhrase {
             | Self::ResultYes
             | Self::ResultNo
             | Self::Once => Box::new([]),
-            Self::Batch => {
-                Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }, HoleShape { kind: HoleKind::Span, bytes: 0 }])
-            }
+            Self::Batch => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
             Self::Number | Self::Task => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Timer => Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }]),
-            Self::Period => Box::new([HoleShape { kind: HoleKind::Span, bytes: 0 }]),
+            Self::Timer => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::Period => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::Topic => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -167,7 +168,7 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b"Wakes after ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
                 Segment::Text(copy_of(b" messages or ")),
-                Segment::Hole { index: 1, kind: HoleKind::Span },
+                Segment::Hole { index: 1, kind: HoleKind::Number },
                 Segment::Text(copy_of(b" ns of oldest message age")),
             ]),
             WakePhrase::ResultsNever => Box::new([Segment::Text(copy_of(b"Delegate results do not wake"))]),
@@ -194,12 +195,12 @@ pub fn language() -> Language {
             WakePhrase::ResultNo => Box::new([Segment::Text(copy_of(b"Result is not subscribed"))]),
             WakePhrase::Timer => Box::new([
                 Segment::Text(copy_of(b"Timer at ")),
-                Segment::Hole { index: 0, kind: HoleKind::Wall },
+                Segment::Hole { index: 0, kind: HoleKind::Number },
                 Segment::Text(copy_of(b" ns since epoch")),
             ]),
             WakePhrase::Period => Box::new([
                 Segment::Text(copy_of(b"Repeats every ")),
-                Segment::Hole { index: 0, kind: HoleKind::Span },
+                Segment::Hole { index: 0, kind: HoleKind::Number },
                 Segment::Text(copy_of(b" ns")),
             ]),
             WakePhrase::Once => Box::new([Segment::Text(copy_of(b"Fires once"))]),
