@@ -1,5 +1,5 @@
 //! Closed source activity/message sayings (client/domain/view.md, 7).
-//! Allocated phrase numbers 7200 onward are independent of legacy conversation rendering.
+//! Allocated phrase numbers 7200 onward are independent of conversation rendering.
 use crate::{
     Owner,
     phrases::{
