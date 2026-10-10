@@ -196,6 +196,8 @@ pub struct Task {
     pub taken_by: Option<u64>,
     /// Last committed immutable activity position.
     pub activity: u64,
+    /// Current specification source facts; list loss is independent of the page's cut.
+    pub spec: super::SpecLine,
     pub words: Text,
     pub parameters: List<Parameter>,
     pub instructions: Option<Text>,
@@ -745,6 +747,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         },
         taken_by: row.taken_by,
         activity: row.activity,
+        spec: super::objects::spec(limits, &row.spec),
         words: super::small::text(&row.spec.words, limits.documents.text_bytes),
         parameters,
         instructions: match row.executor {
@@ -934,8 +937,13 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
     let path = List::<Box<[u8]>>::worst_case(limits.lines)?.checked_add(lines.checked_mul(text)?)?;
     let authority = authority_worst_case(limits)?;
     let references = List::<TaskLink>::worst_case(limits.lines)?.checked_add(lines.checked_mul(chip)?)?;
+    let specification = text
+        .checked_add(List::<Parameter>::worst_case(limits.lines)?)?
+        .checked_add(lines.checked_mul(text)?)?
+        .checked_add(List::<u64>::worst_case(limits.lines)?)?;
     let task = u64::try_from(size_of::<Task>())
         .ok()?
+        .checked_add(specification)?
         .checked_add(text.checked_mul(7)?)?
         .checked_add(path.checked_mul(2)?)?
         .checked_add(chip)?

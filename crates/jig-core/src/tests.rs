@@ -2852,6 +2852,7 @@ fn approval_documents_keep_opaque_state_whole_and_refuse_a_smaller_bound() {
 }
 
 mod chip_executor;
+mod task_specification;
 
 #[test]
 fn verdict_documents_preserve_machine_field_rules_and_values_whole() {
