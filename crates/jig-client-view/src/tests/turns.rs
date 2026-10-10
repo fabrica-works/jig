@@ -595,8 +595,8 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         live_call_words::LiveCallPhrase,
         phrases::{Form, PhraseLimits, Phrasebook, PluralClass, Segment, english},
     };
-    let first = crate::owner_words::language(english::language());
-    let mut selected = crate::owner_words::language(english::language());
+    let first = english::language();
+    let mut selected = english::language();
     for phrase in &mut selected.phrases {
         let label: Option<&[u8]> = if phrase.id == LiveCallPhrase::OpenCurrentCallInput.id() {
             Some(b"Selected language opens actual current input")
@@ -611,7 +611,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         }
     }
     let book = Phrasebook::load(
-        crate::owner_words::shapes(crate::phrases::jig::shapes(CLIENT.text)),
+        crate::phrases::jig::shapes(CLIENT.text),
         Box::new([first, selected]),
         &PhraseLimits {
             languages: 2,
