@@ -725,9 +725,9 @@ fn fill_notes(d: &mut Domain, read: Token) {
         scope: NoteScope::Resource { project: 4, connector: 2, pattern: full_pattern() },
         description: DocumentText::complete(full()),
         body: DocumentText::complete(full()),
-        by: Actor::Party(1),
+        writer: NoteAuthor::Party { party: 1 },
         tasks: list([8, 9]),
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
         acts: list([
             Offered { act: ActKind::EditNote, admission: Admission::Allowed },
             Offered { act: ActKind::DeleteNote, admission: Admission::Allowed },

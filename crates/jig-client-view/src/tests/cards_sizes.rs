@@ -249,9 +249,9 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
         scope: NoteScope::Project(4),
         description: DocumentText::complete(full_name()),
         body: DocumentText::complete(full_text()),
-        by: Actor::Party(1),
+        writer: NoteAuthor::Party { party: 1 },
         tasks: list([8, 9]),
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
         acts: offered(ActKind::EditNote),
         cut: false,
     };
