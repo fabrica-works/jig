@@ -7,7 +7,7 @@
 [profile.default]
 default-filter = "not binary(/^fuzzy_/)"
 global-timeout = "15s"
-slow-timeout = { period = "3s" }
+slow-timeout = { period = "500ms" }
 
 # The worlds' tests first, the longest, then the many short unit tests behind
 # them, so that the run ends close to its total over the threads.
@@ -18,7 +18,7 @@ priority = 10
 [profile.fuzzy]
 default-filter = "binary(/^fuzzy_/)"
 global-timeout = "60s"
-slow-timeout = { period = "20s" }
+slow-timeout = { period = "5s" }
 
 # Measuring, not gating: no budget. With -j 1, each test's own time:
 #   cargo nextest run --workspace --profile measure -j 1
