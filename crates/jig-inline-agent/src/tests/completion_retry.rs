@@ -117,6 +117,16 @@ fn completed(
     content: Box<[smith::llm::Said]>,
     out: &mut Queue<Request>,
 ) -> Box<[Request]> {
+    completed_with_stop(agent, env, owner, content, smith::llm::Stop::EndTurn, out)
+}
+fn completed_with_stop(
+    agent: &mut Agent,
+    env: &Env<Limits>,
+    owner: Token,
+    content: Box<[smith::llm::Said]>,
+    stop: smith::llm::Stop,
+    out: &mut Queue<Request>,
+) -> Box<[Request]> {
     terminal(
         agent,
         env,
@@ -125,7 +135,7 @@ fn completed(
             owner,
             completion: smith::llm::Completion {
                 content,
-                stop: smith::llm::Stop::EndTurn,
+                stop,
                 usage: smith::llm::Usage {
                     input_tokens: 1,
                     output_tokens: 1,
@@ -197,7 +207,7 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
     let (owner, _) = named(&spawn(&mut agent, &env, start, &mut out));
     let (_, issued) = named(&retry(&mut agent, &mut env, owner, &mut out));
     let call = smith::llm::Said::ToolCall {
-        id: Box::from(&[0xff, 0, 0x80][..]),
+        id: Box::from(&b"provider/id"[..]),
         name: Box::from(&b"unknown"[..]),
         input: Box::from(&b"{}"[..]),
         call: smith::llm::Decoded::Invalid { problem: smith::llm::Problem::UnknownTool },
@@ -220,7 +230,7 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
                         assert_eq!((*seen, *completion), (owner, issued));
                         assert_eq!(
                             (id.as_ref(), name.as_ref(), input.as_ref()),
-                            (&[0xff, 0, 0x80][..], &b"unknown"[..], &b"{}"[..])
+                            (&b"provider/id"[..], &b"unknown"[..], &b"{}"[..])
                         );
                         assert_eq!(*provisional, Some(Provisional { turn: 1, retry: 1, offset: 7 }));
                         kinds.push("call").expect("three captured kinds");
@@ -260,7 +270,7 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
         &env,
         owner,
         Box::new([smith::llm::Said::ToolCall {
-            id: Box::from(&[0xff, 0, 0x80][..]),
+            id: Box::from(&b"provider/id"[..]),
             name: Box::from(&b"unknown"[..]),
             input: Box::from(&b"{}"[..]),
             call: smith::llm::Decoded::Invalid { problem: smith::llm::Problem::UnknownTool },
@@ -269,7 +279,7 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
         &mut out,
     );
     assert_ne!(issued, second_name, "one opaque provider id in another completion names another call");
-    assert!(has_call(&second, owner, second_name, &[0xff, 0, 0x80]));
+    assert!(has_call(&second, owner, second_name, b"provider/id"));
 }
 
 #[test]
@@ -331,7 +341,8 @@ fn nested_retry_keeps_its_opaque_owner_without_becoming_main_writing() {
         },
         replay: None,
     };
-    let mut requests = completed(&mut agent, &env, main, Box::new([call]), &mut out);
+    let mut requests =
+        completed_with_stop(&mut agent, &env, main, Box::new([call]), smith::llm::Stop::ToolUse, &mut out);
     settle(&mut agent, &env, &mut out, &mut requests);
     let (child, first) = named(&requests);
     assert_ne!(child, main, "actual typed admission and provider requests: {requests:?}");
