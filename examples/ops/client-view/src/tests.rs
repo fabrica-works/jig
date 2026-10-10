@@ -156,6 +156,31 @@ fn incident() -> observability::documents::Incident {
     }
 }
 #[test]
+fn deployment_keys_are_distinct_from_both_zero_and_maximum_project_identifiers() {
+    let infrastructure = [
+        infrastructure::Scope::Project(0),
+        infrastructure::Scope::Project(u32::MAX),
+        infrastructure::Scope::Deployment,
+    ]
+    .map(|scope| {
+        crate::infrastructure::key(&infrastructure::Subject { scope, kind: infrastructure::Kind::Outbox(17) })
+    });
+    let observability =
+        [observability::Scope::Project(0), observability::Scope::Project(u32::MAX), observability::Scope::Deployment]
+            .map(|scope| {
+                crate::observability::key(&observability::Subject { scope, kind: observability::Kind::Outbox(17) })
+            });
+    for keys in [infrastructure, observability] {
+        assert_ne!(keys[0], keys[1]);
+        assert_ne!(keys[0], keys[2]);
+        assert_ne!(keys[1], keys[2]);
+        assert_eq!(keys[0].a, 0);
+        assert_eq!(keys[1].a, u64::from(u32::MAX));
+        assert_eq!(keys[2].a, u64::MAX);
+        assert!(keys.iter().all(|key| key.b == 17 && key.kind == 6));
+    }
+}
+#[test]
 fn an_incident_drawing_has_a_readable_fallback_and_missing_lead_is_explicit() {
     let mut root = ready();
     let requests = drive(

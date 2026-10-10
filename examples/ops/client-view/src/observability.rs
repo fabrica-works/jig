@@ -235,7 +235,8 @@ pub fn part(
 pub fn key(service: &Subject) -> Key {
     let value = match service.scope {
         Scope::Project(part) => u64::from(part),
-        Scope::Deployment => 0,
+        // Project identifiers are u32; this sentinel preserves every supplied project, including zero.
+        Scope::Deployment => u64::MAX,
     };
     let (kind, builder) = match service.kind {
         Kind::Incidents { open } => (1, u64::from(open)),
