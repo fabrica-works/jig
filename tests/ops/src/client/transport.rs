@@ -564,7 +564,7 @@ impl Front<Ops> for Scripted {
     }
 }
 struct SubjectRun {
-    turn: Option<TurnName>,
+    turn: Option<jig_client::contract::ProvisionalTurnName>,
     offset: u32,
 }
 fn run_position(subject: &jig_client::contract::Subject) -> SubjectRun {
