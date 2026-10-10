@@ -237,11 +237,6 @@ fn full_runtime_tools_and_held_closing_fit_the_declared_tree_envelope() {
     }
 }
 
-fn current_identity(id: &[u8]) -> jig_client::contract::CallIdentity {
-    jig_client::contract::CallIdentity {
-        owner: skein_lib::Token::new(u64::MAX),
-        sequence: u32::MAX,
-        retry: u32::MAX,
-        id: text(id),
-    }
+fn current_identity(id: &[u8]) -> CallIdentity {
+    CallIdentity { owner: Token::new(u64::MAX), sequence: u32::MAX, retry: u32::MAX, id: text(id) }
 }

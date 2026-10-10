@@ -582,9 +582,13 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
         escaped.extend_from_slice(b"\\xFE");
     }
     assert!(contains(&tree, &escaped));
-    assert!(
-        matches!(d.conversation().live.get(0).unwrap().call.as_ref().unwrap(), LiveCall::Raw(call) if call.identity.owner == Token::new(u64::MAX) && call.identity.id == full_raw_byte(0xfd))
-    );
+    match d.conversation().live.get(0).unwrap().call.as_ref().unwrap() {
+        LiveCall::Raw(call) => {
+            assert_eq!(call.identity.owner, Token::new(u64::MAX));
+            assert_eq!(call.identity.id, full_raw_byte(0xfd));
+        }
+        LiveCall::Decoded(_) => panic!("expected the supplied raw current call"),
+    }
     assert!(limits.text_per_node >= CLIENT.text * 4);
     let (mut reloaded, _, run, _) = ready();
     assert!(reloaded.conversation().live.is_empty());
@@ -691,11 +695,6 @@ fn full_raw_byte(byte: u8) -> Text {
     Text::new(bytes.into_boxed_slice(), super::cards::CLIENT.text).unwrap()
 }
 
-fn current_identity(id: &[u8]) -> jig_client::contract::CallIdentity {
-    jig_client::contract::CallIdentity {
-        owner: skein_lib::Token::new(u64::MAX),
-        sequence: u32::MAX,
-        retry: u32::MAX,
-        id: text(id),
-    }
+fn current_identity(id: &[u8]) -> CallIdentity {
+    CallIdentity { owner: Token::new(u64::MAX), sequence: u32::MAX, retry: u32::MAX, id: text(id) }
 }
