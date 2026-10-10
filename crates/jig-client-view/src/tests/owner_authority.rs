@@ -164,3 +164,17 @@ fn authority_phrasebook_rejects_missing_duplicate_wrong_holes_and_unknown_langua
         Invalid::Language
     );
 }
+
+#[test]
+fn authority_words_reject_unrepresentable_utc_offsets_before_retaining_the_book() {
+    for offset in [i32::MIN, i32::MAX] {
+        assert_eq!(
+            OwnerAuthorityWords::load(Box::new([words::english()]), &phrase_limits(), 0, offset)
+                .expect_err("offset arithmetic cannot overflow after loading"),
+            Invalid::Overflow
+        );
+    }
+    let positive =
+        OwnerAuthorityWords::load(Box::new([words::english()]), &phrase_limits(), 0, 60).expect("person offset fits");
+    assert_eq!(positive.adjusted_wall(Wall::from_nanos(u64::MAX)), Wall::from_nanos(u64::MAX));
+}

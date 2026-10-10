@@ -173,6 +173,9 @@ impl OwnerAuthorityWords {
         if usize::from(language) >= languages.len() {
             return Err(Invalid::Language);
         }
+        if u64::from(offset_minutes.unsigned_abs()).checked_mul(60_000_000_000).is_none() {
+            return Err(Invalid::Overflow);
+        }
         let book = Phrasebook::load(shapes(), languages, limits)?;
         Ok(Self { book, language, offset_minutes })
     }
@@ -191,7 +194,7 @@ impl OwnerAuthorityWords {
     pub fn adjusted_wall(&self, at: Wall) -> Wall {
         let nanos = u64::from(self.offset_minutes.unsigned_abs())
             .checked_mul(60_000_000_000)
-            .expect("i32 minutes fit u64 nanos");
+            .expect("loaded UTC offset fits u64 nanos");
         Wall::from_nanos(if self.offset_minutes < 0_i32 {
             at.as_nanos().saturating_sub(nanos)
         } else {
