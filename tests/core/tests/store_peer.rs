@@ -1,6 +1,11 @@
 use jig_core as core;
 use jig_core_people as people;
-use jig_core_world::{Store, client_peer::ClientPeer, effects::World, store_peer::StorePeer};
+use jig_core_world::{
+    Store,
+    client_peer::ClientPeer,
+    effects::{Cut, World},
+    store_peer::StorePeer,
+};
 use jig_fake_store::{Fault, Write};
 use jig_test_domain as root;
 use skein_lib::{Duration, ReplyTo, Time, Token, Wall};
@@ -43,6 +48,7 @@ fn opaque_turn(bytes: &[u8]) -> root::Record {
 fn an_applied_world_transaction_is_captured_before_its_held_client_answer() {
     let mut world = observed_world(641);
     let before = world.store.applied;
+    world.cut = Some(Cut::Durable(before + 1));
     world.store.fault(Fault::Hold { commits: 1 });
     world.send(sign_in(11));
     assert_eq!(world.store.applied, before + 1);
@@ -54,6 +60,8 @@ fn an_applied_world_transaction_is_captured_before_its_held_client_answer() {
     assert_eq!(snapshots[0].rows, world.store.rows, "the complete externally applied store");
     assert!(snapshots[0].at > Time::ZERO);
     assert!(snapshots[0].at.as_nanos() <= world.wall_time().as_nanos());
+    assert_eq!(world.reached_cut, Some(Cut::Durable(world.store.applied)));
+    assert_eq!(snapshots[0].at, Time::from_nanos(world.wall_time().as_nanos()), "the exact public applied tick");
 }
 
 #[test]
