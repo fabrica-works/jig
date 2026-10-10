@@ -312,10 +312,27 @@ impl Conversation {
         {
             return true;
         }
+        if let Some(current) = self.current
+            && current.turn() == value.turn.turn()
+            && value.turn.retry < current.retry
+        {
+            return true;
+        }
         if self.replacing {
-            self.live.clear();
-            self.current = None;
-            self.stream_offset = 0;
+            let mut kept = List::with_capacity(self.live.capacity());
+            let old = core::mem::replace(&mut self.live, List::with_capacity(0));
+            for held in old.into_boxed() {
+                if held.name.turn() != value.turn.turn() {
+                    kept.push(held).expect("replacement preserves bounded earlier turns");
+                }
+            }
+            self.live = kept;
+            if let Some(current) = self.current
+                && current.turn() == value.turn.turn()
+            {
+                self.current = None;
+                self.stream_offset = 0;
+            }
             self.replacing = false;
         }
         let mut index = None;

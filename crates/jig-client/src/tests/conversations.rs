@@ -1091,3 +1091,34 @@ fn explicit_cut_and_reopened_origin_replace_retry_text_while_valid_suffixes_dedu
     assert_eq!(c.current, Some(value.turn));
     assert_eq!(c.offset(), 4);
 }
+
+#[test]
+fn reopened_current_retry_preserves_other_uncommitted_turns_and_fences_stale_retry() {
+    let mut c = Conversation::new(9, 3);
+    assert!(c.stream(stream(1, 0, 3, b"one", false), 100));
+    assert!(c.stream(stream(2, 0, 3, b"two", false), 100));
+    c.interrupted();
+    let mut current = stream(3, 0, 3, b"new", false);
+    current.turn.retry = 2;
+    assert!(c.stream(current.clone(), 100));
+    assert_eq!(c.live.len(), 3, "reopening a later turn cannot reset the earlier uncommitted turns");
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one");
+    assert_eq!(c.live.get(1).unwrap().text.bytes(), b"two");
+    assert_eq!(c.live.get(2).unwrap().text.bytes(), b"new");
+    c.interrupted();
+    let mut stale = current.clone();
+    stale.turn.retry = 1;
+    stale.text = text(b"old");
+    assert!(c.stream(stale, 100));
+    assert_eq!(c.current, Some(current.turn));
+    assert_eq!(c.live.get(2).unwrap().text.bytes(), b"new");
+    current.text = text(b"ok");
+    current.through = 2;
+    assert!(c.stream(current.clone(), 100));
+    assert_eq!(c.live.len(), 3);
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one");
+    assert_eq!(c.live.get(1).unwrap().text.bytes(), b"two");
+    assert_eq!(c.live.get(2).unwrap().text.bytes(), b"ok", "only the reopened current turn is replaced");
+    assert_eq!(c.current, Some(current.turn));
+    assert_eq!(c.offset(), 2);
+}
