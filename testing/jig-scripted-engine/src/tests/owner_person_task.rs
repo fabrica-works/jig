@@ -17,7 +17,7 @@ fn person_owner_public_read_preserves_whole_optional_results_and_original_object
             },
         )
         .expect("whole owner document admitted");
-    engine.poll(Time::from_nanos(100_000_000));
+    assert!(engine.poll(Time::from_nanos(100_000_000)).is_empty());
     engine
         .read(Time::from_nanos(100_000_000), 11, Token::new(97), Read::PersonTask { task: 8 })
         .expect("original read admitted");

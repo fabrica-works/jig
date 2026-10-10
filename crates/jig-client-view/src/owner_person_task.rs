@@ -6,6 +6,7 @@ use crate::{
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
+use alloc::boxed::Box;
 use jig_client::{
     Domain, Limits,
     action::Act,
@@ -156,7 +157,7 @@ pub fn required(value: &OwnerPersonTask, l: &Limits, words: &Words) -> Option<Pe
     }
     worst_case(l, words)
 }
-fn saying(words: &Words, phrase: P, holes: &[Hole]) -> alloc::boxed::Box<[u8]> {
+fn saying(words: &Words, phrase: P, holes: &[Hole]) -> Box<[u8]> {
     words.book.say(words.language, phrase.id(), holes).expect("checked person words and typed holes").text
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {

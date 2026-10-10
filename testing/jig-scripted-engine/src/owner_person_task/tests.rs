@@ -1,8 +1,5 @@
 use super::{bytes, fits, worst_case};
-use crate::{
-    Bounds,
-    payload::{self, Payload},
-};
+use crate::{Bounds, payload};
 use core::mem::size_of;
 use jig_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
