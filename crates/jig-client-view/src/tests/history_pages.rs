@@ -80,10 +80,10 @@ fn populated() -> Domain {
     );
     let Request::Open { watch, subject: Subject::Frame } = out.as_slice()[0] else { panic!("explicit frame watch") };
     drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
-    let opened = drive(
-        &mut domain,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(cards::document()))) },
-    );
+    let mut frame = cards::document();
+    frame.party.login = DocumentText::complete(cards::text(b"login"));
+    let opened =
+        drive(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) });
     let _original_read = history_read(opened.as_slice());
     let task_watch = opened
         .as_slice()

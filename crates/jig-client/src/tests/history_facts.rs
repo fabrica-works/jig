@@ -89,7 +89,8 @@ fn page(cut: bool, after: Option<Cursor>) -> ReadValue {
 fn owner_history_original_scope_cursors_and_page_loss_survive_continuation_and_reset() {
     let mut domain = Domain::new(&LIMITS, 207);
     let watch = start(&mut domain, List::with_capacity(0));
-    delivered(&mut domain, Time::ZERO, watch, frame(7));
+    let initial = delivered(&mut domain, Time::ZERO, watch, frame(7));
+    super::pages::finish_initial_inbox_reads(&mut domain, &initial);
     let original = history_read(&drive(
         &mut domain,
         Time::ZERO,
