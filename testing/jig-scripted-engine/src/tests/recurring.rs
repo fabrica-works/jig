@@ -99,3 +99,60 @@ fn recurring_checks_allocated_batch_last_batch_and_nested_member_capacities() {
     row.batch.get_mut(1).unwrap().spec = Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap();
     assert!(!fits(&row, &bounds), "the final template member's text is checked");
 }
+
+#[test]
+fn exact_parts_and_contracts_price_every_segment_choice_and_opaque_state_byte() {
+    let mut bounds = Bounds { rows: 2, document_bytes: u64::MAX, ..Bounds::default() };
+    let reference = OwnerPart {
+        connector: u16::MAX,
+        kind: OwnerPartKind::Outbox,
+        key: OwnerPartKey::Path(list(vec![b"a/b".as_slice().into(), b"c\xff".as_slice().into()])),
+    };
+    let bytes = u64::try_from(core::mem::size_of::<OwnerPart>()).unwrap()
+        + skein_lib::List::<Box<[u8]>>::worst_case(2).unwrap()
+        + 3
+        + 2;
+    bounds.document_bytes = bytes;
+    assert!(fits(&reference, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!fits(&reference, &bounds));
+    bounds.document_bytes = u64::MAX;
+    let mut oversized = reference.clone();
+    oversized.key = OwnerPartKey::Path(skein_lib::List::with_capacity(3));
+    assert!(!fits(&oversized, &bounds));
+
+    let approval = TaskContractDocument::Approval { state: b"opaque\xff".as_slice().into(), part: reference };
+    let bytes = u64::try_from(core::mem::size_of::<TaskContractDocument>()).unwrap()
+        + skein_lib::List::<Box<[u8]>>::worst_case(2).unwrap()
+        + 3
+        + 2
+        + 7;
+    bounds.document_bytes = bytes;
+    assert!(fits(&approval, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!fits(&approval, &bounds));
+
+    let choice = VerdictChoice {
+        code: u32::MAX,
+        words: u32::MAX,
+        followups: u32::MAX,
+        fields: list(vec![
+            FieldRule { name: b"a/b".as_slice().into(), max: 11 },
+            FieldRule { name: b"c\xff".as_slice().into(), max: 17 },
+        ]),
+    };
+    let verdict = TaskContractDocument::Verdict { choices: list(vec![choice]), cut: true };
+    let bytes = u64::try_from(core::mem::size_of::<TaskContractDocument>()).unwrap()
+        + skein_lib::List::<VerdictChoice>::worst_case(1).unwrap()
+        + skein_lib::List::<FieldRule>::worst_case(2).unwrap()
+        + 3
+        + 2;
+    bounds.document_bytes = bytes;
+    assert!(fits(&verdict, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!fits(&verdict, &bounds));
+    bounds.document_bytes = u64::MAX;
+    assert!(!fits(&TaskContractDocument::Verdict { choices: skein_lib::List::with_capacity(3), cut: false }, &bounds));
+    let oversized = VerdictChoice { code: 9, words: 8, followups: 7, fields: skein_lib::List::with_capacity(3) };
+    assert!(!fits(&TaskContractDocument::Verdict { choices: list(vec![oversized]), cut: false }, &bounds));
+}
