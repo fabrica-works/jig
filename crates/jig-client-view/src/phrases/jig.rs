@@ -2045,7 +2045,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 515] = [
+pub const ALL: [JigPhrase; 516] = [
     JigPhrase::SpecificationNumber,
     JigPhrase::SpecificationBytes,
     JigPhrase::SpecificationResource,
