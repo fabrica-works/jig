@@ -337,9 +337,9 @@ pub fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_
             let ids: Vec<_> = value
                 .rows
                 .iter()
-                .map(|row| match row {
-                    reads::PageRow::Conversation(row) => row.chip.number,
-                    _ => panic!("conversation row"),
+                .map(|row| {
+                    let reads::PageRow::Conversation(row) = row else { panic!("conversation row") };
+                    row.chip.number
                 })
                 .collect();
             prefixes.push(ids);
