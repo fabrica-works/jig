@@ -11,9 +11,9 @@ fn random_faults_and_restart_cuts_reach_every_retained_ending() {
     let branches = Story::all();
     assert_eq!(branches.iter().copied().collect::<std::collections::BTreeSet<_>>().len(), 48);
     for (index, branch) in branches.into_iter().enumerate() {
-        let seed = u64::try_from(index).expect("48 branch timings");
-        let (trace, frozen) = run_story_branches(seed, branch);
-        assert_eq!(frozen.results.len(), 5, "seed {seed}, branch {branch:?}");
+        let timing_seed = u64::try_from(index).expect("48 branch timings");
+        let (trace, frozen) = run_story_branches(timing_seed, branch);
+        assert_eq!(frozen.results.len(), 5, "seed {timing_seed}, branch {branch:?}");
         seen.extend(trace.coverage.0);
     }
     let mut random = skein_lib::Rng::new(DRAW_SOURCE);
