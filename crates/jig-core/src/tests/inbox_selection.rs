@@ -8,6 +8,9 @@ fn fixture() -> (Core, Limits) {
     limits.tasks.project_tasks = 16;
     limits.tasks.tree_tasks = 16;
     limits.tasks.depth = 4;
+    limits.tasks.inbox_messages = 16;
+    limits.people.inbox_tasks = 32;
+    limits.people.requests = 4;
     limits.people.inbox_entries = 16;
     limits.documents.rows = 16;
     core.tasks = tasks::Domain::new(&limits.tasks, 17, Box::new([1]));
@@ -25,16 +28,24 @@ fn fixture() -> (Core, Limits) {
         assert!(core.tasks.task(number).is_some());
     }
     send_task(&mut core, &limits, tasks::Event::Restored);
-    restore_document_party(&mut core, &limits, &[1]);
+    let identity = core.people.identity(1).unwrap().clone();
+    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
-    people::step(
-        &mut core.people,
-        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
-        people::Event::Restore {
-            record: people::Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(u64::MAX) },
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
+    for record in [
+        people::Stored::Person { number: 1, identity },
+        people::Stored::Roles {
+            project: 1,
+            holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
         },
-        &mut out,
-    );
+        people::Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(Duration::from_secs(60).as_nanos()) },
+    ] {
+        people::step(&mut core.people, &env, people::Event::Restore { record }, &mut out);
+        while out.pop().is_some() {}
+    }
+    people::step(&mut core.people, &env, people::Event::Restored, &mut out);
+    assert!(core.people.identity(1).is_some());
+    assert_eq!(core.people.person(10, Time::ZERO, Wall::EPOCH), Some(1));
     (core, limits)
 }
 
