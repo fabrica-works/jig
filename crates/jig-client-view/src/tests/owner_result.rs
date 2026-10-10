@@ -173,8 +173,8 @@ fn result_metadata_reuses_whole_contract_opaque_parts_and_owner_executor() {
 #[test]
 fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capacity() {
     let limits = phrase_limits();
-    let normal = crate::owner_words::language(crate::phrases::english::language());
-    let mut translated = crate::owner_words::language(crate::phrases::english::language());
+    let normal = crate::phrases::english::language();
+    let mut translated = crate::phrases::english::language();
     translated.wall = WallFormat::Clock;
     for phrase in &mut translated.phrases {
         for form in &mut phrase.forms {
@@ -186,12 +186,7 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
             }
         }
     }
-    let book = Phrasebook::load(
-        crate::owner_words::shapes(crate::phrases::jig::shapes(128)),
-        Box::new([normal, translated]),
-        &limits,
-    )
-    .unwrap();
+    let book = Phrasebook::load(crate::phrases::jig::shapes(128), Box::new([normal, translated]), &limits).unwrap();
     let words = Words { book, language: 1, offset_minutes: 0 };
     let tree = build(&details(), &words);
     assert!(has(&tree, b"selected 4294967295"));
