@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 use skein_lib::{Duration, ReplyTo, Token};
 
 /// parent -> host
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Event {
     /// A named message with its sender label and words.
     Inbound {
@@ -148,7 +148,7 @@ pub enum Event {
 }
 
 /// host -> parent
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Request {
     /// Relay a named host tool call with its effect classification and input.
     Relay {
