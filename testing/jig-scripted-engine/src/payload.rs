@@ -14,9 +14,9 @@ use jig_client::contract::{
     Pool, Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read,
     ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
     ResultValue, Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, Specification,
-    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskFilter, TaskLine, TaskSpend,
-    Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent,
-    WriterSlot,
+    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskFilter, TaskLine,
+    TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd,
+    WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
