@@ -58,6 +58,8 @@ pub struct Delegation {
     pub kind: DelegationKind,
     /// Absent until the same-decision core outcome.
     pub child: Option<u64>,
+    /// The exact core outcome was recorded, including a refused creation.
+    pub settled: bool,
 }
 
 /// A closed reason the owner refused an association.
@@ -217,9 +219,9 @@ pub(crate) fn step(
                         Some(value) if !value.is_empty() => value.clone(),
                         Some(_) | None => return refused(task, step, AssociationRefusal::Template, out),
                     };
-                    let Some(number) = crate::incidents::open(domain, env, &watch, alerts, service, severity, out)
-                    else {
-                        return refused(task, step, AssociationRefusal::Conflict, out);
+                    let number = match crate::incidents::open(domain, env, &watch, alerts, service, severity, out) {
+                        Ok(number) => number,
+                        Err(reason) => return refused(task, step, reason, out),
                     };
                     save(
                         domain,
@@ -229,6 +231,7 @@ pub(crate) fn step(
                             project: watch.project,
                             kind: DelegationKind::Lead { incident: number },
                             child: None,
+                            settled: false,
                         },
                         out,
                     );
@@ -276,7 +279,14 @@ fn make_triage(
     let project = watch.project;
     save(
         domain,
-        Delegation { task, step, project, kind: DelegationKind::Triage { alerts: alerts.clone() }, child: None },
+        Delegation {
+            task,
+            step,
+            project,
+            kind: DelegationKind::Triage { alerts: alerts.clone() },
+            child: None,
+            settled: false,
+        },
         out,
     );
     out.push(Request::WatchDecision { task, step, decision: WatchDecision::Triage { delegate, alerts } });
@@ -288,23 +298,24 @@ pub(crate) fn outcome(domain: &mut Domain, task: u64, step: u64, child: Option<u
         out.push(Request::AssociationRefused { task, step, reason: AssociationRefusal::UnknownStep });
         return;
     };
-    if value.child.is_some() {
+    if value.settled {
         if value.child != child {
             out.push(Request::AssociationRefused { task, step, reason: AssociationRefusal::Conflict });
         }
         return;
     }
-    let Some(child) = child else {
-        domain.delegations.remove(&(task, step));
-        out.push(Request::Erase { key: RecordKey::Delegation { task, step } });
-        return;
-    };
-    if child == 0 {
+    if child == Some(0) {
         out.push(Request::AssociationRefused { task, step, reason: AssociationRefusal::Conflict });
         return;
     }
     match &value.kind {
-        DelegationKind::Triage { .. } => {}
+        DelegationKind::Triage { .. } => {
+            if child.is_none() {
+                domain.delegations.remove(&(task, step));
+                out.push(Request::Erase { key: RecordKey::Delegation { task, step } });
+                return;
+            }
+        }
         DelegationKind::Lead { incident } => {
             let Some(incident) = domain.incidents.get_mut(&(value.project, *incident)) else {
                 out.push(Request::AssociationRefused { task, step, reason: AssociationRefusal::UnknownStep });
@@ -314,12 +325,13 @@ pub(crate) fn outcome(domain: &mut Domain, task: u64, step: u64, child: Option<u
                 out.push(Request::AssociationRefused { task, step, reason: AssociationRefusal::Conflict });
                 return;
             }
-            incident.lead = Some(child);
+            incident.lead = child;
             out.push(Request::Save { record: Record::Incident(incident.clone()) });
         }
     }
     let mut value = value;
-    value.child = Some(child);
+    value.child = child;
+    value.settled = true;
     save(domain, value, out);
 }
 

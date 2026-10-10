@@ -91,6 +91,18 @@ fn assert_alert(world: &jig_conformance::Harness<jig_ops_world::conformance::Ops
             panic!("ended task {number}")
         };
         assert_eq!(row.requester, jig_core_tasks::Party::Task(requester), "W -> T1,T2,I -> R");
+        if number == 3 || number == 4 {
+            assert_eq!(row.authority.delegation.tasks, 0, "triage has no delegate authority");
+            assert_eq!(row.authority.delegation.depth, 0);
+            assert!(row.delegates.is_empty());
+            let jig_core_tasks::Contract::Verdict { choices } = &row.spec.contract else {
+                panic!("triage's closed verdict")
+            };
+            assert_eq!(choices.len(), 2);
+            for choice in choices {
+                assert_eq!(choice.followups, 0);
+            }
+        }
     }
     let (_, incident, association) = world.peers.lead_commits.first().expect("durable lead association");
     assert_eq!(incident.lead, Some(5));

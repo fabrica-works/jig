@@ -438,6 +438,7 @@ fn the_lead_is_unknown_until_the_same_step_outcome_and_a_conflict_never_replaces
                 project: 1,
                 kind: DelegationKind::Lead { incident: 12 },
                 child: None,
+                settled: false,
             }),
         },
     );
@@ -543,4 +544,30 @@ fn has_request(requests: &Queue<Request>, expected: ExpectedRequest) -> bool {
         }
     }
     false
+}
+
+#[test]
+fn a_refused_lead_creation_keeps_its_step_and_never_accepts_a_later_child() {
+    let mut domain = incident_owner();
+    event(
+        &mut domain,
+        2,
+        Event::WatchStep { task: 7, step: 2, batch: 11, messages: Box::new([incident_verdict(100)]) },
+    );
+    let receipt = event(&mut domain, 2, Event::ProcedureDelegateOutcome { task: 7, step: 2, child: None });
+    let mut restarted = Domain::new(&limits());
+    for request in &receipt {
+        if let Request::Save { record } = request {
+            event(&mut restarted, 2, Event::Restore { record: record.clone() });
+        }
+    }
+    let retained = restarted.delegations.get(&(7, 2)).expect("refused creation retains its exact lead step");
+    assert!(retained.settled);
+    assert_eq!(retained.child, None);
+    let later = event(&mut restarted, 2, Event::ProcedureDelegateOutcome { task: 7, step: 2, child: Some(200) });
+    assert!(has_request(&later, ExpectedRequest::Conflict));
+    let ClientDocument::Incident { incident, .. } = read_incident(&mut restarted).expect("retained incident") else {
+        panic!()
+    };
+    assert_eq!(incident.lead, None);
 }

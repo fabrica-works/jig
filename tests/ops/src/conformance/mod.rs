@@ -586,6 +586,7 @@ impl Application for Ops {
         events
     }
     fn submitted(peers: &mut Peers, store: &Store, _: Clock) {
+        documents::leads_submitted(peers, store);
         if peers.document_story {
             documents::submitted(peers, store);
         }

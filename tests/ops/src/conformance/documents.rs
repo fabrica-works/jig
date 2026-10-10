@@ -5,6 +5,21 @@ use skein_lib::Token;
 pub fn submitted(peers: &mut Peers, store: &Store) {
     let pending = store.pending.back().expect("submitted transaction");
     for write in &pending.writes {
+        if let jig_fake_store::Write::Save { row, .. } = write
+            && matches!(
+                row,
+                root::Record::Observability(obs::Record::Incident(_))
+                    | root::Record::Infrastructure(infra::Record::Procedure(_))
+            )
+        {
+            peers.document_rows.push((pending.number, row.clone()));
+        }
+    }
+}
+
+pub fn leads_submitted(peers: &mut Peers, store: &Store) {
+    let pending = store.pending.back().expect("submitted transaction");
+    for write in &pending.writes {
         let jig_fake_store::Write::Save { row: root::Record::Observability(obs::Record::Incident(incident)), .. } =
             write
         else {
@@ -28,17 +43,6 @@ pub fn submitted(peers: &mut Peers, store: &Store) {
                 if task.number == lead && task.requester == jig_core_tasks::Party::Task(association.task)
             )), "lead association and actual child are submitted together");
             peers.lead_commits.push((pending.number, incident.clone(), association.clone()));
-        }
-    }
-    for write in &pending.writes {
-        if let jig_fake_store::Write::Save { row, .. } = write
-            && matches!(
-                row,
-                root::Record::Observability(obs::Record::Incident(_))
-                    | root::Record::Infrastructure(infra::Record::Procedure(_))
-            )
-        {
-            peers.document_rows.push((pending.number, row.clone()));
         }
     }
 }

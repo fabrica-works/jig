@@ -99,15 +99,18 @@ pub(crate) fn open(
     service: Service,
     severity: u8,
     out: &mut Queue<Request>,
-) -> Option<u64> {
+) -> Result<u64, crate::AssociationRefusal> {
     // The primary covered alert names this incident account; it never names a lead task.
-    let number = *alerts.first()?;
+    let number = *alerts.first().ok_or(crate::AssociationRefusal::Verdict)?;
     let project = watch.project;
     let task = watch.task;
     let key = (project, number);
-    let raised = domain.alerts.get(&key)?.raised;
-    if domain.incidents.contains_key(&key) || domain.incidents.len() >= capacity(&env.limits)? {
-        return None;
+    let raised = domain.alerts.get(&key).ok_or(crate::AssociationRefusal::Verdict)?.raised;
+    if domain.incidents.contains_key(&key) {
+        return Err(crate::AssociationRefusal::Conflict);
+    }
+    if domain.incidents.len() >= capacity(&env.limits).ok_or(crate::AssociationRefusal::Full)? {
+        return Err(crate::AssociationRefusal::Full);
     }
     let mut incident = Incident {
         project,
@@ -125,7 +128,7 @@ pub(crate) fn open(
     append(&mut incident, IncidentPoint { at: raised, health: None });
     domain.incidents.insert(key, incident.clone()).expect("incident capacity checked");
     out.push(Request::Save { record: Record::Incident(incident) });
-    Some(number)
+    Ok(number)
 }
 
 pub(crate) fn observed(
