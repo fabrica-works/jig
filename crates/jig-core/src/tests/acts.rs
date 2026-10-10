@@ -833,7 +833,7 @@ fn a_task_and_a_party_with_identical_proposal_numbers_are_decided_separately() {
                 },
             },
         );
-        let goal = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, Some(4));
+        let goal = new_row(&core, 5, tasks::Funder::Pool { project: 1, person: 1, period: 1 }, Some(4));
         send_task(
             &mut core,
             &limits,
@@ -848,6 +848,8 @@ fn a_task_and_a_party_with_identical_proposal_numbers_are_decided_separately() {
                 },
             },
         );
+        assert!(core.tasks.proposal(1, 10).is_some(), "task proposal admitted");
+        assert!(core.tasks.person_proposal(1, 10).is_some(), "party proposal admitted");
         let task = Proposer::Task(1);
         let party = Proposer::Party(1);
         let order = if party_first { [party, task] } else { [task, party] };
@@ -896,7 +898,7 @@ fn a_task_and_a_party_with_identical_proposal_numbers_are_decided_separately() {
 }
 
 #[test]
-fn a_historical_proposal_decision_requires_the_exact_typed_maker() {
+fn a_historical_proposal_decision_requires_the_exact_maker() {
     for proposer in [Proposer::Task(1), Proposer::Party(1)] {
         for other_store in [false, true] {
             let (mut core, limits) = make_tree();
