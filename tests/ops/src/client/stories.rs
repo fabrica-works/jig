@@ -130,7 +130,9 @@ pub fn incident_world(seed: u64) -> ClientWorld {
     p.why = text(b"Restart checkout in production");
     let mut lead = task();
     lead.chip.title = DocumentText::complete(text(b"I incident lead"));
-    *lead.chip.details = ChipPhase::Idle { wake: lead.wake.clone() };
+    *lead.chip.details = ChipPhase::Idle {
+        wake: WakePolicy { words: false, results: false, topics: list([]), subscriptions: list([]) },
+    };
     let mut restart = task();
     restart.chip.task = 10;
     restart.chip.title = DocumentText::complete(text(b"R restart checkout"));
@@ -358,7 +360,9 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     }
     let mut chat = task();
     chat.chip.title = DocumentText::complete(text(b"Q staging chat"));
-    *chat.chip.details = ChipPhase::Idle { wake: chat.wake.clone() };
+    *chat.chip.details = ChipPhase::Idle {
+        wake: WakePolicy { words: false, results: false, topics: list([]), subscriptions: list([]) },
+    };
     let mut p = proposal();
     p.why = text(b"Provision staging for one week");
     p.funding = Budget { total: 40, own: 40, ended: 0, reserved: 0, left: 40, funder: Actor::Party(7) };
