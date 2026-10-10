@@ -149,6 +149,7 @@ pub fn received(event: &Event) -> Vec<Receipt> {
                 vec![Receipt::Answer { attempt: *attempt, final_answer: *envelope == RequestEnvelope::Final, words }]
             }
         }
+        Event::Start { .. } => vec![Receipt::Started],
         Event::Jig(event) => jig_received(event),
         Event::First(
             domain::first::Event::Read { result: family::ReadResult::Value(doc), .. }
@@ -159,7 +160,7 @@ pub fn received(event: &Event) -> Vec<Receipt> {
             domain::first::Event::Read { result: family::ReadResult::SignedOut, .. }
             | domain::first::Event::Ended { end: family::WatchEnd::SignedOut, .. },
         ) => vec![Receipt::Parked],
-        Event::Start { .. } | Event::Went { .. } | Event::Act { .. } | Event::First(_) => vec![],
+        Event::Went { .. } | Event::Act { .. } | Event::First(_) => vec![],
     }
 }
 /// Observe delivered jig documents and sign-in state before the root callback.
