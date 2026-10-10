@@ -11,39 +11,7 @@ use alloc::boxed::Box;
 use jig_core_tasks as tasks;
 use skein_lib::{List, Map, Wall};
 
-/// Connector-owned value's kind, carried only as a reference.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum PartKind {
-    /// A named resource or its state.
-    Resource,
-    /// A counted resource pool.
-    Pool,
-    /// A task's connector result.
-    Result,
-    /// A procedure's panel or kind.
-    Procedure,
-    /// A proposed effect's description.
-    Effect,
-    /// An existing connector-owned outbox entry.
-    Outbox,
-}
-
-/// The core's key for a connector-owned part; keys are never shortened.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum PartKey {
-    /// Literal resource path segments.
-    Path(List<Box<[u8]>>),
-    /// A numbered kind, resource, task or proposal.
-    Number(u64),
-}
-
-/// A reference to application data; no application value is copied.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Part {
-    pub connector: u16,
-    pub kind: PartKind,
-    pub key: PartKey,
-}
+pub use tasks::{Part, PartKey, PartKind};
 
 /// Terminal coverage rule of a granted resource pattern.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -88,6 +56,8 @@ pub struct AuthorityLine {
 /// Result form and its admitted bounds, usable as a person task's form.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ContractLine {
+    /// Exact connector state required for approval; it is never shortened.
+    Approval { state: Box<[u8]>, part: Part },
     /// A report in words.
     Report { words: u32 },
     /// A configured choice with an explanation and bounded follow-ups.
@@ -99,6 +69,8 @@ pub enum ContractLine {
 /// Contract-shaped result words and an optional connector-owned value.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ResultValue {
+    /// Whole approved state and optional bounded explanation.
+    Approved { state: Box<[u8]>, words: Option<Text> },
     /// Successful report.
     Report(Text),
     /// A selected verdict code with its explanation.
@@ -409,8 +381,27 @@ pub(super) fn authority(limits: &Limits, value: &tasks::Authority) -> Result<Aut
     })
 }
 
-pub(super) fn contract(limits: &Limits, value: &tasks::Contract) -> ContractLine {
-    match value {
+pub(super) fn contract(limits: &Limits, value: &tasks::Contract) -> Result<ContractLine, Missing> {
+    Ok(match value {
+        tasks::Contract::Approval { state, part } => {
+            if state.len() > usize::try_from(limits.documents.text_bytes).expect("u32 fits usize") {
+                return Err(Missing::TooLarge);
+            }
+            match &part.key {
+                PartKey::Number(_) => {}
+                PartKey::Path(segments) => {
+                    if segments.capacity() > limits.documents.lines {
+                        return Err(Missing::TooLarge);
+                    }
+                    for segment in segments {
+                        if segment.len() > usize::try_from(limits.documents.text_bytes).expect("u32 fits usize") {
+                            return Err(Missing::TooLarge);
+                        }
+                    }
+                }
+            }
+            ContractLine::Approval { state: state.clone(), part: part.clone() }
+        }
         tasks::Contract::Report { words } => ContractLine::Report { words: *words },
         tasks::Contract::Change { connector, kind, words } => {
             ContractLine::Change { connector: *connector, kind: *kind, words: *words }
@@ -422,11 +413,23 @@ pub(super) fn contract(limits: &Limits, value: &tasks::Contract) -> ContractLine
             }
             ContractLine::Verdict { cut: size(result.len()) < choices.len(), choices: result }
         }
-    }
+    })
 }
 
-pub(super) fn result_value(limits: &Limits, value: &tasks::TaskResult) -> ResultValue {
-    match value {
+pub(super) fn result_value(limits: &Limits, value: &tasks::TaskResult) -> Result<ResultValue, Missing> {
+    Ok(match value {
+        tasks::TaskResult::Approved { state, words } => {
+            if state.len() > usize::try_from(limits.documents.text_bytes).expect("u32 fits usize") {
+                return Err(Missing::TooLarge);
+            }
+            ResultValue::Approved {
+                state: state.clone(),
+                words: match words {
+                    Some(words) => Some(super::small::text(words, limits.documents.text_bytes)),
+                    None => None,
+                },
+            }
+        }
         tasks::TaskResult::Report { words } => {
             ResultValue::Report(super::small::text(words, limits.documents.text_bytes))
         }
@@ -441,23 +444,23 @@ pub(super) fn result_value(limits: &Limits, value: &tasks::TaskResult) -> Result
         tasks::TaskResult::Failure { reason } => {
             ResultValue::Failure(super::small::text(reason, limits.documents.text_bytes))
         }
-    }
+    })
 }
 
-pub(super) fn ending(limits: &Limits, value: &tasks::Ending) -> Ending {
-    match value {
-        tasks::Ending::Done(result) => Ending::Done(result_value(limits, result)),
+pub(super) fn ending(limits: &Limits, value: &tasks::Ending) -> Result<Ending, Missing> {
+    Ok(match value {
+        tasks::Ending::Done(result) => Ending::Done(result_value(limits, result)?),
         tasks::Ending::Failed { reason } => Ending::Failed(super::small::text(reason, limits.documents.text_bytes)),
         tasks::Ending::Cancelled { reason, result, by, at } => Ending::Cancelled {
             by: *by,
             at: *at,
             reason: super::small::text(reason, limits.documents.text_bytes),
             result: match result {
-                Some(result) => Some(result_value(limits, result)),
+                Some(result) => Some(result_value(limits, result)?),
                 None => None,
             },
         },
-    }
+    })
 }
 
 pub(super) fn hold_source(limits: &Limits, source: Option<&tasks::HoldSource>) -> Result<Option<Part>, Missing> {
@@ -674,12 +677,12 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         || row.dependencies.len() > bound(limits)
         || row.references.len() > bound(limits);
     let result = match &row.phase {
-        tasks::Phase::Closing(closing) => Some(ending(limits, &closing.ending)),
+        tasks::Phase::Closing(closing) => Some(ending(limits, &closing.ending)?),
         tasks::Phase::Held { was, .. } => match was {
-            tasks::Was::Closing(closing) => Some(ending(limits, &closing.ending)),
+            tasks::Was::Closing(closing) => Some(ending(limits, &closing.ending)?),
             tasks::Was::Waiting | tasks::Was::Active(_) => None,
         },
-        tasks::Phase::Ended(value) => Some(ending(limits, value)),
+        tasks::Phase::Ended(value) => Some(ending(limits, value)?),
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
     let acts = super::offers::task(core, limits, party, row)?;
@@ -723,7 +726,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         references: links(core, limits, party, &row.references)?,
         subscriptions,
         wake: row.wake,
-        contract: contract(limits, &row.contract),
+        contract: contract(limits, &row.contract)?,
         result,
         budget: budget(row),
         authority,
@@ -896,8 +899,8 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
     let references = List::<TaskLink>::worst_case(limits.lines)?.checked_add(lines.checked_mul(chip)?)?;
     let task = u64::try_from(size_of::<Task>())
         .ok()?
-        .checked_add(text.checked_mul(5)?)?
-        .checked_add(path)?
+        .checked_add(text.checked_mul(7)?)?
+        .checked_add(path.checked_mul(2)?)?
         .checked_add(chip)?
         .checked_add(List::<super::LiveDelegate>::worst_case(limits.lines)?)?
         .checked_add(lines.checked_mul(chip)?)?

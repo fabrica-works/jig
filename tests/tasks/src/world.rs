@@ -1007,6 +1007,14 @@ fn status(ending: &Ending) -> tasks::Status {
 fn result_notice(ending: Ending) -> (ResultKind, Box<[u8]>) {
     match ending {
         Ending::Done(result) => match result {
+            TaskResult::Approved { state, words } => {
+                let words_present = words.is_some();
+                let words = match words {
+                    Some(words) => words,
+                    None => Box::new([]),
+                };
+                (ResultKind::Approved { state, words_present }, words)
+            }
             TaskResult::Report { words } => (ResultKind::Report, words),
             TaskResult::Verdict { code, words } => (ResultKind::Verdict { code }, words),
             TaskResult::Change { connector, kind, resource, words } => {

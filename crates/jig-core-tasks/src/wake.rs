@@ -20,7 +20,7 @@ pub(crate) fn valid(policy: &WakePolicy) -> bool {
     true
 }
 
-fn category(kind: MessageKind) -> u8 {
+fn category(kind: &MessageKind) -> u8 {
     match kind {
         MessageKind::Words => 0,
         MessageKind::EffectNotMade { .. }
@@ -39,7 +39,7 @@ fn category(kind: MessageKind) -> u8 {
 
 fn rule(domain: &Domain, number: u64, word: &Word) -> WakeRule {
     let task = record(domain, number).expect("inbox task live");
-    match word.kind {
+    match &word.kind {
         MessageKind::Words => match word.from {
             Party::Person(_) => WakeRule::Immediate,
             Party::Task(_) | Party::Deployment { .. } => task.wake.words,
@@ -69,7 +69,10 @@ fn rule(domain: &Domain, number: u64, word: &Word) -> WakeRule {
             ResultsWake::Each => WakeRule::Immediate,
             ResultsWake::LastOrFailure => match result {
                 crate::ResultKind::Failed | crate::ResultKind::Cancelled => WakeRule::Immediate,
-                crate::ResultKind::Report | crate::ResultKind::Verdict { .. } | crate::ResultKind::Change { .. } => {
+                crate::ResultKind::Approved { .. }
+                | crate::ResultKind::Report
+                | crate::ResultKind::Verdict { .. }
+                | crate::ResultKind::Change { .. } => {
                     if task.delegates.is_empty() {
                         WakeRule::Immediate
                     } else {
@@ -99,7 +102,7 @@ fn batch_state(domain: &Domain, number: u64, word: &Word) -> (u32, Wall, bool) {
     let mut oldest = word.at;
     let mut latched = false;
     for item in &task.inbox {
-        if category(item.kind) == category(word.kind) {
+        if category(&item.kind) == category(&word.kind) {
             hits = hits.saturating_add(item.hits);
             oldest = oldest.min(item.at);
             latched |= item.eligible;
@@ -143,7 +146,7 @@ pub(crate) fn after_message(
             if latched || hits >= count || env.wall.as_nanos() >= at {
                 let task = task_mut(domain, number).expect("batch task live");
                 for item in &mut task.record.inbox {
-                    if category(item.kind) == category(word.kind) {
+                    if category(&item.kind) == category(&word.kind) {
                         item.eligible = true;
                     }
                 }

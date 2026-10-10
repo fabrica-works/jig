@@ -306,6 +306,7 @@ fn bytes(result: &TaskResult) -> usize {
         TaskResult::Report { words } | TaskResult::Verdict { words, .. } | TaskResult::Change { words, .. } => {
             words.len()
         }
+        TaskResult::Approved { state, words } => state.len() + words.as_ref().map_or(0, |words| words.len()),
         TaskResult::Failure { reason } => reason.len(),
     }
 }
@@ -363,6 +364,7 @@ fn within(task: &TaskRecord, limits: &Limits) -> bool {
     }
     let result_cap = usize::try_from(limits.result_bytes).expect("u32 fits usize");
     let contract = match &task.contract {
+        Contract::Approval { state, .. } => state.len() <= result_cap,
         Contract::Report { words } | Contract::Change { words, .. } => *words <= limits.result_bytes,
         Contract::Verdict { choices } => {
             !choices.is_empty()

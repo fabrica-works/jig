@@ -1409,3 +1409,306 @@ fn a_goal_with_a_deadline_is_held_past_it() {
 
 #[path = "stories/offers.rs"]
 mod offers;
+
+fn approval_world(seed: u64) -> (World, u64, u64, u64) {
+    let (configuration, limits) = person_world_fixture(seed);
+    let mut world = World::configured(seed, false, configuration, limits);
+    let parent = world.assignments[0];
+    let mut approval = member(&world, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"approve shown state");
+    approval.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    approval.contract = tasks::Contract::Approval {
+        state: Box::from(&b"state\x00\xff"[..]),
+        part: tasks::Part { connector: 1, kind: tasks::PartKind::Resource, key: tasks::PartKey::Number(45) },
+    };
+    let task = delegate(&mut world, parent, 1, approval);
+    ask(&mut world, 81, people::Ask::TakePerson { project: 1, task });
+    let revision = live_row(&world, task).revisions.person;
+    (world, parent.0, task, revision)
+}
+
+#[test]
+fn a_person_approves_the_exact_state_and_its_delegate_result_waits_for_commit() {
+    let (mut world, parent, task, revision) = approval_world(451);
+    world.people_answers.clear();
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    ask(
+        &mut world,
+        82,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task,
+            revision,
+            result: people::PersonResult::Approved {
+                state: Box::from(&b"state\x00\xff"[..]),
+                words: Some(Box::from(&b"looks correct"[..])),
+            },
+        },
+    );
+    assert!(world.people_answers.is_empty(), "the reply waits for the approval transaction");
+    assert!(
+        !world
+            .inbound
+            .iter()
+            .any(|message| matches!(message.kind, tasks::MessageKind::Result(tasks::ResultKind::Approved { .. })))
+    );
+    let number = world.store.release_held().expect("withheld approval completion");
+    world.send(root::Event::Committed { number });
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::PersonAnswered { task })));
+    let message = live_row(&world, parent)
+        .inbox
+        .iter()
+        .find(|message| message.from == tasks::Party::Task(task))
+        .expect("delegate result delivered");
+    assert_eq!(
+        message.kind,
+        tasks::MessageKind::Result(tasks::ResultKind::Approved {
+            state: Box::from(&b"state\x00\xff"[..]),
+            words_present: true
+        })
+    );
+    assert_eq!(message.words.as_ref(), b"looks correct");
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))]
+    else {
+        panic!("ended approval owner");
+    };
+    assert_eq!(
+        row.phase,
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Approved {
+            state: Box::from(&b"state\x00\xff"[..]),
+            words: Some(Box::from(&b"looks correct"[..]))
+        }))
+    );
+    world.restart_with(person_world_fixture(451).0);
+    let message = live_row(&world, parent)
+        .inbox
+        .iter()
+        .find(|message| message.from == tasks::Party::Task(task))
+        .expect("result survives cold restore");
+    assert_eq!(
+        message.kind,
+        tasks::MessageKind::Result(tasks::ResultKind::Approved {
+            state: Box::from(&b"state\x00\xff"[..]),
+            words_present: true
+        })
+    );
+    assert_eq!(message.words.as_ref(), b"looks correct");
+}
+
+#[test]
+fn a_person_approving_a_different_state_or_wrong_revision_is_refused_as_moved() {
+    let (mut world, _, task, revision) = approval_world(452);
+    for (request, named, state) in
+        [(82, revision, b"other state".as_slice()), (83, revision + 1, b"state\x00\xff".as_slice())]
+    {
+        ask(
+            &mut world,
+            request,
+            people::Ask::AnswerPerson {
+                project: 1,
+                task,
+                revision: named,
+                result: people::PersonResult::Approved { state: state.into(), words: None },
+            },
+        );
+        assert_eq!(
+            world.people_answers.last(),
+            Some(&people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Moved {
+                now: people::Moved::Person { revision }
+            })))
+        );
+        assert_eq!(live_row(&world, task).person_answer, None);
+        assert!(!world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))));
+    }
+    ask(
+        &mut world,
+        84,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task,
+            revision,
+            result: people::PersonResult::Approved { state: Box::from(&b"state\x00\xff"[..]), words: None },
+        },
+    );
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::PersonAnswered { task })));
+}
+
+#[test]
+fn a_person_declines_an_approval_with_the_existing_cannot_do_result() {
+    let (mut world, parent, task, revision) = approval_world(453);
+    ask(
+        &mut world,
+        82,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task,
+            revision,
+            result: people::PersonResult::Failure { reason: Box::from(&b"the shown state is unsuitable"[..]) },
+        },
+    );
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::PersonAnswered { task })));
+    let message = live_row(&world, parent)
+        .inbox
+        .iter()
+        .find(|message| message.from == tasks::Party::Task(task))
+        .expect("declined result delivered");
+    assert_eq!(message.kind, tasks::MessageKind::Result(tasks::ResultKind::Failed));
+    assert_eq!(message.words.as_ref(), b"the shown state is unsuitable");
+}
+
+#[test]
+fn approval_delegate_results_preserve_absent_and_explicitly_empty_explanations() {
+    for (seed, words, present) in [(454, None, false), (455, Some(Box::<[u8]>::from([])), true)] {
+        let (mut world, parent, task, revision) = approval_world(seed);
+        ask(
+            &mut world,
+            82,
+            people::Ask::AnswerPerson {
+                project: 1,
+                task,
+                revision,
+                result: people::PersonResult::Approved { state: Box::from(&b"state\x00\xff"[..]), words },
+            },
+        );
+        let message = live_row(&world, parent)
+            .inbox
+            .iter()
+            .find(|message| message.from == tasks::Party::Task(task))
+            .expect("approval result delivered");
+        assert_eq!(
+            message.kind,
+            tasks::MessageKind::Result(tasks::ResultKind::Approved {
+                state: Box::from(&b"state\x00\xff"[..]),
+                words_present: present
+            })
+        );
+        assert!(message.words.is_empty());
+        assert!(
+            world.inbound.iter().any(|delivered| delivered == message),
+            "typed result reaches the independent host"
+        );
+    }
+}
+
+#[test]
+fn an_approval_reaches_its_asking_procedure_connector_as_the_whole_durable_input() {
+    let (mut configuration, mut limits) = person_world_fixture(456);
+    limits.core.authority.executors = 3;
+    limits.core.tasks.executor_kinds = 3;
+    let kinds: Box<[authority::Executor]> =
+        Box::new([authority::Executor::Charter(1), authority::Executor::Role(0), authority::Executor::Procedure(1)]);
+    configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
+    let mut rules = configuration.core.authority.rules().clone();
+    rules.ceiling.delegation.kinds.clone_from(&kinds);
+    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
+    policy.ceiling.delegation.kinds.clone_from(&kinds);
+    policy.roles[0].authority.delegation.kinds = kinds;
+    let mut domain = authority::Domain::new(rules, limits.core.authority).expect("procedure policy");
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    configuration.core.authority = domain;
+    let mut world = World::configured(456, false, configuration, limits);
+    world.hold_procedures = true;
+    let root_run = world.assignments[0];
+    let mut procedure = member(&world, tasks::Executor::Procedure { connector: 1, code: 1 }, b"ask for approval");
+    procedure.authority.delegation.kinds = Box::new([tasks::AuthorityExecutor::Role(0)]);
+    let parent = delegate(&mut world, root_run, 1, procedure);
+    let (step, connector, code, context) = world.procedure_inputs.last().expect("first procedure input");
+    assert_eq!(context.task, parent);
+    let mut child = member(&world, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"approve this state");
+    child.authority.budget.spend = 5;
+    child.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    child.contract = tasks::Contract::Approval {
+        state: Box::from(&b"procedure\x00\xff"[..]),
+        part: tasks::Part { connector: 1, kind: tasks::PartKind::Resource, key: tasks::PartKey::Number(45) },
+    };
+    world.send(root::Event::Core(core::Event::ProcedureStep {
+        task: parent,
+        step: *step,
+        connector: *connector,
+        code: u32::from(*code),
+        action: core::ProcedureAction::Delegate(Box::new([child])),
+    }));
+    let task = *live_row(&world, parent).delegates.first().expect("person delegate");
+    ask(&mut world, 81, people::Ask::TakePerson { project: 1, task });
+    let revision = live_row(&world, task).revisions.person;
+    let before = world.procedure_inputs.len();
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    ask(
+        &mut world,
+        82,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task,
+            revision,
+            result: people::PersonResult::Approved {
+                state: Box::from(&b"procedure\x00\xff"[..]),
+                words: Some(Box::new([])),
+            },
+        },
+    );
+    assert_eq!(world.procedure_inputs.len(), before, "connector cannot receive an unacknowledged commit");
+    let number = world.store.release_held().expect("approval transaction held");
+    world.send(root::Event::Committed { number });
+    let (_, connector, _, context) = world.procedure_inputs.last().expect("procedure receives approval");
+    assert_eq!(*connector, 1);
+    assert_eq!(context.task, parent);
+    let result =
+        context.inbox.iter().find(|message| message.from == tasks::Party::Task(task)).expect("whole result input");
+    assert_eq!(
+        result.kind,
+        tasks::MessageKind::Result(tasks::ResultKind::Approved {
+            state: Box::from(&b"procedure\x00\xff"[..]),
+            words_present: true
+        })
+    );
+    assert!(result.words.is_empty());
+    assert_eq!(world.procedure_inputs.len(), before + 1);
+}
+
+#[test]
+fn approval_state_and_explanation_share_the_person_answer_byte_bound() {
+    let (mut world, parent, task, revision) = approval_world(457);
+    let bound = usize::try_from(person_world_fixture(457).1.core.people.words).expect("small bound");
+    let state = b"state\x00\xff";
+    ask(
+        &mut world,
+        82,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task,
+            revision,
+            result: people::PersonResult::Approved {
+                state: state.as_slice().into(),
+                words: Some(vec![7; bound - state.len() + 1].into_boxed_slice()),
+            },
+        },
+    );
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Words }))
+    );
+    assert_eq!(live_row(&world, task).person_answer, None);
+    assert!(!world.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))));
+    ask(
+        &mut world,
+        83,
+        people::Ask::AnswerPerson {
+            project: 1,
+            task,
+            revision,
+            result: people::PersonResult::Approved {
+                state: state.as_slice().into(),
+                words: Some(vec![7; bound - state.len()].into_boxed_slice()),
+            },
+        },
+    );
+    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::PersonAnswered { task })));
+    let message = live_row(&world, parent)
+        .inbox
+        .iter()
+        .find(|message| message.from == tasks::Party::Task(task))
+        .expect("bounded result");
+    assert_eq!(message.payload_bytes(), Some(bound));
+}

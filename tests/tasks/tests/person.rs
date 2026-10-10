@@ -235,3 +235,37 @@ fn person_stall_news_and_the_result_keep_room_before_ordinary_words() {
     assert!(inbox.iter().any(|word| word.kind == tasks::MessageKind::PersonStalled { task: 2 }));
     assert!(inbox.iter().any(|word| word.kind == tasks::MessageKind::Result(tasks::ResultKind::Report)));
 }
+
+#[test]
+fn an_approval_exceeding_the_tasks_result_bound_leaves_it_answerable() {
+    let mut world = World::new(458, LIMITS);
+    let mut new = task(1, &[]);
+    new.executor = Executor::Person(PersonAddress::Person(9));
+    let state = vec![5; usize::try_from(LIMITS.result_bytes).expect("small bound")].into_boxed_slice();
+    new.contract = Contract::Approval {
+        state: state.clone(),
+        part: tasks::Part { connector: 1, kind: tasks::PartKind::Resource, key: tasks::PartKey::Number(1) },
+    };
+    assert_eq!(world.make(Party::Person(9), vec![new]), Reply::Made(vec![1]));
+    assert!(matches!(
+        response(&mut world, |reply_to| Event::AnswerPerson {
+            reply_to,
+            task: 1,
+            person: 9,
+            result: TaskResult::Approved { state: state.clone(), words: Some(Box::new([7])) },
+        }),
+        Reply::Refused(_)
+    ));
+    assert_eq!(world.record(1).person_answer, None);
+    assert_eq!(
+        response(&mut world, |reply_to| Event::AnswerPerson {
+            reply_to,
+            task: 1,
+            person: 9,
+            result: TaskResult::Approved { state: state.clone(), words: None },
+        }),
+        Reply::Done
+    );
+    world.settle(1);
+    assert_eq!(world.results[&1], tasks::Ending::Done(TaskResult::Approved { state, words: None }));
+}

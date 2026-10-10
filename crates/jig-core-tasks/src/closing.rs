@@ -397,6 +397,10 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
         Ending::Done(
             TaskResult::Report { words } | TaskResult::Verdict { words, .. } | TaskResult::Change { words, .. },
         ) => words.as_ref(),
+        Ending::Done(TaskResult::Approved { words, .. }) => match words {
+            Some(words) => words.as_ref(),
+            None => &[],
+        },
         Ending::Done(TaskResult::Failure { reason }) | Ending::Failed { reason } | Ending::Cancelled { reason, .. } => {
             reason.as_ref()
         }

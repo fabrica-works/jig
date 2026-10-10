@@ -9,11 +9,11 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Wall};
 
-fn hint_of(kind: MessageKind) -> Option<u64> {
+fn hint_of(kind: &MessageKind) -> Option<u64> {
     match kind {
         MessageKind::Notice { subscription, .. }
         | MessageKind::Timer { subscription }
-        | MessageKind::News { subscription, .. } => Some(subscription),
+        | MessageKind::News { subscription, .. } => Some(*subscription),
         MessageKind::EffectNotMade { .. }
         | MessageKind::Words
         | MessageKind::Proposal { .. }
@@ -35,7 +35,7 @@ pub(crate) fn credit(task: &crate::TaskRecord, limits: &Limits) -> Option<(usize
     if task.tracked.is_some() {
         let mut waiting = false;
         for word in &task.inbox {
-            waiting |= hint_of(word.kind) == Some(0);
+            waiting |= hint_of(&word.kind) == Some(0);
         }
         if !waiting {
             count = count.checked_add(1)?;
@@ -45,7 +45,7 @@ pub(crate) fn credit(task: &crate::TaskRecord, limits: &Limits) -> Option<(usize
     for subscription in &task.subscriptions {
         let mut waiting = false;
         for word in &task.inbox {
-            if hint_of(word.kind) == Some(subscription.number) {
+            if hint_of(&word.kind) == Some(subscription.number) {
                 waiting = true;
             }
         }
@@ -190,7 +190,7 @@ pub(crate) fn unsubscribe(
     row.record.subscriptions = next.into_boxed();
     let mut inbox = List::with_capacity(env.limits.inbox_messages);
     for word in &row.record.inbox {
-        if hint_of(word.kind) != Some(subscription) {
+        if hint_of(&word.kind) != Some(subscription) {
             inbox.push(word.clone()).expect("inbox subset bounded");
         }
     }
@@ -202,7 +202,7 @@ pub(crate) fn unsubscribe(
 
 pub(crate) fn notice(domain: &mut Domain, env: &Env<Limits>, number: u64, word: Word, out: &mut Queue<Request>) {
     let Some(task) = record(domain, number) else { return };
-    let Some(subscription_number) = hint_of(word.kind) else { return };
+    let Some(subscription_number) = hint_of(&word.kind) else { return };
     let subscription = match find(task, subscription_number) {
         Some(subscription) => subscription,
         None => {

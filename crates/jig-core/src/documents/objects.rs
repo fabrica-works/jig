@@ -281,7 +281,7 @@ pub(super) fn proposed(limits: &Limits, value: &tasks::New) -> Result<ProposedTa
         number: value.number,
         executor: value.executor,
         spec: spec(limits, &value.spec),
-        contract: super::task_tree::contract(limits, &value.contract),
+        contract: super::task_tree::contract(limits, &value.contract)?,
         authority: super::task_tree::authority(limits, &value.authority)?,
         budget: value.numbers.budget,
         funder: value.funder,
@@ -650,7 +650,7 @@ pub fn person_from_row(
             Some(wait) => Some(wait.deadline),
             None => None,
         },
-        contract: super::task_tree::contract(limits, &row.contract),
+        contract: super::task_tree::contract(limits, &row.contract)?,
         results,
         cut: row.dependencies.len().checked_add(row.spec.inputs.len()).ok_or(Missing::TooLarge)? > bound(limits),
     })
@@ -685,8 +685,8 @@ pub fn result_from_row(
     Ok(ResultDoc {
         acts: super::offers::subject(core, limits, party, &super::Subject::Result { task: row.number })?,
         task: super::small::chip_with_core(core, limits, row)?,
-        contract: super::task_tree::contract(limits, &row.contract),
-        ending: super::task_tree::ending(limits, value),
+        contract: super::task_tree::contract(limits, &row.contract)?,
+        ending: super::task_tree::ending(limits, value)?,
         at: row.ended_at,
         requester: row.requester,
         executor: row.executor,
@@ -760,7 +760,7 @@ pub fn ended_delegate_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Resu
     match &row.phase {
         tasks::Phase::Ended(value) => Ok(EndedDelegate {
             chip: super::small::chip_from_row(limits, row)?,
-            ended: super::task_tree::ending(limits, value),
+            ended: super::task_tree::ending(limits, value)?,
             at: row.ended_at,
         }),
         tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => {
@@ -847,13 +847,13 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Result<M
             tasks::Phase::Active(active) => MilestonePhase::Active(*active),
             tasks::Phase::Closing(closing) => MilestonePhase::Closing {
                 stage: closing.stage,
-                ending: super::task_tree::ending(limits, &closing.ending),
+                ending: super::task_tree::ending(limits, &closing.ending)?,
             },
             tasks::Phase::Held { was, why, source } => MilestonePhase::Held {
                 why: *why,
                 source: super::task_tree::hold_source(limits, source.as_deref())?,
                 ending: match was {
-                    tasks::Was::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)),
+                    tasks::Was::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)?),
                     tasks::Was::Waiting | tasks::Was::Active(_) => None,
                 },
                 before: match was {
@@ -862,7 +862,7 @@ pub fn milestone_from_row(limits: &Limits, value: &tasks::Milestone) -> Result<M
                     tasks::Was::Closing(closing) => PriorPhase::Closing(closing.stage),
                 },
             },
-            tasks::Phase::Ended(ending) => MilestonePhase::Ended(super::task_tree::ending(limits, ending)),
+            tasks::Phase::Ended(ending) => MilestonePhase::Ended(super::task_tree::ending(limits, ending)?),
         },
     })
 }

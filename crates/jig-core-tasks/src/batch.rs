@@ -371,6 +371,25 @@ pub fn valid_spec(limits: &Limits, spec: &Spec) -> bool {
 #[must_use]
 pub fn valid_contract(limits: &Limits, contract: &Contract) -> bool {
     match contract {
+        Contract::Approval { state, part } => {
+            if state.len() > usize::try_from(limits.result_bytes).expect("u32 fits usize") {
+                return false;
+            }
+            match &part.key {
+                crate::PartKey::Number(_) => true,
+                crate::PartKey::Path(segments) => {
+                    if segments.len() > limits.hold_segments || segments.capacity() > limits.hold_segments {
+                        return false;
+                    }
+                    let mut bytes = 0_usize;
+                    for segment in segments {
+                        let Some(total) = bytes.checked_add(segment.len()) else { return false };
+                        bytes = total;
+                    }
+                    bytes <= usize::try_from(limits.hold_bytes).expect("u32 fits usize")
+                }
+            }
+        }
         Contract::Report { words } | Contract::Change { words, .. } => *words <= limits.result_bytes,
         Contract::Verdict { choices } => {
             if choices.is_empty() || choices.len() > usize::try_from(limits.contract_choices).expect("u32 fits usize") {

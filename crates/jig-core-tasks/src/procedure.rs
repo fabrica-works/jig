@@ -68,9 +68,10 @@ pub(crate) fn stepped(
         ProcedureDecision::Result(result) => {
             let ending = match result {
                 TaskResult::Failure { reason } => Ending::Failed { reason },
-                TaskResult::Report { .. } | TaskResult::Verdict { .. } | TaskResult::Change { .. } => {
-                    Ending::Done(result)
-                }
+                TaskResult::Approved { .. }
+                | TaskResult::Report { .. }
+                | TaskResult::Verdict { .. }
+                | TaskResult::Change { .. } => Ending::Done(result),
             };
             task_mut(domain, number).expect("procedure task live").record.phase =
                 Phase::Closing(Closing { stage: Stage::Delegates, ending });

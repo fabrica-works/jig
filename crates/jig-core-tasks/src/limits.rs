@@ -131,9 +131,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(2)?
         .checked_mul(u64::from(limits.authority_segments))?
         .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
+    let approval_contract = u64::from(limits.result_bytes)
+        .checked_add(u64::from(limits.hold_bytes))?
+        .checked_add(List::<Box<[u8]>>::worst_case(limits.hold_segments)?)?;
     let payload = u64::from(limits.spec_bytes)
         .checked_add(u64::from(limits.message_bytes))?
         .checked_add(u64::from(limits.inbox_bytes))?
+        .checked_add(approval_contract)?
         .checked_add(u64::from(limits.message_bytes).checked_mul(2)?)?
         .checked_add(u64::try_from(size_of::<crate::Word>()).ok()?)?
         .checked_add(u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::Word>()).ok()?)?)?
@@ -208,6 +212,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(u64::from(limits.hold_bytes))?,
             )?,
         )?
+        .checked_add(approval_contract)?
         .checked_add(u64::from(limits.contract_choices).checked_mul(u64::try_from(size_of::<Verdict>()).ok()?)?)?;
     let proposal_payload = u64::try_from(size_of::<crate::Proposal>())
         .ok()?

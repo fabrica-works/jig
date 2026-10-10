@@ -460,3 +460,58 @@ fn the_complete_maximum_recurring_batch_and_retained_ids_fit_the_owner_bound() {
         [2, 3, 4, 5]
     );
 }
+
+#[test]
+fn saturated_approval_states_parts_and_results_fit_the_owner_bound() {
+    let l = LIMITS;
+    let mut m = Measured::new(&l);
+    m.bootstrap();
+    let mut path = skein_lib::List::with_capacity(l.hold_segments);
+    for _ in 0..l.hold_segments {
+        path.push(vec![7; usize::try_from(l.hold_bytes / l.hold_segments).expect("small limit")].into_boxed_slice())
+            .expect("bounded path");
+    }
+    let batch = (1..=u64::from(l.tasks))
+        .map(|number| {
+            let mut new = filled(&l, number);
+            new.executor = tasks::Executor::Person(tasks::PersonAddress::Person(9));
+            new.funder = Funder::Pool { project: 1, person: 9, period: 7 };
+            new.contract = Contract::Approval {
+                state: vec![5; usize::try_from(l.result_bytes).expect("small limit")].into_boxed_slice(),
+                part: tasks::Part {
+                    connector: 1,
+                    kind: tasks::PartKind::Resource,
+                    key: tasks::PartKey::Path(path.clone()),
+                },
+            };
+            new
+        })
+        .collect::<Vec<_>>();
+    let reply_to = m.to();
+    m.event(Event::Make {
+        reply_to,
+        creator: Party::Person(9),
+        batch: batch[..usize::try_from(l.batch).expect("small limit")].to_vec().into_boxed_slice(),
+    });
+    assert!(!m.refused);
+    for number in 1..=u64::from(l.batch) {
+        let reply_to = m.to();
+        m.event(Event::AnswerPerson {
+            reply_to,
+            task: number,
+            person: 9,
+            result: TaskResult::Approved {
+                state: vec![5; usize::try_from(l.result_bytes).expect("small limit")].into_boxed_slice(),
+                words: Some(Box::new([])),
+            },
+        });
+        assert!(!m.refused);
+        m.event(Event::EffectsSettled { task: number });
+        m.event(Event::Settled { task: number });
+    }
+    let approval = Contract::Approval {
+        state: vec![5; usize::try_from(l.result_bytes + 1).expect("small limit")].into_boxed_slice(),
+        part: tasks::Part { connector: 1, kind: tasks::PartKind::Resource, key: tasks::PartKey::Number(1) },
+    };
+    assert!(!tasks::valid_contract(&l, &approval), "oversized whole state cannot be admitted");
+}

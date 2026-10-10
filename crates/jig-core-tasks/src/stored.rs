@@ -302,7 +302,10 @@ fn valid_followups(task: &TaskRecord) -> bool {
         Ending::Done(crate::TaskResult::Verdict { code, .. })
         | Ending::Cancelled { result: Some(crate::TaskResult::Verdict { code, .. }), .. } => *code,
         Ending::Done(
-            crate::TaskResult::Report { .. } | crate::TaskResult::Change { .. } | crate::TaskResult::Failure { .. },
+            crate::TaskResult::Approved { .. }
+            | crate::TaskResult::Report { .. }
+            | crate::TaskResult::Change { .. }
+            | crate::TaskResult::Failure { .. },
         )
         | Ending::Failed { .. }
         | Ending::Cancelled { .. } => return false,
@@ -316,7 +319,7 @@ fn valid_followups(task: &TaskRecord) -> bool {
             }
             false
         }
-        crate::Contract::Report { .. } | crate::Contract::Change { .. } => false,
+        crate::Contract::Approval { .. } | crate::Contract::Report { .. } | crate::Contract::Change { .. } => false,
     }
 }
 
@@ -438,7 +441,8 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
     let mut previous = 0;
     let mut bytes = 0_usize;
     for word in &task.inbox {
-        let Some(total) = bytes.checked_add(word.words.len()) else { return false };
+        let Some(payload_bytes) = word.payload_bytes() else { return false };
+        let Some(total) = bytes.checked_add(payload_bytes) else { return false };
         bytes = total;
         let requester = match word.kind {
             crate::MessageKind::Proposal { .. } | crate::MessageKind::Escalation { .. } => false,
@@ -502,7 +506,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
                 | crate::MessageKind::Timer { .. } => false,
             })
             || word.hits == 0
-            || word.words.len() > usize::try_from(bound).expect("u32 fits usize")
+            || payload_bytes > usize::try_from(bound).expect("u32 fits usize")
             || !requester
         {
             return false;

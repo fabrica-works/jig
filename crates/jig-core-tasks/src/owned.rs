@@ -6,6 +6,7 @@ use crate::{
     Authority, Contract, End, Ending, Holding, Last, Parameter, PersonProposalState, Phase, Proposal, ProposalAction,
     ProposalState, ResultFollowups, Spec, Stored, TaskRecord, TaskResult, Was,
 };
+use alloc::boxed::Box;
 use core::mem::{size_of, size_of_val};
 
 /// Pure borrowed measurement for root journal/load byte admission: counts existing boxed records,
@@ -17,7 +18,7 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
     match record {
         Stored::Activity(row) => match &row.line {
             crate::Line::Words { words, .. } => bytes(words.len()),
-            crate::Line::Heard(word) | crate::Line::Notified { word, .. } => bytes(word.words.len()),
+            crate::Line::Heard(word) | crate::Line::Notified { word, .. } => bytes(word.payload_bytes()?),
             crate::Line::Decided { .. }
             | crate::Line::Milestone { .. }
             | crate::Line::RunBegan { .. }
@@ -160,6 +161,19 @@ fn authority_bytes(authority: &Authority) -> Option<u64> {
 
 fn contract_bytes(contract: &Contract) -> Option<u64> {
     match contract {
+        Contract::Approval { state, part } => {
+            let mut total = bytes(state.len())?;
+            match &part.key {
+                crate::PartKey::Number(_) => {}
+                crate::PartKey::Path(segments) => {
+                    total = total.checked_add(skein_lib::List::<Box<[u8]>>::worst_case(segments.capacity())?)?;
+                    for segment in segments {
+                        total = total.checked_add(bytes(segment.len())?)?;
+                    }
+                }
+            }
+            Some(total)
+        }
         Contract::Verdict { choices } => bytes(size_of_val(&**choices)),
         Contract::Report { .. } | Contract::Change { .. } => Some(0),
     }
@@ -170,6 +184,10 @@ fn result_bytes(result: &TaskResult) -> Option<u64> {
         TaskResult::Report { words } | TaskResult::Verdict { words, .. } | TaskResult::Change { words, .. } => {
             bytes(words.len())
         }
+        TaskResult::Approved { state, words } => bytes(state.len())?.checked_add(match words {
+            Some(words) => bytes(words.len())?,
+            None => 0,
+        }),
         TaskResult::Failure { reason } => bytes(reason.len()),
     }
 }
@@ -265,7 +283,7 @@ fn proposal_bytes(proposal: &Proposal) -> Option<u64> {
 pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
     let mut inbox_bytes = bytes(size_of_val(&*task.inbox))?;
     for word in &task.inbox {
-        inbox_bytes = inbox_bytes.checked_add(bytes(word.words.len())?)?;
+        inbox_bytes = inbox_bytes.checked_add(bytes(word.payload_bytes()?)?)?;
     }
     let mut saved_bytes = bytes(size_of_val(&*task.saved))?;
     for resource in &task.saved {

@@ -68,7 +68,7 @@ pub(crate) fn assignment(
             agents: policy.agents,
             workspace: charter::WorkspaceTools { inspect: false, modify: false, shell: false },
             conventions: None,
-            contract: contract(run.contract),
+            contract: contract(run.contract)?,
             budget: charter::Budget { turns: policy.turns, spend: run.budget, time: policy.time },
             model: model(policy.model),
             models: models.into_boxed(),
@@ -121,8 +121,9 @@ fn model(value: core::Model) -> charter::Model {
         max_tokens: value.max_tokens,
     }
 }
-fn contract(value: tasks::Contract) -> charter::Contract {
-    match value {
+fn contract(value: tasks::Contract) -> Option<charter::Contract> {
+    Some(match value {
+        tasks::Contract::Approval { .. } => return None,
         tasks::Contract::Report { words } => charter::Contract {
             report: Some(charter::TextRule { max: words, fields: Box::new([]) }),
             failure: Some(charter::TextRule { max: words, fields: Box::new([]) }),
@@ -160,7 +161,7 @@ fn contract(value: tasks::Contract) -> charter::Contract {
                 ]),
             }),
         },
-    }
+    })
 }
 const fn delivery(value: core::DeliveryOutcome) -> host::DeliveryOutcome {
     match value {

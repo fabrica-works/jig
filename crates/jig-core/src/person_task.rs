@@ -37,8 +37,21 @@ pub(crate) fn number(ask: &people::Ask) -> u64 {
     }
 }
 
+fn approval_matches(contract: &tasks::Contract, result: &people::PersonResult) -> bool {
+    match result {
+        people::PersonResult::Approved { state, .. } => match contract {
+            tasks::Contract::Approval { state: expected, .. } => state == expected,
+            tasks::Contract::Report { .. } | tasks::Contract::Verdict { .. } | tasks::Contract::Change { .. } => true,
+        },
+        people::PersonResult::Report { .. }
+        | people::PersonResult::Verdict { .. }
+        | people::PersonResult::Failure { .. } => true,
+    }
+}
+
 fn person_result(result: people::PersonResult) -> tasks::TaskResult {
     match result {
+        people::PersonResult::Approved { state, words } => tasks::TaskResult::Approved { state, words },
         people::PersonResult::Report { words } => tasks::TaskResult::Report { words },
         people::PersonResult::Verdict { code, words } => tasks::TaskResult::Verdict { code, words },
         people::PersonResult::Failure { reason } => tasks::TaskResult::Failure { reason },
@@ -146,15 +159,23 @@ impl Core {
                 PersonTaskRoute::HandBack(task),
                 tasks::Event::HandBackPerson { reply_to: ReplyTo::new(request), task, person },
             ),
-            people::Ask::AnswerPerson { result, .. } => (
-                PersonTaskRoute::Answer(task),
-                tasks::Event::AnswerPerson {
-                    reply_to: ReplyTo::new(request),
-                    task,
-                    person,
-                    result: person_result(result),
-                },
-            ),
+            people::Ask::AnswerPerson { result, .. } => {
+                let row = self.tasks.task(task).expect("person act admission checked");
+                if !approval_matches(&row.contract, &result) {
+                    return Err(people::Refusal::Moved {
+                        now: people::Moved::Person { revision: row.revisions.person },
+                    });
+                }
+                (
+                    PersonTaskRoute::Answer(task),
+                    tasks::Event::AnswerPerson {
+                        reply_to: ReplyTo::new(request),
+                        task,
+                        person,
+                        result: person_result(result),
+                    },
+                )
+            }
             people::Ask::MarkSeen { .. }
             | people::Ask::Close { .. }
             | people::Ask::Application { .. }

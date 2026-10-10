@@ -1009,6 +1009,24 @@ fn valid_close(limits: &Limits, chat: u64, disposals: &List<crate::Disposal>) ->
     true
 }
 
+fn valid_person_result(limits: &Limits, result: &crate::PersonResult) -> bool {
+    let bound = usize::try_from(limits.words).expect("u32 fits usize");
+    match result {
+        crate::PersonResult::Report { words } | crate::PersonResult::Verdict { words, .. } => words.len() <= bound,
+        crate::PersonResult::Failure { reason } => reason.len() <= bound,
+        crate::PersonResult::Approved { state, words } => {
+            let words = match words {
+                Some(words) => words.len(),
+                None => 0,
+            };
+            match state.len().checked_add(words) {
+                Some(bytes) => bytes <= bound,
+                None => false,
+            }
+        }
+    }
+}
+
 fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
     match ask {
         Ask::Close { chat, disposals, .. } => valid_close(limits, *chat, disposals),
@@ -1033,17 +1051,7 @@ fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
         | Ask::HandBackPerson { task, .. }
         | Ask::Stop { task, .. }
         | Ask::Release { task, .. } => *task != 0,
-        Ask::AnswerPerson { task, result, .. } => {
-            *task != 0
-                && match result {
-                    crate::PersonResult::Report { words } | crate::PersonResult::Verdict { words, .. } => {
-                        words.len() <= usize::try_from(limits.words).expect("u32 fits usize")
-                    }
-                    crate::PersonResult::Failure { reason } => {
-                        reason.len() <= usize::try_from(limits.words).expect("u32 fits usize")
-                    }
-                }
-        }
+        Ask::AnswerPerson { task, result, .. } => *task != 0 && valid_person_result(limits, result),
         Ask::Adopt { adoption, .. } => valid_adoption(limits, adoption),
         Ask::SetRoles { holdings, .. } => holdings.len() <= usize::try_from(limits.holdings).expect("u32 fits usize"),
         Ask::ChangePolicy { change, .. } => match crate::policy_change_bytes(change) {

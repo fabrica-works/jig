@@ -60,6 +60,8 @@ fn task_carrier(limits: &Limits) -> Option<u64> {
         .checked_add(bytes(task.dependencies, sizeof(size_of::<u64>())?)?)?
         .checked_add(bytes(task.contract_choices, sizeof(size_of::<tasks::Verdict>())?)?)?
         .checked_add(u64::from(task.result_bytes))?
+        .checked_add(List::<Box<[u8]>>::worst_case(task.hold_segments)?)?
+        .checked_add(u64::from(task.hold_bytes))?
         .checked_add(names)?
         .checked_add(authority)
 }

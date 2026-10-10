@@ -183,7 +183,10 @@ pub(crate) fn activation(
             {
                 match result {
                     TaskResult::Verdict { .. } => {}
-                    TaskResult::Report { .. } | TaskResult::Change { .. } | TaskResult::Failure { .. } => {
+                    TaskResult::Approved { .. }
+                    | TaskResult::Report { .. }
+                    | TaskResult::Change { .. }
+                    | TaskResult::Failure { .. } => {
                         return refused(to, Some(number), Refusal::Contract, out);
                     }
                 }

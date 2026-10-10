@@ -159,8 +159,23 @@ pub(crate) fn valid_result(contract: &Contract, result: &TaskResult, limits: &Li
 
 pub(crate) fn invalid_result(contract: &Contract, result: &TaskResult, limits: &Limits) -> Option<InvalidResult> {
     match result {
+        TaskResult::Approved { state, .. } => match contract {
+            Contract::Approval { state: expected, .. } => {
+                if state != expected {
+                    Some(InvalidResult::Form)
+                } else if result_bytes(result) > usize::try_from(limits.result_bytes).expect("u32 fits usize") {
+                    Some(InvalidResult::Words)
+                } else {
+                    None
+                }
+            }
+            Contract::Report { .. } | Contract::Verdict { .. } | Contract::Change { .. } => Some(InvalidResult::Form),
+        },
         TaskResult::Failure { reason } => match contract {
-            Contract::Report { .. } | Contract::Verdict { .. } | Contract::Change { .. } => {
+            Contract::Approval { .. }
+            | Contract::Report { .. }
+            | Contract::Verdict { .. }
+            | Contract::Change { .. } => {
                 if reason.len() <= usize::try_from(limits.result_bytes).expect("u32 fits usize") {
                     None
                 } else {
@@ -176,7 +191,7 @@ pub(crate) fn invalid_result(contract: &Contract, result: &TaskResult, limits: &
                     Some(InvalidResult::Words)
                 }
             }
-            Contract::Verdict { .. } | Contract::Change { .. } => Some(InvalidResult::Form),
+            Contract::Approval { .. } | Contract::Verdict { .. } | Contract::Change { .. } => Some(InvalidResult::Form),
         },
         TaskResult::Verdict { code, words } => match contract {
             Contract::Verdict { choices } => {
@@ -191,7 +206,7 @@ pub(crate) fn invalid_result(contract: &Contract, result: &TaskResult, limits: &
                 }
                 Some(InvalidResult::Verdict)
             }
-            Contract::Report { .. } | Contract::Change { .. } => Some(InvalidResult::Form),
+            Contract::Approval { .. } | Contract::Report { .. } | Contract::Change { .. } => Some(InvalidResult::Form),
         },
         TaskResult::Change { connector: actual_connector, kind: actual_kind, words, .. } => match contract {
             Contract::Change { connector, kind, words: limit } => {
@@ -203,7 +218,7 @@ pub(crate) fn invalid_result(contract: &Contract, result: &TaskResult, limits: &
                     None
                 }
             }
-            Contract::Report { .. } | Contract::Verdict { .. } => Some(InvalidResult::Form),
+            Contract::Approval { .. } | Contract::Report { .. } | Contract::Verdict { .. } => Some(InvalidResult::Form),
         },
     }
 }
@@ -243,7 +258,10 @@ pub(crate) fn invalid_followups(
             }
             Some(InvalidResult::Verdict)
         }
-        (Contract::Report { .. } | Contract::Change { .. } | Contract::Verdict { .. }, _) => Some(InvalidResult::Form),
+        (
+            Contract::Approval { .. } | Contract::Report { .. } | Contract::Change { .. } | Contract::Verdict { .. },
+            _,
+        ) => Some(InvalidResult::Form),
     }
 }
 
@@ -252,6 +270,10 @@ pub(crate) fn result_bytes(result: &TaskResult) -> usize {
         TaskResult::Report { words } | TaskResult::Verdict { words, .. } | TaskResult::Change { words, .. } => {
             words.len()
         }
+        TaskResult::Approved { state, words } => state.len().saturating_add(match words {
+            Some(words) => words.len(),
+            None => 0,
+        }),
         TaskResult::Failure { reason } => reason.len(),
     }
 }
@@ -259,7 +281,10 @@ pub(crate) fn result_bytes(result: &TaskResult) -> usize {
 fn ending(result: TaskResult) -> Ending {
     match result {
         TaskResult::Failure { reason } => Ending::Failed { reason },
-        TaskResult::Report { .. } | TaskResult::Verdict { .. } | TaskResult::Change { .. } => Ending::Done(result),
+        TaskResult::Approved { .. }
+        | TaskResult::Report { .. }
+        | TaskResult::Verdict { .. }
+        | TaskResult::Change { .. } => Ending::Done(result),
     }
 }
 

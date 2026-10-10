@@ -1061,7 +1061,8 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
             Ending::Done(ResultValue::Verdict { code, .. }) => assert_eq!(code, 3),
             Ending::Done(ResultValue::Change { part, .. }) => assert_eq!(part.key, PartKey::Number(4)),
             Ending::Failed(reason) => assert_eq!(reason.bytes.as_ref(), b"Failure"),
-            Ending::Done(ResultValue::Report(_) | ResultValue::Failure(_)) | Ending::Cancelled { .. } => panic!(),
+            Ending::Done(ResultValue::Approved { .. } | ResultValue::Report(_) | ResultValue::Failure(_))
+            | Ending::Cancelled { .. } => panic!(),
         }
     }
     row.phase = tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict { code: 3, words: Box::new([]) }));
@@ -2683,3 +2684,40 @@ mod periods;
 mod project_tasks;
 
 mod frame_facts;
+
+#[test]
+fn approval_documents_keep_opaque_state_whole_and_refuse_a_smaller_bound() {
+    let (mut core, limits) = make_tree();
+    let mut row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
+    row.executor = tasks::Executor::Person(tasks::PersonAddress::Person(1));
+    let part = Part { connector: 1, kind: PartKind::Resource, key: PartKey::Number(5) };
+    row.contract = tasks::Contract::Approval { state: Box::from(&b"opaque\x00\xff"[..]), part: part.clone() };
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(450)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
+    let subject = Subject::PersonTask { task: 5 };
+    let Document::PersonTask(task) = make(&core, &limits, 1, &subject, &window()).unwrap() else {
+        panic!("person approval");
+    };
+    assert_eq!(task.contract, ContractLine::Approval { state: Box::from(&b"opaque\x00\xff"[..]), part });
+    let mut smaller = limits;
+    smaller.documents.text_bytes = 3;
+    assert_eq!(make(&core, &smaller, 1, &subject, &window()), Err(Missing::TooLarge));
+    let mut row = core.tasks.task(5).unwrap().clone();
+    row.phase = tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Approved {
+        state: Box::from(&b"opaque\x00\xff"[..]),
+        words: None,
+    }));
+    let result = result_from_row(&core, &limits, 1, &row).unwrap();
+    assert_eq!(
+        result.ending,
+        Ending::Done(ResultValue::Approved { state: Box::from(&b"opaque\x00\xff"[..]), words: None })
+    );
+    assert_eq!(result_from_row(&core, &smaller, 1, &row), Err(Missing::TooLarge));
+}

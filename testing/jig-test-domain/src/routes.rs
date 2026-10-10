@@ -199,7 +199,7 @@ fn route_ask(
                 }
             };
             assert!(domain.procedure_steps.insert(context.task, (step, code)).is_ok(), "one procedure step flight");
-            hold(decision, Delivery::Procedure { task: context.task, step, connector: number, code });
+            hold(decision, Delivery::Procedure { task: context.task, step, connector: number, code, context });
         }
         core::Ask::ClaimDone { task, attempt } => {
             if number == 1 {
@@ -514,11 +514,11 @@ fn route_now(
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::CompleteBrief { .. }
-        | core::Now::ProcedureDelegateOutcome { .. }
         | core::Now::RestoreRefused => {
             unreachable!("this route awaits the testing application's scripted peer");
         }
-        other @ (core::Now::HistoricalPersonTask { .. }
+        other @ (core::Now::ProcedureDelegateOutcome { .. }
+        | core::Now::HistoricalPersonTask { .. }
         | core::Now::SettledCallRefused { .. }
         | core::Now::Call { .. }
         | core::Now::DropCall { .. }

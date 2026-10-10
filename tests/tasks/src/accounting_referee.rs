@@ -63,7 +63,7 @@ fn standing_reset(before: &TaskRecord, after: &TaskRecord, rows: &BTreeMap<Key, 
     Some(archived)
 }
 
-fn merged_hint(before: MessageKind, after: MessageKind) -> bool {
+fn merged_hint(before: &MessageKind, after: &MessageKind) -> bool {
     match (before, after) {
         (MessageKind::Notice { subscription: old, .. }, MessageKind::Notice { subscription: new, .. })
         | (MessageKind::Timer { subscription: old }, MessageKind::Timer { subscription: new })
@@ -99,7 +99,7 @@ impl Accounting {
                     continue;
                 }
                 let kept = after.inbox.iter().any(|new| {
-                    new.number == word.number || (new.number > word.number && merged_hint(word.kind, new.kind))
+                    new.number == word.number || (new.number > word.number && merged_hint(&word.kind, &new.kind))
                 });
                 if !kept {
                     return Err("committed message disappeared without a turn, procedure step or merge");
@@ -114,7 +114,7 @@ impl Accounting {
                         && after.from == word.from
                         && after.kind == word.kind
                         && after.words == word.words)
-                        || (after.number > word.number && merged_hint(word.kind, after.kind))
+                        || (after.number > word.number && merged_hint(&word.kind, &after.kind))
                 });
                 if !kept || row.last_message < word.number {
                     return Err("accepted message missing from durable inbox");

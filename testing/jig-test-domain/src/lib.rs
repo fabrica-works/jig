@@ -123,7 +123,7 @@ pub enum Delivery {
     /// A fresh read owed after this run's loss committed.
     LostRead { connector: u16, task: u64, attempt: u64, resource: tasks::Name, call: connector::SystemRequest },
     /// A procedure is due at its owning connector.
-    Procedure { task: u64, step: u64, connector: u16, code: u16 },
+    Procedure { task: u64, step: u64, connector: u16, code: u16, context: Box<tasks::RunContext> },
 }
 
 /// The root's assembled, worker assignment.

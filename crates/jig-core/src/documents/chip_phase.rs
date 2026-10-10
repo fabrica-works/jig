@@ -81,10 +81,10 @@ pub(super) fn from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<ChipD
         }
     }
     let ending = match &row.phase {
-        tasks::Phase::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)),
-        tasks::Phase::Ended(ending) => Some(super::task_tree::ending(limits, ending)),
+        tasks::Phase::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)?),
+        tasks::Phase::Ended(ending) => Some(super::task_tree::ending(limits, ending)?),
         tasks::Phase::Held { was, .. } => match was {
-            tasks::Was::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)),
+            tasks::Was::Closing(closing) => Some(super::task_tree::ending(limits, &closing.ending)?),
             tasks::Was::Waiting | tasks::Was::Active(_) => None,
         },
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
@@ -203,7 +203,7 @@ pub(super) fn heap_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     let path = List::<Box<[u8]>>::worst_case(limits.lines)?.checked_add(lines.checked_mul(text)?)?;
     u64::try_from(size_of::<ChipDetails>())
         .ok()?
-        .checked_add(text.checked_mul(6)?)?
+        .checked_add(text.checked_mul(7)?)?
         .checked_add(List::<u64>::worst_case(limits.lines)?)?
         .checked_add(List::<u16>::worst_case(limits.lines)?)?
         .checked_add(List::<ResourceLine>::worst_case(limits.lines)?)?

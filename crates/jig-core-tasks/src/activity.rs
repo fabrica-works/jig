@@ -90,7 +90,7 @@ pub(crate) fn append(task: &mut TaskRecord, at: Wall, line: Line, out: &mut Queu
 pub(crate) fn message(task: &mut TaskRecord, word: &Word, out: &mut Queue<Request>) {
     let line = match word.kind {
         MessageKind::Words | MessageKind::Question | MessageKind::Answer { .. } => {
-            Line::Words { message: word.number, by: word.from, kind: word.kind, words: word.words.clone() }
+            Line::Words { message: word.number, by: word.from, kind: word.kind.clone(), words: word.words.clone() }
         }
         MessageKind::EffectNotMade { .. }
         | MessageKind::Escalation { .. }

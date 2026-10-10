@@ -102,7 +102,10 @@ pub(crate) fn answer(
     }
     let ending = match result {
         TaskResult::Failure { reason } => Ending::Failed { reason },
-        TaskResult::Report { .. } | TaskResult::Verdict { .. } | TaskResult::Change { .. } => Ending::Done(result),
+        TaskResult::Approved { .. }
+        | TaskResult::Report { .. }
+        | TaskResult::Verdict { .. }
+        | TaskResult::Change { .. } => Ending::Done(result),
     };
     let row = &mut task_mut(domain, number).expect("live person task").record;
     row.taken_by = None;

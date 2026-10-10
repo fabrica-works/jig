@@ -332,6 +332,8 @@ pub enum Ask {
 /// A person's answer to a report, choice or failure contract; root translates it for tasks.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PersonResult {
+    /// Approve the exact opaque state shown by this person task contract.
+    Approved { state: Box<[u8]>, words: Option<Box<[u8]>> },
     /// Freeform words for a report contract.
     Report { words: Box<[u8]> },
     /// One named choice with optional explanation.

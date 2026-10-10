@@ -79,7 +79,7 @@ pub struct Subscription {
 }
 
 /// Kind of a durable task-inbox message (domain/tasks.md, sections 5.6 and 8).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum MessageKind {
     /// Virtual, durable held decision entry projected from the held task.
     Escalation { task: u64, revision: u64 },
@@ -111,11 +111,22 @@ pub enum MessageKind {
 }
 
 /// Terminal shape carried with a delegate's bounded message words.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ResultKind {
+    /// Exact approved state; presence distinguishes absent from empty explanation words.
+    Approved {
+        state: Box<[u8]>,
+        words_present: bool,
+    },
     Report,
-    Verdict { code: u32 },
-    Change { connector: u16, kind: u16, resource: u64 },
+    Verdict {
+        code: u32,
+    },
+    Change {
+        connector: u16,
+        kind: u16,
+        resource: u64,
+    },
     Failed,
     Cancelled,
 }
@@ -138,6 +149,40 @@ pub struct Word {
     pub hits: u32,
     /// A batching threshold already reached, retained across restart.
     pub eligible: bool,
+}
+
+impl Word {
+    /// Whole admitted payload, including the opaque state of an approval result.
+    #[must_use]
+    pub fn payload_bytes(&self) -> Option<usize> {
+        match &self.kind {
+            MessageKind::Result(ResultKind::Approved { state, words_present }) => {
+                if !words_present && !self.words.is_empty() {
+                    return None;
+                }
+                state.len().checked_add(self.words.len())
+            }
+            MessageKind::Result(
+                ResultKind::Report
+                | ResultKind::Verdict { .. }
+                | ResultKind::Change { .. }
+                | ResultKind::Failed
+                | ResultKind::Cancelled,
+            )
+            | MessageKind::Escalation { .. }
+            | MessageKind::Proposal { .. }
+            | MessageKind::PersonStalled { .. }
+            | MessageKind::ProposalDecision { .. }
+            | MessageKind::Words
+            | MessageKind::EffectNotMade { .. }
+            | MessageKind::Amendment { .. }
+            | MessageKind::Question
+            | MessageKind::Answer { .. }
+            | MessageKind::Notice { .. }
+            | MessageKind::Timer { .. }
+            | MessageKind::News { .. } => Some(self.words.len()),
+        }
+    }
 }
 
 /// A connector resource on which a run left state for its next activation.
@@ -300,6 +345,8 @@ pub struct Verdict {
 /// admission. (domain/tasks.md, sections 3 and 5.6).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Contract {
+    /// Approval of exact opaque connector state (domain/people.md, section 8).
+    Approval { state: Box<[u8]>, part: crate::Part },
     /// Bounded report result.
     Report {
         /** Maximum report bytes, no greater than `Limits::result_bytes`. */
@@ -325,6 +372,8 @@ pub enum Contract {
 /// connector interpretation and outward delivery remain with root. (domain/tasks.md, section 5.6).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TaskResult {
+    /// Exact state approved by the addressed person, with optional explanation.
+    Approved { state: Box<[u8]>, words: Option<Box<[u8]>> },
     /// Successful bounded report matching a report contract.
     Report {
         /** Report bytes, bounded by both the admitted contract and `Limits::result_bytes`. */

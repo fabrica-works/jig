@@ -23,11 +23,11 @@ pub(crate) struct Prepared {
     pub inbox: Box<[Word]>,
 }
 
-fn merge_key(kind: MessageKind) -> Option<(u8, u64)> {
+fn merge_key(kind: &MessageKind) -> Option<(u8, u64)> {
     match kind {
         MessageKind::Notice { subscription, .. }
         | MessageKind::Timer { subscription }
-        | MessageKind::News { subscription, .. } => Some((1, subscription)),
+        | MessageKind::News { subscription, .. } => Some((1, *subscription)),
         MessageKind::Amendment { .. } => Some((0, 0)),
         MessageKind::EffectNotMade { .. }
         | MessageKind::Words
@@ -65,12 +65,12 @@ pub(crate) fn prepare(
     let activity_word = word.clone();
     let previous = if task.last_message == 0 { None } else { Some(task.last_message) };
     let key = match admission {
-        Admission::Merged => merge_key(word.kind),
+        Admission::Merged => merge_key(&word.kind),
         Admission::Refusable | Admission::RoomKept => None,
     };
     let mut inbox = List::with_capacity(limits.inbox_messages.saturating_add(1));
     for old in &task.inbox {
-        if key.is_some() && key == merge_key(old.kind) {
+        if key.is_some() && key == merge_key(&old.kind) {
             // The hint offered to a procedure belongs to that step. A later
             // hint stays unread and begins a fresh batch after its fence.
             match domain.procedure_offered(number) {
@@ -134,7 +134,10 @@ pub(crate) fn room(domain: &Domain, limits: &Limits, task: u64, count: u32, byte
     };
     let mut total_bytes = bytes;
     for message in &record.inbox {
-        let Some(sum) = total_bytes.checked_add(message.words.len()) else {
+        let Some(sum) = total_bytes.checked_add(match message.payload_bytes() {
+            Some(bytes) => bytes,
+            None => return false,
+        }) else {
             return false;
         };
         total_bytes = sum;
@@ -382,13 +385,14 @@ pub(crate) fn delegate_result(
         | MessageKind::PersonStalled { .. }
         | MessageKind::News { .. } => return,
     }
+    let Some(payload_bytes) = word.payload_bytes() else { return };
     if !match word.from {
         Party::Task(_) => true,
         Party::Person(_) | Party::Deployment { .. } => false,
     } || word.number == 0
         || word.number <= task.last_message
-        || word.words.len() > usize::try_from(env.limits.result_bytes).expect("u32 fits usize")
-        || !room(domain, &env.limits, number, 1, word.words.len())
+        || payload_bytes > usize::try_from(env.limits.result_bytes).expect("u32 fits usize")
+        || !room(domain, &env.limits, number, 1, payload_bytes)
     {
         return;
     }

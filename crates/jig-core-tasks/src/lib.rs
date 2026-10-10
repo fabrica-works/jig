@@ -80,6 +80,7 @@ mod inbox;
 mod limits;
 mod moving;
 mod owned;
+mod parts;
 mod periods;
 mod person;
 mod procedure;
@@ -118,6 +119,7 @@ pub use funders::FundingRecord;
 pub use holds::valid_name;
 pub use limits::{Limits, worst_case};
 pub use owned::{phase_bytes, stored_bytes, task_bytes, terminal_bytes};
+pub use parts::{Part, PartKey, PartKind};
 pub use periods::PeriodTimes;
 pub use proposals::{
     PersonProposal, PersonProposalState, Proposal, ProposalAction, ProposalDecision, ProposalHolder, ProposalKind,

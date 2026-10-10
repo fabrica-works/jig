@@ -42,6 +42,12 @@ pub struct World {
     pub people_answers: Vec<people::Reply>,
     pub application_answers: Vec<(Token, u16, connector::ApplicationOutcome)>,
     pub procedure: Option<u64>,
+    /// Whole held protocol inputs received by the independent procedure connector.
+    pub procedure_inputs: Vec<(u64, u16, u16, Box<tasks::RunContext>)>,
+    /// A procedure connector can withhold its reply while a story drives its step.
+    pub hold_procedures: bool,
+    /// Immediate owner binding facts; these are not durable creation acknowledgments.
+    pub procedure_delegations: Vec<(u64, u64, Option<u64>)>,
     pub pending_reads: Vec<(u16, connector::SystemRequest)>,
     pub lost_answers: u32,
     pub hold_writes: bool,
@@ -242,6 +248,9 @@ impl World {
             people_answers: Vec::new(),
             application_answers: Vec::new(),
             procedure: None,
+            procedure_inputs: Vec::new(),
+            hold_procedures: false,
+            procedure_delegations: Vec::new(),
             pending_reads: Vec::new(),
             lost_answers: 0,
             hold_writes: false,
@@ -467,6 +476,9 @@ impl World {
                             busy: false,
                         }));
                     }
+                    root::Request::Now(core::Now::ProcedureDelegateOutcome { task, step, child }) => {
+                        self.procedure_delegations.push((task, step, child));
+                    }
                     root::Request::Now(now) => {
                         if let Some(peer) = &mut self.client_peer
                             && crate::client_peer::ClientPeer::immediate(&now)
@@ -594,8 +606,12 @@ impl World {
             root::Delivery::Core(core::Held::Cancel { run, attempt, .. }) => {
                 self.cancellations.push((run.raw(), attempt.raw()));
             }
-            root::Delivery::Procedure { task, connector: number, code, .. } => {
+            root::Delivery::Procedure { task, step, connector: number, code, context } => {
                 self.procedure = Some(task);
+                self.procedure_inputs.push((step, number, code, context));
+                if self.hold_procedures {
+                    return;
+                }
                 self.events.push_back(root::Event::Connector {
                     number,
                     event: connector::Event::Procedure {
