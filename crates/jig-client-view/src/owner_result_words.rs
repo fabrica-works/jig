@@ -13,28 +13,51 @@ use skein_lib::{List, bytes::copy_of};
 /// Result owner facts and explicit absence, selected as checked language data.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ResultPhrase {
+    /// Metadata heading.
     Details,
+    /// Supplied task contract.
     Contract,
+    /// Task requester number.
     RequesterTask,
+    /// Person requester number.
     RequesterPerson,
+    /// Deployment requester project.
     RequesterDeployment,
+    /// Supplied chooser identity.
     Chooser,
+    /// Absent chooser identity.
     ChooserAbsent,
+    /// Delegate reference count.
     Delegates,
+    /// Available follow-up reference count.
     Followups,
+    /// Unavailable follow-up references.
     FollowupsAbsent,
+    /// Proposal with a task maker.
     ProposalTask,
+    /// Proposal with a party maker.
     ProposalParty,
+    /// Absent proposal reference.
     ProposalAbsent,
+    /// Live linked task.
     Live,
+    /// Retained ended task.
     Retained,
+    /// Stored task number.
     Stored,
+    /// Supplied retained clock.
     At,
+    /// Unavailable retained clock.
     AtUnknown,
+    /// Stored completed status.
     Done,
+    /// Stored failed status.
     Failed,
+    /// Stored cancelled status.
     Cancelled,
+    /// Unavailable stored status.
     StatusUnknown,
+    /// Aggregate metadata loss.
     Cut,
 }
 /// Complete closed vocabulary in stable identity order.

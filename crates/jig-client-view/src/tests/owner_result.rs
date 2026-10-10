@@ -210,11 +210,15 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
     let value = details();
     let client = Domain::new(&client_limits(), 1);
     let mut capacity = view::limits(&client_limits(), &words).unwrap();
-    capacity.nodes = tree.len();
+    assert_eq!(tree.len(), 9, "one region and eight independent metadata leaves");
+    capacity.nodes = 9;
+    capacity.depth = 2;
+    capacity.text_per_node = 19;
+    capacity.text_bytes = 112;
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(capacity.bindings, 128);
     view::render(&mut b, &client, &value, &words, &mut bindings);
-    assert_eq!(b.finish().len(), tree.len(), "minimal node capacity fits");
+    assert_eq!(b.finish().len(), 9, "minimal nodes, depth and selected saying bytes fit");
     capacity.nodes = capacity.nodes.checked_sub(1).unwrap();
     assert!(
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -225,5 +229,21 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
         .is_err(),
         "one fewer node refuses before a partial tree is retained"
     );
+    capacity.nodes = 9;
+    for below in [
+        Limits { depth: 1, ..capacity },
+        Limits { text_per_node: 18, ..capacity },
+        Limits { text_bytes: 111, ..capacity },
+    ] {
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let mut b = Builder::new(&below);
+                let mut bindings = JigBindings::new(below.bindings, 128);
+                view::render(&mut b, &client, &value, &words, &mut bindings);
+            }))
+            .is_err(),
+            "one below a checked storage dimension refuses"
+        );
+    }
     assert_eq!(view::nodes(&jig_client::Limits { rows: u32::MAX, ..client_limits() }), None);
 }
