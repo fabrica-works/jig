@@ -142,21 +142,28 @@ impl ConversationWindow {
     pub fn new(capacity: u32) -> Self {
         Self { cut: false, rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
     }
-    /// Slides from one end, returning the number dropped from the other.
+    /// Merges by task key before sliding; a retained row wins over a read overlap.
     pub fn slide(&mut self, incoming: List<ConversationLine>, incoming_edges: Edges, end: End) -> u32 {
         let capacity = self.rows.capacity();
         let empty = self.rows.is_empty();
-        let slide = plan(self.rows.len(), incoming.len(), capacity, end);
+        let key_capacity = self.rows.len().checked_add(incoming.len()).expect("admitted row counts fit");
+        let mut keys = List::with_capacity(key_capacity);
+        conversation_keys(&self.rows, &mut keys);
+        let old_count = keys.len();
+        conversation_keys(&incoming, &mut keys);
+        let new_count = keys.len().checked_sub(old_count).expect("keys only append");
+        let slide = plan(old_count, new_count, capacity, end);
         let mut rows = List::with_capacity(capacity);
         let old = core::mem::replace(&mut self.rows, List::with_capacity(0));
+        let new_from = old_count.checked_add(slide.new_from).expect("bounded key range fits");
         match end {
             End::After => {
-                move_conversationwindow(old, slide.old_from, slide.old_count, &mut rows);
-                move_conversationwindow(incoming, slide.new_from, slide.new_count, &mut rows);
+                move_conversationwindow(old, &keys, slide.old_from, slide.old_count, &mut rows);
+                move_conversationwindow(incoming, &keys, new_from, slide.new_count, &mut rows);
             }
             End::Before => {
-                move_conversationwindow(incoming, slide.new_from, slide.new_count, &mut rows);
-                move_conversationwindow(old, slide.old_from, slide.old_count, &mut rows);
+                move_conversationwindow(incoming, &keys, new_from, slide.new_count, &mut rows);
+                move_conversationwindow(old, &keys, slide.old_from, slide.old_count, &mut rows);
             }
         }
         self.rows = rows;
@@ -176,12 +183,38 @@ impl ConversationWindow {
         true
     }
 }
-fn move_conversationwindow(rows: List<ConversationLine>, start: u32, count: u32, out: &mut List<ConversationLine>) {
+fn conversation_keys(rows: &List<ConversationLine>, keys: &mut List<u64>) {
+    for row in rows {
+        if !keys.as_slice().contains(&row.chip.task) {
+            keys.push(row.chip.task).expect("one key per admitted row fits");
+        }
+    }
+}
+fn move_conversationwindow(
+    rows: List<ConversationLine>,
+    keys: &List<u64>,
+    start: u32,
+    count: u32,
+    out: &mut List<ConversationLine>,
+) {
     let until = start.saturating_add(count);
-    for (index, row) in rows.into_boxed().into_iter().enumerate() {
-        let index = u32::try_from(index).expect("a bounded list index fits u32");
-        if index >= start && index < until {
-            out.push(row).expect("the slide plan fits the window");
+    for row in rows.into_boxed() {
+        let mut selected = false;
+        for index in start..until {
+            if keys.get(index) == Some(&row.chip.task) {
+                selected = true;
+                break;
+            }
+        }
+        let mut present = false;
+        for held in &*out {
+            if held.chip.task == row.chip.task {
+                present = true;
+                break;
+            }
+        }
+        if selected && !present {
+            out.push(row).expect("the distinct key slide fits the window");
         }
     }
 }
@@ -307,5 +340,8 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     total = total.checked_add(List::<ConversationLine>::worst_case(limits.rows)?)?;
     total = total.checked_add(List::<ActivityLine>::worst_case(limits.rows)?)?;
     total = total.checked_add(List::<HistoryRow>::worst_case(limits.rows)?)?;
-    total.checked_mul(2)?.checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(6)?)
+    total
+        .checked_mul(2)?
+        .checked_add(List::<u64>::worst_case(limits.rows.checked_mul(2)?)?)?
+        .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(6)?)
 }

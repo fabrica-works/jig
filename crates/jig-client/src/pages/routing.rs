@@ -351,10 +351,29 @@ pub(crate) fn delivery(
         Delivery::Conversations(conversations) => {
             domain.chats.more = conversations.more;
             if domain.conversation_rows.edges.reaches(End::Before) {
-                domain.conversation_rows.rows.clear();
+                // A current live snapshot replaces live rows, while retained past rows
+                // still belong to the read window. An overlapping watch row wins whole.
+                let capacity = domain.conversation_rows.rows.capacity();
+                let old = core::mem::replace(&mut domain.conversation_rows.rows, List::with_capacity(capacity));
+                for row in old.into_boxed() {
+                    let mut named = false;
+                    for current in &conversations.rows {
+                        if current.chip.task == row.chip.task {
+                            named = true;
+                            break;
+                        }
+                    }
+                    if !super::conversations::live(row.chip.phase) && !named {
+                        domain.conversation_rows.rows.push(row).expect("retained rows fit their window");
+                    }
+                }
+                let after = domain.conversation_rows.edges.after.clone();
                 let mut rows = conversations.rows;
                 crate::pages::conversations::order(&mut rows);
                 let dropped = domain.conversation_rows.slide(rows, blank_edges(), End::Before);
+                if dropped == 0 {
+                    domain.conversation_rows.edges.after = after;
+                }
                 if dropped > 0 {
                     refuse(domain, Limit::Objects);
                 }
@@ -515,7 +534,8 @@ fn read_value(
             let edges = page_edges(page.before, page.after);
             let mut rows = page.rows;
             crate::pages::conversations::order(&mut rows);
-            let dropped = domain.conversation_rows.slide(rows, edges, End::After);
+            let end = super::conversations::read_end(source);
+            let dropped = domain.conversation_rows.slide(rows, edges, end);
             if dropped > 0 {
                 domain.changed();
             }

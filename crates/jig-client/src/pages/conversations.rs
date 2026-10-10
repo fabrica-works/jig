@@ -340,6 +340,15 @@ pub const INBOX_WINDOW: u64 = 10;
 pub const INBOX_UPDATES_WINDOW: u64 = 12;
 /// The conversations window's binding number.
 pub const CONVERSATIONS_WINDOW: u64 = 11;
+/// The read source for the conversations window's reverse edge.
+pub(crate) const CONVERSATIONS_BEFORE: u16 = 14;
+/// Recovers the requested sliding end from this domain's read source.
+pub(crate) const fn read_end(source: Source) -> End {
+    match source {
+        Source::Window { number: CONVERSATIONS_BEFORE, .. } => End::Before,
+        Source::Window { .. } | Source::Watch(_) | Source::Card(_) => End::After,
+    }
+}
 pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue<Request>) {
     if window == Token::new(INBOX_WINDOW) || window == Token::new(INBOX_UPDATES_WINDOW) {
         let group = if window == Token::new(INBOX_WINDOW) { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
@@ -375,7 +384,11 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
                         return;
                     }
                 }
-                ask_read(domain, 11, Read::Conversations { after: Some(cursor.clone()) }, out);
+                let number = match end {
+                    End::Before => CONVERSATIONS_BEFORE,
+                    End::After => 11,
+                };
+                ask_read(domain, number, Read::Conversations { after: Some(cursor.clone()) }, out);
             }
             Edge::End => {}
         }

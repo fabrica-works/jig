@@ -507,6 +507,23 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
 }
 /// Protects disappearing cards before the source replacement prunes its names.
 pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &crate::contract::Delivery) {
+    match value {
+        crate::contract::Delivery::Conversations(_) => {
+            if !domain.conversation_rows.edges.reaches(crate::action::End::Before) {
+                return;
+            }
+        }
+        crate::contract::Delivery::Frame(_)
+        | crate::contract::Delivery::Run(_)
+        | crate::contract::Delivery::RunState(_)
+        | crate::contract::Delivery::Deployment(_)
+        | crate::contract::Delivery::Task(_)
+        | crate::contract::Delivery::Tree(_)
+        | crate::contract::Delivery::Chips(_)
+        | crate::contract::Delivery::Inbox(_)
+        | crate::contract::Delivery::Goals(_)
+        | crate::contract::Delivery::Tasks(_) => {}
+    }
     let source = Source::Watch(watch);
     for (key, id) in &domain.objects.index {
         let object = domain.objects.slab.get_mut(*id).expect("indexed object exists");
