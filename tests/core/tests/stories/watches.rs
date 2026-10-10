@@ -81,7 +81,10 @@ fn a_run_s_text_streams_by_turn_and_is_replaced_by_the_committed_turn() {
     assert_eq!(world.store.applied, committed, "provisional text writes nothing");
     let streams = &world.watches.as_ref().expect("watches").streams;
     assert_eq!(streams.len(), 2);
-    assert_eq!((streams[0].turn, streams[0].from, streams[0].to), (views::TurnName { attempt, turn: 1 }, 0, 6));
+    assert_eq!(
+        (streams[0].turn, streams[0].from, streams[0].to),
+        (views::TurnName { attempt, turn: 1, retry: 0 }, 0, 6)
+    );
     assert_eq!((streams[1].from, streams[1].to, streams[1].text.as_ref()), (6, 11, b"world".as_slice()));
     world.store_delay = 3;
     world.turn(1, 1, None, b"whole committed turn");

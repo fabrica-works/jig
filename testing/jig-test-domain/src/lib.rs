@@ -558,6 +558,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
                 run: Token::new(task),
                 attempt: Token::new(attempt),
                 turn,
+                // This finite scripted source supplies one initial completion.
+                retry: 0,
                 offset,
                 text,
                 call: None,

@@ -12,8 +12,8 @@ fn a_reconnected_run_watch_receives_only_its_unacknowledged_suffix() {
     open(&mut world, 5, core::documents::Subject::Run { task });
     let durable = world.store.applied;
     world.send(root::Event::Text { task, attempt, turn: 1, offset: 0, text: b"abcdef".as_slice().into() });
-    let turn = views::TurnName { attempt, turn: 1 };
-    for (watcher, recalled) in [(6, turn), (7, views::TurnName { attempt, turn: 2 })] {
+    let turn = views::TurnName { attempt, turn: 1, retry: 0 };
+    for (watcher, recalled) in [(6, turn), (7, views::TurnName { attempt, turn: 2, retry: 0 })] {
         world.send(root::Event::Core(core::Event::WatchRun {
             watcher: Token::new(watcher),
             sign_in: world.sign_in.expect("signed in"),
