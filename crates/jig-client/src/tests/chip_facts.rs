@@ -45,13 +45,21 @@ fn folded_generic_endings_keep_unknown_outcome_separate_and_retain_whole_visible
     let mut domain = crate::Domain::new(&limits, 1);
     let mut nodes = List::with_capacity(3);
     for (task, phase) in [(1, Phase::Active), (2, Phase::Ended), (3, Phase::Failed)] {
-        let details = ChipPhase::Owner {
-            phase: if phase == Phase::Active {
-                OwnerChipPhase::Person { address: PersonAddress::Role(u32::MAX), taken_by: Some(u64::MAX), since: None }
-            } else {
-                OwnerChipPhase::Ended
-            },
-            details: Box::new(details()),
+        let details = if phase == Phase::Failed {
+            super::objects::phase_details(Phase::Failed)
+        } else {
+            ChipPhase::Owner {
+                phase: if phase == Phase::Active {
+                    OwnerChipPhase::Person {
+                        address: PersonAddress::Role(u32::MAX),
+                        taken_by: Some(u64::MAX),
+                        since: None,
+                    }
+                } else {
+                    OwnerChipPhase::Ended
+                },
+                details: Box::new(details()),
+            }
         };
         nodes
             .push(TreeNode {
