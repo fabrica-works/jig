@@ -97,6 +97,7 @@ struct Due<A: App> {
     client: ClientId,
     epoch: u64,
     event: A::Event,
+    navigation: bool,
 }
 /// One deterministic loop shared by client, joint and application worlds.
 pub struct World<A: App, F: Front<A>> {
@@ -427,7 +428,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         if changed {
             self.schedule.send(
                 self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(address) },
+                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(address), navigation: true },
             );
         }
     }
@@ -493,7 +494,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 if let Some(event) = A::unsent(request) {
                     self.schedule.send(
                         self.now.saturating_add(Duration::from_nanos(1)),
-                        Due { client: id, epoch: self.clients[id.0].epoch, event },
+                        Due { client: id, epoch: self.clients[id.0].epoch, event, navigation: false },
                     );
                 }
             } else {
@@ -513,7 +514,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             self.front.sign_in(id, self.now, env.wall);
             self.schedule.send(
                 self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(back) },
+                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(back), navigation: true },
             );
         }
         let c = &mut self.clients[id.0];
@@ -638,7 +639,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             for (client, event) in self.front.poll(self.now, wall) {
                 self.schedule.send(
                     self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                    Due { client, epoch: self.clients[client.0].epoch, event },
+                    Due { client, epoch: self.clients[client.0].epoch, event, navigation: false },
                 );
             }
             for observed in self.front.observed() {
@@ -648,6 +649,10 @@ impl<A: App, F: Front<A>> World<A, F> {
             self.referee.assert_holding(self.settings.seed);
             while let Some(due) = self.schedule.next(self.now) {
                 if due.epoch == self.clients[due.client.0].epoch {
+                    if due.navigation {
+                        self.observe(Observation::LeftPage { client: due.client });
+                        self.clients[due.client.0].acted_card = None;
+                    }
                     self.front.received(due.client, &due.event);
                     self.callback(due.client, Some(due.event));
                 } else {
