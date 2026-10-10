@@ -17,7 +17,11 @@ fn note_row(name: u64, scope: notes::Scope, description: &[u8]) -> reads::Row {
 }
 
 fn scoped(scope: notes::Scope, description: Option<&[u8]>, from: Option<reads::Cursor>) -> reads::Read {
-    reads::Read::ScopedNotes { scope, description: description.map(skein_lib::bytes::copy_of), from }
+    let description = match description {
+        Some(bytes) => Some(skein_lib::bytes::copy_of(bytes)),
+        None => None,
+    };
+    reads::Read::ScopedNotes { scope, description, from }
 }
 
 #[test]
@@ -115,15 +119,19 @@ fn resource_note_scope_preserves_literal_segments_and_exact_or_open_end() {
 #[test]
 fn scoped_note_reads_bound_the_query_before_retaining_it_and_recheck_the_role() {
     let (mut core, limits) = watch_core();
-    let too_long = vec![0; usize::try_from(limits.notes.description_bytes).unwrap() + 1];
+    let mut too_long = List::with_capacity(limits.notes.description_bytes + 1);
+    for _ in 0..=limits.notes.description_bytes {
+        too_long.push(0).unwrap();
+    }
+    let too_long = too_long.into_boxed();
+    let mut too_many_segments = List::with_capacity(limits.notes.pattern_bytes + 1);
+    for _ in 0..=limits.notes.pattern_bytes {
+        too_many_segments.push(Box::<[u8]>::from([])).unwrap();
+    }
     let too_many = notes::Scope::Resources {
         project: 1,
         connector: 1,
-        pattern: notes::Pattern {
-            segments: vec![Box::<[u8]>::from([]); usize::try_from(limits.notes.pattern_bytes).unwrap() + 1]
-                .into_boxed_slice(),
-            last: notes::Last::Exact(Box::new([])),
-        },
+        pattern: notes::Pattern { segments: too_many_segments.into_boxed(), last: notes::Last::Exact(Box::new([])) },
     };
     for read in [scoped(notes::Scope::Project { project: 1 }, Some(&too_long), None), scoped(too_many, None, None)] {
         let Held::Read { answer, .. } = read_start(&mut core, &limits, 10, read) else {
@@ -195,23 +203,22 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
         people::EntryKind::PersonTask,
         people::EntryKind::Reply { message: 1 },
     ];
+    let mut entries = List::with_capacity(5);
+    for (i, kind) in kinds.into_iter().enumerate() {
+        entries
+            .push(people::Entry {
+                task: 1,
+                project: 1,
+                whom: people::Whom::Person(1),
+                kind,
+                at: Wall::from_nanos(u64::try_from(i).unwrap() + 1),
+            })
+            .unwrap();
+    }
     people::step(
         &mut core.people,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
-        people::Event::Waiting {
-            task: 1,
-            entries: kinds
-                .into_iter()
-                .enumerate()
-                .map(|(i, kind)| people::Entry {
-                    task: 1,
-                    project: 1,
-                    whom: people::Whom::Person(1),
-                    kind,
-                    at: Wall::from_nanos(u64::try_from(i).unwrap() + 1),
-                })
-                .collect(),
-        },
+        people::Event::Waiting { task: 1, entries: entries.into_boxed() },
         &mut out,
     );
     core.people.remember_result(
@@ -228,8 +235,8 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
         (reads::Group::Replies, InboxObject::Reply { message: 1 }),
     ] {
         let mut from = None;
-        let mut found = Vec::new();
-        for _ in 0..8 {
+        let mut found = List::with_capacity(8);
+        for _ in 0_u32..8 {
             let held = read_start(
                 &mut core,
                 &limits,
@@ -239,14 +246,15 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
             let Held::Read { answer: reads::Answer::Page(page), .. } = held else { break };
             for row in &page.rows {
                 let reads::PageRow::Inbox(entry) = row else { panic!("inbox row") };
-                found.push(entry.object);
+                found.push(entry.object).unwrap();
             }
             from = page.next;
-            if matches!(from, Some(reads::Cursor::Store { .. }) | None) {
-                break;
+            match &from {
+                Some(reads::Cursor::Live { .. }) => {}
+                Some(reads::Cursor::Store { .. }) | None => break,
             }
         }
-        assert_eq!(found, [expected], "{group:?} selects its exact owner kind");
+        assert_eq!(found.into_boxed().as_ref(), [expected], "{group:?} selects its exact owner kind");
     }
 }
 

@@ -11,9 +11,14 @@ fn resumed(
 }
 
 fn stream(out: &[Request]) -> &Request {
-    out.iter()
-        .find(|request| matches!(request, Request::Now(now) if matches!(now.as_ref(), Now::RunText { .. })))
-        .expect("run watch offers retained provisional suffix")
+    for request in out {
+        if let Request::Now(now) = request {
+            if let Now::RunText { .. } = now.as_ref() {
+                return request;
+            }
+        }
+    }
+    panic!("run watch offers retained provisional suffix")
 }
 
 #[test]
@@ -25,11 +30,15 @@ fn newly_opened_run_watches_resume_at_independent_named_offsets() {
     for (watcher, offset, suffix) in [(31, 2, b"cdefgh".as_slice()), (32, 5, b"fgh".as_slice())] {
         let out = resumed(&mut core, &limits, watcher, Some(turn), offset);
         assert_stream(stream(&out), watcher, turn, offset, 8, suffix, false);
-        assert!(
-            out.iter().any(
-                |request| matches!(request, Request::Held(held) if matches!(held.as_ref(), Held::Delivery { .. }))
-            )
-        );
+        let mut delivered = false;
+        for request in &out {
+            if let Request::Held(held) = request {
+                if let Held::Delivery { .. } = held.as_ref() {
+                    delivered = true;
+                }
+            }
+        }
+        assert!(delivered);
     }
 }
 
@@ -52,7 +61,11 @@ fn a_resumed_run_offset_applies_only_to_its_exact_turn_and_attempt() {
 fn a_resumed_run_reports_a_cut_when_its_acknowledged_prefix_was_discarded() {
     let (mut core, limits) = watch_core();
     open_run_watch(&mut core, &limits, 30);
-    let text = vec![b'a'; usize::try_from(limits.views.text_bytes).unwrap()];
+    let mut text = List::with_capacity(limits.views.text_bytes);
+    for _ in 0..limits.views.text_bytes {
+        text.push(b'a').unwrap();
+    }
+    let text = text.into_boxed();
     run_text_outputs(&mut core, &limits, 7, 1, 0, &text);
     run_text_outputs(&mut core, &limits, 7, 1, limits.views.text_bytes, &text);
     let turn = views::TurnName { attempt: 7, turn: 1 };

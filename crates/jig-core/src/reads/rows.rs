@@ -960,7 +960,7 @@ fn inbox_row(
 ) -> Result<Option<PageRow>, Missing> {
     match row.inbox {
         Some(documents::Cursor::Inbox { object, .. }) if !group.includes(object) => return Ok(None),
-        Some(documents::Cursor::Inbox { .. }) | Some(documents::Cursor::Number { .. }) | None => {}
+        Some(documents::Cursor::Inbox { .. } | documents::Cursor::Number { .. }) | None => {}
     }
     match &row.value {
         Record::Tasks(tasks::Stored::PersonProposal(proposal)) => {
