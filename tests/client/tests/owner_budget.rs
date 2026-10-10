@@ -130,6 +130,18 @@ fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() 
         }
         let tree = builder.finish();
         assert_eq!(tree.len(), required.nodes);
+        for exact in [
+            &b"Budget: 18446744073709551615"[..],
+            &b"Spent directly: 18446744073709551614"[..],
+            &b"Settled spend below: 18446744073709551613"[..],
+            &b"Reserved for funded work: 18446744073709551612"[..],
+            &b"Left: 18446744073709551611"[..],
+        ] {
+            assert!(
+                tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.as_ref() == exact)),
+                "all owner accounting values retain their full width in both fragments"
+            );
+        }
         assert!(meter.held() <= jig_client_view::worst_case(&limits).expect("tree heap envelope"));
     }
 }
