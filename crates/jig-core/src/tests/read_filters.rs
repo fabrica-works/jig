@@ -16,6 +16,7 @@ fn note_row(name: u64, scope: notes::Scope, description: &[u8]) -> reads::Row {
     )
 }
 
+#[expect(clippy::manual_map, reason = "the strict subset requires the explicit Option match")]
 fn scoped(scope: notes::Scope, description: Option<&[u8]>, from: Option<reads::Cursor>) -> reads::Read {
     let description = match description {
         Some(bytes) => Some(skein_lib::bytes::copy_of(bytes)),

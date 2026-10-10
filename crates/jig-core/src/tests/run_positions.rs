@@ -12,10 +12,10 @@ fn resumed(
 
 fn stream(out: &[Request]) -> &Request {
     for request in out {
-        if let Request::Now(now) = request {
-            if let Now::RunText { .. } = now.as_ref() {
-                return request;
-            }
+        if let Request::Now(now) = request
+            && let Now::RunText { .. } = now.as_ref()
+        {
+            return request;
         }
     }
     panic!("run watch offers retained provisional suffix")
@@ -32,10 +32,10 @@ fn newly_opened_run_watches_resume_at_independent_named_offsets() {
         assert_stream(stream(&out), watcher, turn, offset, 8, suffix, false);
         let mut delivered = false;
         for request in &out {
-            if let Request::Held(held) = request {
-                if let Held::Delivery { .. } = held.as_ref() {
-                    delivered = true;
-                }
+            if let Request::Held(held) = request
+                && let Held::Delivery { .. } = held.as_ref()
+            {
+                delivered = true;
             }
         }
         assert!(delivered);
