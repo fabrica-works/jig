@@ -101,6 +101,10 @@ fn amendment_receiving_prices_reserved_kind_order_rows_and_refuses_the_whole_ove
         bounds.document_bytes -= 1;
         assert!(!payload::fits(&value, &bounds));
         bounds.document_bytes = u64::MAX;
+        let mut oversized = value.clone();
+        let jig_client::contract::Bounds::Amend { implications, .. } = &mut oversized else { panic!("whole offer") };
+        *implications = List::with_capacity(3);
+        assert!(!payload::fits(&oversized, &bounds));
         bounds.rows = 1;
         assert!(!payload::fits(&value, &bounds));
         assert_eq!(value, before);
