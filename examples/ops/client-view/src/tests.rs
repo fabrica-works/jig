@@ -307,8 +307,22 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
         };
         assert_eq!(
             rows.iter()
-                .filter(|request| matches!(request,
-                Request::Infrastructure(infrastructure::Out::Read { subject, .. }) if *subject == expected))
+                .filter(|request| match request {
+                    Request::Infrastructure(out) => match out {
+                        infrastructure::Out::Read { subject, .. } => *subject == expected,
+                        infrastructure::Out::Open { .. }
+                        | infrastructure::Out::Close { .. }
+                        | infrastructure::Out::Fact { .. } => false,
+                    },
+                    Request::Save { .. }
+                    | Request::Erase { .. }
+                    | Request::Send { .. }
+                    | Request::Jig(_)
+                    | Request::Observability(_)
+                    | Request::Show { .. }
+                    | Request::SignIn { .. }
+                    | Request::Fact { .. } => false,
+                })
                 .count(),
             1
         );
