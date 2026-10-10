@@ -485,12 +485,9 @@ fn observed(run: &mut Run, content: &smith::Content) -> Option<crate::Provisiona
         return None;
     }
     let offset = main.offset?;
-    let length = match u32::try_from(bytes) {
-        Ok(length) => length,
-        Err(_) => {
-            main.offset = None;
-            return None;
-        }
+    let Ok(length) = u32::try_from(bytes) else {
+        main.offset = None;
+        return None;
     };
     main.offset = offset.checked_add(length);
     main.offset?;
