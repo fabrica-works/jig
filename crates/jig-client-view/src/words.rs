@@ -10,7 +10,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::{
-    contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome},
+    contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer},
     intents::Progress,
     link::Link,
 };
@@ -181,6 +181,21 @@ impl Words {
             Ending::Deleted => self.text(b, JigPhrase::DeletedEnding, &[]),
         }
     }
+    /// The named maker, without inventing a party name or another actor kind.
+    pub fn proposer(&self, b: &mut Builder, proposer: Proposer) {
+        match proposer {
+            Proposer::Task(task) => self.actor(b, Actor::Task(task)),
+            Proposer::Party(party) => self.actor(b, Actor::Party(party)),
+        }
+    }
+    /// A proposal's maker kind and both full-width numeric identities.
+    pub fn proposal(&self, b: &mut Builder, proposal: ProposalKey) {
+        let (phrase, maker) = match proposal.proposer {
+            Proposer::Task(task) => (JigPhrase::Proposed, task),
+            Proposer::Party(party) => (JigPhrase::ProposedByParty, party),
+        };
+        self.text(b, phrase, &[Hole::Number(maker), Hole::Number(proposal.number)]);
+    }
     /// Say all durable outcomes, preserving who decided first and when.
     pub fn outcome(&self, b: &mut Builder, outcome: &Outcome) {
         match outcome {
@@ -200,7 +215,7 @@ impl Words {
                 Made::Note { note, .. } => self.text(b, JigPhrase::MadeNote, &[Hole::Number(*note)]),
             },
             Outcome::Proposed { proposal } => {
-                self.text(b, JigPhrase::Proposed, &[Hole::Number(proposal.proposer), Hole::Number(proposal.number)]);
+                self.proposal(b, *proposal);
             }
             Outcome::Decided { by, how, at } => {
                 self.actor(b, *by);

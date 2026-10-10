@@ -88,7 +88,7 @@ fn full_value() -> ResultValue {
             ResultField { name: full_text().bytes().into(), value: full_text().bytes().into() },
         ]),
         tasks: list([full_chip(11), full_chip(12)]),
-        proposal: Some(ProposalKey { proposer: 8, number: 1 }),
+        proposal: Some(ProposalKey { proposer: Proposer::Task(8), number: 1 }),
     }
 }
 fn full_result() -> Result {
@@ -144,7 +144,7 @@ fn dependencies_and_proposal(d: &mut Domain, watch: Token, root: ObjectKey) {
     task.chip = full_chip(9);
     acquire(d, watch, root, ObjectKey::Task(9), ReadValue::Task(Box::new(task)));
     assert_eq!(d.objects().len(), CLIENT.objects);
-    assert!(d.objects().find(ObjectKey::Proposal(ProposalKey { proposer: 8, number: 1 })).is_some());
+    assert!(d.objects().find(ObjectKey::Proposal(ProposalKey { proposer: Proposer::Task(8), number: 1 })).is_some());
 }
 fn card_tree(d: &Domain, id: Id<Object>, words: &crate::words::Words, sized: &Limits, bound: u32) {
     let mut b = Builder::new(sized);

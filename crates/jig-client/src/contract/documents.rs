@@ -4,8 +4,8 @@
 //! the working set keeps only what its own configured limits admit.
 use super::{
     Actor, Amendment, Authority, Count, Decision, DocumentText, Ending, Executor, Holding, Lacking, NoteScope,
-    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Refusal, Revision, Text, Turn, TurnName, VersionRange,
-    WakePolicy,
+    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Proposer, Refusal, Revision, Text, Turn, TurnName,
+    VersionRange, WakePolicy,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
@@ -393,7 +393,7 @@ pub struct Passed {
 pub struct Proposal {
     pub key: ProposalKey,
     pub project: u32,
-    pub proposer: Actor,
+    pub proposer: Proposer,
     pub why: Text,
     pub action: ProposalAction,
     pub needs: Authority,

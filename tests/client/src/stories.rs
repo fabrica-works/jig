@@ -337,11 +337,11 @@ pub fn deployment() -> Deployment {
 #[must_use]
 pub fn proposal() -> Proposal {
     let task = task();
-    let key = ProposalKey { proposer: 10, number: 1 };
+    let key = ProposalKey { proposer: Proposer::Task(10), number: 1 };
     Proposal {
         key,
         project: 1,
-        proposer: Actor::Task(10),
+        proposer: Proposer::Task(10),
         why: text(b"Resolve the incident"),
         action: ProposalAction::Effect {
             part: Part::Effect { connector: jig_test_client_domain::FIRST, proposal: key },
@@ -647,8 +647,8 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
         .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_scripted_engine::Change::Project(Box::new(doc)))
         .expect("project facts fit");
     let mut p = proposal();
-    p.key = ProposalKey { proposer: 7, number: 1 };
-    p.proposer = Actor::Party(7);
+    p.key = ProposalKey { proposer: Proposer::Party(7), number: 1 };
+    p.proposer = Proposer::Party(7);
     p.waiting = Recipient::Role { project: 1, role: 1 };
     p.needs.budget = 2;
     p.funding = Budget { total: 2, own: 0, ended: 0, reserved: 0, left: 2, funder: Actor::Party(7) };

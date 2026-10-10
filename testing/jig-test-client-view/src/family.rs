@@ -4,7 +4,7 @@ use crate::{
     drawing,
     words::{Word, Words},
 };
-use jig_client::contract::{ObjectKey, Part};
+use jig_client::contract::{ObjectKey, Part, Proposer};
 use jig_client_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
 use jig_test_client_domain::{
     family::{Document, ItemState, Kind, Scope, Subject},
@@ -238,7 +238,10 @@ pub fn key(subject: &Subject) -> Key {
         Kind::Item(item) => Key { owner: NAV.owner, kind: 10, a: project, b: item },
         Kind::Panel(task) => Key { owner: NAV.owner, kind: 11, a: project, b: task },
         Kind::Result(task) => Key { owner: NAV.owner, kind: 12, a: project, b: task },
-        Kind::Effect(proposal) => Key { owner: NAV.owner, kind: 13, a: proposal.proposer, b: proposal.number },
+        Kind::Effect(proposal) => match proposal.proposer {
+            Proposer::Task(task) => Key { owner: NAV.owner, kind: 13, a: task, b: proposal.number },
+            Proposer::Party(party) => Key { owner: NAV.owner, kind: 19, a: party, b: proposal.number },
+        },
         Kind::Outbox(entry) => match subject.scope {
             Scope::Project(project) => Key { owner: NAV.owner, kind: 17, a: u64::from(project), b: entry },
             Scope::Deployment => Key { owner: NAV.owner, kind: 18, a: 0, b: entry },

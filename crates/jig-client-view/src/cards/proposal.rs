@@ -29,7 +29,7 @@ pub fn proposal(
     if !super::open(b, client, object, place, &title, words, bindings) {
         return false;
     }
-    words.actor(b, document.proposer);
+    words.proposer(b, document.proposer);
     words.waiting(b, client.wall(), document.since);
     words.text(b, JigPhrase::ProposalWhy, &[]);
     crate::markdown::read(document.why.bytes(), 2, b);

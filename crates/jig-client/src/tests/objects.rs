@@ -73,9 +73,9 @@ pub(super) fn authority() -> Authority {
 }
 pub(super) fn proposal() -> Proposal {
     Proposal {
-        key: ProposalKey { proposer: 8, number: 1 },
+        key: ProposalKey { proposer: Proposer::Task(8), number: 1 },
         project: 1,
-        proposer: Actor::Task(8),
+        proposer: Proposer::Task(8),
         why: text(b"why"),
         action: ProposalAction::Widen { before: authority(), after: authority() },
         needs: authority(),

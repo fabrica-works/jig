@@ -146,7 +146,7 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         | ObjectKey::PersonTask(task)
         | ObjectKey::Result(task)
         | ObjectKey::Question { task, .. } => task,
-        ObjectKey::Proposal(key) => key.proposer,
+        ObjectKey::Proposal(_) => return decide(object, confirmation, fields, project),
         ObjectKey::Note { note, .. } => note,
     };
     let choices = &confirmation.choices;

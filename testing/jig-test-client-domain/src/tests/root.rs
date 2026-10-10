@@ -295,7 +295,7 @@ fn family_watch(rows: &[Request]) -> Token {
 }
 fn item(revision: u64) -> crate::family::Document {
     let mut proposals = List::with_capacity(1);
-    proposals.push(contract::ProposalKey { proposer: 9, number: 2 }).unwrap();
+    proposals.push(contract::ProposalKey { proposer: contract::Proposer::Task(9), number: 2 }).unwrap();
     crate::family::Document::Item(crate::family::Item {
         project: 3,
         key: 5,
@@ -333,7 +333,10 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
         contract::Part::Kind { connector: crate::FIRST, kind: 4 },
         contract::Part::Panel { connector: crate::FIRST, task: 9 },
         contract::Part::Result { connector: crate::FIRST, task: 9 },
-        contract::Part::Effect { connector: crate::FIRST, proposal: contract::ProposalKey { proposer: 9, number: 2 } },
+        contract::Part::Effect {
+            connector: crate::FIRST,
+            proposal: contract::ProposalKey { proposer: contract::Proposer::Task(9), number: 2 },
+        },
         contract::Part::Hold { connector: crate::FIRST, task: 9 },
         contract::Part::Project { connector: crate::FIRST, project: 3 },
         contract::Part::Deployment { connector: crate::FIRST },
@@ -412,7 +415,10 @@ fn a_family_page_hands_its_task_and_proposal_to_jigs_working_set() {
     assert!(
         root.jig()
             .objects()
-            .find(contract::ObjectKey::Proposal(contract::ProposalKey { proposer: 9, number: 2 }))
+            .find(contract::ObjectKey::Proposal(contract::ProposalKey {
+                proposer: contract::Proposer::Task(9),
+                number: 2
+            }))
             .is_some()
     );
     assert!(rows.iter().any(|row| match row {
@@ -808,7 +814,7 @@ fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_propo
         })
         .unwrap();
     let entry = u64::MAX;
-    let proposal = contract::ProposalKey { proposer: entry, number: entry };
+    let proposal = contract::ProposalKey { proposer: contract::Proposer::Task(entry), number: entry };
     let parts = [
         contract::Part::Outbox { connector: crate::FIRST, scope: contract::PartScope::Project(3), entry },
         contract::Part::Outbox { connector: crate::FIRST, scope: contract::PartScope::Project(4), entry },

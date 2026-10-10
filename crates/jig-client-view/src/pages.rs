@@ -80,7 +80,10 @@ pub(super) fn object_key(object: jig_client::contract::ObjectKey) -> crate::Key 
     use jig_client::contract::ObjectKey;
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
-        ObjectKey::Proposal(key) => (1, key.proposer, key.number),
+        ObjectKey::Proposal(key) => match key.proposer {
+            jig_client::contract::Proposer::Task(task) => (1, task, key.number),
+            jig_client::contract::Proposer::Party(party) => (29, party, key.number),
+        },
         ObjectKey::Escalation(task) => (2, task, 0),
         ObjectKey::Question { task, message } => (3, task, message),
         ObjectKey::PersonTask(task) => (4, task, 0),

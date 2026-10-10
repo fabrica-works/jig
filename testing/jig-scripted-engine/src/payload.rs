@@ -12,8 +12,8 @@ use jig_client::contract::{
     Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs, Note,
     NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter, ParameterDocument, Part,
     PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool,
-    Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone,
-    ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
+    Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, Question, Read,
+    ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
     ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunText,
     RunWork, Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering,
     Subject, TakenBy, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName,
@@ -45,6 +45,7 @@ plain!(
     RunStage,
     RetryNotice,
     ClosingStage,
+    Proposer,
     jig_client::contract::RecurringOverlap
 );
 impl Payload for Text {

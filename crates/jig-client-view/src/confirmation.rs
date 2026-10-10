@@ -105,7 +105,7 @@ fn context(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bin
         Some(Body::Question(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::PersonTask(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::Result(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
-        Some(Body::Proposal(doc)) => words.actor(b, doc.proposer),
+        Some(Body::Proposal(doc)) => words.proposer(b, doc.proposer),
         Some(Body::Note { document, .. }) => b.text(Run::Plain, document.description.bytes()),
         None => words.status(b, JigPhrase::LoadingObject, &[]),
     }

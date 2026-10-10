@@ -58,9 +58,9 @@ fn offered(act: ActKind) -> List<Offered> {
 }
 fn proposal(action: ProposalAction) -> Proposal {
     Proposal {
-        key: ProposalKey { proposer: 8, number: 1 },
+        key: ProposalKey { proposer: Proposer::Task(8), number: 1 },
         project: 4,
-        proposer: Actor::Task(8),
+        proposer: Proposer::Task(8),
         why: text(b"**whole reason**"),
         action,
         needs: authority(),
@@ -405,7 +405,7 @@ fn result_value_payloads(words: &crate::words::Words, part: &Part) {
 }
 
 fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crate::words::Words) {
-    let part = Part::Effect { connector: 2, proposal: ProposalKey { proposer: 8, number: 9 } };
+    let part = Part::Effect { connector: 2, proposal: ProposalKey { proposer: Proposer::Task(8), number: 9 } };
     for (action, whole) in [
         (
             ProposalAction::Batch {

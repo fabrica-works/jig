@@ -74,7 +74,7 @@ fn object_words(b: &mut Builder, object: ObjectKey, words: &Words) {
             words.text(b, JigPhrase::RepliesThrough, &[Hole::Number(task), Hole::Number(message)]);
         }
         ObjectKey::Proposal(key) => {
-            words.text(b, JigPhrase::Proposed, &[Hole::Number(key.proposer), Hole::Number(key.number)]);
+            words.proposal(b, key);
         }
         ObjectKey::Note { project, note } => {
             words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(project))]);

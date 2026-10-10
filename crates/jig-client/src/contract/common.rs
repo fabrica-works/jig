@@ -38,10 +38,19 @@ pub struct Revision {
     pub value: u64,
 }
 
-/// A proposal named by its proposer and local number.
+/// The actual maker of a proposal (client/domain/contract.md, 3.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Proposer {
+    /// A task's proposal store.
+    Task(u64),
+    /// A party's proposal store.
+    Party(u64),
+}
+
+/// A proposal named by its typed maker and local number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProposalKey {
-    pub proposer: u64,
+    pub proposer: Proposer,
     pub number: u64,
 }
 

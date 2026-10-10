@@ -235,7 +235,7 @@ fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_h
         assert_eq!(domain.inbox().rows.get(0).unwrap().object, ObjectKey::Task(first));
         assert_eq!(domain.inbox().rows.get(0).unwrap().recipient, Some(Recipient::Role { project: 1, role: 2 }));
         assert_eq!(domain.inbox().updates, Count { value: 100, limited: true });
-        assert_eq!(crate::pages::inbox::address(ObjectKey::Task(first)), Address::task(first));
+        assert_eq!(crate::pages::inbox::address(ObjectKey::Task(first)), Some(Address::task(first)));
         for filter in [
             crate::pages::inbox::Filter { project: Some(2), kind: None, goal: None },
             crate::pages::inbox::Filter { project: None, kind: Some(InboxGroup::Questions), goal: None },

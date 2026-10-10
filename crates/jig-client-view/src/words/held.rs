@@ -140,11 +140,11 @@ impl Words {
             }
             Part::Project { project, .. } => self.text(b, JigPhrase::PartProject, &[Hole::Number(u64::from(*project))]),
             Part::Effect { proposal, .. } => {
-                self.text(
-                    b,
-                    JigPhrase::PartProposal,
-                    &[Hole::Number(proposal.proposer), Hole::Number(proposal.number)],
-                );
+                let (phrase, maker) = match proposal.proposer {
+                    jig_client::contract::Proposer::Task(task) => (JigPhrase::PartProposalTask, task),
+                    jig_client::contract::Proposer::Party(party) => (JigPhrase::PartProposalParty, party),
+                };
+                self.text(b, phrase, &[Hole::Number(maker), Hole::Number(proposal.number)]);
             }
         }
     }

@@ -6,6 +6,12 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    /// A proposal made by an actual party.
+    ProposedByParty,
+    /// A task maker's proposal part.
+    PartProposalTask,
+    /// A party maker's proposal part.
+    PartProposalParty,
     /// The executor stopped progressing.
     HoldStalled,
     /// Dependency task .
@@ -1008,6 +1014,9 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::ProposedByParty => 570,
+            Self::PartProposalTask => 571,
+            Self::PartProposalParty => 572,
             Self::RunIdle => 530,
             Self::RunDue => 531,
             Self::RunPreparing => 532,
@@ -2079,6 +2088,9 @@ impl JigPhrase {
             | Self::FailedJudge
             | Self::UnguardedJudge
             | Self::PartProposal
+            | Self::PartProposalTask
+            | Self::PartProposalParty
+            | Self::ProposedByParty
             | Self::Proposed
             | Self::MadeWords
             | Self::RoleMissing
@@ -2170,7 +2182,10 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 557] = [
+pub const ALL: [JigPhrase; 560] = [
+    JigPhrase::ProposedByParty,
+    JigPhrase::PartProposalTask,
+    JigPhrase::PartProposalParty,
     JigPhrase::RunIdle,
     JigPhrase::RunDue,
     JigPhrase::RunPreparing,

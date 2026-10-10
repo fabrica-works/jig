@@ -82,9 +82,9 @@ fn final_answer(up: &Up) -> &Answer {
 }
 fn proposal() -> Proposal {
     Proposal {
-        key: ProposalKey { proposer: 8, number: 1 },
+        key: ProposalKey { proposer: Proposer::Task(8), number: 1 },
         project: 1,
-        proposer: Actor::Task(8),
+        proposer: Proposer::Task(8),
         why: text(b"wider"),
         action: ProposalAction::Batch { tasks: list(vec![]), own: false },
         needs: authority(),
@@ -709,7 +709,7 @@ fn scenario_all_read_shapes_and_reverse_activity() {
     let reads = vec![
         Read::Frame,
         Read::Task { task: 8 },
-        Read::Proposal { proposal: ProposalKey { proposer: 8, number: 1 } },
+        Read::Proposal { proposal: ProposalKey { proposer: Proposer::Task(8), number: 1 } },
         Read::Escalation { task: 8 },
         Read::Question { task: 8, message: 1 },
         Read::PersonTask { task: 8 },
@@ -838,8 +838,16 @@ fn bounded_offer_payloads_and_predictions() {
     let offer = Admission::Bounded { within, beyond: Beyond::Proposed { to: Recipient::Party(2) } };
     for (budget, answer, valid) in [
         (110, Answer::Done(Outcome::Changed), true),
-        (111, Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: 8, number: 1 } }), true),
-        (110, Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: 8, number: 1 } }), false),
+        (
+            111,
+            Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: Proposer::Task(8), number: 1 } }),
+            true,
+        ),
+        (
+            110,
+            Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: Proposer::Task(8), number: 1 } }),
+            false,
+        ),
         (111, Answer::Done(Outcome::Changed), false),
     ] {
         let mut setup = live_script();
@@ -1415,7 +1423,11 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
     assert!(!crate::payload::fits(&room, &bounds), "unused allocated room is bounded too");
     for (executor, budget, answer) in [
         (exact, 3, Answer::Done(Outcome::Changed)),
-        (exact, 4, Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: 1, number: 2 } })),
+        (
+            exact,
+            4,
+            Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: Proposer::Task(1), number: 2 } }),
+        ),
         (GoalExecutor::Procedure { connector: 6, code: u32::MAX }, 3, Answer::Refused(Refusal::NotOffered)),
         (GoalExecutor::Procedure { connector: u16::MAX, code: 7 }, 3, Answer::Refused(Refusal::NotOffered)),
         (GoalExecutor::Charter(1), 3, Answer::Refused(Refusal::NotOffered)),

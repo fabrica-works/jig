@@ -643,6 +643,24 @@ pub fn language() -> Language {
                 Box::new([Segment::Text(copy_of(b"Ended; its final facts are no longer available"))])
             }
             JigPhrase::Changed => Box::new([Segment::Text(copy_of(b"Changed"))]),
+            JigPhrase::ProposedByParty => Box::new([
+                Segment::Text(copy_of(b"Proposed by party ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", proposal ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::PartProposalTask => Box::new([
+                Segment::Text(copy_of(b"Proposal by task ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", number ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::PartProposalParty => Box::new([
+                Segment::Text(copy_of(b"Proposal by party ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", number ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
             JigPhrase::Proposed => Box::new([
                 Segment::Text(copy_of(b"Proposed by task ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

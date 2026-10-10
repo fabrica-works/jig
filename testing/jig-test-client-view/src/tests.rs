@@ -148,8 +148,10 @@ fn family_read(rows: &[Request]) -> Token {
 fn family_document(root: &mut Domain, proposal_count: u64) -> Vec<Request> {
     let rows =
         drive(root, Event::Went { place: Place::Address(Address::First(first::Address { project: 3, item: 5 })) });
-    let proposals =
-        list((2..2_u64.checked_add(proposal_count).unwrap()).map(|number| ProposalKey { proposer: 9, number }));
+    let proposals = list(
+        (2..2_u64.checked_add(proposal_count).unwrap())
+            .map(|number| ProposalKey { proposer: Proposer::Task(9), number }),
+    );
     drive(
         root,
         Event::First(first::Event::Read {
@@ -244,7 +246,7 @@ fn proposal(key: ProposalKey) -> Proposal {
     Proposal {
         key,
         project: 3,
-        proposer: Actor::Task(9),
+        proposer: key.proposer,
         why: text(&[b'w'; 32]),
         action: ProposalAction::Effect {
             part: Part::Effect { connector: jig_test_client_domain::FIRST, proposal: key },
@@ -480,7 +482,7 @@ fn outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
         family::Subject { scope: family::Scope::Deployment, kind: family::Kind::Outbox(entry) },
         family::Subject {
             scope: family::Scope::Project(3),
-            kind: family::Kind::Effect(ProposalKey { proposer: entry, number: entry }),
+            kind: family::Kind::Effect(ProposalKey { proposer: Proposer::Task(entry), number: entry }),
         },
     ];
     let mut root = ready();

@@ -522,7 +522,10 @@ fn fill_tree(d: &mut Domain, watch: Token) {
         chip: full_chip(number),
         parent,
         dependencies: list([1, 2]),
-        proposals: list([ProposalKey { proposer: 8, number: 1 }, ProposalKey { proposer: 8, number: 2 }]),
+        proposals: list([
+            ProposalKey { proposer: Proposer::Task(8), number: 1 },
+            ProposalKey { proposer: Proposer::Task(8), number: 2 },
+        ]),
         spend: u64::MAX,
         folded: PhaseCounts { waiting: 2, running: 2, held: 2, closing: 2, done: 2, failed: 2, cancelled: 2 },
         held_below: 2,

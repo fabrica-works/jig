@@ -202,17 +202,20 @@ fn earlier(a: &InboxEntry, b: &InboxEntry) -> bool {
     }
     a.object < b.object
 }
-/// The task address behind every card or inbox entry.
+/// The known address behind an entry; a party maker supplies no task address.
 #[must_use]
-pub const fn address(key: ObjectKey) -> Address {
+pub const fn address(key: ObjectKey) -> Option<Address> {
     let task = match key {
         ObjectKey::Task(task)
         | ObjectKey::Escalation(task)
         | ObjectKey::PersonTask(task)
         | ObjectKey::Result(task)
         | ObjectKey::Question { task, .. } => task,
-        ObjectKey::Proposal(proposal) => proposal.proposer,
-        ObjectKey::Note { project, .. } => return Address::Project { project, section: ProjectSection::Notes },
+        ObjectKey::Proposal(proposal) => match proposal.proposer {
+            crate::contract::Proposer::Task(task) => task,
+            crate::contract::Proposer::Party(_) => return None,
+        },
+        ObjectKey::Note { project, .. } => return Some(Address::Project { project, section: ProjectSection::Notes }),
     };
-    Address::task(task)
+    Some(Address::task(task))
 }

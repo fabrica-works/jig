@@ -2,7 +2,7 @@
 //! The place changes context only. Card state and terminal facts are owned by
 //! the domain; this module neither changes them nor judges offered acts.
 use crate::{
-    Builder, JigBindings, Key, Role,
+    Builder, JigBindings, Role,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
@@ -40,15 +40,7 @@ pub fn open(
         return false;
     };
     b.open(Role::Item);
-    let key = match facts.key {
-        ObjectKey::Task(task) => Key { owner: crate::Owner::Jig, kind: 0, a: task, b: 0 },
-        ObjectKey::Proposal(key) => Key { owner: crate::Owner::Jig, kind: 1, a: key.proposer, b: key.number },
-        ObjectKey::Escalation(task) => Key { owner: crate::Owner::Jig, kind: 2, a: task, b: 0 },
-        ObjectKey::Question { task, message } => Key { owner: crate::Owner::Jig, kind: 3, a: task, b: message },
-        ObjectKey::PersonTask(task) => Key { owner: crate::Owner::Jig, kind: 4, a: task, b: 0 },
-        ObjectKey::Result(task) => Key { owner: crate::Owner::Jig, kind: 5, a: task, b: 0 },
-        ObjectKey::Note { project, note } => Key { owner: crate::Owner::Jig, kind: 6, a: u64::from(project), b: note },
-    };
+    let key = crate::pages::object_key(facts.key);
     b.key(key);
     b.open(Role::Region);
     b.name(title);
