@@ -743,10 +743,10 @@ impl Body {
             | Self::Question(_)
             | Self::PersonTask(_)
             | Self::Result(_)
-            | Self::Note { .. } => match self.ending() {
-                Some(how) => Some(Left::Ended { how: how.clone() }),
-                None => None,
-            },
+            | Self::Note { .. } => {
+                let how = self.ending()?;
+                Some(Left::Ended { how: how.clone() })
+            }
         }
     }
     /// The ending a terminal document supplies, never inferred from its phase.
@@ -755,8 +755,7 @@ impl Body {
         match self {
             Self::Task(task) => match &task.result {
                 Some(crate::contract::TaskResult::Document(result)) => Some(&result.ending),
-                Some(crate::contract::TaskResult::Ending(_)) => None,
-                None => None,
+                Some(crate::contract::TaskResult::Ending(_)) | None => None,
             },
             Self::Proposal(proposal) => proposal.ending.as_ref(),
             Self::Question(question) => question.ending.as_ref(),
