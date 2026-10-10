@@ -46,6 +46,7 @@ pub enum Body {
     Task(Box<Task>),
     /// A proposal document.
     Proposal(Box<Proposal>),
+    OwnerProposal(Box<crate::contract::OwnerProposal>),
     /// A held task escalation.
     Escalation(Box<Escalation>),
     /// A question.
@@ -55,7 +56,10 @@ pub enum Body {
     /// A result.
     Result(Box<Result>),
     /// A note and the routing project of its page.
-    Note { project: u32, document: Box<crate::contract::Note> },
+    Note {
+        project: u32,
+        document: Box<crate::contract::Note>,
+    },
 }
 /// Why a card leaves, with durable facts preserved for its view.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

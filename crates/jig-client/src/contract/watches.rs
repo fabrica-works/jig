@@ -36,6 +36,8 @@ pub enum Delivery {
     Frame(Box<Frame>),
     /// A task.
     Task(Box<Task>),
+    /// Whole supplied pending owner proposal.
+    OwnerProposal(Box<super::OwnerProposal>),
     /// A subtree.
     Tree(Box<Tree>),
     /// Whole subtree owner facts.

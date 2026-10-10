@@ -157,6 +157,8 @@ pub enum ReadValue {
     Task(Box<Task>),
     /// A proposal.
     Proposal(Box<Proposal>),
+    /// Whole supplied pending owner proposal.
+    OwnerProposal(Box<super::OwnerProposal>),
     /// An escalation.
     Escalation(Box<Escalation>),
     /// A question.
