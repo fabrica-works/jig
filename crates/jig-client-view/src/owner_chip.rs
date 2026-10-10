@@ -173,7 +173,7 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
     for phrase in owner_chip_words::ALL {
         phrase_bytes = phrase_bytes.max(words.book.capacity(phrase.id())?);
     }
-    // A legacy node can carry a title and text together; each literal byte can
+    // A card node can carry a title and text together; each literal byte can
     // need four escaped display bytes. Both costs are included, never narrowed.
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase_bytes).checked_mul(2)?;
     Some(ChipFragment {
