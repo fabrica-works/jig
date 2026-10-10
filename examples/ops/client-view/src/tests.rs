@@ -577,3 +577,197 @@ fn an_environment_without_an_end_has_no_revision_or_move_form() {
     assert!(!contains(&view, b"Revision"));
     assert!(!contains(&view, b"Not ready"));
 }
+
+#[test]
+fn a_common_entrance_refusal_prints_supplied_budget_facts_without_claiming_gone() {
+    use infrastructure::documents::{Creation, End, Environment, Purpose};
+    let mut root = ready();
+    let requests = drive(
+        &mut root,
+        Event::Went {
+            place: root::Place::Address(Address::Infrastructure(infrastructure::Address::Environment {
+                project: 1,
+                environment: 7,
+            })),
+        },
+    );
+    let read = requests
+        .iter()
+        .find_map(|r| match r {
+            Request::Infrastructure(infrastructure::Out::Read { read, .. }) => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    let document = Environment {
+        project: 1,
+        number: 7,
+        pool: 3,
+        name: Box::from(*b"staging-7"),
+        revision: Revision { value: 99 },
+        created_by: Creation { deployment: [1; 16], task: 9, origin: Purpose::Procedure { purpose: 2 }, purpose: 2 },
+        ready_at: None,
+        ready: Some(false),
+        cost: Some(40),
+        observed_until: Some(Wall::from_nanos(123_000_000_000)),
+        end: Some(End { revision: Revision { value: 5 }, until: Wall::from_nanos(600_000_000_000) }),
+    };
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read,
+            result: infrastructure::ReadResult::Value(Box::new(infrastructure::Document::Environment(
+                document.clone(),
+            ))),
+        }),
+    );
+    let object = root.infrastructure().page().unwrap().token();
+    let revision = Revision { value: 5 };
+    drive(
+        &mut root,
+        Event::Act {
+            action: root::Action::Infrastructure(infrastructure::Act::Until {
+                object,
+                revision,
+                value: Wall::from_nanos(900_000_000_000),
+            }),
+        },
+    );
+    drive(
+        &mut root,
+        Event::Act { action: root::Action::Infrastructure(infrastructure::Act::MoveEnd { object, revision }) },
+    );
+    let mut out = Queue::with_capacity(root::max_out(&limits()));
+    root::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
+    let mut attempt = None;
+    while let Some(request) = out.pop() {
+        if let Request::Send { attempt: token, .. } = request {
+            attempt = Some(token);
+        }
+    }
+    let refusal =
+        EntranceRefusal::new(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 3 }, proposable: None })
+            .unwrap();
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt: attempt.unwrap(),
+            envelope: skein_lib::RequestEnvelope::Final,
+            answer: Some(root::Answered::Infrastructure(infrastructure::Answer::EntranceRefused(refusal))),
+        },
+    );
+    let mut view = view();
+    let mut patches = Queue::with_capacity(view.limits().tree.patches);
+    build(&mut view, &root, &mut patches);
+    assert!(contains(&view, b"Your pool has 3 left; this needs 10"));
+    assert!(!contains(&view, b"Gone"));
+    assert!(!contains(&view, b"End moved"));
+    assert!(view.tree().len() <= view.limits().tree.nodes);
+}
+
+#[test]
+fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys_distinct() {
+    for scope in [PartScope::Project(91), PartScope::Deployment] {
+        let mut root = ready();
+        let rows = drive(
+            &mut root,
+            Event::Went { place: root::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+        );
+        let watch = rows
+            .iter()
+            .find_map(|request| match request {
+                Request::Jig(JigOut::Open { watch, subject: Subject::Deployment }) => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
+        let mut parts = List::with_capacity(1);
+        parts.push(Part::Outbox { connector: 2, scope, entry: 17 }).unwrap();
+        let rows = drive(
+            &mut root,
+            Event::Jig(jig_client::Event::Watch {
+                watch,
+                event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                    hosts: List::with_capacity(0),
+                    accounts: List::with_capacity(0),
+                    capacity: List::with_capacity(0),
+                    proposals: 0,
+                    refusals: List::with_capacity(0),
+                    parts,
+                }))),
+            }),
+        );
+        let (read, subject) = rows
+            .iter()
+            .find_map(|request| match request {
+                Request::Infrastructure(infrastructure::Out::Read { read, subject }) => Some((*read, *subject)),
+                _ => None,
+            })
+            .unwrap();
+        let expected_scope = match scope {
+            PartScope::Project(project) => infrastructure::Scope::Project(project),
+            PartScope::Deployment => infrastructure::Scope::Deployment,
+        };
+        assert_eq!(subject, infrastructure::Subject { scope: expected_scope, kind: infrastructure::Kind::Outbox(17) });
+        drive(
+            &mut root,
+            Event::Infrastructure(infrastructure::Event::Read {
+                read,
+                result: infrastructure::ReadResult::Value(Box::new(outbox_document(subject))),
+            }),
+        );
+        let mut view = view();
+        let mut patches = Queue::with_capacity(view.limits().tree.patches);
+        build(&mut view, &root, &mut patches);
+        let value = match scope {
+            PartScope::Project(project) => u64::from(project),
+            PartScope::Deployment => 0,
+        };
+        let expected_key =
+            jig_client_view::Key { owner: jig_client_view::Owner::Side { connector: 2 }, kind: 6, a: value, b: 17 };
+        assert!(view.tree().nodes().iter().any(|node| node.key == Some(expected_key)));
+        assert!(contains(&view, b"Outbox entry 17"));
+        assert!(contains(&view, b"Sent"));
+        assert!(!contains(&view, b"Maximum price:"));
+        let proposal_key = crate::infrastructure::key(&infrastructure::Subject {
+            scope: expected_scope,
+            kind: infrastructure::Kind::Effect(ProposalKey { proposer: 17, number: 17 }),
+        });
+        assert_ne!(expected_key, proposal_key);
+    }
+}
+
+fn outbox_document(subject: infrastructure::Subject) -> infrastructure::Document {
+    use infrastructure::documents::{Creation, Effect, EffectAction, EffectState, PartDocument, Purpose, Service};
+    let mut effects = List::with_capacity(1);
+    effects
+        .push(Effect {
+            entry: 17,
+            task: 29,
+            project: Some(91),
+            origin: Creation { deployment: [4; 16], task: 29, origin: Purpose::Procedure { purpose: 2 }, purpose: 2 },
+            description: None,
+            state: EffectState::Sent,
+            attempt: 2,
+            deadline: Wall::EPOCH,
+            action: EffectAction::Restart {
+                service: Service { environment: Box::from(*b"production"), name: Box::from(*b"checkout") },
+                operation: 31,
+            },
+        })
+        .unwrap();
+    infrastructure::Document::Part(Box::new(PartDocument {
+        subject,
+        revision: Revision { value: 7 },
+        panel: None,
+        description: None,
+        effect: None,
+        resources: List::with_capacity(0),
+        effects,
+        drift: List::with_capacity(0),
+        environments: List::with_capacity(0),
+        pools: List::with_capacity(0),
+        backend: None,
+        made: None,
+        request_limit: None,
+        staged_limit: None,
+    }))
+}

@@ -266,6 +266,13 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
         Part::Panel { task, .. } => Kind::Panel(*task),
         Part::Result { task, .. } => Kind::Result(*task),
         Part::Effect { proposal, .. } => Kind::Effect(*proposal),
+        Part::Outbox { scope, entry, .. } => {
+            let scope = match scope {
+                jig_client::contract::PartScope::Project(project) => Scope::Project(*project),
+                jig_client::contract::PartScope::Deployment => Scope::Deployment,
+            };
+            return Some(Subject { scope, kind: Kind::Outbox(*entry) });
+        }
         Part::Hold { task, .. } => Kind::Hold(*task),
         Part::Project { project, .. } => {
             return Some(Subject { scope: Scope::Project(*project), kind: Kind::Project(*project) });

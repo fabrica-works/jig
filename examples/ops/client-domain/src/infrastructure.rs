@@ -757,7 +757,7 @@ fn answered(side: &mut Side, _env: &Env<Limits>, request: Token, answer: Answer,
         if let Some(object) = side.objects.get_mut(object) {
             object.card = match &answer {
                 Answer::MovedEnd { .. } => Card::Done { answer: answer.clone() },
-                Answer::Moved { .. } | Answer::Gone | Answer::Refused { .. } => {
+                Answer::Moved { .. } | Answer::Gone | Answer::Refused { .. } | Answer::EntranceRefused(_) => {
                     Card::Refused { answer: answer.clone() }
                 }
             };
@@ -808,6 +808,7 @@ fn part_fits(part: &Part, text: u32) -> bool {
         | Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::Outbox { .. }
         | Part::Hold { .. }
         | Part::Project { .. }
         | Part::Deployment { .. } => true,

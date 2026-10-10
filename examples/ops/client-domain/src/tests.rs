@@ -964,3 +964,100 @@ fn an_outbox_description_can_be_absent_without_becoming_a_proposal() {
     };
     assert!(Document::Part(Box::new(part)).fits(&limits().infrastructure));
 }
+
+#[test]
+fn an_entrance_refusal_finishes_only_its_original_child_and_survives_a_duplicate_final() {
+    let mut root = ready(5091);
+    let object = load_environment(&mut root);
+    until(&mut root, object.token());
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::Infrastructure(infrastructure::Act::MoveEnd {
+                object: object.token(),
+                revision: contract::Revision { value: 2 },
+            }),
+        },
+    );
+    let attempt = taken(&mut root)
+        .iter()
+        .find_map(|row| match row {
+            Request::Send { attempt, .. } => Some(*attempt),
+            _ => None,
+        })
+        .unwrap();
+    let refusal = contract::EntranceRefusal::new(contract::Refusal::Authority {
+        lacking: contract::Lacking::Budget { needed: 10, left: 3 },
+        proposable: None,
+    })
+    .unwrap();
+    let answer = infrastructure::Answer::EntranceRefused(refusal);
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt,
+            envelope: RequestEnvelope::Again,
+            answer: Some(Answered::Infrastructure(answer.clone())),
+        },
+    );
+    assert!(match root.infrastructure().object(object).unwrap().card {
+        infrastructure::Card::Deciding { .. } => true,
+        _ => false,
+    });
+    let mut future = env();
+    future.now = Time::from_nanos(80);
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    take(&mut root, &future, &mut out);
+    let attempt = out_iter(out)
+        .iter()
+        .find_map(|row| match row {
+            Request::Send { attempt, .. } => Some(*attempt),
+            _ => None,
+        })
+        .unwrap();
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::Infrastructure(answer.clone())),
+        },
+    );
+    let card = infrastructure::Card::Refused { answer };
+    assert_eq!(root.infrastructure().object(object).unwrap().card, card);
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::Infrastructure(infrastructure::Answer::Gone)),
+        },
+    );
+    assert_eq!(root.infrastructure().object(object).unwrap().card, card);
+}
+
+#[test]
+fn outbox_subjects_copy_the_supplied_scope_and_numeric_entry_independently_of_effects() {
+    use crate::{infrastructure as infra, observability as obs};
+    let proposal = contract::ProposalKey { proposer: 17, number: 17 };
+    let effect = contract::Part::Effect { connector: 2, proposal };
+    for scope in [contract::PartScope::Project(91), contract::PartScope::Deployment] {
+        let part = contract::Part::Outbox { connector: 2, scope, entry: 17 };
+        let infrastructure = infra::documents::subject(&part, infra::Scope::Project(3)).unwrap();
+        let observability = obs::documents::subject(&part, obs::Scope::Project(3)).unwrap();
+        assert_eq!(infrastructure.kind, infra::Kind::Outbox(17));
+        assert_eq!(observability.kind, obs::Kind::Outbox(17));
+        match scope {
+            contract::PartScope::Project(project) => {
+                assert_eq!(infrastructure.scope, infra::Scope::Project(project));
+                assert_eq!(observability.scope, obs::Scope::Project(project));
+            }
+            contract::PartScope::Deployment => {
+                assert_eq!(infrastructure.scope, infra::Scope::Deployment);
+                assert_eq!(observability.scope, obs::Scope::Deployment);
+            }
+        }
+        assert_ne!(infra::documents::subject(&effect, infrastructure.scope), Some(infrastructure));
+        assert_ne!(obs::documents::subject(&effect, observability.scope), Some(observability));
+    }
+}

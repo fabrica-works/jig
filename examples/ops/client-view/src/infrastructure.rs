@@ -47,7 +47,13 @@ fn link(
     builder.bind(binding);
     builder.close();
 }
-pub fn page(builder: &mut Builder, side: &infrastructure::Side, words: &Words, bindings: &mut Bindings) {
+pub fn page(
+    builder: &mut Builder,
+    side: &infrastructure::Side,
+    words: &Words,
+    jig_words: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+) {
     builder.open(Role::Heading { level: 1 });
     words.text(builder, Word::Environments, &[]);
     builder.close();
@@ -55,13 +61,14 @@ pub fn page(builder: &mut Builder, side: &infrastructure::Side, words: &Words, b
         words.status(builder, Word::Unknown, &[]);
         return;
     };
-    show_object(builder, side, id, words, bindings);
+    show_object(builder, side, id, words, jig_words, bindings);
 }
 fn show_object(
     builder: &mut Builder,
     side: &infrastructure::Side,
     id: Id<infrastructure::Object>,
     words: &Words,
+    jig_words: &jig_client_view::words::Words,
     bindings: &mut Bindings,
 ) {
     let object = side.object(id).expect("named object");
@@ -82,7 +89,7 @@ fn show_object(
             }
         }
     }
-    show_card(builder, &object.card, words);
+    show_card(builder, &object.card, words, jig_words);
     builder.close();
 }
 fn form(
@@ -119,7 +126,7 @@ fn form(
     }
     builder.close();
 }
-fn show_card(builder: &mut Builder, card: &Card, words: &Words) {
+fn show_card(builder: &mut Builder, card: &Card, words: &Words, jig_words: &jig_client_view::words::Words) {
     match card {
         Card::Open => {}
         Card::Unknown => words.status(builder, Word::Unknown, &[]),
@@ -141,6 +148,9 @@ fn show_card(builder: &mut Builder, card: &Card, words: &Words) {
             }
             Answer::Moved { revision, .. } => words.status(builder, Word::Moved, &[Hole::Number(revision.value)]),
             Answer::Gone => words.status(builder, Word::Gone, &[]),
+            Answer::EntranceRefused(refusal) => {
+                jig_client_view::cards::refusal(builder, refusal.refusal(), jig_words);
+            }
             Answer::Refused { why } => {
                 words.status(builder, Word::Refused, &[]);
                 match why {
@@ -450,6 +460,7 @@ pub fn part(
     part: &Part,
     generation: u32,
     words: &Words,
+    jig_words: &jig_client_view::words::Words,
     bindings: &mut Bindings,
 ) {
     if !side.contains(part, generation) {
@@ -469,12 +480,13 @@ pub fn part(
         Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::Outbox { .. }
         | Part::Hold { .. }
         | Part::Project { .. }
         | Part::Deployment { .. } => match side.part(part) {
             Some(object) => {
                 let id = side.find(object.subject).expect("part is named");
-                show_object(builder, side, id, words, bindings);
+                show_object(builder, side, id, words, jig_words, bindings);
             }
             None => words.status(builder, Word::Unshowable, &[]),
         },

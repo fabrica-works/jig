@@ -90,6 +90,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                 &mut builder,
                 root.infrastructure(),
                 &view.infrastructure_words,
+                &view.words,
                 &mut view.infrastructure,
             );
         }
@@ -161,6 +162,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                 part,
                                 root.jig().generation(),
                                 &view.infrastructure_words,
+                                &view.words,
                                 &mut view.infrastructure,
                             );
                             true

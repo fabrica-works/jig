@@ -646,6 +646,7 @@ fn part_fits(part: &Part, text: u32) -> bool {
         | Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::Outbox { .. }
         | Part::Hold { .. }
         | Part::Project { .. }
         | Part::Deployment { .. } => true,
