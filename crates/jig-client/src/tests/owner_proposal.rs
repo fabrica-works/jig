@@ -120,7 +120,32 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
     assert!(!out.iter().any(|r| matches!(r, Request::Send { .. })));
     assert_eq!(objects::proposal::owner_facts(domain.objects.get(id).unwrap()), Some(&changed));
-    assert!(matches!(domain.objects.get(id).unwrap().card, Card::Refused { refusal: Refusal::NotOffered }));
+    assert_eq!(
+        domain.confirmation().unwrap().missing,
+        Some(crate::confirm::Missing::Refused { why: Refusal::NotOffered })
+    );
+    assert_eq!(
+        domain.objects.get(id).unwrap().card,
+        Card::Deciding { request: None, progress: crate::intents::Progress::Confirming }
+    );
+    // The established document uses the same review state when its offer disappears.
+    let (mut control, _) = live();
+    let mut old = super::objects::proposal();
+    old.acts = List::with_capacity(1);
+    old.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+    let old_key = ObjectKey::Proposal(old.key);
+    let old_id = control.objects.name(old_key, Source::Window { generation: 0, number: 4 }).unwrap();
+    assert!(control.objects.put(old_key, Body::Proposal(Box::new(old.clone()))));
+    drive(&mut control, Time::ZERO, Event::Act { act: Act::Intend { object: old_id.token(), act: ActKind::Accept } });
+    old.acts.clear();
+    assert!(control.objects.put(old_key, Body::Proposal(Box::new(old))));
+    assert!(
+        !drive(&mut control, Time::ZERO, Event::Act { act: Act::Confirm })
+            .iter()
+            .any(|r| matches!(r, Request::Send { .. }))
+    );
+    assert_eq!(control.confirmation().unwrap().missing, domain.confirmation().unwrap().missing);
+    assert_eq!(control.objects.get(old_id).unwrap().card, domain.objects.get(id).unwrap().card);
     for admission in
         [Admission::Refused(Refusal::NotOffered), Admission::Refused(Refusal::Limit { which: Limit::Objects })]
     {
