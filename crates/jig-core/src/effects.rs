@@ -1233,6 +1233,17 @@ fn settled(
     }
 }
 
+pub(crate) fn next_deadline(core: &Core) -> Option<Wall> {
+    let mut earliest = None;
+    for (_, waiting) in &core.effect_replies {
+        earliest = Some(match earliest {
+            Some(previous) if previous < waiting.deadline => previous,
+            Some(_) | None => waiting.deadline,
+        });
+    }
+    earliest
+}
+
 pub(crate) fn deadline(core: &mut Core, env: &Env<Limits>) -> Requests {
     let mut out = Queue::with_capacity(env.limits.call_records.checked_add(1).expect("deadline replies"));
     let mut due = List::with_capacity(env.limits.call_records);

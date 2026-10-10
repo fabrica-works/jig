@@ -346,6 +346,14 @@ fn assert_connector_registry(connectors: &[u16]) {
 }
 
 impl Core {
+    /// Earliest absolute wall time among retained effect reply rights
+    /// (`domain/engine.md`, 4.4). Stale rights remain visible until the
+    /// existing effect-deadline event consumes them; this query changes nothing.
+    #[must_use]
+    pub fn effect_deadline(&self) -> Option<Wall> {
+        effects::next_deadline(self)
+    }
+
     /// Whether a live task still holds this exact fenced attempt.
     #[must_use]
     pub fn current_proof(&self, task: u64, attempt: u64) -> bool {
