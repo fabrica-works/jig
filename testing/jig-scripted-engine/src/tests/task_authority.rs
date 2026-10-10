@@ -65,7 +65,7 @@ fn task_authority_receiving_prices_whole_documents_replacements_and_reserved_nes
             3 => row.authority.authority.grants.get_mut(0).unwrap().pattern.segments = List::with_capacity(3),
             4 => {
                 row.authority.authority.note_resources.get_mut(0).unwrap().pattern.last =
-                    OwnerPatternEnd::Open(vec![0; 33].into_boxed_slice())
+                    OwnerPatternEnd::Open(vec![0; 33].into_boxed_slice());
             }
             _ => unreachable!(),
         }
