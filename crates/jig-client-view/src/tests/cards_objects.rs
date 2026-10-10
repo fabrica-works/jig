@@ -1518,3 +1518,6 @@ fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_
         }
     }
 }
+
+#[path = "amendment_presence.rs"]
+mod amendment_presence;

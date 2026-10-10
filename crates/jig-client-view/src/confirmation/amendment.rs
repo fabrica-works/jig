@@ -26,13 +26,25 @@ pub enum Field {
 }
 /// Decode one field against the exact amendment snapshot that named its token.
 #[must_use]
-pub fn edit(before: &Amendment, field: Field, value: Box<[u8]>, text_limit: u32) -> Option<Act> {
-    let mut change = before.clone();
+pub fn edit(before: &Amendment, selected: &Amendment, field: Field, value: Box<[u8]>, text_limit: u32) -> Option<Act> {
+    let mut change = selected.clone();
     match field {
-        Field::Words => change.spec.as_mut()?.words = Text::new(value, text_limit).ok()?,
+        Field::Words => {
+            let mut spec = selected.spec.clone().or(before.spec.clone())?;
+            spec.words = Text::new(value, text_limit).ok()?;
+            change.spec = Some(spec);
+        }
         Field::Instructions => change.instructions = Some(Text::new(value, text_limit).ok()?),
-        Field::Budget => change.authority.as_mut()?.budget = crate::number(&value)?,
-        Field::Deadline => change.authority.as_mut()?.deadline = Some(deadline(&value)?),
+        Field::Budget => {
+            let mut authority = selected.authority.clone().or(before.authority.clone())?;
+            authority.budget = crate::number(&value)?;
+            change.authority = Some(authority);
+        }
+        Field::Deadline => {
+            let mut authority = selected.authority.clone().or(before.authority.clone())?;
+            authority.deadline = Some(deadline(&value)?);
+            change.authority = Some(authority);
+        }
         Field::Party => change.addressed = Some(jig_client::contract::Recipient::Party(crate::number(&value)?)),
         Field::Task => change.addressed = Some(jig_client::contract::Recipient::Task(crate::number(&value)?)),
         Field::Role { project } => {
@@ -91,33 +103,38 @@ pub fn form(
     bindings: &mut JigBindings,
 ) {
     let Some(before) = before(object) else {
-        match &object.body {
-            Some(Body::Task(doc)) if doc.spec.has_loss() => words.text(b, JigPhrase::SpecificationCut, &[]),
-            Some(Body::Escalation(doc)) if doc.steering.spec.has_loss() => {
-                words.text(b, JigPhrase::SpecificationCut, &[]);
-            }
-            _ => {}
-        }
         return;
     };
     words.text(b, JigPhrase::Before, &[]);
     proposal::amendment(b, &before, words, bindings);
-    let change = open.choices.change.as_ref().unwrap_or(&before);
+    match &object.body {
+        Some(Body::Task(doc)) if doc.spec.has_loss() => words.text(b, JigPhrase::SpecificationCut, &[]),
+        Some(Body::Escalation(doc)) if doc.steering.spec.has_loss() => {
+            words.text(b, JigPhrase::SpecificationCut, &[]);
+        }
+        _ => {}
+    }
+    let empty =
+        Amendment { addressed: None, spec: None, instructions: None, wake: None, dependencies: None, authority: None };
+    let change = open.choices.change.as_ref().unwrap_or(&empty);
+    let value = values(&before, change);
     words.text(b, JigPhrase::After, &[]);
     proposal::amendment(b, change, words, bindings);
-    input(b, change, Field::Words, JigPhrase::NewSpec, open.writes, words, bindings);
-    input(b, change, Field::Instructions, JigPhrase::NewInstructions, open.writes, words, bindings);
-    input(b, change, Field::Budget, JigPhrase::NewBudget, open.writes, words, bindings);
-    input(b, change, Field::Deadline, JigPhrase::NewDeadline, open.writes, words, bindings);
-    if let Some(to) = &change.addressed {
+    if value.spec.is_some() {
+        input(b, &value, change, Field::Words, JigPhrase::NewSpec, open.writes, words, bindings);
+    }
+    input(b, &value, change, Field::Instructions, JigPhrase::NewInstructions, open.writes, words, bindings);
+    input(b, &value, change, Field::Budget, JigPhrase::NewBudget, open.writes, words, bindings);
+    input(b, &value, change, Field::Deadline, JigPhrase::NewDeadline, open.writes, words, bindings);
+    if let Some(to) = &value.addressed {
         common::recipient(b, to, words);
-        input(b, change, Field::Party, JigPhrase::AddressParty, open.writes, words, bindings);
-        input(b, change, Field::Task, JigPhrase::AddressTask, open.writes, words, bindings);
+        input(b, &value, change, Field::Party, JigPhrase::AddressParty, open.writes, words, bindings);
+        input(b, &value, change, Field::Task, JigPhrase::AddressTask, open.writes, words, bindings);
         if let Some(project) = object.project {
-            input(b, change, Field::Role { project }, JigPhrase::AddressRole, open.writes, words, bindings);
+            input(b, &value, change, Field::Role { project }, JigPhrase::AddressRole, open.writes, words, bindings);
         }
     }
-    if let Some(dependencies) = &change.dependencies {
+    if let Some(dependencies) = &value.dependencies {
         for task in dependencies {
             let mut without = skein_lib::List::with_capacity(dependencies.capacity());
             for other in dependencies {
@@ -138,9 +155,11 @@ pub fn form(
             );
         }
     }
-    if let Some(wake) = &change.wake {
+    if let Some(wake) = &value.wake {
         let mut next = change.clone();
-        next.wake.as_mut().expect("wake present").words = !wake.words;
+        let mut policy = wake.clone();
+        policy.words = !wake.words;
+        next.wake = Some(policy);
         crate::frame::control(
             b,
             words,
@@ -151,7 +170,9 @@ pub fn form(
             Act::Change { change: Box::new(next) },
         );
         let mut next = change.clone();
-        next.wake.as_mut().expect("wake present").results = !wake.results;
+        let mut policy = wake.clone();
+        policy.results = !wake.results;
+        next.wake = Some(policy);
         crate::frame::control(
             b,
             words,
@@ -187,8 +208,21 @@ fn numbers(chips: &skein_lib::List<jig_client::contract::Chip>) -> skein_lib::Li
     }
     numbers
 }
+// Display/edit values come from the source unless the person selected a whole replacement.
+// The replacement request remains the separate selected delta.
+fn values(before: &Amendment, change: &Amendment) -> Amendment {
+    Amendment {
+        addressed: change.addressed.clone().or(before.addressed.clone()),
+        spec: change.spec.clone().or(before.spec.clone()),
+        instructions: change.instructions.clone().or(before.instructions.clone()),
+        wake: change.wake.clone().or(before.wake.clone()),
+        dependencies: change.dependencies.clone().or(before.dependencies.clone()),
+        authority: change.authority.clone().or(before.authority.clone()),
+    }
+}
 fn input(
     b: &mut Builder,
+    value: &Amendment,
     change: &Amendment,
     field: Field,
     phrase: JigPhrase,
@@ -203,32 +237,31 @@ fn input(
     b.name(&words.say(phrase, &[]));
     match field {
         Field::Words => {
-            if let Some(value) = &change.spec {
+            if let Some(value) = &value.spec {
                 b.value(value.words.bytes(), written);
             }
         }
         Field::Instructions => {
-            if let Some(value) = &change.instructions {
+            if let Some(value) = &value.instructions {
                 b.value(value.bytes(), written);
             }
         }
         Field::Budget => {
-            if let Some(authority) = &change.authority {
+            if let Some(authority) = &value.authority {
                 b.value(&words.say(JigPhrase::Amount, &[Hole::Amount(authority.budget)]), written);
             }
         }
         Field::Deadline | Field::Party | Field::Task | Field::Role { .. } => b.value(&[], written),
     }
-    b.bind(bindings.insert(JigMeaning::Amendment { change: Box::new(change.clone()), field }));
+    b.bind(bindings.insert(JigMeaning::Amendment {
+        before: Box::new(value.clone()),
+        change: Box::new(change.clone()),
+        field,
+    }));
     b.close();
 }
 
 fn before(object: &Object) -> Option<Amendment> {
-    match &object.body {
-        Some(Body::Task(doc)) if doc.spec.has_loss() => return None,
-        Some(Body::Escalation(doc)) if doc.steering.spec.has_loss() => return None,
-        _ => {}
-    }
     Some(match &object.body {
         Some(Body::Task(doc)) => Amendment {
             addressed: match &*doc.chip.details {
@@ -245,7 +278,7 @@ fn before(object: &Object) -> Option<Amendment> {
                 | jig_client::contract::ChipPhase::Held { .. }
                 | jig_client::contract::ChipPhase::Ended { .. } => None,
             },
-            spec: Some(doc.spec.whole()?),
+            spec: doc.spec.whole(),
             instructions: Some(doc.instructions.clone()),
             wake: Some(doc.wake.clone()),
             dependencies: Some(numbers(&doc.dependencies)),
@@ -253,7 +286,7 @@ fn before(object: &Object) -> Option<Amendment> {
         },
         Some(Body::Escalation(doc)) => Amendment {
             addressed: doc.steering.addressed.clone(),
-            spec: Some(doc.steering.spec.whole()?),
+            spec: doc.steering.spec.whole(),
             instructions: Some(doc.steering.instructions.clone()),
             wake: Some(doc.steering.wake.clone()),
             dependencies: Some(doc.steering.dependencies.clone()),

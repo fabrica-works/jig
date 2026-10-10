@@ -59,8 +59,12 @@ pub enum JigMeaning {
     TaskNumber,
     /// Digits edit the confirmation's priority without a hidden submit.
     Priority,
-    /// A typed amendment snapshot updated by one named form field.
-    Amendment { change: Box<jig_client::contract::Amendment>, field: crate::confirmation::amendment::Field },
+    /// Source values and selected replacements kept separately for one named field.
+    Amendment {
+        before: Box<jig_client::contract::Amendment>,
+        change: Box<jig_client::contract::Amendment>,
+        field: crate::confirmation::amendment::Field,
+    },
     /// A typed project goal form field.
     GoalField { form: jig_client::pages::project::goals::GoalForm, field: crate::pages::project::goals::Field },
     /// Description search changes the current note scope only.
@@ -230,9 +234,9 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
                     }
                     Act::Press | Act::Submit | Act::Toggle => None,
                 },
-                JigMeaning::Amendment { change, field } => match act {
+                JigMeaning::Amendment { before, change, field } => match act {
                     Act::Input { value } => {
-                        crate::confirmation::amendment::edit(change, *field, value, view.text_limit)
+                        crate::confirmation::amendment::edit(before, change, *field, value, view.text_limit)
                     }
                     Act::Press | Act::Submit | Act::Toggle => None,
                 },
@@ -265,10 +269,10 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
 }
 
 /// Owned heap for the last tree's jig meanings, separately from tree storage.
-/// Amendment controls clone one bounded document plus newly entered words and
-/// instructions. The envelope also covers action text and connector part paths.
+/// Amendment controls own both source values and selected replacements, each
+/// under the bounded document/text envelope. Action text and part paths also fit.
 #[must_use]
 pub fn jig_bindings_worst_case(capacity: u32, client: &jig_client::Limits) -> Option<u64> {
-    let payload = client.document_bytes.checked_mul(2)?.checked_add(u64::from(client.text).checked_mul(4)?)?;
+    let payload = client.document_bytes.checked_mul(4)?.checked_add(u64::from(client.text).checked_mul(8)?)?;
     skein_lib::List::<Entry>::worst_case(capacity)?.checked_add(u64::from(capacity).checked_mul(payload)?)
 }
