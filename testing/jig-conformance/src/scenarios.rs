@@ -104,7 +104,7 @@ pub fn run<A: ScenarioApplication>(scenario: Scenario, cut: Cut, seed: u64) -> R
     let mut world = Harness::<A>::new(config, seed);
     world.cut(cut);
     world.drain()?;
-    A::action(&mut world, Action::Ready)?;
+    A::action(&mut world, Action::Ready).map_err(|violation| world.diagnostic(violation))?;
     world.drain()?;
     let actions: &[Action] = match scenario {
         Scenario::LateCopy => &[Action::Late, Action::Effect(1)],
@@ -135,7 +135,7 @@ pub fn run<A: ScenarioApplication>(scenario: Scenario, cut: Cut, seed: u64) -> R
         Scenario::RunBudget => &[Action::Resume],
     };
     for &action in actions {
-        A::action(&mut world, action)?;
+        A::action(&mut world, action).map_err(|violation| world.diagnostic(violation))?;
         world.drain()?;
     }
     match scenario {
@@ -146,17 +146,17 @@ pub fn run<A: ScenarioApplication>(scenario: Scenario, cut: Cut, seed: u64) -> R
                 world.advance(2_000_000_000);
                 world.drain()?;
             }
-            A::action(&mut world, Action::DeliverLate)?;
+            A::action(&mut world, Action::DeliverLate).map_err(|violation| world.diagnostic(violation))?;
             world.drain()?;
         }
         Scenario::UncertainRestarts => {
-            A::action(&mut world, Action::CheckDeadline)?;
+            A::action(&mut world, Action::CheckDeadline).map_err(|violation| world.diagnostic(violation))?;
             for _ in 0..3 {
-                world.crash()?;
+                world.crash().map_err(|violation| world.diagnostic(violation))?;
                 world.drain()?;
-                A::action(&mut world, Action::CheckDeadline)?;
+                A::action(&mut world, Action::CheckDeadline).map_err(|violation| world.diagnostic(violation))?;
             }
-            A::action(&mut world, Action::ReleaseWrites)?;
+            A::action(&mut world, Action::ReleaseWrites).map_err(|violation| world.diagnostic(violation))?;
             for _ in 0..2 {
                 world.advance(2_000_000_000);
                 world.drain()?;
@@ -168,16 +168,16 @@ pub fn run<A: ScenarioApplication>(scenario: Scenario, cut: Cut, seed: u64) -> R
                 world.drain()?;
             }
             if scenario == Scenario::ChangedJudge {
-                A::action(&mut world, Action::Effect(2))?;
+                A::action(&mut world, Action::Effect(2)).map_err(|violation| world.diagnostic(violation))?;
             } else {
-                A::action(&mut world, Action::NarrowPolicy)?;
+                A::action(&mut world, Action::NarrowPolicy).map_err(|violation| world.diagnostic(violation))?;
                 world.drain()?;
-                A::action(&mut world, Action::AcceptProposal)?;
+                A::action(&mut world, Action::AcceptProposal).map_err(|violation| world.diagnostic(violation))?;
             }
             world.drain()?;
         }
         Scenario::ShrinkingPool | Scenario::StandingTask | Scenario::RunBudget => {}
     }
-    A::check(&world, scenario)?;
+    A::check(&world, scenario).map_err(|violation| world.diagnostic(violation))?;
     Ok(Some(world.outcome()))
 }

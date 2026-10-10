@@ -432,7 +432,7 @@ impl World {
                     .map(String::as_str)
                     .or_else(|| cause.downcast_ref::<&str>().copied())
                     .unwrap_or("non-string panic");
-                panic!("host seed {seed}: {detail}");
+                panic!("host seed {seed}: {detail}\n{}", self.trace.lines().join("\n"));
             },
         );
     }

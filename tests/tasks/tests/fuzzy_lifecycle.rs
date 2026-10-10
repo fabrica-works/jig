@@ -14,6 +14,6 @@ fn random_faults_and_restart_cuts_reach_every_retained_ending() {
         }
     }
     for marker in markers {
-        assert!(seen.contains(marker), "sweep reaches {marker:?}");
+        assert!(seen.contains(&marker), "sweep reaches {marker:?}");
     }
 }

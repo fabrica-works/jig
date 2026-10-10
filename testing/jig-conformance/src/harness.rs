@@ -369,17 +369,35 @@ impl<A: Application> Harness<A> {
     /// # Errors
     /// Returns a broken promise or a story that exceeded its bound.
     pub fn drain(&mut self) -> Result<Outcome, Violation> {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.drain_iterations())).unwrap_or_else(
+            |cause| {
+                let detail = cause
+                    .downcast_ref::<String>()
+                    .map(String::as_str)
+                    .or_else(|| cause.downcast_ref::<&str>().copied())
+                    .unwrap_or("non-string panic");
+                panic!("application seed {}: {detail}\n{}", self.seed, self.trace.join("\n"));
+            },
+        );
+        result.map_err(|violation| self.diagnostic(violation))
+    }
+
+    /// Attach the seed and enabled full trace only when a check fails.
+    #[must_use]
+    pub fn diagnostic(&self, mut violation: Violation) -> Violation {
+        violation.why = format!("seed {}: {}\n{}", self.seed, violation.why, self.trace.join("\n"));
+        violation
+    }
+
+    fn drain_iterations(&mut self) -> Result<Outcome, Violation> {
         for _ in 0..self.referee.policy.story_steps {
-            if !self.iterate().map_err(|mut violation| {
-                violation.why = format!("seed {}: {}", self.seed, violation.why);
-                violation
-            })? {
+            if !self.iterate()? {
                 return Ok(self.outcome());
             }
         }
         Err(Violation {
             promise: crate::referee::Promise::Bounded,
-            why: format!("seed {}: scenario did not settle within its iteration bound", self.seed),
+            why: "scenario did not settle within its iteration bound".into(),
         })
     }
 

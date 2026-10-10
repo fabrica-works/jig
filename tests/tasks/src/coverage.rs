@@ -37,10 +37,10 @@ impl Coverage {
                 Status::Cancelled => Reached::Cancelled,
             });
         }
-        if let Seen::Stored { live, .. } | Seen::Resources { live, .. } = seen {
-            if live.iter().any(|row| matches!(row.phase, Phase::Held { .. })) {
-                self.0.insert(Reached::Held);
-            }
+        if let Seen::Stored { live, .. } | Seen::Resources { live, .. } = seen
+            && live.iter().any(|row| matches!(row.phase, Phase::Held { .. }))
+        {
+            self.0.insert(Reached::Held);
         }
     }
     pub fn input(&mut self, event: &Event) {

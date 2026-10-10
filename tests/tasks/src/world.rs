@@ -1076,20 +1076,21 @@ pub fn run_story_traced(seed: u64, consume_facts: bool, enabled: bool) -> (Trace
 }
 
 fn story(seed: u64, consume_facts: bool, trace: Trace) -> (Trace, Frozen) {
-    std::panic::catch_unwind(|| story_run(seed, consume_facts, trace)).unwrap_or_else(|cause| {
+    let mut w = World::start(seed, LIMITS, trace);
+    w.consume_facts = consume_facts;
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| story_run(seed, &mut w))).unwrap_or_else(|cause| {
         let detail = cause
             .downcast_ref::<String>()
             .map(String::as_str)
             .or_else(|| cause.downcast_ref::<&str>().copied())
             .unwrap_or("non-string panic");
-        panic!("task seed {seed}: {detail}");
-    })
+        panic!("task seed {seed}: {detail}\n{}", w.trace.lines.join("\n"));
+    });
+    (std::mem::take(&mut w.trace), w.frozen())
 }
 
-fn story_run(seed: u64, consume_facts: bool, trace: Trace) -> (Trace, Frozen) {
+fn story_run(seed: u64, w: &mut World) {
     let mut rng = Rng::new(seed);
-    let mut w = World::start(seed, LIMITS, trace);
-    w.consume_facts = consume_facts;
     let arrival = Duration::from_millis(rng.between(1, 20));
     w.env.now = w.env.now.saturating_add(arrival);
     w.env.wall = Wall::from_nanos(arrival.as_nanos());
@@ -1151,5 +1152,4 @@ fn story_run(seed: u64, consume_facts: bool, trace: Trace) -> (Trace, Frozen) {
     w.complete_cancel();
     assert_eq!(w.results.len(), 5);
     assert_eq!(w.live(), 0);
-    (std::mem::take(&mut w.trace), w.frozen())
 }
