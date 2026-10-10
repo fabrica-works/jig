@@ -211,6 +211,8 @@ pub enum NoteScope {
 /// How an object ended.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ending {
+    /// The complete ending supplied by a task owner, separate from other terminal objects.
+    Task(Box<super::OwnerChipEnding>),
     /// Completed.
     Done,
     /// Failed with a reason.

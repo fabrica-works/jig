@@ -59,7 +59,7 @@ fn fixed(refusal: &Refusal) -> bool {
         Refusal::Ended { how } => match how {
             Ending::Done | Ending::Deleted => true,
             Ending::Failed { reason } | Ending::Cancelled { reason, .. } => reason.is_none(),
-            Ending::Withdrawn { .. } => false,
+            Ending::Withdrawn { .. } | Ending::Task(_) => false,
             Ending::Decided { party, how, .. } => party.is_none() && fixed_decision(how.as_ref()),
         },
         Refusal::Role { .. }

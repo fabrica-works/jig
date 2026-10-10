@@ -101,10 +101,7 @@ impl<A: crate::Application> Engine<A> {
                 return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
             };
             if let Some(Ending::Decided { party: Some(by), how: Some(how), at, .. }) = ending(value) {
-                return Ok((
-                    Answer::Done(Outcome::DecidedFirst { by: by.clone(), how: how.clone(), at: *at }),
-                    Vec::new(),
-                ));
+                return Ok((Answer::Done(Outcome::DecidedFirst { by: by.clone(), how: how.clone(), at }), Vec::new()));
             }
             if let Some(how) = ending(value) {
                 return Ok((Answer::Refused(Refusal::Ended { how: how.clone() }), Vec::new()));
@@ -445,14 +442,17 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         | ReadValue::Deployment(_) => None,
     }
 }
-fn ending(value: &ReadValue) -> Option<&Ending> {
+fn ending(value: &ReadValue) -> Option<Ending> {
     match value {
-        ReadValue::Task(v) => v.result.as_ref().map(|result| &result.ending),
-        ReadValue::Proposal(v) => v.ending.as_ref(),
-        ReadValue::Escalation(v) => v.ending.as_ref(),
-        ReadValue::Question(v) => v.ending.as_ref(),
-        ReadValue::PersonTask(v) => v.ending.as_ref(),
-        ReadValue::Result(v) => Some(&v.ending),
+        ReadValue::Task(v) => match v.result.as_ref()? {
+            jig_client::contract::TaskResult::Document(result) => Some(result.ending.clone()),
+            jig_client::contract::TaskResult::Ending(ending) => Some(Ending::Task(ending.clone())),
+        },
+        ReadValue::Proposal(v) => v.ending.clone(),
+        ReadValue::Escalation(v) => v.ending.clone(),
+        ReadValue::Question(v) => v.ending.clone(),
+        ReadValue::PersonTask(v) => v.ending.clone(),
+        ReadValue::Result(v) => Some(v.ending.clone()),
         ReadValue::Frame(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)

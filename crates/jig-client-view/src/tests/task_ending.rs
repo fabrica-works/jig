@@ -26,7 +26,7 @@ fn task_overview_shows_only_supplied_ending_facts_with_opaque_state_loss_and_raw
             by: OwnerRequester::Deployment { project: u32::MAX },
             at: Wall::from_nanos(u64::MAX),
         })));
-        let (tree, bindings) = super::task_contract::page(row.clone());
+        let (tree, bindings) = task_contract::page(row.clone());
         assert!(contains(&tree, b"Cancelled with reason"));
         assert!(contains(&tree, b"source reason"));
         assert!(contains(&tree, b"Only part of this text was supplied"));
@@ -81,7 +81,7 @@ fn task_result_document_keeps_its_own_time_value_and_departure_state_without_own
     let result = result();
     let mut row = task_doc(&[]);
     row.result = Some(TaskResult::Document(Box::new(result.clone())));
-    let (tree, _) = super::task_contract::page(row);
+    let (tree, _) = task_contract::page(row);
     assert!(contains(&tree, b"whole failure"));
     assert!(contains(&tree, b"whole report"));
     assert!(!contains(&tree, b"Cancellation requester deployment project:"));

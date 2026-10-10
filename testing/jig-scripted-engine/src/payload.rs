@@ -353,6 +353,7 @@ impl Payload for Ending {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Done | Self::Deleted => Some(0),
+            Self::Task(value) => value.heap(bounds),
             Self::Failed { reason } => reason.heap(bounds),
             Self::Withdrawn { reason } => reason.heap(bounds),
             Self::Cancelled { by, reason, at } => sum(&[by.heap(bounds), reason.heap(bounds), at.heap(bounds)]),

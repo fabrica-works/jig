@@ -179,6 +179,7 @@ impl Words {
                 self.wall(b, *at);
             }
             Ending::Deleted => self.text(b, JigPhrase::DeletedEnding, &[]),
+            Ending::Task(value) => crate::owner_chip::ending_summary(b, value, self),
         }
     }
     /// The named maker, without inventing a party name or another actor kind.

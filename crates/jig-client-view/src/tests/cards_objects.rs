@@ -566,6 +566,7 @@ fn all_chip_phases(words: &crate::words::Words) {
             ChipPhase::Held { .. } => Phase::Held,
             ChipPhase::Ended { how, .. } => match how {
                 Ending::Done | Ending::Decided { .. } | Ending::Deleted => Phase::Done,
+                Ending::Task(_) => Phase::Ended,
                 Ending::Failed { .. } => Phase::Failed,
                 Ending::Cancelled { .. } | Ending::Withdrawn { .. } => Phase::Cancelled,
             },
