@@ -1,5 +1,6 @@
 #![expect(
     clippy::disallowed_methods,
+    clippy::disallowed_macros,
     clippy::disallowed_types,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary tests inspect complete typed cards and loaded language data"

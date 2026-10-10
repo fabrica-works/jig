@@ -42,8 +42,14 @@ fn question_sender_closed_widths_and_absence_keep_whole_facts_and_original_answe
             Event::Act { act: Act::Edit { field: Purpose::Answer, text: text(b"whole answer") } },
         );
         let requests = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-        let sent =
-            requests.iter().find_map(|r| if let Request::Send { ask, .. } = r { Some(ask) } else { None }).unwrap();
+        let mut sent = None;
+        for request in requests.as_ref() {
+            if let Request::Send { ask, .. } = request {
+                sent = Some(ask);
+                break;
+            }
+        }
+        let sent = sent.expect("original question Answer request");
         assert_eq!(
             sent.as_ref(),
             &Ask::AnswerQuestion {
