@@ -11,7 +11,7 @@ pub struct CallIdentity {
     pub retry: u32,
     pub id: Text,
 }
-/// The owner's raw call snapshot, with aggregate loss and supplied first-seen clock.
+/// The owner's raw call snapshot, with aggregate loss and supplied current-call start.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CurrentCall {
     pub identity: CallIdentity,

@@ -118,6 +118,7 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
         | Delivery::Tasks(_)
         | Delivery::Conversations(_)
         | Delivery::Run(_)
+        | Delivery::RunState(_)
         | Delivery::Deployment(_) => {}
     }
 }

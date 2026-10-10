@@ -698,3 +698,118 @@ fn full_raw_byte(byte: u8) -> Text {
 fn current_identity(id: &[u8]) -> CallIdentity {
     CallIdentity { owner: Token::new(u64::MAX), sequence: u32::MAX, retry: u32::MAX, id: text(id) }
 }
+
+#[test]
+fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_ack() {
+    let words = words();
+    let (mut d, _, run, _) = ready();
+    let raw = CurrentCall {
+        identity: current_identity(b"id/\xff"),
+        began: None,
+        tool: text(b"call-only-tool"),
+        input: text(b"call-only-input"),
+        cut: true,
+    };
+    let mut state = RunState { task: 8, attempt: Some(2), committed_turn: 0, writing: None, call: Some(raw.clone()) };
+    let out = deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
+    for request in &out {
+        if let Request::Continue { .. } = request {
+            panic!("normal document never invents a stream continuation");
+        }
+    }
+    assert!(d.conversation().live.is_empty());
+    assert_eq!(d.conversation().current, None);
+    assert_eq!(d.conversation().offset(), 0);
+    assert_eq!(d.conversation().current_run, Some(state.clone()));
+    let folded = build(&d, 3, &words).0;
+    access(&folded);
+    assert!(keys(&folded).is_empty(), "call-only has no invented provisional turn key");
+    assert!(contains(&folded, b"call-only-tool"));
+    assert!(!contains(&folded, b"call-only-input"));
+    let label: &[u8] = b"Observed current tool call";
+    assert_eq!(folded.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(), 1);
+    drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
+    let opened = build(&d, 3, &words).0;
+    assert!(contains(&opened, b"call-only-input"));
+    let without_wall = opened.nodes().len();
+    state.call.as_mut().unwrap().began = Some(Wall::EPOCH);
+    deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
+    assert_eq!(build(&d, 3, &words).0.nodes().len(), without_wall + 2);
+    state.writing = Some(RunText {
+        attempt: 2,
+        began: None,
+        turn: TurnName { attempt: 2, number: 1 },
+        from: 0,
+        through: 4,
+        text: text(b"live"),
+        cut: false,
+        call: Some(LiveCall::Raw(raw)),
+    });
+    deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
+    let writing = build(&d, 3, &words).0;
+    assert_eq!(keys(&writing).len(), 1);
+    assert_eq!(
+        writing.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(),
+        1,
+        "the full snapshot's independent call is not duplicated inside writing"
+    );
+    state.writing = None;
+    state.committed_turn = 1;
+    deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
+    assert_eq!(d.conversation().current_run, Some(state.clone()));
+    assert_eq!(build(&d, 3, &words).0.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(), 1);
+    state.call = None;
+    deliver(&mut d, run, Delivery::RunState(Box::new(state)));
+    let cleared = build(&d, 3, &words).0;
+    assert!(!contains(&cleared, b"call-only-tool"), "absent whole-document call clears the retained current call");
+}
+
+#[test]
+fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows() {
+    use super::cards::CLIENT;
+    let words = words();
+    let (mut d, _, run, _) = ready();
+    for number in 1..=CLIENT.rows {
+        live(&mut d, run, number);
+    }
+    let call = CurrentCall {
+        identity: CallIdentity { id: full_raw_byte(0xfd), ..current_identity(b"id") },
+        began: Some(Wall::from_nanos(u64::MAX)),
+        tool: full_raw_byte(0xff),
+        input: full_raw_byte(0xfe),
+        cut: true,
+    };
+    deliver(
+        &mut d,
+        run,
+        Delivery::RunState(Box::new(RunState {
+            task: 8,
+            attempt: Some(2),
+            committed_turn: 0,
+            writing: None,
+            call: Some(call.clone()),
+        })),
+    );
+    drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity, open: true } });
+    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let mut b = crate::Builder::new(&limits);
+    let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
+    b.open(Role::Page);
+    assert!(crate::jig(
+        &mut b,
+        &d,
+        crate::SlotRef { owner: crate::Owner::Other { child: 1 }, token: Token::new(1) },
+        &words,
+        &mut bindings
+    ));
+    b.close();
+    let tree = b.finish();
+    access(&tree);
+    assert!(u32::try_from(tree.nodes().len()).unwrap() <= limits.nodes);
+    let mut escaped = Vec::new();
+    for _ in 0..CLIENT.text {
+        escaped.extend_from_slice(b"\\xFE");
+    }
+    assert!(contains(&tree, &escaped));
+    assert_eq!(d.conversation().live.len(), CLIENT.rows);
+}

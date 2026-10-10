@@ -15,7 +15,7 @@ use jig_client::contract::{
     Phase, PhaseCounts, Policy, Pool, Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey,
     ProposedTask, Proposer, Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal,
     ReplyPosition, Result, ResultContract, ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning,
-    RunEnding, RunObservation, RunStage, RunText, RunWork, Runtime, Seen, Speaker, Specification,
+    RunEnding, RunObservation, RunStage, RunState, RunText, RunWork, Runtime, Seen, Speaker, Specification,
     SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskFilter, TaskLine,
     TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd,
     WatchEvent, WriterSlot,
@@ -1023,6 +1023,7 @@ impl Payload for Delivery {
             Self::Tasks(value0) => sum(&[value0.heap(bounds)]),
             Self::Conversations(value0) => sum(&[value0.heap(bounds)]),
             Self::Run(value0) => sum(&[value0.heap(bounds)]),
+            Self::RunState(value0) => sum(&[value0.heap(bounds)]),
             Self::Deployment(value0) => sum(&[value0.heap(bounds)]),
         }
     }
@@ -1038,6 +1039,7 @@ impl Payload for LiveCall {
     }
 }
 fields!(RunText { attempt, began, turn, from, through, text, cut, call });
+fields!(RunState { task, attempt, committed_turn, writing, call });
 impl Payload for WatchEvent {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {

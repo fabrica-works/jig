@@ -905,3 +905,100 @@ fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_
     assert!(c.current_opened.is_empty());
     assert!(c.set_fold(CallName { attempt: 1, turn: 1, call: 7 }, Fold::Open));
 }
+
+#[test]
+fn whole_run_state_keeps_call_only_and_postcommit_facts_without_a_synthetic_turn() {
+    use crate::contract::{CurrentCall, LiveCall, RunState};
+    let mut c = Conversation::new(9, 4);
+    let identity = current_identity(b"opaque/\xff\x00");
+    let call = CurrentCall {
+        identity: identity.clone(),
+        tool: text(b"tool/\xfe"),
+        input: text(b"literal/\x00"),
+        cut: true,
+        began: Some(Wall::from_nanos(71)),
+    };
+    let mut state = RunState { task: 9, attempt: Some(1), committed_turn: 0, writing: None, call: Some(call.clone()) };
+    assert!(c.run_state(state.clone(), 100));
+    assert_eq!(c.current_run, Some(state.clone()));
+    assert!(c.live.is_empty());
+    assert_eq!(c.current, None);
+    assert_eq!(c.offset(), 0);
+    assert!(c.set_current_fold(identity.clone(), Fold::Open));
+    assert!(!c.set_current_fold(current_identity(b"different"), Fold::Open));
+    assert!(c.names(4).is_empty());
+    assert!(c.parts(4).is_empty());
+    let mut writing = stream(1, 0, 3, b"one", false);
+    writing.call = Some(LiveCall::Raw(call.clone()));
+    state.writing = Some(writing.clone());
+    state.committed_turn = 1;
+    assert!(c.run_state(state.clone(), 100));
+    assert_eq!(c.live.len(), 1, "owner progress alone cannot hide unread committed text");
+    assert_eq!(c.live.get(0).unwrap().name, writing.turn);
+    assert!(c.moved(1).is_some());
+    let mut rows = List::with_capacity(1);
+    rows.push(calls(1, 1)).unwrap();
+    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert!(c.live.is_empty(), "actual activity replaces only matching provisional text");
+    assert_eq!(c.current_run, Some(state.clone()), "a committed turn is not a tool-end report");
+    assert_eq!(c.current_fold(&identity), Fold::Open);
+    state.writing = None;
+    assert!(c.run_state(state.clone(), 100));
+    assert_eq!(c.current_run.as_ref().unwrap().call, Some(call));
+    assert!(c.set_fold(CallName { attempt: 1, turn: 1, call: 7 }, Fold::Open));
+    assert_eq!(c.current_fold(&identity), Fold::Open, "raw identity and transcript number remain separate");
+    let bad = RunState { task: 10, ..state.clone() };
+    assert!(!c.run_state(bad, 100));
+    assert_eq!(c.current_run, Some(state.clone()));
+    let bad = RunState { attempt: None, ..state.clone() };
+    assert!(!c.run_state(bad, 100));
+    assert_eq!(c.current_run, Some(state.clone()));
+    let newer = RunState { attempt: Some(2), ..state.clone() };
+    assert!(c.run_state(newer.clone(), 100));
+    assert!(c.run_state(state.clone(), 100));
+    assert_eq!(c.current_run, Some(newer), "older attempt documents do not replace current facts");
+    state.attempt = Some(2);
+    state.call = None;
+    assert!(c.run_state(state, 100));
+    assert!(!c.set_current_fold(identity, Fold::Open));
+    assert!(c.current_opened.is_empty());
+    let ended = RunState { task: 9, attempt: None, committed_turn: 1, writing: None, call: None };
+    assert!(c.run_state(ended.clone(), 100));
+    assert_eq!(c.current_run, Some(ended), "an actual absent attempt ends provisional state");
+    assert_eq!(c.current, None);
+    assert!(c.live.is_empty());
+    c.end_run();
+    assert_eq!(c.current_run, None);
+}
+
+#[test]
+fn whole_current_call_replacement_copies_each_supplied_current_clock_without_a_history_ledger() {
+    use crate::contract::{CurrentCall, RunState};
+    let mut c = Conversation::new(9, 4);
+    let a = CurrentCall {
+        identity: current_identity(b"same/\xff"),
+        tool: text(b"tool"),
+        input: text(b"input"),
+        cut: false,
+        began: Some(Wall::from_nanos(3)),
+    };
+    let mut value = RunState { task: 9, attempt: Some(1), committed_turn: 0, writing: None, call: Some(a.clone()) };
+    assert!(c.run_state(value.clone(), 100));
+    assert!(c.set_current_fold(a.identity.clone(), Fold::Open));
+    value.call.as_mut().unwrap().input = text(b"replacement");
+    assert!(c.run_state(value.clone(), 100));
+    assert_eq!(c.current_run, Some(value.clone()));
+    assert_eq!(c.current_fold(&a.identity), Fold::Open);
+    value.call.as_mut().unwrap().identity.retry = 1;
+    value.call.as_mut().unwrap().began = Some(Wall::from_nanos(5));
+    assert!(c.run_state(value.clone(), 100));
+    assert_eq!(c.current_run, Some(value));
+    assert_eq!(c.current_fold(&a.identity), Fold::Folded);
+    let returned = CurrentCall { began: Some(Wall::from_nanos(9)), ..a.clone() };
+    let value = RunState { task: 9, attempt: Some(1), committed_turn: 0, writing: None, call: Some(returned) };
+    assert!(c.run_state(value.clone(), 100));
+    assert_eq!(c.current_run, Some(value), "A to B to A copies the supplied restarted current clock");
+    assert_eq!(c.current_fold(&a.identity), Fold::Folded);
+    assert!(c.current.is_none());
+    assert!(c.live.is_empty());
+}

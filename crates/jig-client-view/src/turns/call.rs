@@ -80,7 +80,7 @@ pub(super) fn live(
         LiveCall::Raw(value) => raw(b, client, value, words, bindings),
     }
 }
-fn raw(b: &mut Builder, client: &Domain, call: &CurrentCall, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn raw(b: &mut Builder, client: &Domain, call: &CurrentCall, words: &Words, bindings: &mut JigBindings) {
     let open = client.conversation().current_fold(&call.identity) == Fold::Open;
     b.open(Role::Region);
     let region = words

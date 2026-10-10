@@ -806,6 +806,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                     | Delivery::Goals(_)
                     | Delivery::Conversations(_)
                     | Delivery::Run(_)
+                    | Delivery::RunState(_)
                     | Delivery::Deployment(_) => {}
                 },
                 Owner::Page { generation } => {

@@ -16,8 +16,8 @@
 use crate::{
     action::End,
     contract::{
-        Activity, ActivityLine, ActivityPage, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part, Read, RunText,
-        Text, TurnName,
+        Activity, ActivityLine, ActivityPage, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part, Read, RunState,
+        RunText, Text, TurnName,
     },
     objects::{Objects, Source},
     windows::{Edge, Edges, TurnWindow},
@@ -81,6 +81,8 @@ pub struct Conversation {
     pub opened: Map<CallName, ()>,
     /// Opaque current-call folds are equality-only and independent of transcript numbers.
     pub current_opened: List<CallIdentity>,
+    /// Whole run document, independent of retained provisional and committed turns.
+    pub current_run: Option<RunState>,
     /// Earlier provisional turns survive deliveries of a later turn.
     pub live: List<LiveTurn>,
     /// The name and offset to request on the run watch.
@@ -115,6 +117,7 @@ impl Conversation {
             fresh: TurnWindow::new(rows),
             opened: Map::with_capacity(rows),
             current_opened: List::with_capacity(rows),
+            current_run: None,
             live: List::with_capacity(rows),
             current: None,
             stream_offset: 0,
@@ -259,6 +262,37 @@ impl Conversation {
         self.reading = None;
         self.fresh.rows.clear();
     }
+    /// Apply the owner's whole current run without inventing a provisional name.
+    /// Owner committed progress never hides text before its activity is read.
+    pub fn run_state(&mut self, value: RunState, text_limit: u32) -> bool {
+        if value.task != self.task {
+            return false;
+        }
+        if value.attempt.is_none() && (value.writing.is_some() || value.call.is_some()) {
+            return false;
+        }
+        if let Some(held) = &self.current_run
+            && let Some(previous) = held.attempt
+            && let Some(incoming) = value.attempt
+            && incoming < previous
+        {
+            return true;
+        }
+        if let Some(writing) = &value.writing {
+            if value.attempt != Some(writing.attempt) {
+                return false;
+            }
+            if !self.stream(writing.clone(), text_limit) {
+                return false;
+            }
+        }
+        if value.attempt.is_none() {
+            self.end_run();
+        }
+        self.current_run = Some(value);
+        self.prune_folds();
+        true
+    }
     /// Appends one valid offset delivery, retaining other provisional turn names.
     /// A gap needs an explicit cut; overlap and duplicate text are absorbed once.
     pub fn stream(&mut self, value: RunText, text_limit: u32) -> bool {
@@ -352,6 +386,7 @@ impl Conversation {
     /// Drops provisional text that a completed run never committed.
     pub fn end_run(&mut self) {
         self.live.clear();
+        self.current_run = None;
         self.current = None;
         self.stream_offset = 0;
         self.replacing = false;
@@ -488,6 +523,12 @@ impl Conversation {
         if self.current_opened.as_slice().contains(identity) { Fold::Open } else { Fold::Folded }
     }
     fn displayed_current_call(&self, identity: &CallIdentity) -> bool {
+        if let Some(run) = &self.current_run {
+            return match &run.call {
+                Some(call) => &call.identity == identity,
+                None => false,
+            };
+        }
         for live in &self.live {
             if let Some(LiveCall::Raw(call)) = &live.call
                 && &call.identity == identity
@@ -670,6 +711,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(Map::<CallName, ()>::worst_case(limits.rows)?)?
         .checked_add(List::<CallName>::worst_case(limits.rows)?)?
         .checked_add(List::<CallIdentity>::worst_case(limits.rows)?.checked_mul(2)?)?
+        .checked_add(limits.document_bytes.checked_mul(2)?)?
         .checked_add(u64::from(limits.rows).checked_mul(u64::from(limits.text))?.checked_mul(2)?)?
         .checked_add(List::<u64>::worst_case(limits.rows)?.checked_mul(2)?)?
         .checked_add(List::<ActivityLine>::worst_case(limits.rows)?.checked_mul(3)?)?

@@ -196,3 +196,39 @@ pub(crate) fn fold_current(domain: &mut Domain, identity: crate::contract::CallI
         domain.changed();
     }
 }
+
+/// Whole owner run documents carry calls without requiring a text turn.
+/// The transport owns normal document acknowledgment; no stream cursor is invented.
+pub(crate) fn run_state(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    watch: Id<Watch>,
+    value: crate::contract::RunState,
+    out: &mut Queue<Request>,
+) {
+    let Some(following) = domain.watches.get(watch) else {
+        return;
+    };
+    match &following.subject {
+        Subject::Run { task, .. } => {
+            if *task != domain.conversation.task || value.task != *task {
+                return;
+            }
+        }
+        Subject::Frame
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Tasks { .. }
+        | Subject::Goals { .. }
+        | Subject::Conversations
+        | Subject::Deployment => return,
+    }
+    if domain.conversation.run_state(value, env.limits.text) {
+        working_set(domain, env, out);
+    } else {
+        crate::pages::routing::refuse(domain, Limit::Objects);
+    }
+    domain.changed();
+}

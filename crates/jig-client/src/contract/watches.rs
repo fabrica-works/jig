@@ -1,7 +1,7 @@
 //! Level-triggered subjects and one-terminal watches; client/domain/contract.md, 7.
 //! Deliveries replace the previous document. Run text alone is offset based and
 //! provisional, and never resets text belonging to an earlier turn.
-use super::{Chip, Conversations, Deployment, Frame, Goals, Inbox, LiveCall, Task, Text, Tree, TurnName};
+use super::{Chip, Conversations, CurrentCall, Deployment, Frame, Goals, Inbox, LiveCall, Task, Text, Tree, TurnName};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 /// A live subject followed by one unkeyed watch.
@@ -50,8 +50,21 @@ pub enum Delivery {
     Conversations(Box<Conversations>),
     /// Provisional run text.
     Run(Box<RunText>),
+    /// Whole current run, including a call independent of provisional writing.
+    RunState(Box<RunState>),
     /// Deployment capacity.
     Deployment(Box<Deployment>),
+}
+
+/// Current owner run state; absent writing does not assert a call ended.
+/// The committed position is owner progress, not activity already read by the client.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct RunState {
+    pub task: u64,
+    pub attempt: Option<u64>,
+    pub committed_turn: u32,
+    pub writing: Option<RunText>,
+    pub call: Option<CurrentCall>,
 }
 
 /// Provisional text named by turn, with explicit offset and truncation.

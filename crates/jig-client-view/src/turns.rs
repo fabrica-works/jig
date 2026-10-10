@@ -5,7 +5,7 @@
 use crate::{Builder, JigBindings, Key, Owner, Role, Run, phrases::jig::JigPhrase, words::Words};
 use jig_client::{
     Domain,
-    contract::{Activity, Party, TurnName},
+    contract::{Activity, LiveCall, Party, TurnName},
     conversation::{Conversation, Words as WordState},
 };
 mod activity;
@@ -66,8 +66,26 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
             words.status(b, JigPhrase::TurnCut, &[]);
         }
         if let Some(value) = &live.call {
-            call::live(b, client, live.name, value, words, bindings);
+            match value {
+                LiveCall::Decoded(_) => call::live(b, client, live.name, value, words, bindings),
+                LiveCall::Raw(_) => {
+                    if state.current_run.is_none() {
+                        call::live(b, client, live.name, value, words, bindings);
+                    }
+                }
+            }
         }
+        b.close();
+        b.close();
+    }
+    if let Some(run) = &state.current_run
+        && let Some(value) = &run.call
+    {
+        b.open(Role::Item);
+        b.open(Role::Region);
+        b.name(&words.say(JigPhrase::Provisional, &[]));
+        words.status(b, JigPhrase::Provisional, &[]);
+        call::raw(b, client, value, words, bindings);
         b.close();
         b.close();
     }

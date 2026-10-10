@@ -1905,3 +1905,85 @@ fn current_identity(id: &[u8]) -> jig_client::contract::CallIdentity {
         id: text(id),
     }
 }
+
+#[test]
+fn whole_run_state_prices_independent_call_and_writing_and_preserves_refused_snapshot() {
+    use crate::payload::Payload;
+    let setup = live_script();
+    let original = setup.bounds;
+    let call = CurrentCall {
+        identity: current_identity(b"id/\xff"),
+        tool: text(b"tool/\xfe"),
+        input: text(b"input/\x00"),
+        cut: true,
+        began: Some(Wall::from_nanos(73)),
+    };
+    let state = RunState {
+        task: 8,
+        attempt: Some(u64::MAX),
+        committed_turn: u32::MAX,
+        writing: None,
+        call: Some(call.clone()),
+    };
+    let heap = state.heap(&original).unwrap();
+    assert_eq!(heap, 17, "four identity, six tool and seven input bytes are priced whole");
+    let mut bounds = original;
+    bounds.document_bytes = u64::try_from(core::mem::size_of::<RunState>()).unwrap() + heap;
+    assert!(crate::payload::fits(&state, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&state, &bounds));
+    bounds = original;
+    bounds.text = 3;
+    assert!(!crate::payload::fits(&state, &bounds), "a whole opaque id never gets shortened to admit a document");
+    let writing = RunText {
+        attempt: u64::MAX,
+        began: None,
+        turn: TurnName { attempt: u64::MAX, number: u32::MAX },
+        from: 9,
+        through: 13,
+        text: text(b"tail"),
+        cut: true,
+        call: Some(LiveCall::Raw(call)),
+    };
+    let with_writing = RunState { writing: Some(writing.clone()), ..state.clone() };
+    assert_eq!(
+        with_writing.heap(&original).unwrap(),
+        heap + writing.heap(&original).unwrap(),
+        "the supplied independent call and writing are separately allocated and priced"
+    );
+    let large = CurrentCall {
+        identity: CallIdentity { id: text(&vec![0xfd; 4096]), ..state.call.as_ref().unwrap().identity.clone() },
+        tool: text(&vec![0xff; 4096]),
+        input: text(&vec![0xfe; 4096]),
+        ..state.call.clone().unwrap()
+    };
+    let held = RunState { call: Some(large), ..state.clone() };
+    let delivery = Delivery::RunState(Box::new(held.clone()));
+    let exact = u64::try_from(core::mem::size_of::<Delivery>()).unwrap() + delivery.heap(&original).unwrap();
+    let mut setup = setup;
+    setup.bounds.document_bytes = exact;
+    let mut engine = Engine::new(setup, 27).unwrap();
+    let token = Token::new(1);
+    engine.open(Time::ZERO, 11, token, Subject::Run { task: 8, turn: None, offset: 0 }).unwrap();
+    drop(engine.poll(Time::ZERO));
+    engine.write_run_state(Time::ZERO, held.clone()).unwrap();
+    assert!(engine.poll(Time::ZERO).contains(&Up::Watch { token, event: WatchEvent::Delivered(delivery.clone()) }));
+    engine.taken(token);
+    assert!(engine.poll(Time::ZERO).is_empty(), "taking a normal document cannot create a stream delivery loop");
+    let overflow = RunState { writing: Some(writing), ..held.clone() };
+    assert_eq!(engine.write_run_state(Time::ZERO, overflow), Err(Invalid::Payload));
+    engine.continue_run(token, None, 0).unwrap();
+    assert!(
+        engine.poll(Time::ZERO).contains(&Up::Watch { token, event: WatchEvent::Delivered(delivery) }),
+        "refusal retained every independent current-call byte and the supplied clock"
+    );
+    engine.taken(token);
+    let postcommit = RunState { committed_turn: u32::MAX, writing: None, ..state };
+    engine.write_run_state(Time::ZERO, postcommit.clone()).unwrap();
+    assert!(
+        engine
+            .poll(Time::ZERO)
+            .contains(&Up::Watch { token, event: WatchEvent::Delivered(Delivery::RunState(Box::new(postcommit))) }),
+        "a postcommit call is deliverable without a text turn or continuation cursor"
+    );
+}

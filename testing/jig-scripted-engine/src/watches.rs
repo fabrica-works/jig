@@ -1,11 +1,16 @@
 //! One in-flight document and a dirty mark per watch; contract.md, 7.
 use crate::{Engine, Invalid, Rows, Up, payload, reads::list};
 use jig_client::contract::{
-    Actor, Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, Phase, Read, ReadValue, RunText, Subject,
-    TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
+    Actor, Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, Phase, Read, ReadValue, RunState, RunText,
+    Subject, TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
 };
 use skein_lib::{Time, Token, Wall};
 
+#[derive(Debug)]
+pub(crate) enum Run {
+    Text(RunText),
+    State(RunState),
+}
 #[derive(Debug)]
 pub(crate) struct Watch {
     pub(crate) sign_in: u64,
@@ -308,6 +313,10 @@ impl<A: crate::Application> Engine<A> {
                 let Some(run) = self.runs.get(task) else {
                     return Ok(None);
                 };
+                let run = match run {
+                    Run::State(value) => return Ok(Some(Delivery::RunState(Box::new(value.clone())))),
+                    Run::Text(value) => value,
+                };
                 let from = if *turn == Some(run.turn) { (*offset).max(run.from).min(run.through) } else { run.from };
                 let start = (from - run.from) as usize;
                 let mut value = run.clone();
@@ -361,6 +370,7 @@ impl<A: crate::Application> Engine<A> {
                 | Delivery::Task(_)
                 | Delivery::Chips(_)
                 | Delivery::Run(_)
+                | Delivery::RunState(_)
                 | Delivery::Deployment(_) => return Err(WatchEnd::Busy),
             }
         }
@@ -397,7 +407,10 @@ impl<A: crate::Application> Engine<A> {
         if !self.truth.objects.contains_key(&ObjectKey::Task(task)) {
             return Err(Invalid::Identity);
         }
-        let old = self.runs.get(&task).filter(|run| run.turn == turn);
+        let old = self.runs.get(&task).and_then(|run| match run {
+            Run::Text(value) if value.turn == turn => Some(value),
+            Run::Text(_) | Run::State(_) => None,
+        });
         let mut text = old.map_or_else(Vec::new, |run| run.text.bytes().to_vec());
         let through = old
             .map_or(0, |run| run.through)
@@ -420,9 +433,35 @@ impl<A: crate::Application> Engine<A> {
         if !payload::fits(&run, &self.bounds) {
             return Err(Invalid::Payload);
         }
-        self.runs.insert(task, run);
+        self.runs.insert(task, Run::Text(run));
         for watch in self.watches.values_mut() {
             if matches!(watch.subject, Subject::Run { task:id, .. } if id == task) {
+                if !watch.dirty {
+                    watch.ready = now.saturating_add(self.slow);
+                }
+                watch.dirty = true;
+            }
+        }
+        Ok(())
+    }
+    /// Supplies a whole current run document, including calls with no writing.
+    /// Every optional fact and current-call clock comes from the caller.
+    pub fn write_run_state(&mut self, now: Time, value: RunState) -> Result<(), Invalid> {
+        if !self.online(now) {
+            return Err(Invalid::Offline);
+        }
+        if !payload::fits(&value, &self.bounds)
+            || !payload::fits(&Delivery::RunState(Box::new(value.clone())), &self.bounds)
+        {
+            return Err(Invalid::Payload);
+        }
+        if !self.truth.objects.contains_key(&ObjectKey::Task(value.task)) {
+            return Err(Invalid::Identity);
+        }
+        let task = value.task;
+        self.runs.insert(task, Run::State(value));
+        for watch in self.watches.values_mut() {
+            if matches!(watch.subject, Subject::Run { task: id, .. } if id == task) {
                 if !watch.dirty {
                     watch.ready = now.saturating_add(self.slow);
                 }

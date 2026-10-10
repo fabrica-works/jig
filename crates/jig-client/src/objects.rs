@@ -414,7 +414,7 @@ pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
 fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<bool> {
     use crate::contract::Delivery;
     match value {
-        Delivery::Frame(_) | Delivery::Run(_) | Delivery::Deployment(_) => None,
+        Delivery::Frame(_) | Delivery::Run(_) | Delivery::RunState(_) | Delivery::Deployment(_) => None,
         Delivery::Conversations(chats) => {
             for row in &chats.rows {
                 if key == ObjectKey::Task(row.chip.task) {
@@ -764,6 +764,7 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
         | crate::contract::Delivery::Goals(_)
         | crate::contract::Delivery::Conversations(_)
         | crate::contract::Delivery::Run(_)
+        | crate::contract::Delivery::RunState(_)
         | crate::contract::Delivery::Deployment(_) => {}
     }
     rows

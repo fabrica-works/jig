@@ -274,6 +274,7 @@ pub(crate) fn delivery(
     match value {
         Delivery::Frame(_) => {}
         Delivery::Run(value) => crate::conversation::routing::stream(domain, env, watch, *value, out),
+        Delivery::RunState(value) => crate::conversation::routing::run_state(domain, env, watch, *value, out),
         Delivery::Task(task) => {
             crate::conversation::routing::document(domain, &task, out);
             let key = ObjectKey::Task(task.chip.task);
