@@ -850,11 +850,12 @@ pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Fram
         }
     }
     let previous = domain.frame.party();
+    let previously_confirmed = domain.confirmed;
     let retention = frame.retention;
     domain.frame.document = Some(frame);
     domain.confirmed = if mismatch { None } else { Some(party) };
     domain.changed();
-    if first || previous != Some(party) || mismatch {
+    if first || previous != Some(party) || mismatch || previously_confirmed != domain.confirmed {
         let confirmed = if mismatch { None } else { Some(party) };
         out.push(Request::Confirmed { party: confirmed });
     }

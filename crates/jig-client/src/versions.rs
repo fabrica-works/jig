@@ -6,6 +6,7 @@ use crate::{
     limits::Limits,
     link::Link,
     pages::Page,
+    watches::Following,
 };
 use skein_lib::{Env, Queue};
 
@@ -25,7 +26,22 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, versions: VersionRan
         domain.changed();
         return;
     }
-    if first && let Some(frame) = domain.frame.document.take() {
+    let live = match domain.frame_watch {
+        Some(id) => match domain.watches.get(id) {
+            Some(watch) => match watch.state {
+                Following::Live => true,
+                Following::Opening { .. } | Following::Reopening { .. } | Following::Closing | Following::Closed => {
+                    false
+                }
+            },
+            None => false,
+        },
+        None => false,
+    };
+    if first
+        && live
+        && let Some(frame) = domain.frame.document.take()
+    {
         crate::domain::frame_delivery(domain, env, frame, out);
     }
 }

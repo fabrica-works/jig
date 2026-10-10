@@ -64,3 +64,34 @@ fn an_invalid_hello_closes_watches_without_fabricating_frame_and_a_later_range_c
     assert_eq!(domain.page(), &Page::OutOfDate);
     assert_eq!(domain.link(), Link::Offline);
 }
+
+#[test]
+fn a_late_hello_cannot_restore_link_from_a_frame_whose_watch_already_dropped() {
+    let (mut domain, watch) = start();
+    assert!(
+        drive(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) })
+            .is_empty()
+    );
+    assert_eq!(
+        drive(&mut domain, Event::Ended { watch, end: crate::contract::WatchEnd::Dropped }).as_ref(),
+        &[Request::Link { link: Link::Offline }]
+    );
+    assert!(drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } }).is_empty());
+    assert_eq!(domain.link(), Link::Offline);
+    let retry = domain.next_deadline().expect("dropped frame watch keeps its retry");
+    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::fire(&mut domain, &env(retry), &mut out);
+    assert_eq!(drain(out).as_ref(), &[Request::Open { watch, subject: crate::contract::Subject::Frame }]);
+    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::step(
+        &mut domain,
+        &env(retry),
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
+        &mut out,
+    );
+    let out = drain(out);
+    assert_eq!(out[0], Request::Confirmed { party: Some(7) });
+    assert_eq!(out[1], Request::Retention { retention: frame(7).retention });
+    assert_eq!(out[2], Request::Link { link: Link::Live });
+    assert_eq!(domain.link(), Link::Live);
+}
