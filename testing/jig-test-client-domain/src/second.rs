@@ -1,4 +1,5 @@
 //! The second connector owns resource/kind words and the shared link only.
+use alloc::boxed::Box;
 use jig_client::{contract::Part, link::Link};
 use skein_lib::List;
 #[derive(Debug)]

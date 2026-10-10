@@ -2213,7 +2213,10 @@ impl JigPhrase {
             | Self::LimitLive
             | Self::LimitInbox
             | Self::WaitingRole
-            | Self::RepliesThrough => Box::new([
+            | Self::RepliesThrough
+            | Self::LiteralGrant
+            | Self::LiteralGrantMissing
+            | Self::ScopedResourceNotes => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
@@ -2234,10 +2237,6 @@ impl JigPhrase {
             Self::BudgetMissing | Self::BudgetHold => Box::new([
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
-            ]),
-            Self::LiteralGrant | Self::LiteralGrantMissing | Self::ScopedResourceNotes => Box::new([
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
             Self::GrantMissing | Self::Grant => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },

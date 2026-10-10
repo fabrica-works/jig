@@ -2017,14 +2017,14 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
         Time::ZERO,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc.clone()))) },
     );
-    let parts: Vec<_> = shown
-        .iter()
-        .filter_map(|request| match request {
-            Request::ShowPart { part, scope: PartScope::Project(1), .. } => Some(part.clone()),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(parts, vec![one, two]);
+    let mut parts = List::with_capacity(2);
+    for request in &shown {
+        if let Request::ShowPart { part, scope, .. } = request {
+            assert_eq!(*scope, PartScope::Project(1));
+            parts.push(part.clone()).unwrap();
+        }
+    }
+    assert_eq!(parts.as_ref(), &[one, two]);
     let budget_opened = drive(
         &mut domain,
         Time::ZERO,
@@ -2036,14 +2036,14 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
         Time::ZERO,
         Event::Watch { watch: budget_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) },
     );
-    let parts: Vec<_> = budget
-        .iter()
-        .filter_map(|request| match request {
-            Request::ShowPart { part, scope: PartScope::Project(1), .. } => Some(part.clone()),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(parts, vec![Part::Kind { connector: 2, kind: 9 }], "an open pattern is not a resource name");
+    let mut parts = List::with_capacity(1);
+    for request in &budget {
+        if let Request::ShowPart { part, scope, .. } = request {
+            assert_eq!(*scope, PartScope::Project(1));
+            parts.push(part.clone()).unwrap();
+        }
+    }
+    assert_eq!(parts.as_ref(), &[Part::Kind { connector: 2, kind: 9 }], "an open pattern is not a resource name");
 }
 
 #[test]
@@ -2070,15 +2070,12 @@ fn goal_note_scope_keeps_its_supplied_project_instead_of_the_parent_page() {
             },
         },
     );
-    let reads: Vec<_> = output
-        .iter()
-        .filter_map(|request| match request {
-            Request::Read { what: Read::Notes { scope, description, after }, .. } => {
-                Some((scope.clone(), description.clone(), after.clone()))
-            }
-            _ => None,
-        })
-        .collect();
-    assert_eq!(reads, vec![(scope.clone(), Some(text(b"supplied")), None)]);
+    let mut reads = List::with_capacity(1);
+    for request in &output {
+        if let Request::Read { what: Read::Notes { scope, description, after }, .. } = request {
+            reads.push((scope.clone(), description.clone(), after.clone())).unwrap();
+        }
+    }
+    assert_eq!(reads.as_ref(), &[(scope.clone(), Some(text(b"supplied")), None)]);
     assert_eq!(domain.project_page().note_filter.as_ref().unwrap().scope, scope);
 }

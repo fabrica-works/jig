@@ -2,6 +2,7 @@
 //! set, owned reads/watches and revision-naming acts (root.md, sections 6–8).
 use crate::family::{self, Document, Kind, Scope, Subject};
 pub use crate::family::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
+use alloc::boxed::Box;
 use jig_client::{
     contract::{Part, Revision},
     frame::FrameShown,
