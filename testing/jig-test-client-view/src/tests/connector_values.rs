@@ -400,10 +400,22 @@ fn connector_values_view_selected_checked_language_covers_owner_values_and_reord
         }
     }
     let count = u32::try_from(normal.phrases.len()).unwrap();
+    let mut text_bytes = 0_u32;
+    for language in [&normal, &selected] {
+        for phrase in &language.phrases {
+            for form in &phrase.forms {
+                for segment in &form.segments {
+                    if let Segment::Text(bytes) = segment {
+                        text_bytes += u32::try_from(bytes.len()).unwrap();
+                    }
+                }
+            }
+        }
+    }
     let book = Phrasebook::load(
         words::shapes(phrases::jig::shapes(64)),
         Box::new([normal, selected]),
-        &PhraseLimits { languages: 2, phrases: count, holes: 3, segments: 3000, text_bytes: 30000, hole_bytes: 64 },
+        &PhraseLimits { languages: 2, phrases: count, holes: 3, segments: 3000, text_bytes, hole_bytes: 64 },
     )
     .unwrap();
     let mut words = jig_client_view::words::Words { book, language: 1, offset_minutes: 0 };
