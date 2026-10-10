@@ -161,7 +161,7 @@ impl Expectations for Checks {
                 }
             }
             Seen::Called { run, call } => {
-                if let Some((_, source)) = self.text.iter_mut().filter(|((owner, _), _)| *owner == run).next_back() {
+                if let Some((_, source)) = self.text.iter_mut().rfind(|((owner, _), _)| *owner == run) {
                     source.1 = Some(observed_call(call, source.1.as_ref()));
                 }
             }

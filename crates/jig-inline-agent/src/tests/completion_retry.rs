@@ -163,7 +163,7 @@ fn captured_text_call_and_usage_keep_their_issued_retry_before_the_next_start() 
         .unwrap();
     assert!(captured[..turn_at].iter().filter(|r| matches!(r, Request::Content { .. })).count() >= 3);
     let next = &captured;
-    assert_eq!(named(&next), (owner, smith::llm::CompletionName { sequence: 2, retry: 0 }));
+    assert_eq!(named(next), (owner, smith::llm::CompletionName { sequence: 2, retry: 0 }));
     assert!(next.contains(&Request::CompletionStarted { client: CLIENT, turn: 2, retry: 0 }));
     let (_, second_name) = named(next);
     let second = completed(
