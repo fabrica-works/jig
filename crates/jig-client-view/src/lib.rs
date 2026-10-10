@@ -67,3 +67,6 @@ pub mod policy_edit;
 
 pub mod owner_outcome;
 pub mod owner_outcome_words;
+
+pub mod owner_chip;
+pub mod owner_chip_words;

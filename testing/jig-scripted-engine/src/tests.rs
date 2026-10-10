@@ -1765,3 +1765,5 @@ fn result_metadata_boxes_price_unfilled_delegate_and_followup_capacity_without_i
     bounds.rows = 2;
     assert!(!crate::payload::fits(&result, &bounds), "whole supplied capacity is enforced for empty retained lists");
 }
+
+mod owner_chip;

@@ -49,3 +49,6 @@ pub use owner_budget::*;
 
 pub mod owner_outcome;
 pub use owner_outcome::*;
+
+pub mod owner_chip;
+pub use owner_chip::*;
