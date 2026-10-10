@@ -440,12 +440,12 @@ impl Front<Test> for Scripted {
                                 end: match why {
                                     WatchEnd::Closed => family::WatchEnd::Closed,
                                     WatchEnd::SignedOut => family::WatchEnd::SignedOut,
-                                    WatchEnd::Dropped
-                                    | WatchEnd::Unknown
-                                    | WatchEnd::NotAllowed
-                                    | WatchEnd::Busy
-                                    | WatchEnd::SubjectEnded
-                                    | WatchEnd::Stopping => family::WatchEnd::Dropped,
+                                    WatchEnd::Dropped => family::WatchEnd::Dropped,
+                                    WatchEnd::Unknown => family::WatchEnd::Unknown,
+                                    WatchEnd::NotAllowed => family::WatchEnd::NotAllowed,
+                                    WatchEnd::Busy => family::WatchEnd::Busy,
+                                    WatchEnd::SubjectEnded => family::WatchEnd::SubjectEnded,
+                                    WatchEnd::Stopping => family::WatchEnd::Stopping,
                                 },
                             }),
                         },

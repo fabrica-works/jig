@@ -1,5 +1,8 @@
 //! First connector's client side. Parts and family objects have one working
 //! set, owned reads/watches and revision-naming acts (root.md, sections 6–8).
+//! Departures stay beside the supplied document and keyed answer. Busy,
+//! stopping and dropped watches wait for the supplied retry deadline; signed
+//! out watches park until confirmation (contract.md, sections 6–7).
 use crate::family::{self, Document, Kind, Scope, Subject};
 pub use crate::family::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
 use alloc::boxed::Box;
@@ -95,6 +98,38 @@ pub enum Card {
     Unknown,
     Done { answer: Answer },
 }
+/// A received departure, separate from a connector document or keyed answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FamilyTerminal {
+    /// The client left the watch.
+    Closed,
+    /// Connection recovery waits for the retry deadline.
+    Dropped,
+    /// No visible subject has this name.
+    Unknown,
+    /// The owner cannot represent this subject.
+    Unsupported,
+    /// Work stays parked until confirmation.
+    SignedOut,
+    /// The party may not see the subject.
+    NotAllowed,
+    /// The subject ended and left the engine.
+    SubjectEnded,
+    /// The engine is stopping; recovery waits for the retry deadline.
+    Stopping,
+    /// Admission is busy; recovery waits for the retry deadline.
+    Busy,
+}
+impl FamilyTerminal {
+    /// Departures and parking prevent acquisition and mutation.
+    #[must_use]
+    pub const fn unavailable(self) -> bool {
+        match self {
+            Self::Unknown | Self::Unsupported | Self::NotAllowed | Self::SubjectEnded | Self::SignedOut => true,
+            Self::Closed | Self::Dropped | Self::Stopping | Self::Busy => false,
+        }
+    }
+}
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the view reads values; the side alone owns read and watch obligations")]
 pub struct Object {
@@ -102,6 +137,8 @@ pub struct Object {
     pub value: Value,
     pub card: Card,
     pub draft: Option<u64>,
+    /// Last received departure; a fresh admitted document clears it.
+    pub terminal: Option<FamilyTerminal>,
     read: Option<Id<Reading>>,
     watch: Option<Id<Watching>>,
 }
@@ -277,6 +314,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             Act::Parameters { object, revision, value } => {
                 let id = Id::from_token(object);
                 if let Some(object) = side.objects.get_mut(id)
+                    && !unavailable(object)
                     && parameters_revision(&object.value) == Some(revision)
                 {
                     object.draft = Some(value);
@@ -299,6 +337,12 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
                 hide(side, out);
             }
             side.party = party;
+            for (_, id) in &side.names {
+                let object = side.objects.get_mut(*id).expect("named object exists");
+                if object.terminal == Some(FamilyTerminal::SignedOut) && party.is_some() {
+                    object.terminal = None;
+                }
+            }
             sync(side, env, out);
             save(side, out);
             side.changed();
@@ -349,7 +393,15 @@ fn hold(side: &mut Side, env: &Env<Limits>, subject: Subject, out: &mut Queue<Re
             full(out);
             return;
         }
-        let object = Object { subject, value: Value::Loading, card: Card::Open, draft: None, read: None, watch: None };
+        let object = Object {
+            subject,
+            value: Value::Loading,
+            card: Card::Open,
+            draft: None,
+            terminal: None,
+            read: None,
+            watch: None,
+        };
         let Ok(id) = side.objects.insert(object) else {
             full(out);
             return;
@@ -366,6 +418,9 @@ fn acquire(side: &mut Side, _env: &Env<Limits>, subject: Subject, out: &mut Queu
         return;
     };
     let object = side.objects.get_mut(id).expect("named object exists");
+    if unavailable(object) {
+        return;
+    }
     match object.value {
         Value::Unknown | Value::Unsupported => return,
         Value::Known(_) | Value::Loading => {}
@@ -434,6 +489,7 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
         Value::Loading | Value::Unknown | Value::Unsupported => {}
     }
     object.value = Value::Known(document);
+    object.terminal = None;
     match object.card {
         Card::Unknown => object.card = Card::Open,
         Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Done { .. } => {}
@@ -448,17 +504,51 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
     side.changed();
 }
 fn unknown(side: &mut Side, subject: Subject) {
+    departure(side, subject, FamilyTerminal::Unknown);
+}
+fn unsupported(side: &mut Side, subject: Subject) {
+    departure(side, subject, FamilyTerminal::Unsupported);
+}
+fn departure(side: &mut Side, subject: Subject, terminal: FamilyTerminal) {
     if let Some(id) = side.find(subject) {
-        side.objects.get_mut(id).expect("named object exists").value = Value::Unknown;
+        let object = side.objects.get_mut(id).expect("named object exists");
+        object.terminal = Some(terminal);
+        match object.value {
+            Value::Loading | Value::Unknown | Value::Unsupported => match terminal {
+                FamilyTerminal::Unknown => object.value = Value::Unknown,
+                FamilyTerminal::Unsupported => object.value = Value::Unsupported,
+                FamilyTerminal::Closed
+                | FamilyTerminal::Dropped
+                | FamilyTerminal::SignedOut
+                | FamilyTerminal::NotAllowed
+                | FamilyTerminal::SubjectEnded
+                | FamilyTerminal::Stopping
+                | FamilyTerminal::Busy => {}
+            },
+            Value::Known(_) => {}
+        }
         side.changed();
     }
 }
-fn unsupported(side: &mut Side, subject: Subject) {
-    if let Some(id) = side.find(subject) {
-        let object = side.objects.get_mut(id).expect("named object exists");
-        object.value = Value::Unsupported;
-        object.draft = None;
-        side.changed();
+/// Whether the received departure prevents acts on the retained value.
+#[must_use]
+pub fn unavailable(object: &Object) -> bool {
+    match object.terminal {
+        Some(terminal) => terminal.unavailable(),
+        None => false,
+    }
+}
+fn terminal(end: WatchEnd) -> FamilyTerminal {
+    match end {
+        WatchEnd::Closed => FamilyTerminal::Closed,
+        WatchEnd::Dropped => FamilyTerminal::Dropped,
+        WatchEnd::Unknown => FamilyTerminal::Unknown,
+        WatchEnd::Unsupported => FamilyTerminal::Unsupported,
+        WatchEnd::SignedOut => FamilyTerminal::SignedOut,
+        WatchEnd::NotAllowed => FamilyTerminal::NotAllowed,
+        WatchEnd::SubjectEnded => FamilyTerminal::SubjectEnded,
+        WatchEnd::Stopping => FamilyTerminal::Stopping,
+        WatchEnd::Busy => FamilyTerminal::Busy,
     }
 }
 fn named(side: &Side, subject: Subject) -> bool {
@@ -549,12 +639,17 @@ fn ended(side: &mut Side, env: &Env<Limits>, id: Id<Watching>, end: WatchEnd, ou
         return;
     };
     let subject = watch.subject;
+    match watch.state {
+        Following::Dropped { .. } => return,
+        Following::Live | Following::Waiting | Following::Closing => {}
+    }
     let closing = watch.state == Following::Closing;
     if closing {
         retire_watch(side, id);
     } else {
+        departure(side, subject, terminal(end));
         match end {
-            WatchEnd::Dropped => {
+            WatchEnd::Dropped | WatchEnd::Busy | WatchEnd::Stopping => {
                 side.watches.get_mut(id).expect("watch exists").state =
                     Following::Dropped { again: env.now.saturating_add(env.limits.retry) }
             }
@@ -566,14 +661,23 @@ fn ended(side: &mut Side, env: &Env<Limits>, id: Id<Watching>, end: WatchEnd, ou
                 retire_watch(side, id);
                 unsupported(side, subject);
             }
+            WatchEnd::NotAllowed | WatchEnd::SubjectEnded | WatchEnd::Closed => retire_watch(side, id),
             WatchEnd::SignedOut => {
                 retire_watch(side, id);
                 out.push(Request::Out(Out::Fact { fact: Fact::SignedOut }));
             }
-            WatchEnd::Closed => retire_watch(side, id),
         }
     }
-    if closing || end != WatchEnd::Dropped {
+    let retrying = match end {
+        WatchEnd::Dropped | WatchEnd::Busy | WatchEnd::Stopping => true,
+        WatchEnd::Closed
+        | WatchEnd::Unknown
+        | WatchEnd::Unsupported
+        | WatchEnd::SignedOut
+        | WatchEnd::NotAllowed
+        | WatchEnd::SubjectEnded => false,
+    };
+    if closing || !retrying {
         if let Some(object) = side.find(subject) {
             let object = side.objects.get_mut(object).expect("named object exists");
             if object.watch == Some(id) {
@@ -591,6 +695,9 @@ fn touch(side: &mut Side, id: Id<Object>, revision: Revision, out: &mut Queue<Re
     let Some(object) = side.object(id) else {
         return;
     };
+    if unavailable(object) {
+        return;
+    }
     match object.card {
         Card::Deciding { .. } | Card::Unknown => return,
         Card::Open | Card::Refused { .. } | Card::Done { .. } => {}
@@ -752,6 +859,7 @@ fn read_result(side: &mut Side, env: &Env<Limits>, read: Token, result: ReadResu
         ReadResult::Value(document) => received(side, env, subject, document, out),
         ReadResult::Unknown => unknown(side, subject),
         ReadResult::Unsupported => unsupported(side, subject),
+        ReadResult::NotAllowed => departure(side, subject, FamilyTerminal::NotAllowed),
         ReadResult::Busy => full(out),
         ReadResult::SignedOut => out.push(Request::Out(Out::Fact { fact: Fact::SignedOut })),
     }
@@ -765,8 +873,9 @@ fn watch_event(side: &mut Side, env: &Env<Limits>, watch: Token, event: WatchEve
     let Some(watching) = side.watches.get_mut(id) else {
         return;
     };
-    if watching.state == Following::Closing {
-        return;
+    match watching.state {
+        Following::Closing | Following::Dropped { .. } => return,
+        Following::Live | Following::Waiting => {}
     }
     let subject = watching.subject;
     watching.state = Following::Live;

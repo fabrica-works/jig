@@ -5,6 +5,7 @@
     reason = "ordinary fixtures collect outputs and query public accessibility trees"
 )]
 mod connector_values;
+mod family_terminals;
 use crate::{Limits, View, build, decode, words};
 use jig_client::contract::*;
 use jig_client_view::{Act, NodeId, Owner, Patch, Role};

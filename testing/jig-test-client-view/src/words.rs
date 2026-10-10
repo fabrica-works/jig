@@ -35,8 +35,12 @@ pub enum Word {
     Kind,
     Part,
     OutboxEntry,
+    NotAllowed,
+    SubjectEnded,
+    WatchBusy,
+    WatchStopping,
 }
-const ALL: [Word; 25] = [
+const ALL: [Word; 29] = [
     Word::Navigation,
     Word::Family,
     Word::Item,
@@ -62,6 +66,10 @@ const ALL: [Word; 25] = [
     Word::Kind,
     Word::Part,
     Word::OutboxEntry,
+    Word::NotAllowed,
+    Word::SubjectEnded,
+    Word::WatchBusy,
+    Word::WatchStopping,
 ];
 impl Word {
     #[must_use]
@@ -92,6 +100,10 @@ impl Word {
             Self::Kind => 22,
             Self::Part => 23,
             Self::OutboxEntry => 24,
+            Self::NotAllowed => 7800,
+            Self::SubjectEnded => 7801,
+            Self::WatchBusy => 7802,
+            Self::WatchStopping => 7803,
         };
         PhraseId { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, number }
     }
@@ -103,8 +115,8 @@ pub struct Words {
 }
 impl Words {
     pub fn english(text: u32) -> Result<Self, Invalid> {
-        let mut shapes = List::with_capacity(25);
-        let mut phrases = List::with_capacity(25);
+        let mut shapes = List::with_capacity(29);
+        let mut phrases = List::with_capacity(29);
         for word in ALL {
             let (literal, hole) = match word {
                 Word::Navigation => (b"Family".as_slice(), None),
@@ -132,6 +144,10 @@ impl Words {
                 Word::Kind => (b"Kind ".as_slice(), Some(HoleKind::Number)),
                 Word::Part => (b"Family part revision ".as_slice(), Some(HoleKind::Number)),
                 Word::OutboxEntry => (b"Outbox entry ".as_slice(), Some(HoleKind::Number)),
+                Word::NotAllowed => (b"Family object is not allowed".as_slice(), None),
+                Word::SubjectEnded => (b"Family subject ended".as_slice(), None),
+                Word::WatchBusy => (b"Family watch busy; retrying".as_slice(), None),
+                Word::WatchStopping => (b"Engine stopping; retrying family watch".as_slice(), None),
             };
             let (holes, segments): (Box<[HoleShape]>, Box<[Segment]>) = match hole {
                 Some(kind) => (
@@ -179,5 +195,5 @@ impl Words {
 }
 #[must_use]
 pub const fn phrase_limits(text: u32) -> PhraseLimits {
-    PhraseLimits { languages: 1, phrases: 25, holes: 1, segments: 50, text_bytes: 1024, hole_bytes: text }
+    PhraseLimits { languages: 1, phrases: 29, holes: 1, segments: 58, text_bytes: 1024, hole_bytes: text }
 }

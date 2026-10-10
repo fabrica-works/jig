@@ -147,6 +147,8 @@ pub enum Answer {
 pub enum ReadResult {
     Value(Document),
     Unknown,
+    /// The connector denies this read.
+    NotAllowed,
     /// The supplied subject has no representation in this owner's scoped API.
     Unsupported,
     Busy,
@@ -165,6 +167,14 @@ pub enum WatchEnd {
     Unknown,
     Unsupported,
     SignedOut,
+    /// The party may not see this subject.
+    NotAllowed,
+    /// The subject ended and left the engine.
+    SubjectEnded,
+    /// The engine is stopping.
+    Stopping,
+    /// Watch admission is busy.
+    Busy,
 }
 #[must_use]
 pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {

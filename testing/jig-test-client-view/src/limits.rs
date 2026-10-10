@@ -40,7 +40,7 @@ impl Limits {
     ) -> Option<Self> {
         let owner = crate::connector_values::requirements(&domain.first.connector, jig)?;
         let fragment_nodes =
-            family::PART_NODES.max(owner.nodes.checked_add(14)?).max(domain.first.rows.checked_add(2)?);
+            family::PART_NODES.max(owner.nodes.checked_add(16)?).max(domain.first.rows.checked_add(2)?);
         let cards = domain.first.rows.checked_add(1)?;
         let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(3)?;
         // All nodes bound the possible slots in the public jig envelope.

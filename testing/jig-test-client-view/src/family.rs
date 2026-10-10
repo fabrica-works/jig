@@ -14,7 +14,7 @@ use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =
     SlotRef { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, token: Token::new(0) };
 /// A fragment includes a document heading, drawing fallback, card status and form.
-pub const PART_NODES: u32 = 37;
+pub const PART_NODES: u32 = 39;
 pub const NAV_NODES: u32 = 2;
 pub fn navigation(b: &mut Builder, address: first::Address, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Link);
@@ -127,13 +127,16 @@ fn object(
         }
     };
     b.name(&title);
+    departure(b, object.terminal, words);
     match &object.value {
         Value::Loading => {
-            b.open(Role::Status);
-            b.name(&words.say(Word::Loading, &[]));
-            b.state(State::Busy);
-            words.text(b, Word::Loading, &[]);
-            b.close();
+            if !first::unavailable(object) {
+                b.open(Role::Status);
+                b.name(&words.say(Word::Loading, &[]));
+                b.state(State::Busy);
+                words.text(b, Word::Loading, &[]);
+                b.close();
+            }
         }
         Value::Unknown => words.status(b, Word::Unknown, &[]),
         Value::Unsupported => words.status(b, Word::Unshowable, &[]),
@@ -149,7 +152,7 @@ fn object(
                 };
                 words.status(b, word, &[]);
                 drawing::value(b, words, item.value);
-                if item.touchable {
+                if item.touchable && !first::unavailable(object) {
                     button(
                         b,
                         Word::Touch,
@@ -162,11 +165,7 @@ fn object(
             }
             Document::Connector(value) => {
                 crate::connector_values::document(b, value, jig);
-                if let jig_test_client_domain::connector_values::ClientDocument::Object { now, .. } =
-                    value.value.as_ref()
-                {
-                    owner_object_form(b, object, id, now, words, bindings);
-                }
+                connector_form(b, object, id, value.value.as_ref(), words, bindings);
             }
             Document::Part(part) => {
                 b.open(Role::Heading { level: 3 });
@@ -175,6 +174,7 @@ fn object(
                 drawing::value(b, words, part.value);
                 if let Some(parameters) = part.parameters
                     && parameters.amendable
+                    && !first::unavailable(object)
                 {
                     b.open(Role::TextField);
                     b.name(&words.say(Word::Parameters, &[]));
@@ -203,6 +203,48 @@ fn object(
     card(b, &object.card, words, jig);
     b.close();
     b.close();
+}
+fn departure(b: &mut Builder, terminal: Option<first::FamilyTerminal>, words: &Words) {
+    let word = match terminal {
+        Some(terminal) => match terminal {
+            first::FamilyTerminal::Unknown => Some(Word::Unknown),
+            first::FamilyTerminal::Unsupported => Some(Word::Unshowable),
+            first::FamilyTerminal::NotAllowed => Some(Word::NotAllowed),
+            first::FamilyTerminal::SubjectEnded => Some(Word::SubjectEnded),
+            first::FamilyTerminal::Busy => Some(Word::WatchBusy),
+            first::FamilyTerminal::Stopping => Some(Word::WatchStopping),
+            first::FamilyTerminal::Dropped => Some(Word::Retrying),
+            first::FamilyTerminal::SignedOut => Some(Word::Parked),
+            first::FamilyTerminal::Closed => None,
+        },
+        None => None,
+    };
+    if let Some(word) = word {
+        words.status(b, word, &[]);
+    }
+}
+fn connector_form(
+    b: &mut Builder,
+    object: &first::Object,
+    id: Id<first::Object>,
+    value: &jig_test_client_domain::connector_values::ClientDocument,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    match value {
+        jig_test_client_domain::connector_values::ClientDocument::Object { now, .. } => {
+            if !first::unavailable(object) {
+                owner_object_form(b, object, id, now, words, bindings);
+            }
+        }
+        jig_test_client_domain::connector_values::ClientDocument::Panel { .. }
+        | jig_test_client_domain::connector_values::ClientDocument::Result { .. }
+        | jig_test_client_domain::connector_values::ClientDocument::Effect { .. }
+        | jig_test_client_domain::connector_values::ClientDocument::Outbox { .. }
+        | jig_test_client_domain::connector_values::ClientDocument::Hold { .. }
+        | jig_test_client_domain::connector_values::ClientDocument::Project { .. }
+        | jig_test_client_domain::connector_values::ClientDocument::Deployment { .. } => {}
+    }
 }
 fn owner_object_form(
     b: &mut Builder,
