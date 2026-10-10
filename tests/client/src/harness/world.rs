@@ -523,6 +523,9 @@ impl<A: App, F: Front<A>> World<A, F> {
                 Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(back), navigation: true },
             );
         }
+        self.build(id);
+    }
+    fn build(&mut self, id: ClientId) {
         let c = &mut self.clients[id.0];
         A::build(&mut c.view, &c.root, &mut c.patches);
         let changed = !c.patches.is_empty();

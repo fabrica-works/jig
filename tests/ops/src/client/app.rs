@@ -106,6 +106,24 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
         })
         .clone()
 }
+// Story storage is declared independently of the shipped composition envelope.
+// Builder checks catch a fixture growing beyond these bounds.
+fn view_bounds(
+    limits: &domain::Limits,
+    jig: &jig_client_view::words::Words,
+    obs: &view::words::Words,
+    infra: &view::words::Words,
+) -> view::Limits {
+    let mut bounds = view::Limits::of(limits, jig, obs, infra).expect("composed view fits");
+    assert!(bounds.tree.nodes >= 1024, "world profile fits the composition envelope");
+    bounds.tree.nodes = 1024;
+    bounds.tree.bindings = 1024;
+    bounds.tree.slots = 256;
+    bounds.tree.patches = 5 * bounds.tree.nodes;
+    bounds.tree.text_bytes = bounds.tree.nodes.checked_mul(bounds.tree.text_per_node).expect("world text fits");
+    view::worst_case(&bounds, limits, jig, obs, infra).expect("world profile fits");
+    bounds
+}
 impl App for Ops {
     type Root = domain::Domain;
     type View = view::View;
@@ -121,7 +139,7 @@ impl App for Ops {
     fn new(seed: u64) -> (Self::Root, Self::View) {
         let limits = limits();
         let (jig, obs, infra) = phrasebooks(&limits);
-        let bounds = view::Limits::of(&limits, &jig, &obs, &infra).expect("composed view fits");
+        let bounds = view_bounds(&limits, &jig, &obs, &infra);
         let mut root = domain::new(&limits, seed);
         domain::provider(
             &mut root,
@@ -230,7 +248,7 @@ impl App for Ops {
     }
     fn worst_case(limits: &Self::Limits) -> u64 {
         let (jig, obs, infra) = phrasebooks(limits);
-        let bounds = view::Limits::of(limits, &jig, &obs, &infra).expect("view fits");
+        let bounds = view_bounds(limits, &jig, &obs, &infra);
         domain::worst_case(limits).expect("root bound")
             + 2 * view::worst_case(&bounds, limits, &jig, &obs, &infra).expect("shell model projection bound")
     }
