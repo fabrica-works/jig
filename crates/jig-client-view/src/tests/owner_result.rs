@@ -193,13 +193,15 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
     assert!(!has(&tree, b"Follow-up facts unavailable"));
     let mut language = result_words::language();
     language.phrases[0].id = ResultPhrase::Contract.id();
-    assert!(
-        matches!(Phrasebook::load(result_words::shapes(),Box::new([language]),&limits),Err(Invalid::Duplicate{id}) if id==ResultPhrase::Contract.id())
+    assert_eq!(
+        Phrasebook::load(result_words::shapes(), Box::new([language]), &limits).err(),
+        Some(Invalid::Duplicate { id: ResultPhrase::Contract.id() })
     );
     let mut language = result_words::language();
     language.phrases[2].forms[0].segments = Box::new([Segment::Text(copy_of(b"missing hole"))]);
-    assert!(
-        matches!(Phrasebook::load(result_words::shapes(),Box::new([language]),&limits),Err(Invalid::Holes{id}) if id==ResultPhrase::RequesterTask.id())
+    assert_eq!(
+        Phrasebook::load(result_words::shapes(), Box::new([language]), &limits).err(),
+        Some(Invalid::Holes { id: ResultPhrase::RequesterTask.id() })
     );
     let value = details();
     let client = Domain::new(&client_limits(), 1);
@@ -215,7 +217,7 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
     assert_eq!(b.finish().len(), 9, "minimal nodes, depth and selected saying bytes fit");
     capacity.nodes = capacity.nodes.checked_sub(1).unwrap();
     assert!(
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
             let mut b = Builder::new(&capacity);
             let mut bindings = JigBindings::new(capacity.bindings, 128);
             view::render(&mut b, &client, &value, &words, &mut bindings);
@@ -230,7 +232,7 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
         Limits { text_bytes: 111, ..capacity },
     ] {
         assert!(
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
                 let mut b = Builder::new(&below);
                 let mut bindings = JigBindings::new(below.bindings, 128);
                 view::render(&mut b, &client, &value, &words, &mut bindings);
