@@ -4,8 +4,19 @@ use skein_lib::{Time, Wall};
 use skein_world::domain::heap::Counting;
 #[global_allocator]
 static HEAP: Counting = Counting;
+fn full_contract() -> jig_client::contract::TaskContractDocument {
+    use jig_client::contract::{FieldRule, TaskContractDocument, VerdictChoice};
+    let fields = jig_client_world::test::list([
+        FieldRule { name: vec![0xff; 32].into_boxed_slice(), max: u32::MAX },
+        FieldRule { name: vec![0xfe; 32].into_boxed_slice(), max: u32::MAX },
+    ]);
+    let choice = VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields };
+    TaskContractDocument::Verdict { choices: jig_client_world::test::list([choice.clone(), choice]), cut: true }
+}
 fn full_task() -> jig_client::contract::Task {
     let mut task = stories::task();
+    task.goal = Some(u64::MAX);
+    task.result_contract = full_contract();
     task.chip.title = jig_client::contract::DocumentText::complete(stories::text(&[b't'; 32]));
     task.lineage = jig_client_world::test::list([8, 7]);
     task.subscriptions.entries = jig_client_world::test::list([

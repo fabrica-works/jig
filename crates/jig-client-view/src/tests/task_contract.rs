@@ -85,3 +85,56 @@ fn task_header_links_the_supplied_served_goal_without_turning_ancestor_identity_
         assert!(contains(&tree, b"Priority 1"));
     }
 }
+
+#[test]
+fn maximum_nested_task_contracts_fit_the_page_bound_and_preserve_every_raw_slot_and_field() {
+    let raw = vec![0xff; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice();
+    let mut segments = List::with_capacity(CLIENT.rows);
+    for _ in 0..CLIENT.rows {
+        segments.push(raw.clone()).unwrap();
+    }
+    let reference = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(segments) };
+    let mut fields = List::with_capacity(CLIENT.rows);
+    for _ in 0..CLIENT.rows {
+        fields.push(FieldRule { name: raw.clone(), max: u32::MAX }).unwrap();
+    }
+    let mut choices = List::with_capacity(CLIENT.rows);
+    for _ in 0..CLIENT.rows {
+        choices
+            .push(VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields: fields.clone() })
+            .unwrap();
+    }
+    for contract in [
+        TaskContractDocument::Approval { state: raw.clone(), part: reference.clone() },
+        TaskContractDocument::Verdict { choices, cut: true },
+    ] {
+        let mut row = task_doc(&[]);
+        row.goal = Some(u64::MAX);
+        row.spec.specification.words = DocumentText::complete(text(b""));
+        row.result_contract = contract.clone();
+        let (tree, bindings) = page(row);
+        let expected = "\\xFF".repeat(usize::try_from(CLIENT.text).unwrap());
+        assert!(contains(&tree, expected.as_bytes()));
+        match contract {
+            TaskContractDocument::Approval { state, .. } => {
+                assert_eq!(state, raw);
+                let slots: Vec<_> = tree.nodes().iter().filter_map(|node| node.slot).collect();
+                assert_eq!(slots.len(), 1);
+                assert_eq!(bindings.owner_part(slots[0].token), Some(&reference));
+            }
+            TaskContractDocument::Verdict { choices, .. } => {
+                assert_eq!(choices.len(), CLIENT.rows);
+                let fields = tree
+                    .nodes()
+                    .iter()
+                    .filter(|node| {
+                        node.text.as_ref().is_some_and(|text| text.bytes() == b"Field value byte limit 4294967295")
+                    })
+                    .count();
+                assert_eq!(fields, usize::try_from(CLIENT.rows * CLIENT.rows).unwrap());
+                assert!(contains(&tree, b"Some contract choices were omitted"));
+            }
+            TaskContractDocument::Report { .. } | TaskContractDocument::Change { .. } => unreachable!(),
+        }
+    }
+}
