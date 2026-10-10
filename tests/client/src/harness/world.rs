@@ -557,7 +557,9 @@ impl<A: App, F: Front<A>> World<A, F> {
                 .heap_bound
                 .checked_mul(u64::try_from(self.clients.len()).expect("client count fits"))
                 .expect("world heap bound fits");
-            self.heap_peak = self.heap_peak.max(meter.check(measured, bound, &"client world iteration"));
+            // Measure owned bytes here; the observation-based referee owns the
+            // bounded rule and its failure, including its negative proofs.
+            self.heap_peak = self.heap_peak.max(meter.check(measured, u64::MAX, &"client world iteration"));
             self.observe(Observation::Bounded { heap: self.heap_peak, bound });
         }
     }
