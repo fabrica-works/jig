@@ -417,12 +417,19 @@ impl<A: App, F: Front<A>> World<A, F> {
             c.at += 1;
         }
     }
-    fn platform_went(&mut self, id: ClientId, address: A::Address) {
-        // History changed on the platform; report Went through the normal callback.
-        self.schedule.send(
-            self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-            Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(address) },
-        );
+    fn platform_show(&mut self, id: ClientId, address: A::Address, replace: bool) {
+        self.observe(Observation::LeftPage { client: id });
+        self.clients[id.0].acted_card = None;
+        let changed = self.clients[id.0].history[self.clients[id.0].at] != address;
+        self.history(id, address.clone(), replace);
+        // A Went may ask to replace the current history entry; that acknowledgement
+        // does not change the platform address and must not trigger another Went.
+        if changed {
+            self.schedule.send(
+                self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
+                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(address) },
+            );
+        }
     }
     fn observe(&mut self, observation: Observation) {
         self.referee.observe(self.now, observation, &mut Vec::new());
@@ -500,14 +507,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             }
         }
         for (address, replace) in shows {
-            // A Show is navigation even when the chosen address is already current.
-            self.observe(Observation::LeftPage { client: id });
-            self.clients[id.0].acted_card = None;
-            let changed = self.clients[id.0].history[self.clients[id.0].at] != address;
-            self.history(id, address.clone(), replace);
-            if changed {
-                self.platform_went(id, address);
-            }
+            self.platform_show(id, address, replace);
         }
         for back in signs {
             self.front.sign_in(id, self.now, env.wall);
