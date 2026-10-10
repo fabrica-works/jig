@@ -253,7 +253,7 @@ fn person_wait(b: &mut Builder, value: &OwnerPersonWait, words: &Words) {
         number(b, words, P::NoticeActivity, notice.activity);
     }
 }
-fn hold_failure(b: &mut Builder, value: HoldFailure, words: &Words) {
+pub(crate) fn hold_failure(b: &mut Builder, value: HoldFailure, words: &Words) {
     let phrase = match value {
         HoldFailure::Transient => P::Transient,
         HoldFailure::Permanent => P::Permanent,
@@ -433,6 +433,14 @@ pub fn render(b: &mut Builder, value: &OwnerChipDetails, client: &Domain, words:
     match value.retry {
         Some(RetryNotice::Failed { class, count, allowance }) => {
             crate::cards::chip::failure(b, class, words);
+            words.text(
+                b,
+                crate::phrases::jig::JigPhrase::RunRetryFailed,
+                &[Hole::Number(u64::from(count)), Hole::Number(u64::from(allowance))],
+            );
+        }
+        Some(RetryNotice::OwnerFailed { class, count, allowance }) => {
+            hold_failure(b, class, words);
             words.text(
                 b,
                 crate::phrases::jig::JigPhrase::RunRetryFailed,

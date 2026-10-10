@@ -160,3 +160,59 @@ fn chip_admission_refuses_oversized_terminal_bytes_nested_raw_parts_and_unused_l
     assert!(!pricing::fits(&invalid, &bounds));
     assert!(pricing::fits(&base, &bounds), "all refusal probes leave the original complete source untouched");
 }
+
+#[test]
+fn owner_retry_scalar_notices_price_whole_retained_and_boxed_envelopes_at_adjacent_bounds() {
+    let bounds = Bounds { text: 6, rows: 3, document_bytes: u64::MAX, ..Bounds::default() };
+    let each_part = List::<Box<[u8]>>::worst_case(3).unwrap() + 3 + 2;
+    let exact = u64::try_from(core::mem::size_of::<OwnerChipDetails>()).unwrap()
+        + List::<OwnerResourceLine>::worst_case(2).unwrap()
+        + List::<u16>::worst_case(3).unwrap()
+        + each_part * 4
+        + 2
+        + 6
+        + 3
+        + 2
+        + 4;
+    let optional_scalar = u64::try_from(core::mem::size_of::<Option<RetryNotice>>()).unwrap();
+    let mut metadata = value();
+    for retry in [None, Some(RetryNotice::Refused { count: 0 }), Some(RetryNotice::Refused { count: u32::MAX })] {
+        metadata.retry = retry;
+        assert_eq!(pricing::bytes(&metadata, &bounds), Some(exact));
+        assert!(crate::payload::fits(&retry, &Bounds { document_bytes: optional_scalar, ..bounds }));
+        assert!(!crate::payload::fits(&retry, &Bounds { document_bytes: optional_scalar - 1, ..bounds }));
+    }
+    let mut notices = Vec::new();
+    for class in [
+        HoldFailure::Transient,
+        HoldFailure::Permanent,
+        HoldFailure::Run,
+        HoldFailure::Agent,
+        HoldFailure::Lost,
+        HoldFailure::Invalid,
+    ] {
+        for (count, allowance) in [(0, 0), (0, u32::MAX), (u32::MAX, 0), (u32::MAX, u32::MAX)] {
+            notices.push(RetryNotice::OwnerFailed { class, count, allowance });
+        }
+    }
+    for class in [FailureClass::Temporary, FailureClass::Stall, FailureClass::HostLost, FailureClass::Permanent] {
+        notices.push(RetryNotice::Failed { class, count: 7, allowance: 9 });
+    }
+    for retry in notices {
+        let scalar = u64::try_from(core::mem::size_of::<RetryNotice>()).unwrap();
+        assert!(crate::payload::fits(&retry, &Bounds { document_bytes: scalar, ..bounds }));
+        assert!(!crate::payload::fits(&retry, &Bounds { document_bytes: scalar - 1, ..bounds }));
+        metadata.retry = Some(retry);
+        assert_eq!(metadata.clone().retry, Some(retry));
+        assert_eq!(pricing::bytes(&metadata, &bounds), Some(exact));
+        for (bound, expected) in [(exact - 1, false), (exact, true), (exact + 1, true)] {
+            assert_eq!(pricing::fits(&metadata, &Bounds { document_bytes: bound, ..bounds }), expected);
+        }
+        let boxed = Some(Box::new(metadata.clone()));
+        let boxed_exact = exact + u64::try_from(core::mem::size_of::<Option<Box<OwnerChipDetails>>>()).unwrap();
+        assert_eq!(pricing::boxed_bytes(&boxed, &bounds), Some(boxed_exact));
+        for (bound, expected) in [(boxed_exact - 1, false), (boxed_exact, true), (boxed_exact + 1, true)] {
+            assert_eq!(pricing::boxed_fits(&boxed, &Bounds { document_bytes: bound, ..bounds }), expected);
+        }
+    }
+}

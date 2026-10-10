@@ -574,3 +574,151 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
         Some(Invalid::Language)
     );
 }
+
+fn retry_activation_tree(retry: Option<RetryNotice>, words: &Words) -> Tree {
+    let mut value = details();
+    value.retry = retry;
+    let f = view::required(&value, &client_limits(), words).unwrap();
+    let capacity = Limits {
+        nodes: f.nodes,
+        depth: f.depth,
+        text_per_node: f.text_per_node,
+        text_bytes: f.text_bytes,
+        drawing_bytes: 0,
+        styles_per_node: 2,
+        patches: 0,
+        bindings: f.bindings,
+        slots: f.slots,
+        markdown_depth: 2,
+    };
+    let client = Domain::new(&client_limits(), 1);
+    let chip = Chip {
+        task: u64::MAX,
+        title: doc(b"retry", false),
+        executor: Executor::Agent { charter: u32::MAX },
+        phase: Phase::Running,
+        details: Box::new(ChipPhase::Active(ActiveRun {
+            stage: RunStage::Claimed { attempt: u64::MAX },
+            phase_since: Wall::from_nanos(10),
+            attempt: Some(u64::MAX),
+            placement: Some(Wall::from_nanos(20)),
+            retry,
+            observation: None,
+        })),
+    };
+    let mut b = Builder::new(&capacity);
+    let mut bindings = JigBindings::new(f.bindings, 256);
+    crate::cards::chip::chip(&mut b, &client, &chip, words, &mut bindings);
+    let tree = b.finish();
+    assert!(tree.len() <= f.nodes);
+    assert!(tree.nodes().iter().all(|node| node.text_bytes() <= f.text_per_node));
+    assert!(tree.nodes().iter().map(|node| u64::from(node.text_bytes())).sum::<u64>() <= u64::from(f.text_bytes));
+    tree
+}
+
+#[test]
+fn owner_retry_keeps_all_six_classes_and_independent_zero_max_counts_in_chip_and_activation() {
+    for (class, label) in [
+        (HoldFailure::Transient, b"Transient failure".as_slice()),
+        (HoldFailure::Permanent, b"Permanent failure"),
+        (HoldFailure::Run, b"Run failure"),
+        (HoldFailure::Agent, b"Agent failure"),
+        (HoldFailure::Lost, b"Lost failure"),
+        (HoldFailure::Invalid, b"Invalid failure"),
+    ] {
+        for (count, allowance, caption) in [
+            (0, 0, b"Failure count 0 of allowance 0".as_slice()),
+            (0, u32::MAX, b"Failure count 0 of allowance 4294967295"),
+            (u32::MAX, 0, b"Failure count 4294967295 of allowance 0"),
+            (u32::MAX, u32::MAX, b"Failure count 4294967295 of allowance 4294967295"),
+        ] {
+            let retry = Some(RetryNotice::OwnerFailed { class, count, allowance });
+            let mut value = details();
+            value.retry = retry;
+            assert_eq!(value.clone().retry, retry);
+            let tree = build(&value, words()).0;
+            assert!(has(&tree, label));
+            assert!(has(&tree, caption));
+            assert!(has(&tree, b"Run work unobserved"));
+            assert!(!contains(&tree, b"Actual run start:"));
+            let tree = retry_activation_tree(retry, words());
+            assert!(has(&tree, label));
+            assert!(has(&tree, caption));
+            assert!(contains(&tree, b"Run observation not supplied"));
+            assert!(!contains(&tree, b"Start observed at"));
+            assert_eq!(value.retry, retry, "rendering cannot mutate owner class or independent counts");
+        }
+    }
+}
+
+#[test]
+fn owner_retry_absence_refusal_and_all_supplied_failure_classes_remain_independent() {
+    let mut value = details();
+    value.retry = None;
+    for tree in [build(&value, words()).0, retry_activation_tree(None, words())] {
+        assert!(!contains(&tree, b"Failure count"));
+        assert!(!contains(&tree, b"Activation refusal count"));
+    }
+    for (count, caption) in
+        [(0, b"Activation refusal count 0".as_slice()), (u32::MAX, b"Activation refusal count 4294967295")]
+    {
+        value.retry = Some(RetryNotice::Refused { count });
+        for tree in [build(&value, words()).0, retry_activation_tree(value.retry, words())] {
+            assert!(has(&tree, caption));
+            assert!(!contains(&tree, b"Failure count"));
+        }
+    }
+    for (class, label) in [
+        (FailureClass::HostLost, b"Host lost".as_slice()),
+        (FailureClass::Temporary, b"Temporary failure"),
+        (FailureClass::Permanent, b"Permanent failure"),
+        (FailureClass::Stall, b"Stalled"),
+    ] {
+        value.retry = Some(RetryNotice::Failed { class, count: 7, allowance: 9 });
+        for tree in [build(&value, words()).0, retry_activation_tree(value.retry, words())] {
+            assert!(has(&tree, label));
+            assert!(has(&tree, b"Failure count 7 of allowance 9"));
+            assert!(!contains(&tree, b"Activation refusal count"));
+        }
+    }
+}
+
+#[test]
+fn owner_retry_borrows_selected_checked_six_class_words_and_both_count_holes() {
+    let cases = [
+        (HoldFailure::Transient, ChipPhrase::Transient, b"chosen transient".as_slice()),
+        (HoldFailure::Permanent, ChipPhrase::Permanent, b"chosen permanent"),
+        (HoldFailure::Run, ChipPhrase::RunFailure, b"chosen run"),
+        (HoldFailure::Agent, ChipPhrase::AgentFailure, b"chosen agent"),
+        (HoldFailure::Lost, ChipPhrase::Lost, b"chosen lost"),
+        (HoldFailure::Invalid, ChipPhrase::InvalidFailure, b"chosen invalid"),
+    ];
+    let mut selected = crate::phrases::english::language();
+    for phrase in &mut selected.phrases {
+        for (_, class_phrase, label) in cases {
+            if phrase.id == class_phrase.id() {
+                phrase.forms[0].segments = Box::new([Segment::Text(copy_of(label))]);
+            }
+        }
+        if phrase.id == crate::phrases::jig::JigPhrase::RunRetryFailed.id() {
+            phrase.forms[0].segments = Box::new([
+                Segment::Text(copy_of(b"chosen count ")),
+                Segment::Hole { index: 0, kind: crate::phrases::HoleKind::Number },
+                Segment::Text(copy_of(b" versus ")),
+                Segment::Hole { index: 1, kind: crate::phrases::HoleKind::Number },
+            ]);
+        }
+    }
+    let checked =
+        OwnerChipWords::load(Box::new([crate::phrases::english::language(), selected]), &phrase_limits(), 1, 0)
+            .unwrap();
+    for (class, _, label) in cases {
+        let mut value = details();
+        value.retry = Some(RetryNotice::OwnerFailed { class, count: 0, allowance: u32::MAX });
+        for tree in [build(&value, checked.words()).0, retry_activation_tree(value.retry, checked.words())] {
+            assert!(has(&tree, label));
+            assert!(has(&tree, b"chosen count 0 versus 4294967295"));
+            assert!(!contains(&tree, b"Failure count"));
+        }
+    }
+}

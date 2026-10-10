@@ -126,7 +126,7 @@ fn retry_notices_keep_refusal_and_failure_counters_without_fabricated_reasons() 
         assert!(!contains(&tree, b"Start observed at"));
         match retry {
             RetryNotice::Refused { .. } => assert!(!contains(&tree, b"Failure count")),
-            RetryNotice::Failed { .. } => {}
+            RetryNotice::Failed { .. } | RetryNotice::OwnerFailed { .. } => {}
         }
     }
 }

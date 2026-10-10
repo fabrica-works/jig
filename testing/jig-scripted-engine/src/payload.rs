@@ -46,11 +46,17 @@ plain!(
     Wall,
     Token,
     RunStage,
-    RetryNotice,
     ClosingStage,
     Proposer,
     jig_client::contract::RecurringOverlap
 );
+impl Payload for RetryNotice {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::OwnerFailed { .. } | Self::Failed { .. } | Self::Refused { .. } => Some(0),
+        }
+    }
+}
 impl Payload for Text {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         if self.fits(bounds.text) { u64::try_from(self.bytes().len()).ok() } else { None }

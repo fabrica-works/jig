@@ -34,6 +34,14 @@ pub(crate) fn active(b: &mut Builder, value: &ActiveRun, words: &Words) {
                 &[Hole::Number(u64::from(count)), Hole::Number(u64::from(allowance))],
             );
         }
+        Some(RetryNotice::OwnerFailed { class, count, allowance }) => {
+            crate::owner_chip::hold_failure(b, class, words);
+            words.text(
+                b,
+                JigPhrase::RunRetryFailed,
+                &[Hole::Number(u64::from(count)), Hole::Number(u64::from(allowance))],
+            );
+        }
         Some(RetryNotice::Refused { count }) => {
             words.text(b, JigPhrase::RunRetryRefused, &[Hole::Number(u64::from(count))]);
         }
