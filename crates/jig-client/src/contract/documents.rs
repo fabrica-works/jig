@@ -49,7 +49,7 @@ pub struct ProjectRole {
     pub name: Option<DocumentText>,
     pub role: HeldRole,
     pub pool: Option<PoolLedger>,
-    /// The role default used by the project chat charter.
+    /// The owner-configured chat budget for this supplied membership.
     pub chat_budget: u64,
 }
 

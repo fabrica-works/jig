@@ -831,6 +831,7 @@ fn specification(words: jig_client::contract::Text) -> jig_client::contract::Spe
     })
 }
 
+#[must_use]
 pub fn party(number: u64) -> Party {
     Party { number, kind: PartyKind::Person, name: text(b"Pat") }
 }
