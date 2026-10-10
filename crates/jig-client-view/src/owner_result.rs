@@ -15,7 +15,7 @@ fn requester(b: &mut Builder, value: OwnerRequester, words: &Words) {
         OwnerRequester::Task(number) => text(b, words, ResultPhrase::RequesterTask, &[Hole::Number(number)]),
         OwnerRequester::Person(number) => text(b, words, ResultPhrase::RequesterPerson, &[Hole::Number(number)]),
         OwnerRequester::Deployment { project } => {
-            text(b, words, ResultPhrase::RequesterDeployment, &[Hole::Number(u64::from(project))])
+            text(b, words, ResultPhrase::RequesterDeployment, &[Hole::Number(u64::from(project))]);
         }
     }
 }
@@ -74,10 +74,10 @@ pub fn render(b: &mut Builder, client: &Domain, value: &ResultDetails, words: &W
     match value.proposal {
         Some(key) => match key.proposer {
             Proposer::Task(task) => {
-                text(b, words, ResultPhrase::ProposalTask, &[Hole::Number(task), Hole::Number(key.number)])
+                text(b, words, ResultPhrase::ProposalTask, &[Hole::Number(task), Hole::Number(key.number)]);
             }
             Proposer::Party(party) => {
-                text(b, words, ResultPhrase::ProposalParty, &[Hole::Number(party), Hole::Number(key.number)])
+                text(b, words, ResultPhrase::ProposalParty, &[Hole::Number(party), Hole::Number(key.number)]);
             }
         },
         None => text(b, words, ResultPhrase::ProposalAbsent, &[]),

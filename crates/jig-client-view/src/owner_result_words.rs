@@ -121,35 +121,31 @@ impl ResultPhrase {
     #[must_use]
     pub fn shape(self) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::Details => Box::new([]),
-            Self::Contract => Box::new([]),
-            Self::RequesterTask => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::RequesterPerson => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::RequesterDeployment => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Chooser => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::ChooserAbsent => Box::new([]),
-            Self::Delegates => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Followups => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::FollowupsAbsent => Box::new([]),
-            Self::ProposalTask => Box::new([
+            Self::RequesterTask
+            | Self::RequesterPerson
+            | Self::RequesterDeployment
+            | Self::Chooser
+            | Self::Delegates
+            | Self::Followups
+            | Self::Stored => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::ProposalTask | Self::ProposalParty => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::ProposalParty => Box::new([
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-            ]),
-            Self::ProposalAbsent => Box::new([]),
-            Self::Live => Box::new([]),
-            Self::Retained => Box::new([]),
-            Self::Stored => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::At => Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }]),
-            Self::AtUnknown => Box::new([]),
-            Self::Done => Box::new([]),
-            Self::Failed => Box::new([]),
-            Self::Cancelled => Box::new([]),
-            Self::StatusUnknown => Box::new([]),
-            Self::Cut => Box::new([]),
+            Self::Details
+            | Self::Contract
+            | Self::ChooserAbsent
+            | Self::FollowupsAbsent
+            | Self::ProposalAbsent
+            | Self::Live
+            | Self::Retained
+            | Self::AtUnknown
+            | Self::Done
+            | Self::Failed
+            | Self::Cancelled
+            | Self::StatusUnknown
+            | Self::Cut => Box::new([]),
         };
         PhraseShape { id: self.id(), holes, plural: None }
     }
