@@ -365,7 +365,7 @@ fn conversation_states(words: &crate::words::Words) {
                     details: Box::new(ChipPhase::Starting),
                 },
                 project: 4,
-                first_words: jig_client::contract::DocumentText::complete(text(b"Help with work")),
+                first_words: DocumentText::complete(text(b"Help with work")),
                 unread: Some(Count { value: 2, limited: task == 2 }),
                 seen: 1,
                 last_reply: 3,

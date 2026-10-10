@@ -403,7 +403,7 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
         cached_replies: 0,
         chip: full_chip(8),
         project: 4,
-        first_words: jig_client::contract::DocumentText::complete(full_text()),
+        first_words: DocumentText::complete(full_text()),
         unread: Some(Count { value: 2, limited: false }),
         seen: 1,
         last_reply: 3,

@@ -45,7 +45,7 @@ fn conversation(task: u64) -> ConversationLine {
         },
         chip: chip(task),
         project: 1,
-        first_words: jig_client::contract::DocumentText::complete(text(b"words")),
+        first_words: DocumentText::complete(text(b"words")),
         unread: Some(Count { value: 0, limited: false }),
         seen: 0,
         last_reply: 0,

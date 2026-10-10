@@ -615,7 +615,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
         cached_replies: 0,
         chip: dependency,
         project: 4,
-        first_words: jig_client::contract::DocumentText::complete(text(b"whole first reply")),
+        first_words: DocumentText::complete(text(b"whole first reply")),
         unread: Some(Count { value: 2, limited: false }),
         seen: 5,
         last_reply: 7,

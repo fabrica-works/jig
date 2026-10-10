@@ -1,5 +1,5 @@
 //! Exact counts from the owner (client/domain/contract.md, 5.1).
-/// Ten independent supplied lifecycle counters; local folded chips use PhaseCounts.
+/// Ten independent supplied lifecycle counters; local folded chips use `PhaseCounts`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerPhaseCounts {
     pub waiting: u32,

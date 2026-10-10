@@ -259,7 +259,7 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
                         budget: task.budget.clone(),
                         chip: task.chip.clone(),
                         project: 1,
-                        first_words: jig_client::contract::DocumentText::complete(text(b"Hello")),
+                        first_words: DocumentText::complete(text(b"Hello")),
                         unread: Some(Count { value: 0, limited: false }),
                         seen: 0,
                         last_reply: 0,

@@ -17,7 +17,7 @@ fn a_page_loss_flag_is_independent_of_row_text_loss_and_whole_cursor_bytes() {
             funder: Funder::Period { project: 1, period: 3 },
             deadline: None,
         },
-        first_words: jig_client::contract::DocumentText::complete(text(b"words")),
+        first_words: DocumentText::complete(text(b"words")),
         runtime: Some(Runtime::Idle),
         last_reply: 4,
         seen: 2,

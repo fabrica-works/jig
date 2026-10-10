@@ -302,7 +302,7 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
         },
         chip: chip(9),
         project: 1,
-        first_words: jig_client::contract::DocumentText::complete(text(b"first words")),
+        first_words: DocumentText::complete(text(b"first words")),
         unread: Some(Count { value: 2, limited: false }),
         seen: 5,
         last_reply: 7,

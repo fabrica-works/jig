@@ -398,7 +398,7 @@ fn conversations(words: &Words) {
         budget: full_owner_budget(),
         chip: full_chip(number),
         project: 4,
-        first_words: jig_client::contract::DocumentText { text: full(), cut: true },
+        first_words: DocumentText { bytes: full(), cut: true },
         unread: Some(Count { value: u32::MAX, limited: true }),
         seen: 0,
         last_reply: u64::MAX,
@@ -666,7 +666,7 @@ fn fill_goals(d: &mut Domain, watch: Token, _doc: &Project) {
         changed: Some(Wall::EPOCH),
         chip: full_chip(number),
         priority: u32::MAX,
-        progress: jig_client::contract::OwnerPhaseCounts {
+        progress: OwnerPhaseCounts {
             idle: 2,
             starting: 2,
             backing_off: 2,
@@ -688,7 +688,7 @@ fn fill_ended_goals(d: &mut Domain, read: Token, _doc: &Project) {
         changed: Some(Wall::EPOCH),
         chip: full_chip(number),
         priority: u32::MAX,
-        progress: jig_client::contract::OwnerPhaseCounts {
+        progress: OwnerPhaseCounts {
             idle: 2,
             starting: 2,
             backing_off: 2,

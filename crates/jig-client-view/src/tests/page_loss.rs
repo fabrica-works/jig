@@ -200,7 +200,7 @@ fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_c
         },
         chip,
         project: 4,
-        first_words: jig_client::contract::DocumentText::complete(text(b"whole first words")),
+        first_words: DocumentText::complete(text(b"whole first words")),
         unread: Some(Count { value: 0, limited: false }),
         seen: 7,
         last_reply: 7,
@@ -247,4 +247,143 @@ fn sliding_a_read_window_keeps_supplied_page_loss_until_that_source_is_reset() {
             assert!(!held(&domain, kind));
         }
     }
+}
+
+fn row_selected_words() -> crate::words::Words {
+    use crate::phrases::{PhraseLimits, Phrasebook, Segment};
+    let first = crate::phrases::english::language();
+    let mut second = first.clone();
+    for phrase in &mut second.phrases {
+        for form in &mut phrase.forms {
+            form.segments.reverse();
+            for segment in &mut form.segments {
+                if let Segment::Text(bytes) = segment {
+                    let mut selected = b"ALT ".to_vec();
+                    selected.extend_from_slice(bytes);
+                    *bytes = selected.into_boxed_slice();
+                }
+            }
+        }
+    }
+    let mut segments = 0;
+    let mut text_bytes = 0;
+    for language in [&first, &second] {
+        for phrase in &language.phrases {
+            for form in &phrase.forms {
+                for segment in &form.segments {
+                    segments += 1;
+                    if let Segment::Text(bytes) = segment {
+                        text_bytes += u32::try_from(bytes.len()).unwrap();
+                    }
+                }
+            }
+        }
+    }
+    crate::words::Words {
+        book: Phrasebook::load(
+            crate::phrases::jig::shapes(super::cards::CLIENT.text),
+            Box::new([first, second]),
+            &PhraseLimits {
+                languages: 2,
+                phrases: crate::owner_words::phrase_count(),
+                holes: 4,
+                segments,
+                text_bytes,
+                hole_bytes: super::cards::CLIENT.text,
+            },
+        )
+        .unwrap(),
+        language: 1,
+        offset_minutes: 0,
+    }
+}
+
+#[test]
+fn owner_conversation_rows_render_whole_text_loss_independent_cache_and_only_supplied_enrichments_in_selected_language()
+{
+    let (mut domain, read) = ready(4);
+    let row = ConversationLine {
+        chip: super::work_pages::chip(8),
+        project: 4,
+        first_words: DocumentText { bytes: text(b"\xff\0whole words"), cut: true },
+        unread: None,
+        cached_replies: u32::MAX,
+        runtime: None,
+        changed: None,
+        delegates: u32::MAX,
+        seen: 1,
+        last_reply: u64::MAX,
+        budget: super::cards_objects::task_doc(&[]).budget,
+    };
+    let page = ConversationPage { rows: list([row.clone()]), cut: false, before: None, after: Some(cursor()) };
+    drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Conversations(Box::new(page))) });
+    let selected = row_selected_words();
+    let tree = build(&domain, 1, &selected).0;
+    assert!(contains(&tree, b"\xff\0whole words"));
+    assert!(contains(&tree, b"ALT Text is incomplete"));
+    assert!(contains(&tree, b"4294967295ALT Cached replies "));
+    assert!(!contains(&tree, b"ALT Updates"));
+    assert!(tree.len() <= crate::conversations_nodes(&super::cards::CLIENT, 0).unwrap());
+    assert_eq!(domain.conversation_rows().rows.get(0), Some(&row));
+}
+
+#[test]
+fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_public_finite_capacity() {
+    let (mut domain, read) = ready(5);
+    let row = GoalLine {
+        chip: super::work_pages::chip(9),
+        priority: u32::MAX,
+        progress: OwnerPhaseCounts {
+            waiting: u32::MAX,
+            idle: u32::MAX - 1,
+            starting: u32::MAX - 2,
+            running: u32::MAX - 3,
+            backing_off: u32::MAX - 4,
+            closing: u32::MAX - 5,
+            held: u32::MAX - 6,
+            done: u32::MAX - 7,
+            failed: u32::MAX - 8,
+            cancelled: u32::MAX - 9,
+        },
+        budget: super::cards_objects::task_doc(&[]).budget,
+        held_below: u32::MAX,
+        changed: None,
+    };
+    drive(
+        &mut domain,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                rows: list([row.clone()]),
+                cut: false,
+                before: None,
+                after: Some(cursor()),
+            }))),
+        },
+    );
+    let selected = row_selected_words();
+    let tree = build(&domain, 3, &selected).0;
+    for phrase_and_count in [
+        (crate::phrases::jig::JigPhrase::TasksWaiting, u32::MAX),
+        (crate::phrases::jig::JigPhrase::TasksIdle, u32::MAX - 1),
+        (crate::phrases::jig::JigPhrase::TasksStarting, u32::MAX - 2),
+        (crate::phrases::jig::JigPhrase::TasksRunning, u32::MAX - 3),
+        (crate::phrases::jig::JigPhrase::TasksBackingOff, u32::MAX - 4),
+        (crate::phrases::jig::JigPhrase::TasksClosing, u32::MAX - 5),
+        (crate::phrases::jig::JigPhrase::TasksHeld, u32::MAX - 6),
+        (crate::phrases::jig::JigPhrase::TasksDone, u32::MAX - 7),
+        (crate::phrases::jig::JigPhrase::TasksFailed, u32::MAX - 8),
+        (crate::phrases::jig::JigPhrase::TasksCancelled, u32::MAX - 9),
+    ] {
+        assert!(contains(
+            &tree,
+            &selected.say(phrase_and_count.0, &[crate::phrases::Hole::Number(u64::from(phrase_and_count.1))])
+        ));
+    }
+    assert!(!contains(
+        &tree,
+        &selected.say(crate::phrases::jig::JigPhrase::TasksEnded, &[crate::phrases::Hole::Number(1)])
+    ));
+    assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
+    assert!(tree.len() <= crate::page_nodes(&super::cards::CLIENT, 0).unwrap());
 }

@@ -351,7 +351,7 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                         rows: list([GoalLine {
                             chip: chip(8),
                             priority: 2,
-                            progress: jig_client::contract::OwnerPhaseCounts::ZERO,
+                            progress: OwnerPhaseCounts::ZERO,
                             budget: OwnerBudget { deadline: Some(Wall::EPOCH), ..doc.budget },
                             held_below: 1,
                             changed: Some(Wall::EPOCH),

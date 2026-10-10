@@ -724,7 +724,7 @@ pub struct ConversationLine {
     pub budget: super::OwnerBudget,
     pub chip: Chip,
     pub project: u32,
-    pub first_words: super::DocumentText,
+    pub first_words: DocumentText,
     pub unread: Option<Count>,
     /// Independently supplied cached replies, never the unread count.
     pub cached_replies: u32,

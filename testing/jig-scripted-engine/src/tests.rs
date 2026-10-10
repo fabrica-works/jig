@@ -703,7 +703,7 @@ fn scenario_byte_bound_pages_and_watch_windows() {
                 },
                 chip: task().chip,
                 project: 1,
-                first_words: jig_client::contract::DocumentText::complete(text(&[b'x'; 1100])),
+                first_words: DocumentText::complete(text(&[b'x'; 1100])),
                 unread: Some(Count { value: 1, limited: false }),
                 seen: 0,
                 last_reply: 1,
@@ -830,7 +830,7 @@ fn scenario_reply_identity() {
         },
         chip: task().chip,
         project: 1,
-        first_words: jig_client::contract::DocumentText::complete(text(b"whole reply")),
+        first_words: DocumentText::complete(text(b"whole reply")),
         unread: Some(Count { value: 1, limited: false }),
         seen: 0,
         last_reply: 1,
@@ -1486,7 +1486,7 @@ fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
         GoalLine {
             chip,
             priority: 1,
-            progress: jig_client::contract::OwnerPhaseCounts {
+            progress: OwnerPhaseCounts {
                 idle: 2,
                 starting: 2,
                 backing_off: 2,

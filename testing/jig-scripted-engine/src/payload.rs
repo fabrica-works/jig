@@ -744,7 +744,7 @@ fields!(InboxEntry { reply, lineage, goal, recipient, stall, object, project, gr
 fields!(Inbox { entries, needs, updates, results_seen, replies_seen, more });
 fields!(ReplyPosition { chat, through });
 fields!(ConversationLine {
-    cached_replies: 0,
+    cached_replies,
     runtime,
     delegates,
     budget,

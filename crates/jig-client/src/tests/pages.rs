@@ -231,7 +231,7 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
             details: Box::new(super::objects::phase_details(phase)),
         },
         project: 1,
-        first_words: jig_client::contract::DocumentText::complete(text(b"help checkout")),
+        first_words: DocumentText::complete(text(b"help checkout")),
         unread: Some(Count { value: 1, limited: false }),
         seen: 2,
         last_reply: 3,
@@ -773,7 +773,7 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine
     GoalLine {
         chip,
         priority,
-        progress: jig_client::contract::OwnerPhaseCounts::ZERO,
+        progress: OwnerPhaseCounts::ZERO,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
             left: 20,
@@ -1274,7 +1274,7 @@ fn reply_entry(task: u64, seen: u64, last: u64) -> InboxEntry {
     let mut line = list_entry(task, Phase::Idle, last);
     line.seen = seen;
     line.last_reply = last;
-    line.unread = Count { value: u32::try_from(last.saturating_sub(seen)).unwrap(), limited: false };
+    line.unread = Some(Count { value: u32::try_from(last.saturating_sub(seen)).unwrap(), limited: false });
     row.reply = Some(Box::new(line));
     row
 }
@@ -1426,7 +1426,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
     task.spec = specification(text(b"retained full document"));
     assert!(domain.objects.put(ObjectKey::Task(9), Body::Task(Box::new(task.clone()))));
     rows.get_mut(1).unwrap().seen = 3;
-    rows.get_mut(1).unwrap().unread.value = 0;
+    rows.get_mut(1).unwrap().unread.as_mut().unwrap().value = 0;
     drive(
         &mut domain,
         Time::ZERO,
@@ -2420,4 +2420,157 @@ fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_de
             ));
         }
     }
+}
+
+#[test]
+fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_reply_positions() {
+    let (mut domain, watch, read) = live_conversation_page(3101);
+    let mut old = list_entry(8, Phase::Idle, 99);
+    old.cached_replies = 17;
+    let mut rows = List::with_capacity(1);
+    rows.push(old.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: false }))),
+        },
+    );
+    let mut current = old.clone();
+    current.runtime = None;
+    current.changed = None;
+    current.unread = None;
+    current.first_words = DocumentText { bytes: text(b"\xff\0whole"), cut: true };
+    current.cached_replies = u32::MAX;
+    current.seen = 0;
+    current.last_reply = u64::MAX;
+    let mut rows = List::with_capacity(1);
+    rows.push(current.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: true }))),
+        },
+    );
+    let mut rows = List::with_capacity(1);
+    rows.push(old).unwrap();
+    let cursor = Cursor { value: text(b"\xff\0opaque-row") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                rows,
+                cut: true,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.get(0), Some(&current));
+    assert!(domain.conversation_rows().cut);
+    assert_eq!(domain.conversation_rows().edges.after, crate::windows::Edge::More(cursor));
+    let reply =
+        domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.as_ref().unwrap();
+    assert_eq!(reply.first_words, current.first_words);
+    assert_eq!(reply.chat, 8);
+    assert_eq!(reply.first_unread, 1);
+    let mut zero = current.clone();
+    zero.unread = Some(Count { value: 0, limited: false });
+    zero.runtime = Some(Runtime::Idle);
+    zero.changed = Some(skein_lib::Wall::EPOCH);
+    zero.first_words = DocumentText::complete(text(b""));
+    let mut rows = List::with_capacity(1);
+    rows.push(zero.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: false }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.get(0), Some(&zero));
+}
+
+#[test]
+fn owner_conversation_order_keeps_missing_clock_rows_in_source_order_and_supplied_clocks_newest_first() {
+    for absent in [true, false] {
+        let (mut domain, watch, _) = live_conversation_page(3102);
+        let mut first = list_entry(8, Phase::Idle, 1);
+        let second = list_entry(9, Phase::Idle, 99);
+        if absent {
+            first.changed = None;
+        }
+        let mut rows = List::with_capacity(2);
+        rows.push(first).unwrap();
+        rows.push(second).unwrap();
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch {
+                watch,
+                event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: false }))),
+            },
+        );
+        assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, if absent { 8 } else { 9 });
+    }
+}
+
+#[test]
+fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget_by_key() {
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let watch = open_token(&opened);
+    let mut row = goal_line(9, u32::MAX, Phase::Running, 9);
+    row.changed = None;
+    row.held_below = u32::MAX;
+    row.progress = OwnerPhaseCounts {
+        waiting: u32::MAX,
+        idle: u32::MAX - 1,
+        starting: u32::MAX - 2,
+        running: u32::MAX - 3,
+        backing_off: u32::MAX - 4,
+        closing: u32::MAX - 5,
+        held: u32::MAX - 6,
+        done: u32::MAX - 7,
+        failed: u32::MAX - 8,
+        cancelled: u32::MAX - 9,
+    };
+    row.budget.funder = Funder::Task(u64::MAX);
+    row.budget.deadline = Some(skein_lib::Wall::from_nanos(u64::MAX));
+    let mut rows = List::with_capacity(1);
+    rows.push(row.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: false }))),
+        },
+    );
+    let mut duplicate = row.clone();
+    duplicate.changed = Some(skein_lib::Wall::EPOCH);
+    duplicate.progress = OwnerPhaseCounts::ZERO;
+    let mut rows = List::with_capacity(2);
+    rows.push(duplicate).unwrap();
+    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&opened, &Read::Goals { project: 1, after: None }),
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                rows,
+                cut: false,
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
+    assert_eq!(domain.project_page().listed_goals.len(), 2);
 }

@@ -35,7 +35,7 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
                 cached_replies: 0,
                 chip: row.chip.clone(),
                 project: row.project,
-                first_words: jig_client::contract::DocumentText::complete(text(b"first")),
+                first_words: DocumentText::complete(text(b"first")),
                 unread: Some(Count { value: 0, limited: false }),
                 seen: 0,
                 last_reply: 0,
@@ -67,4 +67,81 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
             whole_budget_fits(&goal);
         }
     }
+}
+
+#[test]
+fn owner_row_parent_admission_prices_full_text_optional_runtime_and_allocated_window_without_trimming() {
+    let mut nested = List::with_capacity(2);
+    nested.push(u64::MAX).unwrap();
+    let row = ConversationLine {
+        chip: task().chip,
+        project: u32::MAX,
+        first_words: DocumentText { bytes: text(&[0xff; 32]), cut: true },
+        unread: Some(Count { value: u32::MAX, limited: true }),
+        cached_replies: u32::MAX,
+        delegates: u32::MAX,
+        seen: u64::MAX,
+        last_reply: u64::MAX,
+        runtime: Some(Runtime::Waiting { dependencies: nested, hold: None }),
+        changed: Some(Wall::from_nanos(u64::MAX)),
+        budget: task().budget,
+    };
+    whole_budget_fits(&row);
+    let bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut absent = row.clone();
+    absent.runtime = None;
+    absent.changed = None;
+    absent.unread = None;
+    assert_eq!(row.heap(&bounds).unwrap() - absent.heap(&bounds).unwrap(), List::<u64>::worst_case(2).unwrap());
+    whole_budget_fits(&absent);
+    for capacity in [1, 2] {
+        let mut rows = List::with_capacity(capacity);
+        rows.push(row.clone()).unwrap();
+        let page = ReadValue::Conversations(Box::new(ConversationPage {
+            rows,
+            cut: true,
+            before: None,
+            after: Some(Cursor { value: text(b"\xff\0opaque") }),
+        }));
+        whole_budget_fits(&page);
+        let mut too_short = bounds;
+        too_short.text = 31;
+        assert!(!payload::fits(&page, &too_short));
+    }
+}
+
+#[test]
+fn owner_goal_payload_admits_all_independent_full_width_stages_and_whole_budget_at_exact_bound() {
+    let row = GoalLine {
+        chip: task().chip,
+        priority: u32::MAX,
+        held_below: u32::MAX,
+        changed: None,
+        progress: OwnerPhaseCounts {
+            waiting: u32::MAX,
+            idle: u32::MAX,
+            starting: u32::MAX,
+            running: u32::MAX,
+            backing_off: u32::MAX,
+            closing: u32::MAX,
+            held: u32::MAX,
+            done: u32::MAX,
+            failed: u32::MAX,
+            cancelled: u32::MAX,
+        },
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: u64::MAX, spent: u64::MAX, spent_below: u64::MAX, reserved: u64::MAX },
+            left: u64::MAX,
+            funder: Funder::Recurring { project: u32::MAX, task: u64::MAX, period: u64::MAX },
+            deadline: Some(Wall::from_nanos(u64::MAX)),
+        },
+    };
+    whole_budget_fits(&row);
+    let page = ReadValue::Goals(Box::new(GoalPage {
+        rows: list(vec![row]),
+        cut: true,
+        before: None,
+        after: Some(Cursor { value: text(b"\xff\0opaque-goal") }),
+    }));
+    whole_budget_fits(&page);
 }
