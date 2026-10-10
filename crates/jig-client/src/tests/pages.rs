@@ -1883,6 +1883,8 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
         let mut value = frame(7);
         value.projects = List::with_capacity(1);
         value.projects.push(project(1, true)).unwrap();
+        value.charters = List::with_capacity(1);
+        value.charters.push(offers(1, true)).unwrap();
         delivered(&mut domain, Time::ZERO, token, value);
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewChat, text: text(b"start") } });
         let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::StartChat { project: 1 } });
