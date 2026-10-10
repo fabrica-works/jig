@@ -17,7 +17,16 @@ fn limits() -> Limits {
 }
 fn drive(domain: &mut Domain, limits: &Limits, now: Time, event: Event) -> Box<[Request]> {
     let mut out = Queue::with_capacity(crate::max_out(limits));
+    let starting = matches!(event, Event::Start { .. });
     crate::step(domain, &Env { now, wall: Wall::EPOCH, limits: *limits }, event, &mut out);
+    if starting {
+        crate::step(
+            domain,
+            &Env { now, wall: Wall::EPOCH, limits: *limits },
+            Event::Hello { versions: crate::contract::VersionRange { first: 1, last: 1 } },
+            &mut out,
+        );
+    }
     drain(out)
 }
 fn tick(domain: &mut Domain, limits: &Limits, now: Time) -> Box<[Request]> {

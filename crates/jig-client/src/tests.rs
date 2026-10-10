@@ -43,3 +43,5 @@ mod drafts;
 
 mod entrance;
 mod policy;
+
+mod hello;

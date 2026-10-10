@@ -76,7 +76,16 @@ pub(super) fn text(bytes: &[u8]) -> Text {
 }
 pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
     let mut q = Queue::with_capacity(jig_client::max_out(&CLIENT));
+    let starting = matches!(event, Event::Start { .. });
     jig_client::step(d, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT }, event, &mut q);
+    if starting {
+        jig_client::step(
+            d,
+            &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT },
+            Event::Hello { versions: VersionRange { first: 1, last: 1 } },
+            &mut q,
+        );
+    }
     let mut out = Vec::new();
     while let Some(r) = q.pop() {
         out.push(r);
@@ -101,7 +110,7 @@ pub(super) fn document() -> Frame {
         projects,
         needs: Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: 4 },
         updates: Count { value: 120, limited: false },
-        versions: VersionRange { first: 1, last: 1 },
+
         retention: Duration::from_secs(1000),
         deployment_role: Some(1),
     }

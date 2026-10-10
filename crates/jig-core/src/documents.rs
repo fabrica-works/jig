@@ -258,7 +258,6 @@ pub struct Frame {
     pub results_seen: u64,
     pub retention: Duration,
     pub charters: List<OfferedCharter>,
-    pub versions: Versions,
     pub cut: bool,
 }
 

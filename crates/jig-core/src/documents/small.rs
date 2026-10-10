@@ -126,7 +126,6 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         results_seen: core.people.results_seen(party).ok_or(Missing::Unknown)?,
         charters,
         retention: limits.people.request_retention,
-        versions: limits.documents.versions,
     })
 }
 

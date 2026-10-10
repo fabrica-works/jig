@@ -24,6 +24,8 @@ pub struct Offset {
 pub enum Event {
     /// Start with this domain records and display time offset.
     Start { address: Address, kept: List<Record>, offset: Offset },
+    /// Jig's served range supplied by the protocol stream hello, independently of Frame.
+    Hello { versions: crate::contract::VersionRange },
     /// Restored table requests, counted once per scope after Start.
     Kept { scope: u64, requests: u32 },
     /// One restored request retired, with or without a known outcome.

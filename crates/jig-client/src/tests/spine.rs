@@ -51,7 +51,11 @@ pub(super) fn drain(mut out: Queue<Request>) -> Box<[Request]> {
 }
 pub(super) fn drive(domain: &mut Domain, now: Time, event: Event) -> Box<[Request]> {
     let mut out = Queue::with_capacity(max_out(&LIMITS));
+    let starting = matches!(event, Event::Start { .. });
     step(domain, &env(now), event, &mut out);
+    if starting {
+        step(domain, &env(now), Event::Hello { versions: VersionRange { first: 1, last: 1 } }, &mut out);
+    }
     drain(out)
 }
 fn tick(domain: &mut Domain, now: Time) -> Box<[Request]> {
@@ -80,7 +84,7 @@ pub(super) fn frame(party: u64) -> Frame {
         projects: List::with_capacity(0),
         needs: needs(),
         updates: Count { value: 0, limited: false },
-        versions: VersionRange { first: 1, last: 1 },
+
         retention: Duration::from_secs(1000),
         deployment_role: Some(1),
     }
@@ -254,9 +258,7 @@ fn a_different_party_keeps_the_previous_partys_work_hidden_until_they_return() {
 fn an_unsupported_version_parks_work_and_never_sends_a_new_engine_request() {
     let mut domain = Domain::new(&LIMITS, 5);
     let watch = start(&mut domain, List::with_capacity(0));
-    let mut old = frame(7);
-    old.versions = VersionRange { first: 2, last: 3 };
-    let refused = delivered(&mut domain, Time::ZERO, watch, old);
+    let refused = drive(&mut domain, Time::ZERO, Event::Hello { versions: VersionRange { first: 2, last: 3 } });
     assert_eq!(
         refused.as_ref(),
         &[Request::Close { watch }, Request::Link { link: Link::Offline }, Request::Confirmed { party: None }]

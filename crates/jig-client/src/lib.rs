@@ -28,6 +28,7 @@ pub mod pages;
 pub mod reads;
 pub mod signin;
 pub mod store;
+mod versions;
 pub mod watches;
 pub mod windows;
 pub use boundary::{Event, Request};

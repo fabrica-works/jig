@@ -397,7 +397,6 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
     );
     assert_eq!(frame.retention, limits.people.request_retention);
     assert_eq!(frame.charters.as_slice()[0].goals.as_slice(), &[1]);
-    assert_eq!(frame.versions, limits.documents.versions);
     assert_eq!(frame.needs, 0);
     assert_eq!(frame.updates, Count::Known(0));
 }

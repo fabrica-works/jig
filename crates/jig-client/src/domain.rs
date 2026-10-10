@@ -8,14 +8,14 @@
 //! | unstarted | start | starting | frame open |
 //! | starting/offline | frame delivery | live | confirmed, retention, link |
 //! | live | frame dropped/silent | offline | link, retry/close |
-//! | active | unsupported frame version | out of date | park and close |
+//! | active | unsupported stream hello | out of date | park and close |
 //! | active | different party from kept work | someone else's work | confirm nobody |
 //! | active | frame hand off | unchanged | frame answer |
 use crate::{
     action::Act,
     address::{Address, Place},
     boundary::{Event, Offset, Request},
-    contract::{CLIENT_VERSION, Delivery, Frame, Limit, Subject, VersionRange, WatchEnd, WatchEvent},
+    contract::{Delivery, Frame, Limit, Subject, VersionRange, WatchEnd, WatchEvent},
     facts::Fact,
     frame::{FrameShown, FrameState},
     limits::Limits,
@@ -60,6 +60,7 @@ pub struct Domain {
     pub(crate) fields: crate::fields::Fields,
     pub(crate) signin: crate::signin::SignIn,
     pub(crate) blocked: bool,
+    pub(crate) versions: Option<VersionRange>,
     pub(crate) frame: FrameState,
     pub(crate) link: Link,
     pub(crate) page: Page,
@@ -111,6 +112,7 @@ impl Domain {
             fields: crate::fields::Fields::new(limits.fields, limits.text),
             signin: crate::signin::SignIn::new(limits.providers),
             blocked: false,
+            versions: None,
             frame: FrameState { document: None },
             link: Link::Starting,
             page: Page::Starting,
@@ -563,7 +565,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     if !domain.started {
         match event {
             Event::Start { address, kept, offset } => start(domain, env, address, kept, offset, out),
-            Event::Went { .. }
+            Event::Hello { .. }
+            | Event::Went { .. }
             | Event::Act { .. }
             | Event::Ask { .. }
             | Event::Progress { .. }
@@ -583,6 +586,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     domain.now = env.now;
     domain.wall = env.wall;
     match event {
+        Event::Hello { versions } => crate::versions::hello(domain, env, versions, out),
         Event::Frame { asked } => frame_answer(domain, asked, out),
         Event::Watch { watch, event } => watch_event(domain, env, Id::from_token(watch), event, out),
         Event::Ended { watch, end } => watch_end(domain, env, Id::from_token(watch), end, out),
@@ -820,20 +824,13 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
         domain.arm(Timer::Silent(id), env.now.saturating_add(env.limits.heartbeat));
     }
 }
-fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mut Queue<Request>) {
+pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mut Queue<Request>) {
     if !crate::frame::fits(&frame, &env.limits) {
         out.push(Request::Fact { fact: Fact::Refused { which: Limit::Objects } });
         return;
     }
-    let range: VersionRange = frame.versions;
-    if !range.contains(CLIENT_VERSION) {
-        domain.blocked = true;
-        domain.confirmed = None;
-        domain.page = Page::OutOfDate;
+    if domain.versions.is_none() {
         domain.frame.document = Some(frame);
-        domain.close_all(out);
-        domain.set_link(Link::Offline, out);
-        out.push(Request::Confirmed { party: None });
         domain.changed();
         return;
     }

@@ -166,6 +166,7 @@ struct Due<A: Application> {
 #[derive(Debug)]
 pub struct Engine<A: Application = NoApplication> {
     bounds: Bounds,
+    versions: jig_client::contract::VersionRange,
     truth: Truth,
     durable_truth: Truth,
     rules: Vec<Rule>,
@@ -215,6 +216,7 @@ impl<A: Application> Engine<A> {
             request_fault: None,
             clock: Time::ZERO,
             bounds: script.bounds,
+            versions: script.versions,
             durable_truth: script.truth.clone(),
             truth: script.truth,
             rules: script.rules,
@@ -236,6 +238,11 @@ impl<A: Application> Engine<A> {
     #[must_use]
     pub fn bounds(&self) -> Bounds {
         self.bounds
+    }
+    /// Configured range for the stream hello, independent of Frame and commits.
+    #[must_use]
+    pub fn versions(&self) -> jig_client::contract::VersionRange {
+        self.versions
     }
     /// The injected seed, for replay ledgers.
     #[must_use]

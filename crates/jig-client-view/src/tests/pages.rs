@@ -64,9 +64,8 @@ pub(super) fn special_pages(words: &crate::words::Words) {
         Some(jig_client::action::Act::SignIn { provider: 3 })
     );
     let (mut d, f) = start();
-    let mut frame = document();
-    frame.versions = VersionRange { first: 2, last: 2 };
-    deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
+    drive(&mut d, Event::Hello { versions: VersionRange { first: 2, last: 2 } });
+    assert!(deliver(&mut d, f, Delivery::Frame(Box::new(document()))).is_empty());
     assert!(contains(&build(&d, 2, words).0, b"update or reload"));
     let mut d = Domain::new(&CLIENT, 9);
     let mut kept = List::with_capacity(1);

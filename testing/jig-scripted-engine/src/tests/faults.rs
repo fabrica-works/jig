@@ -104,11 +104,10 @@ fn scenario_busy_not_ready_loss_sign_out_versions_and_watch_faults() {
     drop(engine.poll(Time::ZERO));
     engine.taken(Token::new(1));
     engine.fault(Time::ZERO, Fault::Versions(VersionRange { first: 2, last: 2 }));
+    assert_eq!(engine.versions(), VersionRange { first: 2, last: 2 });
+    assert!(engine.commits().is_empty(), "a hello range is protocol configuration, not a business commit");
     assert!(engine.poll(at(9_999_999)).is_empty());
-    let up = engine.poll(at(10_000_000));
-    assert!(
-        matches!(&up[0],Up::Watch { event:WatchEvent::Delivered(Delivery::Frame(frame)),.. } if frame.versions.first==2 && frame.versions.last==2)
-    );
+    assert!(engine.poll(at(10_000_000)).is_empty(), "changing hello never rewrites Frame");
     engine.fault(at(10_000_000), Fault::DropWatch { watch: Token::new(1) });
     assert_eq!(engine.poll(at(10_000_000)), vec![Up::Ended { token: Token::new(1), why: WatchEnd::Dropped }]);
     engine.open(at(10_000_000), 11, Token::new(2), Subject::Frame).expect("new frame");

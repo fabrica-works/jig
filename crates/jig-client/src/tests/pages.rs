@@ -113,9 +113,8 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
     }
     let mut old = Domain::new(&LIMITS, 6);
     let f = start(&mut old, List::with_capacity(0));
-    let mut value = frame(7);
-    value.versions = VersionRange { first: 2, last: 2 };
-    delivered(&mut old, Time::ZERO, f, value);
+    drive(&mut old, Time::ZERO, Event::Hello { versions: VersionRange { first: 2, last: 2 } });
+    assert!(delivered(&mut old, Time::ZERO, f, frame(7)).is_empty());
     assert_eq!(old.page(), &Page::OutOfDate);
     let mut other = Domain::new(&LIMITS, 7);
     let mut kept = List::with_capacity(1);

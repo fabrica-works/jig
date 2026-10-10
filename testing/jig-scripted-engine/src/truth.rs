@@ -26,7 +26,7 @@ pub struct Truth {
 pub enum Change {
     /// A jig request on an application requester's behalf; only application decisions may use this.
     Request(Box<Ask>),
-    /// Replace a party's authoritative frame, including roles, versions and retention.
+    /// Replace a party's authoritative frame, including roles and retention.
     Frame(Frame),
     /// Confirm a numbered sign-in for a party.
     SignIn { sign_in: u64, party: u64 },
@@ -213,11 +213,26 @@ impl Rule {
     }
 }
 /// The starting truth, payload limits and request outcomes for a scenario.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Script {
+    /// Jig owner range stated by the scripted protocol stream hello.
+    pub versions: jig_client::contract::VersionRange,
     pub truth: Truth,
     pub bounds: Bounds,
     pub rules: Vec<Rule>,
+}
+impl Default for Script {
+    fn default() -> Self {
+        Self {
+            versions: jig_client::contract::VersionRange {
+                first: jig_client::contract::CLIENT_VERSION,
+                last: jig_client::contract::CLIENT_VERSION,
+            },
+            truth: Truth::default(),
+            bounds: Bounds::default(),
+            rules: Vec::new(),
+        }
+    }
 }
 impl Script {
     pub(crate) fn validate(&self) -> core::result::Result<(), Invalid> {

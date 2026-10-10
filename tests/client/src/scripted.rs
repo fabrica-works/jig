@@ -64,6 +64,7 @@ pub struct Scripted {
     pub engine: engine::Engine<Family>,
     ledger: Ledger<Token, ()>,
     parties: BTreeMap<ClientId, u64>,
+    hellos: std::collections::BTreeSet<ClientId>,
     routes: BTreeMap<Token, Route>,
     serial: u64,
     committed: usize,
@@ -88,6 +89,7 @@ impl Scripted {
             ledger: Ledger::new("scripted wire operation"),
             engine: engine::Engine::with_application(script, seed, family).expect("script keeps contract"),
             parties: BTreeMap::new(),
+            hellos: std::collections::BTreeSet::new(),
             routes: BTreeMap::new(),
             serial: 0,
             committed: 0,
@@ -187,6 +189,7 @@ impl Scripted {
 impl Front<Test> for Scripted {
     fn bind(&mut self, client: ClientId, party: u64) {
         self.parties.insert(client, party);
+        self.hellos.insert(client);
     }
     fn wire(&mut self, client: ClientId, now: Time, wall: Wall, request: Request) {
         let party = self.parties[&client];
@@ -281,98 +284,110 @@ impl Front<Test> for Scripted {
     }
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
         self.recover(now, wall);
-        self.engine
-            .poll(now)
+        let mut events: Vec<_> = std::mem::take(&mut self.hellos)
             .into_iter()
-            .filter_map(|up| {
-                let token = match &up {
-                    Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => *attempt,
-                    Up::Read { token, .. }
-                    | Up::ApplicationRead { token, .. }
-                    | Up::Watch { token, .. }
-                    | Up::Ended { token, .. } => *token,
-                    Up::App { watch, .. } => *watch,
-                };
-                let terminal = matches!(
-                    &up,
-                    Up::Answer { .. }
-                        | Up::Read { .. }
-                        | Up::ApplicationAnswer { .. }
-                        | Up::ApplicationRead { .. }
-                        | Up::Ended { .. }
-                );
-                if terminal {
-                    self.ledger.end(token);
-                }
-                let route = self.routes.get(&token).copied()?;
-                if terminal {
-                    self.routes.remove(&token);
-                }
-                let (client, local) = match route {
-                    Route::Jig(c, t) | Route::First(c, t) => (c, t),
-                };
-                let event = match up {
-                    Up::Answer { attempt: _, envelope: e, answer } => Event::Answer {
-                        attempt: local,
-                        envelope: envelope(e),
-                        answer: answer.map(domain::Answered::Jig),
-                    },
-                    Up::Read { token: _, terminal } => {
-                        Event::Jig(jig_client::Event::Read { read: local, result: terminal })
+            .map(|client| (client, Event::Jig(jig_client::Event::Hello { versions: self.engine.versions() })))
+            .collect();
+        events.extend(
+            self.engine
+                .poll(now)
+                .into_iter()
+                .filter_map(|up| {
+                    let token = match &up {
+                        Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => *attempt,
+                        Up::Read { token, .. }
+                        | Up::ApplicationRead { token, .. }
+                        | Up::Watch { token, .. }
+                        | Up::Ended { token, .. } => *token,
+                        Up::App { watch, .. } => *watch,
+                    };
+                    let terminal = matches!(
+                        &up,
+                        Up::Answer { .. }
+                            | Up::Read { .. }
+                            | Up::ApplicationAnswer { .. }
+                            | Up::ApplicationRead { .. }
+                            | Up::Ended { .. }
+                    );
+                    if terminal {
+                        self.ledger.end(token);
                     }
-                    Up::Watch { token: _, event } => match route {
-                        Route::Jig(_, _) => Event::Jig(jig_client::Event::Watch { watch: local, event }),
-                        Route::First(_, _) => Event::First(first::Event::Watch {
-                            watch: local,
-                            event: match event {
-                                WatchEvent::Opened => family::WatchEvent::Opened,
-                                WatchEvent::Alive => family::WatchEvent::Alive,
-                                WatchEvent::Delivered(_) => panic!("application watches carry application documents"),
-                            },
-                        }),
-                    },
-                    Up::ApplicationAnswer { attempt: _, envelope: e, answer } => Event::Answer {
-                        attempt: local,
-                        envelope: envelope(e),
-                        answer: answer
-                            .map(|a| domain::Answered::First(a.expect("test family fixture requires a typed outcome"))),
-                    },
-                    Up::ApplicationRead { token: _, terminal } => Event::First(first::Event::Read {
-                        read: local,
-                        result: match terminal {
-                            Ok(d) => family::ReadResult::Value(d),
-                            Err(ReadNone::Busy | ReadNone::Unreachable) => family::ReadResult::Busy,
-                            Err(ReadNone::SignedOut) => family::ReadResult::SignedOut,
-                            Err(ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone) => family::ReadResult::Unknown,
+                    let route = self.routes.get(&token).copied()?;
+                    if terminal {
+                        self.routes.remove(&token);
+                    }
+                    let (client, local) = match route {
+                        Route::Jig(c, t) | Route::First(c, t) => (c, t),
+                    };
+                    let event = match up {
+                        Up::Answer { attempt: _, envelope: e, answer } => Event::Answer {
+                            attempt: local,
+                            envelope: envelope(e),
+                            answer: answer.map(domain::Answered::Jig),
                         },
-                    }),
-                    Up::App { watch: _, document } => Event::First(first::Event::Watch {
-                        watch: local,
-                        event: family::WatchEvent::Delivered(document),
-                    }),
-                    Up::Ended { token: _, why } => match route {
-                        Route::Jig(_, _) => Event::Jig(jig_client::Event::Ended { watch: local, end: why }),
-                        Route::First(_, _) => Event::First(first::Event::Ended {
-                            watch: local,
-                            end: match why {
-                                WatchEnd::Closed => family::WatchEnd::Closed,
-                                WatchEnd::SignedOut => family::WatchEnd::SignedOut,
-                                WatchEnd::Dropped
-                                | WatchEnd::Unknown
-                                | WatchEnd::NotAllowed
-                                | WatchEnd::Busy
-                                | WatchEnd::SubjectEnded
-                                | WatchEnd::Stopping => family::WatchEnd::Dropped,
+                        Up::Read { token: _, terminal } => {
+                            Event::Jig(jig_client::Event::Read { read: local, result: terminal })
+                        }
+                        Up::Watch { token: _, event } => match route {
+                            Route::Jig(_, _) => Event::Jig(jig_client::Event::Watch { watch: local, event }),
+                            Route::First(_, _) => Event::First(first::Event::Watch {
+                                watch: local,
+                                event: match event {
+                                    WatchEvent::Opened => family::WatchEvent::Opened,
+                                    WatchEvent::Alive => family::WatchEvent::Alive,
+                                    WatchEvent::Delivered(_) => {
+                                        panic!("application watches carry application documents")
+                                    }
+                                },
+                            }),
+                        },
+                        Up::ApplicationAnswer { attempt: _, envelope: e, answer } => Event::Answer {
+                            attempt: local,
+                            envelope: envelope(e),
+                            answer: answer.map(|a| {
+                                domain::Answered::First(a.expect("test family fixture requires a typed outcome"))
+                            }),
+                        },
+                        Up::ApplicationRead { token: _, terminal } => Event::First(first::Event::Read {
+                            read: local,
+                            result: match terminal {
+                                Ok(d) => family::ReadResult::Value(d),
+                                Err(ReadNone::Busy | ReadNone::Unreachable) => family::ReadResult::Busy,
+                                Err(ReadNone::SignedOut) => family::ReadResult::SignedOut,
+                                Err(ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone) => {
+                                    family::ReadResult::Unknown
+                                }
                             },
                         }),
-                    },
-                };
-                Some((client, event))
-            })
-            .collect()
+                        Up::App { watch: _, document } => Event::First(first::Event::Watch {
+                            watch: local,
+                            event: family::WatchEvent::Delivered(document),
+                        }),
+                        Up::Ended { token: _, why } => match route {
+                            Route::Jig(_, _) => Event::Jig(jig_client::Event::Ended { watch: local, end: why }),
+                            Route::First(_, _) => Event::First(first::Event::Ended {
+                                watch: local,
+                                end: match why {
+                                    WatchEnd::Closed => family::WatchEnd::Closed,
+                                    WatchEnd::SignedOut => family::WatchEnd::SignedOut,
+                                    WatchEnd::Dropped
+                                    | WatchEnd::Unknown
+                                    | WatchEnd::NotAllowed
+                                    | WatchEnd::Busy
+                                    | WatchEnd::SubjectEnded
+                                    | WatchEnd::Stopping => family::WatchEnd::Dropped,
+                                },
+                            }),
+                        },
+                    };
+                    Some((client, event))
+                })
+                .collect::<Vec<_>>(),
+        );
+        events
     }
     fn next_due(&self) -> Option<Time> {
-        self.recovery.or_else(|| self.engine.next_due())
+        if self.hellos.is_empty() { self.recovery.or_else(|| self.engine.next_due()) } else { Some(Time::ZERO) }
     }
     fn observed(&mut self) -> Vec<Observed> {
         let mut seen = std::mem::take(&mut self.link);
@@ -439,12 +454,16 @@ impl Front<Test> for Scripted {
             FrontFault::SignedOut => {
                 engine::Fault::SignOut { sign_in: *self.parties.values().next().expect("client bound") }
             }
-            FrontFault::Versions => engine::Fault::Versions(VersionRange { first: 2, last: 2 }),
+            FrontFault::Versions => {
+                self.hellos.extend(self.parties.keys().copied());
+                engine::Fault::Versions(VersionRange { first: 2, last: 2 })
+            }
             FrontFault::ObjectGone => unreachable!("object disappearance handled above"),
         };
         self.engine.fault(now, fault);
     }
     fn reload(&mut self, client: ClientId, now: Time) {
+        self.hellos.insert(client);
         let tokens: Vec<_> = self
             .routes
             .iter()

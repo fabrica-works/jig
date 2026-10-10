@@ -104,6 +104,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
         .unwrap()
 }
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
+    drive(root, Event::Jig(jig_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
     let frame = Frame {
         party: Party {
             number: party,
@@ -113,7 +114,7 @@ fn confirm(root: &mut Domain, watch: Token, party: u64) {
         projects: List::with_capacity(0),
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
         updates: contract::Count { value: 0, limited: false },
-        versions: VersionRange { first: 1, last: 1 },
+
         retention: Duration::from_secs(1000),
         deployment_role: Some(1),
     };

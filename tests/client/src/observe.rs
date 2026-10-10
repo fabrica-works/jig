@@ -121,11 +121,7 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
     }
 }
 fn frame(frame: &Frame) -> Vec<Receipt> {
-    if frame.versions.first > 1 || frame.versions.last < 1 {
-        vec![Receipt::Parked]
-    } else {
-        vec![Receipt::Party { party: frame.party.number }]
-    }
+    vec![Receipt::Party { party: frame.party.number }]
 }
 fn family(doc: &family::Document) -> Receipt {
     let revision = match doc {
@@ -170,6 +166,13 @@ pub fn received(event: &Event) -> Vec<Receipt> {
 #[must_use]
 pub fn jig_received(event: &jig_client::Event) -> Vec<Receipt> {
     match event {
+        jig_client::Event::Hello { versions } => {
+            if versions.contains(jig_client::contract::CLIENT_VERSION) {
+                vec![]
+            } else {
+                vec![Receipt::Parked]
+            }
+        }
         jig_client::Event::Read { result: ReadResult::Value(value), .. } => read(value),
         jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => vec![task(value)],
         jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Frame(value)), .. } => frame(value),

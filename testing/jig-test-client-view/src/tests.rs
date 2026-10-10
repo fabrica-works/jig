@@ -99,6 +99,7 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
+    drive(&mut root, Event::Jig(jig_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
     drive(
         &mut root,
         Event::Jig(jig_client::Event::Watch {
@@ -108,7 +109,7 @@ fn ready() -> Domain {
                 projects: List::with_capacity(0),
                 needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
                 updates: Count { value: 0, limited: false },
-                versions: VersionRange { first: 1, last: 1 },
+
                 retention: Duration::from_secs(1000),
                 deployment_role: Some(1),
             }))),
@@ -500,6 +501,7 @@ fn outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     for scope in [PartScope::Project(3), PartScope::Project(4), PartScope::Deployment] {
         parts.push(Part::Outbox { connector: jig_test_client_domain::FIRST, scope, entry }).unwrap();
     }
+    drive(&mut root, Event::Jig(jig_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
     drive(
         &mut root,
         Event::Jig(jig_client::Event::Watch {

@@ -1,5 +1,5 @@
 //! Jig versions, independent of application versions; client/domain/contract.md, 8.
-//! Compatibility is decided on the first frame, before any page request leaves.
+//! Compatibility is supplied by the protocol stream hello before page requests leave.
 /// The inclusive range served by the engine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct VersionRange {

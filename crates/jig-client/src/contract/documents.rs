@@ -4,8 +4,7 @@
 //! the working set keeps only what its own configured limits admit.
 use super::{
     Actor, Amendment, Authority, Count, Decision, DocumentText, Ending, Executor, Holding, Lacking, NoteScope,
-    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Proposer, Refusal, Revision, Text, Turn, TurnName,
-    VersionRange, WakePolicy,
+    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Proposer, Refusal, Revision, Text, Turn, TurnName, WakePolicy,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
@@ -16,7 +15,6 @@ pub struct Frame {
     pub projects: List<ProjectRole>,
     pub needs: Needs,
     pub updates: Count,
-    pub versions: VersionRange,
     pub retention: Duration,
     pub deployment_role: Option<u16>,
 }

@@ -26,7 +26,7 @@ pub enum Fault {
     SignOut {
         sign_in: u64,
     },
-    /// Replace each frame's supported versions; the world chooses the mismatching range.
+    /// Replace the protocol's served range; the next stream hello supplies it.
     Versions(VersionRange),
 }
 impl<A: Application> Engine<A> {
@@ -105,16 +105,7 @@ impl<A: Application> Engine<A> {
             }
             Fault::Restart { offline } => self.restart(now, offline),
             Fault::SignOut { sign_in } => self.sign_out(now, sign_in),
-            Fault::Versions(range) => {
-                let frames: Vec<_> = self.truth.frames.values().cloned().collect();
-                let mut changes = Vec::new();
-                for mut frame in frames {
-                    frame.versions = range;
-                    self.truth.frames.insert(frame.party.number, frame.clone());
-                    changes.push(crate::Change::Frame(frame));
-                }
-                self.commit(now, Wall::EPOCH, None, None, None, None, changes);
-            }
+            Fault::Versions(range) => self.versions = range,
         }
     }
     fn restart(&mut self, now: Time, offline: Duration) {

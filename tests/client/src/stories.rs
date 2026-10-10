@@ -26,7 +26,7 @@ pub fn frame(party: u64) -> Frame {
         }]),
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
         updates: Count { value: 0, limited: false },
-        versions: VersionRange { first: 1, last: 1 },
+
         retention: Duration::from_secs(1000),
         deployment_role: Some(1),
     }
@@ -48,6 +48,7 @@ pub fn configured(settings: Settings) -> World<Test, Scripted> {
         settings,
         Scripted::new(
             Script {
+                versions: VersionRange { first: 1, last: 1 },
                 truth,
                 bounds: Bounds {
                     text: 32,

@@ -363,7 +363,7 @@ impl Payload for Decision {
 }
 fields!(TurnName { attempt, number });
 fields!(Count { value, limited });
-fields!(Frame { party, projects, needs, updates, versions, retention, deployment_role });
+fields!(Frame { party, projects, needs, updates, retention, deployment_role });
 fields!(Needs { questions, proposals, escalations, person_tasks });
 fields!(ProjectRole { project, name, roles, chats, goals, pool, chat_budget });
 fields!(Charter { number, name });
