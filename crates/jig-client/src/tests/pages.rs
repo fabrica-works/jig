@@ -1548,11 +1548,11 @@ fn goal_read_from_start_merges_live_watch_by_key() {
     assert_eq!(chip.phase, Phase::Running);
 }
 fn assert_only_inbox_read(requests: &[Request], expected: &Read) {
-    let mut count = 0;
+    let mut count = 0_u32;
     for request in requests {
         if let Request::Read { what: query @ Read::Inbox { .. }, .. } = request {
             assert_eq!(query, expected);
-            count += 1;
+            count = count.checked_add(1).expect("bounded request count");
         }
     }
     assert_eq!(count, 1, "only the selected group's exact query is emitted");

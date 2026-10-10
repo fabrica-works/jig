@@ -423,8 +423,8 @@ fn inbox_group_controls_decode_independent_windows() {
         }
     }
     assert_eq!(
-        acts,
-        vec![
+        acts.as_slice(),
+        &[
             jig_client::action::Act::More {
                 window: Token::new(jig_client::pages::conversations::INBOX_WINDOW),
                 end: jig_client::action::End::After

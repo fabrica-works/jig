@@ -743,6 +743,9 @@ fn scenario_all_read_shapes_and_reverse_activity() {
         assert!(matches!(up[0],Up::Read { token:id,.. } if id == token));
         assert!(engine.poll(Time::ZERO).is_empty());
     }
+    scenario_reply_identity();
+}
+fn scenario_reply_identity() {
     let mut setup = live_script();
     let line = ConversationLine {
         runtime: Runtime::Idle,
@@ -1197,16 +1200,13 @@ fn whole_specification_prices_parameter_and_input_capacity_and_refuses_partial_v
     assert!(!crate::payload::fits(&too_long, &bounds), "whole opaque bytes parameter is never clipped");
 }
 
-#[test]
-fn inbox_group_cursors_keep_exact_filters_and_whole_query_order() {
-    let mut setup = live_script();
-    setup.bounds.rows = 1;
-    let entry = |number, kind, at, goal| InboxEntry {
+fn cursor_inbox_entry(number: u64, kind: InboxGroup, at: u64, goal: Option<u64>) -> InboxEntry {
+    InboxEntry {
         object: match kind {
             InboxGroup::Questions => ObjectKey::Question { task: number, message: 1 },
             InboxGroup::Results => ObjectKey::Result(number),
             InboxGroup::PersonTasks => ObjectKey::PersonTask(number),
-            _ => unreachable!("fixture kinds"),
+            InboxGroup::Proposals | InboxGroup::Escalations | InboxGroup::Replies => unreachable!("fixture kinds"),
         },
         group: kind,
         project: 1,
@@ -1217,20 +1217,29 @@ fn inbox_group_cursors_keep_exact_filters_and_whole_query_order() {
         reply: None,
         position: number,
         at: Wall::from_nanos(at),
-    };
+    }
+}
+
+#[test]
+fn inbox_group_cursors_keep_exact_filters_and_whole_query_order() {
+    let mut setup = live_script();
+    setup.bounds.rows = 1;
     for (group, rows) in [
         (
             InboxReadGroup::Needs,
             vec![
-                entry(6, InboxGroup::PersonTasks, 1, Some(9)),
-                entry(8, InboxGroup::Questions, 3, Some(9)),
-                entry(7, InboxGroup::Questions, 2, Some(9)),
-                entry(5, InboxGroup::Questions, 0, Some(8)),
+                cursor_inbox_entry(6, InboxGroup::PersonTasks, 1, Some(9)),
+                cursor_inbox_entry(8, InboxGroup::Questions, 3, Some(9)),
+                cursor_inbox_entry(7, InboxGroup::Questions, 2, Some(9)),
+                cursor_inbox_entry(5, InboxGroup::Questions, 0, Some(8)),
             ],
         ),
         (
             InboxReadGroup::Updates,
-            vec![entry(10, InboxGroup::Results, 4, Some(9)), entry(11, InboxGroup::Results, 5, Some(9))],
+            vec![
+                cursor_inbox_entry(10, InboxGroup::Results, 4, Some(9)),
+                cursor_inbox_entry(11, InboxGroup::Results, 5, Some(9)),
+            ],
         ),
     ] {
         setup.truth.sources.push(Source {
