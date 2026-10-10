@@ -32,6 +32,20 @@ fn chip() -> Chip {
         }),
     }
 }
+fn owner_authority() -> OwnerAuthorityDocument {
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: 0,
+            grants: List::with_capacity(0),
+            delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 3, depth: 2 },
+            spend: 10,
+            deadline: None,
+            notes: 0,
+            note_resources: List::with_capacity(0),
+        },
+        cut: false,
+    }
+}
 fn authority() -> Authority {
     Authority {
         budget: 10,
@@ -717,7 +731,7 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
                 timers: false,
             },
             dependencies: list([9]),
-            authority: authority(),
+            authority: owner_authority(),
             budget: Budget { total: 10, own: 10, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
         }),
         impact: impact(),
@@ -774,7 +788,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         references: list([]),
         resources: list([]),
         budget: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) },
-        authority: authority(),
+        authority: owner_authority(),
         hold: Some(escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[]).hold),
         escalation: None,
         proposals: list([]),
@@ -1157,13 +1171,13 @@ fn escalation_row_scenario(
         assert_eq!(written, initial_writes);
         let change = input(&tree, b"New budget", b"25", bindings);
         drive(&mut d, Event::Act { act: change });
-        assert_eq!(d.confirmation().unwrap().choices.change.as_ref().unwrap().authority.as_ref().unwrap().budget, 25);
+        assert_eq!(d.confirmation().unwrap().choices.change.as_ref().unwrap().authority.as_ref().unwrap().spend, 25);
         let tree = dialog(&d, words, bindings);
         let change = input(&tree, b"New instructions", b"try another way", bindings);
         drive(&mut d, Event::Act { act: change });
         let open = d.confirmation().unwrap();
         assert_eq!(open.choices.change.as_ref().unwrap().instructions.as_ref().unwrap().bytes(), b"try another way");
-        assert_eq!(open.choices.change.as_ref().unwrap().authority.as_ref().unwrap().budget, 25);
+        assert_eq!(open.choices.change.as_ref().unwrap().authority.as_ref().unwrap().spend, 25);
         assert_eq!(open.revision, Some(Revision { value: 6 }));
         let tree = dialog(&d, words, bindings);
         let change = input(&tree, b"Address to role number in this project", b"7", bindings);

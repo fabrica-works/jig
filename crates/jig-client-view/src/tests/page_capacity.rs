@@ -31,6 +31,27 @@ fn full_chip(number: u64) -> Chip {
 fn parts() -> List<Part> {
     list([part(), Part::Panel { connector: 3, task: 8 }])
 }
+fn full_owner_authority() -> OwnerAuthorityDocument {
+    let pattern = full_pattern();
+    let grant = OwnerGrant { connector: 2, kind: u16::MAX, pattern: pattern.clone() };
+    let scope = OwnerResourceScope { connector: 2, pattern };
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: u64::MAX,
+            grants: list([grant.clone(), grant]),
+            delegation: OwnerDelegation {
+                kinds: list([OwnerAuthorityExecutor::Charter(u32::MAX), OwnerAuthorityExecutor::Role(u32::MAX)]),
+                tasks: u32::MAX,
+                depth: u32::MAX,
+            },
+            spend: u64::MAX,
+            deadline: Some(Wall::from_nanos(u64::MAX)),
+            notes: u8::MAX,
+            note_resources: list([scope.clone(), scope]),
+        },
+        cut: true,
+    }
+}
 fn authority() -> Authority {
     Authority {
         budget: u64::MAX,
@@ -152,7 +173,7 @@ fn task_pages(words: &Words) {
         doc.chip.executor = Executor::Agent { charter: 2 };
         doc.spec = specification(full());
         doc.instructions = Some(DocumentText { bytes: full(), cut: true });
-        doc.authority = authority();
+        doc.authority = full_owner_authority();
         doc.lineage_chips = list([full_chip(1), full_chip(2)]);
         doc.inputs = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
         doc.dependencies = doc.inputs.clone();

@@ -92,6 +92,20 @@ pub fn inbox() -> RootAddress {
     RootAddress::Jig(Address::Inbox { project: None })
 }
 
+fn owner_authority() -> OwnerAuthorityDocument {
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: 0,
+            grants: List::with_capacity(0),
+            delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 1 },
+            spend: 1,
+            deadline: None,
+            notes: 0,
+            note_resources: List::with_capacity(0),
+        },
+        cut: false,
+    }
+}
 fn authority() -> Authority {
     Authority {
         budget: 1,
@@ -183,7 +197,7 @@ pub fn task() -> Task {
         references: list([]),
         resources: list([]),
         budget: budget(),
-        authority: authority(),
+        authority: owner_authority(),
         hold: None,
         escalation: None,
         proposals: list([]),
@@ -292,7 +306,7 @@ pub fn chat_ready(seed: u64) -> World<Test, Scripted> {
 #[must_use]
 pub fn project() -> Project {
     let task = task();
-    let role = RolePolicy { number: 1, authority: task.authority.clone(), allotment: 10, decisions: list([1, 2]) };
+    let role = RolePolicy { number: 1, authority: authority(), allotment: 10, decisions: list([1, 2]) };
     let recurring = Recurring {
         chip: task.chip.clone(),
         key: 1,
@@ -314,7 +328,7 @@ pub fn project() -> Project {
         number: 1,
         name: text(&[b'p'; 32]),
         policy: Policy {
-            ceiling: task.authority,
+            ceiling: authority(),
             period: 3,
             spend: 20,
             roles: list([role.clone(), RolePolicy { number: 2, ..role }]),
@@ -389,7 +403,7 @@ pub fn proposal() -> Proposal {
         action: ProposalAction::Effect {
             part: Part::Effect { connector: jig_test_client_domain::FIRST, proposal: key },
         },
-        needs: task.authority,
+        needs: authority(),
         funding: task.budget,
         waiting: Recipient::Party(7),
         trail: list([]),

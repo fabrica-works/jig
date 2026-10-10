@@ -188,6 +188,20 @@ fn family_document(root: &mut Domain, proposal_count: u64) -> Vec<Request> {
         }),
     )
 }
+fn owner_authority() -> OwnerAuthorityDocument {
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: 0,
+            grants: List::with_capacity(0),
+            delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 1 },
+            spend: 1,
+            deadline: None,
+            notes: 0,
+            note_resources: List::with_capacity(0),
+        },
+        cut: false,
+    }
+}
 fn authority() -> Authority {
     Authority {
         budget: 1,
@@ -246,7 +260,7 @@ fn task() -> Task {
         cut: false,
         resources: list([]),
         budget: budget(),
-        authority: authority(),
+        authority: owner_authority(),
         hold: None,
         escalation: None,
         proposals: list([]),

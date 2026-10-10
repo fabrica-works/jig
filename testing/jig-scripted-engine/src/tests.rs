@@ -62,6 +62,20 @@ fn frame(number: u64) -> Frame {
         deployment_role: Some(HeldRole::Policy { role: 1 }),
     }
 }
+fn owner_authority() -> OwnerAuthorityDocument {
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: 0,
+            grants: List::with_capacity(0),
+            delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 10, depth: 10 },
+            spend: 100,
+            deadline: None,
+            notes: 0,
+            note_resources: List::with_capacity(0),
+        },
+        cut: false,
+    }
+}
 fn authority() -> Authority {
     Authority {
         budget: 100,
@@ -238,7 +252,7 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
                 timers: false,
             },
             dependencies: List::with_capacity(0),
-            authority: authority(),
+            authority: owner_authority(),
             budget: Budget { total: 100, own: 100, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
         }),
         impact: Impact {
@@ -356,7 +370,7 @@ fn task() -> Task {
         references: list(vec![]),
         resources: list(vec![]),
         budget: budget(),
-        authority: authority(),
+        authority: owner_authority(),
         hold: None,
         escalation: None,
         proposals: list(vec![]),
@@ -867,8 +881,8 @@ fn restart_faults_and_application_hooks_keep_one_durable_truth() {
     application::run();
 }
 
-fn overlong_resource_grant() -> Grant {
-    Grant {
+fn overlong_resource_grant() -> OwnerGrant {
+    OwnerGrant {
         connector: 1,
         kind: 1,
         pattern: OwnerPattern {
@@ -881,10 +895,10 @@ fn overlong_resource_grant() -> Grant {
 fn bounded_offer_payloads_and_predictions() {
     use jig_client::contract::Bounds as DraftBounds;
     closing_connector_payload_bounds();
-    let mut direct = authority();
-    direct.budget = 110;
+    let mut direct = owner_authority();
+    direct.authority.spend = 110;
     let mut ceiling = direct.clone();
-    ceiling.budget = 200;
+    ceiling.authority.spend = 200;
     let within = DraftBounds::Amend {
         budget_left: 10,
         grants: list(vec![]),
@@ -910,8 +924,8 @@ fn bounded_offer_payloads_and_predictions() {
         let mut row = task();
         row.acts = list(vec![Offered { act: ActKind::Amend, admission: offer.clone() }]);
         setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-        let mut after = authority();
-        after.budget = budget;
+        let mut after = owner_authority().whole().unwrap();
+        after.spend = budget;
         let ask = Ask::Amend {
             project: 1,
             task: 8,
@@ -951,20 +965,20 @@ fn bounded_offer_payloads_and_predictions() {
                 maximum_deadline: None,
             }
         } else {
-            let mut direct = authority();
-            let mut ceiling = authority();
+            let mut direct = owner_authority();
+            let mut ceiling = owner_authority();
             let mut grants = list(vec![]);
             if variant == 1 {
                 grants = List::with_capacity(33);
             }
             if variant == 2 {
-                direct.tools = List::with_capacity(33);
+                direct.authority.delegation.kinds = List::with_capacity(33);
             }
             if variant == 3 {
-                ceiling.grants = list(vec![overlong_resource_grant()]);
+                ceiling.authority.grants = list(vec![overlong_resource_grant()]);
             }
             if variant == 4 {
-                ceiling.note_scopes = List::with_capacity(33);
+                ceiling.authority.note_resources = List::with_capacity(33);
             }
             DraftBounds::Amend { budget_left: 1, grants, authority: Box::new(direct), ceiling: Box::new(ceiling) }
         };

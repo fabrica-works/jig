@@ -214,7 +214,7 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
         }
     }
 }
-fn budget(b: &mut Builder, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+fn budget(b: &mut Builder, doc: &Task, words: &Words, _bindings: &mut JigBindings) {
     super::work::budget(b, &doc.budget, words);
     if let Some(deadline) = doc.deadline {
         words.deadline(b, deadline);

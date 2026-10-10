@@ -13,6 +13,27 @@ fn full_text() -> Text {
 fn full_name() -> Text {
     text(&[b'n'; 128])
 }
+fn full_owner_authority() -> OwnerAuthorityDocument {
+    let pattern = full_pattern();
+    let grant = OwnerGrant { connector: 2, kind: u16::MAX, pattern: pattern.clone() };
+    let scope = OwnerResourceScope { connector: 2, pattern };
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: u64::MAX,
+            grants: list([grant.clone(), grant]),
+            delegation: OwnerDelegation {
+                kinds: list([OwnerAuthorityExecutor::Charter(u32::MAX), OwnerAuthorityExecutor::Role(u32::MAX)]),
+                tasks: u32::MAX,
+                depth: u32::MAX,
+            },
+            spend: u64::MAX,
+            deadline: Some(Wall::from_nanos(u64::MAX)),
+            notes: u8::MAX,
+            note_resources: list([scope.clone(), scope]),
+        },
+        cut: true,
+    }
+}
 fn full_authority() -> Authority {
     let mut value = authority();
     let grant = Grant { kind: 2, connector: 2, pattern: full_pattern() };
@@ -76,7 +97,7 @@ fn full_amendment() -> Amendment {
         instructions: Some(full_text()),
         wake: Some(full_wake()),
         dependencies: Some(list([9, 10])),
-        authority: Some(full_authority()),
+        authority: Some(full_owner_authority().authority),
     }
 }
 fn full_proposal(action: ProposalAction) -> Proposal {
@@ -255,7 +276,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     escalation_value.trail = full_trail();
     escalation_value.steering.spec = specification(full_text());
     escalation_value.steering.instructions = Some(DocumentText { bytes: full_text(), cut: true });
-    escalation_value.steering.authority = full_authority();
+    escalation_value.steering.authority = full_owner_authority();
     escalation_value.steering.wake = full_wake();
     escalation_value.steering.dependencies = list([9, 10]);
     let root = ObjectKey::Escalation(8);
@@ -303,7 +324,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     task.wake = full_wake();
     task.subscriptions = full_subscriptions();
 
-    task.authority = full_authority();
+    task.authority = full_owner_authority();
     task.dependencies = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
     task.delegates = list([
         LiveDelegate { chip: full_chip(9), takeover_budget: 10 },

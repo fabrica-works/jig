@@ -1,5 +1,5 @@
 use super::{
-    objects::{authority, chip, escalation, live, person, proposal, text},
+    objects::{chip, escalation, live, owner_authority, person, proposal, text},
     spine::{LIMITS, drive},
 };
 use crate::{
@@ -71,7 +71,7 @@ pub(super) fn task() -> Task {
         references: List::with_capacity(0),
         resources: List::with_capacity(0),
         budget: proposal().funding,
-        authority: authority(),
+        authority: owner_authority(),
         hold: Some(escalation().hold),
         escalation: None,
         proposals: List::with_capacity(0),
@@ -328,7 +328,7 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
     for act in [ActKind::Amend, ActKind::AmendRelease] {
         let (mut domain, _) = live();
         let mut row = task();
-        let grant = Grant {
+        let grant = OwnerGrant {
             connector: 1,
             kind: 2,
             pattern: OwnerPattern {
@@ -346,14 +346,14 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
                     grants: grants.clone(),
                     authority: Box::new({
                         let mut allowed = row.authority.clone();
-                        allowed.budget = 15;
-                        allowed.grants = grants.clone();
+                        allowed.authority.spend = 15;
+                        allowed.authority.grants = grants.clone();
                         allowed
                     }),
                     ceiling: Box::new({
                         let mut maximum = row.authority.clone();
-                        maximum.budget = 100;
-                        maximum.grants = grants;
+                        maximum.authority.spend = 100;
+                        maximum.authority.grants = grants;
                         maximum
                     }),
                 },
@@ -364,15 +364,15 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
         intend(&mut domain, id, act);
         assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Change));
         let mut draft = change();
-        let mut after = row.authority.clone();
-        after.budget = 15;
+        let mut after = row.authority.whole().unwrap();
+        after.spend = 15;
         after.grants = List::with_capacity(1);
         after.grants.push(grant).unwrap();
         draft.authority = Some(after);
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
         assert!(domain.confirmation().unwrap().missing.is_none());
         assert_eq!(domain.confirmation().unwrap().proposed, None);
-        draft.authority.as_mut().unwrap().budget = 16;
+        draft.authority.as_mut().unwrap().spend = 16;
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
         assert_eq!(domain.confirmation().unwrap().proposed, Some(Recipient::Party(9)));
         row.acts = offered(
@@ -384,8 +384,8 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
                     authority: Box::new(row.authority.clone()),
                     ceiling: Box::new({
                         let mut maximum = row.authority.clone();
-                        maximum.budget = 100;
-                        maximum.grants = draft.authority.as_ref().unwrap().grants.clone();
+                        maximum.authority.spend = 100;
+                        maximum.authority.grants = draft.authority.as_ref().unwrap().grants.clone();
                         maximum
                     }),
                 },
@@ -415,29 +415,38 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
 }
 
 fn bounded_amendment_dimensions() {
-    let before = authority();
-    let mut facts = before.clone();
-    facts.budget = 20;
-    facts.depth = 3;
-    facts.tasks = 5;
+    let before = owner_authority();
+    let mut facts = before.authority.clone();
+    facts.spend = 20;
+    facts.delegation.depth = 3;
+    facts.delegation.tasks = 5;
     facts.deadline = Some(Wall::from_nanos(100));
-    facts.tools = List::with_capacity(1);
-    facts.tools.push(7).unwrap();
-    facts.task_kinds = List::with_capacity(1);
-    facts.task_kinds.push(Executor::Party { party: 4 }).unwrap();
-    facts.note_scopes = List::with_capacity(1);
-    facts.note_scopes.push(NoteScope::Project(1)).unwrap();
+    facts.tools = 1 << 7;
+    facts.delegation.kinds = List::with_capacity(1);
+    facts.delegation.kinds.push(OwnerAuthorityExecutor::Role(4)).unwrap();
+    facts.notes = 1;
+    facts.note_resources = List::with_capacity(1);
+    facts
+        .note_resources
+        .push(OwnerResourceScope {
+            connector: 1,
+            pattern: OwnerPattern {
+                segments: List::with_capacity(0),
+                last: OwnerPatternEnd::Exact(Box::from(*b"listed")),
+            },
+        })
+        .unwrap();
     let mut maximum = facts.clone();
-    maximum.tasks = 6;
-    maximum.depth = 4;
-    maximum.budget = 100;
+    maximum.delegation.tasks = 6;
+    maximum.delegation.depth = 4;
+    maximum.spend = 100;
     maximum.deadline = None;
     let offer = Admission::Bounded {
         within: Bounds::Amend {
             budget_left: 10,
             grants: List::with_capacity(0),
-            authority: Box::new(facts.clone()),
-            ceiling: Box::new(maximum),
+            authority: Box::new(OwnerAuthorityDocument::complete(facts.clone())),
+            ceiling: Box::new(OwnerAuthorityDocument::complete(maximum)),
         },
         beyond: Beyond::Proposed { to: Recipient::Party(9) },
     };
@@ -447,13 +456,13 @@ fn bounded_amendment_dimensions() {
     for dimension in 0_u8..7 {
         let mut outside = facts.clone();
         match dimension {
-            0 => outside.budget = 21,
-            1 => outside.depth = 4,
-            2 => outside.tasks = 6,
+            0 => outside.spend = 21,
+            1 => outside.delegation.depth = 4,
+            2 => outside.delegation.tasks = 6,
             3 => outside.deadline = Some(Wall::from_nanos(101)),
-            4 => *outside.tools.get_mut(0).unwrap() = 8,
-            5 => *outside.task_kinds.get_mut(0).unwrap() = Executor::Party { party: 5 },
-            6 => *outside.note_scopes.get_mut(0).unwrap() = NoteScope::Project(2),
+            4 => outside.tools = 1 << 8,
+            5 => *outside.delegation.kinds.get_mut(0).unwrap() = OwnerAuthorityExecutor::Role(5),
+            6 => outside.note_resources.get_mut(0).unwrap().connector = 2,
             _ => unreachable!(),
         }
         draft.authority = Some(outside);
@@ -469,11 +478,11 @@ fn bounded_amendment_dimensions() {
     }
     // Current task facts may already be wider than the role; narrowing remains direct.
     let mut existing = facts;
-    existing.depth = 9;
+    existing.delegation.depth = 9;
     let mut narrower = existing.clone();
-    narrower.budget = 19;
+    narrower.spend = 19;
     draft.authority = Some(narrower);
-    assert_eq!(admission::amendment(&offer, &draft, &existing), Admission::Allowed);
+    assert_eq!(admission::amendment(&offer, &draft, &OwnerAuthorityDocument::complete(existing)), Admission::Allowed);
 }
 
 #[test]
@@ -485,9 +494,9 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
     roles.push(2).unwrap();
     let recipient = Recipient::Roles { project: 1, roles };
     let mut direct = row.authority.clone();
-    direct.budget = 15;
+    direct.authority.spend = 15;
     let mut ceiling = row.authority.clone();
-    ceiling.budget = 100;
+    ceiling.authority.spend = 100;
     row.acts = offered(
         ActKind::Amend,
         Admission::Bounded {
@@ -503,8 +512,8 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
     let id = install(&mut domain, Body::Task(Box::new(row.clone())));
     intend(&mut domain, id, ActKind::Amend);
     let mut draft = change();
-    let mut after = row.authority.clone();
-    after.budget = 16;
+    let mut after = row.authority.whole().unwrap();
+    after.spend = 16;
     draft.authority = Some(after);
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
     assert_eq!(domain.confirmation().unwrap().proposed, Some(recipient));

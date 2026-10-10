@@ -95,9 +95,9 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
             instructions: None,
             wake: None,
             dependencies: None,
-            authority: Some(row.authority.clone()),
+            authority: Some(row.authority.whole().unwrap()),
         };
-        expected.authority.as_mut().unwrap().budget = 25;
+        expected.authority.as_mut().unwrap().spend = 25;
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
         let tree = dialog(&domain, &words(), &mut bindings);
         baseline(&tree, source.as_ref());
@@ -125,8 +125,8 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         baseline(&tree, source.as_ref());
         assert!(domain.confirmation().unwrap().choices.change.is_none());
         drive(&mut domain, Event::Act { act: input(&tree, b"New budget", b"25", &mut bindings) });
-        let mut authority = row.steering.authority.clone();
-        authority.budget = 25;
+        let mut authority = row.steering.authority.whole().unwrap();
+        authority.spend = 25;
         let mut expected = Amendment {
             addressed: None,
             spec: None,

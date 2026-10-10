@@ -2038,10 +2038,11 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
     doc.resources = List::with_capacity(2);
     doc.resources.push(one.clone()).unwrap();
     doc.resources.push(two.clone()).unwrap();
-    doc.authority.grants = List::with_capacity(1);
+    doc.authority.authority.grants = List::with_capacity(1);
     doc.authority
+        .authority
         .grants
-        .push(Grant {
+        .push(OwnerGrant {
             connector: 2,
             kind: 9,
             pattern: OwnerPattern { segments: resource_path(b"a/b"), last: OwnerPatternEnd::Open(Box::from(*b"c")) },

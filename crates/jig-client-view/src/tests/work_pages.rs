@@ -220,10 +220,15 @@ pub(super) fn project_doc() -> Project {
         number: 4,
         name: text(b"Workshop"),
         policy: Policy {
-            ceiling: doc.authority.clone(),
+            ceiling: super::cards_objects::authority(),
             period: 3,
             spend: 20,
-            roles: list([RolePolicy { number: 1, authority: doc.authority, allotment: 10, decisions: list([2]) }]),
+            roles: list([RolePolicy {
+                number: 1,
+                authority: super::cards_objects::authority(),
+                allotment: 10,
+                decisions: list([2]),
+            }]),
             requirements: list([part()]),
             deciders: list([Decider { kind: 2, role: 1 }]),
         },

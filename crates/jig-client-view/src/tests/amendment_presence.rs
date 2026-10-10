@@ -35,9 +35,9 @@ fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_i
     row.spec.specification.inputs = list([u64::MAX]);
     let mut specification = row.spec.whole().unwrap();
     specification.words = text(b"replacement");
-    let mut budget = row.authority.clone();
-    budget.budget = 25;
-    let mut deadline = row.authority.clone();
+    let mut budget = row.authority.whole().unwrap();
+    budget.spend = 25;
+    let mut deadline = row.authority.whole().unwrap();
     deadline.deadline = crate::confirmation::amendment::deadline(b"2000-02-29 12:34");
     for (label, value, selected) in [
         (
@@ -165,8 +165,8 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
         let tree = dialog(&domain, &words, &mut bindings);
         drive(&mut domain, Event::Act { act: input(&tree, label, value, &mut bindings) });
     }
-    let mut authority = row.steering.authority;
-    authority.budget = 25;
+    let mut authority = row.steering.authority.whole().unwrap();
+    authority.spend = 25;
     authority.deadline = crate::confirmation::amendment::deadline(b"2000-02-29 12:34");
     let expected = Amendment { authority: Some(authority), instructions: Some(text(b"")), ..empty() };
     let open = domain.confirmation().unwrap();

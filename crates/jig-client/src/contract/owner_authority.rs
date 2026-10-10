@@ -63,6 +63,11 @@ pub struct OwnerAuthorityDocument {
     pub cut: bool,
 }
 impl OwnerAuthorityDocument {
+    /// Mark an explicitly complete supplied value.
+    #[must_use]
+    pub const fn complete(authority: OwnerAuthority) -> Self {
+        Self { authority, cut: false }
+    }
     /// A whole replacement exists only when this owner projection is complete.
     #[must_use]
     pub fn whole(&self) -> Option<OwnerAuthority> {

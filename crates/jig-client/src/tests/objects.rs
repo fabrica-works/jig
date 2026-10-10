@@ -62,6 +62,20 @@ pub(super) fn phase_details(phase: Phase) -> ChipPhase {
         },
     }
 }
+pub(super) fn owner_authority() -> OwnerAuthorityDocument {
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: 0,
+            grants: List::with_capacity(0),
+            delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 1 },
+            spend: 10,
+            deadline: None,
+            notes: 0,
+            note_resources: List::with_capacity(0),
+        },
+        cut: false,
+    }
+}
 pub(super) fn authority() -> Authority {
     Authority {
         budget: 10,
@@ -128,7 +142,7 @@ pub(super) fn escalation() -> Escalation {
                 timers: false,
             },
             dependencies: List::with_capacity(0),
-            authority: authority(),
+            authority: owner_authority(),
             budget: Budget { total: 100, own: 100, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
         }),
         impact: Impact {
