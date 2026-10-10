@@ -692,7 +692,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     checked_max_out(limits)?;
     let mut total = List::<Held>::worst_case(limits.parts)?.checked_mul(2)?.checked_add(
         u64::from(limits.parts).checked_mul(
-            List::<alloc::boxed::Box<[u8]>>::worst_case(limits.rows)?
+            List::<Box<[u8]>>::worst_case(limits.rows)?
                 .checked_add(u64::from(limits.rows).checked_mul(u64::from(limits.text))?)?,
         )?,
     )?;
