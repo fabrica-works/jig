@@ -25,7 +25,7 @@ fn phrase_limits() -> PhraseLimits {
     PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
-        holes: 3,
+        holes: 4,
         segments: 4096,
         text_bytes: 100_000,
         hole_bytes: 128,

@@ -258,7 +258,7 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
     let limits = PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
-        holes: 3,
+        holes: 4,
         segments: 5000,
         text_bytes: 200_000,
         hole_bytes: CLIENT.text,

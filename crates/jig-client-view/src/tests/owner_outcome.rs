@@ -365,7 +365,7 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
     let limits = PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
-        holes: 3,
+        holes: 4,
         segments: 5000,
         text_bytes: 200_000,
         hole_bytes: super::cards::CLIENT.text,

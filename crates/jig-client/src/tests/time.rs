@@ -58,11 +58,13 @@ fn start(domain: &mut Domain, limits: &Limits, kept: List<Record>) -> (Token, To
         Time::ZERO,
         Event::Start { address: Address::Inbox { project: None }, kept, offset: Offset { minutes: 0 } },
     ));
+    let mut source = frame(7);
+    source.party.login = DocumentText::complete(text(b"L"));
     let initial = drive(
         domain,
         limits,
         Time::ZERO,
-        Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
+        Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) },
     );
     let page = open_token(&initial);
     for request in &initial {
