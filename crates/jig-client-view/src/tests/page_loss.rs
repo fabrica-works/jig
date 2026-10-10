@@ -265,15 +265,15 @@ fn row_selected_words() -> crate::words::Words {
             }
         }
     }
-    let mut segments = 0;
-    let mut text_bytes = 0;
+    let mut segments = 0_u32;
+    let mut text_bytes = 0_u32;
     for language in [&first, &second] {
         for phrase in &language.phrases {
             for form in &phrase.forms {
                 for segment in &form.segments {
-                    segments += 1;
+                    segments = segments.checked_add(1).unwrap();
                     if let Segment::Text(bytes) = segment {
-                        text_bytes += u32::try_from(bytes.len()).unwrap();
+                        text_bytes = text_bytes.checked_add(u32::try_from(bytes.len()).unwrap()).unwrap();
                     }
                 }
             }
