@@ -12,6 +12,7 @@ use jig_client::{
 };
 pub mod goals;
 mod notes;
+mod recurring;
 mod tasks;
 /// Show the project document and its selected bounded section.
 pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
@@ -192,35 +193,8 @@ fn settings(
             );
         }
         ProjectSection::Recurring => {
-            for recurring in &doc.recurring {
-                crate::markdown::read(recurring.spec.bytes(), 2, b);
-                words.text(b, JigPhrase::Period, &[Hole::Number(recurring.period)]);
-                words.text(b, JigPhrase::Budget, &[Hole::Amount(recurring.budget)]);
-                words.text(b, JigPhrase::CurrentPeriod, &[Hole::Number(recurring.current_period)]);
-                if let Some(began) = recurring.began {
-                    b.open(Role::Time);
-                    words.text(b, JigPhrase::PeriodBegan, &[Hole::Wall(words.adjusted_wall(began))]);
-                    b.close();
-                }
-                match recurring.next {
-                    Some(next) => {
-                        b.open(Role::Time);
-                        words.text(b, JigPhrase::NextRun, &[Hole::Wall(words.adjusted_wall(next))]);
-                        b.close();
-                    }
-                    None => words.text(b, JigPhrase::NextPeriod, &[]),
-                }
-                for task in &recurring.last {
-                    crate::frame::control(
-                        b,
-                        words,
-                        bindings,
-                        Role::Link,
-                        JigPhrase::TaskPage,
-                        &[Hole::Number(*task)],
-                        Act::Go { address: Address::task(*task) },
-                    );
-                }
+            for row in &doc.recurring {
+                recurring::recurring(b, client, row, words, bindings);
             }
         }
         ProjectSection::Resources

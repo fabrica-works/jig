@@ -7,7 +7,7 @@
 use super::{
     cards::{CLIENT, document, drive, start, words},
     pages::deliver,
-    work_pages::{chip, list, part, project_doc},
+    work_pages::{chip, list, part, project_doc, recurring_task},
 };
 use crate::{Builder, JigBindings, Owner, Role, SlotRef, Tree, words::Words};
 use jig_client::{
@@ -209,16 +209,20 @@ fn project_pages(words: &Words) {
             Party { number: 2, kind: PartyKind::Service, name: full() },
         ]);
         let recurring = Recurring {
-            number: 1,
-            spec: full(),
-            period: u64::MAX,
+            chip: full_chip(7),
+            key: u32::MAX,
+            batch: list([recurring_task(1, full().bytes()), recurring_task(2, full().bytes())]),
             budget: u64::MAX,
-            last: list([8, 9]),
+            overlap: RecurringOverlap::Wait,
+            last_period: u64::MAX,
+            pending_period: Some(u64::MAX),
+            last_batch: list([8, 9]),
+            cut: true,
             current_period: u64::MAX,
             began: Some(Wall::from_nanos(u64::MAX)),
             next: Some(Wall::from_nanos(u64::MAX)),
         };
-        doc.recurring = list([recurring.clone(), Recurring { number: 2, ..recurring }]);
+        doc.recurring = list([recurring.clone(), Recurring { key: 2, ..recurring }]);
         doc.pools = list([*doc.pools.get(0).unwrap(), *doc.pools.get(0).unwrap()]);
         doc.spend_lines = list([
             TaskSpend { chip: full_chip(8), spent: u64::MAX },

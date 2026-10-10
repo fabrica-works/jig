@@ -4,6 +4,7 @@ use crate::Decision as ApplicationDecision;
 use jig_client::contract::Decision;
 use jig_client::contract::*;
 use skein_lib::List;
+mod recurring;
 fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), 4096).expect("fixture text fits")
 }
@@ -934,23 +935,33 @@ fn closing_connector_payload_bounds() {
 fn recurring_optional_boundaries_keep_whole_value_and_allocated_list_limits() {
     let mut bounds = Bounds { rows: 2, ..Bounds::default() };
     for next in [None, Some(Wall::from_nanos(u64::MAX))] {
+        let mut chip = task().chip;
+        chip.title = text(b"job");
+        chip.details = Box::new(ChipPhase::Starting);
         let mut row = Recurring {
-            number: 1,
-            spec: text(b"job"),
-            period: 9,
+            chip,
+            key: u32::MAX,
+            batch: list(vec![]),
             budget: 20,
-            last: list(vec![7, 8]),
+            overlap: RecurringOverlap::Wait,
+            last_period: 8,
+            pending_period: Some(9),
+            last_batch: list(vec![7, 8]),
+            cut: true,
             current_period: 9,
             began: Some(Wall::from_nanos(1)),
             next,
         };
-        let bytes = u64::try_from(core::mem::size_of::<Recurring>()).unwrap() + List::<u64>::worst_case(2).unwrap() + 3;
+        let bytes = u64::try_from(core::mem::size_of::<Recurring>()).unwrap()
+            + u64::try_from(core::mem::size_of::<ChipPhase>()).unwrap()
+            + List::<u64>::worst_case(2).unwrap()
+            + 3;
         bounds.document_bytes = bytes;
         assert!(crate::payload::fits(&row, &bounds));
         bounds.document_bytes = bytes.checked_sub(1).unwrap();
         assert!(!crate::payload::fits(&row, &bounds));
         bounds.document_bytes = u64::MAX;
-        row.last = List::with_capacity(3);
+        row.last_batch = List::with_capacity(3);
         assert!(!crate::payload::fits(&row, &bounds));
     }
 }

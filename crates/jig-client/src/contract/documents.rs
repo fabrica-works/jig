@@ -699,20 +699,24 @@ pub struct Pool {
     pub budget: Budget,
 }
 
-/// A recurring template and its next occurrence.
+/// Whole recurring template and retained period facts (pages.md, section 6).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Recurring {
-    pub number: u64,
-    pub spec: Text,
-    pub period: u64,
+    pub chip: Chip,
+    pub key: u32,
+    pub batch: List<ProposedTask>,
     pub budget: u64,
-    pub last: List<u64>,
+    pub overlap: super::RecurringOverlap,
     /// The current period supplied by the engine's funding owner.
     pub current_period: u64,
     /// When its retained ledger opened, if that ledger exists.
     pub began: Option<Wall>,
     /// The period source's next boundary, when supplied.
     pub next: Option<Wall>,
+    pub last_period: u64,
+    pub pending_period: Option<u64>,
+    pub last_batch: List<u64>,
+    pub cut: bool,
 }
 
 /// A note with its independently moving revision.

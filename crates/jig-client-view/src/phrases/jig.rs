@@ -693,6 +693,12 @@ pub enum JigPhrase {
     Spend,
     /// Recurring tasks.
     Recurring,
+    RecurringKey,
+    RecurringSkip,
+    RecurringWait,
+    RecurringLastPeriod,
+    RecurringPendingPeriod,
+    RecurringCut,
     /// A supplied next run wall time.
     NextRun,
     /// The source has not supplied the next period wall time.
@@ -1555,6 +1561,12 @@ impl JigPhrase {
             Self::FailureRun => 505,
             Self::FailureAgent => 506,
             Self::FailureInvalid => 507,
+            Self::RecurringKey => 800,
+            Self::RecurringSkip => 801,
+            Self::RecurringWait => 802,
+            Self::RecurringLastPeriod => 803,
+            Self::RecurringPendingPeriod => 804,
+            Self::RecurringCut => 805,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -1677,6 +1689,9 @@ impl JigPhrase {
             | Self::Spend
             | Self::Recurring
             | Self::NextPeriod
+            | Self::RecurringSkip
+            | Self::RecurringWait
+            | Self::RecurringCut
             | Self::Settings
             | Self::Goals
             | Self::Tasks
@@ -1982,6 +1997,9 @@ impl JigPhrase {
             | Self::BatchMade
             | Self::Period
             | Self::CurrentPeriod
+            | Self::RecurringKey
+            | Self::RecurringLastPeriod
+            | Self::RecurringPendingPeriod
             | Self::WaitingRoles
             | Self::HoldRevision
             | Self::RoleNumber
@@ -2152,7 +2170,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 551] = [
+pub const ALL: [JigPhrase; 557] = [
     JigPhrase::RunIdle,
     JigPhrase::RunDue,
     JigPhrase::RunPreparing,
@@ -2704,6 +2722,12 @@ pub const ALL: [JigPhrase; 551] = [
     JigPhrase::FailureRun,
     JigPhrase::FailureAgent,
     JigPhrase::FailureInvalid,
+    JigPhrase::RecurringKey,
+    JigPhrase::RecurringSkip,
+    JigPhrase::RecurringWait,
+    JigPhrase::RecurringLastPeriod,
+    JigPhrase::RecurringPendingPeriod,
+    JigPhrase::RecurringCut,
 ];
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]

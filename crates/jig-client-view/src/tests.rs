@@ -12,6 +12,7 @@ mod cards_access;
 
 mod pages;
 
+mod recurring;
 mod work_pages;
 
 mod turns;

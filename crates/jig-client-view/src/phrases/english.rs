@@ -132,6 +132,27 @@ pub fn language() -> Language {
             JigPhrase::FailureAgent => Box::new([Segment::Text(copy_of(b"Agent failed"))]),
             JigPhrase::FailureInvalid => Box::new([Segment::Text(copy_of(b"Result broke its contract"))]),
 
+            JigPhrase::RecurringSkip => {
+                Box::new([Segment::Text(copy_of(b"If the preceding batch is still live, skip this period"))])
+            }
+            JigPhrase::RecurringWait => {
+                Box::new([Segment::Text(copy_of(b"If the preceding batch is still live, wait for it to end"))])
+            }
+            JigPhrase::RecurringCut => {
+                Box::new([Segment::Text(copy_of(b"Some recurring template facts were omitted"))])
+            }
+            JigPhrase::RecurringKey => Box::new([
+                Segment::Text(copy_of(b"Recurring template ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::RecurringLastPeriod => Box::new([
+                Segment::Text(copy_of(b"Last batch period ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::RecurringPendingPeriod => Box::new([
+                Segment::Text(copy_of(b"Pending batch period ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::PanelPart => Box::new([Segment::Text(copy_of(b"Task panel"))]),
             JigPhrase::ResultPart => Box::new([Segment::Text(copy_of(b"Connector result"))]),
             JigPhrase::HoldPart => Box::new([Segment::Text(copy_of(b"Connector hold"))]),

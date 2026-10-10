@@ -116,7 +116,14 @@ fn settings(l: &Limits) -> Option<u32> {
         .checked_mul(l.rows)?
         .checked_add(authority(l)?)?
         .checked_add(l.rows.checked_mul(2)?)?;
-    let recurring = markdown(l)?.checked_add(l.rows.checked_mul(2)?)?.checked_add(8)?.checked_mul(l.rows)?;
+    // Each recurring line carries a chip, a whole template batch, its retained
+    // last batch's links and only the period boundaries the source supplied.
+    let recurring = super::proposed_task_nodes(l)?
+        .checked_mul(l.rows)?
+        .checked_add(chip_nodes(l)?)?
+        .checked_add(l.rows.checked_mul(2)?)?
+        .checked_add(18)?
+        .checked_mul(l.rows)?;
     policy.checked_add(spend(l)?)?.checked_add(recurring)?.checked_add(l.rows.checked_mul(24)?)?.checked_add(32)
 }
 /// Project board, filtered windows and every settings subregion together.

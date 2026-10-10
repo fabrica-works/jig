@@ -171,6 +171,17 @@ fn plan_folds(words: &Words) {
     drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
     assert!(d.task_page().plan.nodes.is_empty());
 }
+pub(super) fn recurring_task(local: u16, words: &[u8]) -> ProposedTask {
+    ProposedTask {
+        local,
+        spec: text(words),
+        executor: Executor::Agent { charter: 2 },
+        budget: 5,
+        deadline: None,
+        dependencies: list([]),
+        grants: list([]),
+    }
+}
 pub(super) fn project_doc() -> Project {
     let doc = super::cards_objects::task_doc(&[]);
     Project {
@@ -192,11 +203,15 @@ pub(super) fn project_doc() -> Project {
         resources: list([part()]),
         services: list([Party { number: 2, kind: PartyKind::Service, name: text(b"Notifier") }]),
         recurring: list([Recurring {
-            number: 1,
-            spec: text(b"Daily work"),
-            period: 3,
+            chip: chip(7),
+            key: 1,
+            batch: list([recurring_task(1, b"Daily work"), recurring_task(2, b"Then follow up")]),
             budget: 10,
-            last: list([8]),
+            overlap: RecurringOverlap::Wait,
+            last_period: 3,
+            pending_period: Some(4),
+            last_batch: list([8, 10]),
+            cut: false,
             current_period: 3,
             began: Some(Wall::EPOCH),
             next: Some(Wall::EPOCH),
@@ -533,7 +548,7 @@ fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Word
             drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
             let (tree, _) = build(&d, 3, words);
             assert!(contains(&tree, b"Daily work"));
-            assert!(contains(&tree, b"Period 3"));
+            assert!(contains(&tree, b"Last batch period 3"));
             assert!(contains(&tree, b"Current period 9"));
             assert_eq!(contains(&tree, b"Period began at 01:30"), began.is_some());
             assert_eq!(contains(&tree, b"Runs at the next period"), next.is_none());
