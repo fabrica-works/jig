@@ -138,7 +138,7 @@ fn ledger_keeps_distinct_parent_periods_full_source_widths_and_explicit_optional
 }
 #[test]
 fn budget_and_shared_funder_sayings_borrow_selected_normal_words_and_person_offset() {
-    let mut translated = data::standalone_language();
+    let mut translated = crate::phrases::english::language();
     translated.wall = WallFormat::Clock;
     for phrase in &mut translated.phrases {
         for form in &mut phrase.forms {
@@ -150,17 +150,39 @@ fn budget_and_shared_funder_sayings_borrow_selected_normal_words_and_person_offs
             }
         }
     }
-    let words = OwnerBudgetWords::load(Box::new([data::standalone_language(), translated]), &phrase_limits(), 1, -1)
-        .expect("selected data checked whole");
-    let tree = budget_tree(&budget(), words.words());
+    let limits = PhraseLimits {
+        languages: 2,
+        phrases: crate::owner_words::phrase_count(),
+        holes: 4,
+        segments: 4000,
+        text_bytes: 40000,
+        hole_bytes: 256,
+    };
+    let book = Phrasebook::load(
+        crate::phrases::jig::shapes(256),
+        Box::new([crate::phrases::english::language(), translated]),
+        &limits,
+    )
+    .expect("normal composed vocabulary checks both supplied languages whole");
+    let words = Words { book, language: 1, offset_minutes: -1 };
+    let tree = budget_tree(&budget(), &words);
     assert!(has(&tree, b"selected 17"));
     assert!(has(&tree, b"selected 00:01"));
     assert!(contains(&tree, b"selected 18446744073709551615"));
     assert!(!contains(&tree, b"Budget:"));
     assert!(!contains(&tree, b"Funded by"));
+    let tree = ledger_tree(&ledger(), &words);
+    assert!(has(&tree, b"selected 17"));
+    assert!(has(&tree, b"selected 00:01"));
+    assert!(has(&tree, b"selected 00:02"));
+    assert!(!contains(&tree, b"Ledger source"));
+    assert!(
+        crate::owner_words::phrase_bytes(&words.book).expect("whole normal saying envelope")
+            >= view::ledger_worst_case(&words).expect("whole ledger envelope").text_per_node
+    );
     let mut value = budget();
     value.deadline = Some(Wall::EPOCH);
-    assert!(has(&budget_tree(&value, words.words()), b"selected 00:00"));
+    assert!(has(&budget_tree(&value, &words), b"selected 00:00"));
 }
 #[test]
 fn budget_words_check_the_whole_closed_language_holes_selection_and_offset_before_retaining_it() {
