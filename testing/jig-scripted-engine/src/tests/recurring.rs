@@ -135,7 +135,7 @@ fn recurring_checks_allocated_batch_last_batch_and_nested_member_capacities() {
     };
     assert!(!fits(&row, &bounds), "the final member's opaque approval bytes are admitted whole");
     let mut row = recurring();
-    row.chip.details = Box::new(ChipPhase::Waiting { dependencies: skein_lib::List::with_capacity(3), hold: None });
+    *row.chip.details = ChipPhase::Waiting { dependencies: skein_lib::List::with_capacity(3), hold: None };
     assert!(!fits(&row, &bounds));
     let mut row = recurring();
     row.batch.get_mut(1).unwrap().spec.specification.words.bytes =

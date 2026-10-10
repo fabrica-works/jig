@@ -96,30 +96,26 @@ impl ProposedPhrase {
     #[must_use]
     pub fn shape(self) -> PhraseShape {
         let count = match self {
-            Self::ExecutorCharter => 1,
-            Self::ExecutorProcedure => 2,
-            Self::ExecutorParty => 1,
-            Self::ExecutorRole => 1,
-            Self::FunderTask => 1,
-            Self::FunderPool => 3,
-            Self::FunderRecurring => 3,
-            Self::FunderPeriod => 2,
-            Self::ContractReport => 1,
-            Self::ContractApproval => 0,
-            Self::ContractVerdict => 0,
-            Self::ContractChange => 3,
-            Self::VerdictChoice => 3,
-            Self::FieldCap => 1,
-            Self::ContractCut => 0,
-            Self::TaskCut => 0,
-            Self::PartConnector => 1,
-            Self::PartNumber => 1,
-            Self::PartResource => 0,
-            Self::PartPool => 0,
-            Self::PartResult => 0,
-            Self::PartProcedure => 0,
-            Self::PartEffect => 0,
-            Self::PartOutbox => 0,
+            Self::ExecutorCharter
+            | Self::ExecutorParty
+            | Self::ExecutorRole
+            | Self::FunderTask
+            | Self::ContractReport
+            | Self::FieldCap
+            | Self::PartConnector
+            | Self::PartNumber => 1,
+            Self::ExecutorProcedure | Self::FunderPeriod => 2,
+            Self::FunderPool | Self::FunderRecurring | Self::ContractChange | Self::VerdictChoice => 3,
+            Self::ContractApproval
+            | Self::ContractVerdict
+            | Self::ContractCut
+            | Self::TaskCut
+            | Self::PartResource
+            | Self::PartPool
+            | Self::PartResult
+            | Self::PartProcedure
+            | Self::PartEffect
+            | Self::PartOutbox => 0,
         };
         let mut holes = List::with_capacity(count);
         for _ in 0..count {

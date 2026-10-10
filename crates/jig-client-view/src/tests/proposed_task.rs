@@ -1,6 +1,7 @@
 #![expect(
     clippy::disallowed_methods,
     clippy::disallowed_types,
+    clippy::disallowed_macros,
     reason = "ordinary fixtures inspect public semantic trees"
 )]
 use super::{
@@ -219,13 +220,13 @@ fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
     for offset in [i32::MAX, i32::MIN] {
         words.offset_minutes = offset;
         for instant in [skein_lib::Wall::EPOCH, skein_lib::Wall::from_nanos(u64::MAX)] {
-            let expected = if offset > 0 { u64::MAX } else { 0 };
+            let expected = if offset > 0_i32 { u64::MAX } else { 0 };
             assert_eq!(words.adjusted_wall(instant).as_nanos(), expected);
         }
     }
-    words.offset_minutes = 60;
+    words.offset_minutes = 60_i32;
     assert_eq!(words.adjusted_wall(skein_lib::Wall::EPOCH).as_nanos(), 3_600_000_000_000);
-    words.offset_minutes = -60;
+    words.offset_minutes = -60_i32;
     assert_eq!(words.adjusted_wall(skein_lib::Wall::from_nanos(7_200_000_000_000)).as_nanos(), 3_600_000_000_000);
 }
 
@@ -270,7 +271,7 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
         .filter(|phrase| phrase.id != crate::owner_wake_words::WakePhrase::Policy.id())
         .collect::<Vec<_>>()
         .into_boxed_slice();
-    assert!(Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), incomplete]), &limits).is_err());
+    Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), incomplete]), &limits).unwrap_err();
     let words = crate::words::Words {
         book: Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), selected]), &limits).unwrap(),
         language: 1,

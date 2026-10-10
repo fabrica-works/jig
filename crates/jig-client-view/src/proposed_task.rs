@@ -17,7 +17,7 @@ pub fn text(b: &mut Builder, words: &Words, phrase: ProposedPhrase, holes: &[Hol
 pub fn executor(b: &mut Builder, value: OwnerExecutor, words: &Words) {
     match value {
         OwnerExecutor::Agent { charter } => {
-            text(b, words, ProposedPhrase::ExecutorCharter, &[Hole::Number(u64::from(charter))])
+            text(b, words, ProposedPhrase::ExecutorCharter, &[Hole::Number(u64::from(charter))]);
         }
         OwnerExecutor::Procedure { connector, code } => text(
             b,
@@ -47,7 +47,7 @@ pub fn funder(b: &mut Builder, value: Funder, words: &Words) {
             &[Hole::Number(u64::from(project)), Hole::Number(task), Hole::Number(period)],
         ),
         Funder::Period { project, period } => {
-            text(b, words, ProposedPhrase::FunderPeriod, &[Hole::Number(u64::from(project)), Hole::Number(period)])
+            text(b, words, ProposedPhrase::FunderPeriod, &[Hole::Number(u64::from(project)), Hole::Number(period)]);
         }
     }
 }
@@ -107,7 +107,7 @@ pub fn contract(b: &mut Builder, value: &TaskContractDocument, words: &Words, bi
             part(b, reference, words, bindings);
         }
         TaskContractDocument::Report { words: cap } => {
-            text(b, words, ProposedPhrase::ContractReport, &[Hole::Number(u64::from(*cap))])
+            text(b, words, ProposedPhrase::ContractReport, &[Hole::Number(u64::from(*cap))]);
         }
         TaskContractDocument::Verdict { choices, cut } => {
             text(b, words, ProposedPhrase::ContractVerdict, &[]);

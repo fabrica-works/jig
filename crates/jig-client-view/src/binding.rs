@@ -109,8 +109,8 @@ impl JigBindings {
             if entry.token == token {
                 match &entry.meaning {
                     JigMeaning::Part(part) => return Some(part),
-                    JigMeaning::OwnerPart(_) => return None,
-                    JigMeaning::Action(_)
+                    JigMeaning::OwnerPart(_)
+                    | JigMeaning::Action(_)
                     | JigMeaning::Field(_)
                     | JigMeaning::TaskNumber
                     | JigMeaning::Priority

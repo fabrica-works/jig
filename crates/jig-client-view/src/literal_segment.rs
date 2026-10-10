@@ -1,4 +1,8 @@
 //! Resource name segments are display bytes, never joined or parsed (authority.md, 4).
+#![expect(
+    clippy::disallowed_methods,
+    reason = "Q39 permits UTF-8 classification for display only; supplied literal bytes remain opaque"
+)]
 use crate::{Builder, Run};
 use skein_lib::List;
 
@@ -25,7 +29,12 @@ pub fn render(b: &mut Builder, bytes: &[u8]) {
     let mut display = List::with_capacity(capacity);
     let digits = b"0123456789ABCDEF";
     for byte in bytes {
-        for escaped in [b'\\', b'x', digits[usize::from(byte / 16)], digits[usize::from(byte % 16)]] {
+        for escaped in [
+            b'\\',
+            b'x',
+            *digits.get(usize::from(byte / 16)).expect("high nibble is below sixteen"),
+            *digits.get(usize::from(byte % 16)).expect("low nibble is below sixteen"),
+        ] {
             display.push(escaped).expect("four bytes per input byte fit");
         }
     }

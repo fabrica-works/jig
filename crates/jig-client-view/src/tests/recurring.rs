@@ -1,6 +1,5 @@
 #![expect(
     clippy::disallowed_methods,
-    clippy::disallowed_types,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary tests drive public entries and inspect the semantic tree"
 )]
