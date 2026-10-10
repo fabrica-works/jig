@@ -1191,7 +1191,7 @@ fn verdict_documents_price_whole_machine_field_arrays_and_bytes() {
 }
 
 #[test]
-fn owner_verdict_payload_prices_reserved_field_rows_without_legacy_chip_or_proposal_arrays() {
+fn owner_verdict_payload_prices_reserved_field_rows_and_only_supplied_payload() {
     let mut fields = List::with_capacity(2);
     fields.push(ResultField { name: b"state".as_slice().into(), value: Box::new([0, 255]) }).unwrap();
     let value =
