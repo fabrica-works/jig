@@ -1,4 +1,5 @@
 use super::*;
+use jig_client::contract::*;
 use skein_lib::{Duration, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 8).unwrap(), cut }

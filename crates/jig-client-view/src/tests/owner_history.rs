@@ -461,9 +461,9 @@ fn owner_history_all_states_holders_policy_kinds_raw_proposer_and_pending_clock_
     ] {
         holders.push(OwnerHistoryHolder::Policy { project: u32::MAX, kind }).unwrap();
     }
-    for holder in holders {
+    for holder in &holders {
         for as_holder in [false, true] {
-            let state = OwnerProposalHistoryState::Pending { holder, since: Wall::from_nanos(u64::MAX) };
+            let state = OwnerProposalHistoryState::Pending { holder: *holder, since: Wall::from_nanos(u64::MAX) };
             let value = OwnerHistoryLine {
                 proposal: Some(OwnerProposalHistory {
                     state,
