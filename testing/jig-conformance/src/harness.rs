@@ -141,11 +141,11 @@ pub enum Cut {
     Random { seed: u64 },
 }
 
+type CommitHook<A> = Box<dyn FnMut(&Harness<A>)>;
+
 /// The application engine, its independent peers, and durable store.
 /// The heap meter begins before engine construction; counting the test peers
 /// too is a conservative engine bound. Configuration ownership is added back.
-type CommitHook<A> = Box<dyn FnMut(&Harness<A>)>;
-
 pub struct Harness<A: Application> {
     pub domain: A::Domain,
     pub systems: A::Systems,
