@@ -84,7 +84,7 @@ fn populated() -> Domain {
         &mut domain,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(cards::document()))) },
     );
-    let read = history_read(&opened);
+    let _original_read = history_read(&opened);
     let task_watch = opened
         .iter()
         .find_map(|request| {
@@ -101,6 +101,8 @@ fn populated() -> Domain {
         &mut domain,
         Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) },
     );
+    let read =
+        history_read(&drive(&mut domain, Event::Act { act: jig_client::action::Act::HistoryScope { subtree: true } }));
     drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::History(Box::new(history_page()))) });
     domain
 }
@@ -127,6 +129,12 @@ fn whole_history_page_keeps_three_distinct_keys_stored_overrides_and_raw_slots_i
         for kind in [21, 41, 42] {
             let key = Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX };
             assert_eq!(tree.nodes().iter().filter(|node| node.key == Some(key)).count(), 1);
+            if kind != 21 {
+                let index = tree.nodes().iter().position(|node| node.key == Some(key)).unwrap();
+                let region = &tree.nodes()[index + 1];
+                assert_eq!(region.role, Role::Region);
+                assert!(region.name.as_ref().is_some_and(|name| !name.is_empty()));
+            }
         }
         let slots: Vec<_> = tree.nodes().iter().filter_map(|node| node.slot).collect();
         assert_eq!(slots.len(), 7);

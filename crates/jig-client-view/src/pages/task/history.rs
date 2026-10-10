@@ -27,13 +27,13 @@ pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings:
             HistoryRow::Legacy(row) => legacy(b, row, words, bindings),
             HistoryRow::Change(row) => {
                 b.key(crate::Key { owner: crate::Owner::Jig, kind: 41, a: row.task, b: row.revision });
-                task_link(b, row.task, words, bindings);
                 crate::owner_history::render(b, row, words, bindings);
+                task_link(b, row.task, words, bindings);
             }
             HistoryRow::Milestone(row) => {
                 b.key(crate::Key { owner: crate::Owner::Jig, kind: 42, a: row.task, b: row.position });
-                task_link(b, row.task, words, bindings);
                 crate::owner_milestone::render(b, row, client, words, bindings);
+                task_link(b, row.task, words, bindings);
             }
         }
         b.close();
