@@ -62,12 +62,8 @@ fn finish(
 ///
 /// # Errors
 /// Returns the same scenario/referee failure as fresh cut replay.
-pub fn every_cut(
-    scenario: Scenario,
-    seed: u64,
-    mut visit: impl FnMut(u64, World) + 'static,
-) -> Result<Outcome, Violation> {
-    every_cut_traced(scenario, seed, None, move |cut, world| visit(cut, world))
+pub fn every_cut(scenario: Scenario, seed: u64, visit: impl FnMut(u64, World) + 'static) -> Result<Outcome, Violation> {
+    every_cut_traced(scenario, seed, None, visit)
 }
 
 /// Explicit complete traces for the independent snapshot/fresh equivalence proof.
