@@ -78,6 +78,12 @@ pub struct Scripted {
     pending_faults: Vec<FrontFault>,
 }
 impl Scripted {
+    fn hello_events(&mut self) -> Vec<(ClientId, Event)> {
+        std::mem::take(&mut self.hellos)
+            .into_iter()
+            .map(|client| (client, Event::Jig(jig_client::Event::Hello { versions: self.engine.versions() })))
+            .collect()
+    }
     /// Installs a checked story and its application documents.
     #[must_use]
     pub fn new(script: engine::Script, seed: u64, family: Family) -> Self {
@@ -284,10 +290,7 @@ impl Front<Test> for Scripted {
     }
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
         self.recover(now, wall);
-        let mut events: Vec<_> = std::mem::take(&mut self.hellos)
-            .into_iter()
-            .map(|client| (client, Event::Jig(jig_client::Event::Hello { versions: self.engine.versions() })))
-            .collect();
+        let mut events = self.hello_events();
         events.extend(
             self.engine
                 .poll(now)
