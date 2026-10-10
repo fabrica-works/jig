@@ -14,7 +14,7 @@ use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =
     SlotRef { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, token: Token::new(0) };
 /// A fragment includes a document heading, drawing fallback, card status and form.
-pub const PART_NODES: u32 = 24;
+pub const PART_NODES: u32 = 36;
 pub const NAV_NODES: u32 = 2;
 pub fn navigation(b: &mut Builder, address: first::Address, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Link);
@@ -26,7 +26,13 @@ pub fn navigation(b: &mut Builder, address: first::Address, words: &Words, bindi
     b.bind(binding);
     b.close();
 }
-pub fn page(b: &mut Builder, side: &first::Side, words: &Words, bindings: &mut Bindings) {
+pub fn page(
+    b: &mut Builder,
+    side: &first::Side,
+    words: &Words,
+    jig: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+) {
     b.open(Role::Heading { level: 1 });
     words.text(b, Word::Family, &[]);
     b.close();
@@ -35,7 +41,7 @@ pub fn page(b: &mut Builder, side: &first::Side, words: &Words, bindings: &mut B
         return;
     };
     b.open(Role::List);
-    object(b, side, id, words, bindings);
+    object(b, side, id, words, jig, bindings);
     let object = side.object(id).expect("page object is named");
     match &object.value {
         Value::Known(Document::Item(item)) => {
@@ -52,7 +58,15 @@ fn jig_slot(b: &mut Builder, key: ObjectKey, words: &Words, bindings: &mut Bindi
     let binding = bindings.insert(Meaning::Object(key));
     b.slot(SlotRef { owner: Owner::Jig, token: binding.token }, &words.say(Word::Loading, &[]));
 }
-pub fn part(b: &mut Builder, side: &first::Side, part: &Part, generation: u32, words: &Words, bindings: &mut Bindings) {
+pub fn part(
+    b: &mut Builder,
+    side: &first::Side,
+    part: &Part,
+    generation: u32,
+    words: &Words,
+    jig: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+) {
     if !side.contains(part, generation) {
         words.status(b, Word::Unshowable, &[]);
         return;
@@ -75,12 +89,19 @@ pub fn part(b: &mut Builder, side: &first::Side, part: &Part, generation: u32, w
             };
             let id = side.find(facts.subject).expect("held part is registered");
             b.open(Role::List);
-            object(b, side, id, words, bindings);
+            object(b, side, id, words, jig, bindings);
             b.close();
         }
     }
 }
-fn object(b: &mut Builder, side: &first::Side, id: Id<first::Object>, words: &Words, bindings: &mut Bindings) {
+fn object(
+    b: &mut Builder,
+    side: &first::Side,
+    id: Id<first::Object>,
+    words: &Words,
+    jig: &jig_client_view::words::Words,
+    bindings: &mut Bindings,
+) {
     let Some(object) = side.object(id) else {
         words.status(b, Word::Unknown, &[]);
         return;
@@ -158,7 +179,7 @@ fn object(b: &mut Builder, side: &first::Side, id: Id<first::Object>, words: &Wo
             }
         },
     }
-    card(b, &object.card, words);
+    card(b, &object.card, words, jig);
     b.close();
     b.close();
 }
@@ -179,7 +200,7 @@ fn button(b: &mut Builder, word: Word, action: first::Act, card: &Card, words: &
     }
     b.close();
 }
-fn card(b: &mut Builder, card: &Card, words: &Words) {
+fn card(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::words::Words) {
     match card {
         Card::Open => {}
         Card::Unknown => words.status(b, Word::Unknown, &[]),
@@ -196,6 +217,7 @@ fn card(b: &mut Builder, card: &Card, words: &Words) {
             first::Answer::Touched { revision, .. } => words.status(b, Word::Touched, &[Hole::Number(revision.value)]),
             first::Answer::Moved { revision, .. } => words.status(b, Word::Moved, &[Hole::Number(revision.value)]),
             first::Answer::Gone => words.status(b, Word::Gone, &[]),
+            first::Answer::Refused(refusal) => jig.refusal(b, refusal.refusal()),
         },
     }
 }

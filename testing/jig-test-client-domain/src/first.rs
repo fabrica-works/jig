@@ -737,7 +737,7 @@ fn answered(side: &mut Side, _env: &Env<Limits>, request: Token, answer: Answer,
         if let Some(object) = side.objects.get_mut(object) {
             object.card = match &answer {
                 Answer::Touched { .. } => Card::Done { answer: answer.clone() },
-                Answer::Moved { .. } | Answer::Gone => Card::Refused { answer: answer.clone() },
+                Answer::Moved { .. } | Answer::Gone | Answer::Refused(_) => Card::Refused { answer: answer.clone() },
             };
             side.changed();
         }

@@ -737,3 +737,57 @@ fn work_page(page: &jig_client::pages::Page) -> bool {
         | jig_client::pages::Page::SomeoneElse => false,
     }
 }
+
+#[test]
+fn a_raw_entrance_refusal_finishes_the_original_family_request_once_with_its_facts() {
+    let mut root = ready(29);
+    let rows = family_page(&mut root);
+    drive(
+        &mut root,
+        Event::First(first::Event::Read { read: family_read(&rows), result: first::ReadResult::Value(item(2)) }),
+    );
+    let id = root.first().page().unwrap();
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::First(first::Act::Touch {
+                object: id.token(),
+                revision: contract::Revision { value: 2 },
+            }),
+        },
+    );
+    let rows = taken(&mut root);
+    let Request::Save { .. } = &rows[0] else { panic!("retention precedes send") };
+    let Request::Send { attempt, ask: Ask::First(_), .. } = &rows[1] else { panic!("family request") };
+    let answer = first::Answer::Refused(
+        contract::EntranceRefusal::new(contract::Refusal::Authority {
+            lacking: contract::Lacking::Budget { needed: 19, left: 3 },
+            proposable: Some(false),
+        })
+        .unwrap(),
+    );
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt: *attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::First(answer.clone())),
+        },
+    );
+    assert_eq!(root.first().object(id).unwrap().card, first::Card::Refused { answer: answer.clone() });
+    let shown = crate::shown(&root);
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt: *attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::First(first::Answer::Gone)),
+        },
+    );
+    assert_eq!(root.first().object(id).unwrap().card, first::Card::Refused { answer });
+    assert_eq!(crate::shown(&root), shown);
+    assert!(taken(&mut root).iter().all(|request| match request {
+        Request::Send { .. } => false,
+        _ => true,
+    }));
+}

@@ -1,6 +1,6 @@
 //! The connector's documents and one revision-naming keyed request. Application
 //! values and forms stay here, never in jig's requests (root.md, sections 6–7).
-use jig_client::contract::{ObjectKey, Part, ProposalKey, Revision};
+use jig_client::contract::{EntranceRefusal, ObjectKey, Part, ProposalKey, Revision};
 use skein_lib::List;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Scope {
@@ -104,9 +104,17 @@ pub enum Ask {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answer {
-    Touched { item: u64, revision: Revision },
-    Moved { item: u64, revision: Revision },
+    Touched {
+        item: u64,
+        revision: Revision,
+    },
+    Moved {
+        item: u64,
+        revision: Revision,
+    },
     Gone,
+    /// A refusal at the shared application entrance, retaining its actual facts.
+    Refused(EntranceRefusal),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReadResult {

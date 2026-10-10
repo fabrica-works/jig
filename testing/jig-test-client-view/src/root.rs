@@ -56,7 +56,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     let mut b = view.render.builder();
     b.open(Role::Page);
     if !jig_client_view::jig(&mut b, root.jig(), family::NAV, &view.words, &mut view.jig) {
-        family::page(&mut b, root.first(), &view.first_words, &mut view.first);
+        family::page(&mut b, root.first(), &view.first_words, &view.words, &mut view.first);
         jig_client_view::after_page(&mut b, root.jig(), &view.words, &mut view.jig);
     }
     b.close();
@@ -92,6 +92,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                         part,
                                         root.jig().generation(),
                                         &view.first_words,
+                                        &view.words,
                                         &mut view.first,
                                     );
                                     true

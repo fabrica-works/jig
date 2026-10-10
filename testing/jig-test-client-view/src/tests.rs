@@ -417,3 +417,49 @@ fn family_card_keys_are_public_subjects_across_page_and_fragment_positions() {
         crate::family_key(&family::Subject { scope: family::Scope::Project(4), kind: family::Kind::Panel(9) })
     );
 }
+
+#[test]
+fn a_family_entrance_refusal_shows_its_budget_and_keeps_the_object_present() {
+    let mut root = ready();
+    family_document(&mut root, 0);
+    let id = root.first().page().unwrap();
+    drive(
+        &mut root,
+        Event::Act {
+            action: jig_test_client_domain::Action::First(first::Act::Touch {
+                object: id.token(),
+                revision: Revision { value: 1 },
+            }),
+        },
+    );
+    let mut out = Queue::with_capacity(jig_test_client_domain::max_out(&limits()));
+    jig_test_client_domain::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
+    let mut attempt = None;
+    while let Some(request) = out.pop() {
+        if let Request::Send { attempt: sent, .. } = request {
+            attempt = Some(sent);
+        }
+    }
+    let refusal = EntranceRefusal::new(Refusal::Authority {
+        lacking: Lacking::Budget { needed: 19, left: 3 },
+        proposable: Some(false),
+    })
+    .unwrap();
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt: attempt.unwrap(),
+            envelope: skein_lib::RequestEnvelope::Final,
+            answer: Some(jig_test_client_domain::Answered::First(first::Answer::Refused(refusal))),
+        },
+    );
+    let mut view = view();
+    patches(&mut view, &root);
+    assert!(contains(&view, b"19"));
+    assert!(contains(&view, b"3"));
+    assert!(contains(&view, b"Nobody in this project may accept it"));
+    assert!(!contains(&view, b"Gone"));
+    assert!(root.first().object(id).is_some());
+    assert!(view.tree().len() <= view.limits().tree.nodes);
+    assert!(patches(&mut view, &root).is_empty());
+}
