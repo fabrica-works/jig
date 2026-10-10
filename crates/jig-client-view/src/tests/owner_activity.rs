@@ -194,10 +194,52 @@ fn owner_activity_all_eight_lines_keep_task_commit_clock_and_exact_variant_facts
         ] {
             assert!(has(&tree, bytes));
         }
+        assert_line_fields(&tree, &value.line);
         assert_eq!(value, original);
         for absent in [b"Fresh tail".as_slice(), b"Failure reason", b"Decoded turn", b"Unknown sender"] {
             assert!(!has(&tree, absent));
         }
+    }
+}
+fn assert_line_fields(tree: &Tree, line: &OwnerActivity) {
+    match line {
+        OwnerActivity::Words { .. } => {
+            assert!(has(tree, b"Message: 18446744073709551615"));
+            assert!(has(tree, b"Task: 18446744073709551615"));
+            assert!(has(tree, b"\\xFF\\x00"));
+        }
+        OwnerActivity::Heard(_) => {
+            assert!(has(tree, b"Message: 18446744073709551615"));
+            assert!(has(tree, b"Merged hints: 4294967295"));
+        }
+        OwnerActivity::Notified { .. } => {
+            assert!(has(tree, b"Deployment project: 4294967295"));
+            assert!(has(tree, b"Person: 18446744073709551615"));
+        }
+        OwnerActivity::RunBegan { .. } => {
+            assert!(has(tree, b"Attempt: 18446744073709551615"));
+            assert!(has(tree, b"Cause: made"));
+            assert!(has(tree, b"Not resumed"));
+        }
+        OwnerActivity::RunEnded { .. } => {
+            assert!(has(tree, b"Attempt: 18446744073709551615"));
+            assert!(has(tree, b"Spent: 18446744073709551615"));
+            assert!(has(tree, b"End: refused"));
+        }
+        OwnerActivity::Turn { .. } => {
+            assert!(has(tree, b"Archive reply: 18446744073709551615"));
+            assert!(has(tree, b"Turn: 4294967295"));
+            assert!(has(tree, b"Last read message: 18446744073709551615"));
+        }
+        OwnerActivity::Decided { .. } => assert!(has(tree, b"Revision: 18446744073709551615")),
+        OwnerActivity::Milestone { .. } => assert_eq!(
+            tree.nodes()
+                .iter()
+                .flat_map(|n| &n.text)
+                .filter(|r| r.text.as_ref() == b"Commit position: 18446744073709551615")
+                .count(),
+            2
+        ),
     }
 }
 #[test]
@@ -398,6 +440,20 @@ fn owner_activity_archive_read_none_zero_and_max_are_distinct_without_decoding_o
     assert!(has(&build(&later, normal_words()), b"Recorded at: 0"));
     assert_eq!(first.position, 9);
     assert_eq!(later.position, 10);
+    assert_time_presentation();
+}
+fn assert_time_presentation() {
+    let value = OwnerWord { at: Wall::from_nanos(123), ..fixture(OwnerMessageKind::Words) };
+    let presentations: Box<[(i32, &[u8])]> =
+        Box::new([(1, b"Recorded at: 60000000123"), (0, b"Recorded at: 123"), (-1, b"Recorded at: 0")]);
+    for (offset, label) in presentations {
+        let mut words = normal_words().clone();
+        words.offset_minutes = offset;
+        assert!(has(&build_word(&value, &words), label));
+        let line = OwnerActivityLine { at: value.at, ..activity(OwnerActivity::Heard(value.clone())) };
+        assert!(has(&build(&line, &words), label));
+        assert_eq!(value.at.as_nanos(), 123);
+    }
 }
 #[test]
 fn owner_activity_all_six_result_metadata_keep_approved_presence_opaque_fields_and_change_identity() {
@@ -542,12 +598,48 @@ fn owner_activity_selected_normal_language_and_full_opaque_tree_envelope_refuse_
     let reserved =
         fixture(OwnerMessageKind::Result(OwnerWordResult::Verdict { code: 1, fields: List::with_capacity(4) }));
     assert!(view::word_required(&reserved, &client_limits(), &selected).is_none());
+    assert_each_text_bound(&selected);
     let saved = word.clone();
     if let OwnerMessageKind::Result(OwnerWordResult::Verdict { fields, .. }) = &mut word.kind {
         fields.get_mut(0).unwrap().name = copy_of(b"123456789");
     }
     assert!(view::word_required(&word, &client_limits(), &selected).is_none());
     assert_eq!(saved.words.bytes(), &[255; 8]);
+}
+fn assert_each_text_bound(words: &Words) {
+    let mutations: [fn(&mut OwnerWord); 4] = [
+        |s| s.words = text(b"123456789"),
+        |s| {
+            s.kind =
+                OwnerMessageKind::Result(OwnerWordResult::Approved { state: text(b"123456789"), words_present: true })
+        },
+        |s| {
+            if let OwnerMessageKind::Result(OwnerWordResult::Verdict { fields, .. }) = &mut s.kind {
+                fields.get_mut(0).unwrap().name = copy_of(b"123456789");
+            }
+        },
+        |s| {
+            if let OwnerMessageKind::Result(OwnerWordResult::Verdict { fields, .. }) = &mut s.kind {
+                fields.get_mut(0).unwrap().value = copy_of(b"123456789");
+            }
+        },
+    ];
+    for mutate in mutations {
+        let mut value = fixture(OwnerMessageKind::Result(OwnerWordResult::Verdict { code: 7, fields: fields() }));
+        mutate(&mut value);
+        let saved = value.clone();
+        assert!(view::word_required(&value, &client_limits(), words).is_none());
+        assert!(view::required(&activity(OwnerActivity::Heard(value.clone())), &client_limits(), words).is_none());
+        assert!(view::word_required(&value, &jig_client::Limits { text: 9, ..client_limits() }, words).is_some());
+        assert_eq!(value, saved);
+    }
+    for capacity in [0_u32, 1, 3] {
+        let value = fixture(OwnerMessageKind::Result(OwnerWordResult::Verdict {
+            code: 0,
+            fields: List::with_capacity(capacity),
+        }));
+        assert!(view::word_required(&value, &client_limits(), words).is_some());
+    }
 }
 #[test]
 fn owner_activity_checked_normal_book_rejects_missing_duplicate_wrong_number_and_wall_holes() {

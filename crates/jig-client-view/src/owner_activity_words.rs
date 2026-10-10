@@ -224,6 +224,10 @@ pub const ALL: [ActivityPhrase; 104] = [
 ];
 impl ActivityPhrase {
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one total data table keeps all closed activity phrase identities together"
+    )]
     pub fn id(self) -> PhraseId {
         let number = match self {
             Self::Activity => 7200,
@@ -333,6 +337,7 @@ impl ActivityPhrase {
         };
         PhraseId { owner: Owner::Jig, number }
     }
+    #[expect(clippy::too_many_lines, reason = "one total data table keeps all closed activity phrase shapes together")]
     fn hole(self) -> Option<HoleKind> {
         match self {
             Self::Activity => None,
@@ -441,6 +446,10 @@ impl ActivityPhrase {
             Self::ResultCancelled => None,
         }
     }
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one total data table keeps all closed activity phrase captions together"
+    )]
     fn label(self) -> &'static [u8] {
         match self {
             Self::Activity => b"Task activity",

@@ -250,7 +250,7 @@ pub fn word(b: &mut Builder, value: &OwnerWord, words: &Words) {
     kind(b, &value.kind, words);
     caption(b, words, P::WholeWords);
     crate::literal_segment::render(b, value.words.bytes());
-    say(b, words, P::At, &[Hole::Wall(value.at)]);
+    say(b, words, P::At, &[Hole::Wall(words.adjusted_wall(value.at))]);
     number(b, words, P::Hits, u64::from(value.hits));
     caption(b, words, if value.eligible { P::Eligible } else { P::Ineligible });
     b.close();
@@ -361,7 +361,7 @@ pub fn render(b: &mut Builder, value: &OwnerActivityLine, words: &Words) {
     region(b, words, P::Activity);
     number(b, words, P::Task, value.task);
     number(b, words, P::Position, value.position);
-    say(b, words, P::At, &[Hole::Wall(value.at)]);
+    say(b, words, P::At, &[Hole::Wall(words.adjusted_wall(value.at))]);
     line(b, &value.line, words);
     b.close();
 }
