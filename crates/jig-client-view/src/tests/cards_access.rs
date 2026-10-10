@@ -3,7 +3,7 @@
     clippy::disallowed_methods,
     reason = "ordinary accessibility assertions select semantic role categories"
 )]
-use crate::{JigStyle, Role, State, Tree};
+use crate::{JigStyle, Owner, Role, State, Tree};
 
 /// Run on the same trees as every fact/state/action scenario. The shell can
 /// discard styles and still read names, roles, statuses and semantic states.
@@ -23,10 +23,11 @@ pub(super) fn check(tree: &Tree) {
             }
             _ => {}
         }
-        if node.key.is_some() {
+        if let Some(key) = node.key {
             assert_eq!(node.role, Role::Item);
             let card = tree.nodes().get(index.checked_add(1).unwrap()).unwrap();
-            assert_eq!(card.role, Role::Region);
+            let role = if key.owner == Owner::Jig && key.kind == 28 { Role::Log } else { Role::Region };
+            assert_eq!(card.role, role);
             assert!(card.name.as_ref().is_some_and(|name| !name.is_empty()));
         }
         if node.styles.as_slice().contains(&JigStyle::Danger.token()) {

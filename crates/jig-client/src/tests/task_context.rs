@@ -113,6 +113,7 @@ fn finished(phase: Option<OwnerChipPhase>, prior: Option<OwnerPriorPhase>) -> bo
     ));
     let mut row = super::confirmation::task();
     row.context = None;
+    row.chip.executor = Executor::Agent { charter: 1 };
     row.activity = 0;
     if let Some(phase) = phase {
         let mut details = super::chip_facts::details();
