@@ -1,14 +1,15 @@
 # The core
 
-Provisional, 2026-10-07. What jig's core is, as a domain layer inside an
-application's engine: its parts and how they fit, what crosses between
-it and the application's root, how a decision reaches the store before
-anything leaves the engine, how it restarts, how it runs agents, and the
-capabilities it keeps (the fleet, briefs, notes, views, accounts). The
-model is core.md; tasks are tasks.md, authority authority.md, connectors
-connectors.md, parties people.md, hosts hosts.md; what the application's
-root does with all of it is root.md. The mechanics are those of skein's
-`programming-model.md`. What is still open is listed in section 16.
+Provisional, 2026-10-07, revised 2026-10-10. What jig's core is, as a
+domain layer inside an application's engine: its parts and how they fit,
+what crosses between it and the application's root, how a decision
+reaches the store before anything leaves the engine, how it restarts,
+how it runs agents, and the capabilities it keeps (the fleet, briefs,
+notes, views, accounts). The model is core.md; tasks are tasks.md,
+authority authority.md, connectors connectors.md, parties people.md,
+hosts hosts.md; what the application's root does with all of it is
+root.md. The mechanics are those of skein's `programming-model.md`. What
+is still open is listed in section 16.
 
 ## 1. In one page
 
@@ -75,7 +76,7 @@ jig-core                    the core: routing among its children, runs, calls, t
 ├── jig-core-authority      authority's order and checks; the rules and the projects' policies
 ├── jig-core-people         parties: identities, sign-ins, roles, requests, inboxes
 ├── jig-core-fleet          hosts: slots, placement, attempts, relaying
-├── jig-core-accounts       LLM accounts: refreshing, granting
+├── jig-core-accounts       LLM accounts: usable, granted
 ├── jig-core-brief          a run's brief, from typed sections and connectors' sized ones, within a budget
 ├── jig-core-notes          notes: scopes, entries, indexes
 └── jig-core-views          parties' watches, level-triggered
@@ -117,7 +118,8 @@ translates between them with small total functions.
   calls, answers and facts of runs; a host lost or back;
 - **from parties:** sign-ins and their ends, keyed requests, reads of
   their inbox and of history;
-- **from accounts' protocol:** a refresh's outcome;
+- **from accounts' protocol:** a generation granted, a failure, the
+  component closed;
 - **from the application,** through its root: a project's period begun,
   saying when the next begins if its source knows. The core keeps no
   calendar, infers no cadence and schedules nothing of its own
@@ -269,7 +271,7 @@ answers to a run's reads.
 | proposals: pending, and decided ones' outcome | tasks | pending ones at start |
 | transcripts: turns, with their spend | the core | to resume; on demand |
 | notes | notes | indexes per scope in use; entries on demand |
-| secrets: LLM accounts' refresh tokens, sign-ins' tokens or their digests | the protocol layer, never the domain, which names them by account and generation, or by a sign-in's number | at start, by the protocol layer |
+| secrets: sign-ins' digests; LLM accounts' records are kept apart, by skein's accounts driver | the protocol layer, never the domain, which names them by account and generation, or by a sign-in's number | at start, by the protocol layer |
 
 Each connector keeps its own records beside these (connectors.md,
 section 2): its outbox, procedures' states and parameters, what it made
@@ -365,6 +367,26 @@ next only once the root says this one is done (root.md, section 8).
 Workers keep the answers and turns they were not acknowledged for, and
 send them again after their hello; the core commits any it does not
 have, and acknowledges each.
+
+### 6.1 Stopping
+
+The engine stops when its service is told to (a signal, an operator), and
+the core hears it from its root before anything closes
+(`../protocol/service.md`, section 5). From then on it takes nothing that
+would make a commit:
+
+- **a party's request** is answered not ready, and an application's
+  request likewise;
+- **a run's turn, answer or call** is answered busy, so its host keeps it
+  and sends it again to the next engine;
+- **a connector's events and outcomes** stay with the connector, as when
+  the journal is full;
+- **no run is placed, and no procedure stepped.**
+
+It ends every watch saying the engine is stopping
+(`../client/domain/contract.md`, 7.2), and says once when nothing it holds
+waits for a commit, so the service can close its components. A restart
+then starts from the store as section 6 says.
 
 ## 7. Agent executors
 
@@ -537,6 +559,10 @@ The fleet child domain knows the hosts and the runs they host:
   to or longer than the engine's grace is refused. So the core places no
   next attempt while a worker may still host the last, and one run at
   most writes a resource at a time.
+- **Grants follow their attempts:** each new generation of an account
+  goes to every live attempt that uses it (section 12), and each attempt
+  the fleet keeps at a worker's hello, or adopts, is sent its account's
+  current grant, so no run outlives its token for want of a resend.
 - **Every start and adoption ends once:** answered, lost, withdrawn (the
   core cancelled it), or refused (busy, a duplicate, or invalid).
 - **Restarting** (section 6): the fleet adopts the claims the store
@@ -648,11 +674,11 @@ contract (`../client/domain/contract.md`, sections 5 to 7).
 - **Durable before shown:** a delivery waits for the last commit made
   before it, as every read's answer does (5.2).
 - **A run's text as it is written** is the one stream: kept per live run
-  being watched, within a bound, named by the turn the host reports it
-  for, and delivered from the offset each watcher has; never stored, and
-  marked provisional. It decides nothing and leaves at once (5.2). A
-  committed turn reaches a client through the task's activity, read
-  (7.2).
+  being watched, within a bound, named by the turn and the retry the host
+  reports it for (hosts.md, 6.5), and delivered from the offset each
+  watcher has; never stored, and marked provisional. It decides nothing
+  and leaves at once (5.2). A committed turn reaches a client through the
+  task's activity, read (7.2).
 - **History is the store's.** What a client shows of the past (a task's
   results, its activity, a plan's revisions and why) is read (5.3),
   paged, never held.
@@ -661,14 +687,45 @@ Nothing the core decides depends on a view arriving.
 
 ## 12. Accounts
 
-The accounts child domain keeps the deployment's LLM accounts: refreshed
-by the engine alone, their rotated refresh tokens made durable before
-the access tokens they bought are granted, grants pushed to every live
-attempt that uses an account, on whatever host, and a run whose account
-is unusable not started. The refresh tokens are in the store's secret
-records, which the protocol layer alone writes and the domain never
-reads; the domain names an account by its number and a token's
-generation.
+The accounts child domain keeps the deployment's LLM accounts: which are
+usable, and which runs hold which generation of each. The protocol
+layer's accounts' component signs them in, refreshes them, keeps their
+records before lending, and holds their values (`../protocol/llm.md`,
+section 5). The domain names an account by its number and a token's
+generation, with how long it is valid, and never sees a value or a
+record.
+
+- **Every configured account is wanted,** from the restart's first step
+  (section 6) to the close, so the component refreshes each before its
+  token expires, and answers each new generation, granted.
+- **Usable** while the child holds a granted generation still valid and
+  the account is not spent. A run whose account is unusable is not
+  started.
+- **Every live attempt hears each new generation** of its account, on
+  whatever host, the engine's own included; and the fleet sends each
+  attempt it keeps its current grant when its worker says hello, and
+  when it adopts the attempt (section 8).
+- **Rejected:** a run's provider refused a generation. The child passes
+  it to the component, which refreshes once; a second rejection of the
+  same generation fails.
+- **Exhausted:** a run's provider says the account is spent until a time.
+  The child marks it spent until then, and asks nothing of the component.
+- **Failed,** in one of five classes:
+  - **later,** with how long: the child asks again after it, while the
+    account is still wanted;
+  - **sign in again:** its grant was revoked, or it has no record. The
+    account is unusable, the deployment's document says a person must
+    sign it in, and the child asks again at its retry interval, which
+    finds a record a new sign-in put in place;
+  - **misconfigured:** the provider rejected the deployment's client. The
+    account is unusable until a restart with its configuration fixed,
+    and the document says so;
+  - **unloaded:** its record could not be read. The account is unusable,
+    the document says where and why, and the child asks again at its
+    retry interval;
+  - **cancelled,** at the close.
+- **Close** releases every account, and ends once the component has
+  closed.
 
 ## 13. Limits and working sets
 
@@ -711,7 +768,8 @@ protocol layer, which composes jig's pieces with its own:
 - **Parties:** a client protocol carrying jig's documents and the
   application's, with sign-in by the application's providers
   (people.md, section 10; `../client/domain/contract.md`, section 10).
-- **Accounts:** OAuth refreshes with the LLM providers.
+- **Accounts:** sign-in, refresh, records kept and tokens lent, by
+  skein's OAuth accounts driver (`../protocol/llm.md`, section 5).
 - **Configuration:** the deployment's rules, connectors and their
   systems' addresses and credentials, LLM endpoints, accounts and models'
   prices, workers' secrets, the engine's own slots, the charters the

@@ -1,13 +1,13 @@
 # The application's root
 
-Provisional, 2026-10-07. What an application's engine root is and does:
-the top-level domain every application on jig writes, which composes
-jig's core with the application's connectors and its own child domains.
-It says what the root carries, the one shape every root has, what jig
-asks of skein-lib's journal, how the root routes, translates and puts
-outputs together, its part in restart and in effects, and what it must
-never do. The core is engine.md; connectors are connectors.md. What is
-still open is listed in section 14.
+Provisional, 2026-10-07, revised 2026-10-10. What an application's
+engine root is and does: the top-level domain every application on jig
+writes, which composes jig's core with the application's connectors and
+its own child domains. It says what the root carries, the one shape
+every root has, what jig asks of skein-lib's journal, how the root
+routes, translates and puts outputs together, its part in restart and in
+effects, and what it must never do. The core is engine.md; connectors
+are connectors.md. What is still open is listed in section 14.
 
 ## 1. In one page
 
@@ -60,12 +60,16 @@ still open is listed in section 14.
   to resume). It has no records of its own in the store.
 - **Its vocabulary** is what crosses the domain boundary: the store's
   commits and loads, the workers' channel, the clients' requests, each
-  connector's protocol, the accounts' OAuth, timers. It is the union of
-  its children's, wrapped: an exhaustive enum per direction, with one
+  connector's protocol, the LLM accounts' driver, timers. It is the union
+  of its children's, wrapped: an exhaustive enum per direction, with one
   variant per child.
 - **Its children are siblings,** sharing no types (programming-model.md,
   4.5). The core knows each connector by a number the root gives it in
   configuration; each connector knows nothing of the core.
+- **No root above it.** In one process, an engine's root and its
+  workers' roots stay apart, each under its own protocol layer, joined
+  only by bytes over in-process addresses (`../protocol/service.md`,
+  section 10).
 
 ## 3. The one shape
 
@@ -313,7 +317,3 @@ application's.
   wrapping, which have one shape, are best copied and filled by agents,
   as now, or generated from a short description, which the subset's
   rules on macros would confine to a build step.
-- **Several roots in one process:** an engine, a worker and agents in
-  one process for tests and small deployments (smith's `host.md`,
-  section 9) composes several roots under one more; whether that top is
-  jig's or the application's.

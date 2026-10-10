@@ -1,11 +1,11 @@
 # jig's domain
 
-Provisional, 2026-10-07. The design of jig's domain layer: the core an
-application's engine composes, the contract its connectors meet, what
-its root does, where its agents run, and how all of it is tested. jig as
-a whole, and why it is a kit, is `../README.md`; the client's domain is
-`../client/domain/`, designed separately. The mechanics are those of
-skein's `programming-model.md`.
+Provisional, 2026-10-07, revised 2026-10-10. The design of jig's domain
+layer: the core an application's engine composes, the contract its
+connectors meet, what its root does, where its agents run, and how all
+of it is tested. jig as a whole, and why it is a kit, is `../README.md`;
+the client's domain is `../client/domain/`, designed separately. The
+mechanics are those of skein's `programming-model.md`.
 
 ## 1. Reading order
 
@@ -116,6 +116,7 @@ charter's translation link smith; nothing in jig names a system.
 | run, attempt | one activation of an agent task on a host; one try at it, fenced by a number that only grows |
 | tries | the failed attempts counted per class, which a release resets |
 | transcript, turn | an agent task's conversation, kept turn by turn; one LLM turn, committed as it ends |
+| a completion's retry | a turn's completion asked for again within one run, counted from zero by smith; a later retry's live text replaces an earlier one's (hosts.md, 6.5). Not one of a task's tries |
 | call | a run's tool call, named by the run, decided once |
 | brief | the context a run is given for why it runs |
 | message, inbox | what a task hears once started; its durable, bounded store of them |
@@ -280,7 +281,6 @@ Each document lists its own; the ones that reach across:
 
 - the deployment's unit of spend, and costs over time (authority.md);
 - generating a root's boilerplate rather than copying it (root.md);
-- several roots in one process (root.md);
 - fairness for runs on the engine's loop (hosts.md);
 - how fresh a verdict's facts must be (connectors.md);
 - how many commits the focused suite crashes at (testing.md).

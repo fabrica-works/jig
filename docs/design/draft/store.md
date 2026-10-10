@@ -14,11 +14,11 @@ is deleted.
 ## 1. In one page
 
 - **The base is a design on skein-kv** (skein's `kv.md`), embedded in the
-  engine's process, with no store process and no wire: ordered keys and values in memory, an append-only log and
-  snapshots; transcripts beside it; secrets in a second store; one
-  decision, one commit; a thin protocol layer that encodes keys so that
-  bytes sort as the domain's keys do, and records with a version per
-  shape.
+  engine's process, with no store process and no wire: ordered keys and
+  values in memory, an append-only log and snapshots; transcripts beside
+  it; secrets in a second store; one decision, one commit; a thin protocol
+  layer that encodes keys so that bytes sort as the domain's keys do, and
+  records with a version per shape.
 - **jig's part is the engine's own:** the core's and its children's
   families, their keys and encodings, commits and loads, transcripts,
   secrets, opening and restart, growth, retention and fill. The
@@ -42,7 +42,7 @@ is deleted.
 | records: a codec per shape, versions, golden bytes | jig's; codecs from skein's generator (skein's `codec.md`), as the channel's are, or written out (section 5.6) |
 | commits: numbered as the journal numbers them; group commit; a failure stops the engine; loads in pages | jig's, with skein-lib's journal numbering |
 | transcripts: a file per session, written before their commit, read from either end, cut after a crash | jig's (section 5.2) |
-| secrets in a second store | jig's: accounts' records, sign-ins' digests, services' credentials' digests; an application's connectors' credentials as its own records there |
+| secrets in a second store | jig's: sign-ins' digests, services' credentials' digests; an application's connectors' credentials as its own records there. LLM accounts' records are skein's accounts driver's private files, not the store's |
 | opening and restart | jig's, before the core's restart script (`../domain/engine.md`, section 6; `../protocol/service.md`, section 3) |
 | growth, retention, fill | jig's mechanisms; the base's numbers become examples (section 5.5) |
 | the real store in the domain worlds | section 5.3 |
@@ -81,28 +81,25 @@ the store's design checks them against the code when it is written.
 
 ## 4. What the other components rely on
 
-`../protocol/README.md`, section 9: commits numbered, ordered and
-answered once durable, a failure stopping the engine; loads by range in
-pages, seeing every commit answered before them; transcripts appended
-with their commit and read from either end; secrets' records written by
-components alone, durable on request, read at start; opening before the
-root, refusing another format, or records that disagree with their own
-header. The accounts' component keeps each refresh's whole record (its
-generation, access token, expiry and refresh token) on request before
-lending what it bought (`../protocol/llm.md`, 5.2); the client's
-protocol keeps a sign-in's digest under the number its commit gave it,
-before handing the client its secret (`../protocol/README.md`,
+`../protocol/README.md`, section 9: commits numbered, ordered and answered
+once durable, a failure stopping the engine; loads by range in pages,
+seeing every commit answered before them; transcripts appended with their
+commit and read from either end; secrets' records written by components
+alone, durable on request, read at start; opening before the root,
+refusing another format, or records that disagree with their own header.
+The client's protocol keeps a sign-in's digest under the number its commit
+gave it, before handing the client its secret (`../protocol/README.md`,
 section 8).
 
 ## 5. Questions to settle, with a leaning
 
 ### 5.1 Who writes the store's component
 
-No traits or generics in step code, so jig cannot own a store machine
-that holds an application's records typed. Either jig ships the
-component, and the application's protocol layer hands it connector
-records already encoded, with their keys' bytes; or jig ships codecs and key encodings, and the
-application writes its store component from `ops`'s.
+No traits or generics in step code, so jig cannot own a store machine that
+holds an application's records typed. Either jig ships the component, and
+the application's protocol layer hands it connector records already
+encoded, with their keys' bytes; or jig ships codecs and key encodings,
+and the application writes its store component from `ops`'s.
 
 **Leaning:** jig ships it. The core's reads are queries (a scope joined
 with each row's owner, ancestry and links; indexes walked), transcripts

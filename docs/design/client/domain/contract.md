@@ -1,13 +1,13 @@
 # The client and the engine
 
-Provisional, 2026-10-09. What crosses between a party's client and the
-engine, at the level of the two domains: who the party is, the keyed
-requests and their answers, the documents the engine gives, the reads
-and watches that bring them, and versions. It is to clients what
-`../../domain/hosts.md`, section 2 is to hosts: the contract both sides
-keep, whatever carries it. Section 9 lists what the engine's domain owes
-the client, as changes to its documents. What is still open is listed in
-section 11.
+Provisional, 2026-10-09, revised 2026-10-10. What crosses between a
+party's client and the engine, at the level of the two domains: who the
+party is, the keyed requests and their answers, the documents the engine
+gives, the reads and watches that bring them, and versions. It is to
+clients what `../../domain/hosts.md`, section 2 is to hosts: the
+contract both sides keep, whatever carries it. Section 9 lists what the
+engine's domain owes the client, as changes to its documents. What is
+still open is listed in section 11.
 
 ## 1. In one page
 
@@ -345,7 +345,8 @@ party reads is therefore never lost by a crash.
 - **Pages** are within a row and a byte limit, and carry a cursor for the
   next, or say there is none (`../../domain/engine.md`, 5.3).
 - **Refused** for what the party may not see, as unknown; when the
-  engine's loads are full, as busy.
+  engine's loads are full, as busy; when the sign-in has ended, as
+  signed out (client.md, section 12).
 
 ## 7. Watches
 
@@ -416,12 +417,14 @@ commit, so they leave through the journal's door (`../../README.md`,
 6.3), marked provisional.
 
 - **The run's document** is its attempt, the turn being written, named by
-  its attempt and its number within it as the host reports it, that
-  turn's text so far, and the call it is making, within a bound on bytes.
+  its attempt, its number within it and its completion's retry as the
+  host reports them, that retry's text so far, and the call it is making,
+  within a bound on bytes.
 - **Read from an offset:** each delivery carries the turn's name, the text
   after the offset the client has, and the offset it ends at; the client
-  takes it and is sent the rest when there is more. A new turn's text
-  starts at zero under its own name, so it never resets another's.
+  takes it and is sent the rest when there is more. A new turn's text,
+  or a new retry's, starts at zero under its own name, so it never resets
+  another turn's; a later retry replaces the earlier retries of its turn.
 - **Committed turns are not in it.** A turn's committed form reaches the
   client only through its task's activity, read once the task's document
   says the activity has moved, and held until durable (section 6). The
@@ -481,22 +484,21 @@ Changes this design asks of `../../domain/`, adopted there with it
 8. **The reads of section 6,** their answers held until the last commit
    made is durable (`../../domain/engine.md`, 5.2 and 5.3).
 9. **Level-triggered views** with the subjects of 7.1, what marks them
-   changed (7.2), a run's text by turn and offset, and an application's
-   subjects through the same watches, each naming its scope
+   changed (7.2), a run's text by turn, retry and offset, and an
+   application's subjects through the same watches, each naming its scope
    (`../../domain/engine.md`, section 11). The views child keeps, per
    watch, its subject, its window, whether a delivery is in flight and
-   whether its subject changed since; the subject's owner (the core, or
-   a connector through the root) computes each document when a delivery
-   is made, and the delivery is held as a read's answer is. Older
-   passages that describe views as a best-effort stream
-   (`../../domain/core.md`, section 11; `../../README.md`, 6.3) say so
-   too.
+   whether its subject changed since; the subject's owner (the core, or a
+   connector through the root) computes each document when a delivery is
+   made, and the delivery is held as a read's answer is. Older passages
+   that describe views as a best-effort stream (`../../domain/core.md`,
+   section 11; `../../README.md`, 6.3) say so too.
 10. **A watch is not a keyed request** (3.2).
 
 ## 10. Below the domain
 
-What the client's protocol layer and the engine's owe this contract, to
-be designed with the protocol layers (`../../README.md`, section 12):
+What the client's protocol layer and the engine's owe this contract,
+which the client's protocol designs (`../../protocol/client.md`):
 
 - **One connection per client,** carrying jig's documents and the
   application's, composed in each end's protocol layer: requests and
@@ -506,8 +508,8 @@ be designed with the protocol layers (`../../README.md`, section 12):
   browser and over skein's HTTP client alike, as the platform allows.
 - **Each request carries its key and its sign-in;** the engine's protocol
   layer checks the sign-in's secret and hands the domain its number.
-- **`jig-client-wire`** encodes jig's documents and requests for both
-  ends, from one schema, with their versions; each application's own
+- **`jig-protocol-client-wire`** encodes jig's documents and requests for
+  both ends, from one schema, with their versions; each application's own
   wire crate does the same for its own.
 - **Turns** cross as their bytes, inside activity lines, and are decoded
   by `jig-client-transcript` in the client's protocol layer.

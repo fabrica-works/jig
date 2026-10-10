@@ -1,12 +1,12 @@
 # Pages
 
-Provisional, 2026-10-09. jig's pages: how a client is organised, what a
-party finds where, and what they do there. They are jig's, as the
-primitives they show are, and every application's client has them,
-around its own. This document says what each page shows and offers, never
-how it looks: no layout and no style. The cards that every page reuses
-are objects.md; what each page reads and watches is contract.md. What is
-still open is listed in section 11.
+Provisional, 2026-10-09, revised 2026-10-10. jig's pages: how a client is
+organised, what a party finds where, and what they do there. They are
+jig's, as the primitives they show are, and every application's client
+has them, around its own. This document says what each page shows and
+offers, never how it looks: no layout and no style. The cards that every
+page reuses are objects.md; what each page reads and watches is
+contract.md. What is still open is listed in section 11.
 
 ## 1. In one page
 
@@ -69,7 +69,7 @@ Deployment       hosts, accounts, connectors, capacity
   - the project they are in, and a way to switch;
   - going to a task by its number;
   - whether the client is live, behind or offline (client.md, 8.2), and
-    who is signed in;
+    who is signed in, with a way to sign out (client.md, section 12);
   - the navigation: jig's pages and the application's.
 - **Home and navigation are the application's choice.** The application
   says which of jig's pages its frame shows, in what order among its

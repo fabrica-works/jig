@@ -79,6 +79,12 @@ in section 14.
   client root's match from a part to its child is exhaustive, and a new
   connector breaks the client's build where it must be shown.
 
+- **No root above it.** A client and an engine in one process (a
+  desktop application that runs its own engine, a test) keep their own
+  roots, each with its protocol layer, joined by bytes over an in-process
+  address, as an engine and its workers are
+  (`../../protocol/service.md`, section 10).
+
 ## 3. The one shape
 
 ```
@@ -385,6 +391,3 @@ the root kept every promise above.
   wrapping, which have one shape, are best copied, as now, or generated
   from a short description, as for the engine's root
   (`../../domain/root.md`, section 14).
-- **Several clients in one process:** a client and an engine in one
-  process, for a desktop application that runs its own engine, or for
-  tests: whether their roots sit under one more, and whose.

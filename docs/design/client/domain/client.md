@@ -1,14 +1,14 @@
 # The client domain
 
-Provisional, 2026-10-09. `jig-client`: what a party's client knows of the
-engine's work, and what it does with it. It is the client's counterpart
-of the engine's core: a child of the application's client root, holding
-jig's part of the client: the frame and the link, jig's pages and the
-objects they show, the person's drafts and confirmations, and what a page
-reads and watches. How the root composes it with the application's own
-objects is root.md; what it shows is pages.md and objects.md; what it
-asks of the engine is contract.md. What is still open is listed in
-section 18.
+Provisional, 2026-10-09, revised 2026-10-10. `jig-client`: what a party's
+client knows of the engine's work, and what it does with it. It is the
+client's counterpart of the engine's core: a child of the application's
+client root, holding jig's part of the client: the frame and the link,
+jig's pages and the objects they show, the person's drafts and
+confirmations, and what a page reads and watches. How the root composes
+it with the application's own objects is root.md; what it shows is
+pages.md and objects.md; what it asks of the engine is contract.md. What
+is still open is listed in section 18.
 
 ## 1. In one page
 
@@ -387,14 +387,19 @@ What a chat's page leads with, and every agent task's activity
   used and spent. The domain holds that turn, typed and bounded, and
   links nothing of smith's.
 - **Live, then replaced.** While a run is live, the page watches it: the
-  turn being written, named by its attempt and its number within it, its
-  text from the offset the client has, and the call it is making. What is
-  shown live is provisional, marked so, and kept under that name until
-  the committed turn of the same name replaces it: the task's watch says
-  its activity has moved, and the client reads what is new
-  (contract.md, 7.3). Text of a later turn never resets an earlier one. A
-  turn lost with its host never commits: its provisional text goes when
-  the run ends, and the next run starts after the last committed turn.
+  turn being written, named by its attempt, its number within it and its
+  completion's retry, its text from the offset the client has, and the
+  call it is making. What is shown live is provisional, marked so, and
+  kept under that name until the committed turn of the same attempt and
+  number replaces
+  it: the task's watch says its activity has moved, and the client reads
+  what is new (contract.md, 7.3). Text of a later turn never resets an
+  earlier one; a later retry of the same turn replaces the text of
+  its earlier retries. A watch opened again starts from the beginning of the
+  turn being written: the client keeps the text it holds of that turn, and
+  takes what goes past it. A turn lost with its host never commits: its
+  provisional text goes when the run ends, and the next run starts after
+  the last committed turn.
 - **A person's words, in three states:** being sent, while their request
   is pending; sent, once its answer says which message they are in the
   task's inbox; read, once a committed turn says it read through that
@@ -453,6 +458,9 @@ What a chat's page leads with, and every agent task's activity
   page, which lists the application's providers. Choosing one asks to
   sign in, coming back to where the person was; the exchange (a
   browser's navigation, a device code for a terminal) is the shell's.
+- **Signing out,** from the frame, is the shell's exchange too: it ends
+  the sign-in on the engine (`../../domain/people.md`, section 3), and the
+  client then shows the sign-in page, as when signed out.
 - **Keys are the party's across sign-ins,** so the parked requests are
   sent again once the same party is confirmed (`../../domain/people.md`,
   5.1), within the engine's retention.
@@ -507,8 +515,8 @@ limits derive from these, so a tree always fits (view.md, section 10).
 
 ## 16. Below the domain
 
-What the client's protocol layer and its shells owe this domain, and
-which come with the client's protocol design:
+What the client's protocol layer and its shells owe this domain, which
+the client's protocol designs (`../../protocol/client.md`):
 
 - **One attempt per request, read and watch.** Retries, backoffs and what
   a failure means are the domain's and the table's; the protocol layer

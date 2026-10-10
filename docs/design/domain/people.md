@@ -78,6 +78,11 @@ authority and to the tasks.
   makes one in a project, with a role, and the protocol layer issues its
   credential. A service makes requests (section 5) but starts no chat,
   and its inbox is read through the client's protocol, not shown.
+- **The deployment's own link,** a provider of jig's for one person's
+  machine: the engine prints at start a link carrying a one-time secret,
+  and opening it signs in the configured first owner it names
+  (`../protocol/client.md`, section 8). An application enables it by
+  configuration, on a loopback listener only.
 - **The first owners** of a deployment are named in its configuration;
   everyone else gets a role from a project's owner, or by adoption's seed
   (section 4).

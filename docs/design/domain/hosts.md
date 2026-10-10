@@ -1,14 +1,14 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07. Where an application's agents run, and what
-hosts them: the contract between the core and a host, the three shapes
-an application may take, the agent as a capability of two kinds, jig's
-one host for runs wherever their agents run, the application's
-workspaces, and how a run's charter, tools, contract and delivery become
-smith's. The agent is smith, whose design is its own (smith's
-`docs/design/domain/`, cited as smith's `run.md`, `session.md`,
-`tools.md`, `host.md`). The core's side of runs is engine.md, sections 7
-and 8. What is still open is listed in section 12.
+Provisional, 2026-10-07, revised 2026-10-10. Where an application's
+agents run, and what hosts them: the contract between the core and a
+host, the three shapes an application may take, the agent as a
+capability of two kinds, jig's one host for runs wherever their agents
+run, the application's workspaces, and how a run's charter, tools,
+contract and delivery become smith's. The agent is smith, whose design
+is its own (smith's `docs/design/domain/`, cited as smith's `run.md`,
+`session.md`, `tools.md`, `host.md`). The core's side of runs is
+engine.md, sections 7 and 8. What is still open is listed in section 12.
 
 ## 1. In one page
 
@@ -77,11 +77,14 @@ Between the core's fleet and a host, whatever its shape:
     last message it read;
   - **calls,** named by the run, each answered once;
   - **facts,** best effort: progress, streaming text, tool calls as they
-    happen; a run's text names the turn it belongs to and the offset of
-    its first byte within that turn's text (6.5);
+    happen; a run's text names the turn it belongs to, its completion's
+    retry, and the offset of its first byte within that retry's text
+    (6.5);
   - one **answer:** finished with its result, parked, or failed with a
     typed failure; with the turns it took, what it spent, what it left on
     resources (the application's part), and how its save went;
+  - **notices,** relayed from the run's agent: a grant its provider
+    rejected, an account exhausted until a time;
   - **refusals:** busy, invalid, a duplicate.
 - **Fenced.** Every message names the run's task and attempt; the core
   drops what a stale attempt sends, and a host drops an attempt the core
@@ -192,10 +195,12 @@ host domain's vocabulary:
   order, so the root translates both the same way;
 - **cancel** is smith's cancel: the run winds down and answers. One that
   does not within the grace is dropped, which is when the agent is gone;
-- **LLM completions** are requests smith's domain makes; the inline
-  agent passes them up, and the root routes them to the application's
-  protocol layer, which runs them on skein's LLM client, and their
-  answers back. They do not pass through the hub;
+- **LLM completions** are requests smith's domain makes, each with its
+  run's result contract (smith's `protocol/llm.md`); the inline agent
+  passes them up as they are, and the root routes them to the
+  application's protocol layer, which runs them on smith's LLM component
+  over skein's connections, and their answers back. They do not pass
+  through the hub;
 - **bounded:** each run's worst case is smith's, and the inline agent's
   is its slots' sum, part of the root's.
 
@@ -234,6 +239,12 @@ per shape, buys:
   section 6); its slots never dial in.
 - **Hello first,** as section 2 says, on every link. Facts go only after
   it.
+- **One vocabulary toward the link,** section 2's whole, on a worker as
+  in the engine: the hello as one value, which a worker's root assembles
+  from the hub, its workspace and its link's graces; notices relayed from
+  the agent; facts as outputs, best effort, as well as by query. The
+  engine's root translates its own hub's link as it translates a
+  worker's (`../protocol/channel.md`, section 1).
 - **The engine holds the claim.** It commits a claim before assigning a
   run, and decides what follows: commit its result, run it again on any
   host, or hold its task. The hub never retries a run and never decides
@@ -350,12 +361,17 @@ watchdog and goes up to the engine for live views. Forwarding is best
 effort: a bounded queue, what does not fit dropped and counted, sent on
 an open link only, after the hello. Nothing decides on a fact.
 
-- **A run's text names its turn and its offset:** the turn it belongs
-  to, by its attempt and its number within it, and the offset of its
-  first byte within that turn's text, as smith gives them with the text
-  it streams. The engine's views keep a run's text by turn and offset
-  (engine.md, section 11). Since facts may be dropped, text that starts
-  past what the engine holds of its turn marks that turn's text cut.
+- **A run's text names its turn, its retry and its offset:** the turn it
+  belongs to, by its attempt and its number within it (an attempt is one
+  activation of smith's run, whose turns smith numbers); the retry of
+  the turn's completion, which smith retries within the turn, each retry's text
+  starting again at zero; and the offset of its first byte within that
+  retry's text, as smith gives them with the text it streams (smith's
+  `domain/run.md`, 11.1). The host asks smith for text on every run it
+  starts. The engine's views keep a run's text by turn, retry and offset
+  (engine.md, section 11): a later retry replaces an earlier one's text, and
+  since facts may be dropped, text that starts past what the engine holds
+  of its retry marks that turn's text cut.
 - **Activity is the host's observation:** a run's phase, and a tool
   begun or ended, are facts, fenced like everything a host sends
   (section 2). The engine shows a run as writing, or as running a tool,

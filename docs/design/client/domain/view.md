@@ -1,13 +1,13 @@
 # The view
 
-Provisional, 2026-10-09. `jig-client-view`: the client domain's state as a
-tree a shell shows, a person's acts coming back as typed actions, and the
-diff between the last tree and the next. It is optional: a service has
-none, and a command-line tool may write its own. It says what the tree
-is, how pages and cards are built and how an application's slots are
-filled, bindings, the diff, words and their languages, Markdown,
-conversations, and what a shell does. What is still open is listed in
-section 14.
+Provisional, 2026-10-09, revised 2026-10-10. `jig-client-view`: the client
+domain's state as a tree a shell shows, a person's acts coming back as
+typed actions, and the diff between the last tree and the next. It is
+optional: a service has none, and a command-line tool may write its own.
+It says what the tree is, how pages and cards are built and how an
+application's slots are filled, bindings, the diff, words and their
+languages, Markdown, conversations, and what a shell does. What is still
+open is listed in section 14.
 
 ## 1. In one page
 
@@ -259,12 +259,12 @@ application's view root adds its families' counts to jig's.
   restarts a process, and its small store and its keys make what was
   pending safe to send again.
 - **jig's shells:**
-  - *the browser's* (`jig-client-shell-web`): the client compiled to
+  - *the browser's* (`jig-shell-web`): the client compiled to
     WebAssembly, with only the glue the toolchain generates; the tree
     mapped to HTML elements with their roles; session storage as the
     small store; served by the engine from its one origin under a strict
     content security policy;
-  - *the native one* (`jig-client-shell-native`): skein's HTTP client and
+  - *the native one* (`jig-shell-native`): skein's HTTP client and
     its server-sent events reader, for Linux and for the worlds that make
     bytes real; with no view, it is a service's shell.
 - **Drawings are drawn by the application's code in the shell.** A shell

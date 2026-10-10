@@ -18,9 +18,9 @@ when configuration is read. What is still open is listed in section 9.
   smith's agent does with its own (smith's `crates/smith/README.md`).
 - **One document per process, composed like its root.** The application's
   configuration is one object, with a member for jig's part and one for
-  each of its connectors and its own children. `jig-config` parses jig's
-  part; the application parses its own; its startup code hands each child
-  its part, as its root hands each child its limits
+  each of its connectors and its own children. `jig-protocol-config`
+  parses jig's part; the application parses its own; its startup code
+  hands each child its part, as its root hands each child its limits
   (`../domain/root.md`, section 6).
 - **Typed, then checked whole.** Parsing yields plain values of jig's
   domain and protocol vocabularies. A check then runs across them: names
@@ -40,23 +40,23 @@ when configuration is read. What is still open is listed in section 9.
 
 ```
 the application's main (its shell)
-├── reads the file, and each secret file it names        skein's startup kit
-├── parses: jig's part (jig-config), its own parts         plain values
+├── reads the file, and each secret file it names            skein's startup kit
+├── parses: jig's part (jig-protocol-config), its own parts   plain values
 ├── checks the whole, and the worst case
-└── makes the root, the protocol layer's components, io    then the loop
+└── makes the root, the protocol layer's components, io       then the loop
 ```
 
-- **`jig-config`** is a crate of jig's, step code: functions from a
-  parsed JSON value to jig's typed configuration and back to the problems
-  it found, each naming its path in the document. It reads no file. It
-  yields jig's own plain values only, and links neither smith nor
+- **`jig-protocol-config`** is a crate of jig's, step code: functions from
+  a parsed JSON value to jig's typed configuration and back to the
+  problems it found, each naming its path in the document. It reads no
+  file. It yields jig's own plain values only, and links neither smith nor
   skein's LLM crates, so an application without agents never links them
   (`../README.md`, section 9); an application with agents turns the
   endpoints and charters it yields into smith's and skein's types in its
   startup (`llm.md`, section 4).
 - **The application's startup** is ordinary code of its main: it reads,
-  parses with `jig-config` and its own parsers, checks, and constructs.
-  `ops`'s main is the reference (`service.md`, section 7).
+  parses with `jig-protocol-config` and its own parsers, checks, and
+  constructs. `ops`'s main is the reference (`service.md`, section 7).
 
 ## 3. jig's part for an engine
 
@@ -68,9 +68,9 @@ the application's main (its shell)
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
 | projects | each project seeded on a first start: its number, its resources and their roles, its homes, its policy, its parties' roles | the core, on a first start |
 | charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (`../domain/hosts.md`, section 8) | the core; `jig-charter` |
-| hosts | the engine's own slots, and the inline agent's limits, if it runs agents; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, and its certificate and key files (`channel.md`, section 10) | the fleet; `jig-engine-channel` |
-| llm | endpoints, models and prices; accounts, each with its registration, its token endpoint and its seed file (`llm.md`, sections 4 and 5) | the core; smith's and skein's components, through the application's startup; `jig-engine-accounts` |
-| clients | the client's listener and what it serves (the client's protocol design) | the client's protocol layer |
+| hosts | the engine's own slots, and the inline agent's limits, if it runs agents; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10) | the fleet; `jig-protocol-engine-workers` |
+| llm | endpoints, models and prices; accounts, each with its registration and its token endpoint, and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
+| clients | the clients' listener (a TCP address, or loopback on one person's machine) and its certificate and key files, but on loopback; the heartbeat; whether the engine prints a local sign-in link at start (`client.md`, sections 4 and 8) | `jig-protocol-engine-clients` |
 | connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5) | the core |
 | limits | a profile, and any limit overridden by name (section 6) | every child and component of jig's |
 
@@ -84,7 +84,7 @@ the application's main (its shell)
 
 | Member | What it gives |
 |---|---|
-| engine | the engine's address, and its TLS server name and trusted roots, or plaintext to a loopback address (`channel.md`, 10.1) |
+| engine | the engine's address, and its TLS server name and trusted roots; or plaintext to a loopback address; or an in-process name, in one process (`channel.md`, 10.1; `service.md`, section 10) |
 | name, secret | the worker's name, and the file holding its secret |
 | slots | how many runs it hosts at once |
 | graces | the grace after losing the engine, the stop graces of an agent's tree, a delivery's deadline, a save's: with the link's ping interval and silence deadline, what its stop bound is made of (`channel.md`, 10.1; `../domain/hosts.md`, 6.6) |
@@ -112,8 +112,8 @@ secret, and every credential its runs need comes with their assignments
 ## 6. Limits
 
 - **Policy above, numbers below.** The design documents name limits and
-  what they bound; the numbers are in `jig-config`'s profiles, as module
-  documentation and constants, never in the design.
+  what they bound; the numbers are in `jig-protocol-config`'s profiles,
+  as module documentation and constants, never in the design.
 - **A profile** is a named set of every limit jig's children and
   components take, consistent with one another: a small one for one
   person's machine, a standard one for a team. A deployment names a
@@ -131,19 +131,20 @@ secret, and every credential its runs need comes with their assignments
 | Secret | Kind | Configured as |
 |---|---|---|
 | a worker's secret | shared between the engine and that worker | on the worker, a file holding it; on the engine, a file holding its digest, per worker |
-| an LLM account's seed | an OAuth refresh token, with the generation it starts from | a file read at every start, which replaces the kept record only when its generation is above it (`llm.md`, 5.4) |
+| an LLM account's record | its tokens, as skein's accounts driver keeps them | a private file per account, written by a sign-in, loaded by the driver (`llm.md`, 5.4) |
 | an LLM account's client secret, if its provider has one | a confidential client's | a file |
 | the listeners' TLS keys | private keys | files beside their certificates |
-| a sign-in provider's client secret | a confidential client's | a file (the client's protocol design) |
+| a sign-in provider's client secret | a confidential client's | a file (`client.md`, section 8) |
 | a connector's credentials | the application's | the application's files, or its own secrets' records |
 
 - **Read at startup,** each within its bound, from a private file: a file
   readable by anyone but the process's user refuses the start, naming it.
 - **Held by the protocol layer,** never the domain: the domains name
   secrets by number (`../domain/engine.md`, section 12).
-- **What changes while the engine runs** (a rotated refresh token, a
-  sign-in's digest) is the store's, in its secrets' records, never
-  written back to a file.
+- **What changes while the engine runs** is kept by its owner, never
+  written back to configuration: a rotated refresh token in the account's
+  private file, by skein's driver; a sign-in's digest in the store's
+  secrets' records.
 
 ## 8. First start, and every start
 

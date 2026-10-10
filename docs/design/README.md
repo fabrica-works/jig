@@ -1,10 +1,11 @@
 # jig's design
 
-Provisional, 2026-10-06. What jig is, how an application is built around
-it, and what keeps the application's wiring from breaking what jig
-promises. This document comes first. The documents it lists in section 12
-go deeper into each part. The mechanics are those of skein's
-`programming-model.md`. What is still open is listed in section 14.
+Provisional, 2026-10-06, revised 2026-10-10. What jig is, how an
+application is built around it, and what keeps the application's wiring
+from breaking what jig promises. This document comes first. The documents
+it lists in section 12 go deeper into each part. The mechanics are those
+of skein's `programming-model.md`. What is still open is listed in
+section 14.
 
 ## 1. In one page
 
@@ -167,7 +168,7 @@ application root    routing between its children, translation; its store, channe
   - agents' hosts: the workers' channel, the engine's side, or the host
     inside the engine (section 9);
   - people's requests, and the replies to them;
-  - LLM accounts' refreshes;
+  - LLM accounts: wanted, granted, failed;
   - the connectors' vocabulary (section 7).
 - **Connectors are numbered.** The core knows from its configuration that
   connector `k` exists and that its resources are paths under its
@@ -395,7 +396,8 @@ and the conformance world crashes the application at every commit.
   - the core's records and keys;
   - their encoding, ordered as the keys are and versioned;
   - transcripts as files, per session;
-  - the secret records: sign-ins, refresh tokens.
+  - the secret records: sign-ins' digests (LLM accounts' records are
+    skein's accounts driver's own files).
 - **The application's part:**
   - its connectors' records: outboxes, procedures' states, what was made
     by key, and each connector's own state;
@@ -569,10 +571,10 @@ application as its first user.
   root.
 - **`protocol/`:** jig's protocol layer: the components an application's
   protocol layers own, the engine's and the worker's services, the
-  workers' channel, LLM calls and accounts in the engine, and
-  configuration. Its `README.md` gives the reading order, the names, what
-  jig needs from skein and smith, and what the domain owes. The store's
-  design and the client's protocol join it.
+  workers' channel, LLM calls and accounts in the engine, configuration,
+  and the client's protocol. Its `README.md` gives the reading order, the
+  names, what jig needs from skein and smith, and what the domain owes.
+  The store's design joins it.
 - **`draft/`:** drafts, not contract: ideas and inputs gathered for a
   design to come, such as the store's.
 
@@ -598,3 +600,43 @@ section 5). What remains here:
 
 - **Versioning:** how jig is released and pinned, and how a change to its
   vocabulary reaches every application.
+
+## 15. Crates' names
+
+- **Named by layer.** A crate's name says the layer it is in
+  (programming-model.md, section 2):
+  - `jig-domain-<name>`: a domain's step code: the core and its children,
+    the hub, the inline agent, the client's domain;
+  - `jig-protocol-<name>`: the protocol layer's: codecs, components,
+    translations, parsing;
+  - `jig-view`: the client's view;
+  - `jig-shell-<platform>`: the client's shells;
+  - test kits keep their kind as their prefix (`jig-test-`, `jig-fake-`,
+    `jig-scripted-`, `jig-conformance`), and worlds end in `-world`.
+- **An application follows the same rule** for its own crates, under its
+  own name: `jig-ops-domain-*`, `jig-ops-protocol-*`, `jig-ops-view`. Its
+  service (its `iterate` and its protocol layer's routing) and its binary
+  carry its name alone: `jig-ops-service`, `jig-ops`.
+- **Renamed from the names as built.** The design's documents use the
+  names as built until the rename lands, and new crates take their names
+  at once:
+
+| As built | Renamed |
+|---|---|
+| `jig-core` | `jig-domain-core` |
+| `jig-core-accounts`, `-authority`, `-brief`, `-fleet`, `-notes`, `-people`, `-tasks`, `-views` | `jig-domain-accounts`, `-authority`, `-brief`, `-fleet`, `-notes`, `-people`, `-tasks`, `-views` |
+| `jig-host` | `jig-domain-host` |
+| `jig-inline-agent` | `jig-domain-inline-agent` |
+| `jig-client` | `jig-domain-client` |
+| `jig-client-view` | `jig-view` |
+| `jig-charter` | `jig-protocol-charter` |
+| `jig-client-transcript` | `jig-protocol-transcript` |
+| `jig-test-client-domain` | `jig-test-domain-client` |
+| `jig-test-client-view` | `jig-test-view` |
+| `jig-ops-client-domain` | `jig-ops-domain-client` |
+| `jig-ops-client-view` | `jig-ops-view` |
+| `jig-ops-connectors` | `jig-ops-domain-connectors` |
+
+  Every other crate keeps its name: the test kits, the worlds, `ops`'s
+  domains, `jig-test-domain`, the reference root's test application, and
+  `jig-boundary`, the check of the crate graph.

@@ -1,11 +1,11 @@
 # jig's client domain
 
-Provisional, 2026-10-09. The design of jig's client: the domain a party's
-client runs, the pages and cards it shows of jig's primitives, how an
-application composes it with its own kinds of object, what it asks of the
-engine, its view, and how all of it is tested. jig as a whole is
-`../../README.md` (section 10 is the client in one page); the engine's
-domain is `../../domain/`. The mechanics are those of skein's
+Provisional, 2026-10-09, revised 2026-10-10. The design of jig's client:
+the domain a party's client runs, the pages and cards it shows of jig's
+primitives, how an application composes it with its own kinds of object,
+what it asks of the engine, its view, and how all of it is tested. jig as
+a whole is `../../README.md` (section 10 is the client in one page); the
+engine's domain is `../../domain/`. The mechanics are those of skein's
 `programming-model.md`, as for every part of jig.
 
 ## 1. Reading order
@@ -45,10 +45,11 @@ an application's client
 skein-lib's request table       keyed requests: the client root's only way out for them (root.md, section 4)
 
 below the domain, with the client's protocol layer
-jig-client-wire                 jig's documents, encoded, for both ends (contract.md, section 10)
+jig-protocol-client-wire        jig's documents, encoded, for both ends (contract.md, section 10)
+jig-protocol-client-link        the connection to the engine: exchanges, the stream, envelopes (../../protocol/client.md)
 jig-client-transcript           turns decoded with smith's transcript crate (client.md, section 10)
-jig-client-shell-web            the browser's shell (view.md, section 11)
-jig-client-shell-native         a shell on skein's HTTP client, for Linux and the worlds
+jig-shell-web                   the browser's shell (view.md, section 11)
+jig-shell-native                a shell on skein's HTTP client, for Linux and the worlds
 
 for tests
 testing/jig-fake-person         the person: reads the view tree, acts on it (testing.md, section 3)
@@ -64,11 +65,11 @@ tests/client                    the client's world, and the joint world (testing
 - **The application owns the roots,** of its domain and of its view, as
   it owns the engine's (root.md). Nothing in jig's client knows an
   application's types.
-- **The wire, the protocol layer and the shells** come with the client's
-  protocol design, beside the engine's (`../../README.md`, section 12).
-  This design says what they owe the domain, and no more. A shell is the
-  one impure part of a client, ordinary Rust as skein's shell is, not
-  step code.
+- **The wire, the protocol layer and the shells** are the client's
+  protocol's (`../../protocol/client.md`), beside the engine's. This
+  design says what they owe the domain, and no more. A shell is the one
+  impure part of a client, ordinary Rust as skein's shell is, not step
+  code.
 
 ## 3. Conventions
 
