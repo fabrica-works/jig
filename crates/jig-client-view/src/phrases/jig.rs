@@ -612,6 +612,8 @@ pub enum JigPhrase {
     NoteBody,
     /// This text value is incomplete.
     DocumentTextCut,
+    /// The named independent person-task revision (0).
+    PersonAddressRevision,
     /// This note reference list is incomplete.
     NoteReferencesCut,
     /// Charter (0).
@@ -1367,6 +1369,7 @@ impl JigPhrase {
             Self::NoteDescription => 268,
             Self::NoteBody => 269,
             Self::DocumentTextCut => 3500,
+            Self::PersonAddressRevision => 3600,
             Self::NoteReferencesCut => 3300,
             Self::Charter => 270,
             Self::GoalProcedure => 510,
@@ -2108,6 +2111,7 @@ impl JigPhrase {
             | Self::ToolAllowed
             | Self::AmendTask
             | Self::Verdict
+            | Self::PersonAddressRevision
             | Self::FirstUnread
             | Self::Topic
             | Self::DependencyEnded
@@ -2232,7 +2236,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 576] = [
+pub const ALL: [JigPhrase; 577] = [
     JigPhrase::PolicyPeriodSpend,
     JigPhrase::PolicyEditRole,
     JigPhrase::PolicyRequests,
@@ -2565,6 +2569,7 @@ pub const ALL: [JigPhrase; 576] = [
     JigPhrase::NoteDescription,
     JigPhrase::NoteBody,
     JigPhrase::DocumentTextCut,
+    JigPhrase::PersonAddressRevision,
     JigPhrase::NoteReferencesCut,
     JigPhrase::Charter,
     JigPhrase::GoalProcedure,

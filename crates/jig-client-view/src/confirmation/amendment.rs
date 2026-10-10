@@ -1,7 +1,7 @@
 //! Bounded typed amendment fields; no authority judgment (client.md, 9).
 use crate::{
     Builder, JigBindings, JigMeaning, Role,
-    cards::{common, proposal},
+    cards::proposal,
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
@@ -10,7 +10,7 @@ use jig_client::{
     Domain,
     action::Act,
     confirm::Confirmation,
-    contract::{Amendment, Text},
+    contract::{AddressChange, Amendment, Executor, PersonAddress, Recipient, Revision, Task, Text},
     objects::{Body, Object},
 };
 /// The one property replaced by an input's whole value.
@@ -21,8 +21,7 @@ pub enum Field {
     Budget,
     Deadline,
     Party,
-    Task,
-    Role { project: u32 },
+    Role,
 }
 /// Decode one field against the exact amendment snapshot that named its token.
 #[must_use]
@@ -45,13 +44,15 @@ pub fn edit(before: &Amendment, selected: &Amendment, field: Field, value: Box<[
             authority.deadline = Some(deadline(&value)?);
             change.authority = Some(authority);
         }
-        Field::Party => change.addressed = Some(jig_client::contract::Recipient::Party(crate::number(&value)?)),
-        Field::Task => change.addressed = Some(jig_client::contract::Recipient::Task(crate::number(&value)?)),
-        Field::Role { project } => {
-            change.addressed = Some(jig_client::contract::Recipient::Role {
-                project,
-                role: u32::try_from(crate::number(&value)?).ok()?,
-            });
+        Field::Party => {
+            let mut addressed = selected.addressed.or(before.addressed)?;
+            addressed.address = PersonAddress::Party(crate::number(&value)?);
+            change.addressed = Some(addressed);
+        }
+        Field::Role => {
+            let mut addressed = selected.addressed.or(before.addressed)?;
+            addressed.address = PersonAddress::Role(u32::try_from(crate::number(&value)?).ok()?);
+            change.addressed = Some(addressed);
         }
     }
     Some(Act::Change { change: Box::new(change) })
@@ -120,12 +121,9 @@ pub fn form(
     input(b, &value, open, Field::Budget, JigPhrase::NewBudget, words, bindings);
     input(b, &value, open, Field::Deadline, JigPhrase::NewDeadline, words, bindings);
     if let Some(to) = &value.addressed {
-        common::recipient(b, to, words);
+        proposal::address_change(b, to, words);
         input(b, &value, open, Field::Party, JigPhrase::AddressParty, words, bindings);
-        input(b, &value, open, Field::Task, JigPhrase::AddressTask, words, bindings);
-        if let Some(project) = object.project {
-            input(b, &value, open, Field::Role { project }, JigPhrase::AddressRole, words, bindings);
-        }
+        input(b, &value, open, Field::Role, JigPhrase::AddressRole, words, bindings);
     }
     if let Some(dependencies) = &value.dependencies {
         for task in dependencies {
@@ -246,7 +244,7 @@ fn empty() -> Amendment {
 // The replacement request remains the separate selected delta.
 fn values(before: &Amendment, change: &Amendment) -> Amendment {
     Amendment {
-        addressed: change.addressed.clone().or(before.addressed.clone()),
+        addressed: change.addressed.or(before.addressed),
         spec: change.spec.clone().or(before.spec.clone()),
         instructions: change.instructions.clone().or(before.instructions.clone()),
         wake: change.wake.clone().or(before.wake.clone()),
@@ -267,7 +265,7 @@ fn input(
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     b.open(match field {
         Field::Words | Field::Instructions => Role::TextArea,
-        Field::Budget | Field::Deadline | Field::Party | Field::Task | Field::Role { .. } => Role::TextField,
+        Field::Budget | Field::Deadline | Field::Party | Field::Role => Role::TextField,
     });
     b.name(&words.say(phrase, &[]));
     match field {
@@ -286,7 +284,7 @@ fn input(
                 b.value(&words.say(JigPhrase::Amount, &[Hole::Amount(authority.budget)]), open.writes);
             }
         }
-        Field::Deadline | Field::Party | Field::Task | Field::Role { .. } => b.value(&[], open.writes),
+        Field::Deadline | Field::Party | Field::Role => b.value(&[], open.writes),
     }
     b.bind(bindings.insert(JigMeaning::Amendment {
         before: Box::new(value.clone()),
@@ -299,20 +297,7 @@ fn input(
 fn before(object: &Object) -> Option<Amendment> {
     Some(match &object.body {
         Some(Body::Task(doc)) => Amendment {
-            addressed: match &*doc.chip.details {
-                jig_client::contract::ChipPhase::Person { addressed, .. } => Some(addressed.clone()),
-                jig_client::contract::ChipPhase::Waiting { .. }
-                | jig_client::contract::ChipPhase::Active(_)
-                | jig_client::contract::ChipPhase::Idle { .. }
-                | jig_client::contract::ChipPhase::Starting
-                | jig_client::contract::ChipPhase::Running { .. }
-                | jig_client::contract::ChipPhase::WaitingForWords { .. }
-                | jig_client::contract::ChipPhase::BackingOff { .. }
-                | jig_client::contract::ChipPhase::Procedure { .. }
-                | jig_client::contract::ChipPhase::Closing(_)
-                | jig_client::contract::ChipPhase::Held { .. }
-                | jig_client::contract::ChipPhase::Ended { .. } => None,
-            },
+            addressed: task_address(doc),
             spec: doc.spec.whole(),
             instructions: crate::instructions::whole(doc.instructions.as_ref()),
             wake: Some(doc.wake.clone()),
@@ -320,7 +305,7 @@ fn before(object: &Object) -> Option<Amendment> {
             authority: Some(doc.authority.clone()),
         },
         Some(Body::Escalation(doc)) => Amendment {
-            addressed: doc.steering.addressed.clone(),
+            addressed: recipient_address(doc.steering.person_revision, &doc.steering.addressed, object.project),
             spec: doc.steering.spec.whole(),
             instructions: crate::instructions::whole(doc.steering.instructions.as_ref()),
             wake: Some(doc.steering.wake.clone()),
@@ -337,4 +322,28 @@ fn before(object: &Object) -> Option<Amendment> {
         )
         | None => return None,
     })
+}
+
+// A held person task keeps its concrete executor; lifecycle alone is not its address.
+fn task_address(doc: &Task) -> Option<AddressChange> {
+    let revision = doc.person_revision?;
+    let address = match doc.chip.executor {
+        Executor::Party { party } => PersonAddress::Party(party),
+        Executor::Role { project, role } if project == doc.project => PersonAddress::Role(role),
+        Executor::Role { .. } | Executor::Agent { .. } | Executor::Procedure { .. } => return None,
+    };
+    Some(AddressChange { revision, address })
+}
+fn recipient_address(
+    revision: Option<Revision>,
+    to: &Option<Recipient>,
+    project: Option<u32>,
+) -> Option<AddressChange> {
+    let revision = revision?;
+    let address = match to.as_ref()? {
+        Recipient::Party(party) => PersonAddress::Party(*party),
+        Recipient::Role { project: scope, role } if Some(*scope) == project => PersonAddress::Role(*role),
+        Recipient::Role { .. } | Recipient::Task(_) | Recipient::Roles { .. } => return None,
+    };
+    Some(AddressChange { revision, address })
 }

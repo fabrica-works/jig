@@ -107,7 +107,7 @@ pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words,
 /// Changes retain the before/after facts instead of interpreting instructions.
 pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &mut JigBindings) {
     if let Some(to) = &change.addressed {
-        super::common::recipient(b, to, words);
+        address_change(b, to, words);
     }
     if let Some(spec) = &change.spec {
         crate::specification::specification(b, spec, words);
@@ -128,4 +128,10 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &
     }
     b.open(Role::Separator);
     b.close();
+}
+
+/// A named person revision and exact closed destination; the ask owns its project scope.
+pub(crate) fn address_change(b: &mut Builder, change: &jig_client::contract::AddressChange, words: &Words) {
+    words.text(b, JigPhrase::PersonAddressRevision, &[Hole::Number(change.revision.value)]);
+    crate::proposed_task::executor(b, jig_client::contract::OwnerExecutor::Person(change.address), words);
 }

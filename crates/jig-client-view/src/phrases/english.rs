@@ -1286,6 +1286,10 @@ pub fn language() -> Language {
             JigPhrase::PriorityField => Box::new([Segment::Text(copy_of(b"New goal priority"))]),
             JigPhrase::NoteDescription => Box::new([Segment::Text(copy_of(b"Note description"))]),
             JigPhrase::NoteBody => Box::new([Segment::Text(copy_of(b"Note body"))]),
+            JigPhrase::PersonAddressRevision => Box::new([
+                Segment::Text(copy_of(b"Person-task revision ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::DocumentTextCut => Box::new([Segment::Text(copy_of(b"Only part of this text was supplied"))]),
             JigPhrase::NoteReferencesCut => Box::new([Segment::Text(copy_of(
                 b"This note has more references; read the whole note before replacing it",

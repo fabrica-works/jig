@@ -3,11 +3,11 @@
 use crate::Bounds;
 use core::mem::size_of;
 use jig_client::contract::{
-    Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, Admission, AdmissionLimit, Amendment,
-    Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing,
-    ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider, Decision,
-    Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending, Escalation, Executor,
-    FailureClass, FieldRule, Frame, GoalExecutor, GoalLine, GoalPage, GoalProcedure, Goals, Grant, HeldRole,
+    Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, AddressChange, Admission, AdmissionLimit,
+    Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase,
+    Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider,
+    Decision, Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending, Escalation,
+    Executor, FailureClass, FieldRule, Frame, GoalExecutor, GoalLine, GoalPage, GoalProcedure, Goals, Grant, HeldRole,
     HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host,
     Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs, Note,
     NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter, ParameterDocument, Part,
@@ -97,6 +97,7 @@ macro_rules! fields {
         }
     };
 }
+fields!(AddressChange { revision, address });
 fields!(Amendment { addressed, spec, wake, dependencies, authority, instructions });
 fields!(WakePolicy { words, results, topics, subscriptions });
 impl Payload for PersonAnswer {

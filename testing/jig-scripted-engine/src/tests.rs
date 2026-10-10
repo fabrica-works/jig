@@ -1676,3 +1676,15 @@ fn optional_instruction_sources_price_whole_task_and_steering_at_byte_and_text_b
         assert_eq!(steering.instructions, source);
     }
 }
+
+#[test]
+fn addressed_changes_keep_named_person_revisions_and_whole_fixed_width_destinations_at_exact_bounds() {
+    for address in [PersonAddress::Party(u64::MAX), PersonAddress::Role(u32::MAX)] {
+        let change = AddressChange { revision: Revision { value: u64::MAX }, address };
+        let exact = u64::try_from(core::mem::size_of::<AddressChange>()).unwrap();
+        let mut bounds = Bounds { text: 0, rows: 0, document_bytes: exact, ..Bounds::default() };
+        assert!(crate::payload::fits(&change, &bounds));
+        bounds.document_bytes -= 1;
+        assert!(!crate::payload::fits(&change, &bounds), "the complete named revision and target are charged together");
+    }
+}

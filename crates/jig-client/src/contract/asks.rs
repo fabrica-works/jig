@@ -12,11 +12,18 @@ pub enum GoalExecutor {
     Procedure { connector: u16, code: u32 },
 }
 
+/// A person destination change names the independent person-task revision (domain/tasks.md, 7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct AddressChange {
+    pub revision: Revision,
+    pub address: super::PersonAddress,
+}
+
 /// A task change whose spec revision the request names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Amendment {
     /// Retarget a person task, with admission decided by its engine document.
-    pub addressed: Option<super::Recipient>,
+    pub addressed: Option<AddressChange>,
     pub spec: Option<super::Specification>,
     pub wake: Option<WakePolicy>,
     pub dependencies: Option<List<u64>>,

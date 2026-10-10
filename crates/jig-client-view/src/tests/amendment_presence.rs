@@ -26,6 +26,7 @@ fn open(row: Task) -> (Domain, Id<Object>) {
 fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_instructions() {
     let mut row = task_doc(&[ActKind::Amend]);
     row.chip.phase = Phase::Active;
+    row.person_revision = Some(Revision { value: 12 });
     *row.chip.details = ChipPhase::Person { addressed: Recipient::Party(1), taken: None, since: None };
     row.spec.specification.parameters = list([
         ParameterDocument::Number { name: 7, value: u64::MAX },
@@ -51,18 +52,28 @@ fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_i
             b"2000-02-29 12:34",
             Amendment { authority: Some(deadline), ..empty() },
         ),
-        (b"Address to party number", b"9", Amendment { addressed: Some(Recipient::Party(9)), ..empty() }),
-        (b"Address to task number", b"9", Amendment { addressed: Some(Recipient::Task(9)), ..empty() }),
+        (
+            b"Address to party number",
+            b"9",
+            Amendment {
+                addressed: Some(AddressChange { revision: Revision { value: 12 }, address: PersonAddress::Party(9) }),
+                ..empty()
+            },
+        ),
         (
             b"Address to role number in this project",
             b"7",
-            Amendment { addressed: Some(Recipient::Role { project: 4, role: 7 }), ..empty() },
+            Amendment {
+                addressed: Some(AddressChange { revision: Revision { value: 12 }, address: PersonAddress::Role(7) }),
+                ..empty()
+            },
         ),
     ] {
         let (mut domain, _) = open(row.clone());
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, &words(), &mut bindings);
         assert!(contains(&tree, b"whole task instructions"));
+        assert!(!contains(&tree, b"Address to task number"), "only actual person and role destinations are offered");
         assert!(domain.confirmation().unwrap().choices.change.is_none());
         let action = input(&tree, label, value, &mut bindings);
         drive(&mut domain, Event::Act { act: action });
@@ -178,4 +189,85 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
     };
     assert_eq!(*revision, Revision { value: 6 });
     assert_eq!(*release, Some(Revision { value: 4 }));
+}
+
+#[test]
+fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revision_with_other_selected_edits() {
+    for (label, bytes, address) in [
+        (b"Address to party number".as_slice(), b"18446744073709551615".as_slice(), PersonAddress::Party(u64::MAX)),
+        (b"Address to role number in this project".as_slice(), b"4294967295".as_slice(), PersonAddress::Role(u32::MAX)),
+    ] {
+        let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
+        let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
+        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        let words = words();
+        let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
+        let tree = dialog(&domain, &words, &mut bindings);
+        drive(
+            &mut domain,
+            Event::Act { act: input(&tree, b"New specification", b"selected whole words", &mut bindings) },
+        );
+        let tree = dialog(&domain, &words, &mut bindings);
+        assert!(contains(&tree, b"Person-task revision 12"));
+        if address == PersonAddress::Role(u32::MAX) {
+            let token =
+                tree.nodes().iter().find(|node| node.name.as_deref() == Some(label)).unwrap().binding.unwrap().token;
+            assert_eq!(
+                crate::decode(&mut bindings, token, crate::Act::Input { value: Box::from(b"4294967296".as_slice()) }),
+                None
+            );
+            assert!(domain.confirmation().unwrap().choices.change.as_ref().unwrap().addressed.is_none());
+        }
+        drive(&mut domain, Event::Act { act: input(&tree, label, bytes, &mut bindings) });
+        let mut specification = row.steering.spec.whole().unwrap();
+        specification.words = text(b"selected whole words");
+        let expected = Amendment {
+            addressed: Some(AddressChange { revision: Revision { value: 12 }, address }),
+            spec: Some(specification),
+            ..empty()
+        };
+        assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
+        let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+        assert_eq!(sent(&out), &expected);
+        let ask = out
+            .iter()
+            .find_map(|request| match request {
+                Request::Send { ask, .. } => Some(&**ask),
+                _ => None,
+            })
+            .unwrap();
+        let Ask::Amend { project, revision, release, .. } = ask else {
+            panic!("sent amendment");
+        };
+        assert_eq!(*project, 4);
+        assert_eq!(*revision, Revision { value: 6 });
+        assert_eq!(*release, Some(Revision { value: 4 }));
+    }
+}
+
+#[test]
+fn address_controls_require_actual_person_revision_and_keep_legacy_task_recipients_outside_the_closed_destination() {
+    for (revision, recipient) in [
+        (None, Some(Recipient::Party(9))),
+        (Some(Revision { value: 12 }), Some(Recipient::Task(9))),
+        (Some(Revision { value: 12 }), Some(Recipient::Roles { project: 4, roles: list([7, 2]) })),
+        (Some(Revision { value: 12 }), Some(Recipient::Role { project: 99, role: 7 })),
+    ] {
+        let mut row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
+        row.steering.person_revision = revision;
+        row.steering.addressed = recipient;
+        let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row)));
+        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        let tree = dialog(&domain, &words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
+        assert!(!contains(&tree, b"Address to party number"));
+        assert!(!contains(&tree, b"Address to role number in this project"));
+        assert!(!contains(&tree, b"Address to task number"));
+        assert!(contains(&tree, b"New budget"), "absent address facts do not block independent properties");
+    }
+    let mut row = task_doc(&[ActKind::Amend]);
+    row.person_revision = None;
+    let (domain, _) = open(row);
+    let tree = dialog(&domain, &words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
+    assert!(!contains(&tree, b"Address to party number"));
+    assert!(contains(&tree, b"New budget"));
 }
