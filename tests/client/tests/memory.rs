@@ -75,9 +75,12 @@ fn full_task() -> jig_client::contract::Task {
     task.parts = jig_client_world::test::list(
         (1..=8).map(|n| jig_client::contract::Part::Panel { connector: jig_test_client_domain::FIRST, task: n }),
     );
-    task.resources = jig_client_world::test::list(
-        (1..=8).map(|n| jig_client::contract::Part::Panel { connector: jig_test_client_domain::SECOND, task: n }),
-    );
+    task.resources = jig_client_world::test::list((1..=8).map(|n| {
+        jig_client::contract::TaskResource::Part(jig_client::contract::Part::Panel {
+            connector: jig_test_client_domain::SECOND,
+            task: n,
+        })
+    }));
     task.spec.specification.words.bytes = stories::text(&[b's'; 32]);
     task.instructions = Some(jig_client::contract::DocumentText::complete(stories::text(&[b'i'; 32])));
     task.dependencies = jig_client_world::test::list([
