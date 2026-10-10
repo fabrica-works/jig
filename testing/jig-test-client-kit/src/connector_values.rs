@@ -33,7 +33,7 @@ fn entries_heap(rows: &List<OutboxEntry>) -> Option<u64> {
     }
     Some(bytes)
 }
-/// Every owned allocation, including the boxed whole ClientDocument and unused list rows.
+/// Every owned allocation, including the boxed whole `ClientDocument` and unused list rows.
 #[must_use]
 pub fn document_heap(value: &ConnectorDocument) -> Option<u64> {
     let nested = match value.value.as_ref() {

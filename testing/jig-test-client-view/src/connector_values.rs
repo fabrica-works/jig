@@ -284,7 +284,7 @@ pub fn answer(b: &mut Builder, value: &ConnectorAnswer, words: &Words) {
                 | application_core::Refusal::Unknown
                 | application_core::Refusal::NotOffered
                 | application_core::Refusal::KeyConflict => {
-                    words.refusal(b, &super::connector_values_refusal::refusal(why))
+                    words.refusal(b, &super::connector_values_refusal::refusal(why));
                 }
             }
             if let application_core::Refusal::Authority { proposable, .. } = why {

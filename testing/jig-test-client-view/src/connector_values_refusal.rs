@@ -1,8 +1,9 @@
 //! Display translation of sparse owner refusals (contract.md, 4; view.md, 7).
-//! Absent facts remain absent. The exact terminal remains in ConnectorAnswer.
+//! Absent facts remain absent. The exact terminal remains in `ConnectorAnswer`.
 use jig_client::contract as client;
 use jig_test_client_domain::connector_values::application_core as owner;
 
+#[expect(clippy::manual_map, reason = "step code uses exhaustive matches without closures")]
 pub(super) fn refusal(value: owner::Refusal) -> client::Refusal {
     match value {
         owner::Refusal::Disposal { task, issue } => client::Refusal::Disposal {
