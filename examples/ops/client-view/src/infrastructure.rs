@@ -474,7 +474,10 @@ pub fn part(
             &[Hole::Number(u64::from(jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure)))],
         ),
         Part::Resource { path, .. } => {
-            words.text(builder, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(path.bytes()))]);
+            words.text(builder, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(b""))]);
+            for segment in path {
+                jig_client_view::literal_segment::render(builder, segment);
+            }
         }
         Part::Kind { kind, .. } => words.text(builder, Word::Kind, &[Hole::Number(u64::from(*kind))]),
         Part::Panel { .. }

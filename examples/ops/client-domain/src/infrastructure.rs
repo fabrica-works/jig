@@ -252,7 +252,7 @@ pub const fn shown(side: &Side) -> u64 {
 pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Show { part, generation, scope } => {
-            if !part_fits(&part, env.limits.text) {
+            if !part_fits(&part, env.limits.rows, env.limits.text) {
                 full(out);
                 return;
             }
@@ -665,9 +665,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     checked_max_out(limits)?;
+    let path = List::<Box<[u8]>>::worst_case(limits.rows)?
+        .checked_add(u64::from(limits.rows).checked_mul(u64::from(limits.text))?)?;
     let mut total = List::<Held>::worst_case(limits.parts)?
         .checked_mul(2)?
-        .checked_add(u64::from(limits.parts).checked_mul(u64::from(limits.text))?)?;
+        .checked_add(u64::from(limits.parts).checked_mul(path)?.checked_mul(2)?)?;
     total = total.checked_add(Slab::<Object>::worst_case(limits.objects.checked_mul(2)?)?)?.checked_add(Map::<
         Subject,
         Id<Object>,
@@ -800,9 +802,9 @@ fn progress_changed(
     }
 }
 
-fn part_fits(part: &Part, text: u32) -> bool {
+fn part_fits(part: &Part, rows: u32, text: u32) -> bool {
     match part {
-        Part::Resource { path, .. } => path.fits(text),
+        Part::Resource { path, .. } => jig_client::contract::resource_path_fits(path, rows, text),
         Part::Connector { .. }
         | Part::Kind { .. }
         | Part::Panel { .. }

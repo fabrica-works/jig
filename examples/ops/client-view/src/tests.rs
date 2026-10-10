@@ -939,3 +939,113 @@ fn outbox_document(subject: infrastructure::Subject) -> infrastructure::Document
         staged_limit: None,
     }))
 }
+
+#[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one public slot lifecycle covers both connector fragment owners and whole opaque paths"
+)]
+fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenations_in_both_connectors() {
+    let domain_limits = limits();
+    let (jig_words, obs_words, infra_words) = phrasebooks();
+    let envelope = Limits::of(&domain_limits, &jig_words, &obs_words, &infra_words).unwrap().tree;
+    // A finite public fragment tree, borrowing the actual checked byte/depth envelope.
+    let mut tree_limits = envelope;
+    tree_limits.nodes = 64;
+    tree_limits.slots = 8;
+    tree_limits.text_bytes = tree_limits.nodes.checked_mul(tree_limits.text_per_node).unwrap();
+    assert!(tree_limits.nodes <= envelope.nodes);
+    assert!(tree_limits.slots <= envelope.slots);
+    assert!(tree_limits.text_per_node >= 128);
+    let mut builder = jig_client_view::Builder::new(&tree_limits);
+    let mut jig_bindings = jig_client_view::JigBindings::new(16, JIG.text);
+    let mut obs_bindings = crate::bindings::Bindings::new(16, 32, 1);
+    let mut infra_bindings = crate::bindings::Bindings::new(16, 32, 2);
+    let mut obs = observability::Side::new(&domain_limits.observability, 63);
+    let mut infra = infrastructure::Side::new(&domain_limits.infrastructure, 64);
+    let mut expected = Vec::new();
+    builder.open(jig_client_view::Role::Page);
+    for connector in [1, 2] {
+        for path in [
+            list([Box::<[u8]>::from(*b"a/b"), Box::<[u8]>::from(*b"c")]),
+            list([Box::<[u8]>::from(*b"a"), Box::<[u8]>::from(*b"b/c")]),
+            list([Box::<[u8]>::from(*b"/\0"), Box::<[u8]>::from([0xFF, 0])]),
+            list([Box::<[u8]>::from([0xFF; 32]), Box::<[u8]>::from([0xFE; 32])]),
+        ] {
+            let part = Part::Resource { connector, path };
+            if connector == 1 {
+                let mut out = Queue::with_capacity(observability::max_out(&domain_limits.observability));
+                observability::step(
+                    &mut obs,
+                    &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.observability },
+                    observability::Event::Show {
+                        part: part.clone(),
+                        generation: 11,
+                        scope: observability::Scope::Project(1),
+                    },
+                    &mut out,
+                );
+                assert!(obs.contains(&part, 11));
+                assert!(out.is_empty());
+            } else {
+                let mut out = Queue::with_capacity(infrastructure::max_out(&domain_limits.infrastructure));
+                infrastructure::step(
+                    &mut infra,
+                    &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.infrastructure },
+                    infrastructure::Event::Show {
+                        part: part.clone(),
+                        generation: 11,
+                        scope: infrastructure::Scope::Project(1),
+                    },
+                    &mut out,
+                );
+                assert!(infra.contains(&part, 11));
+                assert!(out.is_empty());
+            }
+            jig_client_view::cards::common::part(&mut builder, &part, &jig_words, &mut jig_bindings);
+            expected.push(part);
+        }
+    }
+    builder.close();
+    assert_ne!(expected[0], expected[1]);
+    let slots = builder.slots(0);
+    assert_eq!(slots.len(), 8);
+    for (slot, part) in slots.iter().zip(&expected) {
+        assert_eq!(jig_bindings.part(slot.reference.token), Some(part));
+        let mut fragment = jig_client_view::Builder::new(&tree_limits);
+        if slot.reference.owner == (jig_client_view::Owner::Side { connector: 1 }) {
+            crate::observability::part(&mut fragment, &obs, part, 11, &obs_words, &mut obs_bindings);
+        } else {
+            assert_eq!(slot.reference.owner, jig_client_view::Owner::Side { connector: 2 });
+            crate::infrastructure::part(&mut fragment, &infra, part, 11, &infra_words, &jig_words, &mut infra_bindings);
+        }
+        builder.splice(slot.id, fragment);
+    }
+    let tree = builder.finish();
+    let code: Vec<_> = tree
+        .nodes()
+        .iter()
+        .flat_map(|node| node.text.iter())
+        .filter(|run| run.run == jig_client_view::Run::Code)
+        .map(|run| run.text.as_ref())
+        .collect();
+    for bytes in [b"a/b".as_slice(), b"c", b"a", b"b/c", b"/\0", b"\\xFF\\x00"] {
+        assert_eq!(code.iter().filter(|run| **run == bytes).count(), 2);
+    }
+    assert!(!code.contains(&b"a/b/c".as_slice()));
+    let full_ff = b"\\xFF".repeat(32);
+    let full_fe = b"\\xFE".repeat(32);
+    assert_eq!(code.iter().filter(|run| **run == full_ff.as_slice()).count(), 2);
+    assert_eq!(code.iter().filter(|run| **run == full_fe.as_slice()).count(), 2);
+    assert!(tree.len() <= envelope.nodes);
+    assert!(
+        tree.nodes()
+            .iter()
+            .all(|node| node.text.iter().all(|run| run.text.len() <= usize::try_from(envelope.text_per_node).unwrap()))
+    );
+    for (slot, part) in slots.iter().zip(&expected) {
+        assert_eq!(jig_bindings.part(slot.reference.token), Some(part));
+    }
+    jig_bindings.begin();
+    assert!(slots.iter().all(|slot| jig_bindings.part(slot.reference.token).is_none()));
+}

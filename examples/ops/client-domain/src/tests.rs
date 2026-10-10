@@ -864,7 +864,14 @@ fn connector_parts(number: u16) -> List<contract::Part> {
     let mut parts = List::with_capacity(9);
     for part in [
         contract::Part::Connector { connector: number },
-        contract::Part::Resource { connector: number, path: contract::Text::new(Box::from(*b"service"), 32).unwrap() },
+        contract::Part::Resource {
+            connector: number,
+            path: {
+                let mut path = List::with_capacity(1);
+                path.push(Box::<[u8]>::from(*b"service")).unwrap();
+                path
+            },
+        },
         contract::Part::Kind { connector: number, kind: 1 },
         contract::Part::Panel { connector: number, task: 9 },
         contract::Part::Result { connector: number, task: 9 },
@@ -1071,5 +1078,72 @@ fn outbox_subjects_copy_the_supplied_scope_and_numeric_entry_independently_of_ef
         }
         assert_ne!(infra::documents::subject(&effect, infrastructure.scope), Some(infrastructure));
         assert_ne!(obs::documents::subject(&effect, observability.scope), Some(observability));
+    }
+}
+
+#[test]
+fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_connectors() {
+    let limits = limits();
+    for connector in [1, 2] {
+        let mut valid = List::with_capacity(2);
+        valid.push(Box::<[u8]>::from([0xFF; 32])).unwrap();
+        valid.push(Box::<[u8]>::from(*b"/\0")).unwrap();
+        let empty_overallocated = List::with_capacity(3);
+        let mut too_long = List::with_capacity(1);
+        too_long.push(Box::<[u8]>::from([b'x'; 33])).unwrap();
+        for (path, accepted) in [(valid, true), (empty_overallocated, false), (too_long, false)] {
+            let part = contract::Part::Resource { connector, path };
+            if connector == 1 {
+                let mut side = crate::observability::Side::new(&limits.observability, 61);
+                let mut out = Queue::with_capacity(crate::observability::max_out(&limits.observability));
+                crate::observability::step(
+                    &mut side,
+                    &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.observability },
+                    crate::observability::Event::Show {
+                        part: part.clone(),
+                        generation: 11,
+                        scope: crate::observability::Scope::Project(1),
+                    },
+                    &mut out,
+                );
+                assert_eq!(side.contains(&part, 11), accepted);
+                if accepted {
+                    assert!(out.is_empty());
+                } else {
+                    assert!(matches!(
+                        out.pop(),
+                        Some(crate::observability::Request::Out(crate::observability::Out::Fact {
+                            fact: crate::observability::Fact::Full
+                        }))
+                    ));
+                    assert!(out.is_empty());
+                }
+            } else {
+                let mut side = infrastructure::Side::new(&limits.infrastructure, 62);
+                let mut out = Queue::with_capacity(infrastructure::max_out(&limits.infrastructure));
+                infrastructure::step(
+                    &mut side,
+                    &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.infrastructure },
+                    infrastructure::Event::Show {
+                        part: part.clone(),
+                        generation: 11,
+                        scope: infrastructure::Scope::Project(1),
+                    },
+                    &mut out,
+                );
+                assert_eq!(side.contains(&part, 11), accepted);
+                if accepted {
+                    assert!(out.is_empty());
+                } else {
+                    assert!(matches!(
+                        out.pop(),
+                        Some(infrastructure::Request::Out(infrastructure::Out::Fact {
+                            fact: infrastructure::Fact::Full
+                        }))
+                    ));
+                    assert!(out.is_empty());
+                }
+            }
+        }
     }
 }
