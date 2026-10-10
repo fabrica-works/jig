@@ -158,6 +158,25 @@ fn the_same_tool_and_input_with_different_ids_starts_a_new_call_clock() {
 }
 
 #[test]
+fn returning_to_an_earlier_call_restarts_its_current_duration_at_the_public_stream() {
+    let mut domain = Domain::new(&LIMITS);
+    report(&mut domain, 0, 0, b"");
+    call(&mut domain, 9, 1, 0, b"A", Wall::from_nanos(1));
+    let first = writing(&domain, Token::new(7), 16).unwrap().call.unwrap();
+    call(&mut domain, 9, 1, 0, b"B", Wall::from_nanos(2));
+    call(&mut domain, 9, 1, 0, b"A", Wall::from_nanos(3));
+    let opened = follow(&mut domain, 1, 7, None, 0);
+    let Request::Stream { call: Some(current), .. } = opened.last().unwrap() else { panic!("retained current call") };
+    assert_eq!(current.identity, first.identity);
+    assert_eq!(first.began, Some(Wall::from_nanos(1)));
+    assert_eq!(current.began, Some(Wall::from_nanos(3)));
+    take(&mut domain, 1);
+    call(&mut domain, 9, 1, 0, b"A", Wall::from_nanos(4));
+    let retained = writing(&domain, Token::new(7), 16).unwrap().call.unwrap();
+    assert_eq!(retained.began, Some(Wall::from_nanos(3)));
+}
+
+#[test]
 fn repeated_ids_in_one_completion_replace_payload_and_keep_the_first_seen_clock() {
     let mut domain = Domain::new(&LIMITS);
     report(&mut domain, 0, 0, b"");
