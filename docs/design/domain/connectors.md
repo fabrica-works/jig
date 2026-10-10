@@ -75,7 +75,7 @@ application root            routes between the core and every connector
   | keep this effect under this key, or under this proposal; drop it | — (part of the decision) |
   | make this outbox entry (the journal released it) | made, with what it made; failed; uncertain |
   | judge this requirement for this effect's state | met; wait, for what; refuse, on which fact |
-  | a procedure task: made with its parameters; activated; a message; closing | a step's decision: effects, batches, amendments, proposals, messages up, a hold, a result |
+  | a procedure task: made with its parameters; activated; a message; closing; the task its step made | a step's decision: effects, batches, amendments, proposals, messages up, a hold, a result |
   | project this goal: its state, its plan, its milestones | the projection's effects |
   | release what this closing task held | the release's effects |
   | subscribe this task to this topic; unsubscribe | news for these subscribers, classified |
@@ -184,7 +184,10 @@ which it keeps. What the core gets is its **description:**
   retry deadline (4.3), so no restart forgets when an attempt went out.
 - **Its outcome is committed in turn:** made, with what it made; failed,
   typed; or uncertain. A task closing waits until every entry it asked
-  for has settled (tasks.md, 5.1).
+  for has settled (tasks.md, 5.1). The core asks each connector to
+  settle a closing task's entries and waits for its word that it has,
+  connector by connector; how many entries, and which, are the
+  connector's to know and to show, never counted by the core.
 - **Retries are the connector's:** a transient failure is tried again
   after a backoff, within its budget; a failure for good (forbidden, a
   conflict, the object gone) is news for the task that asked, and holds
@@ -350,9 +353,25 @@ documents, beside jig's (`../client/domain/contract.md`, section 5):
   connector marks each changed, through the root, as its state changes,
   and makes its document when the views make a delivery
   (engine.md, section 11);
+- **its reads,** a document of its own a party asks for once, which it
+  makes when the core has admitted the read, as jig's reads are answered
+  (engine.md, 5.3);
+- **the scope each names:** a watch of one of its subjects, and a read
+  of one of its documents, name a project or the deployment, since the
+  core cannot read a connector's subject. The core admits them on the
+  party's sign-in and role in that scope, and the views' limits; the
+  connector, asked for the document, judges that the subject is in that
+  scope and what the party may see of it, and answers that it is
+  unknown, or not allowed, otherwise;
 - **its parts,** which jig's documents name by reference (a resource, a
   kind, a task's panel, a proposed effect, a hold's account), read and
-  followed by its side of the application's client;
+  followed by its side of the application's client. An outbox entry is
+  a part of its own, named by the connector's number and the entry's,
+  apart from a proposed effect's description: an effect made or in
+  flight, or the one that held a task. A part's value lives as long as
+  the connector's records keep it (a procedure's result, while it keeps
+  that procedure's record); past that, the part is unknown, and jig's
+  card says so;
 - **its keyed requests:** a request about one of its own objects comes
   to it through the root, keyed by the people child; it decides it
   within the decision, asks the core for what it needs on the party's
@@ -407,6 +426,16 @@ Every effect and batch is checked against its task's authority, as any
 decision is (authority.md, section 8); a procedure's authority is its
 task's, given by its creator.
 
+**What its step made comes back** within the same decision. The core
+numbers a step's batch as it admits it, so the step cannot know its
+delegates' numbers; the core tells the procedure's connector, through
+the root, the number of the first task the step made, or that it made
+none. A connector that must know what that task is for (an incident's
+lead) keeps, in its procedure's state, what the step made it for, and
+records the number when it hears it, durably, in that decision, so a
+restart keeps it. Nothing is inferred from the task's words or the
+order tasks were made in.
+
 ### 6.4 Level-triggered
 
 A step decides from the facts as they are and its own state, never from
@@ -427,10 +456,11 @@ hears (tasks.md, 5.5).
 
 A procedure may stand: subscribed to topics, it makes tasks as news
 arrives, and ends only when cancelled. `ops`'s watch is one: woken by a
-batch of alerts, it makes a triage task for them, and an incident when a
-triage says so. A standing procedure's tasks are its delegates, within
-its authority, and its requester is usually the deployment or a person
-on call.
+batch of alerts, it makes a triage task for them, and, when a triage's
+verdict says so, an incident and the task that leads it
+(`../examples.md`, 7.1). A standing procedure's tasks are its
+delegates, within its authority, and its requester is usually the
+deployment or a person on call.
 
 ## 7. Requirements and verdicts
 

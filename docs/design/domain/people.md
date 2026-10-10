@@ -140,9 +140,25 @@ answered once durable (engine.md, 5.2):
   authority it lacked and by how much, and whether a proposal could be
   accepted; a limit; the object's revision since; a task since ended
   (`../client/domain/contract.md`, section 4).
+- **A proposal needs someone who may accept it.** A goal or an
+  amendment beyond the party's authority becomes a proposal to the roles
+  the project's policy names for that kind of proposal (tasks.md,
+  section 9). When the policy names none, the request is refused at
+  admission as lacking authority, saying that no proposal could be
+  accepted; it is never committed as a proposal nobody may decide. A
+  proposal already pending, and the proposals tasks make, wait as
+  tasks.md, section 9 says.
 - **A decision names what it saw.** A release, an amendment and a person
   task's answer carry the revision the party was shown; one whose object
   has changed since is refused as moved, saying what it is now.
+- **A hold's revision moves with the hold:** when the task is held anew,
+  or its reason changes; never when its escalation passes up. A release,
+  and a decision about the escalation, name it. Where the escalation
+  waits is checked apart: deciding the escalation needs it to wait for
+  the party, and is refused as not waiting for them otherwise; releasing,
+  amending or cancelling the held task needs the task in their tree, or
+  maintainer, wherever its escalation waits. So a release named with the
+  revision from before a pass up is made, not refused as moved.
 - **Two parties deciding one thing:** the first commit decides; the
   second is told it was decided, by whom, and how.
 - **Requests about an application's own objects** (an environment's end
@@ -151,7 +167,11 @@ answered once durable (engine.md, 5.2):
   change in the core is a request of the table above. This child keeps
   them by key as it keeps its own: admitted on the party's sign-in and
   role, joined when sent twice, and their answer, the connector's
-  outcome, kept under the key by token.
+  outcome, kept under the key by token. One it refuses at admission
+  (signed out, the party's role in the request's project, a key sent
+  again with another request, a limit) is answered with jig's refusal
+  and never reaches its connector; only an admitted request is the
+  connector's to decide, and answered with its outcome.
 - **A watch is not a request:** it decides nothing and keeps no answer.
   It is admitted on the party's sign-in and on what their role lets them
   see, and ends when they leave (engine.md, section 11).
@@ -186,6 +206,11 @@ entry naming the task or proposal it is and its project:
   each party's read positions, one over results and one per chat over its
   replies, moved by their request to mark what they have seen (5.1),
   never by a page being read.
+- **A chat's read position is kept until the chat is forgotten,** not
+  when it ends, nor when its last reply is read. A chat is forgotten once
+  it has ended and its person has read its replies and its result; its
+  record and its read position are erased in one decision, so no restart
+  sees one without the other, and no reply read comes back unread.
 - **Across projects,** since a party who works in several decides in one
   place; a client filters it by project (`../client/domain/pages.md`,
   section 3).
@@ -225,7 +250,17 @@ A task whose executor is a party, or a role (core.md, 3.2):
 - **Made by** an agent's `delegate` (a choice between two reports), a
   procedure (an approval it waits for), or another party.
 - **Its contract** is a choice among the options its spec lists, an
-  approval of a state its spec names, or an answer in words.
+  approval of a state its procedure names, or an answer in words; and,
+  always, that it cannot be done, with a reason, which is a failure
+  (tasks.md, section 3).
+- **An approval** is of the state as its procedure named it: bytes the
+  core carries with the contract and never reads, and a part its
+  connector shows the state by. The answer names the state it approves;
+  declining is "cannot do it". It is admitted as any answer is, naming
+  the person task's revision, and is refused as moved unless its state
+  equals the contract's, byte for byte: the core compares the two, and
+  never reads what they say. The result reaches the procedure that
+  asked, as any delegate's does, and its connector reads the state.
 - **Shown** with its spec, the results it depends on, and what its
   contract asks; the party's answer is its result.
 - **Addressed to a role,** it waits for any party holding it; one who

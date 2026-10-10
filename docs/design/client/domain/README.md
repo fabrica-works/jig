@@ -105,8 +105,8 @@ tests/client                    the client's world, and the joint world (testing
 | chip | a task named in passing: its number, its title, its phase, kept live |
 | client side | the child of the client root that shows one connector's values, and holds its families (root.md, section 2) |
 | family | an application's kind of object, with its own card and pages (root.md, section 7) |
-| owner | the child that keeps a value: `jig-client`, or a connector's client side; never a project's role, which is always "a project's owner" |
-| part | a value of an application's that a jig document names by reference: a resource, a kind, a panel, an effect's description (root.md, section 6) |
+| owner | the child that keeps a value, or that asked for a keyed request: `jig-client`, or a connector's client side; never a project's role, which is always "a project's owner" |
+| part | a value of an application's that a jig document names by reference: a connector's name, a resource, a kind, a panel, an effect's description (root.md, section 6) |
 | slot | the place a jig page or card leaves for a part, filled by its owner |
 | document | a typed value the engine gives a client about one subject, its owner's alone (contract.md, section 5) |
 | revision | the state of one thing a party decides about (a hold, a task's spec, a person task, a note), which the decision names (contract.md, 5.2) |
@@ -121,7 +121,9 @@ tests/client                    the client's world, and the joint world (testing
 | window | a page's bounded view onto a list too long to hold |
 | draft | words a person is writing, kept across pages and reloads |
 | confirmation | what an act will do, said before it is sent |
+| bounds | the engine's facts a draft of an act is compared with, and what happens beyond them, offered for setting a goal and amending (contract.md, 3.2) |
 | small store | what a client keeps across its own restart: its requests not yet answered, its drafts (client.md, section 11) |
+| kept work | the requests a client restored from its small store, whose asker is gone, counted per party (root.md, section 8) |
 | phrasebook | the words a view says, for one language (view.md, section 7) |
 | fake person | the person in the client's worlds, who reads the view tree (testing.md, section 3) |
 | scripted engine | the engine as the client's world plays it (testing.md, section 4) |
@@ -142,13 +144,17 @@ where each is answered:
   the application's, leaves through one generic container of skein-lib's,
   which keeps it until its answer is durable, saved before it is sent,
   sent again with its key within the engine's retention, and only for
-  the party it was made for. It is to the client what the journal is to
-  the engine (root.md, section 4).
+  the party it was made for. It hands each answer back with the owner
+  the root named for it, so the root routes it to the child that asked
+  and keeps no routing of its own. It is to the client what the journal
+  is to the engine (root.md, section 4).
 - **A document per owner.** jig's documents carry jig's values only; an
   application's value they need is a part, named by reference, and read
   and followed by the application's own child through the application's
-  own documents, on the same connection (root.md, section 6;
-  contract.md, section 5).
+  own documents, on the same connection, each naming its scope, a
+  project or the deployment: the engine admits the party in that scope,
+  and the connector judges what they may see (root.md, section 6;
+  contract.md, section 5 and 7.2).
 - **How jig's pages show an application's objects:** through slots, which
   jig's pages and cards leave for parts, and which the application's
   roots fill from the part's owner, in the domain and in the view. Each
@@ -173,11 +179,18 @@ where each is answered:
   moves only when that thing changes, and a decision whose revision
   moved is refused as moved, saying what it is now (contract.md,
   5.2).
+- **Offers with bounds.** Setting a goal and amending are made, proposed
+  or refused by what the person writes, so their documents offer them
+  with the engine's facts a draft is compared with, and what happens
+  beyond them. The client says which before the request is sent,
+  reading the engine's word, never computing authority, and the engine
+  judges again when it comes (contract.md, 3.2).
 - **Requests the engine lacks:** closing a chat with what becomes of its
   live delegates; amending and releasing as one request; marking seen,
-  with a read position for results and one per chat; an application's
-  own keyed requests, kept by the people child like jig's and by their
-  connector (contract.md, section 3; `../../domain/people.md`, 5.1).
+  with a read position for results and one per chat; a person task's
+  approval, naming the state it approves; an application's own keyed
+  requests, kept by the people child like jig's and by their connector
+  (contract.md, section 3; `../../domain/people.md`, 5.1).
 - **Turns are decoded below the domain,** by the client's protocol layer,
   with smith's transcript crate, into the client's own turns; the domain
   and the view never link smith (client.md, section 10).

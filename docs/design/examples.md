@@ -82,6 +82,10 @@ an application is before its protocol layer (`README.md`, section 11).
   connector's (3.3).
 - **Effects:** silencing an alert for a while. It is keyed, and owned by
   the task that made it.
+- **Incidents,** its own records: opened by its watch from a triage's
+  verdict, each with the alerts it covers, the service, a severity, and
+  its lead, the task the watch made to lead it, once the core has said
+  which (7.1).
 
 ### 3.2 Infrastructure
 
@@ -171,7 +175,9 @@ jig-ops-domain                    the engine's root
 - **Agents, in the engine.** Each charter has a model, reads, a budget
   and a result contract:
   - **triage:** a cheap model, with observability's reads; its result
-    is a verdict, noise or incident, with a summary;
+    is a verdict from a closed list, noise or incident, the incident's
+    with its fields: the alerts it covers, the service, a severity. It
+    delegates nothing;
   - **incident lead:** a coordinator, with both connectors' reads; it
     delegates remediation and finishes with a report;
   - **environment chat:** a person's assistant, which plans an
@@ -179,7 +185,9 @@ jig-ops-domain                    the engine's root
 - **Procedures:**
   - observability's **watch:** a standing task subscribed to a set of
     services' alerts, which makes a triage task from a template for each
-    batch that wakes it;
+    batch that wakes it, and, on a triage's verdict of incident, opens
+    the incident and makes its lead, from a lead's template beside the
+    triage's (its charter, budget and words);
   - infrastructure's **remediate, provision and tear down** (3.2);
   - the core's **recurring** tasks.
 - **People:**
@@ -213,9 +221,23 @@ P, the person on call
 ```
 
 - **The storm** of alerts 7 to 9 wakes W once. T1 reads the logs, finds
-  a known, harmless error, and finishes: noise.
-- **Alert 12** is triaged as an incident. W makes I, a tracked task.
-  I reads logs and metrics, and decides on a restart.
+  a known, harmless error, and finishes: noise. W hears T1's result, and
+  does nothing more.
+- **Alert 12** is triaged as an incident. T2 finishes with that verdict
+  and the incident's fields (alert 12, checkout, its severity), and
+  makes nothing itself. W hears T2's result, as a requester hears its
+  delegate's (`domain/tasks.md`, 8.1), and steps on it: it opens the
+  incident from the verdict's fields and makes I, a tracked task, from
+  its lead's template, in that step, keeping in its state which incident
+  the step's task will lead. The core tells observability, in the same
+  decision, the number I was given, and observability records I as the
+  incident's lead then, durably (`domain/connectors.md`, 6.3).
+- **One lead per incident,** set once. An incident may gather several
+  alerts; a second lead for an incident that has one is refused by
+  observability, and reported. Until the core says which task the step
+  made, the incident has no lead, and its page says so: nothing is
+  inferred from names, order, watches or alerts' numbers.
+- **I reads** logs and metrics, and decides on a restart.
 - **The restart is in production,** beyond I's authority. It becomes a
   proposal. It passes over W, a procedure, to P, who accepts it.
 - **R holds the service,** restarts it, and waits on observability's
@@ -288,7 +310,9 @@ section 12):
 - **jig's pages,** for tasks, conversations, proposals and a person's
   inbox, with the inbox as home, plus two families of its own:
   - incidents: their state, their timeline, the service's health, and
-    their lead task's chip, proposals and plan, as jig's cards;
+    their lead, the task observability recorded for it (7.1), shown by
+    jig's own documents as its chip, its report, its plan and its
+    proposals, as jig's cards; an incident with no lead yet says so;
   - environments: their pool, their cost, their end, and a request to
     move the end, keyed like jig's.
 - **Its parts in jig's slots:** infrastructure's panels for remediate and

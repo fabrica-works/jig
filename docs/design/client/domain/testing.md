@@ -123,8 +123,17 @@ the engine's store), never a client's state. Its rules:
 - **What they saw is what they decided:** every act that names a
   revision (contract.md, 5.2) names the one the card the person acted on
   showed.
+- **Offers kept:** a draft within the bounds its act was offered with is
+  made, and one beyond them is proposed or refused as the offer said,
+  unless a newer document of the object shows its facts moved in between
+  (contract.md, 3.2).
 - **A card leaves for a reason:** a card leaves only when its request was
-  answered or its object stopped waiting, and says which.
+  answered or its object stopped waiting, and says which. A person's own
+  display acts (a filter, a fold, reading more in a window, going to
+  another page) change what is shown, not what waits: the world observes
+  each, and it explains that client's cards shown before it going out of
+  view, while every other rule stands for them. A card that goes out of
+  view with no such act, and no such reason, is a fault.
 - **The link is told:** while the engine was unreachable past a
   heartbeat, the person was shown offline.
 - **Bounded:** the client and the view within their limits, the heap

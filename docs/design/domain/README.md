@@ -109,7 +109,7 @@ charter's translation link smith; nothing in jig names a system.
 | closing | a task settling before it ends: its run, its delegates, its effects, its releases |
 | executor | who carries a task out: an agent, a procedure, a party |
 | charter | how an agent executor is set up, and which hosts may run it |
-| result contract | what counts as done: a report, a verdict, a connector's result, a delivery, a choice |
+| result contract | what counts as done: a report, a verdict, a connector's result, a delivery, a choice, an approval |
 | chat | an agent task whose requester is a person (people.md, section 7) |
 | coordinator | an agent whose charter is to delegate and supervise |
 | standing procedure | a procedure subscribed to topics that makes tasks as news arrives (connectors.md, 6.6) |
@@ -209,6 +209,9 @@ where each is answered:
   section 9 (hosts.md, section 8).
 - **Standing work renews by period:** a standing task's allotment of
   tasks and spend is carved again each period (authority.md, section 7).
+- **Periods are the application's to say:** the engine keeps no
+  calendar; a period reaches it from the root, saying when the next
+  begins if its source knows (authority.md, section 7; engine.md, 4.1).
 - **Pools that shrink** keep their holders and admit nobody until they
   drain; the promise is about admission (tasks.md, 6.6).
 - **Effective authority:** a narrowing of rules, policy or access reaches
@@ -236,21 +239,38 @@ where each is answered:
   What marks a watch changed is named by each commit (engine.md,
   section 11).
 - **The inbox across projects,** its read positions (one over results,
-  one per chat) moved by an explicit request (people.md, section 6).
+  one per chat) moved by an explicit request, a chat's kept until the
+  chat is forgotten (people.md, section 6).
 - **Decisions name what they saw:** a release names its hold's revision,
   an amendment its task's spec's, a person task's answer its own; each
   moves only when that thing changes, and a decision whose revision
-  moved is refused as moved (people.md, 5.1).
+  moved is refused as moved (people.md, 5.1). A hold's moves when the
+  task is held anew or for another reason, not when its escalation
+  passes up; an approval names the state it approves too (people.md,
+  section 8).
+- **A proposal nobody may accept is refused,** whoever makes it: a
+  party's at admission, a run's `propose` in its answer, a procedure's
+  step in its decision, saying so, rather than made to wait for ever
+  (people.md, 5.1; tasks.md, section 9).
 - **One request per act:** words that release a stopped chat; an
   amendment that releases; closing a chat with its delegates'
   disposals; an uncertain effect's release saying whether to make it
   again (people.md, 5.1).
 - **Refusals with facts,** and **acts offered** in each object's
-  document, so a client never computes authority
-  (`../client/domain/contract.md`, sections 4 and 5).
+  document, so a client never computes authority; setting a goal and
+  amending are offered with bounds, the facts a draft is compared with
+  and what happens beyond them, and judged again when they come
+  (`../client/domain/contract.md`, 3.2, and sections 4 and 5).
 - **An application's keyed requests** kept by the people child as jig's
   are, their outcomes by their connector (people.md, 5.1;
   connectors.md, 5.5).
+- **An application's subjects and reads name their scope,** a project
+  or the deployment: the core admits on the party's role there, and the
+  connector judges what the party may see (engine.md, section 11;
+  connectors.md, 5.5).
+- **A procedure hears what its step made:** the task its step's batch
+  was given, within the same decision, for its connector to record
+  durably (connectors.md, 6.3).
 - **A task's activity kept** in commit order, the words parties wrote
   among it (engine.md, 7.2).
 

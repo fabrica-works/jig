@@ -118,6 +118,10 @@ translates between them with small total functions.
 - **from parties:** sign-ins and their ends, keyed requests, reads of
   their inbox and of history;
 - **from accounts' protocol:** a refresh's outcome;
+- **from the application,** through its root: a project's period begun,
+  saying when the next begins if its source knows. The core keeps no
+  calendar, infers no cadence and schedules nothing of its own
+  (authority.md, section 7);
 - **from connectors,** each by number, in jig's terms (connectors.md,
   section 2): resources' roles and kinds of hold; pools' slots; effects'
   descriptions; verdicts; procedures' step decisions; outbox outcomes;
@@ -181,6 +185,7 @@ step its last answer arrives.
 | a task due | tasks → authority (the run may start) → brief, with its connectors gathering, and its transcript loading → tasks (claim) → fleet (place) | commit the claim; assign |
 | a task closing | tasks → its connectors (release) | commit; releases made |
 | a goal changing | tasks → its projecting connectors | commit; projections made |
+| a project's period | authority (its spend within the policy) → tasks (the period's funding opened; recurring tasks' batches; standing allotments renewed) | commit; tasks started |
 | a timer | its child | as its child says |
 
 ## 5. Decisions and the store
@@ -258,7 +263,7 @@ answers to a run's reads.
 | parties' requests' keys, with their answers, for a retention | people | at start, those within it |
 | tasks: every field of tasks.md, section 3, holds and their queues, writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
 | calls committed since each live task's last turn, by attempt and name, with the core's part of their answers | the core | with their task |
-| funders' numbers: each party's pool and each project's spend, per period | tasks | at start |
+| funders' numbers: each party's pool and each project's spend, per period; a period's beginning, and when the next begins if its source said | tasks | at start |
 | a task's history: made, amended, held, released, cancelled, by whom, why; and its activity: words written to it, runs begun and ended, what it heard (7.2) | tasks | on demand |
 | inboxes: messages not yet taken | tasks | with their task |
 | proposals: pending, and decided ones' outcome | tasks | pending ones at start |
@@ -443,7 +448,7 @@ answered after the commit:
 | `message` | words, a question or an answer to a task it references | sent; no reference; the inbox full |
 | `amend`, `cancel`, `release` | its delegates (tasks.md, section 7) | done; refused, and why |
 | `decide` | accepts, rejects or passes up a proposal or an escalation waiting for it (tasks.md, section 9) | done; beyond its authority, and passed up |
-| `propose` | any of these, or an effect, or more authority for itself, with a reason | proposed, and to whom |
+| `propose` | any of these, or an effect, or more authority for itself, with a reason | proposed, and to whom; refused, when nobody may accept it (tasks.md, section 9) |
 | `subscribe`, `unsubscribe` | a connector's topic, a referenced task's state, a timer | done; refused |
 | `effect` | one of a connector's kinds of effect offered to agents (connectors.md, 4.5) | made, with what it made; committed and pending, past the call's deadline; waiting for a verdict; failed |
 | `note`, `recall` | writes a note in a scope; reads entries by name or by a search (section 10) | written; the entries |
@@ -537,6 +542,10 @@ The fleet child domain knows the hosts and the runs they host:
 - **Restarting** (section 6): the fleet adopts the claims the store
   names, then hears that the loading is done; a run a worker lists that
   no claim adopts is cancelled once a grace has passed.
+- **Its history is diagnostic:** the deployment's recent lost workers,
+  refused hellos and capacity refusals are kept in memory, within their
+  limits, for the deployment's document, and start empty after a
+  restart.
 
 ## 9. Briefs
 
@@ -604,9 +613,21 @@ contract (`../client/domain/contract.md`, sections 5 to 7).
 
 - **Watches:** the frame of a party (who they are, their projects, what
   needs them); a task; a task's tree; a party's inbox, across projects; a
-  project's goals; a party's conversations; a task's live run; the
-  deployment; and an application's own subjects, through the root to the
-  connector that owns them.
+  project's goals; a project's live tasks, filtered by phase, by
+  executor, by goal, or by whether the party asked for them; a party's
+  conversations; a task's live run; the deployment; and an
+  application's own subjects, through the root to the connector that
+  owns them. The other objects a client shows (a proposal, an
+  escalation, a question, a person task, a result, a project, a note)
+  are read, and read again when a watch that names them moves.
+- **An application's subjects name their scope,** a project or the
+  deployment, as its reads do, since the core cannot read a connector's
+  subject. The core admits a watch or a read of one on the party's
+  sign-in and their role in that scope, and the views' limits, as it
+  admits jig's; the connector, asked for the document, judges that the
+  subject is in that scope and what the party may see of it, and answers
+  unknown, or not allowed, otherwise (connectors.md, 5.5). Only the
+  document, or why there is none, crosses back; the root only routes.
 - **Level-triggered,** as facts are (core.md, section 4). A delivery is
   the subject's whole current document, within the watch's window, made
   by the subject's owner when the delivery is made: the core, or a
@@ -621,7 +642,7 @@ contract (`../client/domain/contract.md`, sections 5 to 7).
 - **Marked by commits:** each decision's commit names the tasks, projects
   and parties it touched, and the views mark the watches they concern: a
   task's own, the trees along its lineage, chips naming it, its
-  project's goals, its requester's conversations, and the frames and
+  project's tasks and goals, its requester's conversations, and the frames and
   inboxes of parties whose entries changed. A connector marks its own
   subjects (connectors.md, 5.5).
 - **Durable before shown:** a delivery waits for the last commit made
@@ -667,7 +688,7 @@ worst case (programming-model.md, 6.3):
   rows;
 - briefs gathering, with the sizes of the connectors' sections, and the
   notes' indexes in use;
-- watches and their backlogs.
+- watches, each its subject, its window and two marks (section 11).
 
 None of it grows with the store's history. A new task, a party, a run or
 a watch past its limit is refused at its entrance, and the asker told

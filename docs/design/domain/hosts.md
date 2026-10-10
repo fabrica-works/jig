@@ -77,7 +77,8 @@ Between the core's fleet and a host, whatever its shape:
     last message it read;
   - **calls,** named by the run, each answered once;
   - **facts,** best effort: progress, streaming text, tool calls as they
-    happen;
+    happen; a run's text names the turn it belongs to and the offset of
+    its first byte within that turn's text (6.5);
   - one **answer:** finished with its result, parked, or failed with a
     typed failure; with the turns it took, what it spent, what it left on
     resources (the application's part), and how its save went;
@@ -348,6 +349,17 @@ What the run reports as it goes (smith's `run.md`, section 11) feeds the
 watchdog and goes up to the engine for live views. Forwarding is best
 effort: a bounded queue, what does not fit dropped and counted, sent on
 an open link only, after the hello. Nothing decides on a fact.
+
+- **A run's text names its turn and its offset:** the turn it belongs
+  to, by its attempt and its number within it, and the offset of its
+  first byte within that turn's text, as smith gives them with the text
+  it streams. The engine's views keep a run's text by turn and offset
+  (engine.md, section 11). Since facts may be dropped, text that starts
+  past what the engine holds of its turn marks that turn's text cut.
+- **Activity is the host's observation:** a run's phase, and a tool
+  begun or ended, are facts, fenced like everything a host sends
+  (section 2). The engine shows a run as writing, or as running a tool,
+  only on such a fact, never inferring it from an attempt being placed.
 
 ### 6.6 Losing contact
 

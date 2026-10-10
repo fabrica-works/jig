@@ -262,8 +262,16 @@ parts.
   enough to skip a chat: what it is, in words; who carries it out, from
   the charters the deployment offers for goals; its budget, from the
   person's pool, saying what is left; its deadline and its priority.
-  Beyond what the person's pool has left, the form says so, and offers to
-  propose it.
+  The project's document offers it with bounds (contract.md, 3.2): the
+  charters offered and the pool left; the largest budget and the latest
+  deadline the person may set alone; and the largest budget and the
+  latest deadline any goal in the project may have. The form compares
+  the draft with them as it is written, and says before it is sent
+  whether the goal will be made, within the first; or, beyond it, what
+  the offer says: proposed, and to whom, or refused, and why, as when
+  nobody in the project may accept the proposal. Past the second, or
+  with a charter not offered, it says the goal cannot be set, and sends
+  nothing.
 
 ### 6.3 Tasks
 
@@ -298,7 +306,13 @@ Searching by description.
   person's pool in it; where it went, by goal and chat, largest first;
   past periods, read a page at a time.
 - **Recurring tasks:** each with its template in words, its period, its
-  budget per period, its last batch and when it next runs.
+  budget per period, its last batch and when it next runs. The engine
+  keeps no calendar: periods are the application's to say, and a period
+  says when the next begins only if its source knows
+  (`../../domain/authority.md`, section 7). Where the current one said
+  so, the line says when the next period begins; otherwise, that the
+  task runs at the next period, with the current period and when it
+  began.
 
 ## 7. The deployment
 
@@ -315,6 +329,10 @@ For a party with a role on the deployment:
   each project; pending proposals; what was refused for want of room,
   recently.
 
+Lost workers, refused hellos and refusals for want of room are the
+engine's diagnostics, kept in memory within its limits: after the engine
+restarts, they start empty.
+
 ## 8. Pages that are not about the work
 
 - **Starting:** until the frame's first delivery.
@@ -327,14 +345,18 @@ For a party with a role on the deployment:
   pending stays in the small store until the client is updated.
 - **Someone else's work:** the small store kept another party's pending
   requests (client.md, section 11): the page says so, and keeps them
-  hidden until that party signs in again.
+  hidden. It shows while `jig-client` still counts kept requests of a
+  party other than the one signed in, and goes when that party signs in
+  again, or once each of their requests is retired as unknown, past the
+  engine's retention.
 
 ## 9. What an application adds
 
 - **Its pages,** one family's or several's, at its own addresses, under
   jig's frame: for `ops`, Incidents (open, then resolved, with each
-  one's service, severity, lead task and timeline) and Environments
-  (each pool, its slots, each environment's cost and end).
+  one's service, severity, lead task and timeline; an incident with no
+  lead yet says so) and Environments (each pool, its slots, each
+  environment's cost and end).
 - **Its parts in jig's slots:** panels, results, effects' descriptions,
   holds' details, resources and kinds in words (root.md, section 6).
 - **Its cards on jig's pages,** through those slots, and jig's cards on its

@@ -82,10 +82,16 @@ it is live:
     as a change landed or an environment ready; the connector keeps it
     under the task's number, and the task keeps words that summarise it;
   - *a choice:* one of the options the spec lists, or an answer in
-    words, for a person.
+    words, for a person;
+  - *an approval,* for a person, of a state a procedure names: the
+    state as bytes its connector gave, which the core carries and
+    compares but never reads, and the part its connector shows it by.
+    The result names the state it approves, which must equal the
+    contract's, byte for byte (people.md, section 8).
 
   Every result may also be a failure, with a reason: the executor's
-  verdict that the task cannot be done as asked (5.6).
+  verdict that the task cannot be done as asked (5.6). Declining an
+  approval is that failure.
 - **Its requester:** a task, a party, or the deployment, for what its
   configuration or a connector starts on a project's behalf (a recurring
   task, a standing watch). Its **proposer,** when an accepted proposal
@@ -128,9 +134,9 @@ A batch is what one decision makes: one task or many, with the
 dependencies among them.
 
 - **Made by** an agent's `delegate` tool, a procedure's step, a party's
-  request, an accepted proposal, or a recurring task's timer. Its tasks'
-  requester is the task or the party that made it, or the accepter of
-  the proposal that asked for them to be its (section 9).
+  request, an accepted proposal, or a recurring task at a period. Its
+  tasks' requester is the task or the party that made it, or the
+  accepter of the proposal that asked for them to be its (section 9).
 - **Dependencies** name tasks in the same batch, or live tasks the
   creator references: its own delegates, or a task it was introduced to
   (8.5). A task's dependencies are never added to once it is made
@@ -195,6 +201,12 @@ waiting ──► active ──► closing ──► done, failed or cancelled
   Then it ends, and its result, or why it failed or was cancelled, goes
   to its requester. So a task that depends on another never starts
   before what that task did is visible and settled.
+
+  What the core knows of a closing task is what it waits for: which of
+  its delegates are still closing, and which connectors it waits on to
+  settle its effects, by number. It never knows their outbox entries,
+  which are each connector's, kept by the connector and settled by it
+  (connectors.md, 4.2; core.md, section 5).
 - **Done, failed, cancelled:** ended. Its result is a message to its
   requester, and kept. An ended task leaves the engine's working set once
   that message is committed, leaving a stub while live tasks name it;
@@ -404,9 +416,18 @@ tasks holding it: a quota cut, a machine gone.
 - **What an amendment may change:** the spec and its parameters; the wake
   policy; the dependencies of a task still waiting, by removing some,
   never adding; the authority, narrowed freely and widened only within
-  the amender's own (beyond it, a proposal); the charter's instructions;
-  a procedure's parameters, which go to its connector. An amendment is
-  refused once a task is closing.
+  the amender's own (beyond it, a proposal); an agent task's
+  instructions; a procedure's parameters, which go to its connector; a
+  person task's address, to another party or role, naming the person
+  task's revision as an amendment names the spec's, a party who took it
+  holding it no more. An amendment is refused once a task is closing.
+- **Instructions are replaced whole.** An agent task runs with its
+  charter's instructions until an amendment gives it its own. An
+  amendment's instructions replace the task's whole instructions, and
+  empty ones leave it with none, not with its charter's; an amendment
+  that leaves them out changes nothing of them. Its history records the
+  instructions as the task held them, its own or none of its own, never
+  which charter's text was in effect.
 - **An amendment is a message** to the task's executor, committed with
   the change: it wakes an agent, steps a procedure, and shows a person
   what changed. A run already live hears it as it arrives; a narrowing it
@@ -557,6 +578,18 @@ action needs, and what an acceptance funds.
   party's own proposal waits there from the start. Where one waits is
   decided again when that holder ends, is held, or no longer covers it,
   and when it stalls.
+- **A proposal nobody may accept is refused.** A proposal is never
+  committed to wait for nobody. When the first holder it would wait for
+  is the parties the project's policy names (a party's own proposal; a
+  task's, when the deployment requested its tree's root, as for a
+  standing procedure's or a recurring task's tree, or when nothing in
+  its tree covers it) and the policy names no role that may accept its
+  kind, it is refused to its proposer as beyond authority, saying that
+  no proposal could be accepted, and nothing of it is committed. A
+  party's request is refused so at admission (people.md, 5.1); a run's
+  `propose` call is answered so; a procedure's step's proposal is
+  refused in its decision. A proposal already pending waits as this
+  section says.
 - **Waking.** It always wakes the task it waits for (8.3), is relayed to
   that task's live run as messages are, and is in the brief of its next
   run (engine.md, section 9); for a party, it appears in their inbox at
@@ -570,7 +603,8 @@ action needs, and what an acceptance funds.
   proposer. A party who does not cover a proposal may reject it or pass
   it up, never accept it. At the parties the policy names there is no one
   further: they accept or reject, and the proposal waits for them,
-  however long.
+  however long. Passing a proposal up where nobody further may accept it
+  is refused, saying there is no one further.
 - **Stalled** past its bound, undecided, a proposal or an escalation
   passes up to the next holder that covers it, and past the last, waits
   for the parties the policy names.
@@ -584,12 +618,13 @@ action needs, and what an acceptance funds.
 
 Procedures the core owns, stepped by this child domain:
 
-- **Recurring.** A task whose procedure is a timer and a template: at
-  each period it makes a batch from its template, as its own delegates,
-  within its authority, its budget carved again each period from the
-  project's spend for that period (authority.md, section 7). If the last
-  batch is still live, the period passes, or the new batch waits, as the
-  template says. A recurring task ends when it is cancelled.
+- **Recurring.** A task whose procedure is a template: at each period,
+  as the period reaches the core from the application's root, it makes
+  a batch from its template, as its own delegates, within its
+  authority, its budget carved again each period from the project's
+  spend for that period (authority.md, section 7). If the last batch is
+  still live, the period passes, or the new batch waits, as the template
+  says. A recurring task ends when it is cancelled.
 
 The core has no other procedure. A static plan is a batch; waiting for
 several tasks is a dependency; anything that needs a condition over
@@ -667,3 +702,7 @@ where a holder can decide it; nothing beyond a task's limits is held.
   scarce: today's order is by when each became due.
 - **Pools across projects:** whether a pool's slots are shared fairly
   between projects, or by goal priority alone.
+- **A pending proposal whose holders go:** one that waits for a policy's
+  roles when the policy stops naming any for its kind, or that stalls
+  past its last holder: who may decide it then, or whether it is
+  withdrawn, saying why.

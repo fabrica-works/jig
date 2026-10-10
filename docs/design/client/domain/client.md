@@ -120,6 +120,9 @@ retired only once its terminal has come.
 - **A request's progress:** for each request it asked the root to send,
   that it is in flight, retrying, or parked; then its one terminal, the
   answer: done or refused, durably (section 6).
+- **Kept work:** after the start, each scope the request table restored
+  requests for, once, with their count; then, as the table retires each
+  of them, that one of that scope's is gone (section 11).
 - **A read's terminal:** the document or the page asked for, or why there
   is none (section 7).
 - **A watch's events:** opened; each delivery of its subject's document;
@@ -222,6 +225,14 @@ keeps it and sends it, is the root's (root.md, section 4).
   beyond the party (a goal past their allotment, an amendment that
   widens), the object's document says so among the acts it offers, and
   the confirmation tells the person it will be proposed, and to whom.
+  Setting a goal and amending are offered with bounds (contract.md,
+  3.2): the form and the confirmation compare the draft with the facts
+  the offer gives (a number no larger, a grant among those listed), and
+  say whether it will be made or, beyond them, what the offer says:
+  proposed, and to whom; or refused, and why (as when nobody in the
+  project may accept the proposal), which the confirmation says in
+  place, sending nothing. That is the engine's word read, never
+  authority computed: the engine judges the request again when it comes.
 - **The answer, applied.** Done: the card shows the outcome (made, or
   proposed), and leaves if its object stopped waiting. Refused: the card
   says why, from the refusal's facts (contract.md, section 4), and offers
@@ -278,10 +289,9 @@ keeps it and sends it, is the root's (root.md, section 4).
 
 - **A watch** follows one subject (contract.md, section 7): the frame, a
   task, a task's tree, the chips a page names, a party's inbox, a
-  project's goals, a party's conversations, a run's live text, the
-  deployment. Its deliveries are
-  documents, each the subject's whole current state within the watch's
-  window, and each replaces the last.
+  project's goals, a project's tasks, a party's conversations, a run's
+  live text, the deployment. Its deliveries are documents, each the subject's whole
+  current state within the watch's window, and each replaces the last.
 - **Level-triggered, as facts are** (`../../domain/core.md`, section 4).
   A watch never carries a change to apply to what came before, so it
   cannot miss one: what changed while a delivery was in flight is in the
@@ -341,16 +351,19 @@ And, beside the link, the page's own state:
 - **Composers keep their drafts per task,** across pages and reloads,
   bounded by the drafts kept; the oldest untouched goes first.
 - **One confirmation at a time:** the act, the object and the revision
-  the act names, as it was when the confirmation opened, the choices made (an option of a person task, what
-  becomes of each live delegate on closing), and what is missing (a
-  reason, a budget beyond the pool). What it says comes from the object
-  (what an acceptance funds, what a cancel ends, what a release will do),
-  so the view can say it without asking anything (objects.md).
+  the act names, as it was when the confirmation opened, the choices
+  made (an option of a person task, what becomes of each live delegate
+  on closing), and what is missing (a reason; a draft its offer's
+  bounds say would be refused, section 6). What it says comes from the
+  object (what an acceptance funds, what a cancel ends, what a release
+  will do), so the view can say it without asking anything (objects.md).
 - **A revision that moves under an open confirmation** marks it changed:
   a held task's hold, under its release. Confirming it then is refused in
   place, saying what changed, rather than sent. What the act does not
   name (spend, a delegate's phase) changes the confirmation's words, not
-  its validity.
+  its validity. Bounds that move under an open confirmation, as a newer
+  document gives them, are compared with the draft again, and the
+  confirmation says what it will now be: made, proposed, or refused.
 - **A confirmation's fields** are cleared when it closes, confirmed or
   dismissed.
 
@@ -413,6 +426,14 @@ What a chat's page leads with, and every agent task's activity
   frame's first delivery confirms that party. A different party sees a
   warning, and the kept work stays parked and hidden until its party
   returns, or the engine's retention passes and it is told unknown.
+- **The warning is this domain's.** The request table keeps the kept
+  requests, and the root keeps nothing of its own, so it tells this
+  domain whose work was kept: each scope the restored requests name,
+  with their count, and each kept request as the table retires it,
+  answered or unknown (root.md, section 8). This domain keeps a count
+  per scope, bounded, shows someone else's work (pages.md, section 8)
+  while the confirmed party differs from a scope it still counts, and
+  leaves that page when no other party's count is left.
 - **Its platform's limits:** a browser tab's session storage goes with
   the tab, so the shell warns before a tab with requests pending is
   closed; a tab duplicated copies it, and both send the same keys, which
@@ -458,7 +479,8 @@ Each is configured and part of the worst case:
 - objects in a page's working set; rows per window; turns a
   conversation's window holds; nodes of a plan held;
 - intents kept, reads in flight, watches open (the frame's included);
-- drafts kept; notices;
+- drafts kept; notices; the scopes of kept work counted, no fewer than
+  the requests the table holds;
 - bytes a person may write (the engine's own bound on words); bytes of
   any one text shown (a spec, a result, a turn); bytes of a provisional
   turn;

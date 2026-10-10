@@ -154,7 +154,9 @@ It inspects nothing it holds. What jig asks of it:
   project, release, subscribe, restore, read afresh, settle) goes to the
   connector the core names by number, and its answer back; what a
   connector says up (a step's decision, news, an outcome, a pool's slots,
-  drift) goes to the core.
+  drift) goes to the core. What the core says of a procedure's step,
+  the task it made, goes to the procedure's connector in the same
+  decision, and is never dropped (connectors.md, 6.3).
 - **To the hub inside the engine:** the core's assignments, relays and
   cancels for runs placed on the engine's own slots go to the hub, and
   what it says goes back to the core as a worker's would (hosts.md,

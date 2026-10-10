@@ -247,6 +247,14 @@ deployment's rules       the most any project may have; requirements on effects
   goes back to that period, so a reset frees nothing reserved. A
   recurring task's budget is carved again each period (tasks.md,
   section 10).
+- **Periods are the application's to say.** The engine keeps no
+  calendar: a period begins when the application's root says so
+  (engine.md, 4.1), and the root may say when the next begins, if its
+  source knows (a deployment configured with a monthly period does).
+  The core keeps that with the period's record, and a project's
+  document carries it on each recurring task's line, as when the task
+  next runs. Without it, the line says the task runs at the next
+  period, with the current period and when it began.
 - **Standing work renews by period.** A standing task, recurring or a
   standing procedure (connectors.md, 6.6), has its tasks and its spend
   carved again from the project's spend each period, so a watch that

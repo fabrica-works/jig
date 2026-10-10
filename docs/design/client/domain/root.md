@@ -32,7 +32,9 @@ in section 14.
   is sent, sends it again with its key until its answer is durable, and
   parks it while the engine is out of reach. It is the root's only way
   out for keyed requests, as the journal is the engine's root's only way
-  out (`../../README.md`, 6.2).
+  out (`../../README.md`, 6.2). It hands each request's progress and
+  answer back with the owner the root named for it, so the root routes
+  them to the child that asked.
 - **The owner keeps the value** (section 6), as in the engine
   (`../../domain/core.md`, section 5). jig's documents name an
   application's values as parts; jig's pages and cards leave slots for
@@ -84,15 +86,16 @@ step(root, event):
     route the event to its child, by its owner                         (section 5)
     while a child asks for a hand-off (a part to show, an object to show),
         route it to the child that owns it, and its answer back         (sections 6 and 7)
-    every keyed request any child asks for       → table.ask(owner, token, ask)
+    every keyed request any child asks for       → table.ask(owner, ask)  (section 4)
     every read, watch, address, sign-in          → out, wrapped
     every record a child saves or erases         → out, wrapped, as the small store's
     every change of the link                     → to every child, and to the table
 
 iterate, after the step:
     table.take(out)  → its records saved first, then its sends, in order, within a bound
-    an answer        → table.answered(token, envelope): a final one retired and handed,
-                       unopened, to the child that asked; the rest sent again or parked
+    an answer        → table.answered(attempt, envelope): a final one retired, and handed,
+                       unopened, to the child its owner names; the rest sent again or parked
+    a progress       → to the child its owner names
     the table's deadlines fired → its retries sent
 ```
 
@@ -110,8 +113,9 @@ iterate, after the step:
 
 ## 4. The request table
 
-The client's barrier, in skein-lib, generic over the requests it holds,
-as the journal is over the writes and outputs it holds
+The client's barrier, in skein-lib, generic over the requests it holds
+and the owner its asker names for each, as the journal is over the
+writes and outputs it holds
 (`../../README.md`, 6.2). jig cannot keep it: `jig-client` may not hold
 the application's requests, and its code may not be generic. It is not
 policy either: it is a data structure with a lifecycle, as a queue is.
@@ -124,6 +128,14 @@ jig consumer.
   - **a scope per request:** an opaque number its asker gives, which
     `jig-client` names: the party the request is for. Only the requests
     of the party confirmed are ever sent (client.md, section 11);
+  - **an owner per request:** a value of the root's own, which the
+    table holds, hands back with the request's progress and its final
+    answer, and never reads. It is an enum of the root's: one variant
+    per child, carrying that child's token for the request, and one,
+    kept, for a request restored from the small store whose asker is
+    gone, carrying its scope. The root routes by matching on it,
+    exhaustively, and keeps no table of its own from requests to
+    children;
   - **kept before sent:** each request asked emits its record for the
     small store (its key, its scope, the request, and the wall time it
     was first sent), then its send; each request retired erases it;
@@ -132,8 +144,8 @@ jig consumer.
     (contract.md, section 4), which the table reads and the root never
     opens:
     - *final:* the engine's durable answer, done or refused, in the
-      owner's vocabulary: retired, and handed to the child that asked,
-      under its token, unread;
+      owner's vocabulary: retired, and handed back with its owner, so the
+      root hands it, unread, to the child that asked, under its token;
     - *again:* busy or not ready; sent again under its key after a
       backoff, jittered;
     - *lost:* no answer came; sent again under its key after a backoff
@@ -147,17 +159,20 @@ jig consumer.
     (contract.md, 3.1). A request first sent longer ago than that, less
     a margin, is never sent again: it is retired, and its owner told it
     is unknown whether it was made;
-  - **restored at start,** from the small store, parked until a party is
-    confirmed;
+  - **restored at start,** from the small store, each with the kept
+    owner of its scope, parked until a party is confirmed. A kept
+    request has no card to show it: when it is retired, answered or
+    unknown, the root hands its answer to no child, and tells
+    `jig-client` one of that scope's kept requests is gone (section 8);
   - **progress for display:** in flight, retrying, parked, or unknown,
     handed to the request's owner as it changes, so its card can say so;
   - **bounded:** a limit on requests held, and on bytes; a request past
     it is refused at `ask`, and its owner shows that;
   - **its worst case,** priced like every lib container.
-- **What it does not do:** read a request or an answer. Whoever owns the
-  bytes checks their bounds before asking. Judging the link, and which
-  party is confirmed, are `jig-client`'s (client.md, sections 8 and 11);
-  the root passes both on.
+- **What it does not do:** read a request, an answer or an owner.
+  Whoever owns the bytes checks their bounds before asking. Judging the
+  link, and which party is confirmed, are `jig-client`'s (client.md,
+  sections 8 and 11); the root passes both on.
 - **It keeps to the subset,** as the journal does: generic types and
   lib's own containers, no traits, no closures.
 
@@ -196,11 +211,13 @@ How jig's pages show an application's values.
 
   | Part | Named by | What it shows, for `ops` |
   |---|---|---|
+  | connector | a connector | its name, where jig names it: "closing: 2 delegates, and infrastructure's effects" |
   | resource | a connector and a path | "the checkout service in production" |
   | kind | a connector and an effect's or a read's kind | "restart", "scale" |
   | panel | a connector and a task | a remediation's way to healthy; an environment's readiness |
   | result | a connector and a task | what a procedure produced: "environment staging-7, ready, until Friday" |
   | effect | a connector and a proposal | what a proposed restart would do, and where |
+  | outbox entry | a connector and the entry's number | an effect asked for, made or in flight, apart from any proposal's description: "restart of checkout, in flight" |
   | hold | a connector and a held task | what drift or a failed effect was: "deleted by hand, at 10:04, by mallory" |
   | project | a connector and a project | what a connector says of a project: a resource's health, its adoption |
   | deployment | a connector | what a connector says of itself: its outbox, its request budget |
@@ -209,16 +226,23 @@ How jig's pages show an application's values.
   or card names it, and jig's view leaves an empty node for it
   (view.md, section 4).
 - **Showing a part.** When a page of `jig-client` shows a part, it asks
-  the root, with the page's generation. The root routes it to the client
-  side of the part's connector, which holds it in its own working set,
-  reads or watches its value through the application's own documents
-  (contract.md, section 5), and forgets it when told the page's parts
-  have left. A resource or a kind needs no document: its words are the
-  owner's view's, from its path or its number.
+  the root, with the page's generation and the part's scope: the project
+  it shows in, or the deployment. The root routes it to the client side
+  of the part's connector, which holds it in its own working set, reads
+  or watches its value through the application's own documents, naming
+  that scope (contract.md, section 5 and 7.2), and forgets it when told
+  the page's parts have left. A connector, a resource or a kind needs no
+  document: its words are the owner's view's, from its number or its
+  path.
 - **Filling a slot.** The view root asks the owner's view to build each
   slot's nodes, from the owner's state, and jig's view splices them in
   (view.md, section 4). A part not yet read shows as loading; a part its
   owner cannot show says so. Neither breaks jig's page.
+- **A part lasts as long as its owner keeps it.** A part's value is its
+  owner's, kept as long as the owner's records keep it (a procedure's
+  result, while its connector keeps the procedure's record). Past that
+  the part is unknown, and its slot says so, as for a part its owner
+  does not know.
 - **A part's acts are its owner's.** A button in a panel (silence this
   alert, extend this environment) is its owner's binding, decoded by its
   owner's view and handled by its owner, whose keyed request goes
@@ -246,7 +270,10 @@ How jig's pages show an application's values.
   - its pages, at its own addresses, under jig's frame;
   - its requests: keyed, through the table, routed by the engine's root
     to the connector they concern (`../../domain/people.md`, 5.1);
-  - its reads and watches, of the application's own documents.
+  - its reads and watches, of the application's own documents, each
+    naming its scope, a project or the deployment, in which the engine
+    admits the party and its connector judges what they may see
+    (contract.md, 7.2).
 - **An application's page shows jig's objects** through slots of the same
   kind, the other way round. An incident's page shows its task's chip,
   the proposals waiting in its subtree and its plan: it names each by
@@ -269,7 +296,15 @@ How jig's pages show an application's values.
 - **Versioned,** each by its owner, so a client updated since reads what
   the older one kept.
 - **Restored at start** by the shell, each record handed to its owner,
-  the table's to the table, before the first step.
+  the table's to the table, each request with the kept owner of its
+  scope (section 4), before the first step.
+- **Whose work was kept.** Once the table's records are restored, the
+  root tells `jig-client` each scope they name, once, with its count of
+  requests, read from the records' own scopes; and whenever the table
+  retires a kept request, answered or unknown past the retention, that
+  one of that scope's is gone. Whether to warn of someone else's work is
+  `jig-client`'s to decide (client.md, section 11); the root passes on
+  what the table kept, and decides nothing.
 
 ## 9. The view, composed
 
@@ -290,7 +325,9 @@ The view root (view.md, section 4) mirrors the domain's root:
   document says;
 - read a part's value meant for another child, or hold one in its own
   state;
-- keep anything across steps but its children's states and the table;
+- keep anything across steps but its children's states and the table:
+  which child asked for a request is its owner, which the table holds
+  (section 4), never a map of the root's own;
 - match on a child's vocabulary with a `_` arm.
 
 ## 11. A service's root

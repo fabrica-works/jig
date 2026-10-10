@@ -53,6 +53,14 @@ is still open is listed in section 13.
 - **Changed while read.** A card follows its object live: a proposal
   passed up, a held task's reason that changed, a person task taken by
   someone else.
+- **How it stays live.** A card follows its object through the watch of
+  the page's subject that covers it: its task's document, a tree, the
+  inbox, chips (contract.md, 7.1). An object no watch carries whole (a
+  proposal, an escalation, a question, a person task, a result, a note)
+  is read, and read again whenever a watch that names it says it moved:
+  its task's activity moved, its entry in the inbox changed, its chip's
+  phase changed. Once no watch names it, it is read once more for how it
+  ended (client.md, section 5).
 
 ## 3. The chip, and phases in words
 
@@ -69,9 +77,15 @@ while it shows, linking to its page.
 | backing off | retrying at a time, and why: "host lost, try 2 of 3" |
 | active, a procedure | its connector's words, a part: "waiting for checkout to be healthy" |
 | active, a party | waiting for an answer from P, or from the person on call, since when |
-| closing | closing, and what it waits for: "2 delegates closing, 1 effect settling" |
+| closing | closing, and what it waits for: its delegates still closing, and each connector it waits on, by name: "closing: 2 delegates, and infrastructure's effects" |
 | held | held, and why (section 5) |
 | done, failed, cancelled | ended so, when, and by whom for a cancel |
+
+A closing task's effects are its connectors'
+(`../../domain/connectors.md`, 4.2): the chip names each connector it
+waits on to settle, in the connector's own words (a part), and never
+counts their effects. How many, and which, the connector shows in its
+panel on the task's page (pages.md, 5.2).
 
 ## 4. Proposal
 
@@ -105,6 +119,12 @@ authority it needs (`../../domain/tasks.md`, section 9;
     policy names there is none, and it is not offered.
 - **Accepted,** it shows what it made: chips for a batch's tasks, "the
   goal is yours", what an effect did once it is made.
+- **A party's own** comes from a goal or an amendment whose draft went
+  beyond the bounds its act was offered with (section 11; pages.md,
+  6.2): the form said, before it was sent, that it would be proposed,
+  and to whom. Where the project's policy names nobody who could accept
+  it, no proposal is ever made: the form says so and sends nothing, and
+  the engine refuses such a request as lacking authority (section 9).
 
 ```
 Proposal from I, incident: checkout errors                waiting 4 min
@@ -125,8 +145,10 @@ A held task whose escalation reached the party
 - **What it had done:** its phase before the hold; its result, if it was
   closing.
 - **Where it has been:** which holders it passed, and why; or "I has it"
-  while a task above may still decide it. A party may act on a task in
-  their tree either way; the first commit decides.
+  while a task above may still decide it. A party may release, amend or
+  cancel a task in their tree either way, and leave it held or pass it
+  up only while its escalation waits for them; the first commit decides
+  (contract.md, 5.2).
 - **Its actions,** those that fit its reason:
   - *release,* saying what will happen ("its next run resumes its
     conversation; tries count again from zero");
@@ -185,9 +207,11 @@ A task whose executor is the party, or a role they hold
   choice between two reports shows both.
 - **Its contract,** as the form that answers it:
   - *a choice* among the options its spec lists, with words to say why;
-  - *an approval* of a state its spec names, which its connector shows (a
-    part); the state is named, so an approval is never given to a state
-    the party did not see;
+  - *an approval* of a state its procedure names, which its connector
+    shows (a part); the answer names the state it approves, and is
+    refused as moved unless that state is still the contract's, so an
+    approval is never given to a state the party did not see; declining
+    it is *cannot do it* (contract.md, 3.2);
   - *an answer* in words;
   - and, always, *cannot do it,* with a reason: a failure.
 - **Addressed to a role:** *take it,* so that two do not answer at once;
@@ -232,7 +256,10 @@ party's allotment, an amendment that widens beyond their authority) is
 not refused: the confirmation said, before it was sent, that it would be
 proposed and to whom, and the answer names the proposal, which then
 waits where the policy says (`../../domain/tasks.md`, section 9;
-contract.md, 3.2).
+contract.md, 3.2). Where the policy names nobody who could accept it,
+the request is refused as lacking authority, the refusal saying that no
+proposal could be accepted ("nobody in this project may accept this");
+the form says so before anything is sent (client.md, section 6).
 
 ## 10. The conversation
 
@@ -274,16 +301,34 @@ will do:
   a slot, as the application's own request (root.md, section 6). The
   form shows before and after, and what the task will do on hearing it: a
   live run hears it; a narrowing that takes a grant its run is using
-  cancels that run, and the next starts narrower. Not offered once the
-  task is closing.
+  cancels that run, and the next starts narrower. It compares the draft
+  with the bounds the act is offered with (contract.md, 3.2): a change
+  that widens no authority is made; one that widens anything is judged
+  whole, against the authority the party may give alone, the budget
+  they may add and the grants they hold, and beyond those is proposed,
+  and to whom, or refused; past the policy's ceiling it is refused, and
+  nothing is sent. The form says which before it is sent. Not offered
+  once the task is closing.
+
+  An agent task runs with its charter's instructions until an amendment
+  gives it its own. Amended instructions replace the task's whole
+  instructions, and empty ones leave it with none, not with its
+  charter's; left out, they change nothing of them. The form shows the
+  task's effective instructions: its own, or its charter's while it has
+  none of its own. A pending proposal's before and after show the
+  effective text; an older history entry shows the instructions as the
+  task held them, its own or none of its own, never which charter's
+  text was in effect (`../../domain/tasks.md`, section 7).
 - **Stop:** halts its live run now and holds the task, stopped by the
   party; its delegates go on, and what its run committed stays.
   Releasing it carries on from there.
 - **Release:** a held task, by its reason (section 5).
 - **Cancel:** ends the task and its subtree, deepest first. Before it is
-  sent, the card says what it ends: the tasks below, by phase; the live
-  runs; the proposals withdrawn; the effects not yet made, dropped; and
-  those in flight, which settle.
+  sent, the card says what it ends: the tasks below that it cancels,
+  counted by phase; the live runs; the proposals withdrawn; and, by
+  name, the connectors whose effects will be dropped, if not yet made,
+  or settle, if in flight. The core never counts a connector's effects
+  (section 3): which, and how many, each connector's panel says.
 - **Close,** for a chat: asks it to finish and cancels it if it has not
   within a grace. A chat with live delegates asks first what becomes of
   each: cancelled, or made the person's, funded from their pool from now
