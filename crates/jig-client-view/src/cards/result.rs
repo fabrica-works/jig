@@ -59,13 +59,11 @@ pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &W
 pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words: &Words, bindings: &mut JigBindings) {
     match value {
         ResultValue::Report(text) | ResultValue::Words(text) => crate::document_text::markdown(b, text, words),
+        ResultValue::OwnerVerdict { verdict, words: explanation, fields } => {
+            verdict_payload(b, *verdict, explanation, fields, words);
+        }
         ResultValue::Verdict { verdict, words: explanation, fields, tasks, proposal } => {
-            words.text(b, JigPhrase::Verdict, &[Hole::Number(u64::from(*verdict))]);
-            crate::document_text::markdown(b, explanation, words);
-            for field in fields {
-                b.text(Run::Plain, &field.name);
-                crate::markdown::read(&field.value, 2, b);
-            }
+            verdict_payload(b, *verdict, explanation, fields, words);
             for task in tasks {
                 super::chip::chip(b, client, task, words, bindings);
             }
@@ -99,6 +97,20 @@ pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words:
                 crate::document_text::markdown(b, explanation, words);
             }
         }
+    }
+}
+fn verdict_payload(
+    b: &mut Builder,
+    verdict: u32,
+    explanation: &jig_client::contract::DocumentText,
+    fields: &skein_lib::List<jig_client::contract::ResultField>,
+    words: &Words,
+) {
+    words.text(b, JigPhrase::Verdict, &[Hole::Number(u64::from(verdict))]);
+    crate::document_text::markdown(b, explanation, words);
+    for field in fields {
+        b.text(Run::Plain, &field.name);
+        crate::markdown::read(&field.value, 2, b);
     }
 }
 /// A reply opens the chat at its domain-kept first unread reply position.

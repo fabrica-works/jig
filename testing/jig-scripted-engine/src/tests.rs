@@ -1191,6 +1191,34 @@ fn verdict_documents_price_whole_machine_field_arrays_and_bytes() {
 }
 
 #[test]
+fn owner_verdict_payload_prices_reserved_field_rows_without_legacy_chip_or_proposal_arrays() {
+    let mut fields = List::with_capacity(2);
+    fields.push(ResultField { name: b"state".as_slice().into(), value: Box::new([0, 255]) }).unwrap();
+    let value =
+        ResultValue::OwnerVerdict { verdict: u32::MAX, words: DocumentText { bytes: text(b"why"), cut: true }, fields };
+    let before = value.clone();
+    let mut bounds = Bounds {
+        text: 5,
+        rows: 2,
+        document_bytes: u64::try_from(core::mem::size_of::<ResultValue>()).unwrap()
+            + List::<ResultField>::worst_case(2).unwrap()
+            + 10,
+        ..Bounds::default()
+    };
+    assert!(crate::payload::fits(&value, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&value, &bounds));
+    bounds.document_bytes += 2;
+    assert!(crate::payload::fits(&value, &bounds));
+    bounds.rows = 1;
+    assert!(!crate::payload::fits(&value, &bounds), "reserved empty field capacity stays priced");
+    bounds.rows = 2;
+    bounds.text = 4;
+    assert!(!crate::payload::fits(&value, &bounds), "opaque name is whole or refused");
+    assert_eq!(value, before);
+}
+
+#[test]
 fn approved_documents_preserve_opaque_state_optional_words_and_exact_byte_bounds() {
     let mut bounds = Bounds { text: 3, document_bytes: u64::MAX, ..Bounds::default() };
     let absent = ResultValue::Approved { state: Box::new([0, 255, 1]), words: None };

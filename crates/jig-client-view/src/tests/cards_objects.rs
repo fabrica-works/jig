@@ -1754,3 +1754,43 @@ fn result_cards_distinguish_an_absent_completion_wall_from_epoch_and_render_supp
         assert!(contains(&tree, b"18446744073709551615"));
     }
 }
+
+#[test]
+fn exact_owner_verdict_renders_payload_and_stored_followups_without_inventing_chip_rows() {
+    let (domain, _) = start();
+    let words = words();
+    for cut in [false, true] {
+        let mut value = result();
+        value.value = Some(ResultValue::OwnerVerdict {
+            verdict: u32::MAX,
+            words: DocumentText { bytes: text(b"actual verdict words"), cut },
+            fields: list([ResultField { name: Box::from(*b"opaque field"), value: Box::from(*b"supplied value") }]),
+        });
+        value.details = Some(Box::new(ResultDetails {
+            contract: TaskContractDocument::Verdict { choices: list([]), cut: true },
+            requester: OwnerRequester::Person(1),
+            executor: OwnerExecutor::Person(PersonAddress::Role(u32::MAX)),
+            chosen_by: None,
+            delegates: list([]),
+            followups: Some(list([OwnerTaskLink::Stored { number: u64::MAX, status: None }])),
+            proposal: Some(ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX }),
+            cut: true,
+        }));
+        let before = value.clone();
+        let envelope = crate::Limits::of_words(&CLIENT, &words).unwrap();
+        let mut builder = Builder::new(&envelope);
+        builder.open(Role::Page);
+        let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
+        cards::result::facts(&mut builder, &domain, &value, &words, &mut bindings);
+        builder.close();
+        let tree = builder.finish();
+        assert!(contains(&tree, b"Verdict 4294967295"));
+        assert!(contains(&tree, b"actual verdict words"));
+        assert!(contains(&tree, b"opaque field"));
+        assert!(contains(&tree, b"supplied value"));
+        assert!(contains(&tree, b"18446744073709551615"));
+        assert!(contains(&tree, b"Stored task"));
+        assert_eq!(contains(&tree, b"Only part of this text was supplied"), cut);
+        assert_eq!(value, before);
+    }
+}

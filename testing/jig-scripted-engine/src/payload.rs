@@ -696,6 +696,9 @@ impl Payload for ResultValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Report(value0) | Self::Words(value0) | Self::Failure(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerVerdict { verdict, words, fields } => {
+                sum(&[verdict.heap(bounds), words.heap(bounds), fields.heap(bounds)])
+            }
             Self::Verdict { verdict, words, fields, tasks, proposal } => sum(&[
                 verdict.heap(bounds),
                 words.heap(bounds),

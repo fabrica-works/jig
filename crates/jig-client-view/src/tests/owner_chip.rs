@@ -458,6 +458,33 @@ fn complete_chip_endings_keep_result_requester_and_each_independent_reason_loss(
         }
     }
 }
+
+#[test]
+fn exact_owner_verdict_fits_chip_result_fragment_at_full_field_capacity_and_rejects_whole_overflow() {
+    let mut fields = List::with_capacity(client_limits().rows);
+    for _ in 0..client_limits().rows {
+        fields.push(ResultField { name: copy_of(&[255; 256]), value: copy_of(&[b'x'; 256]) }).unwrap();
+    }
+    let mut value = details();
+    value.ending = Some(OwnerChipEnding::Done(ResultValue::OwnerVerdict {
+        verdict: u32::MAX,
+        words: doc(&[b'w'; 256], true),
+        fields,
+    }));
+    let before = value.clone();
+    let (tree, _, envelope) = build(&value, words());
+    assert!(has(&tree, b"Verdict 4294967295"));
+    assert!(has(&tree, b"Only part of this text was supplied"));
+    assert!(has(&tree, &[b'w'; 256]));
+    assert!(has(&tree, &[b'x'; 256]));
+    assert!(u32::try_from(tree.nodes().len()).unwrap() <= envelope.nodes);
+    assert!(
+        tree.nodes().iter().map(|node| u64::from(node.text_bytes())).sum::<u64>() <= u64::from(envelope.text_bytes)
+    );
+    assert!(view::required(&value, &jig_client::Limits { rows: 3, ..client_limits() }, words()).is_none());
+    assert!(view::required(&value, &jig_client::Limits { text: 255, ..client_limits() }, words()).is_none());
+    assert_eq!(value, before);
+}
 #[test]
 fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_arithmetic_bounds() {
     let mut value = details();

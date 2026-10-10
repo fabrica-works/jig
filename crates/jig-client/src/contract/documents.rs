@@ -586,6 +586,9 @@ pub enum ResultContract {
 pub enum ResultValue {
     /// A report.
     Report(DocumentText),
+    /// Exact owner verdict payload. ResultDetails separately supplies complete
+    /// followup/proposal references, including stored tasks without a chip.
+    OwnerVerdict { verdict: u32, words: DocumentText, fields: List<ResultField> },
     /// A verdict and follow ups.
     Verdict {
         verdict: u32,

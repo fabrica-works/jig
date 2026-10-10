@@ -58,6 +58,20 @@ fn text_fits(value: &DocumentText, limits: &Limits) -> Option<()> {
 }
 fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> {
     match value {
+        ResultValue::OwnerVerdict { words, fields, .. } => {
+            text_fits(words, limits)?;
+            if fields.capacity() > limits.rows {
+                return None;
+            }
+            for field in fields {
+                if u32::try_from(field.name.len()).ok()? > limits.text
+                    || u32::try_from(field.value.len()).ok()? > limits.text
+                {
+                    return None;
+                }
+            }
+            crate::result_nodes(limits)
+        }
         ResultValue::Verdict { words, fields, tasks, .. } => {
             text_fits(words, limits)?;
             if fields.capacity() > limits.rows || tasks.capacity() > limits.rows {
@@ -372,6 +386,7 @@ fn result_value(b: &mut Builder, value: &ResultValue, client: &Domain, words: &W
         | ResultValue::Words(_)
         | ResultValue::Failure(_)
         | ResultValue::Verdict { .. }
+        | ResultValue::OwnerVerdict { .. }
         | ResultValue::Connector { .. }
         | ResultValue::Change { .. }
         | ResultValue::Choice { .. } => crate::cards::result::value_nodes(b, client, value, words, bindings),
