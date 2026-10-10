@@ -1383,7 +1383,7 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
         &PhraseLimits {
             languages: 1,
             phrases: crate::owner_words::phrase_count(),
-            holes: 3,
+            holes: 4,
             segments: 2000,
             text_bytes: 20000,
             hole_bytes: text,

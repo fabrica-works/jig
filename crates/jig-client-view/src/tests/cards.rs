@@ -418,7 +418,7 @@ fn jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset()
         Phrasebook::load(
             shapes(128),
             Box::new([language]),
-            &PhraseLimits { languages: 1, phrases: 1000, holes: 3, segments: 1000, text_bytes: 10000, hole_bytes: 128 }
+            &PhraseLimits { languages: 1, phrases: 1000, holes: 4, segments: 1000, text_bytes: 10000, hole_bytes: 128 }
         )
         .unwrap_err(),
         crate::phrases::Invalid::Missing { id: missing }
