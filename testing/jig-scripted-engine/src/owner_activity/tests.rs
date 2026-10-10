@@ -173,7 +173,7 @@ fn owner_activity_reserved_empty_fields_and_each_nested_text_overflow_refuse_who
         |s| s.words = text(b"123456789"),
         |s| {
             s.kind =
-                OwnerMessageKind::Result(OwnerWordResult::Approved { state: text(b"123456789"), words_present: true })
+                OwnerMessageKind::Result(OwnerWordResult::Approved { state: text(b"123456789"), words_present: true });
         },
         |s| {
             if let OwnerMessageKind::Result(OwnerWordResult::Verdict { fields, .. }) = &mut s.kind {

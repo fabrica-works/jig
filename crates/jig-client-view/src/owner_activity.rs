@@ -78,7 +78,7 @@ pub fn required(value: &OwnerActivityLine, limits: &Limits, words: &Words) -> Op
     match &value.line {
         OwnerActivity::Words { kind, words, .. } => message_fits(kind, words, limits)?,
         OwnerActivity::Heard(word) | OwnerActivity::Notified { word, .. } => {
-            message_fits(&word.kind, &word.words, limits)?
+            message_fits(&word.kind, &word.words, limits)?;
         }
         OwnerActivity::RunBegan { .. }
         | OwnerActivity::RunEnded { .. }

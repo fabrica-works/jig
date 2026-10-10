@@ -1,5 +1,5 @@
 //! Closed source activity/message sayings (client/domain/view.md, 7).
-//! Allocated IDs7200 onward are independent of legacy conversation rendering.
+//! Allocated phrase numbers 7200 onward are independent of legacy conversation rendering.
 use crate::{
     Owner,
     phrases::{
@@ -340,110 +340,110 @@ impl ActivityPhrase {
     #[expect(clippy::too_many_lines, reason = "one total data table keeps all closed activity phrase shapes together")]
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Activity => None,
-            Self::Task => Some(HoleKind::Number),
-            Self::Position => Some(HoleKind::Number),
+            Self::Activity
+            | Self::Word
+            | Self::From
+            | Self::Recipient
+            | Self::Eligible
+            | Self::Ineligible
+            | Self::WholeWords
+            | Self::Words
+            | Self::Heard
+            | Self::Notified
+            | Self::RunBegan
+            | Self::Resumed
+            | Self::NotResumed
+            | Self::Made
+            | Self::Ready
+            | Self::MessageCause
+            | Self::Released
+            | Self::Retry
+            | Self::Narrowed
+            | Self::Changed
+            | Self::RunEnded
+            | Self::Parked
+            | Self::Finished
+            | Self::CancelledEnd
+            | Self::FailedEnd
+            | Self::Refused
+            | Self::Transient
+            | Self::Permanent
+            | Self::RunFailure
+            | Self::AgentFailure
+            | Self::Lost
+            | Self::Invalid
+            | Self::Turn
+            | Self::ReadAbsent
+            | Self::Decided
+            | Self::Milestone
+            | Self::Escalation
+            | Self::Proposal
+            | Self::Batch
+            | Self::Effect
+            | Self::Amend
+            | Self::Widen
+            | Self::Release
+            | Self::PersonStalled
+            | Self::ProposalDecision
+            | Self::Accepted
+            | Self::Rejected
+            | Self::MessageWords
+            | Self::EffectNotMade
+            | Self::Amendment
+            | Self::Question
+            | Self::Answer
+            | Self::Notice
+            | Self::Held
+            | Self::Done
+            | Self::NoticeFailed
+            | Self::NoticeCancelled
+            | Self::Timer
+            | Self::News
+            | Self::Wakes
+            | Self::Kept
+            | Self::Dropped
+            | Self::Result
+            | Self::Approved
+            | Self::State
+            | Self::WordsPresent
+            | Self::WordsAbsent
+            | Self::Report
+            | Self::Verdict
+            | Self::FieldName
+            | Self::FieldValue
+            | Self::Change
+            | Self::ResultFailed
+            | Self::ResultCancelled => None,
+            Self::Task
+            | Self::Position
+            | Self::Message
+            | Self::TaskIdentity
+            | Self::PersonIdentity
+            | Self::DeploymentIdentity
+            | Self::Hits
+            | Self::Attempt
+            | Self::TransientTries
+            | Self::PermanentTries
+            | Self::RunTries
+            | Self::AgentTries
+            | Self::LostTries
+            | Self::InvalidTries
+            | Self::Spent
+            | Self::Reply
+            | Self::TurnNumber
+            | Self::Read
+            | Self::Revision
+            | Self::Proposer
+            | Self::ProposalNumber
+            | Self::Entry
+            | Self::QuestionNumber
+            | Self::Subscription
+            | Self::Target
+            | Self::Code
+            | Self::Connector
+            | Self::ChangeKind
+            | Self::Resource => Some(HoleKind::Number),
             Self::At => Some(HoleKind::Wall),
-            Self::Word => None,
-            Self::Message => Some(HoleKind::Number),
-            Self::From => None,
-            Self::Recipient => None,
-            Self::TaskIdentity => Some(HoleKind::Number),
-            Self::PersonIdentity => Some(HoleKind::Number),
-            Self::DeploymentIdentity => Some(HoleKind::Number),
-            Self::Hits => Some(HoleKind::Number),
-            Self::Eligible => None,
-            Self::Ineligible => None,
-            Self::WholeWords => None,
-            Self::Words => None,
-            Self::Heard => None,
-            Self::Notified => None,
-            Self::RunBegan => None,
-            Self::Attempt => Some(HoleKind::Number),
-            Self::Resumed => None,
-            Self::NotResumed => None,
-            Self::Made => None,
-            Self::Ready => None,
-            Self::MessageCause => None,
-            Self::Released => None,
-            Self::Retry => None,
-            Self::Narrowed => None,
-            Self::Changed => None,
-            Self::TransientTries => Some(HoleKind::Number),
-            Self::PermanentTries => Some(HoleKind::Number),
-            Self::RunTries => Some(HoleKind::Number),
-            Self::AgentTries => Some(HoleKind::Number),
-            Self::LostTries => Some(HoleKind::Number),
-            Self::InvalidTries => Some(HoleKind::Number),
-            Self::RunEnded => None,
-            Self::Spent => Some(HoleKind::Number),
-            Self::Parked => None,
-            Self::Finished => None,
-            Self::CancelledEnd => None,
-            Self::FailedEnd => None,
-            Self::Refused => None,
-            Self::Transient => None,
-            Self::Permanent => None,
-            Self::RunFailure => None,
-            Self::AgentFailure => None,
-            Self::Lost => None,
-            Self::Invalid => None,
-            Self::Turn => None,
-            Self::Reply => Some(HoleKind::Number),
-            Self::TurnNumber => Some(HoleKind::Number),
-            Self::Read => Some(HoleKind::Number),
-            Self::ReadAbsent => None,
-            Self::Decided => None,
-            Self::Revision => Some(HoleKind::Number),
-            Self::Milestone => None,
-            Self::Escalation => None,
-            Self::Proposal => None,
-            Self::Proposer => Some(HoleKind::Number),
-            Self::ProposalNumber => Some(HoleKind::Number),
-            Self::Batch => None,
-            Self::Effect => None,
-            Self::Amend => None,
-            Self::Widen => None,
-            Self::Release => None,
-            Self::PersonStalled => None,
-            Self::ProposalDecision => None,
-            Self::Accepted => None,
-            Self::Rejected => None,
-            Self::MessageWords => None,
-            Self::EffectNotMade => None,
-            Self::Entry => Some(HoleKind::Number),
-            Self::Amendment => None,
-            Self::Question => None,
-            Self::Answer => None,
-            Self::QuestionNumber => Some(HoleKind::Number),
-            Self::Notice => None,
-            Self::Subscription => Some(HoleKind::Number),
-            Self::Target => Some(HoleKind::Number),
-            Self::Held => None,
-            Self::Done => None,
-            Self::NoticeFailed => None,
-            Self::NoticeCancelled => None,
-            Self::Timer => None,
-            Self::News => None,
-            Self::Wakes => None,
-            Self::Kept => None,
-            Self::Dropped => None,
-            Self::Result => None,
-            Self::Approved => None,
-            Self::State => None,
-            Self::WordsPresent => None,
-            Self::WordsAbsent => None,
-            Self::Report => None,
-            Self::Verdict => None,
-            Self::Code => Some(HoleKind::Number),
-            Self::FieldName => None,
-            Self::FieldValue => None,
-            Self::Change => None,
-            Self::Connector => Some(HoleKind::Number),
-            Self::ChangeKind => Some(HoleKind::Number),
-            Self::Resource => Some(HoleKind::Number),
-            Self::ResultFailed => None,
-            Self::ResultCancelled => None,
         }
     }
     #[expect(

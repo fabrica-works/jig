@@ -68,7 +68,7 @@ fn words(selected: bool) -> Words {
     };
     Words {
         book: Phrasebook::load(crate::phrases::jig::shapes(8), languages, &phrase_limits()).unwrap(),
-        language: if selected { 1 } else { 0 },
+        language: u16::from(selected),
         offset_minutes: 0,
     }
 }
@@ -109,10 +109,10 @@ fn envelope(tree: &Tree, f: view::ActivityFragment) {
     let mut total = 0_u64;
     for node in tree.nodes() {
         assert!(node.text_bytes() <= f.text_per_node);
-        total += u64::from(node.text_bytes());
+        total = total.checked_add(u64::from(node.text_bytes())).unwrap();
         if let Some(name) = &node.name {
             assert!(name.len() <= usize::try_from(f.text_per_node).unwrap());
-            total += u64::try_from(name.len()).unwrap();
+            total = total.checked_add(u64::try_from(name.len()).unwrap()).unwrap();
         }
         assert!(node.binding.is_none() && node.slot.is_none());
         if node.role == crate::Role::Region {
@@ -290,7 +290,7 @@ fn assert_kind_numbers(tree: &Tree, kind: &OwnerMessageKind) {
             assert!(has(tree, b"Target task: 18446744073709551615"));
         }
         OwnerMessageKind::Timer { .. } | OwnerMessageKind::News { .. } => {
-            assert!(has(tree, b"Subscription: 18446744073709551615"))
+            assert!(has(tree, b"Subscription: 18446744073709551615"));
         }
         OwnerMessageKind::Words | OwnerMessageKind::Question | OwnerMessageKind::Result(_) => {}
     }
@@ -445,7 +445,7 @@ fn owner_activity_archive_read_none_zero_and_max_are_distinct_without_decoding_o
 fn assert_time_presentation() {
     let value = OwnerWord { at: Wall::from_nanos(123), ..fixture(OwnerMessageKind::Words) };
     let presentations: Box<[(i32, &[u8])]> =
-        Box::new([(1, b"Recorded at: 60000000123"), (0, b"Recorded at: 123"), (-1, b"Recorded at: 0")]);
+        Box::new([(1_i32, b"Recorded at: 60000000123"), (0_i32, b"Recorded at: 123"), (-1_i32, b"Recorded at: 0")]);
     for (offset, label) in presentations {
         let mut words = normal_words().clone();
         words.offset_minutes = offset;
@@ -611,7 +611,7 @@ fn assert_each_text_bound(words: &Words) {
         |s| s.words = text(b"123456789"),
         |s| {
             s.kind =
-                OwnerMessageKind::Result(OwnerWordResult::Approved { state: text(b"123456789"), words_present: true })
+                OwnerMessageKind::Result(OwnerWordResult::Approved { state: text(b"123456789"), words_present: true });
         },
         |s| {
             if let OwnerMessageKind::Result(OwnerWordResult::Verdict { fields, .. }) = &mut s.kind {
