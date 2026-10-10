@@ -208,13 +208,15 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
         )
         | None => None,
     };
-    if let Some(doc) = doc {
-        if doc.has_loss() {
-            crate::specification::document(b, doc, words);
-            if !doc.cut {
-                words.text(b, JigPhrase::SpecificationCut, &[]);
-            }
-        }
+    let Some(doc) = doc else {
+        return;
+    };
+    if !doc.has_loss() {
+        return;
+    }
+    crate::specification::document(b, doc, words);
+    if !doc.cut {
+        words.text(b, JigPhrase::SpecificationCut, &[]);
     }
 }
 fn numbers(chips: &skein_lib::List<jig_client::contract::Chip>) -> skein_lib::List<u64> {
