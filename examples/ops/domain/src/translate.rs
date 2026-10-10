@@ -788,6 +788,10 @@ pub(crate) mod nested {
     }
 }
 
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one bounded decoded action stays inline; its exact amendment fields are priced by the owner"
+)]
 pub(crate) enum Decoded {
     Read(observability::Read),
     Action(core::NamedAction),
