@@ -129,11 +129,11 @@ pub fn incident_world(seed: u64) -> ClientWorld {
         ProposalAction::Effect { part: Part::Effect { connector: number(Connector::Infrastructure), proposal: p.key } };
     p.why = text(b"Restart checkout in production");
     let mut lead = task();
-    lead.chip.title = text(b"I incident lead");
+    lead.chip.title = DocumentText::complete(text(b"I incident lead"));
     *lead.chip.details = ChipPhase::Idle { wake: lead.wake.clone() };
     let mut restart = task();
     restart.chip.task = 10;
-    restart.chip.title = text(b"R restart checkout");
+    restart.chip.title = DocumentText::complete(text(b"R restart checkout"));
     restart.requester = Actor::Task(9);
     restart.proposals = list([p.key]);
     restart.chip.executor = Executor::Procedure { connector: number(Connector::Infrastructure), kind: 1 };
@@ -150,7 +150,8 @@ pub fn incident_world(seed: u64) -> ClientWorld {
         truth.object_projects.insert(key, 1);
         truth.objects.insert(key, value);
     }
-    let counts = PhaseCounts { waiting: 0, running: 2, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
+    let counts =
+        PhaseCounts { waiting: 0, running: 2, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0, ended: 0 };
     truth.trees.insert(
         9,
         Tree {
@@ -356,7 +357,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
         truth.sign_ins.insert(party, party);
     }
     let mut chat = task();
-    chat.chip.title = text(b"Q staging chat");
+    chat.chip.title = DocumentText::complete(text(b"Q staging chat"));
     *chat.chip.details = ChipPhase::Idle { wake: chat.wake.clone() };
     let mut p = proposal();
     p.why = text(b"Provision staging for one week");
@@ -418,7 +419,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
                 rows: jig_scripted_engine::Rows::Conversations(vec![ConversationLine {
                     chip: {
                         let mut chip = task().chip;
-                        chip.title = text(b"Q staging chat");
+                        chip.title = DocumentText::complete(text(b"Q staging chat"));
                         chip
                     },
                     project: 1,

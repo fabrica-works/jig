@@ -398,7 +398,7 @@ fn task() -> Task {
     Task {
         chip: Chip {
             task: 9,
-            title: text(&[b't'; 32]),
+            title: DocumentText::complete(text(&[b't'; 32])),
             executor: Executor::Procedure { connector: 2, kind: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: 2, task: 9 } }),
@@ -439,7 +439,16 @@ fn task() -> Task {
         result: None,
         runtime: Runtime::Procedure { panel: Part::Panel { connector: 2, task: 9 } },
         impact: Impact {
-            tasks: PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            tasks: PhaseCounts {
+                waiting: 0,
+                running: 0,
+                held: 0,
+                closing: 0,
+                done: 0,
+                failed: 0,
+                cancelled: 0,
+                ended: 0,
+            },
             live_runs: 0,
             proposals: 0,
             effects_pending: 0,
