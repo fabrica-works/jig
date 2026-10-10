@@ -446,8 +446,8 @@ fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_car
         domain.objects.get(pending.get(1).unwrap().1).unwrap().card,
         Card::Leaving { how: Left::Answered { outcome }, until: Time::from_nanos(5_000_000_000) }
     );
-    for (key, id, _) in pending {
-        assert_eq!(domain.objects.find(key), Some(id));
+    for (key, id, _) in &pending {
+        assert_eq!(domain.objects.find(*key), Some(*id));
     }
 }
 
