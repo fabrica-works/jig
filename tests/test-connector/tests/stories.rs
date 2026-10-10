@@ -336,3 +336,36 @@ fn a_persons_retry_preserves_the_previous_attempt_deadline_across_restart() {
     world.release(&due, &mut VecDeque::new());
     assert_eq!(made(&world, 1), 1);
 }
+
+#[test]
+fn procedure_delegate_outcomes_are_bounded_replayed_updated_and_erased() {
+    let mut world = World::new(3);
+    for task in 1..=8 {
+        let requests = world.event(Event::ProcedureDelegateOutcome { task, step: task + 20, child: Some(task + 100) });
+        assert!(matches!(requests.as_slice(), [Request::Save { .. }]));
+    }
+    assert_eq!(
+        world.event(Event::ProcedureDelegateOutcome { task: 9, step: 29, child: None }),
+        vec![Request::Refused { task: 9 }]
+    );
+    world.cold_restart();
+    assert_eq!(
+        world.event(Event::ProcedureDelegateOutcome { task: 9, step: 30, child: None }),
+        vec![Request::Refused { task: 9 }]
+    );
+    let record = Record::ProcedureDelegateOutcome { task: 1, step: 99, child: None };
+    assert_eq!(
+        world.event(Event::ProcedureDelegateOutcome { task: 1, step: 99, child: None }),
+        vec![Request::Save { record: record.clone() }]
+    );
+    assert_eq!(world.records.get(&record.key()), Some(&record));
+    assert_eq!(
+        world.event(Event::Unnamed { task: 1 }),
+        vec![Request::Erase { key: RecordKey::ProcedureDelegateOutcome(1) }]
+    );
+    assert!(!world.records.contains_key(&record.key()));
+    assert!(matches!(
+        world.event(Event::ProcedureDelegateOutcome { task: 9, step: 30, child: None }).as_slice(),
+        [Request::Save { .. }]
+    ));
+}

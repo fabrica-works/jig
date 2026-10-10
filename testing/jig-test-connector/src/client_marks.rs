@@ -93,6 +93,7 @@ fn resource(domain: &Domain, subject: &Subject, owner: Option<u32>, path: &crate
                     | Record::ApplicationAnswer { .. }
                     | Record::Proposal { .. }
                     | Record::Procedure(_)
+                    | Record::ProcedureDelegateOutcome { .. }
                     | Record::Result { .. }
                     | Record::Adoption { .. }
                     | Record::Subscription { .. }
@@ -120,9 +121,11 @@ fn saved(domain: &Domain, subject: &Subject, record: &Record) -> bool {
         Record::Adoption { project, path, .. } => resource(domain, subject, Some(*project), path),
         Record::Proposal { number, .. } => proposal(subject, *number),
         Record::Outbox(entry) => outbox(subject, entry.task),
-        Record::ApplicationAnswer { .. } | Record::Subscription { .. } | Record::Pool { .. } | Record::Made { .. } => {
-            false
-        }
+        Record::ProcedureDelegateOutcome { .. }
+        | Record::ApplicationAnswer { .. }
+        | Record::Subscription { .. }
+        | Record::Pool { .. }
+        | Record::Made { .. } => false,
     }
 }
 
@@ -135,9 +138,11 @@ fn erased(domain: &Domain, subject: &Subject, key: &RecordKey) -> bool {
         RecordKey::Adoption { project, path } => resource(domain, subject, Some(*project), path),
         RecordKey::Proposal(number) => proposal(subject, *number),
         RecordKey::Outbox(key) => outbox(subject, key.task),
-        RecordKey::ApplicationAnswer(_) | RecordKey::Subscription { .. } | RecordKey::Pool(_) | RecordKey::Made(_) => {
-            false
-        }
+        RecordKey::ProcedureDelegateOutcome(_)
+        | RecordKey::ApplicationAnswer(_)
+        | RecordKey::Subscription { .. }
+        | RecordKey::Pool(_)
+        | RecordKey::Made(_) => false,
     }
 }
 

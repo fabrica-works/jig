@@ -46,8 +46,6 @@ pub struct World {
     pub procedure_inputs: Vec<(u64, u16, u16, Box<tasks::RunContext>)>,
     /// A procedure connector can withhold its reply while a story drives its step.
     pub hold_procedures: bool,
-    /// Immediate owner binding facts; these are not durable creation acknowledgments.
-    pub procedure_delegations: Vec<(u64, u64, Option<u64>)>,
     pub pending_reads: Vec<(u16, connector::SystemRequest)>,
     pub lost_answers: u32,
     pub hold_writes: bool,
@@ -250,7 +248,6 @@ impl World {
             procedure: None,
             procedure_inputs: Vec::new(),
             hold_procedures: false,
-            procedure_delegations: Vec::new(),
             pending_reads: Vec::new(),
             lost_answers: 0,
             hold_writes: false,
@@ -475,9 +472,6 @@ impl World {
                             row,
                             busy: false,
                         }));
-                    }
-                    root::Request::Now(core::Now::ProcedureDelegateOutcome { task, step, child }) => {
-                        self.procedure_delegations.push((task, step, child));
                     }
                     root::Request::Now(now) => {
                         if let Some(peer) = &mut self.client_peer

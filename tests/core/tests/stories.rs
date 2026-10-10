@@ -1597,28 +1597,7 @@ fn approval_delegate_results_preserve_absent_and_explicitly_empty_explanations()
 
 #[test]
 fn an_approval_reaches_its_asking_procedure_connector_as_the_whole_durable_input() {
-    let (mut configuration, mut limits) = person_world_fixture(456);
-    limits.core.authority.executors = 3;
-    limits.core.tasks.executor_kinds = 3;
-    let kinds: Box<[authority::Executor]> =
-        Box::new([authority::Executor::Charter(1), authority::Executor::Role(0), authority::Executor::Procedure(1)]);
-    configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
-    let mut rules = configuration.core.authority.rules().clone();
-    rules.ceiling.delegation.kinds.clone_from(&kinds);
-    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
-    policy.ceiling.delegation.kinds.clone_from(&kinds);
-    policy.roles[0].authority.delegation.kinds = kinds;
-    let mut domain = authority::Domain::new(rules, limits.core.authority).expect("procedure policy");
-    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
-    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    configuration.core.authority = domain;
-    let mut world = World::configured(456, false, configuration, limits);
-    world.hold_procedures = true;
-    let root_run = world.assignments[0];
-    let mut procedure = member(&world, tasks::Executor::Procedure { connector: 1, code: 1 }, b"ask for approval");
-    procedure.authority.delegation.kinds = Box::new([tasks::AuthorityExecutor::Role(0)]);
-    let parent = delegate(&mut world, root_run, 1, procedure);
+    let (mut world, parent) = procedure_world(456, 1);
     let (step, connector, code, context) = world.procedure_inputs.last().expect("first procedure input");
     assert_eq!(context.task, parent);
     let mut child = member(&world, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"approve this state");
@@ -1782,4 +1761,115 @@ fn a_verdicts_machine_fields_reach_its_requester_whole_after_commit_and_restart(
         .expect("restored delegate message");
     assert_eq!(message.kind, expected);
     assert_eq!(message.words.as_ref(), b"why");
+}
+
+fn procedure_world(seed: u64, number: u16) -> (World, u64) {
+    let (configuration, limits) = procedure_configuration(seed);
+    let mut world = World::configured(seed, false, configuration, limits);
+    world.hold_procedures = true;
+    let root_run = world.assignments[0];
+    let mut procedure = member(&world, tasks::Executor::Procedure { connector: number, code: 1 }, b"ask for approval");
+    procedure.authority.delegation.kinds = Box::new([tasks::AuthorityExecutor::Role(0)]);
+    let parent = delegate(&mut world, root_run, 1, procedure);
+    (world, parent)
+}
+
+#[test]
+fn a_procedure_delegate_identity_is_committed_with_its_child_by_the_actual_connector() {
+    let (mut world, parent) = procedure_world(458, 2);
+    let (step, number, code, _) = world.procedure_inputs.last().expect("procedure input");
+    let (step, number, code) = (*step, *number, *code);
+    let mut child = member(&world, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"child");
+    child.authority.budget.spend = 5;
+    child.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.send(root::Event::Core(core::Event::ProcedureStep {
+        task: parent,
+        step,
+        connector: number,
+        code: u32::from(code),
+        action: core::ProcedureAction::Delegate(Box::new([child])),
+    }));
+    let child = *live_row(&world, parent).delegates.first().expect("committed child");
+    let record = connector::Record::ProcedureDelegateOutcome { task: parent, step, child: Some(child) };
+    assert_eq!(
+        world.store.rows.get(&root::Key::Connector { number: 2, key: record.key() }),
+        Some(&root::Record::Connector { number: 2, record: record.clone() })
+    );
+    assert!(!world.store.rows.contains_key(&root::Key::Connector { number: 1, key: record.key() }));
+    assert!(world.commits.iter().any(|writes| {
+        writes.iter().any(|write| matches!(write, root::Write::Save(root::Record::Connector { number: 2, record: saved }) if saved == &record))
+            && writes.iter().any(|write| matches!(write, root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(saved)))) if saved.number == child))
+    }), "child and connector identity share one durable decision");
+    world.restart_with(procedure_configuration(458).0);
+    assert_eq!(
+        world.store.rows.get(&root::Key::Connector { number: 2, key: record.key() }),
+        Some(&root::Record::Connector { number: 2, record })
+    );
+}
+
+#[test]
+fn a_refused_procedure_delegation_retains_the_exact_none_outcome() {
+    let (mut world, parent) = procedure_world(459, 2);
+    let (step, number, code, _) = world.procedure_inputs.last().expect("procedure input");
+    let (step, number, code) = (*step, *number, *code);
+    let mut child = member(&world, tasks::Executor::Person(tasks::PersonAddress::Role(0)), b"over budget");
+    child.authority.budget.spend = u64::MAX;
+    world.send(root::Event::Core(core::Event::ProcedureStep {
+        task: parent,
+        step,
+        connector: number,
+        code: u32::from(code),
+        action: core::ProcedureAction::Delegate(Box::new([child])),
+    }));
+    assert!(live_row(&world, parent).delegates.is_empty());
+    let record = connector::Record::ProcedureDelegateOutcome { task: parent, step, child: None };
+    assert_eq!(
+        world.store.rows.get(&root::Key::Connector { number: 2, key: record.key() }),
+        Some(&root::Record::Connector { number: 2, record })
+    );
+}
+
+fn procedure_configuration(seed: u64) -> (root::Config, root::Limits) {
+    let (mut configuration, mut limits) = person_world_fixture(seed);
+    limits.core.authority.executors = 3;
+    limits.core.tasks.executor_kinds = 3;
+    let kinds: Box<[authority::Executor]> =
+        Box::new([authority::Executor::Charter(1), authority::Executor::Role(0), authority::Executor::Procedure(1)]);
+    configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
+    let mut rules = configuration.core.authority.rules().clone();
+    rules.ceiling.delegation.kinds.clone_from(&kinds);
+    let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
+    policy.ceiling.delegation.kinds.clone_from(&kinds);
+    policy.roles[0].authority.delegation.kinds = kinds;
+    let mut domain = authority::Domain::new(rules, limits.core.authority).expect("procedure policy");
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
+    configuration.core.authority = domain;
+    (configuration, limits)
+}
+
+#[test]
+fn procedure_delegate_outcomes_without_a_live_procedure_owner_are_not_routed() {
+    let (configuration, limits) = person_world_fixture(460);
+    let mut world = World::configured(460, false, configuration, limits);
+    let agent = world.assignments[0].0;
+    for task in [agent, u64::MAX] {
+        world.send(root::Event::Core(core::Event::ProcedureStep {
+            task,
+            step: u64::MAX,
+            connector: 2,
+            code: 1,
+            action: core::ProcedureAction::Delegate(Box::new([])),
+        }));
+    }
+    assert!(!world.store.rows.values().any(|row| matches!(
+        row,
+        root::Record::Connector { record: connector::Record::ProcedureDelegateOutcome { .. }, .. }
+    )));
+    assert!(!world.commits.iter().flatten().any(|write| matches!(
+        write,
+        root::Write::Save(root::Record::Connector { record: connector::Record::ProcedureDelegateOutcome { .. }, .. })
+    )));
 }

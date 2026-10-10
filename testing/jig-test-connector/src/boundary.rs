@@ -521,6 +521,8 @@ pub enum Event {
     Judge { token: Token, requirement: u16, resources: Box<[Path]>, state: u64 },
     /// Create, wake or answer a connector-owned procedure task.
     Procedure { task: u64, number: u16, resource: Path, signal: ProcedureSignal },
+    /// The core's first delegated child, returned in the creating decision.
+    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// Serve an ephemeral read.
     Read { token: Token, read: Read },
     /// Gather a brief section for one task.
@@ -600,6 +602,8 @@ pub enum RecordKey {
     ApplicationAnswer(Token),
     /// One procedure task's progress.
     Procedure(u64),
+    /// The last delegate outcome for a live procedure task.
+    ProcedureDelegateOutcome(u64),
     /// Connector-owned result retained for a dependent's brief.
     Result(u64),
     /// Resources named by a live task.
@@ -629,6 +633,8 @@ pub enum Record {
     Proposal { number: u64, task: u64, effect: Effect },
     /// Parameters and state of one procedure task.
     Procedure(ProcedureState),
+    /// Exact delegate identity retained in the child's creation decision.
+    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// A completed connector-owned result.
     Result { task: u64, code: u16 },
     /// A live task's names and project.
@@ -653,6 +659,7 @@ impl Record {
             Record::ApplicationObject { object, .. } => RecordKey::ApplicationObject(*object),
             Record::ApplicationAnswer { token, .. } => RecordKey::ApplicationAnswer(*token),
             Record::Procedure(state) => RecordKey::Procedure(state.task),
+            Record::ProcedureDelegateOutcome { task, .. } => RecordKey::ProcedureDelegateOutcome(*task),
             Record::Result { task, .. } => RecordKey::Result(*task),
             Record::Task { task, .. } => RecordKey::Task(*task),
             Record::Adoption { project, path, .. } => RecordKey::Adoption { project: *project, path: path.clone() },

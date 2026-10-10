@@ -517,8 +517,17 @@ fn route_now(
         | core::Now::RestoreRefused => {
             unreachable!("this route awaits the testing application's scripted peer");
         }
-        other @ (core::Now::ProcedureDelegateOutcome { .. }
-        | core::Now::HistoricalPersonTask { .. }
+        core::Now::ProcedureDelegateOutcome { task, step, child } => {
+            if let Some(parent) = domain.core.tasks.task(task)
+                && let tasks::Executor::Procedure { connector: number, .. } = parent.executor
+            {
+                work.push(Work::Connector {
+                    number,
+                    event: connector::Event::ProcedureDelegateOutcome { task, step, child },
+                });
+            }
+        }
+        other @ (core::Now::HistoricalPersonTask { .. }
         | core::Now::SettledCallRefused { .. }
         | core::Now::Call { .. }
         | core::Now::DropCall { .. }
@@ -607,6 +616,7 @@ pub(super) fn route_connector(
                     | connector::Record::Subscription { .. }
                     | connector::Record::Pool { .. }
                     | connector::Record::Procedure(_)
+                    | connector::Record::ProcedureDelegateOutcome { .. }
                     | connector::Record::Result { .. }
                     | connector::Record::Made { .. } => {}
                 }

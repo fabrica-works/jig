@@ -99,6 +99,7 @@ fn task(domain: &Domain, project: u32, number: u64) -> Result<&[crate::Path], Do
             | crate::Record::ApplicationAnswer { .. }
             | crate::Record::Proposal { .. }
             | crate::Record::Procedure(_)
+            | crate::Record::ProcedureDelegateOutcome { .. }
             | crate::Record::Result { .. }
             | crate::Record::Adoption { .. }
             | crate::Record::Subscription { .. }

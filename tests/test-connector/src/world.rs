@@ -287,6 +287,7 @@ impl World {
                 | Record::ApplicationAnswer { .. }
                 | Record::Proposal { .. }
                 | Record::Subscription { .. }
+                | Record::ProcedureDelegateOutcome { .. }
                 | Record::Result { .. } => {}
             }
         }

@@ -1054,6 +1054,7 @@ fn restore_connector(domain: &mut Domain, env: &Env<Limits>, number: u16, record
         | connector::Record::ApplicationAnswer { .. }
         | connector::Record::Proposal { .. }
         | connector::Record::Procedure(_)
+        | connector::Record::ProcedureDelegateOutcome { .. }
         | connector::Record::Result { .. }
         | connector::Record::Task { .. }
         | connector::Record::Adoption { .. }
