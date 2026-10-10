@@ -516,3 +516,34 @@ fn person_verdict_choices_preserve_full_codes_and_refuse_missing_machine_fields(
         }
     }
 }
+
+#[test]
+fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation() {
+    for (reason, explanation) in [
+        (None, None),
+        (Some(b"".as_slice()), Some(text(b""))),
+        (Some(b"explanation".as_slice()), Some(text(b"explanation"))),
+    ] {
+        let (mut domain, _) = live();
+        let mut row = person();
+        row.contract = PersonContract::Approval {
+            state: text(&[0, 255, 1]),
+            part: Part::Resource { connector: 1, path: text(b"state") },
+        };
+        row.acts = offered(ActKind::Answer, Admission::Allowed);
+        let id = install(&mut domain, Body::PersonTask(Box::new(row)));
+        assert!(intend(&mut domain, id, ActKind::Answer).is_empty());
+        if let Some(reason) = reason {
+            edit(&mut domain, Purpose::Reason, reason);
+        }
+        assert_eq!(
+            sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
+            &Ask::AnswerPerson {
+                project: 1,
+                task: 8,
+                revision: Revision { value: 4 },
+                answer: PersonAnswer::Approved { state: Box::new([0, 255, 1]), words: explanation },
+            }
+        );
+    }
+}

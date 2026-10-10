@@ -1094,3 +1094,30 @@ fn verdict_documents_price_whole_machine_field_arrays_and_bytes() {
     bounds.rows = 2;
     assert!(crate::payload::fits(&option, &bounds));
 }
+
+#[test]
+fn approved_documents_preserve_opaque_state_optional_words_and_exact_byte_bounds() {
+    let mut bounds = Bounds { text: 3, document_bytes: u64::MAX, ..Bounds::default() };
+    let absent = ResultValue::Approved { state: Box::new([0, 255, 1]), words: None };
+    let empty = ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(text(b"")) };
+    assert_ne!(absent, empty);
+    for value in [absent, empty, ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(text(b"yes")) }] {
+        let ResultValue::Approved { words, .. } = &value else {
+            unreachable!("approval fixture");
+        };
+        let explanation = words.as_ref().map_or(0, |words| words.bytes().len());
+        bounds.document_bytes = u64::try_from(core::mem::size_of::<ResultValue>() + 3 + explanation).unwrap();
+        assert!(crate::payload::fits(&value, &bounds));
+        bounds.document_bytes -= 1;
+        assert!(!crate::payload::fits(&value, &bounds));
+        bounds.document_bytes += 1;
+        bounds.text = 2;
+        assert!(!crate::payload::fits(&value, &bounds), "whole opaque state is refused rather than cut");
+        bounds.text = 3;
+    }
+    let failure = ResultValue::Failure(text(b"bad"));
+    bounds.document_bytes = u64::try_from(core::mem::size_of::<ResultValue>() + 3).unwrap();
+    assert!(crate::payload::fits(&failure, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&failure, &bounds));
+}

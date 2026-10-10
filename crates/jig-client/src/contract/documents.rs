@@ -500,8 +500,10 @@ pub enum ResultValue {
     Connector { summary: Text, part: Part },
     /// A party choice.
     Choice { option: u32, by: Party, reason: Text },
-    /// Approval of a named state.
-    Approval { state: Text, approved: bool, by: Party },
+    /// Whole approved state and its optional explanation.
+    Approved { state: Box<[u8]>, words: Option<Text> },
+    /// A task that could not complete its contract.
+    Failure(Text),
     /// An answer in words.
     Words(Text),
 }

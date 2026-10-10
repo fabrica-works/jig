@@ -1,6 +1,7 @@
 //! Each visible act is one ask; client/domain/contract.md, 3.2 and 4.
 //! Requests carry jig facts alone and their outcomes are durable.
 use super::{Actor, Authority, Decision, Executor, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
+use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 /// A task change whose spec revision the request names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -29,7 +30,7 @@ pub enum PersonAnswer {
     /// An option and reason.
     Choice { option: u32, reason: Text },
     /// An approval naming the state seen.
-    Approval { state: Text, approved: bool, reason: Text },
+    Approved { state: Box<[u8]>, words: Option<Text> },
     /// An answer in words.
     Words(Text),
     /// A failure with a reason.

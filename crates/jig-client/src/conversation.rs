@@ -403,7 +403,8 @@ impl Conversation {
                             crate::contract::ResultValue::Report(_)
                             | crate::contract::ResultValue::Verdict { .. }
                             | crate::contract::ResultValue::Choice { .. }
-                            | crate::contract::ResultValue::Approval { .. }
+                            | crate::contract::ResultValue::Approved { .. }
+                            | crate::contract::ResultValue::Failure(_)
                             | crate::contract::ResultValue::Words(_) => {}
                         }
                     }

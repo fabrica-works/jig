@@ -77,9 +77,16 @@ pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words:
             words.text(b, JigPhrase::ChoiceResult, &[Hole::Number(u64::from(*option)), name(by.name.bytes())]);
             crate::markdown::read(reason.bytes(), 2, b);
         }
-        ResultValue::Approval { state, approved, by } => {
-            let phrase = if *approved { JigPhrase::ApprovalYes } else { JigPhrase::ApprovalNo };
-            words.text(b, phrase, &[name(state.bytes()), name(by.name.bytes())]);
+        ResultValue::Failure(reason) => {
+            words.text(b, JigPhrase::FailedPhase, &[]);
+            crate::markdown::read(reason.bytes(), 2, b);
+        }
+        ResultValue::Approved { state, words: explanation } => {
+            words.text(b, JigPhrase::ApprovalExpected, &[]);
+            b.text(Run::Plain, state);
+            if let Some(explanation) = explanation {
+                crate::markdown::read(explanation.bytes(), 2, b);
+            }
         }
     }
 }

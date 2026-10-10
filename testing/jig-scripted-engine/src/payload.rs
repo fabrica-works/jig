@@ -86,9 +86,7 @@ impl Payload for PersonAnswer {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Choice { option, reason } => sum(&[option.heap(bounds), reason.heap(bounds)]),
-            Self::Approval { state, approved, reason } => {
-                sum(&[state.heap(bounds), approved.heap(bounds), reason.heap(bounds)])
-            }
+            Self::Approved { state, words } => sum(&[state.heap(bounds), words.heap(bounds)]),
             Self::Words(value0) => sum(&[value0.heap(bounds)]),
             Self::Cannot { reason } => sum(&[reason.heap(bounds)]),
         }
@@ -557,7 +555,7 @@ impl Payload for ResultContract {
 impl Payload for ResultValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Report(value0) | Self::Words(value0) => sum(&[value0.heap(bounds)]),
+            Self::Report(value0) | Self::Words(value0) | Self::Failure(value0) => sum(&[value0.heap(bounds)]),
             Self::Verdict { verdict, words, fields, tasks, proposal } => sum(&[
                 verdict.heap(bounds),
                 words.heap(bounds),
@@ -567,9 +565,7 @@ impl Payload for ResultValue {
             ]),
             Self::Connector { summary, part } => sum(&[summary.heap(bounds), part.heap(bounds)]),
             Self::Choice { option, by, reason } => sum(&[option.heap(bounds), by.heap(bounds), reason.heap(bounds)]),
-            Self::Approval { state, approved, by } => {
-                sum(&[state.heap(bounds), approved.heap(bounds), by.heap(bounds)])
-            }
+            Self::Approved { state, words } => sum(&[state.heap(bounds), words.heap(bounds)]),
         }
     }
 }

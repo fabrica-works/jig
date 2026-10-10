@@ -388,7 +388,11 @@ fn result_value_payloads(words: &crate::words::Words, part: &Part) {
         ),
         (ResultValue::Connector { summary: text(b"full connector"), part: part.clone() }, b"full connector"),
         (ResultValue::Choice { option: 3, by: document().party, reason: text(b"full reason") }, b"full reason"),
-        (ResultValue::Approval { state: text(b"full state"), approved: false, by: document().party }, b"full state"),
+        (
+            ResultValue::Approved { state: b"full state".as_slice().into(), words: Some(text(b"approved words")) },
+            b"full state",
+        ),
+        (ResultValue::Failure(text(b"full failure")), b"full failure"),
     ] {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
@@ -1249,4 +1253,40 @@ fn collective_recipients_name_every_supplied_role_in_order(words: &crate::words:
     let names: Vec<_> =
         tree.nodes().iter().flat_map(|node| node.text.as_slice().iter().map(|run| run.text.as_ref())).collect();
     assert_eq!(names, [b"Waiting at policy roles in project 4".as_slice(), b"Role 7", b"Role 2"]);
+}
+
+#[test]
+fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
+    let (domain, _) = start();
+    let words = words();
+    for explanation in [None, Some(text(b"")), Some(text(b"exact explanation"))] {
+        let value = ResultValue::Approved { state: Box::new([0, 255, 1]), words: explanation.clone() };
+        let mut builder = Builder::new(&limits());
+        builder.open(Role::Page);
+        let mut bindings = JigBindings::new(64, CLIENT.text);
+        cards::result::value_nodes(&mut builder, &domain, &value, &words, &mut bindings);
+        builder.close();
+        let tree = builder.finish();
+        assert!(contains(&tree, &[0, 255, 1]));
+        assert!(!contains(&tree, document().party.name.bytes()));
+        if let Some(explanation) = explanation
+            && !explanation.bytes().is_empty()
+        {
+            assert!(contains(&tree, explanation.bytes()));
+        }
+    }
+    let mut builder = Builder::new(&limits());
+    builder.open(Role::Page);
+    let mut bindings = JigBindings::new(64, CLIENT.text);
+    cards::result::value_nodes(
+        &mut builder,
+        &domain,
+        &ResultValue::Failure(text(b"cannot complete")),
+        &words,
+        &mut bindings,
+    );
+    builder.close();
+    let tree = builder.finish();
+    assert!(contains(&tree, b"Failed"));
+    assert!(contains(&tree, b"cannot complete"));
 }

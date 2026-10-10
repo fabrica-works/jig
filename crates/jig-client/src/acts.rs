@@ -302,13 +302,10 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
                         };
                         PersonAnswer::Choice { option, reason }
                     }
-                    PersonContract::Approval { state, .. } => {
-                        let reason = match words(fields, Purpose::Reason) {
-                            Some(words) => words,
-                            None => Text::new(Box::from([]), 0).expect("empty text fits"),
-                        };
-                        PersonAnswer::Approval { state: state.clone(), approved: true, reason }
-                    }
+                    PersonContract::Approval { state, .. } => PersonAnswer::Approved {
+                        state: state.clone().into_bytes(),
+                        words: words(fields, Purpose::Reason),
+                    },
                     PersonContract::Words => PersonAnswer::Words(words(fields, Purpose::Answer)?),
                 }
             };
