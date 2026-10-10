@@ -138,9 +138,12 @@ pub fn received(event: &Event) -> Vec<Receipt> {
     match event {
         Event::Answer { attempt, envelope, answer } => {
             let words = match answer {
-                Some(domain::Answered::Jig(Answer::Done(Outcome::Made { what: Made::Words { task, message } }))) => {
-                    Some((*task, *message))
-                }
+                Some(domain::Answered::Jig(Answer::Done(
+                    Outcome::Made { what: Made::Words { task, message } }
+                    | Outcome::Owner(
+                        OwnerOutcome::Said { task, message, .. } | OwnerOutcome::QuestionAnswered { task, message, .. },
+                    ),
+                ))) => Some((*task, *message)),
                 Some(domain::Answered::Jig(_) | domain::Answered::First(_)) | None => None,
             };
             if *envelope == RequestEnvelope::SignedOut {
@@ -457,6 +460,42 @@ mod tests {
         assert_eq!(jig_seen(view.tree()), expected);
         for node in view.tree().nodes().iter().filter(|node| node.role == Role::Item) {
             assert_eq!(super::jig_card(view.tree(), node.id), node.key.map(CardKey::of));
+        }
+    }
+    #[test]
+    fn public_owner_answer_receipts_keep_original_attempt_envelope_and_exact_message_ids() {
+        use super::{Receipt, received};
+        use jig_client::contract::{Answer, Outcome, OwnerOutcome};
+        use jig_test_client_domain::{Answered, Event};
+        use skein_lib::{RequestEnvelope, Token};
+        let cases = [
+            (OwnerOutcome::Said { task: u64::MAX, message: 37, released: false }, Some((u64::MAX, 37))),
+            (OwnerOutcome::Said { task: 41, message: u64::MAX, released: true }, Some((41, u64::MAX))),
+            (OwnerOutcome::QuestionAnswered { task: 43, question: 47, message: 53 }, Some((43, 53))),
+            (OwnerOutcome::GoalProposed { proposal: 59 }, None),
+            (OwnerOutcome::Closing { chat: 61, cancelled: 67, kept: 71 }, None),
+        ];
+        for (outcome, expected) in cases {
+            for envelope in [RequestEnvelope::Final, RequestEnvelope::Again, RequestEnvelope::Lost] {
+                let event = Event::Answer {
+                    attempt: Token::new(73),
+                    envelope,
+                    answer: Some(Answered::Jig(Answer::Done(Outcome::Owner(outcome.clone())))),
+                };
+                let receipts = received(&event);
+                let [Receipt::Answer { attempt, final_answer, words }] = receipts.as_slice() else {
+                    panic!("one original answer envelope");
+                };
+                assert_eq!(*attempt, Token::new(73));
+                assert_eq!(*final_answer, envelope == RequestEnvelope::Final);
+                assert_eq!(*words, expected);
+            }
+            let signed_out = Event::Answer {
+                attempt: Token::new(73),
+                envelope: RequestEnvelope::SignedOut,
+                answer: Some(Answered::Jig(Answer::Done(Outcome::Owner(outcome)))),
+            };
+            assert!(matches!(received(&signed_out).as_slice(), [Receipt::Parked]));
         }
     }
 }
