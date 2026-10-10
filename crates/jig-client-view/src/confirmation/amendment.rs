@@ -188,7 +188,7 @@ pub fn form(
     }
     // Funding is kept with the document and may change independently of its spec revision.
     match &object.body {
-        Some(Body::Task(doc)) => crate::proposed_task::funder(b, &doc.budget.funder, words),
+        Some(Body::Task(doc)) => crate::proposed_task::funder(b, doc.budget.funder, words),
         Some(Body::Escalation(doc)) => words.actor(b, doc.steering.budget.funder),
         Some(
             Body::Chip(_)
