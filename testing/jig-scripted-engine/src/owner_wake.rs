@@ -68,7 +68,6 @@ pub fn subscriptions_fits(value: &Subscriptions, bounds: &Bounds) -> bool {
 
 #[cfg(test)]
 mod tests {
-    #![expect(clippy::unwrap_used, reason = "ordinary tests inspect complete bounded values")]
     use super::*;
     use core::mem::size_of;
     use skein_lib::{Duration, List, Wall};

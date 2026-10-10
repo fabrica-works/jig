@@ -107,34 +107,33 @@ impl WakePhrase {
     #[must_use]
     pub fn shape(self) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::Policy => Box::new([]),
-            Self::Words => Box::new([]),
-            Self::Notices => Box::new([]),
-            Self::News => Box::new([]),
-            Self::Never => Box::new([]),
-            Self::Immediate => Box::new([]),
+            Self::Policy
+            | Self::Words
+            | Self::Notices
+            | Self::News
+            | Self::Never
+            | Self::Immediate
+            | Self::ResultsNever
+            | Self::ResultsEach
+            | Self::ResultsLastOrFailure
+            | Self::QuestionsYes
+            | Self::QuestionsNo
+            | Self::AnswersYes
+            | Self::AnswersNo
+            | Self::TimersYes
+            | Self::TimersNo
+            | Self::Subscriptions
+            | Self::HeldYes
+            | Self::HeldNo
+            | Self::ResultYes
+            | Self::ResultNo
+            | Self::Once => Box::new([]),
             Self::Batch => {
                 Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }, HoleShape { kind: HoleKind::Span, bytes: 0 }])
             }
-            Self::ResultsNever => Box::new([]),
-            Self::ResultsEach => Box::new([]),
-            Self::ResultsLastOrFailure => Box::new([]),
-            Self::QuestionsYes => Box::new([]),
-            Self::QuestionsNo => Box::new([]),
-            Self::AnswersYes => Box::new([]),
-            Self::AnswersNo => Box::new([]),
-            Self::TimersYes => Box::new([]),
-            Self::TimersNo => Box::new([]),
-            Self::Subscriptions => Box::new([]),
-            Self::Number => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Task => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::HeldYes => Box::new([]),
-            Self::HeldNo => Box::new([]),
-            Self::ResultYes => Box::new([]),
-            Self::ResultNo => Box::new([]),
+            Self::Number | Self::Task => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::Timer => Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }]),
             Self::Period => Box::new([HoleShape { kind: HoleKind::Span, bytes: 0 }]),
-            Self::Once => Box::new([]),
             Self::Topic => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },

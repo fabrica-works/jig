@@ -21,7 +21,7 @@ fn rule(b: &mut Builder, value: WakeRule, book: &Phrasebook, language: u16) {
         WakeRule::Never => text(b, book, language, WakePhrase::Never, &[]),
         WakeRule::Immediate => text(b, book, language, WakePhrase::Immediate, &[]),
         WakeRule::Batch { count, age } => {
-            text(b, book, language, WakePhrase::Batch, &[Hole::Number(u64::from(count)), Hole::Span(age)])
+            text(b, book, language, WakePhrase::Batch, &[Hole::Number(u64::from(count)), Hole::Span(age)]);
         }
     }
 }
