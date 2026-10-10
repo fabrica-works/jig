@@ -2159,9 +2159,13 @@ fn turn_three_writing_follows_committed_turn_two_and_fences_old_attempts() {
     assert_eq!(run_text_outputs(&mut core, &limits, 7, 2, 0, b"committed").len(), 1);
     let out = run_text_outputs(&mut core, &limits, 7, 3, 0, b"third");
     assert_stream(&out[0], 30, views::TurnName { attempt: 7, turn: 3, retry: 0 }, 0, 5, b"third", false);
+    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+        panic!("current supplied run document")
+    };
+    let writing = run.writing.unwrap();
     assert_eq!(
-        core.provisional_position(Token::new(1), Token::new(7)),
-        Some((views::TurnName { attempt: 7, turn: 3, retry: 0 }, 5))
+        (writing.turn, writing.from, writing.to, writing.text.as_ref()),
+        (views::TurnName { attempt: 7, turn: 3, retry: 0 }, 0, 5, &b"third"[..])
     );
     core.proofs.get_mut(&1).unwrap().turn = Some(TurnProof { turn: 3, cumulative: 0, read: None });
     finish_watch_outputs(&mut core, &limits);

@@ -216,26 +216,29 @@ fn closing_waits_for_both_document_and_stream_terminals() {
     drive(&mut domain, Event::RunEnded { run: Token::new(7) });
     assert_eq!(domain.runs(), 0);
 }
+fn retained_report(run: u64, offset: u32) -> Event {
+    Event::Text {
+        run: Token::new(run),
+        turn: TurnName { attempt: 1, turn: 1, retry: 0 },
+        offset,
+        text: Box::from(&b"two"[..]),
+        call: None,
+    }
+}
 #[test]
 fn retained_runs_past_the_limit_start_when_a_place_frees() {
     let mut domain = Domain::new(&LIMITS);
     follow(&mut domain, 1, 7, None, 0);
     follow(&mut domain, 2, 8, None, 0);
     text(&mut domain, 1, 0, b"one");
-    let report = |run, offset| Event::Text {
-        run: Token::new(run),
-        turn: TurnName { attempt: 1, turn: 1, retry: 0 },
-        offset,
-        text: Box::from(&b"two"[..]),
-        call: None,
-    };
-    drive(&mut domain, report(8, 0));
+    drive(&mut domain, retained_report(8, 0));
     assert_eq!(domain.runs(), 2);
     assert_eq!(follow(&mut domain, 3, 9, None, 0).len(), 2, "watch admission is independent of retained runs");
-    assert!(drive(&mut domain, report(9, 0)).is_empty());
+    assert!(drive(&mut domain, retained_report(9, 0)).is_empty());
     drive(&mut domain, Event::RunEnded { run: Token::new(8) });
-    let out = drive(&mut domain, report(9, 3));
-    assert!(matches!(&out[0], Request::Stream { watcher, from: 3, to: 6, cut: true, .. } if *watcher == Token::new(3)));
+    let out = drive(&mut domain, retained_report(9, 3));
+    let Request::Stream { watcher, from, to, cut, .. } = &out[0] else { panic!("late retained stream") };
+    assert_eq!((*watcher, *from, *to, *cut), (Token::new(3), 3, 6, true));
     assert_eq!(domain.runs(), 2);
     assert_eq!(follow(&mut domain, 4, 7, None, 0).len(), 2);
 }

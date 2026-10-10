@@ -14,7 +14,7 @@ fn expected(watcher: u64, retry: u32, from: u32, text: &[u8], cut: bool) -> Requ
         watcher: Token::new(watcher),
         turn: name(retry),
         from,
-        to: from + u32::try_from(text.len()).unwrap(),
+        to: from.checked_add(u32::try_from(text.len()).unwrap()).unwrap(),
         text: Box::from(text),
         cut,
         call: None,
