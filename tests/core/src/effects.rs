@@ -57,6 +57,8 @@ pub struct World {
     pub trace: Vec<String>,
     pub restart_steps: Vec<core::RestartStep>,
     pub hold_restart_reads: bool,
+    /// Withhold requested whole store pages during a real cold restore.
+    pub hold_restore_pages: bool,
     /// Delay before a submitted store transaction becomes durable.
     pub store_delay: u32,
     /// Whether the root reported a failed commit and stopped.
@@ -261,6 +263,7 @@ impl World {
             trace: Vec::new(),
             restart_steps: Vec::new(),
             hold_restart_reads: false,
+            hold_restore_pages: false,
             store_delay: 0,
             stopped: false,
             peers: None,
@@ -520,11 +523,13 @@ impl World {
             }
             self.domain.reclaim();
             self.observer.observe(self.wall, self.heap.observed());
+            let held_restore = self.hold_restore_pages && self.restoring.is_some() && self.store.loading();
             if empty
                 && self.events.is_empty()
                 && self.store.pending.is_empty()
-                && !self.store.loading()
+                && (!self.store.loading() || held_restore)
                 && (self.domain.quiescent()
+                    || held_restore
                     || !self.store.held.is_empty()
                     || self.reads.as_ref().is_some_and(crate::reads::Parties::paused))
                 && self.watches.as_ref().is_none_or(crate::peers::WatchParties::quiescent)
@@ -930,6 +935,9 @@ impl World {
     }
 
     fn restore_pages(&mut self) {
+        if self.hold_restore_pages {
+            return;
+        }
         for (owner, page) in self.store.tick_pages() {
             assert_eq!(owner, 1, "one restart page at a time");
             let mut restore = self.restoring.take().expect("requested restart page");
@@ -942,6 +950,12 @@ impl World {
                 self.restored(restore.step, &restore.rows);
             }
         }
+    }
+
+    /// Deliver every outstanding original restore page through the usual route.
+    pub fn finish_restore_pages(&mut self) {
+        self.hold_restore_pages = false;
+        self.drain();
     }
 
     fn restored(&mut self, step: core::RestartStep, rows: &[root::Record]) {
