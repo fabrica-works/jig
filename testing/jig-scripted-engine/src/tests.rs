@@ -952,7 +952,12 @@ fn bounded_offer_payloads_and_predictions() {
             assert!(engine.commits().is_empty());
         }
     }
-    for variant in 0..5 {
+    oversized_bounded_offer_payloads();
+}
+
+fn oversized_bounded_offer_payloads() {
+    use jig_client::contract::Bounds as DraftBounds;
+    for variant in 0..6 {
         let mut setup = live_script();
         let mut row = task();
         let within = if variant == 0 {
@@ -983,7 +988,7 @@ fn bounded_offer_payloads_and_predictions() {
             }
             DraftBounds::Amend {
                 budget_left: 1,
-                implications: List::with_capacity(0),
+                implications: List::with_capacity(if variant == 5 { 33 } else { 0 }),
                 grants,
                 authority: Box::new(direct),
                 ceiling: Box::new(ceiling),
