@@ -9,7 +9,7 @@ use jig_test_client_domain::{Address as RootAddress, family};
 use skein_lib::{Rng, Wall};
 
 /// Independently replayable story starting states for a random person.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Start {
     NewChat,
     Chat,
@@ -21,6 +21,13 @@ pub enum Start {
 impl Start {
     pub const ALL: [Self; 6] = [Self::NewChat, Self::Chat, Self::Held, Self::Proposal, Self::Goal, Self::Incident];
 }
+/// Actual fixture and opening address reached by a random whole-document run.
+#[derive(Clone, Copy, Debug)]
+pub struct Reach {
+    pub start: Start,
+    pub original_address: bool,
+}
+
 fn fixture(seed: u64, start: Start) -> (World<Test, Scripted>, RootAddress) {
     match start {
         Start::NewChat => (stories::chat_world(seed), stories::conversation()),
@@ -60,10 +67,11 @@ pub fn story(seed: u64, start: Start) -> Outcome {
 }
 /// Random whole documents, addresses, family values and offers behind the same shell.
 #[must_use]
-fn world_with_heap(seed: u64, memory: bool) -> Outcome {
+fn world_with_heap(seed: u64, memory: bool) -> (Outcome, Reach) {
     let mut rng = Rng::new(seed);
     let start = Start::ALL[usize::try_from(rng.below(6)).expect("six starts")];
     let (mut world, mut address) = fixture(seed, start);
+    let original_address = address;
     if let Some(ReadValue::Task(task)) = world.front().engine.truth().objects.get(&ObjectKey::Task(9)) {
         let mut task = task.clone();
         task.spec_revision.value = rng.between(1, 16);
@@ -106,13 +114,14 @@ fn world_with_heap(seed: u64, memory: bool) -> Outcome {
         }
         _ => {}
     }
-    explore(world, address, seed, memory)
+    let reach = Reach { start, original_address: address == original_address };
+    (explore(world, address, seed, memory), reach)
 }
 
 /// Random whole documents with allocator accounting for the focused smoke.
 #[must_use]
 pub fn world(seed: u64) -> Outcome {
-    world_with_heap(seed, true)
+    world_with_heap(seed, true).0
 }
 
 /// The same story exploration without heap bookkeeping; memory tests and
@@ -126,5 +135,11 @@ pub fn story_without_heap(seed: u64, start: Start) -> Outcome {
 /// The same random documents and faults without heap bookkeeping.
 #[must_use]
 pub fn world_without_heap(seed: u64) -> Outcome {
+    world_with_heap(seed, false).0
+}
+
+/// Random whole documents with typed reach recorded at their actual opening.
+#[must_use]
+pub fn world_with_coverage(seed: u64) -> (Outcome, Reach) {
     world_with_heap(seed, false)
 }

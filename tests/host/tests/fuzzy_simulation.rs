@@ -29,7 +29,9 @@ fn rough(seed: u64) -> Settings {
 fn random_worlds_settle_and_reach_every_ending() {
     let mut reached = BTreeSet::new();
     let mut seen = BTreeSet::new();
+    let mut last_growth = 0;
     for seed in 0..1_000 {
+        let previous = (reached.len(), seen.len());
         let stats = run(&rough(seed)).stats();
         for ending in stats.endings.keys() {
             reached.insert(*ending);
@@ -59,7 +61,12 @@ fn random_worlds_settle_and_reach_every_ending() {
         for path in stats.paths.keys() {
             seen.insert(path);
         }
+        if previous != (reached.len(), seen.len()) {
+            last_growth = seed + 1;
+            eprintln!("coverage host prefix={last_growth} endings={reached:?} paths={seen:?}");
+        }
     }
+    eprintln!("coverage host plateau={last_growth} endings={} paths={}", reached.len(), seen.len());
     let missing: Vec<&str> = ENDINGS.iter().copied().filter(|ending| !reached.contains(ending)).collect();
     assert!(missing.is_empty(), "every ending is reached: {missing:?} are not");
     let paths = [
