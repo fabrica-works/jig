@@ -1976,3 +1976,103 @@ fn resource_path(bytes: &[u8]) -> List<Box<[u8]>> {
     rows.push(Box::from(bytes)).unwrap();
     rows
 }
+
+#[test]
+fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_slots() {
+    use crate::address::TaskSection;
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Overview }) },
+    );
+    let watch = open_token(&opened);
+    let mut first = List::with_capacity(2);
+    first.push(Box::<[u8]>::from(*b"a/b")).unwrap();
+    first.push(Box::<[u8]>::from(*b"c")).unwrap();
+    let mut second = List::with_capacity(2);
+    second.push(Box::<[u8]>::from(*b"a")).unwrap();
+    second.push(Box::<[u8]>::from(*b"/bc")).unwrap();
+    let one = Part::Resource { connector: 2, path: first };
+    let two = Part::Resource { connector: 2, path: second };
+    assert_ne!(one, two, "equal concatenated bytes are different segmented names");
+    let mut doc = super::confirmation::task();
+    doc.resources = List::with_capacity(2);
+    doc.resources.push(one.clone()).unwrap();
+    doc.resources.push(two.clone()).unwrap();
+    doc.authority.grants = List::with_capacity(1);
+    doc.authority
+        .grants
+        .push(Grant {
+            connector: 2,
+            kind: 9,
+            pattern: OwnerPattern { segments: resource_path(b"a/b"), last: OwnerPatternEnd::Open(Box::from(*b"c")) },
+        })
+        .unwrap();
+    let shown = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) },
+    );
+    let parts: Vec<_> = shown
+        .iter()
+        .filter_map(|request| match request {
+            Request::ShowPart { part, scope: PartScope::Project(1), .. } => Some(part.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(parts, vec![one, two]);
+    let budget = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Budget }) },
+    );
+    let parts: Vec<_> = budget
+        .iter()
+        .filter_map(|request| match request {
+            Request::ShowPart { part, scope: PartScope::Project(1), .. } => Some(part.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(parts, vec![Part::Kind { connector: 2, kind: 9 }], "an open pattern is not a resource name");
+}
+
+#[test]
+fn goal_note_scope_keeps_its_supplied_project_instead_of_the_parent_page() {
+    let mut domain = Domain::new(&LIMITS, 88);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Notes }) },
+    );
+    let scope = NoteScope::Goal { project: u32::MAX, goal: u64::MAX };
+    let output = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: crate::action::Act::FilterNotes {
+                filter: crate::pages::project::NoteFilter {
+                    scope: scope.clone(),
+                    description: Some(text(b"supplied")),
+                },
+            },
+        },
+    );
+    let reads: Vec<_> = output
+        .iter()
+        .filter_map(|request| match request {
+            Request::Read { what: Read::Notes { scope, description, after }, .. } => {
+                Some((scope.clone(), description.clone(), after.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(reads, vec![(scope.clone(), Some(text(b"supplied")), None)]);
+    assert_eq!(domain.project_page().note_filter.as_ref().unwrap().scope, scope);
+}

@@ -2124,3 +2124,5 @@ fn scripted_provisional_retry_reopens_exact_positions_and_replaces_on_empty_star
     assert_eq!(value.text.bytes(), b"retry");
     assert_eq!(value.began, Some(Wall::EPOCH));
 }
+
+mod resource_facts;
