@@ -20,7 +20,7 @@ fn amendment_requires_person_reason_presence_and_accepts_explicit_empty() {
     let refused =
         drive(&mut full, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
     assert!(refused.as_ref().contains(&Request::Fact { fact: crate::facts::Fact::Refused { which: Limit::Fields } }));
-    assert!(!full.confirmation().unwrap().reason_supplied);
+    assert_eq!(full.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
     assert!(full.fields().get(Purpose::Reason).is_none());
     let (mut domain, id) = opened(ActKind::Amend);
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Words { field: Purpose::Reason }));
@@ -35,10 +35,10 @@ fn amendment_requires_person_reason_presence_and_accepts_explicit_empty() {
             .as_ref()
             .contains(&Request::Fact { fact: crate::facts::Fact::Refused { which: Limit::Words { limit: 32 } } })
     );
-    assert!(!domain.confirmation().unwrap().reason_supplied);
+    assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
     assert!(domain.fields().get(Purpose::Reason).is_none());
     edit(&mut domain, Purpose::Reason, b"");
-    assert!(domain.confirmation().unwrap().reason_supplied);
+    assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Supplied);
     assert!(domain.confirmation().unwrap().missing.is_none());
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
     assert_eq!(
@@ -64,7 +64,7 @@ fn amendment_reason_receipt_resets_without_losing_domain_clear_write_counts() {
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, 1);
     intend(&mut domain, id, ActKind::Amend);
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
-    assert!(!domain.confirmation().unwrap().reason_supplied);
+    assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Words { field: Purpose::Reason }));
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
     edit(&mut domain, Purpose::Reason, b"");
@@ -73,7 +73,7 @@ fn amendment_reason_receipt_resets_without_losing_domain_clear_write_counts() {
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, 2);
     intend(&mut domain, id, ActKind::Amend);
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
-    assert!(!domain.confirmation().unwrap().reason_supplied);
+    assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn a_late_amendment_answer_preserves_another_forms_supplied_reason_until_page_sw
     let writes = domain.fields().get(Purpose::Reason).unwrap().writes;
     drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Refused(Refusal::NotOffered) });
     assert_eq!(domain.confirmation().unwrap().object, id);
-    assert!(domain.confirmation().unwrap().reason_supplied);
+    assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Supplied);
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().text.bytes(), b"new reason");
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, writes);
     drive(

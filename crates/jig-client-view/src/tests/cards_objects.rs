@@ -1862,6 +1862,6 @@ mod task_authority;
 #[path = "task_budget.rs"]
 mod task_budget;
 
+mod amendment_reason;
 #[path = "task_ending.rs"]
 mod task_ending;
-mod amendment_reason;

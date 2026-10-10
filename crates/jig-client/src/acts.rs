@@ -162,7 +162,7 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
             Some(Ask::Release { project, task, revision: confirmation.revision?, again: choices.again })
         }
         ActKind::Amend | ActKind::AmendRelease => {
-            if !confirmation.reason_supplied {
+            if confirmation.reason_input == crate::confirm::ReasonInput::Missing {
                 return None;
             }
             Some(Ask::Amend {

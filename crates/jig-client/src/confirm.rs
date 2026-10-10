@@ -57,6 +57,14 @@ pub enum Missing {
     /// The engine does not admit the act, or local admission is full.
     Refused { why: Refusal },
 }
+/// Whether a person supplied the reason in the current amendment form.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReasonInput {
+    /// No person input has arrived in this confirmation.
+    Missing,
+    /// A person supplied bounded bytes, including an empty value.
+    Supplied,
+}
 /// One act and the revision its card showed when the confirmation opened.
 #[derive(Debug)]
 pub struct Confirmation {
@@ -71,7 +79,7 @@ pub struct Confirmation {
     /// A moved hold stays invalid until the person reviews it again.
     pub release_changed: bool,
     /// A person supplied the reason in this confirmation, including an empty value.
-    pub reason_supplied: bool,
+    pub reason_input: ReasonInput,
     pub choices: Choices,
     pub missing: Option<Missing>,
     pub changed: bool,
@@ -203,7 +211,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         revision,
         release_revision: if act == ActKind::AmendRelease { acts::hold_revision(object) } else { None },
         release_changed: false,
-        reason_supplied: false,
+        reason_input: ReasonInput::Missing,
         choices,
         missing: None,
         changed: false,
@@ -222,7 +230,7 @@ pub(crate) fn edited(domain: &mut Domain, field: Purpose) {
         && let Some(open) = domain.confirming.as_mut()
         && (open.act == ActKind::Amend || open.act == ActKind::AmendRelease)
     {
-        open.reason_supplied = true;
+        open.reason_input = ReasonInput::Supplied;
     }
 }
 /// Updates only the validity of the revision the act names and the engine's admission.
@@ -461,7 +469,7 @@ fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Miss
             if open.act == ActKind::AmendRelease && open.release_revision.is_none() {
                 return Some(Missing::Refused { why: Refusal::NotOffered });
             }
-            if !open.reason_supplied || domain.fields.get(Purpose::Reason).is_none() {
+            if open.reason_input == ReasonInput::Missing || domain.fields.get(Purpose::Reason).is_none() {
                 return Some(Missing::Words { field: Purpose::Reason });
             }
             None

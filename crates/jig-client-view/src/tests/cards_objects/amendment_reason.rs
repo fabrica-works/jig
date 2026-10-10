@@ -12,7 +12,7 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
         let reason = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap();
         assert_eq!(reason.role, Role::TextArea);
         assert!(reason.binding.is_some());
-        assert!(!domain.confirmation().unwrap().reason_supplied);
+        assert_eq!(domain.confirmation().unwrap().reason_input, jig_client::confirm::ReasonInput::Missing);
         drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
         assert_eq!(
             domain.confirmation().unwrap().missing,
@@ -35,7 +35,7 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
         let tree = dialog(&domain, &words, &mut bindings);
         let reason = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap();
         assert_eq!(reason.value.as_ref().unwrap().text.as_ref(), bytes);
-        let text_bytes: u32 = tree.nodes().iter().map(|node| node.text_bytes()).sum();
+        let text_bytes: u32 = tree.nodes().iter().map(crate::tree::Node::text_bytes).sum();
         assert!(text_bytes <= limits().text_bytes);
         assert!(
             tree.nodes().iter().filter(|node| node.binding.is_some()).count()
@@ -72,7 +72,7 @@ fn reason_checked_binding_rejects_over_limit_without_establishing_presence() {
     let token =
         tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap().binding.unwrap().token;
     assert_eq!(decode(&mut bindings, token, Act::Input { value: Box::from([0xff; 129]) }), None);
-    assert!(!domain.confirmation().unwrap().reason_supplied);
+    assert_eq!(domain.confirmation().unwrap().reason_input, jig_client::confirm::ReasonInput::Missing);
     assert!(domain.fields().get(Purpose::Reason).is_none());
     assert!(tree.len() <= crate::confirmation_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
 }
