@@ -13,7 +13,8 @@ fn list<T>(capacity: u32, values: impl IntoIterator<Item = T>) -> List<T> {
     result
 }
 fn path() -> Path {
-    Path::new(list(3, [b"literal/slash".as_slice().into(), [0xff, 0x00].as_slice().into()]), 16).unwrap()
+    Path::new(list(3, [b"literal/slash".as_slice().into(), [0xff, 0x00].as_slice().into()]), 16)
+        .expect("admitted opaque fixture path")
 }
 fn effect() -> Effect {
     Effect {
@@ -205,8 +206,7 @@ fn connector_values_scoped_outbox_subjects_and_raw_effect_references_remain_inde
         assert_eq!(entry.number, u64::MAX);
     }
     let original_subject = document.subject;
-    document.value =
-        Box::new(ClientDocument::Effect { proposal: 87, task: 42, effect: effect(), description: description() });
+    *document.value = ClientDocument::Effect { proposal: 87, task: 42, effect: effect(), description: description() };
     assert_eq!(document.subject, original_subject, "supplier never invents a jig maker from an owner reference");
 }
 #[test]
