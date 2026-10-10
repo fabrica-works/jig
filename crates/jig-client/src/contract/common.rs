@@ -139,6 +139,8 @@ pub enum Phase {
     Closing,
     /// Held for a decision.
     Held,
+    /// Ended, with no specific outcome supplied by the phase value.
+    Ended,
     /// Ended successfully.
     Done,
     /// Ended with failure.

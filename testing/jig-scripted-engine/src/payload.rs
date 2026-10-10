@@ -299,7 +299,7 @@ impl Payload for Phase {
             | Self::Held
             | Self::Done
             | Self::Failed
-            | Self::Cancelled => Some(0),
+            | Self::Cancelled | Self::Ended => Some(0),
         }
     }
 }
@@ -404,9 +404,18 @@ impl Payload for HeldRuntime {
         }
     }
 }
+impl Payload for OwnerChipPhase {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Waiting { dependencies, .. } => dependencies.heap(bounds),
+            Self::Active(_) | Self::Person { .. } | Self::Closing(_) | Self::Held { .. } | Self::Ended => Some(0),
+        }
+    }
+}
 impl Payload for ChipPhase {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Owner { phase, details } => sum(&[phase.heap(bounds), details.heap(bounds)]),
             Self::Active(value) => value.heap(bounds),
             Self::Waiting { dependencies, hold } => sum(&[dependencies.heap(bounds), hold.heap(bounds)]),
             Self::Idle { wake } => wake.heap(bounds),
@@ -701,7 +710,7 @@ impl Payload for ResultValue {
     }
 }
 fields!(Result { task, ending, value, at, details, acts });
-fields!(PhaseCounts { waiting, running, held, closing, done, failed, cancelled });
+fields!(PhaseCounts { ended, waiting, running, held, closing, done, failed, cancelled });
 fields!(TreeNode { chip, parent, dependencies, proposals, spend, folded, held_below });
 fields!(Tree { task, nodes, folded, held_below });
 impl Payload for InboxGroup {

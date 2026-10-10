@@ -84,7 +84,7 @@ pub struct Budget {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Chip {
     pub task: u64,
-    pub title: Text,
+    pub title: DocumentText,
     pub executor: Executor,
     pub phase: Phase,
     /// Whole live phase facts; compact `phase` remains the document's filter value.
@@ -96,6 +96,8 @@ pub struct Chip {
 /// See client/domain/objects.md, 3, and contract.md, 5.1.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ChipPhase {
+    /// Exact producer phase with its mandatory whole owner metadata.
+    Owner { phase: super::OwnerChipPhase, details: Box<super::OwnerChipDetails> },
     Active(super::ActiveRun),
     Waiting { dependencies: List<u64>, hold: Option<Part> },
     Idle { wake: WakePolicy },
@@ -587,6 +589,8 @@ pub struct Result {
 /// Counts of tasks folded beyond a tree window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PhaseCounts {
+    /// Ended chips whose source does not supply a specific outcome.
+    pub ended: u32,
     pub waiting: u32,
     pub running: u32,
     pub held: u32,
