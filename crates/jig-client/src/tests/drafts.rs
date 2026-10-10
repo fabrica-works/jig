@@ -191,6 +191,7 @@ fn drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_cur
         },
     );
     let Request::Open { watch, .. } = first[0] else { panic!("frame") };
+    custom(&mut domain, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
     custom(
         &mut domain,
         limits,
@@ -233,6 +234,7 @@ fn drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_cur
     );
     assert!(restarted.fields().get(Purpose::Composer { task: 8 }).is_none());
     let Request::Open { watch, .. } = rows[0] else { panic!("frame") };
+    custom(&mut restarted, limits, Time::ZERO, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
     custom(
         &mut restarted,
         limits,
