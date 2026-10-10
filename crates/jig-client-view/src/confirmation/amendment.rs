@@ -107,21 +107,7 @@ pub fn form(
     };
     words.text(b, JigPhrase::Before, &[]);
     proposal::amendment(b, &before, words, bindings);
-    match &object.body {
-        Some(Body::Task(doc)) if doc.spec.has_loss() => {
-            crate::specification::document(b, &doc.spec, words);
-            if !doc.spec.cut {
-                words.text(b, JigPhrase::SpecificationCut, &[]);
-            }
-        }
-        Some(Body::Escalation(doc)) if doc.steering.spec.has_loss() => {
-            crate::specification::document(b, &doc.steering.spec, words);
-            if !doc.steering.spec.cut {
-                words.text(b, JigPhrase::SpecificationCut, &[]);
-            }
-        }
-        _ => {}
-    }
+    loss(b, object, words);
     let empty = empty();
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     let value = values(&before, change);
@@ -206,6 +192,29 @@ pub fn form(
     };
     if let Some(funding) = funding {
         words.actor(b, funding.funder);
+    }
+}
+fn loss(b: &mut Builder, object: &Object, words: &Words) {
+    let doc = match &object.body {
+        Some(Body::Task(doc)) => Some(&doc.spec),
+        Some(Body::Escalation(doc)) => Some(&doc.steering.spec),
+        Some(
+            Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => None,
+    };
+    if let Some(doc) = doc {
+        if doc.has_loss() {
+            crate::specification::document(b, doc, words);
+            if !doc.cut {
+                words.text(b, JigPhrase::SpecificationCut, &[]);
+            }
+        }
     }
 }
 fn numbers(chips: &skein_lib::List<jig_client::contract::Chip>) -> skein_lib::List<u64> {
