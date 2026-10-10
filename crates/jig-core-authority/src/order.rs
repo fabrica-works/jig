@@ -173,6 +173,13 @@ impl Implies {
         false
     }
 
+    /// Borrow every validated configured row in its original order, including duplicates.
+    /// Equality remains implicit; this accessor allocates nothing and adds no consequences.
+    #[must_use]
+    pub fn entries(&self) -> &[Implication] {
+        &self.pairs
+    }
+
     /// Pure query of the constructor-bounded implication-pair count; duplicates count as retained
     /// entries.
     #[must_use]

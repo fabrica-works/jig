@@ -969,3 +969,5 @@ fn a_historical_proposal_decision_requires_the_exact_maker() {
         }
     }
 }
+
+mod kind_order;

@@ -165,6 +165,14 @@ pub(super) fn amend(core: &Core, limits: &Limits, party: u64, task: u64, held: O
     let Ok(ceiling) = crate::documents::act_authority(limits, &hard) else {
         return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
     };
+    let order = &core.authority.rules().implies;
+    if order.len() > limits.documents.lines {
+        return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
+    }
+    let mut implications = List::with_capacity(limits.documents.lines);
+    for pair in order.entries() {
+        implications.push(*pair).expect("complete configured relation fits receiving bound");
+    }
     let beyond = match recipient(core, row.project, authority::ProposalKind::Amend) {
         Some(to) => Beyond::Proposed { to },
         None => Beyond::Refused(unproposable()),
@@ -173,6 +181,7 @@ pub(super) fn amend(core: &Core, limits: &Limits, party: u64, task: u64, held: O
         within: Bounds::Amend {
             budget_left,
             grants: value.grants.clone(),
+            implications,
             authority: Box::new(value),
             ceiling: Box::new(ceiling),
         },

@@ -109,6 +109,8 @@ pub enum Bounds {
     Amend {
         budget_left: u64,
         grants: List<documents::GrantLine>,
+        /// Complete configured connector-kind relation; equality is implicit.
+        implications: List<jig_core_authority::Implication>,
         authority: Box<documents::AuthorityLine>,
         ceiling: Box<documents::AuthorityLine>,
     },

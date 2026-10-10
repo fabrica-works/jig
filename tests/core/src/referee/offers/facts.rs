@@ -14,19 +14,44 @@ fn deadline(bound: Option<Wall>, draft: Option<Wall>) -> bool {
         (Some(_), None) => false,
     }
 }
-fn end(left: &PatternEnd, right: &people::Last) -> bool {
-    match (left, right) {
-        (PatternEnd::Exact(a), people::Last::Exact(b)) | (PatternEnd::Open(a), people::Last::Open(b)) => a == b,
-        (PatternEnd::Exact(_), people::Last::Open(_)) | (PatternEnd::Open(_), people::Last::Exact(_)) => false,
+// Literal pattern inclusion from supplied segments and terminals only. No connector lookup.
+fn pattern(segments: &skein_lib::List<Box<[u8]>>, last: &PatternEnd, value: &people::Pattern) -> bool {
+    match last {
+        PatternEnd::Exact(bound) => match &value.last {
+            people::Last::Exact(candidate) => segments.as_slice() == value.segments.as_ref() && candidate == bound,
+            people::Last::Open(_) => false,
+        },
+        PatternEnd::Open(bound) => {
+            let prefix = segments.as_slice();
+            if value.segments.get(..prefix.len()) != Some(prefix) {
+                return false;
+            }
+            match value.segments.get(prefix.len()) {
+                Some(segment) => segment.starts_with(bound),
+                None => match &value.last {
+                    people::Last::Exact(segment) | people::Last::Open(segment) => segment.starts_with(bound),
+                },
+            }
+        }
     }
 }
-fn pattern(segments: &skein_lib::List<Box<[u8]>>, last: &PatternEnd, value: &people::Pattern) -> bool {
-    segments.as_slice() == value.segments.as_ref() && end(last, &value.last)
+fn grant(
+    left: &GrantLine,
+    right: &people::Grant,
+    implications: &skein_lib::List<jig_core_authority::Implication>,
+) -> bool {
+    left.connector == right.connector
+        && (left.kind == right.kind
+            || implications
+                .iter()
+                .any(|pair| pair.connector == left.connector && pair.kind == left.kind && pair.implies == right.kind))
+        && pattern(&left.segments, &left.last, &right.pattern)
 }
-fn grant(left: &GrantLine, right: &people::Grant) -> bool {
-    left.connector == right.connector && left.kind == right.kind && pattern(&left.segments, &left.last, &right.pattern)
-}
-fn covers(bound: &AuthorityLine, draft: &people::Authority) -> bool {
+fn covers(
+    bound: &AuthorityLine,
+    draft: &people::Authority,
+    implications: &skein_lib::List<jig_core_authority::Implication>,
+) -> bool {
     !bound.cut
         && draft.spend <= bound.ceiling.spend
         && deadline(bound.ceiling.deadline, draft.deadline)
@@ -46,7 +71,7 @@ fn covers(bound: &AuthorityLine, draft: &people::Authority) -> bool {
             }
         })
         })
-        && draft.grants.iter().all(|value| bound.grants.iter().any(|listed| grant(listed, value)))
+        && draft.grants.iter().all(|value| bound.grants.iter().any(|listed| grant(listed, value, implications)))
         && draft.note_resources.iter().all(|value| {
             bound.note_resources.iter().any(|listed| {
                 listed.connector == value.connector && pattern(&listed.segments, &listed.last, &value.pattern)
@@ -84,7 +109,10 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
                 beyond(outcome)
             })
         }
-        (Bounds::Amend { budget_left, grants, authority, ceiling }, people::Ask::Amend { amendment, revision, .. }) => {
+        (
+            Bounds::Amend { budget_left, grants, implications, authority, ceiling },
+            people::Ask::Amend { amendment, revision, .. },
+        ) => {
             let old = before?;
             if old.spec_revision != *revision || old.authority.cut {
                 return None;
@@ -92,20 +120,23 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
             let Some(after) = &amendment.authority else {
                 return Some(Admission::Allowed);
             };
-            if covers(&old.authority, after) {
+            if covers(&old.authority, after, implications) {
                 return Some(Admission::Allowed);
             }
-            if !covers(ceiling, after) {
+            if !covers(ceiling, after, implications) {
                 return None;
             }
-            let direct = covers(authority, after)
+            let direct = covers(authority, after, implications)
                 && after.spend.saturating_sub(old.authority.ceiling.spend) <= *budget_left
                 && after.grants.iter().all(|value| {
-                    old.authority.grants.iter().any(|listed| grant(listed, value))
-                        || grants.iter().any(|listed| grant(listed, value))
+                    old.authority.grants.iter().any(|listed| grant(listed, value, implications))
+                        || grants.iter().any(|listed| grant(listed, value, implications))
                 });
             Some(if direct { Admission::Allowed } else { beyond(outcome) })
         }
         (Bounds::Goal { .. } | Bounds::Amend { .. }, _) => None,
     }
 }
+
+#[cfg(test)]
+mod tests;

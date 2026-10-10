@@ -34,8 +34,11 @@ fn receiving(value: Admission, limits: &DocumentLimits) -> Result<Admission, Mis
                 Bounds::Goal { charters, procedures, .. } => {
                     charters.len() <= limits.lines && procedures.len() <= limits.lines
                 }
-                Bounds::Amend { authority, ceiling, grants, .. } => {
-                    !authority.cut && !ceiling.cut && grants.len() <= limits.lines
+                Bounds::Amend { authority, ceiling, grants, implications, .. } => {
+                    !authority.cut
+                        && !ceiling.cut
+                        && grants.len() <= limits.lines
+                        && implications.capacity() <= limits.lines
                 }
             };
             if !fits {
@@ -220,7 +223,8 @@ pub(super) fn heap_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let amended = authority
         .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?)?
         .checked_mul(2)?
-        .checked_add(grants)?;
+        .checked_add(grants)?
+        .checked_add(List::<jig_core_authority::Implication>::worst_case(limits.lines)?)?;
     let recipient = List::<u32>::worst_case(limits.lines)?;
     // Only Amend and AmendRelease carry the full amendment facts on a task;
     // all other object kinds carry at most one bounded act.
@@ -283,7 +287,10 @@ pub(super) fn heap_bytes(value: &List<Offered>) -> Option<u64> {
                             List::<acts::GoalProcedure>::worst_case(procedures.len().checked_add(procedures.room())?)?,
                         )?
                     }
-                    Bounds::Amend { grants, authority, ceiling, .. } => grants_heap(grants)?
+                    Bounds::Amend { grants, implications, authority, ceiling, .. } => grants_heap(grants)?
+                        .checked_add(List::<jig_core_authority::Implication>::worst_case(
+                            implications.len().checked_add(implications.room())?,
+                        )?)?
                         .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?.checked_mul(2)?)?
                         .checked_add(authority_heap(authority)?)?
                         .checked_add(authority_heap(ceiling)?)?,
@@ -294,3 +301,6 @@ pub(super) fn heap_bytes(value: &List<Offered>) -> Option<u64> {
     }
     Some(bytes)
 }
+
+#[cfg(test)]
+mod tests;
