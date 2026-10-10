@@ -46,7 +46,13 @@ fn watched(engine: &mut Engine, token: u64) -> Conversations {
             {
                 Some(*value)
             }
-            _ => None,
+            Up::Answer { .. }
+            | Up::Read { .. }
+            | Up::Watch { .. }
+            | Up::ApplicationAnswer { .. }
+            | Up::ApplicationRead { .. }
+            | Up::App { .. }
+            | Up::Ended { .. } => None,
         })
         .unwrap()
 }
@@ -57,7 +63,13 @@ fn read(engine: &mut Engine, sign_in: u64, token: u64, what: Read) -> ReadResult
         .into_iter()
         .find_map(|up| match up {
             Up::Read { token: observed, terminal: result } if observed == Token::new(token) => Some(result),
-            _ => None,
+            Up::Answer { .. }
+            | Up::Read { .. }
+            | Up::Watch { .. }
+            | Up::ApplicationAnswer { .. }
+            | Up::ApplicationRead { .. }
+            | Up::App { .. }
+            | Up::Ended { .. } => None,
         })
         .unwrap()
 }
