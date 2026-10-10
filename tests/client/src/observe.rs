@@ -11,7 +11,10 @@ use skein_lib::RequestEnvelope;
 pub fn key(object: ObjectKey) -> CardKey {
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
-        ObjectKey::Proposal(p) => (1, p.proposer, p.number),
+        ObjectKey::Proposal(p) => match p.proposer {
+            Proposer::Task(task) => (1, task, p.number),
+            Proposer::Party(party) => (29, party, p.number),
+        },
         ObjectKey::Escalation(task) => (2, task, 0),
         ObjectKey::Question { task, message } => (3, task, message),
         ObjectKey::PersonTask(task) => (4, task, 0),
@@ -224,8 +227,8 @@ fn explained(tree: &Tree, start: usize, end: usize) -> bool {
 }
 fn card_key(k: Key) -> bool {
     match k.owner {
-        Owner::Jig => k.kind <= 6,
-        Owner::Side { connector } => connector == domain::FIRST && (10..=16).contains(&k.kind),
+        Owner::Jig => (k.kind <= 6 || k.kind == 29),
+        Owner::Side { connector } => connector == domain::FIRST && ((10..=16).contains(&k.kind) || k.kind == 19),
         Owner::Other { .. } => false,
     }
 }
@@ -236,7 +239,7 @@ pub fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
 /// Find a jig card using only its stable public key and tree ancestry.
 #[must_use]
 pub fn jig_card(tree: &Tree, node: NodeId) -> Option<CardKey> {
-    enclosing_card(tree, node, |key| key.owner == Owner::Jig && key.kind <= 6)
+    enclosing_card(tree, node, |key| key.owner == Owner::Jig && (key.kind <= 6 || key.kind == 29))
 }
 fn enclosing_card(tree: &Tree, node: NodeId, admits: fn(Key) -> bool) -> Option<CardKey> {
     let at = tree.nodes().iter().position(|n| n.id == node)?;
@@ -280,7 +283,7 @@ fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
         };
         let end = at + usize::try_from(node.size).expect("subtree");
         // Plan tree items reuse object identity, but only Item nodes are cards.
-        if (k.owner == Owner::Jig && k.kind <= 6 && node.role == Role::Item)
+        if (k.owner == Owner::Jig && (k.kind <= 6 || k.kind == 29) && node.role == Role::Item)
             || (include_test_family && k.owner != Owner::Jig && card_key(k))
         {
             let deciding = contains(tree, at, end, Role::Status, b"In flight")
@@ -401,5 +404,55 @@ mod tests {
         assert!(
             matches!(seen.as_slice(), [Seen::Card { key, state: CardSeen::Waiting, revision: None }] if *key == CardKey::of(card))
         );
+    }
+    #[test]
+    fn public_observations_keep_equal_task_and_party_proposal_cards_and_requests_distinct() {
+        use jig_client::contract::{Ask, Decision, ObjectKey, ProposalKey, Proposer};
+        let limits = jig_client_view::Limits {
+            nodes: 16,
+            depth: 4,
+            text_per_node: 64,
+            text_bytes: 1024,
+            drawing_bytes: 0,
+            styles_per_node: 0,
+            patches: 128,
+            bindings: 0,
+            slots: 0,
+            markdown_depth: 1,
+        };
+        let mut view = View::new(&limits);
+        let mut builder = view.builder();
+        builder.open(Role::Page);
+        let mut expected = Vec::new();
+        for proposer in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
+            let proposal = ProposalKey { proposer, number: u64::MAX };
+            let card = super::key(ObjectKey::Proposal(proposal));
+            let kind = match proposer {
+                Proposer::Task(_) => 1,
+                Proposer::Party(_) => 29,
+            };
+            assert_eq!(card, CardKey::of(Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX }));
+            let sent = super::jig_sent(
+                skein_lib::Token::new(1),
+                [7; 16],
+                &Ask::DecideProposal { project: 4, proposal, decision: Decision::Accepted },
+            );
+            assert_eq!(sent.card, Some(card));
+            builder.open(Role::Item);
+            builder.key(Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX });
+            builder.text(jig_client_view::Run::Plain, b"supplied proposal");
+            builder.close();
+            expected.push(Seen::Card { key: card, state: CardSeen::Waiting, revision: None });
+        }
+        builder.close();
+        view.finish(builder, 1, &mut Queue::with_capacity(limits.patches));
+        assert_ne!(
+            super::key(ObjectKey::Proposal(ProposalKey { proposer: Proposer::Task(u64::MAX), number: u64::MAX })),
+            super::key(ObjectKey::Proposal(ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX }))
+        );
+        assert_eq!(jig_seen(view.tree()), expected);
+        for node in view.tree().nodes().iter().filter(|node| node.role == Role::Item) {
+            assert_eq!(super::jig_card(view.tree(), node.id), node.key.map(CardKey::of));
+        }
     }
 }
