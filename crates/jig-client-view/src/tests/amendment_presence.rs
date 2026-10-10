@@ -163,8 +163,11 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
     assert_eq!(retained.steering.instructions.bytes(), b"held instructions");
     let out = drive(&mut domain, Event::Act { act: Action::Confirm });
     assert_eq!(sent(&out), &expected);
-    assert!(
-        out.iter().any(|request| matches!(request, Request::Send { ask, .. }
-        if matches!(&**ask, Ask::Amend { revision: Revision { value: 6 }, release: Some(Revision { value: 4 }), .. })))
-    );
+    assert!(out.iter().any(|request| match request {
+        Request::Send { ask, .. } => match &**ask {
+            Ask::Amend { revision: Revision { value: 6 }, release: Some(Revision { value: 4 }), .. } => true,
+            _ => false,
+        },
+        _ => false,
+    }));
 }

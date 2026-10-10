@@ -114,24 +114,23 @@ pub fn form(
         }
         _ => {}
     }
-    let empty =
-        Amendment { addressed: None, spec: None, instructions: None, wake: None, dependencies: None, authority: None };
+    let empty = empty();
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     let value = values(&before, change);
     words.text(b, JigPhrase::After, &[]);
     proposal::amendment(b, change, words, bindings);
     if value.spec.is_some() {
-        input(b, &value, change, Field::Words, JigPhrase::NewSpec, open.writes, words, bindings);
+        input(b, &value, open, Field::Words, JigPhrase::NewSpec, words, bindings);
     }
-    input(b, &value, change, Field::Instructions, JigPhrase::NewInstructions, open.writes, words, bindings);
-    input(b, &value, change, Field::Budget, JigPhrase::NewBudget, open.writes, words, bindings);
-    input(b, &value, change, Field::Deadline, JigPhrase::NewDeadline, open.writes, words, bindings);
+    input(b, &value, open, Field::Instructions, JigPhrase::NewInstructions, words, bindings);
+    input(b, &value, open, Field::Budget, JigPhrase::NewBudget, words, bindings);
+    input(b, &value, open, Field::Deadline, JigPhrase::NewDeadline, words, bindings);
     if let Some(to) = &value.addressed {
         common::recipient(b, to, words);
-        input(b, &value, change, Field::Party, JigPhrase::AddressParty, open.writes, words, bindings);
-        input(b, &value, change, Field::Task, JigPhrase::AddressTask, open.writes, words, bindings);
+        input(b, &value, open, Field::Party, JigPhrase::AddressParty, words, bindings);
+        input(b, &value, open, Field::Task, JigPhrase::AddressTask, words, bindings);
         if let Some(project) = object.project {
-            input(b, &value, change, Field::Role { project }, JigPhrase::AddressRole, open.writes, words, bindings);
+            input(b, &value, open, Field::Role { project }, JigPhrase::AddressRole, words, bindings);
         }
     }
     if let Some(dependencies) = &value.dependencies {
@@ -208,6 +207,9 @@ fn numbers(chips: &skein_lib::List<jig_client::contract::Chip>) -> skein_lib::Li
     }
     numbers
 }
+fn empty() -> Amendment {
+    Amendment { addressed: None, spec: None, instructions: None, wake: None, dependencies: None, authority: None }
+}
 // Display/edit values come from the source unless the person selected a whole replacement.
 // The replacement request remains the separate selected delta.
 fn values(before: &Amendment, change: &Amendment) -> Amendment {
@@ -223,13 +225,14 @@ fn values(before: &Amendment, change: &Amendment) -> Amendment {
 fn input(
     b: &mut Builder,
     value: &Amendment,
-    change: &Amendment,
+    open: &Confirmation,
     field: Field,
     phrase: JigPhrase,
-    written: u64,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
+    let empty = empty();
+    let change = open.choices.change.as_ref().unwrap_or(&empty);
     b.open(match field {
         Field::Words | Field::Instructions => Role::TextArea,
         Field::Budget | Field::Deadline | Field::Party | Field::Task | Field::Role { .. } => Role::TextField,
@@ -238,20 +241,20 @@ fn input(
     match field {
         Field::Words => {
             if let Some(value) = &value.spec {
-                b.value(value.words.bytes(), written);
+                b.value(value.words.bytes(), open.writes);
             }
         }
         Field::Instructions => {
             if let Some(value) = &value.instructions {
-                b.value(value.bytes(), written);
+                b.value(value.bytes(), open.writes);
             }
         }
         Field::Budget => {
             if let Some(authority) = &value.authority {
-                b.value(&words.say(JigPhrase::Amount, &[Hole::Amount(authority.budget)]), written);
+                b.value(&words.say(JigPhrase::Amount, &[Hole::Amount(authority.budget)]), open.writes);
             }
         }
-        Field::Deadline | Field::Party | Field::Task | Field::Role { .. } => b.value(&[], written),
+        Field::Deadline | Field::Party | Field::Task | Field::Role { .. } => b.value(&[], open.writes),
     }
     b.bind(bindings.insert(JigMeaning::Amendment {
         before: Box::new(value.clone()),
