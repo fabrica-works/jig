@@ -94,9 +94,11 @@ fn an_actual_assignment_opens_a_call_only_document_with_whole_opaque_identity() 
     assert_eq!(current.identity, call.identity);
     assert_eq!((&current.tool, &current.input, current.cut), (&call.tool, &call.input, false));
     assert!(current.began.is_some());
-    assert!(world.watches.as_ref().unwrap().streams.iter().all(|stream| stream.watcher != 5));
+    assert!(
+        world.watches.as_ref().expect("independent watch consumer").streams.iter().all(|stream| stream.watcher != 5)
+    );
     assert_eq!(world.store.applied, durable, "current content makes no durable decision");
-    world.watches.as_ref().unwrap().finish();
+    world.watches.as_ref().expect("independent watch consumer").finish();
 }
 
 #[test]
@@ -118,8 +120,8 @@ fn a_real_committed_turn_keeps_current_calls_without_main_writing_on_reopen() {
     let run = current_run(&world, 5);
     assert_eq!(run.committed_turn, 1);
     assert!(run.writing.is_none());
-    assert_eq!(run.call.as_ref().unwrap().identity, main.identity);
-    let first_wall = run.call.as_ref().unwrap().began;
+    assert_eq!(run.call.as_ref().expect("current postcommit call").identity, main.identity);
+    let first_wall = run.call.as_ref().expect("current postcommit call").began;
     world.send(root::Event::Core(core::Event::Unwatch { watcher: Token::new(5) }));
     let nested = supplied_call(92, b"same");
     let durable = world.store.applied;
@@ -132,10 +134,10 @@ fn a_real_committed_turn_keeps_current_calls_without_main_writing_on_reopen() {
     let reopened = current_run(&world, 6);
     assert_eq!(reopened.committed_turn, 1);
     assert!(reopened.writing.is_none());
-    assert_eq!(reopened.call.as_ref().unwrap().identity, nested.identity);
-    assert_ne!(reopened.call.as_ref().unwrap().identity, main.identity);
+    assert_eq!(reopened.call.as_ref().expect("current nested call").identity, nested.identity);
+    assert_ne!(reopened.call.as_ref().expect("current nested call").identity, main.identity);
     assert!(first_wall.is_some());
-    assert!(reopened.call.as_ref().unwrap().began.is_some());
+    assert!(reopened.call.as_ref().expect("current nested call").began.is_some());
     assert_eq!(world.store.applied, durable);
-    world.watches.as_ref().unwrap().finish();
+    world.watches.as_ref().expect("independent watch consumer").finish();
 }
