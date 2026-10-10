@@ -268,6 +268,7 @@ fn read_subject(read: &core::reads::Read) -> Option<Subject> {
         | core::reads::Read::Conversations { .. }
         | core::reads::Read::Goals { .. }
         | core::reads::Read::Notes { .. }
+        | core::reads::Read::ScopedNotes { .. }
         | core::reads::Read::Spend { .. } => None,
     }
 }

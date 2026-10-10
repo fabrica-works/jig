@@ -363,6 +363,8 @@ pub enum Event {
     SignIn { reply_to: ReplyTo, identity: people::Identity },
     /// Admit a visible subject on a live sign-in, without a request key.
     Watch { watcher: Token, sign_in: u64, subject: crate::documents::Subject, window: crate::documents::Window },
+    /// Follow a task's live run from the client's acknowledged turn and offset.
+    WatchRun { watcher: Token, sign_in: u64, task: u64, turn: Option<views::TurnName>, offset: u32 },
     /// The client leaves one volatile watch.
     Unwatch { watcher: Token },
     /// The protocol took a watch's held document.

@@ -369,7 +369,9 @@ fn valid_change(change: &Change, limits: &Limits) -> bool {
     }
 }
 
-pub(crate) fn valid_scope(scope: &Scope, limits: &Limits) -> bool {
+/// Check a scope's bounded shape before a parent retains its query payload.
+#[must_use]
+pub fn valid_scope(scope: &Scope, limits: &Limits) -> bool {
     match scope {
         Scope::Deployment | Scope::Project { .. } | Scope::Goal { .. } => true,
         Scope::Resources { project: _, connector: _, pattern } => {

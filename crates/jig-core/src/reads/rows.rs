@@ -8,11 +8,21 @@ use jig_core_notes as notes;
 use jig_core_tasks as tasks;
 use skein_lib::List;
 
+fn note_project(scope: &notes::Scope) -> u32 {
+    match scope {
+        notes::Scope::Deployment => 0,
+        notes::Scope::Project { project }
+        | notes::Scope::Goal { project, .. }
+        | notes::Scope::Resources { project, .. } => *project,
+    }
+}
+
 pub(super) fn scope_allowed(core: &Core, party: u64, scope: &Scope) -> bool {
     match scope {
         Scope::Goals { project } | Scope::Notes { project } | Scope::Spend { project } => {
             core.people.role(party, *project).is_some()
         }
+        Scope::ScopedNotes { scope, .. } => core.people.role(party, note_project(scope)).is_some(),
         Scope::Inbox { filter, .. } => match filter.project {
             Some(project) => core.people.role(party, project).is_some(),
             None => true,
@@ -71,7 +81,7 @@ fn inbox_filter(core: &Core, limits: &Limits, filter: Filter, entry: &documents:
 pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
     match document {
         Document::Inbox(value) => match read {
-            Read::Inbox { group: Group::Updates, .. } => {
+            Read::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. } => {
                 if !value.updates_time_complete {
                     return true;
                 }
@@ -88,7 +98,10 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
                 }
                 false
             }
-            Read::Inbox { group: Group::Needs, .. }
+            Read::Inbox {
+                group: Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks,
+                ..
+            }
             | Read::Frame
             | Read::Task { .. }
             | Read::Proposal { .. }
@@ -105,6 +118,7 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
             | Read::Goals { .. }
             | Read::Project { .. }
             | Read::Notes { .. }
+            | Read::ScopedNotes { .. }
             | Read::Spend { .. }
             | Read::Deployment
             | Read::Application { .. } => false,
@@ -132,7 +146,7 @@ fn inbox_position(group: Group, cursor: documents::Cursor, activity: Option<u64>
     match cursor {
         documents::Cursor::Inbox { task, object, at } => {
             let key = match group {
-                Group::Updates => match object {
+                Group::Updates | Group::Results | Group::Replies => match object {
                     documents::InboxObject::Result { .. } => Key::Tasks(tasks::Key::Ended(task)),
                     documents::InboxObject::Reply { .. } => {
                         Key::Tasks(tasks::Key::Activity { task, position: activity? })
@@ -142,16 +156,18 @@ fn inbox_position(group: Group, cursor: documents::Cursor, activity: Option<u64>
                     | documents::InboxObject::Escalation { .. }
                     | documents::InboxObject::PersonTask => return None,
                 },
-                Group::Needs => match object {
-                    documents::InboxObject::Proposal { proposer: Proposer::Party(_), number } => {
-                        Key::Tasks(tasks::Key::PersonProposal(number))
+                Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks => {
+                    match object {
+                        documents::InboxObject::Proposal { proposer: Proposer::Party(_), number } => {
+                            Key::Tasks(tasks::Key::PersonProposal(number))
+                        }
+                        documents::InboxObject::Question { .. }
+                        | documents::InboxObject::Proposal { proposer: Proposer::Task(_), .. }
+                        | documents::InboxObject::Escalation { .. }
+                        | documents::InboxObject::PersonTask => Key::Tasks(tasks::Key::Live(task)),
+                        documents::InboxObject::Result { .. } | documents::InboxObject::Reply { .. } => return None,
                     }
-                    documents::InboxObject::Question { .. }
-                    | documents::InboxObject::Proposal { proposer: Proposer::Task(_), .. }
-                    | documents::InboxObject::Escalation { .. }
-                    | documents::InboxObject::PersonTask => Key::Tasks(tasks::Key::Live(task)),
-                    documents::InboxObject::Result { .. } | documents::InboxObject::Reply { .. } => return None,
-                },
+                }
             };
             Some(Position::Inbox { at, task, object, key })
         }
@@ -182,25 +198,28 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 | Read::Goals { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
+                | Read::ScopedNotes { .. }
                 | Read::Spend { .. }
                 | Read::Deployment
                 | Read::Application { .. } => unreachable!("inbox subject comes from inbox read"),
             };
             let needs_done = !value.updates.is_empty();
             let source = match group {
-                Group::Needs => value.needs,
-                Group::Updates => value.updates,
+                Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks => {
+                    value.needs
+                }
+                Group::Updates | Group::Results | Group::Replies => value.updates,
             };
             let mut last = None;
             for entry in source.into_boxed() {
                 last = Some((entry.cursor, entry.activity));
-                if inbox_filter(core, limits, *filter, &entry) {
+                if group.includes(entry.object) && inbox_filter(core, limits, *filter, &entry) {
                     rows.push(PageRow::Inbox(entry)).expect("live page fits");
                 }
             }
             let scope = Scope::Inbox { group: *group, filter: *filter };
             let next = match value.next {
-                Some(after) if *group == Group::Updates || !needs_done => Some(Cursor::Live {
+                Some(after) if group.updates() || !needs_done => Some(Cursor::Live {
                     scope,
                     store_after: match last {
                         Some((cursor, activity)) => inbox_position(*group, cursor, activity),
@@ -252,6 +271,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 | Read::Conversations { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
+                | Read::ScopedNotes { .. }
                 | Read::Spend { .. }
                 | Read::Deployment
                 | Read::Application { .. } => unreachable!("goal subject comes from goal read"),
@@ -321,6 +341,7 @@ fn is_page(scope: &Scope) -> bool {
         | Scope::Conversations
         | Scope::Goals { .. }
         | Scope::Notes { .. }
+        | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => true,
         Scope::Task { .. }
         | Scope::Proposal { .. }
@@ -522,6 +543,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | Scope::Conversations
                 | Scope::Goals { .. }
                 | Scope::Notes { .. }
+                | Scope::ScopedNotes { .. }
                 | Scope::Spend { .. } => unreachable!("task object scope"),
             };
             Ok(Some(answer))
@@ -747,6 +769,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
         | Scope::Conversations
         | Scope::Goals { .. }
         | Scope::Notes { .. }
+        | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => Ok(None),
     }
 }
@@ -807,6 +830,18 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                 return Ok(None);
             }
             Ok(Some(PageRow::Activity(line.clone())))
+        }
+        Scope::ScopedNotes { scope, description } => {
+            let Some(value) = note(&row.value) else { return Ok(None) };
+            if value.scope != *scope
+                || match description {
+                    Some(query) => skein_lib::bytes::find(&value.description, query).is_none(),
+                    None => false,
+                }
+            {
+                return Ok(None);
+            }
+            Ok(Some(PageRow::Note(documents::note_from_entry(core, limits, range.party, value)?)))
         }
         Scope::Notes { project } => {
             let Some(value) = note(&row.value) else {
@@ -923,6 +958,10 @@ fn inbox_row(
     filter: Filter,
     row: Row,
 ) -> Result<Option<PageRow>, Missing> {
+    match row.inbox {
+        Some(documents::Cursor::Inbox { object, .. }) if !group.includes(object) => return Ok(None),
+        Some(documents::Cursor::Inbox { .. }) | Some(documents::Cursor::Number { .. }) | None => {}
+    }
     match &row.value {
         Record::Tasks(tasks::Stored::PersonProposal(proposal)) => {
             return person_proposal_need(core, limits, party, group, filter, &row, proposal);
@@ -955,7 +994,7 @@ fn inbox_row(
         return Ok(None);
     }
     match group {
-        Group::Updates => {
+        Group::Updates | Group::Results | Group::Replies => {
             if let Some(line) = activity_record(&row.value) {
                 return reply_update(core, limits, party, &row, owner, line);
             }
@@ -984,7 +1023,7 @@ fn inbox_row(
                 cursor,
             })))
         }
-        Group::Needs => {
+        Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks => {
             // The store may page current owner rows beyond the people's cache.
             // One waiting reference per row is selected by its related activity.
             let entries = core.waiting_entries(limits, owner);
@@ -1039,8 +1078,10 @@ fn person_proposal_need(
     row: &Row,
     proposal: &tasks::PersonProposal,
 ) -> Result<Option<PageRow>, Missing> {
-    if group != Group::Needs
-        || (filter.project.is_some() && filter.project != Some(proposal.project))
+    if !group.includes(documents::InboxObject::Proposal {
+        proposer: Proposer::Party(proposal.proposer),
+        number: proposal.number,
+    }) || (filter.project.is_some() && filter.project != Some(proposal.project))
         || (filter.goal.is_some() && filter.goal != Some(proposal.goal.number))
     {
         return Ok(None);
@@ -1259,7 +1300,7 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
 
 fn inbox_key_allowed(group: Group, task: u64, object: documents::InboxObject, key: &Key) -> bool {
     match group {
-        Group::Updates => match object {
+        Group::Updates | Group::Results | Group::Replies => match object {
             documents::InboxObject::Result { .. } => key_kind(key) == KeyKind::Ended(task),
             documents::InboxObject::Reply { .. } => key_kind(key) == KeyKind::Activity(task),
             documents::InboxObject::Question { .. }
@@ -1267,7 +1308,7 @@ fn inbox_key_allowed(group: Group, task: u64, object: documents::InboxObject, ke
             | documents::InboxObject::Escalation { .. }
             | documents::InboxObject::PersonTask => false,
         },
-        Group::Needs => match object {
+        Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks => match object {
             documents::InboxObject::Proposal { proposer: Proposer::Party(_), number } => {
                 key_kind(key) == KeyKind::PersonProposal(number)
             }
@@ -1298,6 +1339,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
             | Scope::Conversations
             | Scope::Goals { .. }
             | Scope::Notes { .. }
+            | Scope::ScopedNotes { .. }
             | Scope::Spend { .. } => false,
         },
         Position::Owner(key) => {
@@ -1342,7 +1384,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     | KeyKind::Ledger(_)
                     | KeyKind::Unsupported => false,
                 },
-                Scope::Notes { .. } => kind == KeyKind::Note,
+                Scope::Notes { .. } | Scope::ScopedNotes { .. } => kind == KeyKind::Note,
                 Scope::Spend { project } => kind == KeyKind::Ledger(*project),
                 Scope::Inbox { .. } => false,
             }

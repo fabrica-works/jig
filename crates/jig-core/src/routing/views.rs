@@ -140,6 +140,58 @@ pub(super) fn open(
     subject: Subject,
     window: Window,
 ) -> Requests {
+    let follow = match &subject {
+        Subject::Run { task } => Some(views::Follow { run: Token::new(*task), turn: None, offset: 0 }),
+        Subject::Frame { .. }
+        | Subject::Task { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Tasks { .. }
+        | Subject::Conversations { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Escalation { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. }
+        | Subject::Application { .. } => None,
+    };
+    open_follow(core, env, watcher, sign_in, subject, window, follow)
+}
+
+pub(super) fn open_run(
+    core: &mut Core,
+    env: &Env<Limits>,
+    watcher: Token,
+    sign_in: u64,
+    task: u64,
+    turn: Option<views::TurnName>,
+    offset: u32,
+) -> Requests {
+    open_follow(
+        core,
+        env,
+        watcher,
+        sign_in,
+        Subject::Run { task },
+        Window { rows: env.limits.documents.rows, after: None },
+        Some(views::Follow { run: Token::new(task), turn, offset }),
+    )
+}
+
+fn open_follow(
+    core: &mut Core,
+    env: &Env<Limits>,
+    watcher: Token,
+    sign_in: u64,
+    subject: Subject,
+    window: Window,
+    follow: Option<views::Follow>,
+) -> Requests {
     let Some(party) = core.people.person(sign_in, env.now, env.wall) else {
         return refused_subject(watcher, &subject, WatchRefusal::SignedOut);
     };
@@ -177,26 +229,6 @@ pub(super) fn open(
         | Subject::Project { .. }
         | Subject::Note { .. }
         | Subject::Application { .. }) => subject,
-    };
-    let follow = match &subject {
-        Subject::Run { task } => Some(views::Follow { run: Token::new(*task), turn: None, offset: 0 }),
-        Subject::Frame { .. }
-        | Subject::Task { .. }
-        | Subject::Tree { .. }
-        | Subject::Chips { .. }
-        | Subject::Inbox { .. }
-        | Subject::Goals { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
-        | Subject::Deployment
-        | Subject::Proposal { .. }
-        | Subject::Escalation { .. }
-        | Subject::Question { .. }
-        | Subject::PersonTask { .. }
-        | Subject::Result { .. }
-        | Subject::Project { .. }
-        | Subject::Note { .. }
-        | Subject::Application { .. } => None,
     };
     let mut existing = None;
     for (_, binding) in &core.view_subjects {

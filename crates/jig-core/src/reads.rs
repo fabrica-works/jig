@@ -59,6 +59,9 @@ pub(crate) fn scope(read: &Read) -> Option<Scope> {
         Read::Conversations { .. } => Some(Scope::Conversations),
         Read::Goals { project, .. } => Some(Scope::Goals { project: *project }),
         Read::Notes { project, .. } => Some(Scope::Notes { project: *project }),
+        Read::ScopedNotes { scope, description, .. } => {
+            Some(Scope::ScopedNotes { scope: scope.clone(), description: description.clone() })
+        }
         Read::Spend { project, .. } => Some(Scope::Spend { project: *project }),
         Read::Frame | Read::Project { .. } | Read::Deployment | Read::Application { .. } => None,
     }
@@ -72,6 +75,7 @@ fn cursor(read: &Read) -> Option<&Cursor> {
         | Read::Conversations { from }
         | Read::Goals { from, .. }
         | Read::Notes { from, .. }
+        | Read::ScopedNotes { from, .. }
         | Read::Spend { from, .. } => from.as_ref(),
         Read::Activity { before, .. } => before.as_ref(),
         Read::Frame
@@ -108,6 +112,7 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Notes { .. }
+        | Read::ScopedNotes { .. }
         | Read::Spend { .. }
         | Read::Reply { .. }
         | Read::Turn { .. } => None,
@@ -120,7 +125,7 @@ fn backwards(scope: &Scope) -> bool {
         | Scope::Conversations
         | Scope::Escalation { .. }
         | Scope::Proposal { .. }
-        | Scope::Inbox { group: Group::Updates, .. } => true,
+        | Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. } => true,
         Scope::Task { .. }
         | Scope::Question { .. }
         | Scope::PersonTask { .. }
@@ -129,9 +134,13 @@ fn backwards(scope: &Scope) -> bool {
         | Scope::Turn { .. }
         | Scope::EndedDelegates { .. }
         | Scope::History { .. }
-        | Scope::Inbox { group: Group::Needs, .. }
+        | Scope::Inbox {
+            group: Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks,
+            ..
+        }
         | Scope::Goals { .. }
         | Scope::Notes { .. }
+        | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => false,
     }
 }
@@ -161,6 +170,7 @@ fn refused_application(reply: ReplyTo, read: &Read) -> Requests {
         | Read::Conversations { .. }
         | Read::Goals { .. }
         | Read::Notes { .. }
+        | Read::ScopedNotes { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Deployment => terminal(reply, Answer::None(Why::Unknown)),
@@ -200,6 +210,7 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
         | Read::Conversations { .. }
         | Read::Goals { .. }
         | Read::Notes { .. }
+        | Read::ScopedNotes { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Deployment => {}
@@ -207,7 +218,44 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
     start_jig(core, env, reply, sign_in, party, read)
 }
 
+fn bounded_query(read: &Read, limits: &Limits) -> bool {
+    match read {
+        Read::ScopedNotes { scope, description, .. } => {
+            jig_core_notes::valid_scope(scope, &limits.notes)
+                && match description {
+                    Some(query) => {
+                        query.len() <= usize::try_from(limits.notes.description_bytes).expect("description bound fits")
+                    }
+                    None => true,
+                }
+        }
+        Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Reply { .. }
+        | Read::Turn { .. }
+        | Read::EndedDelegates { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::Inbox { .. }
+        | Read::Conversations { .. }
+        | Read::Goals { .. }
+        | Read::Project { .. }
+        | Read::Notes { .. }
+        | Read::Spend { .. }
+        | Read::Deployment
+        | Read::Application { .. } => true,
+    }
+}
+
 fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, party: u64, read: Read) -> Requests {
+    if !bounded_query(&read, &env.limits) {
+        return terminal(reply, Answer::None(Why::Busy));
+    }
     let target = scope(&read);
     let mut after_live = None;
     let mut after_store = None;
@@ -322,8 +370,16 @@ pub fn answer_worst_case(limits: &Limits) -> Option<u64> {
         document
             .checked_mul(u64::from(limits.documents.rows).checked_add(3)?)?
             .checked_add(limits.load_bytes.checked_mul(2)?)?
-            .checked_add(List::<PageRow>::worst_case(limits.documents.rows)?)?,
+            .checked_add(List::<PageRow>::worst_case(limits.documents.rows)?)?
+            .checked_add(query_worst_case(limits)?)?,
     )
+}
+
+// Resource pattern segments and literal bytes, plus one description query.
+fn query_worst_case(limits: &Limits) -> Option<u64> {
+    u64::from(limits.notes.pattern_bytes)
+        .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?.checked_add(1)?)?
+        .checked_add(u64::from(limits.notes.description_bytes))
 }
 
 /// Pending load slots, one incoming bounded page and its constructed answer.
@@ -333,6 +389,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         return None;
     }
     Slab::<Pending>::worst_case(limits.load_slots)?
+        // Each pending query, plus the incoming read, its cursor and the target
+        // clone during admission. The emitted range and page cursor are priced
+        // in the held output's answer bound.
+        .checked_add(u64::from(limits.load_slots).checked_add(3)?.checked_mul(query_worst_case(limits)?)?)?
         .checked_add(u64::from(limits.load_slots).checked_mul(u64::try_from(size_of::<Position>()).ok()?)?)?
         .checked_add(limits.load_bytes)?
         .checked_add(answer_worst_case(limits)?)

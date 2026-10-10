@@ -320,6 +320,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::EffectDeadline
         | Event::SignIn { .. }
         | Event::Watch { .. }
+        | Event::WatchRun { .. }
         | Event::Unwatch { .. }
         | Event::Delivered { .. }
         | Event::StreamDelivered { .. }
@@ -421,6 +422,9 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::ReadLoaded { load, result } => crate::reads::loaded(core, env, load, result),
         Event::Read { reply, sign_in, read } => crate::reads::start(core, env, reply, sign_in, read),
         Event::Watch { watcher, sign_in, subject, window } => open(core, env, watcher, sign_in, subject, window),
+        Event::WatchRun { watcher, sign_in, task, turn, offset } => {
+            view_routes::open_run(core, env, watcher, sign_in, task, turn, offset)
+        }
         Event::Unwatch { watcher } => route_view(core, env, views::Event::Unwatch { watcher }),
         Event::Delivered { watcher } => route_view(core, env, views::Event::Delivered { watcher }),
         Event::StreamDelivered { watcher } => view_routes::stream_delivered(core, env, watcher),

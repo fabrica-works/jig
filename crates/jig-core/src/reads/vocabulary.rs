@@ -15,6 +15,38 @@ pub enum Group {
     Needs,
     /// Unread outcomes and replies, newest first.
     Updates,
+    /// Pending proposals, oldest first.
+    Proposals,
+    /// Pending escalations, oldest first.
+    Escalations,
+    /// Unanswered questions, oldest first.
+    Questions,
+    /// Active person tasks, oldest first.
+    PersonTasks,
+    /// Unread results, newest first.
+    Results,
+    /// Unread chat replies, newest first.
+    Replies,
+}
+
+impl Group {
+    pub(crate) fn updates(self) -> bool {
+        match self {
+            Self::Updates | Self::Results | Self::Replies => true,
+            Self::Needs | Self::Proposals | Self::Escalations | Self::Questions | Self::PersonTasks => false,
+        }
+    }
+
+    pub(crate) fn includes(self, object: documents::InboxObject) -> bool {
+        match object {
+            documents::InboxObject::Proposal { .. } => self == Self::Needs || self == Self::Proposals,
+            documents::InboxObject::Escalation { .. } => self == Self::Needs || self == Self::Escalations,
+            documents::InboxObject::Question { .. } => self == Self::Needs || self == Self::Questions,
+            documents::InboxObject::PersonTask => self == Self::Needs || self == Self::PersonTasks,
+            documents::InboxObject::Result { .. } => self == Self::Updates || self == Self::Results,
+            documents::InboxObject::Reply { .. } => self == Self::Updates || self == Self::Replies,
+        }
+    }
 }
 
 /// Optional filters on the party's cross-project inbox.
@@ -57,6 +89,8 @@ pub enum Scope {
     Goals { project: u32 },
     /// Notes selected by their owning project.
     Notes { project: u32 },
+    /// Exact notes owner scope and optional byte substring of its descriptions.
+    ScopedNotes { scope: notes::Scope, description: Option<Box<[u8]>> },
     /// Historical project period ledgers.
     Spend { project: u32 },
 }
@@ -119,6 +153,8 @@ pub enum Read {
     Project { project: u32 },
     /// Project notes from their owning child's rows.
     Notes { project: u32, from: Option<Cursor> },
+    /// Notes in one exact owner scope, optionally searched by description.
+    ScopedNotes { scope: notes::Scope, description: Option<Box<[u8]>>, from: Option<Cursor> },
     /// Historical period spending.
     Spend { project: u32, from: Option<Cursor> },
     /// Deployment state.

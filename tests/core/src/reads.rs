@@ -243,7 +243,9 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
             }
             Some(row(store, value, owner(store, *task)?))
         }
-        reads::Scope::Inbox { group: reads::Group::Updates, .. } => {
+        reads::Scope::Inbox {
+            group: reads::Group::Updates | reads::Group::Results | reads::Group::Replies, ..
+        } => {
             let (task, object, at) = match value {
                 core::Record::Tasks(tasks::Stored::Ended(task)) => {
                     if task.requester != tasks::Party::Person(range.party) || task.result_position == 0 {
@@ -281,6 +283,17 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
             value.inbox = Some(documents::Cursor::Inbox { task: task.number, object, at });
             Some(value)
         }
+        reads::Scope::Notes { .. } | reads::Scope::ScopedNotes { .. } => {
+            let core::Record::Notes(jig_core_notes::Record::Entry(_)) = value else { return None };
+            Some(reads::Row {
+                value: value.clone(),
+                owner: None,
+                ancestors: Box::new([]),
+                related: None,
+                linked: Box::new([]),
+                inbox: None,
+            })
+        }
         reads::Scope::Turn { task, attempt, turn } => {
             let core::Record::Core(core::CoreRecord::Turn(line)) = value else { return None };
             if line.task != *task || line.attempt != *attempt || line.turn != *turn {
@@ -293,10 +306,17 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
         | reads::Scope::Question { .. }
         | reads::Scope::EndedDelegates { .. }
         | reads::Scope::History { .. }
-        | reads::Scope::Inbox { group: reads::Group::Needs, .. }
+        | reads::Scope::Inbox {
+            group:
+                reads::Group::Needs
+                | reads::Group::Proposals
+                | reads::Group::Escalations
+                | reads::Group::Questions
+                | reads::Group::PersonTasks,
+            ..
+        }
         | reads::Scope::Conversations
         | reads::Scope::Goals { .. }
-        | reads::Scope::Notes { .. }
         | reads::Scope::Spend { .. } => None,
     }
 }
