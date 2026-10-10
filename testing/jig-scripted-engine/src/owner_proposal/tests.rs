@@ -196,3 +196,64 @@ fn owner_proposal_reserved_empty_and_whole_nested_refusals_never_shorten_input_o
     assert_eq!(worst_case(&bounds), Some(u64::MAX));
     assert_eq!(worst_case(&Bounds { document_bytes: 0, ..bounds }), None);
 }
+#[test]
+fn owner_proposal_full_batch_members_price_every_nested_spec_contract_authority_dependency_and_resource() {
+    let bounds = Bounds { rows: 3, text: 8, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut tasks = List::with_capacity(3);
+    for number in [0, 17, u64::MAX] {
+        let s = state();
+        let mut resources = List::with_capacity(3);
+        for _ in 0..3 {
+            resources.push(part()).unwrap();
+        }
+        tasks
+            .push(ProposedTask {
+                number,
+                spec: s.spec,
+                executor: OwnerExecutor::Person(PersonAddress::Party(u64::MAX)),
+                contract: TaskContractDocument::Approval { state: copy_of(&[0; 8]), part: part() },
+                authority: s.authority,
+                budget: u64::MAX,
+                funder: Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX },
+                dependencies: s.dependencies,
+                resources,
+                wake: s.wake,
+                priority: Some(u32::MAX),
+                cut: true,
+            })
+            .unwrap();
+    }
+    let part_heap = List::<Box<[u8]>>::worst_case(3).unwrap() + 3;
+    let authority_heap = List::<OwnerGrant>::worst_case(3).unwrap()
+        + List::<OwnerAuthorityExecutor>::worst_case(3).unwrap()
+        + List::<OwnerResourceScope>::worst_case(3).unwrap();
+    let member_heap = 8
+        + List::<ParameterDocument>::worst_case(3).unwrap()
+        + 8
+        + List::<u64>::worst_case(3).unwrap()
+        + authority_heap
+        + 8
+        + part_heap
+        + List::<u64>::worst_case(3).unwrap()
+        + List::<OwnerPart>::worst_case(3).unwrap()
+        + part_heap * 3;
+    let supplied = proposal(OwnerProposalAction::Batch(tasks.clone()));
+    let original = supplied.clone();
+    let expected = base_bytes() + List::<ProposedTask>::worst_case(3).unwrap() + member_heap * 3;
+    assert_eq!(bytes(&supplied, &bounds), Some(expected));
+    assert!(fits(&supplied, &Bounds { document_bytes: expected, ..bounds }));
+    assert!(!fits(&supplied, &Bounds { document_bytes: expected - 1, ..bounds }));
+    assert_eq!(supplied, original);
+    let OwnerProposalAction::Batch(received) = supplied.action else { panic!("exact batch") };
+    assert_eq!(received, tasks);
+    let mut changed = tasks.get(0).unwrap().clone();
+    changed.spec.specification.inputs = List::with_capacity(4);
+    let mut nested = List::with_capacity(1);
+    nested.push(changed).unwrap();
+    let mut rejected = proposal(OwnerProposalAction::Batch(nested));
+    rejected.funding = List::with_capacity(0);
+    rejected.acts = List::with_capacity(0);
+    let unchanged = rejected.clone();
+    assert!(!fits(&rejected, &bounds));
+    assert_eq!(rejected, unchanged);
+}
