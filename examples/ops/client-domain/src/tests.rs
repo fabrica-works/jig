@@ -859,7 +859,10 @@ fn connector_parts(number: u16) -> List<contract::Part> {
         contract::Part::Kind { connector: number, kind: 1 },
         contract::Part::Panel { connector: number, task: 9 },
         contract::Part::Result { connector: number, task: 9 },
-        contract::Part::Effect { connector: number, proposal: contract::ProposalKey { proposer: 9, number: 2 } },
+        contract::Part::Effect {
+            connector: number,
+            proposal: contract::ProposalKey { proposer: contract::Proposer::Task(9), number: 2 },
+        },
         contract::Part::Hold { connector: number, task: 9 },
         contract::Part::Project { connector: number, project: 3 },
         contract::Part::Deployment { connector: number },
@@ -1039,7 +1042,7 @@ fn an_entrance_refusal_finishes_only_its_original_child_and_survives_a_duplicate
 #[test]
 fn outbox_subjects_copy_the_supplied_scope_and_numeric_entry_independently_of_effects() {
     use crate::{infrastructure as infra, observability as obs};
-    let proposal = contract::ProposalKey { proposer: 17, number: 17 };
+    let proposal = contract::ProposalKey { proposer: contract::Proposer::Task(17), number: 17 };
     let effect = contract::Part::Effect { connector: 2, proposal };
     for scope in [contract::PartScope::Project(91), contract::PartScope::Deployment] {
         let part = contract::Part::Outbox { connector: 2, scope, entry: 17 };

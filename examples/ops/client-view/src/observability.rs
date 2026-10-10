@@ -5,7 +5,7 @@ use crate::{
     drawing,
     words::{Word, Words},
 };
-use jig_client::contract::{ObjectKey, Part};
+use jig_client::contract::{ObjectKey, Part, Proposer};
 use jig_client_view::{Builder, Key, Owner, Role, Run, SlotRef, phrases::Hole};
 use jig_ops_client_domain::{
     Action,
@@ -243,7 +243,14 @@ pub fn key(service: &Subject) -> Key {
         Kind::Incident(incident) => (2, incident),
         Kind::Panel(t) => (3, t),
         Kind::Result(t) => (4, t),
-        Kind::Effect(part) => return Key { owner: NAV.owner, kind: 5, a: part.proposer, b: part.number },
+        Kind::Effect(part) => {
+            // Keep the full maker identity; equal task and party numbers remain different effects.
+            let (kind, maker) = match part.proposer {
+                Proposer::Task(task) => (5, task),
+                Proposer::Party(party) => (10, party),
+            };
+            return Key { owner: NAV.owner, kind, a: maker, b: part.number };
+        }
         Kind::Outbox(entry) => (6, entry),
         Kind::Hold(t) => (7, t),
         Kind::Project(part) => (8, u64::from(part)),

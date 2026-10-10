@@ -234,10 +234,102 @@ fn family_keys_keep_scope_and_original_owner_identity() {
     assert_ne!(
         crate::observability::key(&Subject {
             scope: Scope::Project(1),
-            kind: Kind::Effect(ProposalKey { proposer: 12, number: 3 })
+            kind: Kind::Effect(ProposalKey { proposer: Proposer::Task(12), number: 3 })
         }),
         crate::observability::key(&Subject { scope: Scope::Project(1), kind: Kind::Outbox(3) })
     );
+}
+
+#[test]
+fn equal_task_and_party_maker_numbers_keep_full_width_effect_keys_in_both_families() {
+    let makers = [Proposer::Task(0), Proposer::Party(0), Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)];
+    let obs_keys = makers.map(|proposer| {
+        crate::observability::key(&observability::Subject {
+            scope: observability::Scope::Project(1),
+            kind: observability::Kind::Effect(ProposalKey { proposer, number: u64::MAX }),
+        })
+    });
+    let infra_keys = makers.map(|proposer| {
+        crate::infrastructure::key(&infrastructure::Subject {
+            scope: infrastructure::Scope::Project(1),
+            kind: infrastructure::Kind::Effect(ProposalKey { proposer, number: u64::MAX }),
+        })
+    });
+    for keys in [obs_keys, infra_keys] {
+        for (index, key) in keys.iter().enumerate() {
+            assert!(keys[index + 1..].iter().all(|other| key != other));
+            assert_eq!(key.b, u64::MAX);
+        }
+        assert_eq!(keys[0].a, 0);
+        assert_eq!(keys[1].a, 0);
+        assert_eq!(keys[2].a, u64::MAX);
+        assert_eq!(keys[3].a, u64::MAX);
+    }
+}
+
+#[test]
+fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
+    let mut root = ready();
+    let rows = drive(
+        &mut root,
+        Event::Went { place: root::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+    );
+    let watch = rows
+        .iter()
+        .find_map(|request| match request {
+            Request::Jig(JigOut::Open { watch, subject: Subject::Deployment }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let makers = [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)];
+    let mut parts = List::with_capacity(2);
+    for proposer in makers {
+        parts.push(Part::Effect { connector: 2, proposal: ProposalKey { proposer, number: u64::MAX } }).unwrap();
+    }
+    let rows = drive(
+        &mut root,
+        Event::Jig(jig_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                hosts: List::with_capacity(0),
+                accounts: List::with_capacity(0),
+                capacity: List::with_capacity(0),
+                proposals: 0,
+                refusals: List::with_capacity(0),
+                parts,
+            }))),
+        }),
+    );
+    for proposer in makers {
+        let expected = infrastructure::Subject {
+            scope: infrastructure::Scope::Deployment,
+            kind: infrastructure::Kind::Effect(ProposalKey { proposer, number: u64::MAX }),
+        };
+        assert_eq!(
+            rows.iter()
+                .filter(|request| matches!(request,
+                Request::Infrastructure(infrastructure::Out::Read { subject, .. }) if *subject == expected))
+                .count(),
+            1
+        );
+    }
+    let mut view = view();
+    let mut patches = Queue::with_capacity(view.limits().tree.patches);
+    build(&mut view, &root, &mut patches);
+    for kind in [5, 10] {
+        let expected = jig_client_view::Key {
+            owner: jig_client_view::Owner::Side { connector: 2 },
+            kind,
+            a: u64::MAX,
+            b: u64::MAX,
+        };
+        assert_eq!(view.tree().nodes().iter().filter(|node| node.key == Some(expected)).count(), 1);
+    }
+    assert!(contains(&view, b"Loading"));
+    assert!(view.tree().len() <= view.limits().tree.nodes);
+    while patches.pop().is_some() {}
+    build(&mut view, &root, &mut patches);
+    assert!(patches.is_empty());
 }
 
 fn text(bytes: &[u8]) -> Text {
@@ -326,7 +418,7 @@ fn proposal(key: ProposalKey) -> Proposal {
     Proposal {
         key,
         project: 1,
-        proposer: Actor::Task(9),
+        proposer: key.proposer,
         why: text(&[b'w'; 32]),
         action: ProposalAction::Effect { part: Part::Effect { connector: 2, proposal: key } },
         needs: authority(),
@@ -367,7 +459,7 @@ fn an_incident_with_a_proposal_and_an_infrastructure_panel_fills_both_slot_passe
         .unwrap();
     let mut facts = incident();
     facts.lead = Some(9);
-    facts.proposals.push(ProposalKey { proposer: 9, number: 1 }).unwrap();
+    facts.proposals.push(ProposalKey { proposer: Proposer::Task(9), number: 1 }).unwrap();
     let requests = drive(
         &mut root,
         Event::Observability(observability::Event::Read {
@@ -760,7 +852,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
         assert!(!contains(&view, b"Maximum price:"));
         let proposal_key = crate::infrastructure::key(&infrastructure::Subject {
             scope: expected_scope,
-            kind: infrastructure::Kind::Effect(ProposalKey { proposer: 17, number: 17 }),
+            kind: infrastructure::Kind::Effect(ProposalKey { proposer: Proposer::Task(17), number: 17 }),
         });
         assert_ne!(expected_key, proposal_key);
     }
