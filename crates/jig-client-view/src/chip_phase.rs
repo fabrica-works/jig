@@ -5,7 +5,7 @@ use crate::{
     phrases::{Hole, jig::JigPhrase},
     words::Words,
 };
-use jig_client::contract::{ClosingStage, OwnerChipPhase, PersonAddress, RunStage};
+use jig_client::contract::{ClosingStage, OwnerChipPhase, RunStage};
 
 pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
     match phase {
@@ -29,10 +29,7 @@ pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
             }
         },
         OwnerChipPhase::Person { address, taken_by, since } => {
-            match address {
-                PersonAddress::Party(party) => words.text(b, JigPhrase::AddressParty, &[Hole::Number(*party)]),
-                PersonAddress::Role(role) => words.text(b, JigPhrase::AddressRole, &[Hole::Number(u64::from(*role))]),
-            }
+            crate::proposed_task::executor(b, jig_client::contract::OwnerExecutor::Person(*address), words);
             if let Some(party) = taken_by {
                 words.text(b, JigPhrase::TakenByNumber, &[Hole::Number(*party)]);
             }

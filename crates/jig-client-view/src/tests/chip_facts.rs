@@ -56,11 +56,24 @@ fn brief_exact_chips_show_title_loss_and_distinct_phase_without_inventing_ending
     ];
     for (phase, label) in cases {
         let mut details = super::owner_chip::details();
-        details.executor = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+        let executor_label = match &phase {
+            OwnerChipPhase::Person { address, .. } => {
+                details.executor = OwnerExecutor::Person(*address);
+                b"Project role 4294967295".as_slice()
+            }
+            OwnerChipPhase::Active(_) => {
+                details.executor = OwnerExecutor::Agent { charter: u32::MAX };
+                b"Agent charter 4294967295".as_slice()
+            }
+            _ => {
+                details.executor = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+                b"Procedure connector 65535, code 4294967295".as_slice()
+            }
+        };
         let tree = brief(&chip(phase, details));
         assert!(contains(&tree, label));
         assert!(contains(&tree, b"Title is incomplete"));
-        assert!(contains(&tree, b"Procedure connector 65535, code 4294967295"));
+        assert!(contains(&tree, executor_label));
         assert!(!contains(&tree, b"Ended at:"));
         assert!(!tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.as_ref() == b"Done")));
     }
