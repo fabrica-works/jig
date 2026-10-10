@@ -1342,7 +1342,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
         panic!("durable goal proposal")
     };
     let goal = row.goal.number;
-    let proposer = row.proposer;
+    let proposer = people::Proposer::Party(row.proposer);
     assert_eq!(row.goal.authority.budget.deadline, Some(deadline));
     world.restart_with(amendment_world_fixture(161).0);
     let Some(root::Record::Core(core::Record::Tasks(tasks::Stored::PersonProposal(row)))) =
@@ -1388,12 +1388,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     ask(
         &mut world,
         92,
-        people::Ask::DecideProposal {
-            project: 1,
-            proposer: people::Proposer::Party(proposer),
-            proposal,
-            decision: people::ProposalDecision::Accept,
-        },
+        people::Ask::DecideProposal { project: 1, proposer, proposal, decision: people::ProposalDecision::Accept },
     );
     assert!(
         matches!(
