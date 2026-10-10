@@ -555,7 +555,7 @@ pub fn language() -> Language {
         phrases: values.into_boxed(),
     }
 }
-/// A standalone fragment shares the normal complete checked Words vocabulary.
+/// A standalone fragment shares the normal complete checked `Words` vocabulary.
 #[derive(Debug)]
 pub struct OwnerChipWords {
     words: Words,

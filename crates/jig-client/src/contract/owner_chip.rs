@@ -31,7 +31,7 @@ pub struct OwnerChipDetails {
     pub ended_at: Option<Wall>,
     pub observation: Option<OwnerChipObservation>,
 }
-/// A row's absent holder/writer means unknown when resources_observed is false.
+/// A row's absent holder/writer means unknown when `resources_observed` is false.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerResourceLine {
     pub part: OwnerPart,

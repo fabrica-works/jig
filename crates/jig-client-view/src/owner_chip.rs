@@ -63,7 +63,7 @@ fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> {
 }
 /// A bounded maximum, not a claim that absent facts generated text. All actual
 /// raw parts and observations are validated before this envelope is returned.
-/// Existing ResultValue cards retain their existing domain/row envelopes.
+/// Existing `ResultValue` cards retain their existing domain/row envelopes.
 #[must_use]
 pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Option<ChipFragment> {
     if value.resources.capacity() > limits.rows {
@@ -349,7 +349,7 @@ fn ending(b: &mut Builder, value: &OwnerChipEnding, client: &Domain, words: &Wor
     }
 }
 /// Render metadata without changing domain state, routing or issuing any read.
-/// A borrowed Domain is used only by the existing supplied ResultValue fragment.
+/// A borrowed `Domain` is used only by the existing supplied `ResultValue` fragment.
 pub fn render(b: &mut Builder, value: &OwnerChipDetails, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Region);
     number(b, words, P::Project, u64::from(value.project));
