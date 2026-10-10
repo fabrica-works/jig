@@ -85,7 +85,7 @@ pub(super) fn task() -> Task {
         result: None,
         delegates: List::with_capacity(0),
 
-        context: Some(Box::new(crate::contract::TaskContext {
+        context: Some(Box::new(TaskContext {
             escalation: None,
             parts: List::with_capacity(0),
             closing: None,

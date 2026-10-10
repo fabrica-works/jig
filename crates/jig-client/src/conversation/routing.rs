@@ -66,7 +66,9 @@ pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request
             crate::contract::ChipPhase::Waiting { .. }
             | crate::contract::ChipPhase::Idle { .. }
             | crate::contract::ChipPhase::Starting
+            | crate::contract::ChipPhase::Active(_)
             | crate::contract::ChipPhase::Running { .. }
+            | crate::contract::ChipPhase::WaitingForWords { .. }
             | crate::contract::ChipPhase::BackingOff { .. }
             | crate::contract::ChipPhase::Procedure { .. }
             | crate::contract::ChipPhase::Person { .. }
