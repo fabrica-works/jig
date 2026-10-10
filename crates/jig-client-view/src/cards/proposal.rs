@@ -116,7 +116,7 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &
         crate::markdown::read(text.bytes(), 2, b);
     }
     if let Some(wake) = &change.wake {
-        super::chip::wake(b, wake, words, bindings);
+        crate::owner_wake::policy(b, wake, &words.book, words.language);
     }
     if let Some(dependencies) = &change.dependencies {
         for task in dependencies {

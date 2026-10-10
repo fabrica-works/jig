@@ -120,7 +120,8 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
     if doc.cut {
         words.text(b, JigPhrase::TaskListsCut, &[]);
     }
-    cards::chip::wake(b, &doc.wake, words, bindings);
+    crate::owner_wake::policy(b, &doc.wake, &words.book, words.language);
+    crate::owner_wake::subscriptions(b, &doc.subscriptions, &words.book, words.language);
     for link in &doc.dependencies {
         task_link(b, client, link, words, bindings);
     }

@@ -25,7 +25,7 @@ pub struct Amendment {
     /// Retarget a person task, with admission decided by its engine document.
     pub addressed: Option<AddressChange>,
     pub spec: Option<super::Specification>,
-    pub wake: Option<WakePolicy>,
+    pub wake: Option<super::OwnerWakePolicy>,
     pub dependencies: Option<List<u64>>,
     pub authority: Option<Authority>,
     pub instructions: Option<Text>,

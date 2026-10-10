@@ -57,6 +57,8 @@ fn overview(l: &Limits) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?
         .checked_add(crate::specification::nodes(l)?)?
         .checked_add(crate::instructions::nodes(l)?)?
+        .checked_add(crate::owner_wake::policy_nodes())?
+        .checked_add(crate::owner_wake::subscription_nodes(l.rows)?)?
         .checked_add(chip_nodes(l)?.checked_add(4)?.checked_mul(l.rows)?.checked_mul(3)?)?
         .checked_add(card_nodes(l)?.checked_mul(l.rows.checked_add(2)?)?)?
         .checked_add(l.rows.checked_mul(36)?)?

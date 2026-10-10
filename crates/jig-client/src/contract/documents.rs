@@ -166,7 +166,9 @@ pub struct Task {
     pub taken_by: Option<u64>,
     /// Supplied instruction text; absence supplies no effective text.
     pub instructions: Option<DocumentText>,
-    pub wake: WakePolicy,
+    pub wake: super::OwnerWakePolicy,
+    /// Standing interests supplied separately from activation policy.
+    pub subscriptions: super::Subscriptions,
     pub result_contract: ResultContract,
     pub dependencies: List<super::OwnerTaskLink>,
     pub references: List<super::OwnerTaskLink>,
@@ -433,7 +435,7 @@ pub struct Steering {
     pub spec: super::SpecificationDocument,
     /// Supplied context only; absent retained text is not a current default.
     pub instructions: Option<DocumentText>,
-    pub wake: WakePolicy,
+    pub wake: super::OwnerWakePolicy,
     pub dependencies: List<u64>,
     pub authority: Authority,
     pub budget: Budget,

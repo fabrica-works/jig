@@ -465,6 +465,7 @@ fields!(Task {
     taken_by,
     instructions,
     wake,
+    subscriptions,
     result_contract,
     dependencies,
     references,

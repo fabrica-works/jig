@@ -10,7 +10,9 @@ use jig_client::{
     Domain,
     action::Act,
     confirm::Confirmation,
-    contract::{AddressChange, Amendment, Executor, PersonAddress, Recipient, Revision, Task, Text},
+    contract::{
+        AddressChange, Amendment, Executor, PersonAddress, Recipient, ResultsWake, Revision, Task, Text, WakeRule,
+    },
     objects::{Body, Object},
 };
 /// The one property replaced by an input's whole value.
@@ -149,8 +151,11 @@ pub fn form(
     }
     if let Some(wake) = &value.wake {
         let mut next = change.clone();
-        let mut policy = wake.clone();
-        policy.words = !wake.words;
+        let mut policy = *wake;
+        policy.words = match wake.words {
+            WakeRule::Never => WakeRule::Immediate,
+            WakeRule::Immediate | WakeRule::Batch { .. } => WakeRule::Never,
+        };
         next.wake = Some(policy);
         crate::frame::control(
             b,
@@ -162,8 +167,11 @@ pub fn form(
             Act::Change { change: Box::new(next) },
         );
         let mut next = change.clone();
-        let mut policy = wake.clone();
-        policy.results = !wake.results;
+        let mut policy = *wake;
+        policy.results = match wake.results {
+            ResultsWake::Never => ResultsWake::Each,
+            ResultsWake::Each | ResultsWake::LastOrFailure => ResultsWake::Never,
+        };
         next.wake = Some(policy);
         crate::frame::control(
             b,
@@ -264,7 +272,7 @@ fn values(before: &Amendment, change: &Amendment) -> Amendment {
         addressed: change.addressed.or(before.addressed),
         spec: change.spec.clone().or(before.spec.clone()),
         instructions: change.instructions.clone().or(before.instructions.clone()),
-        wake: change.wake.clone().or(before.wake.clone()),
+        wake: change.wake.or(before.wake),
         dependencies: change.dependencies.clone().or(before.dependencies.clone()),
         authority: change.authority.clone().or(before.authority.clone()),
     }
@@ -317,7 +325,7 @@ fn before(object: &Object) -> Option<Amendment> {
             addressed: task_address(doc),
             spec: doc.spec.whole(),
             instructions: crate::instructions::whole(doc.instructions.as_ref()),
-            wake: Some(doc.wake.clone()),
+            wake: Some(doc.wake),
             dependencies: if doc.cut { None } else { Some(numbers(&doc.dependencies)) },
             authority: Some(doc.authority.clone()),
         },
@@ -325,7 +333,7 @@ fn before(object: &Object) -> Option<Amendment> {
             addressed: recipient_address(doc.steering.person_revision, doc.steering.addressed.as_ref(), object.project),
             spec: doc.steering.spec.whole(),
             instructions: crate::instructions::whole(doc.steering.instructions.as_ref()),
-            wake: Some(doc.steering.wake.clone()),
+            wake: Some(doc.steering.wake),
             dependencies: Some(doc.steering.dependencies.clone()),
             authority: Some(doc.steering.authority.clone()),
         },
