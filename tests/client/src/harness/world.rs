@@ -503,8 +503,11 @@ impl<A: App, F: Front<A>> World<A, F> {
             // A Show is navigation even when the chosen address is already current.
             self.observe(Observation::LeftPage { client: id });
             self.clients[id.0].acted_card = None;
+            let changed = self.clients[id.0].history[self.clients[id.0].at] != address;
             self.history(id, address.clone(), replace);
-            self.platform_went(id, address);
+            if changed {
+                self.platform_went(id, address);
+            }
         }
         for back in signs {
             self.front.sign_in(id, self.now, env.wall);
