@@ -254,8 +254,11 @@ fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_h
         rows.push(entry(7, group, 10)).unwrap();
         inbox_delivery(&mut domain, page, rows);
         let first = if crate::pages::inbox::needs(group) { 7 } else { 8 };
-        assert_eq!(domain.inbox().rows.get(0).unwrap().object, ObjectKey::Task(first));
-        assert_eq!(domain.inbox().rows.get(0).unwrap().recipient, Some(Recipient::Role { project: 1, role: 2 }));
+        assert_eq!(domain.inbox().rows.get(0).unwrap().card_key(), ObjectKey::Task(first));
+        let InboxRow::Entry(row) = domain.inbox().rows.get(0).unwrap() else {
+            panic!("supplied Inbox row");
+        };
+        assert_eq!(row.recipient, Some(Recipient::Role { project: 1, role: 2 }));
         assert_eq!(domain.inbox().updates, Count { value: 100, limited: true });
         assert_eq!(crate::pages::inbox::address(ObjectKey::Task(first)), Some(Address::task(first)));
         for filter in [
@@ -1714,9 +1717,9 @@ fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
         (3, ObjectKey::Result(11)),
         (4, ObjectKey::Result(10)),
     ] {
-        assert_eq!(domain.inbox().rows.get(index).unwrap().object, key);
+        assert_eq!(domain.inbox().rows.get(index).unwrap().card_key(), key);
     }
-    assert_eq!(domain.inbox().rows.get(0).unwrap().at, skein_lib::Wall::from_nanos(1));
+    assert_eq!(domain.inbox().rows.get(0).unwrap().at(), Some(skein_lib::Wall::from_nanos(1)));
     domain.reclaim();
     let out = send(
         &mut domain,

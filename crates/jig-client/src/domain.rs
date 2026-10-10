@@ -802,6 +802,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                     | Delivery::Tree(_)
                     | Delivery::Chips(_)
                     | Delivery::Inbox(_)
+                    | Delivery::OwnerInbox(_)
                     | Delivery::Tasks(_)
                     | Delivery::Goals(_)
                     | Delivery::Conversations(_)
@@ -811,7 +812,10 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 },
                 Owner::Page { generation } => {
                     if generation == domain.generation {
-                        let contexts = crate::objects::contexts(&delivery, env.limits.rows);
+                        let contexts = crate::objects::contexts(
+                            &delivery,
+                            env.limits.rows.checked_mul(2).expect("two whole Inbox groups fit"),
+                        );
                         crate::objects::dropping(domain, id, &delivery);
                         crate::pages::routing::delivery(domain, env, id, delivery, out);
                         crate::objects::apply_contexts(domain, contexts);

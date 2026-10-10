@@ -5,8 +5,12 @@
 //! See client/domain/pages.md, 3, and contract.md, 3.2 and 6–7.
 use crate::{
     address::{Address, ProjectSection},
-    contract::{Count, Cursor, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Needs, ObjectKey},
+    contract::{
+        Count, Cursor, InboxDocument, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, InboxRow, Needs, ObjectKey,
+        OwnerInbox, OwnerInboxPage, Read,
+    },
 };
+use alloc::boxed::Box;
 use skein_lib::List;
 /// An inbox filter, shared by live rows and historical reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -19,18 +23,28 @@ pub struct Filter {
 #[derive(Debug)]
 pub struct InboxWindow {
     pub cut: bool,
-    pub rows: List<InboxEntry>,
+    pub rows: List<InboxRow>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
     pub more: bool,
     pub reading: Option<skein_lib::Token>,
+    /// Original accepted query, including its independent opaque continuation.
+    pub query: Option<Read>,
 }
 impl InboxWindow {
     fn new(rows: u32) -> Self {
-        Self { cut: false, rows: List::with_capacity(rows), before: None, after: None, more: false, reading: None }
+        Self {
+            cut: false,
+            rows: List::with_capacity(rows),
+            before: None,
+            after: None,
+            more: false,
+            reading: None,
+            query: None,
+        }
     }
     // Read rows past the watch remain; duplicate snapshots never resurrect a removed live key.
-    fn past(&mut self, live: &List<InboxEntry>) {
+    fn past(&mut self, live: &List<InboxRow>) {
         if self.rows.is_empty() {
             return;
         }
@@ -39,7 +53,7 @@ impl InboxWindow {
         for row in rows.into_boxed() {
             let mut watched = false;
             for current in live {
-                if current.object == row.object {
+                if current.identity() == row.identity() {
                     watched = true;
                     break;
                 }
@@ -56,17 +70,22 @@ impl InboxWindow {
         self.after = None;
         self.more = false;
         self.reading = None;
+        self.query = None;
     }
 }
 /// Context rows merge the live watch and both read groups by object key.
 /// A watched row wins; each source is bounded by one document's row limit.
 #[derive(Debug)]
 pub struct Inbox {
-    pub rows: List<InboxEntry>,
+    pub rows: List<InboxRow>,
     pub filter: Filter,
+    /// Whole latest source; exact owner aggregates never become four counters.
+    pub document: Option<InboxDocument>,
+    /// Live owner goal membership awaits a separately supplied source context.
+    pub goal_context_pending: bool,
     pub needs: Needs,
     pub updates: Count,
-    pub live: List<InboxEntry>,
+    pub live: List<InboxRow>,
     /// The shared live watch has rows beyond its window; read cursors remain independent.
     pub live_more: bool,
     pub needs_window: InboxWindow,
@@ -82,11 +101,13 @@ impl Inbox {
     #[must_use]
     pub fn new(rows: u32) -> Self {
         Self {
-            rows: List::with_capacity(rows.checked_mul(3).expect("inbox source rows fit")),
+            rows: List::with_capacity(rows.checked_mul(4).expect("inbox source rows fit")),
             filter: Filter { project: None, kind: None, goal: None },
+            document: None,
+            goal_context_pending: false,
             needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
             updates: Count { value: 0, limited: false },
-            live: List::with_capacity(rows),
+            live: List::with_capacity(rows.checked_mul(2).expect("two live groups fit")),
             live_more: false,
             needs_window: InboxWindow::new(rows),
             updates_window: InboxWindow::new(rows),
@@ -98,14 +119,22 @@ impl Inbox {
     }
     /// A filtered row belongs here only while its shared object still waits.
     #[must_use]
-    pub fn includes(&self, entry: &InboxEntry) -> bool {
-        (self.filter.project.is_none() || self.filter.project == Some(entry.project))
-            && (self.filter.kind.is_none() || self.filter.kind == Some(entry.group))
-            && (self.filter.goal.is_none() || self.filter.goal == entry.goal)
+    pub fn includes(&self, entry: &InboxRow) -> bool {
+        let membership = match entry {
+            InboxRow::Entry(value) => self.filter.goal.is_none() || self.filter.goal == value.goal,
+            // Absence of source ancestry is never asserted to be non-membership.
+            // This incomplete live path is explicitly exposed to the view.
+            InboxRow::Owner(_) => self.filter.goal.is_none(),
+        };
+        (self.filter.project.is_none() || self.filter.project == entry.project())
+            && (self.filter.kind.is_none() || self.filter.kind == Some(entry.group()))
+            && membership
     }
     /// Leaving a page discards every source and its pending cursor.
     pub(crate) fn clear(&mut self) {
         self.live.clear();
+        self.document = None;
+        self.goal_context_pending = false;
         self.live_more = false;
         self.needs_window.clear();
         self.updates_window.clear();
@@ -134,7 +163,10 @@ impl Inbox {
     }
     /// The whole live watch replaces its own source, preserving read windows.
     pub(crate) fn replace(&mut self, entries: List<InboxEntry>, more: bool) {
-        self.live = entries;
+        self.live.clear();
+        for entry in entries.into_boxed() {
+            self.live.push(InboxRow::Entry(Box::new(entry))).expect("whole live source fits");
+        }
         self.live_more = more;
         self.needs_window.past(&self.live);
         self.updates_window.past(&self.live);
@@ -144,7 +176,10 @@ impl Inbox {
     pub(crate) fn page(&mut self, group: InboxReadGroup, page: InboxPage) {
         let window = self.window_mut(group);
         window.cut = page.cut;
-        window.rows = page.rows;
+        window.rows.clear();
+        for row in page.rows.into_boxed() {
+            window.rows.push(InboxRow::Entry(Box::new(row))).expect("whole historical source fits");
+        }
         window.before = page.before;
         window.after = page.after;
         window.more = window.after.is_some();
@@ -154,27 +189,78 @@ impl Inbox {
         }
         self.merge();
     }
+    /// Whole exact owner delivery; both allocated groups remain in the envelope.
+    pub(crate) fn owner(&mut self, value: Box<OwnerInbox>) {
+        self.results_seen = value.results_seen;
+        self.marked_results = self.marked_results.max(value.results_seen);
+        self.live_more = value.next.is_some();
+        self.live.clear();
+        for entries in [&value.needs, &value.updates] {
+            for entry in entries {
+                self.live.push(InboxRow::Owner(Box::new(entry.clone()))).expect("both bounded live groups fit");
+            }
+        }
+        self.document = Some(InboxDocument::Owner(value));
+        self.needs_window.past(&self.live);
+        self.updates_window.past(&self.live);
+        self.merge();
+    }
+    /// The source selected these rows using the original query; no guessed goal
+    /// or ancestry is required or used to re-filter a bounded historical page.
+    pub(crate) fn owner_page(&mut self, group: InboxReadGroup, query: Read, page: OwnerInboxPage) {
+        let window = self.window_mut(group);
+        window.cut = page.cut;
+        window.rows.clear();
+        for row in page.rows.into_boxed() {
+            window.rows.push(InboxRow::Owner(Box::new(row))).expect("whole owner page fits");
+        }
+        window.before = page.before;
+        window.after = page.after;
+        window.more = window.after.is_some();
+        window.query = Some(query);
+        match group {
+            InboxReadGroup::Needs => self.needs_window.past(&self.live),
+            InboxReadGroup::Updates => self.updates_window.past(&self.live),
+        }
+        self.merge();
+    }
     fn merge(&mut self) {
         self.rows.clear();
-        for entries in [&self.live, &self.needs_window.rows, &self.updates_window.rows] {
-            for entry in entries {
-                if !self.includes(entry) {
+        self.goal_context_pending = false;
+        for entry in &self.live {
+            match entry {
+                InboxRow::Owner(_) => self.goal_context_pending |= self.filter.goal.is_some(),
+                InboxRow::Entry(_) => {}
+            }
+            if self.includes(entry) {
+                self.rows.push(entry.clone()).expect("bounded live groups fit");
+            }
+        }
+        for window in [&self.needs_window, &self.updates_window] {
+            for entry in &window.rows {
+                let included = match entry {
+                    InboxRow::Entry(_) => self.includes(entry),
+                    InboxRow::Owner(_) => query_filter(window.query.as_ref()) == Some(self.filter),
+                };
+                if !included {
                     continue;
                 }
                 let mut known = false;
                 for current in &self.rows {
-                    if current.object == entry.object {
+                    if current.identity() == entry.identity() {
                         known = true;
                         break;
                     }
                 }
                 if !known {
-                    self.rows.push(entry.clone()).expect("three bounded inbox sources fit");
+                    self.rows.push(entry.clone()).expect("four bounded inbox sources fit");
                 }
             }
         }
-        for first in 0..self.rows.len() {
-            for second in first.checked_add(1).expect("row index fits")..self.rows.len() {
+        // Adjacent swaps preserve supplied order at unknown-time boundaries.
+        for _pass in 0..self.rows.len() {
+            for second in 1..self.rows.len() {
+                let first = second.checked_sub(1).expect("row has predecessor");
                 let a = self.rows.get(first).expect("row exists");
                 let b = self.rows.get(second).expect("row exists");
                 if earlier(b, a) {
@@ -194,16 +280,67 @@ pub const fn needs(group: InboxGroup) -> bool {
         InboxGroup::Results | InboxGroup::Replies => false,
     }
 }
-fn earlier(a: &InboxEntry, b: &InboxEntry) -> bool {
-    let a_needs = needs(a.group);
-    let b_needs = needs(b.group);
+fn earlier(a: &InboxRow, b: &InboxRow) -> bool {
+    let a_needs = needs(a.group());
+    let b_needs = needs(b.group());
     if a_needs != b_needs {
         return a_needs;
     }
-    if a.at != b.at {
-        return if a_needs { a.at < b.at } else { a.at > b.at };
+    match a.at() {
+        Some(a_at) => match b.at() {
+            Some(b_at) => {
+                if a_at != b_at {
+                    return if a_needs { a_at < b_at } else { a_at > b_at };
+                }
+                // Existing supplied rows retain their original tie ordering;
+                // exact owner ties retain the owner's source order.
+                match a {
+                    InboxRow::Entry(a) => match b {
+                        InboxRow::Entry(b) => a.object < b.object,
+                        InboxRow::Owner(_) => false,
+                    },
+                    InboxRow::Owner(_) => false,
+                }
+            }
+            None => false,
+        },
+        None => false,
     }
-    a.object < b.object
+}
+/// Original source filter, independent of owner row fields.
+#[must_use]
+pub const fn query_filter(query: Option<&Read>) -> Option<Filter> {
+    match query {
+        Some(Read::Inbox { project, kind, goal, .. }) => Some(Filter { project: *project, kind: *kind, goal: *goal }),
+        Some(
+            Read::Frame
+            | Read::Task { .. }
+            | Read::Proposal { .. }
+            | Read::Escalation { .. }
+            | Read::Question { .. }
+            | Read::PersonTask { .. }
+            | Read::Result { .. }
+            | Read::Ended { .. }
+            | Read::History { .. }
+            | Read::Activity { .. }
+            | Read::Conversations { .. }
+            | Read::Goals { .. }
+            | Read::Spend { .. }
+            | Read::Project { .. }
+            | Read::Notes { .. }
+            | Read::Deployment,
+        )
+        | None => None,
+    }
+}
+/// Whole Inbox storage, projections and merge scratch including independent windows.
+#[must_use]
+pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
+    let rows = limits.rows.checked_mul(4)?;
+    List::<InboxRow>::worst_case(rows)?
+        .checked_mul(3)?
+        .checked_add(u64::from(rows).checked_mul(limits.document_bytes)?.checked_mul(3)?)?
+        .checked_add(limits.document_bytes.checked_mul(3)?)
 }
 /// The known address behind an entry; a party maker supplies no task address.
 #[must_use]

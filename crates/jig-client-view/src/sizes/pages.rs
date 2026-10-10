@@ -10,8 +10,9 @@ fn runtime(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn inbox_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     card_nodes(l)?
-        .checked_add(14)?
-        .checked_mul(l.rows.checked_mul(3)?)?
+        .checked_add(chip_nodes(l)?)?
+        .checked_add(28)?
+        .checked_mul(l.rows.checked_mul(4)?)?
         .checked_add(l.projects.checked_mul(3)?)?
         .checked_add(84)?
         .checked_add(slot_nodes)

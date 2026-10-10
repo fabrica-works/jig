@@ -42,26 +42,28 @@ pub(crate) fn inbox(domain: &mut Domain, env: &Env<crate::Limits>, incoming: Sou
     let mut keys = List::with_capacity(domain.inbox.rows.capacity());
     let mut contexts = List::with_capacity(domain.inbox.rows.capacity());
     for entry in &domain.inbox.rows {
-        if keys.push(entry.object).is_err() {
+        if keys.push(entry.card_key()).is_err() {
             break;
         }
-        contexts.push(Context { object: entry.object, project: entry.project }).expect("context fits its row");
+        if let Some(project) = entry.project() {
+            contexts.push(Context { object: entry.card_key(), project }).expect("context fits its row");
+        }
     }
     super::routing::names(domain, env, source, keys, out);
     crate::objects::apply_contexts(domain, contexts);
     for index in 0..domain.inbox.rows.len() {
         let entry = domain.inbox.rows.get(index).expect("bounded inbox row exists");
-        let Some(line) = &entry.reply else {
+        let Some(line) = entry.reply() else {
             continue;
         };
-        if entry.group != InboxGroup::Replies
-            || entry.object != ObjectKey::Task(line.chip.task)
-            || entry.project != line.project
+        if entry.group() != InboxGroup::Replies
+            || entry.card_key() != ObjectKey::Task(line.chip.task)
+            || entry.project() != Some(line.project)
         {
             super::routing::refuse(domain, Limit::Objects);
             continue;
         }
-        attach(domain, source, (**line).clone());
+        attach(domain, source, line.clone());
     }
 }
 

@@ -8,7 +8,9 @@ use jig_client::{
     Domain,
     action::Act,
     action::End,
-    contract::{InboxGroup, InboxReadGroup, Recipient},
+    contract::{
+        InboxDocument, InboxGroup, InboxReadGroup, InboxRow, OwnerInboxEntry, OwnerInboxObject, Proposer, Recipient,
+    },
     pages::inbox::{Filter, needs},
 };
 /// Render the bounded, already ordered inbox, filters and both window edges.
@@ -16,18 +18,24 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
     super::heading(b, words, JigPhrase::Inbox, &[]);
     filters(b, client, words, bindings);
     let page = client.inbox();
-    let count = u64::from(page.needs.questions)
-        .checked_add(u64::from(page.needs.proposals))
-        .expect("inbox count fits")
-        .checked_add(u64::from(page.needs.escalations))
-        .expect("inbox count fits")
-        .checked_add(u64::from(page.needs.person_tasks))
-        .expect("inbox count fits");
+    let (count, updates) = match &page.document {
+        Some(InboxDocument::Owner(value)) => (u64::from(value.cached_needs), value.cached_updates),
+        Some(InboxDocument::Entry(_)) | None => {
+            let count = u64::from(page.needs.questions)
+                .checked_add(u64::from(page.needs.proposals))
+                .expect("inbox count fits")
+                .checked_add(u64::from(page.needs.escalations))
+                .expect("inbox count fits")
+                .checked_add(u64::from(page.needs.person_tasks))
+                .expect("inbox count fits");
+            (count, page.updates)
+        }
+    };
     words.text(b, JigPhrase::Needs, &[Hole::Number(count)]);
     words.text(
         b,
-        if page.updates.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
-        &[Hole::Number(u64::from(page.updates.value))],
+        if updates.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates },
+        &[Hole::Number(u64::from(updates.value))],
     );
     for group in [true, false] {
         b.open(Role::Region);
@@ -38,30 +46,11 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
         b.close();
         b.open(Role::List);
         for entry in &page.rows {
-            if needs(entry.group) == group {
+            if needs(entry.group()) == group {
                 b.open(Role::Item);
-                b.key(super::object_key(entry.object));
-                if group {
-                    words.waiting(b, client.wall(), entry.at);
-                } else if unread(entry, client.inbox().results_seen) {
-                    words.text(b, JigPhrase::NewUpdate, &[]);
-                }
-                if let Some(at) = entry.stall {
-                    words.text(b, JigPhrase::PassesUp, &[Hole::Wall(words.adjusted_wall(at))]);
-                }
-                match entry.recipient {
-                    Some(Recipient::Role { .. } | Recipient::Roles { .. }) => words.text(b, JigPhrase::OnCall, &[]),
-                    Some(Recipient::Party(_) | Recipient::Task(_)) | None => {}
-                }
-                if let Some(id) = client.objects().find(entry.object) {
-                    cards::card(
-                        b,
-                        client,
-                        id,
-                        &cards::Place::Inbox { lineage: entry.lineage.clone() },
-                        words,
-                        bindings,
-                    );
+                match entry {
+                    InboxRow::Entry(entry) => supplied_entry(b, client, words, bindings, entry, group),
+                    InboxRow::Owner(entry) => owner_entry(b, client, words, bindings, entry, group),
                 }
                 b.close();
             }
@@ -70,6 +59,9 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
         let parent = if group { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
         window(b, client, words, bindings, parent);
         b.close();
+    }
+    if page.goal_context_pending {
+        owner_text(b, words, crate::owner_inbox_words::InboxPhrase::GoalContextPending, &[]);
     }
     if page.live_more {
         words.status(b, JigPhrase::MoreRows, &[]);
@@ -174,7 +166,7 @@ fn filters(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBi
     }
     filter(b, words, bindings, JigPhrase::AllGoals, &[], Filter { goal: None, ..current });
     for entry in &client.inbox().rows {
-        if let Some(goal) = entry.goal {
+        if let Some(goal) = entry.goal() {
             filter(
                 b,
                 words,
@@ -195,5 +187,92 @@ fn unread(entry: &jig_client::contract::InboxEntry, results_seen: u64) -> bool {
             None => false,
         },
         InboxGroup::Questions | InboxGroup::Proposals | InboxGroup::Escalations | InboxGroup::PersonTasks => false,
+    }
+}
+
+fn supplied_entry(
+    b: &mut Builder,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+    entry: &jig_client::contract::InboxEntry,
+    group: bool,
+) {
+    b.key(super::object_key(entry.object));
+    if group {
+        words.waiting(b, client.wall(), entry.at);
+    } else if unread(entry, client.inbox().results_seen) {
+        words.text(b, JigPhrase::NewUpdate, &[]);
+    }
+    if let Some(at) = entry.stall {
+        words.text(b, JigPhrase::PassesUp, &[Hole::Wall(words.adjusted_wall(at))]);
+    }
+    match entry.recipient {
+        Some(Recipient::Role { .. } | Recipient::Roles { .. }) => words.text(b, JigPhrase::OnCall, &[]),
+        Some(Recipient::Party(_) | Recipient::Task(_)) | None => {}
+    }
+    if let Some(id) = client.objects().find(entry.object) {
+        cards::card(b, client, id, &cards::Place::Inbox { lineage: entry.lineage.clone() }, words, bindings);
+    }
+}
+fn owner_text(b: &mut Builder, words: &Words, phrase: crate::owner_inbox_words::InboxPhrase, holes: &[Hole]) {
+    let saying = words.book.say(words.language, phrase.id(), holes).expect("whole Inbox words and typed holes checked");
+    b.text(Run::Plain, &saying.text);
+}
+fn owner_entry(
+    b: &mut Builder,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+    entry: &OwnerInboxEntry,
+    group: bool,
+) {
+    use crate::owner_inbox_words::InboxPhrase;
+    let task = entry.task_number();
+    let (kind, a, value) = match entry.object {
+        OwnerInboxObject::Question { message } => (50, task, message),
+        OwnerInboxObject::Proposal { proposer, number } => match proposer {
+            Proposer::Task(task) => (51, task, number),
+            Proposer::Party(party) => (52, party, number),
+        },
+        OwnerInboxObject::Escalation { revision } => (53, task, revision),
+        OwnerInboxObject::PersonTask => (54, task, 0),
+        OwnerInboxObject::Reply { message } => (55, task, message),
+        OwnerInboxObject::Result { position } => (56, task, position),
+    };
+    b.key(crate::Key { owner: crate::Owner::Jig, kind, a, b: value });
+    match entry.object {
+        OwnerInboxObject::Question { message } => owner_text(b, words, InboxPhrase::Question, &[Hole::Number(message)]),
+        OwnerInboxObject::Proposal { proposer, number } => match proposer {
+            Proposer::Task(task) => {
+                owner_text(b, words, InboxPhrase::TaskProposal, &[Hole::Number(task), Hole::Number(number)]);
+            }
+            Proposer::Party(party) => {
+                owner_text(b, words, InboxPhrase::PartyProposal, &[Hole::Number(party), Hole::Number(number)]);
+            }
+        },
+        OwnerInboxObject::Escalation { revision } => {
+            owner_text(b, words, InboxPhrase::Escalation, &[Hole::Number(revision)]);
+        }
+        OwnerInboxObject::PersonTask => owner_text(b, words, InboxPhrase::PersonTask, &[]),
+        OwnerInboxObject::Reply { message } => owner_text(b, words, InboxPhrase::Reply, &[Hole::Number(message)]),
+        OwnerInboxObject::Result { position } => owner_text(b, words, InboxPhrase::Result, &[Hole::Number(position)]),
+    }
+    if let Some(project) = entry.project {
+        owner_text(b, words, InboxPhrase::Project, &[Hole::Number(u64::from(project))]);
+    }
+    if group {
+        if let Some(at) = entry.at {
+            words.waiting(b, client.wall(), at);
+        }
+    } else if entry.unread == Some(true) {
+        words.text(b, JigPhrase::NewUpdate, &[]);
+    }
+    if let Some(activity) = entry.activity {
+        owner_text(b, words, InboxPhrase::Activity, &[Hole::Number(activity)]);
+    }
+    crate::owner_result::link(b, client, &entry.task, words, bindings);
+    if let Some(id) = client.objects().find(entry.card_key()) {
+        cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
     }
 }

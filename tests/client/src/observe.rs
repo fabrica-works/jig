@@ -123,6 +123,7 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::History(_)
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
+        | ReadValue::OwnerInbox(_)
         | ReadValue::Conversations(_)
         | ReadValue::Goals(_)
         | ReadValue::Spend(_)

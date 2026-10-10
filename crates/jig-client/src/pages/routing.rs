@@ -326,11 +326,19 @@ pub(crate) fn delivery(
                 }
             }
         }
+        Delivery::OwnerInbox(inbox) => {
+            domain.inbox.owner(inbox);
+            crate::pages::replies::inbox(domain, env, source, out);
+            crate::pages::conversations::mark_results(domain, out);
+            domain.timed_page(!domain.inbox.rows.is_empty());
+            domain.changed();
+        }
         Delivery::Inbox(inbox) => {
             domain.inbox.needs = inbox.needs;
             domain.inbox.updates = inbox.updates;
             domain.inbox.results_seen = inbox.results_seen;
             domain.inbox.marked_results = domain.inbox.marked_results.max(inbox.results_seen);
+            domain.inbox.document = Some(contract::InboxDocument::Entry(inbox.clone()));
             domain.inbox.replace(inbox.entries, inbox.more);
             crate::pages::replies::inbox(domain, env, source, out);
             crate::pages::conversations::mark_results(domain, out);
@@ -371,6 +379,10 @@ pub(crate) fn read_result(
     result: ReadResult,
     out: &mut Queue<Request>,
 ) {
+    if !owner_inbox_read_valid(domain, env, token, &result) {
+        refuse(domain, Limit::Reads);
+        return;
+    }
     let Some(receipt) = domain.reads.terminal(token) else {
         return;
     };
@@ -452,7 +464,7 @@ pub(crate) fn read_result(
                 contract::ReadNone::SignedOut => crate::domain::signed_out(domain, out),
             }
         }
-        ReadResult::Value(value) => read_value(domain, env, receipt.source, value, out),
+        ReadResult::Value(value) => received_value(domain, env, receipt.source, receipt.what, value, out),
     }
 }
 fn read_value(
@@ -463,7 +475,7 @@ fn read_value(
     out: &mut Queue<Request>,
 ) {
     match value {
-        ReadValue::Frame(_) => {}
+        ReadValue::Frame(_) | ReadValue::OwnerInbox(_) => {}
         ReadValue::Notes(page) => crate::pages::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
@@ -552,4 +564,124 @@ fn task_read(domain: &mut Domain, env: &Env<crate::Limits>, task: Box<contract::
     let key = ObjectKey::Task(task.chip.task);
     read_body(domain, key, Body::Task(task));
     crate::pages::task::document(domain, env, out);
+}
+
+// Validate the original query and entire group before consuming its terminal.
+fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
+    let page = match result {
+        ReadResult::Value(value) => match value {
+            ReadValue::OwnerInbox(page) => page,
+            ReadValue::Frame(_)
+            | ReadValue::Task(_)
+            | ReadValue::Proposal(_)
+            | ReadValue::Escalation(_)
+            | ReadValue::Question(_)
+            | ReadValue::PersonTask(_)
+            | ReadValue::Result(_)
+            | ReadValue::Ended(_)
+            | ReadValue::History(_)
+            | ReadValue::Activity(_)
+            | ReadValue::Inbox(_)
+            | ReadValue::Conversations(_)
+            | ReadValue::Goals(_)
+            | ReadValue::Spend(_)
+            | ReadValue::Project(_)
+            | ReadValue::Notes(_)
+            | ReadValue::Deployment(_) => return true,
+        },
+        ReadResult::None(_) => return true,
+    };
+    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+        return false;
+    };
+    let group = match &read.what {
+        Read::Inbox { group, .. } => *group,
+        Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Ended { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::Conversations { .. }
+        | Read::Goals { .. }
+        | Read::Spend { .. }
+        | Read::Project { .. }
+        | Read::Notes { .. }
+        | Read::Deployment => return false,
+    };
+    let number = match read.source {
+        Source::Window { number, .. } => number,
+        Source::Watch(_) | Source::Card(_) => return false,
+    };
+    if super::conversations::inbox_group(number) != Some(group)
+        || super::inbox::query_filter(Some(&read.what)) != Some(domain.inbox.filter)
+        || domain.inbox.window(group).reading != Some(token)
+        || page.rows.capacity() > env.limits.rows
+    {
+        return false;
+    }
+    for row in &page.rows {
+        if contract::InboxReadGroup::of(row.group()) != group {
+            return false;
+        }
+    }
+    true
+}
+
+fn received_value(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    source: Source,
+    query: Read,
+    value: ReadValue,
+    out: &mut Queue<Request>,
+) {
+    match value {
+        ReadValue::OwnerInbox(page) => {
+            let group = match &query {
+                Read::Inbox { group, .. } => *group,
+                Read::Frame
+                | Read::Task { .. }
+                | Read::Proposal { .. }
+                | Read::Escalation { .. }
+                | Read::Question { .. }
+                | Read::PersonTask { .. }
+                | Read::Result { .. }
+                | Read::Ended { .. }
+                | Read::History { .. }
+                | Read::Activity { .. }
+                | Read::Conversations { .. }
+                | Read::Goals { .. }
+                | Read::Spend { .. }
+                | Read::Project { .. }
+                | Read::Notes { .. }
+                | Read::Deployment => return,
+            };
+            domain.inbox.owner_page(group, query, *page);
+            crate::pages::replies::inbox(domain, env, source, out);
+            crate::pages::conversations::mark_results(domain, out);
+            domain.changed();
+        }
+        ReadValue::Frame(_)
+        | ReadValue::Task(_)
+        | ReadValue::Proposal(_)
+        | ReadValue::Escalation(_)
+        | ReadValue::Question(_)
+        | ReadValue::PersonTask(_)
+        | ReadValue::Result(_)
+        | ReadValue::Ended(_)
+        | ReadValue::History(_)
+        | ReadValue::Activity(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::Conversations(_)
+        | ReadValue::Goals(_)
+        | ReadValue::Spend(_)
+        | ReadValue::Project(_)
+        | ReadValue::Notes(_)
+        | ReadValue::Deployment(_) => read_value(domain, env, source, value, out),
+    }
 }

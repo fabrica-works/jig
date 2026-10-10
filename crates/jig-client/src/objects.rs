@@ -432,6 +432,16 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
             Some(false)
         }
         Delivery::Task(task) => Some(key == ObjectKey::Task(task.chip.task)),
+        Delivery::OwnerInbox(inbox) => {
+            for entries in [&inbox.needs, &inbox.updates] {
+                for entry in entries {
+                    if entry.card_key() == key {
+                        return Some(true);
+                    }
+                }
+            }
+            Some(false)
+        }
         Delivery::Inbox(inbox) => {
             for entry in &inbox.entries {
                 if entry.object == key {
@@ -685,6 +695,7 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
         ReadValue::Result(result) => Some(Body::Result(result)),
         ReadValue::Frame(_)
         | ReadValue::Inbox(_)
+        | ReadValue::OwnerInbox(_)
         | ReadValue::Activity(_)
         | ReadValue::History(_)
         | ReadValue::Conversations(_)
@@ -777,6 +788,17 @@ pub struct Context {
 pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List<Context> {
     let mut rows = List::with_capacity(capacity);
     match value {
+        crate::contract::Delivery::OwnerInbox(inbox) => {
+            for entries in [&inbox.needs, &inbox.updates] {
+                for entry in entries {
+                    if let Some(project) = entry.project
+                        && rows.push(Context { object: entry.card_key(), project }).is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+        }
         crate::contract::Delivery::Inbox(inbox) => {
             for entry in &inbox.entries {
                 if rows.push(Context { object: entry.object, project: entry.project }).is_err() {

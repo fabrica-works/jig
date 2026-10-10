@@ -333,6 +333,7 @@ impl<A: crate::Application> Engine<A> {
                 return Ok(Some(value));
             }
             match &mut value {
+                Delivery::OwnerInbox(_) => return Err(WatchEnd::Unknown),
                 Delivery::Inbox(doc) => {
                     if !shorten(&mut doc.entries) {
                         return Err(WatchEnd::Busy);

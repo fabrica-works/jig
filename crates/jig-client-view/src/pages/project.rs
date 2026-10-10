@@ -67,18 +67,7 @@ pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     super::work::section(b, words, phrase(selected));
     match selected {
         ProjectSection::Overview => {
-            for entry in &client.inbox().rows {
-                if let Some(id) = client.objects().find(entry.object) {
-                    cards::card(
-                        b,
-                        client,
-                        id,
-                        &cards::Place::Inbox { lineage: entry.lineage.clone() },
-                        words,
-                        bindings,
-                    );
-                }
-            }
+            inbox_cards(b, client, words, bindings);
             for goal in &client.project_page().goals {
                 goals::line(b, client, goal, words, bindings);
             }
@@ -232,6 +221,26 @@ fn task_spend(
         words.amount(b, task.spent);
         if let Some(id) = client.objects().find(ObjectKey::Task(task.chip.task)) {
             cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
+        }
+    }
+}
+
+fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    for entry in &client.inbox().rows {
+        if let Some(id) = client.objects().find(entry.card_key()) {
+            cards::card(
+                b,
+                client,
+                id,
+                &match entry {
+                    jig_client::contract::InboxRow::Entry(value) => {
+                        cards::Place::Inbox { lineage: value.lineage.clone() }
+                    }
+                    jig_client::contract::InboxRow::Owner(_) => cards::Place::Elsewhere,
+                },
+                words,
+                bindings,
+            );
         }
     }
 }

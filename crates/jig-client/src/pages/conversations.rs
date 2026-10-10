@@ -108,8 +108,8 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
     let mut project = project.or(object.project);
     if project.is_none() {
         for entry in &domain.inbox.rows {
-            if entry.object == key {
-                project = Some(entry.project);
+            if entry.card_key() == key {
+                project = entry.project();
                 break;
             }
         }
@@ -225,13 +225,8 @@ pub(crate) fn mark_results(domain: &mut Domain, out: &mut Queue<Request>) {
     }
     let mut through = domain.inbox.marked_results;
     for entry in &domain.inbox.rows {
-        match entry.group {
-            InboxGroup::Results => through = through.max(entry.position),
-            InboxGroup::Questions
-            | InboxGroup::Proposals
-            | InboxGroup::Escalations
-            | InboxGroup::PersonTasks
-            | InboxGroup::Replies => {}
+        if let Some(position) = entry.result_position() {
+            through = through.max(position);
         }
     }
     if through > domain.inbox.marked_results && seen(domain, Seen::Results { through }, out) {
@@ -242,11 +237,11 @@ pub(crate) fn mark_results(domain: &mut Domain, out: &mut Queue<Request>) {
 pub(crate) fn open_chat(domain: &mut Domain, env: &Env<crate::Limits>, task: u64, out: &mut Queue<Request>) {
     let mut through = None;
     for entry in &domain.inbox.rows {
-        if entry.group == InboxGroup::Replies
-            && entry.object == ObjectKey::Task(task)
-            && let Some(line) = &entry.reply
+        if entry.group() == InboxGroup::Replies
+            && entry.card_key() == ObjectKey::Task(task)
+            && let Some(line) = entry.reply()
             && line.chip.task == task
-            && line.project == entry.project
+            && Some(line.project) == entry.project()
             && line.last_reply > line.seen
         {
             through = Some(line.last_reply);

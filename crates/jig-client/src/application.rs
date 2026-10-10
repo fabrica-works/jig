@@ -100,7 +100,7 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
                 }
             }
         }
-        Delivery::Inbox(_) => {
+        Delivery::Inbox(_) | Delivery::OwnerInbox(_) => {
             let mut keys = List::with_capacity(env.limits.objects);
             for (key, _) in domain.objects.ids() {
                 assert!(keys.push(*key).is_ok(), "objects fit their registry");
@@ -156,6 +156,7 @@ pub(crate) fn read_result(
             | ReadValue::History(_)
             | ReadValue::Activity(_)
             | ReadValue::Inbox(_)
+            | ReadValue::OwnerInbox(_)
             | ReadValue::Conversations(_)
             | ReadValue::Goals(_)
             | ReadValue::Spend(_)

@@ -436,3 +436,5 @@ pub mod owner_activity;
 pub mod owner_history;
 
 pub mod owner_milestone;
+
+pub mod owner_inbox;

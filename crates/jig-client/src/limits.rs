@@ -88,6 +88,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(crate::conversation::worst_case(limits)?)?;
     total = total.checked_add(List::<crate::pages::navigation::Destination>::worst_case(limits.navigation_entries)?)?;
     total = total.checked_add(crate::pages::conversations::worst_case(limits)?)?;
+    total = total.checked_add(crate::pages::inbox::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::task::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::project::worst_case(limits)?)?;
     total = total.checked_add(crate::pages::deployment::worst_case(limits)?)?;
@@ -98,7 +99,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(List::<u64>::worst_case(limits.records)?)?;
     total = total.checked_add(Map::<u64, u32>::worst_case(limits.kept)?)?;
     total = total.checked_add(crate::confirm::worst_case(limits)?)?;
-    total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows)?)?;
+    total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows.checked_mul(2)?)?)?;
     total = total.checked_add(crate::signin::worst_case(limits)?)?;
     total = total.checked_add(crate::objects::worst_case(limits)?)?;
     total = total.checked_add(Slab::<crate::reads::Reading>::worst_case(limits.reads)?)?;

@@ -71,8 +71,7 @@ impl OwnerInboxEntry {
     #[must_use]
     pub const fn task_number(&self) -> u64 {
         match &self.task {
-            OwnerTaskLink::Live(chip) => chip.task,
-            OwnerTaskLink::Retained { chip, .. } => chip.task,
+            OwnerTaskLink::Live(chip) | OwnerTaskLink::Retained { chip, .. } => chip.task,
             OwnerTaskLink::Stored { number, .. } => *number,
         }
     }
