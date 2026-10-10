@@ -24,7 +24,7 @@ fn timer_core(answers: bool) -> (Core, Env<Limits>) {
         rows.push(people::Stored::SignIn {
             number,
             person: 1,
-            expires: Wall::EPOCH.saturating_add(limits.people.sign_in_lifetime),
+            expires: Wall::from_nanos(limits.people.sign_in_lifetime.as_nanos()),
         });
     }
     if answers {

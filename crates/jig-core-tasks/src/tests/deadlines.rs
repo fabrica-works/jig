@@ -29,7 +29,7 @@ fn deadlines(first: usize) -> Harness {
     for (i, span) in spans.into_iter().enumerate() {
         let number = u64::try_from(i).unwrap() + 1;
         let mut row = h.domain.task(number).unwrap().clone();
-        let at = h.env.wall.saturating_add(span);
+        let at = Wall::from_nanos(h.env.wall.as_nanos().checked_add(span.as_nanos()).unwrap());
         match i {
             0 => {
                 row.phase = Phase::Active(Active::BackingOff { until: at });
