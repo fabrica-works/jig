@@ -594,9 +594,15 @@ fn offered_proposal_decisions_are_made_at_the_named_holder_and_another_holder_is
                 &mut core,
                 &limits,
                 1,
-                people::Ask::DecideProposal { project: 1, proposer: 2, proposal: 10, decision: choice }
+                people::Ask::DecideProposal { project: 1, proposer: Proposer::Task(2), proposal: 10, decision: choice }
             ),
-            people::Outcome::ProposalDecided { proposer: 2, proposal: 10, by: 1, at: Wall::EPOCH, choice: expected }
+            people::Outcome::ProposalDecided {
+                proposer: Proposer::Task(2),
+                proposal: 10,
+                by: 1,
+                at: Wall::EPOCH,
+                choice: expected
+            }
         );
     }
 }
@@ -770,4 +776,196 @@ fn procedure_goal_bounds_refuse_an_incomplete_executor_list() {
         core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap().direct,
         "document receiving bound does not alter owner admission"
     );
+}
+
+fn keyed_proposal(core: &mut Core, limits: &Limits, key: u8, proposer: Proposer) -> Queue<Request> {
+    let Requests::Out(out) = step(
+        core,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
+        Event::People(people::Event::Ask {
+            reply_to: ReplyTo::new(Token::new(101)),
+            sign_in: 9,
+            key: [key; 16],
+            ask: people::Ask::DecideProposal {
+                project: 1,
+                proposer,
+                proposal: 10,
+                decision: people::ProposalDecision::Reject { reason: b"no".as_slice().into() },
+            },
+        }),
+    );
+    out
+}
+
+fn proposal_answer(out: &Queue<Request>) -> people::Outcome {
+    for row in out {
+        if let Request::Held(held) = row
+            && let Held::PeopleReply { reply: people::Reply::Outcome(outcome), .. } = &**held
+        {
+            return *outcome;
+        }
+    }
+    panic!("one terminal keyed outcome: {out:?}");
+}
+
+#[test]
+fn a_task_and_a_party_with_identical_proposal_numbers_are_decided_separately() {
+    for party_first in [false, true] {
+        let (mut core, limits) = make_tree();
+        sign_in(&mut core, &limits);
+        let next = new_row(&core, 5, tasks::Funder::Task(1), None);
+        send_task(
+            &mut core,
+            &limits,
+            tasks::Event::Propose {
+                reply_to: ReplyTo::new(Token::new(102)),
+                proposal: tasks::Proposal {
+                    number: 10,
+                    proposer: 1,
+                    project: 1,
+                    action: tasks::ProposalAction::Batch(Box::new([next])),
+                    reason: b"task work".as_slice().into(),
+                    as_holder: true,
+                    state: tasks::ProposalState::Pending {
+                        holder: tasks::ProposalHolder::Person(1),
+                        since: Wall::EPOCH,
+                    },
+                },
+            },
+        );
+        let goal = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, Some(4));
+        send_task(
+            &mut core,
+            &limits,
+            tasks::Event::ProposePerson {
+                reply_to: ReplyTo::new(Token::new(103)),
+                proposal: tasks::PersonProposal {
+                    number: 10,
+                    proposer: 1,
+                    project: 1,
+                    goal,
+                    state: tasks::PersonProposalState::Pending { since: Wall::EPOCH },
+                },
+            },
+        );
+        let task = Proposer::Task(1);
+        let party = Proposer::Party(1);
+        let order = if party_first { [party, task] } else { [task, party] };
+        let mut archives = std::collections::BTreeMap::new();
+        for (position, proposer) in order.into_iter().enumerate() {
+            let out = keyed_proposal(&mut core, &limits, u8::try_from(position + 1).unwrap(), proposer);
+            assert_eq!(
+                proposal_answer(&out),
+                people::Outcome::ProposalDecided {
+                    proposer,
+                    proposal: 10,
+                    by: 1,
+                    at: Wall::EPOCH,
+                    choice: people::ProposalChoice::Rejected,
+                }
+            );
+            for request in &out {
+                if let Request::Write(Write::Save(Record::Core(CoreRecord::ProposalDecision(row)))) = request {
+                    let key = CoreKey::ProposalDecision { proposer: row.proposer, proposal: row.proposal };
+                    assert!(archives.insert(key, *row).is_none(), "makers retain separate immutable histories");
+                }
+            }
+            if position == 0 {
+                match proposer {
+                    Proposer::Task(_) => assert!(matches!(
+                        core.tasks.person_proposal(1, 10).unwrap().state,
+                        tasks::PersonProposalState::Pending { .. }
+                    )),
+                    Proposer::Party(_) => assert!(matches!(
+                        core.tasks.proposal(1, 10).unwrap().state,
+                        tasks::ProposalState::Pending { .. }
+                    )),
+                }
+            }
+        }
+        assert_eq!(archives.len(), 2);
+        assert_eq!(
+            archives[&CoreKey::ProposalDecision { proposer: Proposer::Task(1), proposal: 10 }].choice,
+            people::ProposalChoice::Rejected
+        );
+        assert_eq!(
+            archives[&CoreKey::ProposalDecision { proposer: Proposer::Party(1), proposal: 10 }].choice,
+            people::ProposalChoice::Rejected
+        );
+    }
+}
+
+#[test]
+fn a_historical_proposal_decision_requires_the_exact_typed_maker() {
+    for proposer in [Proposer::Task(1), Proposer::Party(1)] {
+        for other_store in [false, true] {
+            let (mut core, limits) = make_tree();
+            sign_in(&mut core, &limits);
+            // Allocate the archived proposal number through the real deployment family.
+            for _ in 0..10 {
+                fresh(&mut core.counters, Family::Message).unwrap();
+            }
+            let out = keyed_proposal(&mut core, &limits, 1, proposer);
+            let request = out
+                .iter()
+                .find_map(|request| {
+                    if let Request::Now(now) = request
+                        && let Now::HistoricalProposal { request, person, project, proposer: named, proposal } = &**now
+                    {
+                        assert_eq!((*person, *project, *named, *proposal), (1, 1, proposer, 10));
+                        Some(*request)
+                    } else {
+                        None
+                    }
+                })
+                .expect("only the named absent store falls back to history");
+            let maker = match proposer {
+                Proposer::Task(number) => {
+                    if other_store {
+                        Proposer::Party(number)
+                    } else {
+                        Proposer::Task(number)
+                    }
+                }
+                Proposer::Party(number) => {
+                    if other_store {
+                        Proposer::Task(number)
+                    } else {
+                        Proposer::Party(number)
+                    }
+                }
+            };
+            let row = ProposalDecisionRecord {
+                project: 1,
+                proposer: maker,
+                proposal: 10,
+                kind: tasks::ProposalKind::Batch,
+                by: 1,
+                at: Wall::from_nanos(2_000_000_000),
+                choice: people::ProposalChoice::Rejected,
+                created: None,
+            };
+            let Requests::Out(out) = step(
+                &mut core,
+                &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
+                Event::HistoricalProposal {
+                    request,
+                    person: 1,
+                    project: 1,
+                    proposer,
+                    proposal: 10,
+                    row: Some(row),
+                    busy: false,
+                },
+            );
+            assert_eq!(
+                proposal_answer(&out),
+                if other_store {
+                    people::Outcome::Refused(people::Refusal::Unknown)
+                } else {
+                    people::Outcome::ProposalDecided { proposer, proposal: 10, by: 1, at: row.at, choice: row.choice }
+                }
+            );
+        }
+    }
 }

@@ -72,8 +72,8 @@ pub use amendment::{
 pub use boundary::{
     Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, GoalExecutor,
     Holding, Identity, IdentityKey, InitialOwner, Keep, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult,
-    ProjectRole, ProposalChoice, ProposalDecision, Reply, ReplyRef, Request, RequestKey, ResourceName, ResourceRole,
-    ResultRef, Role, Seed, Seen, Stored, Update, Whom,
+    ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply, ReplyRef, Request, RequestKey, ResourceName,
+    ResourceRole, ResultRef, Role, Seed, Seen, Stored, Update, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{FailureClass, HoldReason, Moved};

@@ -5,7 +5,7 @@ mod facts;
 use jig_core::{
     self as core,
     acts::{Act, Admission, Offered},
-    documents::{Document, Proposer, Subject, Task},
+    documents::{Document, Subject, Task},
 };
 use jig_core_people as people;
 use jig_test_domain as root;
@@ -187,7 +187,6 @@ fn fits(received: &Subject, request: &Subject) -> bool {
     received == request
         || matches!((received, request),
         (Subject::Project { project: a }, Subject::Goals { project: b }) if a == b)
-        || matches!((received, request), (Subject::Proposal { proposer: Proposer::Party(a), number: n }, Subject::Proposal { proposer: Proposer::Task(b), number: m }) if a == b && n == m)
 }
 fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
     Some(match ask {
@@ -205,7 +204,7 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
                 people::ProposalDecision::Reject { .. } => Act::Reject,
                 people::ProposalDecision::Pass => Act::PassUp,
             },
-            Subject::Proposal { proposer: Proposer::Task(*proposer), number: *proposal },
+            Subject::Proposal { proposer: *proposer, number: *proposal },
         ),
         people::Ask::DecideEscalation { task, decision, .. } => (
             match decision {

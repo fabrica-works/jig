@@ -1,6 +1,6 @@
 //! Party goal, proposal and escalation choices routed to their owner
-//! (`domain/people.md`, section 5.1). Person-origin proposals take precedence
-//! over live task proposals, then historical reads. Current escalation
+//! (`domain/people.md`, section 5.1). Each proposal maker selects its own
+//! current store, falling back to its exact historical identity. Current escalation
 //! revisions take precedence over archived decisions, as in the former chain.
 
 use super::PersonEscalation;
@@ -411,17 +411,25 @@ pub(super) fn proposal_request(
     project: u32,
     role: Option<people::Role>,
     out: &mut Queue<Request>,
-    proposer: u64,
+    proposer: people::Proposer,
     proposal: u64,
     decision: people::ProposalDecision,
 ) {
-    if core.tasks.person_proposal(proposer, proposal).is_some() {
-        goal_decide(core, env, work, request, person, role, project, proposer, proposal, decision);
-    } else if core.tasks.proposal(proposer, proposal).is_some() {
-        person_proposal_decide(core, env, work, request, person, role, project, proposer, proposal, decision);
-    } else {
-        out.push(Request::Now(Box::new(Now::HistoricalProposal { request, person, project, proposer, proposal })));
+    match proposer {
+        people::Proposer::Party(number) => {
+            if core.tasks.person_proposal(number, proposal).is_some() {
+                goal_decide(core, env, work, request, person, role, project, number, proposal, decision);
+                return;
+            }
+        }
+        people::Proposer::Task(number) => {
+            if core.tasks.proposal(number, proposal).is_some() {
+                person_proposal_decide(core, env, work, request, person, role, project, number, proposal, decision);
+                return;
+            }
+        }
     }
+    out.push(Request::Now(Box::new(Now::HistoricalProposal { request, person, project, proposer, proposal })));
 }
 
 #[expect(clippy::too_many_arguments, reason = "the route retains the admitted party and request fields")]

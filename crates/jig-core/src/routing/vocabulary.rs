@@ -239,7 +239,7 @@ pub enum Now {
     /// Load one proposal decision that has left live task memory.
     SeenChat { request: Token, task: u64 },
     /// Load one proposal decision that has left live task memory.
-    HistoricalProposal { request: Token, person: u64, project: u32, proposer: u64, proposal: u64 },
+    HistoricalProposal { request: Token, person: u64, project: u32, proposer: people::Proposer, proposal: u64 },
     /// Load the ended owner row for a person-task act whose live row is gone.
     HistoricalPersonTask { request: Token, person: u64, project: u32, task: u64 },
     /// Assemble connector-held sections for a still-current brief.
@@ -448,7 +448,7 @@ pub enum Event {
         request: Token,
         person: u64,
         project: u32,
-        proposer: u64,
+        proposer: people::Proposer,
         proposal: u64,
         row: Option<crate::ProposalDecisionRecord>,
         busy: bool,

@@ -99,13 +99,7 @@ pub struct Window {
 }
 
 /// Identity of the immutable proposal's maker.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Proposer {
-    /// A task's proposal.
-    Task(u64),
-    /// A party's proposed goal.
-    Party(u64),
-}
+pub use jig_core_people::Proposer;
 
 /// One subject whose current document a party may read or watch.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

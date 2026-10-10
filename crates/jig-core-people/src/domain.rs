@@ -1111,7 +1111,7 @@ fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
                 }
         }
         Ask::DecideProposal { proposer, proposal, decision, .. } => {
-            *proposer != 0
+            proposer.number() != 0
                 && *proposal != 0
                 && match decision {
                     crate::ProposalDecision::Accept | crate::ProposalDecision::Pass => true,
@@ -1206,7 +1206,7 @@ fn invalid_ask(ask: &Ask) -> Refusal {
             if *revision == 0 { LimitKind::Revision } else { LimitKind::Words }
         }
         Ask::DecideProposal { proposer, proposal, .. } => {
-            if *proposer == 0 || *proposal == 0 {
+            if proposer.number() == 0 || *proposal == 0 {
                 return Refusal::Unknown;
             }
             LimitKind::Words
@@ -1232,7 +1232,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         HandBack(u64),
         AnswerPerson(u64),
         Move(u64),
-        Proposal(u64, u64),
+        Proposal(crate::Proposer, u64),
         Say(u64, bool),
         AnswerQuestion(u64, u64),
         Prioritise(u32),

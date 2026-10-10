@@ -337,7 +337,7 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
             };
             Some(ProposalDecisionRecord {
                 project: row.project,
-                proposer: tasks::Party::Person(row.proposer),
+                proposer: people::Proposer::Party(row.proposer),
                 proposal: row.number,
                 kind: tasks::ProposalKind::Batch,
                 by,
@@ -364,7 +364,7 @@ pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Optio
             };
             Some(ProposalDecisionRecord {
                 project: proposal.project,
-                proposer: tasks::Party::Task(proposal.proposer),
+                proposer: people::Proposer::Task(proposal.proposer),
                 proposal: proposal.number,
                 kind: kind(&proposal.action).0,
                 by,

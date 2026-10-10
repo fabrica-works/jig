@@ -1291,7 +1291,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
         82,
         people::Ask::DecideProposal {
             project: 1,
-            proposer: task,
+            proposer: people::Proposer::Task(task),
             proposal,
             decision: people::ProposalDecision::Accept,
         },
@@ -1388,7 +1388,12 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     ask(
         &mut world,
         92,
-        people::Ask::DecideProposal { project: 1, proposer, proposal, decision: people::ProposalDecision::Accept },
+        people::Ask::DecideProposal {
+            project: 1,
+            proposer: people::Proposer::Party(proposer),
+            proposal,
+            decision: people::ProposalDecision::Accept,
+        },
     );
     assert!(
         matches!(

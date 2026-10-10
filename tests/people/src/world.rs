@@ -96,7 +96,7 @@ struct Commit {
     number: u64,
     changes: Vec<Change>,
     tasks: Vec<(RequestKey, u64)>,
-    proposals: Vec<((u64, u64), Winner)>,
+    proposals: Vec<((people::Proposer, u64), Winner)>,
     person_claims: Vec<(u64, Option<u64>)>,
     person_answers: Vec<(u64, u64, Wall)>,
     sayings: Vec<(u64, u64, Box<[u8]>, bool)>,
@@ -140,7 +140,7 @@ pub struct World {
     owners: Box<[InitialOwner]>,
     records: BTreeMap<Key, Stored>,
     durable_tasks: BTreeMap<RequestKey, u64>,
-    proposals: BTreeMap<(u64, u64), Winner>,
+    proposals: BTreeMap<(people::Proposer, u64), Winner>,
     holds: BTreeMap<u64, (u64, people::HoldReason)>,
     pub sayings: BTreeMap<u64, (u64, Box<[u8]>, bool)>,
     pub executor_outcomes: Vec<(u64, bool)>,
@@ -621,14 +621,19 @@ impl World {
                                     };
                                     let winner = Winner { by: person, choice, at: self.env.wall };
                                     proposals.push((name, winner));
-                                    if choice == ProposalChoice::Accepted
-                                        && let Some(release) = self.pending_amendments.get(&name)
-                                    {
-                                        let released = self
-                                            .holds
-                                            .get(&proposer)
-                                            .is_some_and(|(revision, _)| Some(*revision) == *release);
-                                        amendments.push((proposer, self.specs[&proposer] + 1, released));
+                                    if choice == ProposalChoice::Accepted {
+                                        match proposer {
+                                            people::Proposer::Task(task) => {
+                                                if let Some(release) = self.pending_amendments.get(&(task, proposal)) {
+                                                    let released = self
+                                                        .holds
+                                                        .get(&task)
+                                                        .is_some_and(|(revision, _)| Some(*revision) == *release);
+                                                    amendments.push((task, self.specs[&task] + 1, released));
+                                                }
+                                            }
+                                            people::Proposer::Party(_) => {}
+                                        }
                                     }
                                     winner
                                 };

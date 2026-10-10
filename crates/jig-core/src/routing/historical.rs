@@ -80,7 +80,7 @@ pub(super) fn route_historical_proposal(
     request: Token,
     person: u64,
     project: u32,
-    proposer: u64,
+    proposer: people::Proposer,
     proposal: u64,
     row: Option<crate::ProposalDecisionRecord>,
     busy: bool,
@@ -93,10 +93,7 @@ pub(super) fn route_historical_proposal(
             && row.proposal <= core.counters.deployment().messages
             && row.by != 0
             && row.by <= core.counters.deployment().people
-            && match row.proposer {
-                tasks::Party::Person(number) | tasks::Party::Task(number) => number == proposer,
-                tasks::Party::Deployment { .. } => false,
-            };
+            && row.proposer == proposer;
         if named {
             let allowed = person == row.by
                 || core.proposal_policy_standing(

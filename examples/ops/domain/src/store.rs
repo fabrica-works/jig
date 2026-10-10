@@ -66,7 +66,9 @@ fn core_key(row: &core::Record) -> core::Key {
             core::CoreRecord::RunProof(row) => core::CoreKey::RunProof(row.task),
             core::CoreRecord::Turn(row) => core::CoreKey::Turn { task: row.task, attempt: row.attempt, turn: row.turn },
             core::CoreRecord::Terminal(row) => core::CoreKey::Terminal { task: row.task, attempt: row.attempt },
-            core::CoreRecord::ProposalDecision(row) => core::CoreKey::ProposalDecision(row.proposal),
+            core::CoreRecord::ProposalDecision(row) => {
+                core::CoreKey::ProposalDecision { proposer: row.proposer, proposal: row.proposal }
+            }
             core::CoreRecord::EscalationDecision(row) => {
                 core::CoreKey::EscalationDecision { task: row.task, revision: row.revision }
             }

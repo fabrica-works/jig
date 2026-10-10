@@ -33,12 +33,7 @@ pub(crate) fn request(
                 people::ProposalDecision::Reject { .. } => Act::Reject,
                 people::ProposalDecision::Pass => Act::PassUp,
             };
-            let proposer = if core.tasks.person_proposal(*proposer, *proposal).is_some() {
-                documents::Proposer::Party(*proposer)
-            } else {
-                documents::Proposer::Task(*proposer)
-            };
-            (act, documents::Subject::Proposal { proposer, number: *proposal })
+            (act, documents::Subject::Proposal { proposer: *proposer, number: *proposal })
         }
         people::Ask::DecideEscalation { task, decision, .. } => {
             let act = match decision {
@@ -90,9 +85,11 @@ pub(crate) fn request(
         // eligibility, and preserves the historical ended-task lookup.
         people::Ask::AnswerPerson { .. } => return Ok(()),
         people::Ask::DecideProposal { proposer, proposal, .. } => {
-            if core.tasks.person_proposal(*proposer, *proposal).is_none()
-                && core.tasks.proposal(*proposer, *proposal).is_none()
-            {
+            let present = match proposer {
+                people::Proposer::Party(number) => core.tasks.person_proposal(*number, *proposal).is_some(),
+                people::Proposer::Task(number) => core.tasks.proposal(*number, *proposal).is_some(),
+            };
+            if !present {
                 return Ok(());
             }
         }

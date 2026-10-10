@@ -201,7 +201,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
             }
         }
         for decision in &mut snapshot.decisions {
-            if let tasks::Party::Task(task) = accepted.proposer
+            if let people::Proposer::Task(task) = accepted.proposer
                 && decision.key.task == task
             {
                 decision.accepted_by = Some(r::Source::Person(accepted.by));

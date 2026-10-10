@@ -369,7 +369,7 @@ pub(super) fn tag_tasks(
                             out.push(Request::Write(Write::Save(Record::Core(CoreRecord::ProposalDecision(
                                 crate::ProposalDecisionRecord {
                                     project,
-                                    proposer: tasks::Party::Task(*proposer),
+                                    proposer: people::Proposer::Task(*proposer),
                                     proposal: *proposal,
                                     kind: tasks::ProposalKind::Batch,
                                     by: *person,
@@ -658,8 +658,8 @@ pub(super) fn tag_tasks(
                     // Accepted task batches already saved their member numbers
                     // with Made; the history row must not replace that evidence.
                     let by_task = match archive.proposer {
-                        tasks::Party::Task(_) => true,
-                        tasks::Party::Person(_) | tasks::Party::Deployment { .. } => false,
+                        people::Proposer::Task(_) => true,
+                        people::Proposer::Party(_) => false,
                     };
                     let made = archive.kind == tasks::ProposalKind::Batch
                         && archive.choice == people::ProposalChoice::Accepted

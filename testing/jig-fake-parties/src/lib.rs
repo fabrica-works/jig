@@ -108,7 +108,7 @@ pub enum Ask {
     },
     /// A resolved proposal retained with the keyed request for later duplicates.
     Decision {
-        proposer: u64,
+        proposer: Proposer,
         proposal: u64,
         accept: bool,
     },
@@ -132,10 +132,17 @@ pub enum Act {
 }
 
 /// A waiting item independently presented by the world's observations.
+/// The exact maker of an observed proposal, independent of the engine's vocabulary.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Proposer {
+    Task(u64),
+    Party(u64),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Waiting {
     /// One action needing this party's authority.
-    Proposal { proposer: u64, proposal: u64 },
+    Proposal { proposer: Proposer, proposal: u64 },
     /// One person task asking for a result.
     Choice { task: u64, revision: u64 },
 }
@@ -181,7 +188,7 @@ pub enum Reply {
     SignedOut,
     /// The proposal was decided first by this party at this wall time.
     ProposalDecided {
-        proposer: u64,
+        proposer: Proposer,
         proposal: u64,
         by: u64,
         at: Wall,

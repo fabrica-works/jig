@@ -20,7 +20,7 @@ pub enum CapacityAction {
     Chat,
     Goal,
     Escalation { task: u64 },
-    Proposal { proposer: u64, number: u64 },
+    Proposal { proposer: crate::Proposer, number: u64 },
     Words { task: u64 },
     Question { task: u64, question: u64 },
     Priority,

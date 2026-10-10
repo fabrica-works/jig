@@ -227,7 +227,10 @@ impl Peers {
                     parties::Ask::Decide { .. } => panic!("party resolves its visible proposal"),
                     parties::Ask::Decision { proposer, proposal, accept } => people::Ask::DecideProposal {
                         project,
-                        proposer,
+                        proposer: match proposer {
+                            parties::Proposer::Task(number) => people::Proposer::Task(number),
+                            parties::Proposer::Party(number) => people::Proposer::Party(number),
+                        },
                         proposal,
                         decision: if accept {
                             people::ProposalDecision::Accept
@@ -391,7 +394,10 @@ fn party_reply(reply: people::Reply, sign_in: Option<u64>) -> parties::Reply {
         people::Reply::SignedOut | people::Reply::Outcome(people::Outcome::SignedOut) => parties::Reply::SignedOut,
         people::Reply::Outcome(people::Outcome::ProposalDecided { proposer, proposal, by, at, choice }) => {
             parties::Reply::ProposalDecided {
-                proposer,
+                proposer: match proposer {
+                    people::Proposer::Task(number) => parties::Proposer::Task(number),
+                    people::Proposer::Party(number) => parties::Proposer::Party(number),
+                },
                 proposal,
                 by,
                 at,
@@ -437,7 +443,10 @@ fn waiting(store: &Store, party: &parties::Party) -> Option<parties::Waiting> {
                 | tasks::ProposalState::Withdrawn => false,
             };
             if visible {
-                return Some(parties::Waiting::Proposal { proposer: task.number, proposal: proposal.number });
+                return Some(parties::Waiting::Proposal {
+                    proposer: parties::Proposer::Task(task.number),
+                    proposal: proposal.number,
+                });
             }
         }
         let visible = match task.executor {

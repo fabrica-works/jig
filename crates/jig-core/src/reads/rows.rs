@@ -315,7 +315,9 @@ pub fn row_key(row: &Row) -> Option<Position> {
         Record::Core(CoreRecord::EscalationDecision(value)) => {
             Some(Key::Core(CoreKey::EscalationDecision { task: value.task, revision: value.revision }))
         }
-        Record::Core(CoreRecord::ProposalDecision(value)) => Some(Key::Core(CoreKey::ProposalDecision(value.proposal))),
+        Record::Core(CoreRecord::ProposalDecision(value)) => {
+            Some(Key::Core(CoreKey::ProposalDecision { proposer: value.proposer, proposal: value.proposal }))
+        }
         Record::Core(CoreRecord::Terminal(value)) => {
             Some(Key::Core(CoreKey::Terminal { task: value.task, attempt: value.attempt }))
         }
@@ -571,7 +573,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                         Some(decision)
                             if decision.proposal == *proposal
                                 && decision.project == value.project
-                                && decision.proposer == tasks::Party::Person(value.proposer) =>
+                                && decision.proposer == Proposer::Party(value.proposer) =>
                         {
                             Some(*decision)
                         }
@@ -1431,7 +1433,7 @@ fn key_kind(key: &Key) -> KeyKind {
             | CoreKey::RunProof(_)
             | CoreKey::Call(_)
             | CoreKey::Terminal { .. }
-            | CoreKey::ProposalDecision(_) => KeyKind::Unsupported,
+            | CoreKey::ProposalDecision { .. } => KeyKind::Unsupported,
         },
         Key::Notes(value) => match value {
             notes::Key::Entry { .. } => KeyKind::Note,

@@ -1552,3 +1552,41 @@ fn inbox_counts_follow_current_project_roles_without_losing_archived_census() {
 }
 
 mod need_counts;
+
+#[test]
+fn a_proposal_makers_kind_is_kept_in_its_key_and_restored_answer() {
+    for proposer in [Proposer::Task(7), Proposer::Party(7)] {
+        let mut test = Test::new(LIMITS);
+        test.member();
+        let ask = Ask::DecideProposal { project: 1, proposer, proposal: 8, decision: ProposalDecision::Accept };
+        let request = route(&test.request(10, 1, ask.clone()));
+        let outcome = Outcome::ProposalDecided {
+            proposer,
+            proposal: 8,
+            by: 1,
+            at: Wall::EPOCH,
+            choice: ProposalChoice::Accepted,
+        };
+        let completed = test.send(Event::Decided { request, outcome });
+        assert_eq!(reply(&completed), Reply::Outcome(outcome));
+        let saved = saved_answer(&completed);
+        let other = match proposer {
+            Proposer::Task(number) => Proposer::Party(number),
+            Proposer::Party(number) => Proposer::Task(number),
+        };
+        let other_ask =
+            Ask::DecideProposal { project: 1, proposer: other, proposal: 8, decision: ProposalDecision::Accept };
+        assert_eq!(reply(&test.request(10, 1, other_ask.clone())), Reply::Refused(Refusal::KeyConflict));
+        test.d = Domain::new(&LIMITS, Box::new([]), 2);
+        for record in [
+            Stored::Person { number: 1, identity: identity(0, 1) },
+            Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) },
+            saved,
+        ] {
+            assert!(test.send(Event::Restore { record }).is_empty());
+        }
+        assert!(test.send(Event::Restored).is_empty());
+        assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+        assert_eq!(reply(&test.request(10, 1, other_ask)), Reply::Refused(Refusal::KeyConflict));
+    }
+}

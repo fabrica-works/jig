@@ -742,7 +742,13 @@ impl Observer {
         for accepted in decisions {
             if let Some((first, last)) = accepted.created {
                 for task in first..=last {
-                    if snapshot.tasks.get(&task).is_some_and(|row| row.source == source(accepted.proposer)) {
+                    if snapshot.tasks.get(&task).is_some_and(|row| {
+                        row.source
+                            == match accepted.proposer {
+                                people::Proposer::Task(task) => r::Source::Task(task),
+                                people::Proposer::Party(person) => r::Source::Person(person),
+                            }
+                    }) {
                         snapshot.accepted_tasks.insert(
                             task,
                             r::Acceptance { proposal: accepted.proposal, by: r::Source::Person(accepted.by) },
@@ -758,8 +764,8 @@ impl Observer {
                         && decision.target == effect.target
                         && decision.key.task
                             == match accepted.proposer {
-                                tasks::Party::Task(task) => task,
-                                tasks::Party::Person(_) | tasks::Party::Deployment { .. } => 0,
+                                people::Proposer::Task(task) => task,
+                                people::Proposer::Party(_) => 0,
                             }
                         && decision.key.purpose == effect.purpose
                     {

@@ -1,6 +1,6 @@
 use jig_core_people::{
     Again, Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice, ProposalDecision,
-    Refusal, Reply, Role, Seed, Whom,
+    Proposer, Refusal, Reply, Role, Seed, Whom,
 };
 use jig_people_world::{Settings, World};
 use skein_lib::Duration;
@@ -168,11 +168,16 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_who_how_and_when()
     let first = world.request(
         10,
         [1; 16],
-        Ask::DecideProposal { project: 1, proposer: 7, proposal: 8, decision: ProposalDecision::Accept },
+        Ask::DecideProposal {
+            project: 1,
+            proposer: Proposer::Task(7),
+            proposal: 8,
+            decision: ProposalDecision::Accept,
+        },
     );
     world.commit_all();
     let expected = Some(Reply::Outcome(Outcome::ProposalDecided {
-        proposer: 7,
+        proposer: Proposer::Task(7),
         proposal: 8,
         by: first_person,
         at: skein_lib::Wall::EPOCH,
@@ -185,7 +190,7 @@ fn two_maintainers_decide_one_proposal_and_the_second_is_told_who_how_and_when()
         [2; 16],
         Ask::DecideProposal {
             project: 1,
-            proposer: 7,
+            proposer: Proposer::Task(7),
             proposal: 8,
             decision: ProposalDecision::Reject { reason: b"no".to_vec().into_boxed_slice() },
         },
@@ -630,7 +635,8 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
     assert_eq!(world.spec_revision(7), Some(1));
     assert!(world.held(7));
     world.restart();
-    let decision = Ask::DecideProposal { project: 1, proposer: 7, proposal, decision: ProposalDecision::Accept };
+    let decision =
+        Ask::DecideProposal { project: 1, proposer: Proposer::Task(7), proposal, decision: ProposalDecision::Accept };
     let call = world.request(10, [2; 16], decision.clone());
     assert!(world.reply(call).is_none());
     assert_eq!(world.spec_revision(7), Some(1));

@@ -539,7 +539,7 @@ impl Application for Ops {
                         },
                         ask: people::Ask::DecideProposal {
                             project: 1,
-                            proposer: row.number,
+                            proposer: people::Proposer::Task(row.number),
                             proposal: proposal.number,
                             decision: people::ProposalDecision::Accept,
                         },

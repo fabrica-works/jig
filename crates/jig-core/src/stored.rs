@@ -194,7 +194,7 @@ pub enum CoreKey {
     /// One immutable terminal.
     Terminal { task: u64, attempt: u64 },
     /// One accepted proposal race.
-    ProposalDecision(u64),
+    ProposalDecision { proposer: jig_core_people::Proposer, proposal: u64 },
     /// One accepted held-chat race.
     EscalationDecision { task: u64, revision: u64 },
 }
@@ -560,7 +560,7 @@ pub struct EscalationDecisionRecord {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ProposalDecisionRecord {
     pub project: u32,
-    pub proposer: jig_core_tasks::Party,
+    pub proposer: jig_core_people::Proposer,
     pub proposal: u64,
     pub kind: jig_core_tasks::ProposalKind,
     pub by: u64,

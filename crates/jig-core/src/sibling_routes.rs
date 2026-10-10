@@ -287,7 +287,13 @@ impl Core {
         };
         people::Event::Decided {
             request,
-            outcome: people::Outcome::ProposalDecided { proposer, proposal: number, by, at, choice },
+            outcome: people::Outcome::ProposalDecided {
+                proposer: people::Proposer::Party(proposer),
+                proposal: number,
+                by,
+                at,
+                choice,
+            },
         }
     }
 
@@ -316,7 +322,13 @@ impl Core {
                 };
                 Some(people::Event::Decided {
                     request: named,
-                    outcome: people::Outcome::ProposalDecided { proposer, proposal: number, by, at, choice },
+                    outcome: people::Outcome::ProposalDecided {
+                        proposer: people::Proposer::Task(proposer),
+                        proposal: number,
+                        by,
+                        at,
+                        choice,
+                    },
                 })
             }
             Some(PersonProposalRoute::Deciding { .. } | PersonProposalRoute::Accepting { .. }) => {

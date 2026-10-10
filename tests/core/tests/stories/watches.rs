@@ -203,7 +203,7 @@ fn inbox_across_projects_stories() {
         93,
         people::Ask::DecideProposal {
             project: 1,
-            proposer: 1,
+            proposer: people::Proposer::Party(1),
             proposal: proposals[0],
             decision: people::ProposalDecision::Reject { reason: b"later".as_slice().into() },
         },

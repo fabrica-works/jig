@@ -808,7 +808,12 @@ impl World {
             reply_to: ReplyTo::new(Token::new(u64::from(request) + 230)),
             sign_in: self.sign_in.expect("signed-in person"),
             key: [request; 16],
-            ask: people::Ask::DecideProposal { project: 1, proposer: self.call_key(1).task, proposal, decision },
+            ask: people::Ask::DecideProposal {
+                project: 1,
+                proposer: people::Proposer::Task(self.call_key(1).task),
+                proposal,
+                decision,
+            },
         })));
     }
 
