@@ -57,3 +57,85 @@ fn an_engine_watch_reopens_from_the_retained_retry_after_its_sole_watcher_leaves
     assert_eq!(world.store.applied, durable, "provisional lifecycle is independent of journal commits");
     party.finish();
 }
+
+fn supplied_call(owner: u64, id: &[u8]) -> views::Call {
+    views::Call {
+        identity: views::CallIdentity { owner: Token::new(owner), sequence: 8, retry: 2, id: id.into() },
+        tool: b"wait".as_slice().into(),
+        input: b"{}".as_slice().into(),
+        cut: false,
+        began: None,
+    }
+}
+fn current_run(world: &jig_core_world::effects::World, watcher: u64) -> &core::documents::Run {
+    let core::documents::Document::Run(run) = jig_core_world::watches::latest(world, watcher) else {
+        panic!("whole public run document")
+    };
+    run
+}
+
+#[test]
+fn an_actual_assignment_opens_a_call_only_document_with_whole_opaque_identity() {
+    let mut world = world(801, true);
+    let assignment = world.assigned.as_ref().expect("actual live assignment");
+    let (task, attempt) = (assignment.task, assignment.attempt);
+    let durable = world.store.applied;
+    let call = supplied_call(u64::MAX, &[0xff, 0, 0x80]);
+    world.send(root::Event::Core(core::Event::RunCall {
+        run: Token::new(task),
+        attempt: Token::new(attempt),
+        call: call.clone(),
+    }));
+    open(&mut world, 5, core::documents::Subject::Run { task });
+    let run = current_run(&world, 5);
+    assert_eq!((run.task, run.attempt, run.committed_turn), (task, Some(attempt), 0));
+    assert!(run.writing.is_none());
+    let current = run.call.as_ref().expect("call-only retained independent value");
+    assert_eq!(current.identity, call.identity);
+    assert_eq!((&current.tool, &current.input, current.cut), (&call.tool, &call.input, false));
+    assert!(current.began.is_some());
+    assert!(world.watches.as_ref().unwrap().streams.iter().all(|stream| stream.watcher != 5));
+    assert_eq!(world.store.applied, durable, "current content makes no durable decision");
+    world.watches.as_ref().unwrap().finish();
+}
+
+#[test]
+fn a_real_committed_turn_keeps_current_calls_without_main_writing_on_reopen() {
+    let mut world = world(802, true);
+    let assignment = world.assigned.as_ref().expect("actual live assignment");
+    let (task, attempt) = (assignment.task, assignment.attempt);
+    report(&mut world, task, attempt, 0, b"accepted main text");
+    let main = supplied_call(91, b"same");
+    world.send(root::Event::Core(core::Event::RunCall {
+        run: Token::new(task),
+        attempt: Token::new(attempt),
+        call: main.clone(),
+    }));
+    let before = world.store.applied;
+    world.turn(1, 0, None, b"real committed turn bytes");
+    assert!(world.store.applied > before, "actual turn is durable before its document");
+    open(&mut world, 5, core::documents::Subject::Run { task });
+    let run = current_run(&world, 5);
+    assert_eq!(run.committed_turn, 1);
+    assert!(run.writing.is_none());
+    assert_eq!(run.call.as_ref().unwrap().identity, main.identity);
+    let first_wall = run.call.as_ref().unwrap().began;
+    world.send(root::Event::Core(core::Event::Unwatch { watcher: Token::new(5) }));
+    let nested = supplied_call(92, b"same");
+    let durable = world.store.applied;
+    world.send(root::Event::Core(core::Event::RunCall {
+        run: Token::new(task),
+        attempt: Token::new(attempt),
+        call: nested.clone(),
+    }));
+    open(&mut world, 6, core::documents::Subject::Run { task });
+    let reopened = current_run(&world, 6);
+    assert_eq!(reopened.committed_turn, 1);
+    assert!(reopened.writing.is_none());
+    assert_eq!(reopened.call.as_ref().unwrap().identity, nested.identity);
+    assert_ne!(reopened.call.as_ref().unwrap().identity, main.identity);
+    assert!(first_wall.is_some());
+    assert!(reopened.call.as_ref().unwrap().began.is_some());
+    assert_eq!(world.store.applied, durable);
+    world.watches.as_ref().unwrap().finish();
+}

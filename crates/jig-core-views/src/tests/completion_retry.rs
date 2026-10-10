@@ -230,3 +230,76 @@ fn a_committed_turn_releases_its_bytes_but_its_live_run_keeps_admission() {
     drive(&mut domain, Event::RunEnded { run: Token::new(7) });
     assert_eq!(domain.runs(), 0);
 }
+
+#[test]
+fn a_call_without_text_is_retained_whole_and_fenced_by_its_actual_attempt() {
+    let mut domain = Domain::new(&LIMITS);
+    call(&mut domain, 9, 8, 2, &[0xff, 0, 0x80], Wall::from_nanos(1));
+    assert_eq!(domain.runs(), 1);
+    assert!(writing(&domain, Token::new(7), 16).is_none());
+    let shown = current_call(&domain, Token::new(7), 1, 16).unwrap();
+    assert_eq!(shown.identity.id.as_ref(), &[0xff, 0, 0x80]);
+    assert_eq!((shown.identity.sequence, shown.identity.retry), (8, 2));
+    assert_eq!(shown.began, Some(Wall::from_nanos(1)));
+    assert!(current_call(&domain, Token::new(7), 2, 16).is_none());
+    assert!(current_call(&domain, Token::new(7), 1, 2).is_none(), "whole identity never clipped");
+    let cut = current_call(&domain, Token::new(7), 1, 5).unwrap();
+    assert_eq!(cut.identity, shown.identity);
+    assert!(cut.cut);
+    assert_eq!(cut.tool.len().checked_add(cut.input.len()).unwrap(), 2);
+    let mut stale = shown.clone();
+    stale.input = Box::from(&b"stale"[..]);
+    drive(&mut domain, Event::Called { run: Token::new(7), attempt: 0, call: stale });
+    assert_eq!(current_call(&domain, Token::new(7), 1, 16), Some(shown));
+    drive(&mut domain, Event::RunEnded { run: Token::new(7) });
+    assert_eq!(domain.runs(), 0);
+    assert!(current_call(&domain, Token::new(7), 1, 16).is_none());
+}
+
+#[test]
+fn committing_text_preserves_the_current_call_and_its_continuous_clock() {
+    let mut domain = Domain::new(&LIMITS);
+    report(&mut domain, 0, 0, b"accepted text");
+    call(&mut domain, 9, 1, 0, b"same", Wall::from_nanos(1));
+    let first = current_call(&domain, Token::new(7), 1, 16).unwrap();
+    for _ in 0_u32..2 {
+        drive(&mut domain, Event::TurnCommitted { run: Token::new(7), attempt: 1, turn: 1 });
+        assert!(writing(&domain, Token::new(7), 16).is_none());
+        assert_eq!(current_call(&domain, Token::new(7), 1, 16), Some(first.clone()));
+    }
+    call(&mut domain, 9, 1, 0, b"same", Wall::from_nanos(3));
+    assert_eq!(current_call(&domain, Token::new(7), 1, 16).unwrap().began, first.began);
+    call(&mut domain, 10, 1, 0, b"same", Wall::from_nanos(4));
+    let nested = current_call(&domain, Token::new(7), 1, 16).unwrap();
+    assert_ne!(nested.identity, first.identity);
+    assert_eq!(nested.began, Some(Wall::from_nanos(4)));
+    assert!(writing(&domain, Token::new(7), 16).is_none());
+    text(&mut domain, 2, 0, b"next");
+    assert!(current_call(&domain, Token::new(7), 1, 16).is_none(), "actual next turn resets current call");
+}
+
+#[test]
+fn call_only_live_runs_use_the_existing_retention_capacity_until_end() {
+    let limits = Limits { runs: 1, ..LIMITS };
+    let mut domain = Domain::new(&limits);
+    let supplied = Call {
+        identity: CallIdentity { owner: Token::new(9), sequence: 1, retry: 0, id: Box::from(&b"id"[..]) },
+        tool: Box::from(&b"tool"[..]),
+        input: Box::from(&b"{}"[..]),
+        cut: false,
+        began: None,
+    };
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut out = Queue::with_capacity(max_out(&limits));
+    for run in [7, 8] {
+        step(&mut domain, &env, Event::Called { run: Token::new(run), attempt: 1, call: supplied.clone() }, &mut out);
+    }
+    assert_eq!(domain.runs(), 1);
+    assert!(current_call(&domain, Token::new(7), 1, 16).is_some());
+    assert!(current_call(&domain, Token::new(8), 1, 16).is_none());
+    step(&mut domain, &env, Event::RunEnded { run: Token::new(7) }, &mut out);
+    step(&mut domain, &env, Event::Called { run: Token::new(8), attempt: 1, call: supplied }, &mut out);
+    assert_eq!(domain.runs(), 1);
+    assert!(current_call(&domain, Token::new(8), 1, 16).is_some());
+    assert!(writing(&domain, Token::new(8), 16).is_none());
+}

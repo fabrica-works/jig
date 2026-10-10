@@ -196,3 +196,108 @@ fn opaque_content_calls_are_attempt_fenced_without_deriving_a_text_turn() {
     assert_eq!(shown.identity, call.identity);
     assert_eq!(shown.began, Some(Wall::EPOCH));
 }
+
+fn content_call(id: &[u8]) -> views::Call {
+    views::Call {
+        identity: views::CallIdentity { owner: Token::new(91), sequence: 8, retry: 2, id: Box::from(id) },
+        tool: Box::from(&b"wait"[..]),
+        input: Box::from(&b"{}"[..]),
+        cut: false,
+        began: None,
+    }
+}
+fn delivered_run(out: &[Request]) -> Option<&documents::Run> {
+    for request in out {
+        match request {
+            Request::Held(held) => {
+                if let Held::Delivery { document, .. } = held.as_ref()
+                    && let Document::Run(run) = document.as_ref()
+                {
+                    return Some(run);
+                }
+            }
+            Request::Write(..) | Request::Ask { .. } | Request::Now(..) | Request::Decided => {}
+        }
+    }
+    None
+}
+
+#[test]
+fn a_call_only_report_makes_a_paced_run_document_without_inventing_a_text_turn() {
+    let (mut core, limits) = watch_core();
+    open_run_watch(&mut core, &limits, 30);
+    let call = content_call(&[0xff, 0, 0x80]);
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::RunCall { run: Token::new(1), attempt: Token::new(7), call: call.clone() },
+    );
+    let shown = delivered_run(&out).expect("current call changes the ordinary paced document");
+    assert_eq!((shown.task, shown.attempt, shown.committed_turn), (1, Some(7), 0));
+    assert!(shown.writing.is_none());
+    let current = shown.call.as_ref().unwrap();
+    assert_eq!(current.identity, call.identity);
+    assert_eq!((&current.tool, &current.input), (&call.tool, &call.input));
+    assert_eq!(current.began, Some(Wall::EPOCH));
+    assert!(!has_write(&out));
+    let later = content_call(b"different");
+    let held = watch_outputs(
+        &mut core,
+        &limits,
+        Event::RunCall { run: Token::new(1), attempt: Token::new(7), call: later.clone() },
+    );
+    assert!(only_decided(&held), "one whole run document remains in flight");
+    let taken = watch_outputs(&mut core, &limits, Event::Delivered { watcher: Token::new(30) });
+    let latest = delivered_run(&taken).expect("taking the old document releases current state");
+    assert!(latest.writing.is_none());
+    assert_eq!(latest.call.as_ref().unwrap().identity, later.identity);
+    let stale = watch_outputs(&mut core, &limits, Event::RunCall { run: Token::new(1), attempt: Token::new(6), call });
+    assert!(only_decided(&stale));
+}
+
+#[test]
+fn committed_main_text_keeps_its_independent_call_on_reopen_and_end_releases_it() {
+    let (mut core, limits) = watch_core();
+    report(&mut core, &limits, 7, 0, 0, b"accepted main text");
+    let call = content_call(b"same");
+    watch_outputs(
+        &mut core,
+        &limits,
+        Event::RunCall { run: Token::new(1), attempt: Token::new(7), call: call.clone() },
+    );
+    core.proofs.get_mut(&1).unwrap().turn = Some(TurnProof { turn: 1, cumulative: 0, read: None });
+    finish_watch_outputs(&mut core, &limits);
+    let opened = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher: Token::new(30), sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+    );
+    let shown = delivered_run(&opened).unwrap();
+    assert_eq!(shown.committed_turn, 1);
+    assert!(shown.writing.is_none());
+    assert_eq!(shown.call.as_ref().unwrap().identity, call.identity);
+    assert_eq!(shown.call.as_ref().unwrap().began, Some(Wall::EPOCH));
+    watch_outputs(&mut core, &limits, Event::Unwatch { watcher: Token::new(30) });
+    finish_watch_outputs(&mut core, &limits);
+    let reopened = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Watch { watcher: Token::new(31), sign_in: 10, subject: Subject::Run { task: 1 }, window: window() },
+    );
+    assert_eq!(delivered_run(&reopened).unwrap().call, shown.call);
+    core.proofs.get_mut(&1).unwrap().terminal =
+        Some(TerminalRecord { task: 1, attempt: 7, cumulative: 0, end: tasks::End::Parked });
+    watch_outputs(&mut core, &limits, Event::Tasks(tasks::Event::Hold { task: 1, why: tasks::Hold::Budget }));
+    finish_watch_outputs(&mut core, &limits);
+    let Document::Run(ended) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+        panic!("ended run document")
+    };
+    assert_eq!(ended.attempt, None);
+    assert!(ended.writing.is_none());
+    assert!(ended.call.is_none());
+    assert!(only_decided(&watch_outputs(
+        &mut core,
+        &limits,
+        Event::RunCall { run: Token::new(1), attempt: Token::new(7), call }
+    )));
+}
