@@ -56,3 +56,6 @@ pub use owner_outcome::*;
 
 pub mod owner_chip;
 pub use owner_chip::*;
+
+pub mod owner_amendment;
+pub use owner_amendment::OwnerAmendmentState;

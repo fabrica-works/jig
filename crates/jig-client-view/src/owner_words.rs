@@ -24,6 +24,8 @@ pub fn phrase_count() -> u32 {
         .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::live_call_words::ALL.len()).expect("live call phrase count fits"))
         .expect("composed phrase count fits")
+        .checked_add(u32::try_from(crate::owner_amendment_words::ALL.len()).expect("amendment phrase count fits"))
+        .expect("composed phrase count fits")
 }
 
 #[must_use]
@@ -55,6 +57,9 @@ pub fn shapes(normal: Box<[PhraseShape]>) -> Box<[PhraseShape]> {
     }
     for shape in crate::live_call_words::shapes() {
         result.push(shape).expect("live call shapes fit");
+    }
+    for shape in crate::owner_amendment_words::shapes() {
+        result.push(shape).expect("amendment shapes fit");
     }
     result.into_boxed()
 }
@@ -89,6 +94,9 @@ pub fn language(normal: Language) -> Language {
     for phrase in crate::live_call_words::language().phrases {
         phrases.push(phrase).expect("live call words fit");
     }
+    for phrase in crate::owner_amendment_words::language().phrases {
+        phrases.push(phrase).expect("amendment words fit");
+    }
     Language { plural: normal.plural, span_unit: normal.span_unit, wall: normal.wall, phrases: phrases.into_boxed() }
 }
 
@@ -118,6 +126,9 @@ pub fn phrase_bytes(book: &Phrasebook) -> Option<u32> {
         largest = largest.max(book.capacity(phrase.id())?);
     }
     for phrase in crate::live_call_words::ALL {
+        largest = largest.max(book.capacity(phrase.id())?);
+    }
+    for phrase in crate::owner_amendment_words::ALL {
         largest = largest.max(book.capacity(phrase.id())?);
     }
     Some(largest)

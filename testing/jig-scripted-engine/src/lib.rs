@@ -428,3 +428,5 @@ pub mod owner_budget;
 pub use payload::owner_outcome::{admit_owner_outcome, owner_outcome_bytes};
 
 pub mod owner_chip;
+
+pub mod owner_amendment;

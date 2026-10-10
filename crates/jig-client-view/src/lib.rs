@@ -73,3 +73,6 @@ pub mod owner_outcome_words;
 
 pub mod owner_chip;
 pub mod owner_chip_words;
+
+pub mod owner_amendment;
+pub mod owner_amendment_words;
