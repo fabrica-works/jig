@@ -5,7 +5,7 @@ static HEAP: skein_world::domain::heap::Counting = skein_world::domain::heap::Co
 
 fn compare(scenario: Scenario, seed: u64) {
     let cuts = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let seen = std::rc::Rc::clone(&cuts);
+    let reached = std::rc::Rc::clone(&cuts);
     let baseline = replay::every_cut_traced(scenario, seed, Some(true), move |cut, resumed| {
         let actual = replay::outside(&resumed);
         assert!(resumed.outcome().crashes.contains(&cut));
@@ -16,7 +16,7 @@ fn compare(scenario: Scenario, seed: u64) {
             replay::outside(&fresh),
             "{scenario:?}, cut {cut}, seed {seed}: complete outside state and whole trace"
         );
-        seen.borrow_mut().push(cut);
+        reached.borrow_mut().push(cut);
     })
     .expect("all snapshot cuts");
     assert_eq!(*cuts.borrow(), (1..=baseline.commits).collect::<Vec<_>>());
