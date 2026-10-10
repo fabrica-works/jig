@@ -13,7 +13,7 @@ struct Position {
     drain_started: u64,
 }
 
-fn finish(
+fn finish_steps(
     world: &mut World,
     scenario: Scenario,
     mut position: Position,
@@ -54,6 +54,31 @@ fn finish(
         }
     }
     Testing::check(world, scenario).map_err(|error| world.diagnostic(error))
+}
+
+fn diagnose(
+    world: &mut World,
+    seed: u64,
+    play: impl FnOnce(&mut World) -> Result<(), Violation>,
+) -> Result<(), Violation> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| play(world))).unwrap_or_else(|cause| {
+        let detail = cause
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| cause.downcast_ref::<&str>().copied())
+            .unwrap_or("non-string panic");
+        panic!("scenario seed {seed}: {detail}\n{}", world.trace.join("\n"));
+    })
+}
+
+fn finish(
+    world: &mut World,
+    scenario: Scenario,
+    seed: u64,
+    position: Position,
+    position_seen: &RefCell<Position>,
+) -> Result<(), Violation> {
+    diagnose(world, seed, |world| finish_steps(world, scenario, position, position_seen))
 }
 
 /// Replay every original numbered durable cut from its outside snapshot.
@@ -100,7 +125,7 @@ pub fn every_cut_traced(
             hook_failure.replace(Some(error));
         }
     });
-    finish(&mut world, scenario, Position::default(), &position)?;
+    finish(&mut world, scenario, seed, Position::default(), &position)?;
     if let Some(error) = failure.take() {
         return Err(error);
     }
@@ -115,17 +140,20 @@ pub fn fresh(scenario: Scenario, cut: Cut, seed: u64, enabled: bool) -> Result<W
     let config = Testing::configuration(scenario, seed).expect("testing binds every shared story");
     let mut world = Harness::<Testing>::with_trace(config, seed, enabled);
     world.cut(cut);
-    for step in program(scenario) {
-        match step {
-            Step::Action(action) => Testing::action(&mut world, action).map_err(|error| world.diagnostic(error))?,
-            Step::Drain => {
-                world.drain()?;
+    diagnose(&mut world, seed, |world| {
+        for step in program(scenario) {
+            match step {
+                Step::Action(action) => Testing::action(world, action).map_err(|error| world.diagnostic(error))?,
+                Step::Drain => {
+                    world.drain()?;
+                }
+                Step::Advance(nanos) => world.advance(nanos),
+                Step::Crash => world.crash().map_err(|error| world.diagnostic(error))?,
             }
-            Step::Advance(nanos) => world.advance(nanos),
-            Step::Crash => world.crash().map_err(|error| world.diagnostic(error))?,
         }
-    }
-    Testing::check(&world, scenario).map_err(|error| world.diagnostic(error))?;
+        Testing::check(world, scenario).map_err(|error| world.diagnostic(error))?;
+        Ok(())
+    })?;
     Ok(world)
 }
 
