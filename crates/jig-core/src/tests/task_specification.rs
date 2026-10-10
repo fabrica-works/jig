@@ -24,24 +24,29 @@ fn task_specification_keeps_source_inputs_and_separate_page_loss() {
 #[test]
 fn task_specification_marks_parameter_and_input_list_loss_independently() {
     let (core, mut limits) = make_tree();
-    limits.documents.lines = 1;
+    limits.documents.lines = 2;
     let mut row = core.tasks.task(2).unwrap().clone();
-    row.spec.parameters =
-        Box::new([tasks::Parameter::Number { name: 7, value: 8 }, tasks::Parameter::Number { name: 9, value: 10 }]);
+    row.spec.parameters = Box::new([
+        tasks::Parameter::Number { name: 7, value: 8 },
+        tasks::Parameter::Number { name: 9, value: 10 },
+        tasks::Parameter::Number { name: 11, value: 12 },
+    ]);
     let task = task_from_row(&core, &limits, 1, &row).unwrap();
     assert!(task.spec.cut, "only parameters exceed the spec list bound");
-    assert_eq!(task.spec.parameters.len(), 1);
+    assert_eq!(task.spec.parameters.len(), 2);
     assert_eq!(task.spec.parameters.get(0), Some(&Parameter::Number { name: 7, value: 8 }));
+    assert_eq!(task.spec.parameters.get(1), Some(&Parameter::Number { name: 9, value: 10 }));
     assert!(task.spec.inputs.is_empty());
     assert!(!task.spec.words.cut);
 
     row.spec.parameters = Box::new([]);
-    row.spec.inputs = Box::new([u64::MAX, 1]);
+    row.spec.inputs = Box::new([u64::MAX, 1, 3]);
     let task = task_from_row(&core, &limits, 1, &row).unwrap();
     assert!(task.spec.cut, "only inputs exceed the spec list bound");
     assert!(task.spec.parameters.is_empty());
-    assert_eq!(task.spec.inputs.len(), 1);
+    assert_eq!(task.spec.inputs.len(), 2);
     assert_eq!(task.spec.inputs.get(0), Some(&u64::MAX));
+    assert_eq!(task.spec.inputs.get(1), Some(&1));
     assert!(!task.spec.words.cut);
 }
 
