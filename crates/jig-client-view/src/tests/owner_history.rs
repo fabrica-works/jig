@@ -19,7 +19,7 @@ fn pattern(last: OwnerPatternEnd, capacity: u32) -> OwnerPattern {
     }
     OwnerPattern { segments, last }
 }
-fn state() -> OwnerAmendmentState {
+pub(super) fn state() -> OwnerAmendmentState {
     let mut parameters = List::with_capacity(3);
     parameters.push(ParameterDocument::Number { name: u32::MAX, value: u64::MAX }).unwrap();
     parameters.push(ParameterDocument::Bytes { name: 1, value: doc(b"bytes", false) }).unwrap();
@@ -97,14 +97,14 @@ fn delta() -> OwnerRetainedAmendment {
         cut: false,
     }
 }
-fn part() -> OwnerPart {
+pub(super) fn part() -> OwnerPart {
     let mut segments = List::with_capacity(3);
     for bytes in [b"a/b".as_slice(), &[255, 0], b""] {
         segments.push(copy_of(bytes)).unwrap();
     }
     OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Effect, key: OwnerPartKey::Path(segments) }
 }
-fn task() -> ProposedTask {
+pub(super) fn task() -> ProposedTask {
     let source = state();
     let mut resources = List::with_capacity(3);
     resources.push(part()).unwrap();
@@ -143,7 +143,7 @@ fn actions() -> [OwnerRetainedAction; 5] {
         OwnerRetainedAction::Release { task: u64::MAX },
     ]
 }
-fn proposal(action: OwnerRetainedAction) -> OwnerProposalHistory {
+pub(super) fn proposal(action: OwnerRetainedAction) -> OwnerProposalHistory {
     OwnerProposalHistory {
         action,
         number: u64::MAX,
@@ -155,7 +155,7 @@ fn proposal(action: OwnerRetainedAction) -> OwnerProposalHistory {
         },
     }
 }
-fn line() -> OwnerHistoryLine {
+pub(super) fn line() -> OwnerHistoryLine {
     OwnerHistoryLine {
         task: u64::MAX,
         revision: 6,
@@ -167,10 +167,10 @@ fn line() -> OwnerHistoryLine {
         at: None,
     }
 }
-fn client_limits() -> jig_client::Limits {
+pub(super) fn client_limits() -> jig_client::Limits {
     jig_client::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
 }
-fn words(selected: bool) -> Words {
+pub(super) fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
     english.wall = WallFormat::Nanos;
     english.span_unit = SpanUnit::Nanos;

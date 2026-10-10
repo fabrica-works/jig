@@ -2268,3 +2268,5 @@ mod page_loss;
 mod task_authority;
 
 mod task_budget;
+
+mod history_pages;
