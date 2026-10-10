@@ -1414,15 +1414,34 @@ pub fn language() -> Language {
 }
 /// A ready English phrasebook whose names fit the client's text limit.
 pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
+    let words = language();
+    let mut segments = 0_u32;
+    let mut text_bytes = 0_u32;
+    for phrase in &words.phrases {
+        for form in &phrase.forms {
+            for segment in &form.segments {
+                segments = segments.checked_add(1).ok_or(Invalid::Overflow)?;
+                match segment {
+                    Segment::Text(bytes) => {
+                        let Ok(length) = u32::try_from(bytes.len()) else {
+                            return Err(Invalid::Overflow);
+                        };
+                        text_bytes = text_bytes.checked_add(length).ok_or(Invalid::Overflow)?;
+                    }
+                    Segment::Hole { .. } => {}
+                }
+            }
+        }
+    }
     Phrasebook::load(
         shapes(text),
-        Box::new([language()]),
+        Box::new([words]),
         &PhraseLimits {
             languages: 1,
             phrases: crate::owner_words::phrase_count(),
             holes: 4,
-            segments: 2000,
-            text_bytes: 20000,
+            segments,
+            text_bytes,
             hole_bytes: text,
         },
     )
