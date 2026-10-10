@@ -2277,3 +2277,5 @@ mod history_pages;
 mod amendment_reason;
 mod question_sender;
 mod task_ending;
+
+mod task_resources;

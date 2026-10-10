@@ -1865,3 +1865,6 @@ mod task_budget;
 mod amendment_reason;
 #[path = "task_ending.rs"]
 mod task_ending;
+
+#[path = "task_resources.rs"]
+mod task_resources;
