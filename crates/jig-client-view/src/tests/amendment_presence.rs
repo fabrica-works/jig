@@ -243,7 +243,7 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
 }
 
 #[test]
-fn address_controls_require_actual_person_revision_and_keep_legacy_task_recipients_outside_the_closed_destination() {
+fn address_controls_require_actual_person_revision_and_keep_task_recipients_outside_the_closed_destination() {
     for (revision, recipient) in [
         (None, Some(Recipient::Party(9))),
         (Some(Revision { value: 12 }), Some(Recipient::Task(9))),
@@ -256,15 +256,20 @@ fn address_controls_require_actual_person_revision_and_keep_legacy_task_recipien
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row)));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
         let tree = dialog(&domain, &words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
-        assert!(!contains(&tree, b"Address to party number"));
-        assert!(!contains(&tree, b"Address to role number in this project"));
-        assert!(!contains(&tree, b"Address to task number"));
-        assert!(contains(&tree, b"New budget"), "absent address facts do not block independent properties");
+        assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));
+        assert!(
+            !tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to role number in this project"))
+        );
+        assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to task number")));
+        assert!(
+            tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New budget")),
+            "absent address facts do not block independent properties"
+        );
     }
     let mut row = task_doc(&[ActKind::Amend]);
     row.person_revision = None;
     let (domain, _) = open(row);
     let tree = dialog(&domain, &words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
-    assert!(!contains(&tree, b"Address to party number"));
-    assert!(contains(&tree, b"New budget"));
+    assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));
+    assert!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New budget")));
 }
