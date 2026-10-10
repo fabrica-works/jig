@@ -399,6 +399,13 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
     assert_eq!(frame.charters.as_slice()[0].goals.as_slice(), &[1]);
     assert_eq!(frame.needs, 0);
     assert_eq!(frame.updates, Count::Known(0));
+    let mut upgraded = limits;
+    upgraded.documents.versions = Versions { minimum: u16::MAX, maximum: u16::MAX };
+    assert_eq!(
+        make(&core, &upgraded, 1, &Subject::Frame { party: 1 }, &window()).unwrap(),
+        Document::Frame(frame),
+        "protocol served versions never change the business Frame"
+    );
 }
 
 #[test]
