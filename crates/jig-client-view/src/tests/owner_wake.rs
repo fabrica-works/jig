@@ -125,7 +125,7 @@ fn owner_wake_renderer_uses_checked_selected_language_with_reordered_holes() {
                 class: PluralClass::Other,
                 segments: Box::new([
                     Segment::Text(b"Age ".as_slice().into()),
-                    Segment::Hole { index: 1, kind: HoleKind::Span },
+                    Segment::Hole { index: 1, kind: HoleKind::Number },
                     Segment::Text(b"; count ".as_slice().into()),
                     Segment::Hole { index: 0, kind: HoleKind::Number },
                 ]),
