@@ -79,7 +79,7 @@ use jig_core_notes as notes;
 use jig_core_people as people;
 use jig_core_tasks as tasks;
 use jig_core_views as views;
-use skein_lib::{List, Map, Queue, Token};
+use skein_lib::{List, Map, Queue, Token, Wall};
 
 /// Application-supplied initial core state, in jig's vocabulary.
 #[derive(Debug)]
