@@ -44,18 +44,12 @@ fn frame_tree_keeps_absent_empty_and_partial_names_separate_from_identity_loss()
         assert!(contains(&shown, b"supplied-name"));
         assert!(contains(&shown, b"Service"));
         assert!(contains(&shown, b"Pool ledger not supplied"));
-        let labels: Vec<_> = shown
-            .nodes()
-            .iter()
-            .filter(|node| node.role == Role::Button)
-            .filter_map(|node| node.name.as_deref())
-            .collect();
         let expected = match name {
             None => b"Project 4".as_slice(),
             Some(ref value) if value.bytes().is_empty() => b"Project: ".as_slice(),
             Some(_) => b"Project: partial-name".as_slice(),
         };
-        assert!(labels.contains(&expected));
+        assert!(shown.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(expected)));
         assert_eq!(
             shown
                 .nodes()
