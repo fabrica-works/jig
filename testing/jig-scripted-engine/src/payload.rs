@@ -34,7 +34,19 @@ pub(crate) fn fits<T: Payload>(value: &T, bounds: &Bounds) -> bool {
 macro_rules! plain {
     ($($t:ty),*) => { $(impl Payload for $t { fn heap(&self, _bounds: &Bounds) -> Option<u64> { Some(0) } })* };
 }
-plain!(bool, u16, u32, u64, Duration, Wall, Token, RunStage, RetryNotice, ClosingStage, jig_client::contract::RecurringOverlap);
+plain!(
+    bool,
+    u16,
+    u32,
+    u64,
+    Duration,
+    Wall,
+    Token,
+    RunStage,
+    RetryNotice,
+    ClosingStage,
+    jig_client::contract::RecurringOverlap
+);
 impl Payload for Text {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         if self.fits(bounds.text) { u64::try_from(self.bytes().len()).ok() } else { None }
