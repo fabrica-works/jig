@@ -1543,7 +1543,7 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
         shown.push(expected);
         let action = press(&tree, b"Accept", &mut bindings);
         drive(&mut d, Event::Act { act: action });
-        let tree = render(&d, id, &words, &mut bindings);
+        let tree = dialog(&d, &words, &mut bindings);
         assert!(contains(&tree, label));
         let action = press(&tree, b"Confirm", &mut bindings);
         let sent = drive(&mut d, Event::Act { act: action });

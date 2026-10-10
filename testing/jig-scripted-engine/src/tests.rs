@@ -1550,7 +1550,7 @@ fn activation_observations_and_prior_closing_are_admitted_whole_with_their_alloc
 }
 
 #[test]
-fn full_width_typed_makers_remain_distinct_in_scripted_reads_decisions_and_keyed_replays() {
+fn full_width_task_and_party_makers_remain_distinct_in_scripted_reads_decisions_and_keyed_replays() {
     let mut setup = script();
     let keys = [
         ProposalKey { proposer: Proposer::Task(u64::MAX), number: u64::MAX },
