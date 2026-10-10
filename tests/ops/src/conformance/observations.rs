@@ -5,8 +5,31 @@ use jig_core_people as people;
 use jig_core_tasks as tasks;
 use jig_ops_domain as root;
 use jig_ops_domain_infrastructure as infra;
+use jig_ops_domain_observability as obs;
 use jig_test_system::SystemKey;
 use std::collections::{BTreeMap, BTreeSet};
+
+pub fn fact(observed: &mut Vec<r::Observed>, event: &obs::SystemEvent) {
+    if let obs::SystemEvent::Fact { service, fact } = event {
+        let target = if service.environment.as_ref() == b"production" { 77 } else { 1 };
+        let met = if target == 77 {
+            fact.healthy_replicas >= 2
+        } else {
+            fact.load_percent < 20
+                && fact.load.first().is_some_and(|point| point.at <= fact.observed.saturating_sub(1800))
+                && fact.observed >= 1800
+                && fact.load.iter().all(|point| point.percent < 20)
+        };
+        observed.push(r::Observed::Read {
+            resource: r::Name {
+                connector: 1,
+                path: vec![b"env".to_vec(), service.environment.to_vec(), b"service".to_vec(), service.name.to_vec()],
+            },
+            state: met.then_some(target),
+            at: fact.observed * 1_000_000_000,
+        });
+    }
+}
 
 pub fn key(value: infra::Key) -> SystemKey {
     let (attempt, completion, position) = match value.origin {

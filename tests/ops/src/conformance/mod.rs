@@ -407,30 +407,7 @@ impl Application for Ops {
             }
             root::Output::Observability(call) => {
                 let event = systems.observability(call);
-                if let obs::SystemEvent::Fact { service, fact } = &event {
-                    let target = if service.environment.as_ref() == b"production" { 77 } else { 1 };
-                    let met = if target == 77 {
-                        fact.healthy_replicas >= 2
-                    } else {
-                        fact.load_percent < 20
-                            && fact.load.first().is_some_and(|point| point.at <= fact.observed.saturating_sub(1800))
-                            && fact.observed >= 1800
-                            && fact.load.iter().all(|point| point.percent < 20)
-                    };
-                    peers.observed.push(r::Observed::Read {
-                        resource: r::Name {
-                            connector: 1,
-                            path: vec![
-                                b"env".to_vec(),
-                                service.environment.to_vec(),
-                                b"service".to_vec(),
-                                service.name.to_vec(),
-                            ],
-                        },
-                        state: met.then_some(target),
-                        at: fact.observed * 1_000_000_000,
-                    });
-                }
+                observations::fact(&mut peers.observed, &event);
                 vec![Input::Event(root::Event::Observability(obs::Event::System(event)))]
             }
             root::Output::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
@@ -803,12 +780,14 @@ fn alert_documents(seed: u64, cut: jig_conformance::Cut, documents: bool) -> jig
     world.drain().unwrap_or_else(|error| panic!("recovery: {error:?}\n{}", world.trace.join("\n")));
     world.advance(config::root(seed).1.infrastructure.retry_after_seconds * 1_000_000_000);
     world.drain().expect("settle an uncertain restart after its retry deadline");
-    world.advance(10_000_000_000);
-    world.drain().expect("restart after recovered triage");
-    // A cut before the lead receipt can postpone triage until the retry deadline.
-    // Let the restart effect occur before giving production its recovery window.
-    world.advance(10_000_000_000);
-    world.drain().expect("production recovery clock");
+    // A cut around lead creation can defer I or T2 to the next retry clock.
+    // Two bounded fact/recovery windows cover that resumed run and its effect.
+    for _ in 0..2 {
+        refresh_alert_facts(&mut world);
+        world.drain().expect("restart after recovered triage or lead");
+        world.advance(10_000_000_000);
+        world.drain().expect("production recovery clock");
+    }
     let refreshed = world.systems.infrastructure(infra::SystemRequest::Service {
         service: infra::Service::new(b"production".as_slice().into(), b"checkout".as_slice().into()),
     });
@@ -825,6 +804,18 @@ fn alert_documents(seed: u64, cut: jig_conformance::Cut, documents: bool) -> jig
     }
     read_report(&mut world, cut);
     world
+}
+
+fn refresh_alert_facts(world: &mut jig_conformance::Harness<Ops>) {
+    let refreshed = world.systems.infrastructure(infra::SystemRequest::Service {
+        service: infra::Service::new(b"production".as_slice().into(), b"checkout".as_slice().into()),
+    });
+    world.send(root::Event::Infrastructure(infra::Event::System(refreshed)));
+    let refreshed = world.systems.observability(obs::SystemRequest::Facts {
+        service: obs::Service::new(b"production".as_slice().into(), b"checkout".as_slice().into()),
+    });
+    observations::fact(&mut world.peers.observed, &refreshed);
+    world.send(root::Event::Observability(obs::Event::System(refreshed)));
 }
 
 fn read_report(world: &mut jig_conformance::Harness<Ops>, cut: jig_conformance::Cut) {
