@@ -83,15 +83,33 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     view::render(&mut b, value, &client, words, &mut bindings);
     let tree = b.finish();
     assert!(tree.len() <= f.nodes);
-    assert!(tree.nodes().iter().all(|n| n.text_bytes() <= f.text_per_node));
-    assert!(tree.nodes().iter().map(|n| u64::from(n.text_bytes())).sum::<u64>() <= u64::from(f.text_bytes));
+    let mut total = 0_u64;
+    for node in tree.nodes() {
+        assert!(node.text_bytes() <= f.text_per_node);
+        total = total.checked_add(u64::from(node.text_bytes())).unwrap();
+    }
+    assert!(total <= u64::from(f.text_bytes));
     (tree, bindings, f)
 }
 fn has(tree: &Tree, bytes: &[u8]) -> bool {
-    tree.nodes().iter().any(|n| n.text.iter().any(|r| r.text.as_ref() == bytes))
+    for node in tree.nodes() {
+        for run in &node.text {
+            if run.text.as_ref() == bytes {
+                return true;
+            }
+        }
+    }
+    false
 }
 fn contains(tree: &Tree, bytes: &[u8]) -> bool {
-    tree.nodes().iter().any(|n| n.text.iter().any(|r| find(&r.text, bytes).is_some()))
+    for node in tree.nodes() {
+        for run in &node.text {
+            if find(&run.text, bytes).is_some() {
+                return true;
+            }
+        }
+    }
+    false
 }
 #[test]
 fn owner_milestone_all_five_phases_six_activation_and_five_closing_stages_keep_owner_coordinates() {
@@ -296,16 +314,46 @@ fn owner_milestone_whole_results_keep_all_nine_branches_and_independent_approval
         ResultValue::Words(doc(b"words", false)),
     ];
     for value in values {
+        let label: &[u8] = match &value {
+            ResultValue::Report(_) => b"report",
+            ResultValue::OwnerVerdict { .. } => b"verdict",
+            ResultValue::Verdict { .. } => b"legacy",
+            ResultValue::Connector { .. } => b"summary",
+            ResultValue::Change { .. } => b"change",
+            ResultValue::Choice { .. } => b"choice",
+            ResultValue::Approved { .. } => b"\\xFF\\x00",
+            ResultValue::Failure(_) => b"failure",
+            ResultValue::Words(_) => b"words",
+        };
+        let fields_supplied = match &value {
+            ResultValue::OwnerVerdict { .. } | ResultValue::Verdict { .. } => true,
+            ResultValue::Report(_)
+            | ResultValue::Connector { .. }
+            | ResultValue::Change { .. }
+            | ResultValue::Choice { .. }
+            | ResultValue::Approved { .. }
+            | ResultValue::Failure(_)
+            | ResultValue::Words(_) => false,
+        };
         let source = line(OwnerMilestonePhase::Ended(OwnerChipEnding::Done(value)));
         let original = source.clone();
         let tree = build(&source, &w).0;
         assert!(has(&tree, b"Completed with result"));
+        assert!(has(&tree, label));
+        if fields_supplied {
+            assert!(has(&tree, b"name"));
+            assert!(has(&tree, b"value"));
+            assert!(contains(&tree, b"4294967295"));
+        }
         assert_eq!(source, original);
     }
     let mut absent: Option<u32> = None;
     for explanation in [None, Some(doc(b"", false)), Some(doc(b"explain", true))] {
         let supplied = explanation.is_some();
-        let lost = explanation.as_ref().is_some_and(|v| v.cut);
+        let lost = match &explanation {
+            Some(value) => value.cut,
+            None => false,
+        };
         let value = line(OwnerMilestonePhase::Ended(OwnerChipEnding::Done(ResultValue::Approved {
             state: copy_of(&[255, 0, 254]),
             words: explanation,

@@ -53,7 +53,7 @@ pub fn required(value: &OwnerMilestoneLine, limits: &Limits, words: &Words) -> O
     match &value.phase {
         OwnerMilestonePhase::Waiting | OwnerMilestonePhase::Active(_) => {}
         OwnerMilestonePhase::Closing { ending, .. } | OwnerMilestonePhase::Ended(ending) => {
-            ending_fits(ending, limits)?
+            ending_fits(ending, limits)?;
         }
         OwnerMilestonePhase::Held { source, ending, .. } => {
             if let Some(source) = source {
