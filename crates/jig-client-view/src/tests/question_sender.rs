@@ -1,8 +1,6 @@
 #![expect(
     clippy::disallowed_methods,
-    clippy::disallowed_macros,
     clippy::disallowed_types,
-    clippy::wildcard_enum_match_arm,
     reason = "ordinary tests inspect complete typed cards and loaded language data"
 )]
 use super::{
@@ -93,12 +91,17 @@ fn question_sender_cards_render_exact_closed_kinds_full_widths_and_no_claim_for_
         if from.is_some() {
             assert!(contains(&shown, expected));
         }
-        assert_eq!(contains(&shown, b"Question from task "), matches!(from, Some(OwnerRequester::Task(_))));
-        assert_eq!(contains(&shown, b"Question from person "), matches!(from, Some(OwnerRequester::Person(_))));
-        assert_eq!(
-            contains(&shown, b"Question from deployment project "),
-            matches!(from, Some(OwnerRequester::Deployment { .. }))
-        );
+        let (task, person, deployment) = match from {
+            None => (false, false, false),
+            Some(from) => match from {
+                OwnerRequester::Task(_) => (true, false, false),
+                OwnerRequester::Person(_) => (false, true, false),
+                OwnerRequester::Deployment { .. } => (false, false, true),
+            },
+        };
+        assert_eq!(contains(&shown, b"Question from task "), task);
+        assert_eq!(contains(&shown, b"Question from person "), person);
+        assert_eq!(contains(&shown, b"Question from deployment project "), deployment);
         assert!(contains(&shown, value.words.bytes()), "whole opaque words survive markdown");
         assert!(contains(&shown, b"Waiting "));
         assert!(
@@ -182,11 +185,11 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
         let mut older = value.clone();
         older.from = None;
-        let (old_d, old_id) = loaded(
+        let (baseline, object) = loaded(
             ObjectKey::Question { task: older.task.task, message: older.message },
             ReadValue::Question(Box::new(older)),
         );
-        let old = tree(&old_d, old_id, &w);
+        let old = tree(&baseline, object, &w);
         let buttons = |t: &Tree| {
             t.nodes()
                 .iter()
