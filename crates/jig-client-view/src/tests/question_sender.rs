@@ -166,7 +166,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_legacy
         limits.nodes = crate::question_nodes(&CLIENT).unwrap();
         let mut b = Builder::new(&limits);
         let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
-        assert!(crate::cards::question(&mut b, &d, id, &crate::cards::Place::Elsewhere, &w, &mut bindings));
+        assert!(crate::cards::question::question(&mut b, &d, id, &crate::cards::Place::Elsewhere, &w, &mut bindings));
         let shown = b.finish();
         assert!(shown.len() <= limits.nodes);
         let mut total = 0_u64;
