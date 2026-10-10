@@ -277,16 +277,7 @@ impl<A: crate::Application> Engine<A> {
                 for doc in self.truth.objects.values() {
                     if let ReadValue::Task(task) = doc {
                         let asked_by_me = task.requester == OwnerRequester::Person(party);
-                        let goal = task
-                            .lineage
-                            .iter()
-                            .find(|id| {
-                                self.truth
-                                    .objects
-                                    .get(&ObjectKey::Task(**id))
-                                    .is_some_and(|v| matches!(v, ReadValue::Task(doc) if doc.goal))
-                            })
-                            .copied();
+                        let goal = task.goal;
                         if task.project != *project
                             || ended(task.chip.phase)
                             || filter.phase.is_some_and(|phase| phase != task.chip.phase)
