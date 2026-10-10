@@ -78,7 +78,13 @@ fn task_list_filters_do_not_alias_person_task_and_deployment_requesters_with_equ
                 .iter()
                 .filter_map(|event| match event {
                     Up::Watch { event: WatchEvent::Delivered(Delivery::Tasks(rows)), .. } => Some(rows),
-                    _ => None,
+                    Up::Answer { .. }
+                    | Up::Read { .. }
+                    | Up::Watch { .. }
+                    | Up::ApplicationAnswer { .. }
+                    | Up::ApplicationRead { .. }
+                    | Up::App { .. }
+                    | Up::Ended { .. } => None,
                 })
                 .collect();
             assert_eq!(deliveries.len(), 1);
