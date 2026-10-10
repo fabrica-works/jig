@@ -1,8 +1,4 @@
-#![expect(
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    reason = "ordinary tests inspect complete semantic trees"
-)]
+#![expect(clippy::disallowed_methods, reason = "ordinary tests inspect complete semantic trees")]
 use crate::{
     Builder, Role, Tree, owner_wake,
     owner_wake_words::{self, WakePhrase},
@@ -17,10 +13,10 @@ use skein_lib::{Duration, List, Wall};
 fn builder(nodes: u32, book: &Phrasebook) -> Builder {
     let bytes = owner_wake::phrase_bytes(book).unwrap();
     Builder::new(&crate::Limits {
-        nodes: nodes + 1,
+        nodes: nodes.checked_add(1).unwrap(),
         depth: 4,
         text_per_node: bytes,
-        text_bytes: (nodes + 1) * bytes,
+        text_bytes: nodes.checked_add(1).unwrap().checked_mul(bytes).unwrap(),
         drawing_bytes: 0,
         styles_per_node: 0,
         patches: 0,
@@ -48,7 +44,7 @@ fn owner_wake_renderer_keeps_every_rule_result_and_independent_switch() {
             (ResultsWake::Each, b"Each delegate result wakes".as_slice()),
             (ResultsWake::LastOrFailure, b"The last delegate result or a failure wakes".as_slice()),
         ] {
-            for switches in 0..8 {
+            for switches in 0_u8..8 {
                 let value = OwnerWakePolicy {
                     words: rule,
                     notices: rule,
@@ -165,12 +161,13 @@ fn owner_wake_renderer_uses_checked_selected_language_with_reordered_holes() {
         span_unit: SpanUnit::Nanos,
         wall: WallFormat::Nanos,
     };
-    assert!(
+    assert_eq!(
         Phrasebook::load(
             owner_wake_words::shapes(),
             Box::new([absent]),
             &PhraseLimits { languages: 1, phrases: 27, holes: 2, segments: 100, text_bytes: 2000, hole_bytes: 0 }
         )
-        .is_err()
+        .unwrap_err(),
+        crate::phrases::Invalid::Missing { id: WakePhrase::Policy.id() }
     );
 }
