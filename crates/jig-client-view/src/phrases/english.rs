@@ -955,9 +955,10 @@ pub fn language() -> Language {
             JigPhrase::ChipTitleCut => Box::new([Segment::Text(copy_of(b"Title is incomplete"))]),
             JigPhrase::ChipDependenciesCut => Box::new([Segment::Text(copy_of(b"More dependencies are not shown"))]),
             JigPhrase::ChipWaitingHolds => Box::new([Segment::Text(copy_of(b"Waiting for resource holds"))]),
-            JigPhrase::TasksEnded => {
-                Box::new([Segment::Text(copy_of(b"Ended tasks with outcome not supplied: ")), Segment::Hole(0)])
-            }
+            JigPhrase::TasksEnded => Box::new([
+                Segment::Text(copy_of(b"Ended tasks with outcome not supplied: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::Ended => Box::new([Segment::Text(copy_of(b"Ended"))]),
             JigPhrase::WaitingParty => Box::new([
                 Segment::Text(copy_of(b"Waiting for party ")),
