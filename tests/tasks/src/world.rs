@@ -185,20 +185,14 @@ pub struct World {
 impl World {
     #[must_use]
     pub fn new(seed: u64, limits: Limits) -> World {
-        Self::start(seed, limits, Trace::default())
+        Self::start(seed, &limits, Trace::default())
     }
 
-    /// Explicit trace setting for focused replay, without changing the process environment.
-    #[must_use]
-    pub fn with_trace(seed: u64, limits: Limits, enabled: bool) -> World {
-        Self::start(seed, limits, Trace::with_enabled(enabled))
-    }
-
-    fn start(seed: u64, limits: Limits, trace: Trace) -> World {
+    fn start(seed: u64, limits: &Limits, trace: Trace) -> World {
         let mut world = World {
-            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-            domain: Domain::new(&limits, seed, Box::new([1])),
-            out: Queue::with_capacity(tasks::max_out(&limits)),
+            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
+            domain: Domain::new(limits, seed, Box::new([1])),
+            out: Queue::with_capacity(tasks::max_out(limits)),
             pending: Vec::new(),
             records: BTreeMap::new(),
             replies: BTreeMap::new(),
@@ -1076,7 +1070,7 @@ pub fn run_story_traced(seed: u64, consume_facts: bool, enabled: bool) -> (Trace
 }
 
 fn story(seed: u64, consume_facts: bool, trace: Trace) -> (Trace, Frozen) {
-    let mut w = World::start(seed, LIMITS, trace);
+    let mut w = World::start(seed, &LIMITS, trace);
     w.consume_facts = consume_facts;
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| story_run(seed, &mut w))).unwrap_or_else(|cause| {
         let detail = cause

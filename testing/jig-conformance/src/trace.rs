@@ -1,7 +1,7 @@
 //! Whole application boundary traces, enabled for diagnostic replay only.
 use std::{fmt::Arguments, ops::Deref, sync::OnceLock};
 
-/// Off in sweeps; JIG_WORLD_TRACE enables complete debug diagnostics on replay.
+/// Off in sweeps; `JIG_WORLD_TRACE` enables complete debug diagnostics on replay.
 #[derive(Debug)]
 pub struct Trace {
     enabled: bool,

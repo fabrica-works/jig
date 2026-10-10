@@ -140,7 +140,7 @@ fn rough(seed: u64) -> Settings {
 #[test]
 fn a_seed_replays_to_the_same_run() {
     let trace = skein_world::domain::assert_replays(11, 12, |seed| {
-        let mut world = World::with_trace(rough(seed), true);
+        let mut world = World::with_trace(&rough(seed), true);
         world.run(ITERATIONS);
         (world.trace().to_vec(), (world.stats(), world.now()))
     });
@@ -150,9 +150,9 @@ fn a_seed_replays_to_the_same_run() {
 #[test]
 fn facts_change_nothing_when_none_are_kept() {
     let settings = rough(13);
-    let mut kept = World::with_trace(settings, true);
+    let mut kept = World::with_trace(&settings, true);
     kept.run(ITERATIONS);
-    let mut none = World::with_trace(Settings { host: Limits { facts: 0, ..settings.host }, ..settings }, true);
+    let mut none = World::with_trace(&Settings { host: Limits { facts: 0, ..settings.host }, ..settings }, true);
     none.run(ITERATIONS);
     assert_eq!(kept.trace(), none.trace(), "nothing depends on whether a fact is kept");
     assert!(none.stats().facts_lost > 0);
@@ -160,8 +160,8 @@ fn facts_change_nothing_when_none_are_kept() {
 
 #[test]
 fn tracing_off_keeps_no_copies_and_on_replays_the_whole_host_boundary() {
-    let mut off = World::with_trace(rough(11), false);
-    let mut on = World::with_trace(rough(11), true);
+    let mut off = World::with_trace(&rough(11), false);
+    let mut on = World::with_trace(&rough(11), true);
     off.run(ITERATIONS);
     on.run(ITERATIONS);
     assert!(off.trace().is_empty(), "seed 11 keeps no sweep trace");
@@ -173,7 +173,7 @@ fn tracing_off_keeps_no_copies_and_on_replays_the_whole_host_boundary() {
         "seed 11 keeps the full reply identity"
     );
     assert!(on.trace().iter().any(|line| line.contains("host -> Answer {")), "seed 11 keeps full answer payloads");
-    let mut again = World::with_trace(rough(11), true);
+    let mut again = World::with_trace(&rough(11), true);
     again.run(ITERATIONS);
     assert_eq!(on.trace(), again.trace());
 }

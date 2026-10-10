@@ -341,16 +341,16 @@ pub struct World {
 impl World {
     #[must_use]
     pub fn new(settings: Settings) -> World {
-        Self::start(settings, Trace::default())
+        Self::start(&settings, Trace::default())
     }
 
     /// Explicit trace setting for focused replay, without changing the process environment.
     #[must_use]
-    pub fn with_trace(settings: Settings, enabled: bool) -> World {
+    pub fn with_trace(settings: &Settings, enabled: bool) -> World {
         Self::start(settings, Trace::with_enabled(enabled))
     }
 
-    fn start(settings: Settings, trace: Trace) -> World {
+    fn start(settings: &Settings, trace: Trace) -> World {
         assert!(host::worst_case(&settings.host).is_some(), "the shell refuses limits it cannot provision");
         let mut rng = Rng::new(settings.seed);
         let engine = Engine::new(settings.engine, settings.host, rng.next_u64());
@@ -360,7 +360,7 @@ impl World {
         let mut world = World {
             now: Time::ZERO,
             rng: latencies,
-            settings,
+            settings: *settings,
             host: host::Domain::new(&settings.host),
             stage: Stage::new(settings.host, max_out, max_out + SPARE),
             engine,
