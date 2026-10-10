@@ -176,7 +176,7 @@ pub fn task() -> Task {
             answers: false,
             timers: false,
         },
-        subscriptions: Subscriptions { entries: List::with_capacity(0) },
+        subscriptions: Subscriptions { entries: list([]) },
         result_contract: ResultContract::Report,
         dependencies: list([]),
         cut: false,
