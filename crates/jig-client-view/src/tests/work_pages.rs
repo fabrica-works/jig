@@ -171,15 +171,39 @@ fn plan_folds(words: &Words) {
     drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
     assert!(d.task_page().plan.nodes.is_empty());
 }
-pub(super) fn recurring_task(local: u16, words: &[u8]) -> ProposedTask {
+pub(super) fn recurring_task(number: u64, words: &[u8]) -> ProposedTask {
     ProposedTask {
-        local,
+        number,
         spec: text(words),
-        executor: Executor::Agent { charter: 2 },
+        executor: OwnerExecutor::Agent { charter: 2 },
         budget: 5,
-        deadline: None,
+        contract: TaskContractDocument::Report { words: 32 },
+        authority: OwnerAuthorityDocument {
+            authority: OwnerAuthority {
+                tools: 0,
+                grants: list([]),
+                delegation: OwnerDelegation { kinds: list([]), tasks: 2, depth: 1 },
+                spend: 5,
+                deadline: None,
+                notes: 0,
+                note_resources: list([]),
+            },
+            cut: false,
+        },
+        funder: Funder::Recurring { project: 4, task: 7, period: 3 },
         dependencies: list([]),
-        grants: list([]),
+        resources: list([]),
+        wake: OwnerWakePolicy {
+            words: WakeRule::Immediate,
+            notices: WakeRule::Never,
+            news: WakeRule::Never,
+            results: ResultsWake::Each,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        priority: None,
+        cut: false,
     }
 }
 pub(super) fn project_doc() -> Project {

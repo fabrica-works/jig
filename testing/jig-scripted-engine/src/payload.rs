@@ -569,7 +569,48 @@ impl Payload for ProposalAction {
         }
     }
 }
-fields!(ProposedTask { local, spec, executor, budget, deadline, dependencies, grants });
+fields!(ProposedTask {
+    number,
+    spec,
+    executor,
+    contract,
+    authority,
+    budget,
+    funder,
+    dependencies,
+    resources,
+    wake,
+    priority,
+    cut
+});
+plain!(
+    jig_client::contract::OwnerExecutor,
+    jig_client::contract::PersonAddress,
+    jig_client::contract::Funder,
+    jig_client::contract::OwnerPartKind
+);
+fields!(jig_client::contract::OwnerPart { connector, kind, key });
+impl Payload for jig_client::contract::OwnerPartKey {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Path(segments) => segments.heap(bounds),
+            Self::Number(_) => Some(0),
+        }
+    }
+}
+fields!(jig_client::contract::VerdictChoice { code, words, followups, fields });
+impl Payload for jig_client::contract::TaskContractDocument {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Approval { state, part } => sum(&[state.heap(bounds), part.heap(bounds)]),
+            Self::Report { words } => words.heap(bounds),
+            Self::Verdict { choices, cut } => sum(&[choices.heap(bounds), cut.heap(bounds)]),
+            Self::Change { connector, kind, words } => {
+                sum(&[connector.heap(bounds), kind.heap(bounds), words.heap(bounds)])
+            }
+        }
+    }
+}
 fields!(Question { task, message, words, since, acts, ending });
 fields!(PersonTask {
     task,

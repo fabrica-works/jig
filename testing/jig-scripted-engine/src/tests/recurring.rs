@@ -3,15 +3,39 @@ use crate::{Bounds, payload::fits};
 use jig_client::contract::*;
 use skein_lib::Wall;
 
-fn template(local: u16, words: &[u8]) -> ProposedTask {
+fn template(number: u64, words: &[u8]) -> ProposedTask {
     ProposedTask {
-        local,
+        number,
         spec: text(words),
-        executor: Executor::Agent { charter: 1 },
+        executor: OwnerExecutor::Agent { charter: 1 },
         budget: 20,
-        deadline: None,
+        contract: TaskContractDocument::Report { words: 32 },
+        authority: OwnerAuthorityDocument {
+            authority: OwnerAuthority {
+                tools: 0,
+                grants: list(vec![]),
+                delegation: OwnerDelegation { kinds: list(vec![]), tasks: 2, depth: 1 },
+                spend: 20,
+                deadline: None,
+                notes: 0,
+                note_resources: list(vec![]),
+            },
+            cut: false,
+        },
+        funder: Funder::Recurring { project: 1, task: 7, period: 9 },
         dependencies: list(vec![]),
-        grants: list(vec![]),
+        resources: list(vec![]),
+        wake: OwnerWakePolicy {
+            words: WakeRule::Immediate,
+            notices: WakeRule::Never,
+            news: WakeRule::Never,
+            results: ResultsWake::Each,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        priority: None,
+        cut: false,
     }
 }
 

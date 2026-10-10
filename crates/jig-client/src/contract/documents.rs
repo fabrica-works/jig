@@ -421,13 +421,18 @@ pub enum ProposalAction {
 /// One task in a proposal batch.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ProposedTask {
-    pub local: u16,
+    pub number: u64,
     pub spec: super::SpecificationDocument,
-    pub executor: Executor,
+    pub executor: super::OwnerExecutor,
+    pub contract: super::TaskContractDocument,
+    pub authority: super::OwnerAuthorityDocument,
     pub budget: u64,
-    pub deadline: Option<Wall>,
-    pub dependencies: List<u16>,
-    pub grants: List<super::Grant>,
+    pub funder: super::Funder,
+    pub dependencies: List<u64>,
+    pub resources: List<super::OwnerPart>,
+    pub wake: super::OwnerWakePolicy,
+    pub priority: Option<u32>,
+    pub cut: bool,
 }
 
 /// Words addressed by one task message.

@@ -67,6 +67,8 @@ pub enum JigMeaning {
     NoteSearch { filter: jig_client::pages::project::NoteFilter },
     /// A connector-owned part referred to by a slot, never an actionable node.
     Part(jig_client::contract::Part),
+    /// A whole exact owner reference, with literal path segment boundaries.
+    OwnerPart(jig_client::contract::OwnerPart),
 }
 #[derive(Debug)]
 struct Entry {
@@ -107,7 +109,28 @@ impl JigBindings {
             if entry.token == token {
                 match &entry.meaning {
                     JigMeaning::Part(part) => return Some(part),
+                    JigMeaning::OwnerPart(_) => return None,
                     JigMeaning::Action(_)
+                    | JigMeaning::Field(_)
+                    | JigMeaning::TaskNumber
+                    | JigMeaning::Priority
+                    | JigMeaning::Amendment { .. }
+                    | JigMeaning::GoalField { .. }
+                    | JigMeaning::NoteSearch { .. } => return None,
+                }
+            }
+        }
+        None
+    }
+    /// A link's typed address for the platform's address translation.
+    #[must_use]
+    pub fn owner_part(&self, token: Token) -> Option<&jig_client::contract::OwnerPart> {
+        for entry in &self.entries {
+            if entry.token == token {
+                match &entry.meaning {
+                    JigMeaning::OwnerPart(part) => return Some(part),
+                    JigMeaning::Part(_)
+                    | JigMeaning::Action(_)
                     | JigMeaning::Field(_)
                     | JigMeaning::TaskNumber
                     | JigMeaning::Priority
@@ -165,6 +188,7 @@ impl JigBindings {
                     JigMeaning::Field(_)
                     | JigMeaning::TaskNumber
                     | JigMeaning::Part(_)
+                    | JigMeaning::OwnerPart(_)
                     | JigMeaning::Priority
                     | JigMeaning::Amendment { .. }
                     | JigMeaning::GoalField { .. }
@@ -182,7 +206,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
     for entry in &view.entries {
         if entry.token == token {
             return match &entry.meaning {
-                JigMeaning::Part(_) => None,
+                JigMeaning::Part(_) | JigMeaning::OwnerPart(_) => None,
                 JigMeaning::GoalField { form, field } => match act {
                     Act::Input { value } => crate::pages::project::goals::edit(*form, *field, &value),
                     Act::Press | Act::Submit | Act::Toggle => None,

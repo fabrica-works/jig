@@ -155,4 +155,5 @@ pub(crate) fn scratch(limits: &crate::Limits) -> Option<u64> {
     task::scratch(limits.depth)?
         .checked_add(skein_lib::List::<jig_client::contract::Part>::worst_case(limits.slots)?)?
         .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)
+        .checked_add(skein_lib::List::<u8>::worst_case(limits.text_per_node)?)
 }
