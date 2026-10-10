@@ -14,6 +14,8 @@ mod builder;
 pub mod cards;
 pub mod confirmation;
 pub mod notices;
+pub mod owner_wake;
+pub mod owner_wake_words;
 pub mod pages;
 pub mod styles;
 pub mod turns;

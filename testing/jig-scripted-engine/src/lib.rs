@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 mod application;
 mod faults;
+pub mod owner_wake;
 mod payload;
 pub use application::{
     Application, ApplicationCommit, ApplicationScope, ApplicationValue, Decision, Never, NoApplication,
