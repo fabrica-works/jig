@@ -164,7 +164,7 @@ fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
             number(b, words, P::Person, *person);
         }
         OwnerOutcome::EscalationDecided { task, revision, by, at, choice } => {
-            escalation(b, *task, *revision, *by, *at, *choice, words)
+            escalation(b, *task, *revision, *by, *at, *choice, words);
         }
     }
 }
