@@ -82,3 +82,6 @@ pub mod owner_activity_words;
 
 pub mod owner_history;
 pub mod owner_history_words;
+
+pub mod owner_milestone;
+pub mod owner_milestone_words;

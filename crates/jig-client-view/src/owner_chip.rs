@@ -56,7 +56,7 @@ pub(crate) fn part_fits(part: &OwnerPart, limits: &Limits) -> Option<()> {
 fn text_fits(value: &DocumentText, limits: &Limits) -> Option<()> {
     if value.bytes.fits(limits.text) { Some(()) } else { None }
 }
-fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> {
+pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> {
     match value {
         ResultValue::OwnerVerdict { words, fields, .. } => {
             text_fits(words, limits)?;
@@ -287,7 +287,7 @@ pub(crate) fn reason(b: &mut Builder, value: HoldCategory, words: &Words) {
         HoldCategory::Procedure => text(b, words, P::HoldProcedure, &[]),
     }
 }
-fn prior(b: &mut Builder, value: OwnerPriorPhase, words: &Words) {
+pub(crate) fn prior(b: &mut Builder, value: OwnerPriorPhase, words: &Words) {
     match value {
         OwnerPriorPhase::Waiting => text(b, words, P::PriorWaiting, &[]),
         OwnerPriorPhase::Active(stage) => match stage {
@@ -392,7 +392,13 @@ fn result_value(b: &mut Builder, value: &ResultValue, client: &Domain, words: &W
         | ResultValue::Choice { .. } => crate::cards::result::value_nodes(b, client, value, words, bindings),
     }
 }
-fn ending(b: &mut Builder, value: &OwnerChipEnding, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn ending(
+    b: &mut Builder,
+    value: &OwnerChipEnding,
+    client: &Domain,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     match value {
         OwnerChipEnding::Done(result) => {
             text(b, words, P::Done, &[]);

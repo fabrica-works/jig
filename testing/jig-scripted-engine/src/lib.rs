@@ -434,3 +434,5 @@ pub mod owner_amendment;
 pub mod owner_activity;
 
 pub mod owner_history;
+
+pub mod owner_milestone;
