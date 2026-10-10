@@ -684,8 +684,9 @@ fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
     document.resources = List::with_capacity(1);
     let resource = Part::Resource { connector: 2, path: resource_path(b"resource") };
     document.resources.push(TaskResource::Part(resource.clone())).unwrap();
-    document.parts = List::with_capacity(1);
-    document.parts.push(Part::Panel { connector: 3, task: 8 }).unwrap();
+    let context = document.context.as_mut().expect("supplied task context");
+    context.parts = List::with_capacity(1);
+    context.parts.push(Part::Panel { connector: 3, task: 8 }).unwrap();
     let requests = drive(
         &mut domain,
         Time::ZERO,

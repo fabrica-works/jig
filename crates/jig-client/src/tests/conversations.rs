@@ -243,7 +243,8 @@ fn routed_conversation() {
     let task_watch = open_token(&opened);
     let mut document = super::confirmation::task();
     document.chip.executor = crate::contract::Executor::Agent { charter: 1 };
-    document.runtime = Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: None };
+    document.context.as_mut().expect("supplied task context").runtime =
+        Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: None };
     document.activity = 1;
     let requests = drive(
         &mut domain,
@@ -359,7 +360,7 @@ fn routed_scroll_and_end(
             result: ReadResult::Value(ReadValue::Activity(Box::new(page(&[0], None, Some(b"newer"))))),
         },
     );
-    document.runtime = Runtime::Idle;
+    document.context.as_mut().expect("supplied task context").runtime = Runtime::Idle;
     drive(
         domain,
         Time::ZERO,
