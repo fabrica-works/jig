@@ -3,7 +3,7 @@
 //! moves in; list owners choose capacities from limits. See client/domain/contract.md, 5.
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
-/// Owned text or a path, checked by its owner before it is kept.
+/// Owned text, checked by its owner before it is kept.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Text {
     bytes: Box<[u8]>,
@@ -155,7 +155,7 @@ pub enum Part {
     /// The connector name, supplied by its own view words.
     Connector { connector: u16 },
     /// A resource in its connector.
-    Resource { connector: u16, path: Text },
+    Resource { connector: u16, path: List<Box<[u8]>> },
     /// An effect or read kind.
     Kind { connector: u16, kind: u16 },
     /// A task panel.
@@ -179,7 +179,7 @@ pub enum Part {
 pub struct Grant {
     pub connector: u16,
     pub kind: u16,
-    pub pattern: Text,
+    pub pattern: super::OwnerPattern,
 }
 
 /// Authority facts to show or ask to amend, never evaluated here.
@@ -203,9 +203,9 @@ pub enum NoteScope {
     /// In a project.
     Project(u32),
     /// On a resource pattern.
-    Resource { project: u32, connector: u16, pattern: Text },
+    Resource { project: u32, connector: u16, pattern: super::OwnerPattern },
     /// For one goal.
-    Goal(u64),
+    Goal { project: u32, goal: u64 },
 }
 
 /// How an object ended.
