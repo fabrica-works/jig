@@ -2240,3 +2240,44 @@ fn watched_task_policies_replace_every_channel_without_merging_standing_interest
         }
     }
 }
+
+#[test]
+fn task_watch_replacements_keep_served_goal_identity_and_whole_contract_loss_independent() {
+    let mut domain = Domain::new(&LIMITS, 94);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut choices = List::with_capacity(2);
+    let mut fields = List::with_capacity(2);
+    fields.push(FieldRule { name: Box::from(*b"\xff\0/"), max: u32::MAX }).unwrap();
+    choices.push(VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields }).unwrap();
+    let part = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Result, key: OwnerPartKey::Number(u64::MAX) };
+    for (goal, contract) in [
+        (Some(8), TaskContractDocument::Report { words: u32::MAX }),
+        (Some(u64::MAX), TaskContractDocument::Approval { state: Box::from(*b"\xff\0/"), part }),
+        (None, TaskContractDocument::Verdict { choices, cut: true }),
+        (Some(0), TaskContractDocument::Change { connector: u16::MAX, kind: u16::MAX, words: u32::MAX }),
+    ] {
+        let mut row = super::confirmation::task();
+        row.goal = goal;
+        row.result_contract = contract;
+        row.spec.specification.words = DocumentText::complete(text(b""));
+        row.cut = false;
+        let expected = row.clone();
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row))) },
+        );
+        let id = domain.task_page().header.unwrap();
+        let Some(crate::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
+            panic!("whole task remains retained");
+        };
+        assert_eq!(**retained, expected);
+        assert!(!retained.cut, "contract loss is not aggregate task-list loss");
+        let sections = crate::pages::task::sections(retained);
+        assert!(crate::pages::task::offered(&sections, crate::address::TaskSection::Overview));
+    }
+}

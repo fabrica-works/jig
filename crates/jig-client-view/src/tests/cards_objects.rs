@@ -1821,3 +1821,6 @@ mod task_links;
 
 #[path = "task_wake.rs"]
 mod task_wake;
+
+#[path = "task_contract.rs"]
+mod task_contract;
