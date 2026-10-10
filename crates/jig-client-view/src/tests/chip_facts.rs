@@ -98,7 +98,7 @@ fn task_overview_expands_whole_metadata_but_nested_verdict_chips_stay_brief() {
     let tree = super::page_capacity::render(&client, words());
     assert!(contains(&tree, b"whole outer result"));
     assert!(contains(&tree, b"Project: 4294967295"));
-    assert!(contains(&tree, b"Resources unobserved"));
+    assert!(contains(&tree, b"Resource holder and writer facts unavailable"));
     assert!(!contains(&tree, b"nested ending remains carried"));
     assert!(!contains(&tree, b"Ended at:"));
     assert_eq!(inner.phase, Phase::Ended);
