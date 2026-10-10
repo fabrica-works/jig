@@ -117,7 +117,7 @@ fn task_sections(words: &Words) {
                 slot(&tree, &bindings);
             }
             if section == TaskSection::Budget {
-                assert!(contains(&tree, b"Total budget: 20"));
+                assert!(contains(&tree, b"Budget: 20"));
                 assert!(contains(&tree, b"Left: 20"));
             }
         }

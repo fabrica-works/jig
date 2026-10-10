@@ -62,6 +62,7 @@ pub const fn budget_nodes() -> u32 {
 #[must_use]
 pub fn required(value: &OwnerBudget, words: &Words) -> Option<BudgetFragment> {
     let mut result = region();
+    result.name(words, BudgetPhrase::Budget)?;
     result.numbers(words)?;
     result.phrase(words, BudgetPhrase::Funder)?;
     result.funder(words)?;
@@ -95,6 +96,7 @@ pub fn ledger_required(value: &PoolLedger, words: &Words) -> Option<BudgetFragme
 #[must_use]
 pub fn worst_case(words: &Words) -> Option<BudgetFragment> {
     let mut result = region();
+    result.name(words, BudgetPhrase::Budget)?;
     result.numbers(words)?;
     result.phrase(words, BudgetPhrase::Funder)?;
     result.funder(words)?;
@@ -138,6 +140,12 @@ fn time(b: &mut Builder, words: &Words, phrase: BudgetPhrase, at: Wall) {
 /// Render one exact budget with the caller's normal selected Words.
 pub fn render(b: &mut Builder, value: &OwnerBudget, words: &Words) {
     b.open(Role::Region);
+    let label = words
+        .book
+        .say(words.language, BudgetPhrase::Budget.id(), &[Hole::Amount(value.numbers.budget)])
+        .expect("checked budget region label")
+        .text;
+    b.name(&label);
     numbers(b, &value.numbers, value.left, words);
     text(b, words, BudgetPhrase::Funder, &[]);
     proposed_task::funder(b, value.funder, words);
