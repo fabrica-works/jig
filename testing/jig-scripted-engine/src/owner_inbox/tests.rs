@@ -63,6 +63,7 @@ fn whole() -> OwnerInbox {
         cached_updates: Count { value: 0, limited: true },
         results_seen: u64::MAX,
         updates_time_complete: false,
+        selection: None,
     }
 }
 fn bounds() -> Bounds {
@@ -97,6 +98,7 @@ fn owner_inbox_whole_page_opaque_bytes_allocation_boundaries_and_stored_links_ar
     value.task = OwnerTaskLink::Stored { number: u64::MAX, status: None };
     rows.push(value.clone()).unwrap();
     let page = OwnerInboxPage {
+        selection: None,
         cut: true,
         rows,
         before: Some(Cursor { value: Text::new(copy_of(&[255; 8]), 8).unwrap() }),
@@ -120,8 +122,36 @@ fn owner_inbox_whole_page_opaque_bytes_allocation_boundaries_and_stored_links_ar
         cached_updates: Count { value: u32::MAX, limited: false },
         results_seen: 0,
         updates_time_complete: true,
+        selection: None,
     };
     let root = u64::try_from(size_of::<OwnerInbox>()).unwrap();
     assert_eq!(bytes(&source, &bounds()), Some(root + List::<OwnerInboxEntry>::worst_case(3).unwrap() * 2));
     assert!(worst_case(&Bounds { document_bytes: root - 1, ..bounds() }).is_none());
+}
+#[test]
+fn owner_inbox_selection_roots_exceed_page_rows_without_clipping_and_price_whole_reserved_capacity() {
+    let mut source = whole();
+    let before = bytes(&source, &bounds()).unwrap();
+    let mut goals = List::with_capacity(5);
+    for number in [u64::MAX, 0, 77] {
+        goals.push(number).unwrap();
+    }
+    let mut selection = List::with_capacity(3);
+    selection.push(OwnerInboxSelection { cursor: source.updates.get(0).unwrap().cursor, goals }).unwrap();
+    source.selection = Some(selection);
+    let original = source.clone();
+    let expected = before + List::<OwnerInboxSelection>::worst_case(3).unwrap() + List::<u64>::worst_case(5).unwrap();
+    assert_eq!(bytes(&source, &bounds()), Some(expected));
+    assert!(fits(&source, &Bounds { document_bytes: expected, ..bounds() }));
+    assert!(!fits(&source, &Bounds { document_bytes: expected - 1, ..bounds() }));
+    assert_eq!(source, original);
+    let mut absent = whole();
+    absent.needs = List::with_capacity(0);
+    absent.updates = List::with_capacity(0);
+    let absent_bytes = bytes(&absent, &bounds()).unwrap();
+    let mut supplied = absent.clone();
+    supplied.selection = Some(List::with_capacity(3));
+    assert_ne!(absent, supplied);
+    assert_eq!(bytes(&supplied, &bounds()), Some(absent_bytes + List::<OwnerInboxSelection>::worst_case(3).unwrap()));
+    assert!(bytes(&supplied, &Bounds { rows: 2, ..bounds() }).is_none());
 }

@@ -72,6 +72,7 @@ fn whole(rows: impl IntoIterator<Item = OwnerInboxEntry>, limited: bool) -> Owne
         cached_updates: Count { value: 17, limited },
         results_seen: u64::MAX,
         updates_time_complete: false,
+        selection: None,
     }
 }
 fn domain(value: OwnerInbox) -> Domain {
@@ -202,6 +203,7 @@ fn owner_inbox_both_full_groups_two_read_windows_counts_source_cuts_fit_the_whol
             Event::Read {
                 read: token,
                 result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(OwnerInboxPage {
+                    selection: None,
                     cut: true,
                     rows,
                     before: Some(Cursor { value: Text::new(copy_of(after), CLIENT.text).unwrap() }),

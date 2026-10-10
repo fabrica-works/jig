@@ -32,6 +32,13 @@ pub struct OwnerInboxEntry {
     pub unread: Option<bool>,
     pub cursor: OwnerInboxCursor,
 }
+/// Parallel owner selection facts; roots are self followed by the exact supplied
+/// bounded ancestry. A row cursor associates context, never replaces row identity.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OwnerInboxSelection {
+    pub cursor: OwnerInboxCursor,
+    pub goals: List<u64>,
+}
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerInbox {
     pub party: u64,
@@ -42,9 +49,13 @@ pub struct OwnerInbox {
     pub cached_updates: Count,
     pub results_seen: u64,
     pub updates_time_complete: bool,
+    /// None is unsupplied; Some(empty) is a supplied empty selection collection.
+    pub selection: Option<List<OwnerInboxSelection>>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerInboxPage {
+    /// Original retained-row selection facts, independent of current live ancestry.
+    pub selection: Option<List<OwnerInboxSelection>>,
     pub cut: bool,
     pub rows: List<OwnerInboxEntry>,
     pub before: Option<Cursor>,

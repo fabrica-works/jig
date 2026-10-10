@@ -7,7 +7,7 @@ use crate::{
     address::{Address, ProjectSection},
     contract::{
         Count, Cursor, InboxDocument, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, InboxRow, Needs, ObjectKey,
-        OwnerInbox, OwnerInboxPage, Read,
+        OwnerInbox, OwnerInboxPage, OwnerInboxSelection, Read,
     },
 };
 use alloc::boxed::Box;
@@ -30,6 +30,8 @@ pub struct InboxWindow {
     pub reading: Option<skein_lib::Token>,
     /// Original accepted query, including its independent opaque continuation.
     pub query: Option<Read>,
+    /// Whole original retained context; never replaced with current requester facts.
+    pub selection: Option<List<OwnerInboxSelection>>,
 }
 impl InboxWindow {
     fn new(rows: u32) -> Self {
@@ -41,6 +43,7 @@ impl InboxWindow {
             more: false,
             reading: None,
             query: None,
+            selection: None,
         }
     }
     // Read rows past the watch remain; duplicate snapshots never resurrect a removed live key.
@@ -71,6 +74,7 @@ impl InboxWindow {
         self.more = false;
         self.reading = None;
         self.query = None;
+        self.selection = None;
     }
 }
 /// Context rows merge the live watch and both read groups by object key.
@@ -175,6 +179,7 @@ impl Inbox {
     /// A read terminal moves only its group's rows and cursor.
     pub(crate) fn page(&mut self, group: InboxReadGroup, page: InboxPage) {
         let window = self.window_mut(group);
+        window.selection = None;
         window.cut = page.cut;
         window.rows.clear();
         for row in page.rows.into_boxed() {
@@ -209,6 +214,7 @@ impl Inbox {
     /// or ancestry is required or used to re-filter a bounded historical page.
     pub(crate) fn owner_page(&mut self, group: InboxReadGroup, query: Read, page: OwnerInboxPage) {
         let window = self.window_mut(group);
+        window.selection = page.selection;
         window.cut = page.cut;
         window.rows.clear();
         for row in page.rows.into_boxed() {

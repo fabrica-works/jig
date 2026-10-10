@@ -42,6 +42,7 @@ fn whole(needs: List<OwnerInboxEntry>, updates: List<OwnerInboxEntry>) -> OwnerI
         cached_updates: Count { value: 17, limited: true },
         results_seen: u64::MAX,
         updates_time_complete: false,
+        selection: None,
     }
 }
 #[test]
@@ -120,6 +121,7 @@ fn owner_inbox_whole_groups_aggregate_counts_live_winner_and_unknown_time_source
         InboxReadGroup::Needs,
         query.clone(),
         OwnerInboxPage {
+            selection: None,
             cut: true,
             rows: list([old]),
             before: None,
@@ -165,6 +167,7 @@ fn owner_inbox_read_group_original_goal_query_cut_and_opaque_cursor_are_preserve
     let original = row.clone();
     let cursor = Cursor { value: Text::new(Box::from([255, 0, 254]), 3).unwrap() };
     let wrong = OwnerInboxPage {
+        selection: None,
         cut: true,
         rows: list([entry(3, OwnerInboxObject::Result { position: 9 })]),
         before: None,
@@ -177,7 +180,14 @@ fn owner_inbox_read_group_original_goal_query_cut_and_opaque_cursor_are_preserve
     );
     assert_eq!(domain.inbox().needs_window.reading, Some(read));
     assert!(domain.inbox().needs_window.rows.is_empty());
-    let page = OwnerInboxPage { cut: true, rows: list([row]), before: None, after: Some(cursor.clone()) };
+    let context = list([OwnerInboxSelection { cursor: row.cursor, goals: list([3, 77]) }]);
+    let page = OwnerInboxPage {
+        selection: Some(context.clone()),
+        cut: true,
+        rows: list([row]),
+        before: None,
+        after: Some(cursor.clone()),
+    };
     drive(
         &mut domain,
         Time::ZERO,
@@ -185,6 +195,7 @@ fn owner_inbox_read_group_original_goal_query_cut_and_opaque_cursor_are_preserve
     );
     assert_eq!(domain.inbox().rows.get(0), Some(&InboxRow::Owner(Box::new(original))));
     assert_eq!(domain.inbox().needs_window.query, Some(query));
+    assert_eq!(domain.inbox().needs_window.selection, Some(context));
     assert!(domain.inbox().needs_window.cut);
     assert_eq!(domain.inbox().needs_window.after, Some(cursor));
     assert_eq!(domain.inbox().needs_window.reading, None);
@@ -202,7 +213,7 @@ fn owner_inbox_live_goal_context_is_explicitly_pending_and_bounded_read_membersh
     page.owner_page(
         InboxReadGroup::Needs,
         query,
-        OwnerInboxPage { cut: false, rows: list([row.clone()]), before: None, after: None },
+        OwnerInboxPage { selection: None, cut: false, rows: list([row.clone()]), before: None, after: None },
     );
     assert_eq!(page.rows.get(0), Some(&InboxRow::Owner(Box::new(row))));
     assert!(page.goal_context_pending);
