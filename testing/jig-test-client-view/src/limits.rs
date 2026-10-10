@@ -38,16 +38,25 @@ impl Limits {
         jig: &jig_client_view::words::Words,
         first: &words::Words,
     ) -> Option<Self> {
+        let owner = crate::connector_values::requirements(&domain.first.connector, jig)?;
+        let fragment_nodes = family::PART_NODES.max(owner.nodes.checked_add(14)?);
         let cards = domain.first.rows.checked_add(1)?;
-        let application_nodes = family::PART_NODES.checked_add(cards.checked_mul(3)?)?.checked_add(3)?;
+        let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(3)?;
         // All nodes bound the possible slots in the public jig envelope.
         // This conservative bound also covers duplicate references to one part.
         let jig_nodes = jig_client_view::Limits::of_words(&domain.jig, jig)?.nodes;
         let jig_cards = jig_client_view::card_nodes(&domain.jig)?.checked_mul(cards)?;
-        let part_nodes = jig_nodes.checked_add(jig_cards)?.checked_mul(family::PART_NODES)?;
+        let part_nodes = jig_nodes.checked_add(jig_cards)?.checked_mul(fragment_nodes)?;
         let slot_nodes = part_nodes.checked_add(jig_cards)?.checked_add(family::NAV_NODES)?;
-        let mut tree = jig_client_view::Limits::compose(&domain.jig, jig, application_nodes, slot_nodes, 8)?;
-        tree.text_per_node = tree.text_per_node.max(first.capacity()?.checked_mul(2)?.checked_add(20)?);
+        let mut tree = jig_client_view::Limits::compose(
+            &domain.jig,
+            jig,
+            application_nodes,
+            slot_nodes,
+            owner.depth.checked_add(4)?.max(8),
+        )?;
+        tree.text_per_node =
+            tree.text_per_node.max(first.capacity()?.checked_mul(2)?.checked_add(20)?).max(owner.text_per_node);
         tree.text_bytes = tree.nodes.checked_mul(tree.text_per_node)?;
         tree.drawing_bytes = drawing::BYTES;
         let limits = Self { tree, text: domain.first.text };

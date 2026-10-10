@@ -42,6 +42,13 @@ fn limits() -> jig_test_client_domain::Limits {
             heartbeat: Duration::from_secs(100),
         },
         first: first::Limits {
+            connector: jig_test_client_domain::connector_values::ConnectorLimits {
+                rows: 0,
+                paths: 0,
+                segments: 0,
+                segment_bytes: 0,
+                bytes: 4096,
+            },
             parts: 8,
             objects: 8,
             reads: 16,
@@ -129,11 +136,7 @@ fn ready() -> Domain {
 fn words() -> jig_client_view::words::Words {
     static WORDS: std::sync::OnceLock<jig_client_view::words::Words> = std::sync::OnceLock::new();
     WORDS
-        .get_or_init(|| jig_client_view::words::Words {
-            book: jig_client_view::phrases::english::english(limits().jig.text).unwrap(),
-            language: 0,
-            offset_minutes: 0,
-        })
+        .get_or_init(|| crate::connector_values_words::english(limits().jig.text).unwrap())
         .clone()
 }
 fn family_words() -> words::Words {
@@ -606,6 +609,120 @@ fn effect_family_keys_keep_equal_task_and_party_makers_in_distinct_public_items(
         assert_eq!((key.a, key.b), (u64::MAX, u64::MAX));
         assert!(view.tree().nodes().iter().any(|node| node.key == Some(key)));
     }
+    assert!(view.tree().len() <= view.limits().tree.nodes);
+    assert!(patches(&mut view, &root).is_empty());
+}
+
+#[test]
+fn raw_owner_effect_keys_keep_full_scope_and_numbers_separate_from_equal_core_makers() {
+    let reference = u64::MAX;
+    let mut keys = std::collections::BTreeSet::new();
+    for scope in [family::Scope::Project(0), family::Scope::Project(u32::MAX), family::Scope::Deployment] {
+        let key = crate::family_key(&family::Subject { scope, kind: family::Kind::OwnerEffect(reference) });
+        assert_eq!(key.kind, 20);
+        assert_eq!(key.b, reference);
+        assert_eq!(
+            key.a,
+            match scope {
+                family::Scope::Project(project) => u64::from(project),
+                family::Scope::Deployment => u64::MAX,
+            }
+        );
+        assert!(keys.insert(key));
+    }
+    for proposer in [Proposer::Task(reference), Proposer::Party(reference)] {
+        assert!(keys.insert(crate::family_key(&family::Subject {
+            scope: family::Scope::Project(0),
+            kind: family::Kind::Effect(ProposalKey { proposer, number: reference }),
+        })));
+    }
+    assert_eq!(keys.len(), 5);
+}
+
+#[test]
+fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_fragment() {
+    use jig_test_client_domain::connector_values::{
+        ApplicationObject, ApplicationOutcome, ClientDocument, ConnectorAnswer, ConnectorDocument,
+    };
+    let mut root = ready();
+    let opened =
+        drive(&mut root, Event::Went { place: Place::Address(Address::First(first::Address { project: 3, item: 5 })) });
+    let subject = family::Subject { scope: family::Scope::Project(3), kind: family::Kind::Item(5) };
+    drive(
+        &mut root,
+        Event::First(first::Event::Read {
+            read: family_read(&opened),
+            result: first::ReadResult::Value(family::Document::Connector(ConnectorDocument {
+                subject,
+                value: Box::new(ClientDocument::Object {
+                    object: 5,
+                    now: ApplicationObject { revision: 17, value: u64::MAX },
+                }),
+            })),
+        }),
+    );
+    let id = root.first().find(subject).unwrap();
+    let mut view = view();
+    patches(&mut view, &root);
+    assert!(contains(&view, b"18446744073709551615"));
+    let field = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|node| node.role == Role::TextField && node.name.as_ref() == b"Parameters")
+        .unwrap()
+        .id;
+    let changed = decode(&view, &Act::Change { node: field, value: Box::from(*b"0") }).unwrap();
+    assert_eq!(
+        changed,
+        jig_test_client_domain::Action::First(first::Act::Parameters {
+            object: id.token(),
+            revision: Revision { value: 17 },
+            value: 0
+        })
+    );
+    drive(&mut root, Event::Act { action: changed });
+    patches(&mut view, &root);
+    let apply = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|node| node.role == Role::Button && node.name.as_ref() == b"Apply parameters")
+        .unwrap()
+        .id;
+    drive(&mut root, Event::Act { action: decode(&view, &Act::Activate { node: apply }).unwrap() });
+    let mut sends = Queue::with_capacity(jig_test_client_domain::max_out(&limits()));
+    jig_test_client_domain::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut sends);
+    let mut attempt = None;
+    while let Some(send) = sends.pop() {
+        if let Request::Send { attempt: number, ask: jig_test_client_domain::Ask::First(ask), .. } = send {
+            assert_eq!(
+                ask,
+                family::Ask::ChangeObject { project: 3, object: 5, revision: Revision { value: 17 }, value: 0 }
+            );
+            attempt = Some(number);
+        }
+    }
+    let answer = first::Answer::Connector(ConnectorAnswer {
+        value: ApplicationOutcome::Changed { object: 5, now: ApplicationObject { revision: 18, value: 0 } },
+    });
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt: attempt.unwrap(),
+            envelope: skein_lib::RequestEnvelope::Final,
+            answer: Some(jig_test_client_domain::Answered::First(answer.clone())),
+        },
+    );
+    patches(&mut view, &root);
+    assert!(
+        view.tree()
+            .nodes()
+            .iter()
+            .any(|node| node.role == Role::Status && node.name.as_ref() == b"Application outcome")
+    );
+    assert!(contains(&view, b"Changed"));
+    assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer });
     assert!(view.tree().len() <= view.limits().tree.nodes);
     assert!(patches(&mut view, &root).is_empty());
 }

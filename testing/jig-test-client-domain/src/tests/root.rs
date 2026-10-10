@@ -50,6 +50,13 @@ fn limits() -> Limits {
     Limits {
         jig: JIG,
         first: first::Limits {
+            connector: crate::connector_values::ConnectorLimits {
+                rows: 0,
+                paths: 0,
+                segments: 0,
+                segment_bytes: 0,
+                bytes: 4096,
+            },
             parts: 10,
             text: 32,
             objects: 12,
@@ -871,5 +878,161 @@ fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_propo
     );
     for part in &parts {
         assert!(!root.first().contains(part, generation));
+    }
+}
+
+#[test]
+fn actual_application_object_form_keeps_explicit_zero_observed_revision_and_original_final_child() {
+    use crate::connector_values::{
+        ApplicationObject, ApplicationOutcome, ClientDocument, ConnectorAnswer, ConnectorDocument,
+    };
+    use crate::family::{Document, Kind, Scope, Subject};
+    let mut root = ready(91);
+    let opened = family_page(&mut root);
+    let subject = Subject { scope: Scope::Project(3), kind: Kind::Item(5) };
+    let value = Document::Connector(ConnectorDocument {
+        subject,
+        value: Box::new(ClientDocument::Object { object: 5, now: ApplicationObject { revision: 17, value: 64 } }),
+    });
+    drive(
+        &mut root,
+        Event::First(first::Event::Read {
+            read: family_read(&opened),
+            result: first::ReadResult::Value(value.clone()),
+        }),
+    );
+    let id = root.first().find(subject).unwrap();
+    assert_eq!(root.first().object(id).unwrap().value, first::Value::Known(value));
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::First(first::Act::Parameters {
+                object: id.token(),
+                revision: contract::Revision { value: 17 },
+                value: 0,
+            }),
+        },
+    );
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::First(first::Act::Touch {
+                object: id.token(),
+                revision: contract::Revision { value: 17 },
+            }),
+        },
+    );
+    let sent = taken(&mut root);
+    let (attempt, ask) = sent
+        .iter()
+        .find_map(|request| match request {
+            Request::Send { attempt, ask: Ask::First(ask), .. } => Some((*attempt, ask)),
+            _ => None,
+        })
+        .expect("one keyed complete application request");
+    assert_eq!(
+        ask,
+        &crate::family::Ask::ChangeObject {
+            project: 3,
+            object: 5,
+            revision: contract::Revision { value: 17 },
+            value: 0
+        }
+    );
+    let answer = crate::family::Answer::Connector(ConnectorAnswer {
+        value: ApplicationOutcome::Changed { object: 5, now: ApplicationObject { revision: 18, value: 0 } },
+    });
+    drive(
+        &mut root,
+        Event::Answer { attempt, envelope: RequestEnvelope::Final, answer: Some(Answered::First(answer.clone())) },
+    );
+    assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer });
+    drive(
+        &mut root,
+        Event::Answer {
+            attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(Answered::First(crate::family::Answer::Connector(ConnectorAnswer {
+                value: ApplicationOutcome::Role { held: u32::MAX },
+            }))),
+        },
+    );
+    assert!(matches!(root.first().object(id).unwrap().card, first::Card::Done { .. }));
+}
+
+#[test]
+fn whole_owner_parts_require_original_inner_identity_and_keep_unversioned_snapshots_without_forms() {
+    use crate::connector_values::{ClientDocument, ConnectorDocument};
+    use crate::family::{Document, Kind, Scope, Subject};
+    let mut root = ready(92);
+    let part = contract::Part::Panel { connector: crate::FIRST, task: 9 };
+    let opened = drive(&mut root, Event::First(first::Event::Show { part, generation: 1, scope: Scope::Project(3) }));
+    let subject = Subject { scope: Scope::Project(3), kind: Kind::Panel(9) };
+    let watch = family_watch(&opened);
+    for bad in [
+        ClientDocument::Panel {
+            task: 10,
+            procedure: None,
+            result: None,
+            resources: List::with_capacity(0),
+            effects: List::with_capacity(0),
+        },
+        ClientDocument::Panel {
+            task: 9,
+            procedure: None,
+            result: None,
+            resources: List::with_capacity(1),
+            effects: List::with_capacity(0),
+        },
+    ] {
+        let outputs = drive(
+            &mut root,
+            Event::First(first::Event::Watch {
+                watch,
+                event: first::WatchEvent::Delivered(Document::Connector(ConnectorDocument {
+                    subject,
+                    value: Box::new(bad),
+                })),
+            }),
+        );
+        assert!(
+            outputs.iter().any(|request| matches!(
+                request,
+                Request::First(first::Out::Fact { fact: first::Fact::InvalidDocument })
+            ))
+        );
+        assert!(matches!(
+            root.first().object(root.first().find(subject).unwrap()).unwrap().value,
+            first::Value::Loading
+        ));
+    }
+    for result in [None, Some(0), Some(u16::MAX)] {
+        let document = Document::Connector(ConnectorDocument {
+            subject,
+            value: Box::new(ClientDocument::Panel {
+                task: 9,
+                procedure: None,
+                result,
+                resources: List::with_capacity(0),
+                effects: List::with_capacity(0),
+            }),
+        });
+        assert_eq!(document.revision(), None);
+        drive(
+            &mut root,
+            Event::First(first::Event::Watch { watch, event: first::WatchEvent::Delivered(document.clone()) }),
+        );
+        let id = root.first().find(subject).unwrap();
+        assert_eq!(root.first().object(id).unwrap().value, first::Value::Known(document));
+        drive(
+            &mut root,
+            Event::Act {
+                action: crate::Action::First(first::Act::Touch {
+                    object: id.token(),
+                    revision: contract::Revision { value: 0 },
+                }),
+            },
+        );
+        assert!(!taken(&mut root).iter().any(|request| matches!(request, Request::Send { ask: Ask::First(_), .. })));
     }
 }

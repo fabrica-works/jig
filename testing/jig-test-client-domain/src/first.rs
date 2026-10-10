@@ -76,6 +76,7 @@ pub struct Limits {
     pub requests: u32,
     pub rows: u32,
     pub text: u32,
+    pub connector: crate::connector_values::ConnectorLimits,
     pub retry: skein_lib::Duration,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -327,6 +328,16 @@ fn parameters_revision(value: &Value) -> Option<Revision> {
             Some(parameters) => Some(parameters.revision),
             None => None,
         },
+        Value::Known(Document::Connector(value)) => match value.value.as_ref() {
+            crate::connector_values::ClientDocument::Object { now, .. } => Some(Revision { value: now.revision }),
+            crate::connector_values::ClientDocument::Panel { .. }
+            | crate::connector_values::ClientDocument::Result { .. }
+            | crate::connector_values::ClientDocument::Effect { .. }
+            | crate::connector_values::ClientDocument::Outbox { .. }
+            | crate::connector_values::ClientDocument::Hold { .. }
+            | crate::connector_values::ClientDocument::Project { .. }
+            | crate::connector_values::ClientDocument::Deployment { .. } => None,
+        },
         Value::Known(Document::Item(_)) | Value::Loading | Value::Unknown => None,
     }
 }
@@ -388,7 +399,13 @@ fn matches_loading(value: &Value) -> bool {
     }
 }
 fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Document, out: &mut Queue<Request>) {
-    if document.subject() != subject || !document.fits(env.limits.rows) {
+    let fits = match &document {
+        Document::Connector(value) => {
+            value.matches_subject() && crate::connector_bounds::document_fits(value, &env.limits.connector)
+        }
+        Document::Item(_) | Document::Part(_) => document.fits(env.limits.rows),
+    };
+    if document.subject() != subject || !fits {
         out.push(Request::Out(Out::Fact { fact: Fact::InvalidDocument }));
         return;
     }
@@ -398,10 +415,17 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
     let object = side.objects.get_mut(id).expect("named object exists");
     match &object.value {
         Value::Known(current) => {
-            if current.revision().value > document.revision().value {
-                return;
-            }
-            if current.revision() != document.revision() {
+            if let Some(before) = current.revision()
+                && let Some(now) = document.revision()
+            {
+                if before.value > now.value {
+                    return;
+                }
+                if before != now {
+                    object.draft = None;
+                }
+            } else {
+                // An unversioned snapshot has no revision which can retain a draft.
                 object.draft = None;
             }
         }
@@ -561,6 +585,13 @@ fn touch(side: &mut Side, id: Id<Object>, revision: Revision, out: &mut Queue<Re
         Value::Known(document) => document,
         Value::Loading | Value::Unknown => return,
     };
+    match document {
+        Document::Connector(_) => {
+            connector_touch(side, id, revision, party, out);
+            return;
+        }
+        Document::Item(_) | Document::Part(_) => {}
+    }
     let (project, item, current, allowed) = match document {
         Document::Item(item) => (item.project, item.key, item.revision, item.touchable),
         Document::Part(part) => {
@@ -573,6 +604,7 @@ fn touch(side: &mut Side, id: Id<Object>, revision: Revision, out: &mut Queue<Re
             };
             (project, parameters.item, parameters.revision, parameters.amendable)
         }
+        Document::Connector(_) => return,
     };
     if current != revision {
         side.objects.get_mut(id).expect("named object exists").card =
@@ -654,7 +686,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     >::worst_case(
         limits.objects,
     )?)?;
-    let payload = List::<jig_client::contract::ProposalKey>::worst_case(limits.rows)?;
+    let payload = List::<jig_client::contract::ProposalKey>::worst_case(limits.rows)?
+        .max(crate::connector_bounds::document_worst_case(&limits.connector)?);
     total = total.checked_add(u64::from(limits.objects.checked_mul(2)?).checked_mul(payload)?)?;
     total = total
         .checked_add(Slab::<Reading>::worst_case(limits.reads)?)?
@@ -738,6 +771,14 @@ fn answered(side: &mut Side, _env: &Env<Limits>, request: Token, answer: Answer,
             object.card = match &answer {
                 Answer::Touched { .. } => Card::Done { answer: answer.clone() },
                 Answer::Moved { .. } | Answer::Gone | Answer::Refused(_) => Card::Refused { answer: answer.clone() },
+                Answer::Connector(value) => match value.value {
+                    crate::connector_values::ApplicationOutcome::Changed { .. } => Card::Done { answer },
+                    crate::connector_values::ApplicationOutcome::Moved { .. }
+                    | crate::connector_values::ApplicationOutcome::Role { .. }
+                    | crate::connector_values::ApplicationOutcome::Unknown
+                    | crate::connector_values::ApplicationOutcome::Exhausted
+                    | crate::connector_values::ApplicationOutcome::CoreRefused { .. } => Card::Refused { answer },
+                },
             };
             side.changed();
         }
@@ -791,4 +832,50 @@ fn part_fits(part: &Part, text: u32) -> bool {
         | Part::Project { .. }
         | Part::Deployment { .. } => true,
     }
+}
+
+fn connector_touch(side: &mut Side, id: Id<Object>, revision: Revision, party: u64, out: &mut Queue<Request>) {
+    let Some(object) = side.object(id) else {
+        return;
+    };
+    let document = match &object.value {
+        Value::Known(Document::Connector(value)) => value,
+        Value::Known(Document::Item(_) | Document::Part(_)) | Value::Loading | Value::Unknown => return,
+    };
+    let (number, now) = match document.value.as_ref() {
+        crate::connector_values::ClientDocument::Object { object, now } => (*object, *now),
+        crate::connector_values::ClientDocument::Panel { .. }
+        | crate::connector_values::ClientDocument::Result { .. }
+        | crate::connector_values::ClientDocument::Effect { .. }
+        | crate::connector_values::ClientDocument::Outbox { .. }
+        | crate::connector_values::ClientDocument::Hold { .. }
+        | crate::connector_values::ClientDocument::Project { .. }
+        | crate::connector_values::ClientDocument::Deployment { .. } => return,
+    };
+    let project = match document.subject.scope {
+        Scope::Project(project) => project,
+        Scope::Deployment => return,
+    };
+    if now.revision != revision.value {
+        side.objects.get_mut(id).expect("named object exists").card = Card::Refused {
+            answer: Answer::Connector(crate::connector_values::ConnectorAnswer {
+                value: crate::connector_values::ApplicationOutcome::Moved { object: number, now },
+            }),
+        };
+        side.changed();
+        return;
+    }
+    let value = object.draft.unwrap_or(now.value);
+    let Ok(request) = side.pending.insert(Pending { live: true, object: id }) else {
+        full(out);
+        return;
+    };
+    side.objects.get_mut(id).expect("named object exists").card =
+        Card::Deciding { request: request.token(), progress: RequestProgress::Parked };
+    out.push(Request::Send {
+        request: request.token(),
+        scope: party,
+        ask: Ask::ChangeObject { project, object: number, revision, value },
+    });
+    side.changed();
 }

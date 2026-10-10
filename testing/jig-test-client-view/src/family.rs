@@ -50,7 +50,7 @@ pub fn page(
                 jig_slot(b, ObjectKey::Proposal(*proposal), words, bindings);
             }
         }
-        Value::Known(Document::Part(_)) | Value::Loading | Value::Unknown => {}
+        Value::Known(Document::Part(_) | Document::Connector(_)) | Value::Loading | Value::Unknown => {}
     }
     b.close();
 }
@@ -116,7 +116,7 @@ fn object(
     let title = match &object.value {
         Value::Known(Document::Item(item)) => words.say(Word::Item, &[Hole::Number(item.key)]),
         Value::Known(Document::Part(part)) => words.say(Word::Part, &[Hole::Number(part.revision.value)]),
-        Value::Loading | Value::Unknown => words.say(Word::Family, &[]),
+        Value::Known(Document::Connector(_)) | Value::Loading | Value::Unknown => words.say(Word::Family, &[]),
     };
     b.name(&title);
     match &object.value {
@@ -145,6 +145,31 @@ fn object(
                         b,
                         Word::Touch,
                         first::Act::Touch { object: id.token(), revision: item.revision },
+                        &object.card,
+                        words,
+                        bindings,
+                    );
+                }
+            }
+            Document::Connector(value) => {
+                crate::connector_values::document(b, value, jig);
+                if let jig_test_client_domain::connector_values::ClientDocument::Object { now, .. } =
+                    value.value.as_ref()
+                {
+                    let revision = jig_client::contract::Revision { value: now.revision };
+                    b.open(Role::TextField);
+                    b.name(&words.say(Word::Parameters, &[]));
+                    b.value(Decimal::of(object.draft.unwrap_or(now.value)).as_bytes(), now.revision);
+                    if disabled(&object.card) {
+                        b.state(State::Disabled);
+                    } else {
+                        b.bind(bindings.insert(Meaning::Parameters { object: id.token(), revision }));
+                    }
+                    b.close();
+                    button(
+                        b,
+                        Word::Apply,
+                        first::Act::Touch { object: id.token(), revision },
                         &object.card,
                         words,
                         bindings,
@@ -222,6 +247,16 @@ fn card(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::word
             first::Answer::Moved { revision, .. } => words.status(b, Word::Moved, &[Hole::Number(revision.value)]),
             first::Answer::Gone => words.status(b, Word::Gone, &[]),
             first::Answer::Refused(refusal) => jig.refusal(b, refusal.refusal()),
+            first::Answer::Connector(value) => {
+                let saying = jig
+                    .book
+                    .say(jig.language, crate::connector_values_words::Word::Answer.id(), &[])
+                    .expect("checked application terminal name");
+                b.open(Role::Status);
+                b.name(&saying.text);
+                crate::connector_values::answer(b, value, jig);
+                b.close();
+            }
         },
     }
 }
@@ -242,6 +277,13 @@ pub fn key(subject: &Subject) -> Key {
             Proposer::Task(task) => Key { owner: NAV.owner, kind: 13, a: task, b: proposal.number },
             Proposer::Party(party) => Key { owner: NAV.owner, kind: 19, a: party, b: proposal.number },
         },
+        Kind::OwnerEffect(reference) => {
+            let supplied_scope = match subject.scope {
+                Scope::Project(project) => u64::from(project),
+                Scope::Deployment => u64::MAX,
+            };
+            Key { owner: NAV.owner, kind: 20, a: supplied_scope, b: reference }
+        }
         Kind::Outbox(entry) => match subject.scope {
             Scope::Project(project) => Key { owner: NAV.owner, kind: 17, a: u64::from(project), b: entry },
             Scope::Deployment => Key { owner: NAV.owner, kind: 18, a: 0, b: entry },

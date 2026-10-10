@@ -46,6 +46,13 @@ pub fn limits() -> jig_test_client_domain::Limits {
             heartbeat: Duration::from_millis(100),
         },
         first: first::Limits {
+            connector: jig_test_client_domain::connector_values::ConnectorLimits {
+                rows: 0,
+                paths: 0,
+                segments: 0,
+                segment_bytes: 0,
+                bytes: 4096,
+            },
             parts: 8,
             objects: 8,
             reads: 16,
@@ -88,11 +95,7 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
         .entry((limits.jig.text, limits.first.text))
         .or_insert_with(|| {
             (
-                jig_client_view::words::Words {
-                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
-                    language: 0,
-                    offset_minutes: 0,
-                },
+                view::connector_values_words::english(limits.jig.text).expect("composed application English fits"),
                 view::words::Words::english(limits.first.text).expect("family English fits"),
             )
         })

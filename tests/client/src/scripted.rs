@@ -19,18 +19,57 @@ impl Application for Family {
     type Subject = family::Subject;
     type Document = family::Document;
     fn decide(&mut self, _: &Truth, _: u64, ask: &Self::Ask, _: Wall) -> Decision<Self::Answer> {
-        let family::Ask::Touch { project, item, revision, parameters } = ask;
-        let subject = family::Subject { scope: family::Scope::Project(*project), kind: family::Kind::Item(*item) };
-        let answer = match self.documents.get_mut(&subject) {
-            Some(family::Document::Item(doc)) if doc.revision == *revision => {
-                doc.revision = Revision { value: doc.revision.value + 1 };
-                if let Some(value) = parameters {
-                    doc.value = *value;
+        let answer = match ask {
+            family::Ask::Touch { project, item, revision, parameters } => {
+                let subject =
+                    family::Subject { scope: family::Scope::Project(*project), kind: family::Kind::Item(*item) };
+                match self.documents.get_mut(&subject) {
+                    Some(family::Document::Item(doc)) if doc.revision == *revision => {
+                        doc.revision = Revision { value: doc.revision.value + 1 };
+                        if let Some(value) = parameters {
+                            doc.value = *value;
+                        }
+                        family::Answer::Touched { item: *item, revision: doc.revision }
+                    }
+                    Some(doc) => match doc.revision() {
+                        Some(revision) => family::Answer::Moved { item: *item, revision },
+                        None => family::Answer::Connector(jig_test_client_domain::connector_values::ConnectorAnswer {
+                            value: jig_test_client_domain::connector_values::ApplicationOutcome::Unknown,
+                        }),
+                    },
+                    None => family::Answer::Gone,
                 }
-                family::Answer::Touched { item: *item, revision: doc.revision }
             }
-            Some(doc) => family::Answer::Moved { item: *item, revision: doc.revision() },
-            None => family::Answer::Gone,
+            family::Ask::ChangeObject { project, object, revision, value } => {
+                let subject =
+                    family::Subject { scope: family::Scope::Project(*project), kind: family::Kind::Item(*object) };
+                let outcome = match self.documents.get_mut(&subject) {
+                    Some(family::Document::Connector(doc)) => match doc.value.as_mut() {
+                        jig_test_client_domain::connector_values::ClientDocument::Object { object: number, now }
+                            if number == object =>
+                        {
+                            if now.revision != revision.value {
+                                jig_test_client_domain::connector_values::ApplicationOutcome::Moved {
+                                    object: *object,
+                                    now: *now,
+                                }
+                            } else if let Some(next) = now.revision.checked_add(1) {
+                                now.revision = next;
+                                now.value = *value;
+                                jig_test_client_domain::connector_values::ApplicationOutcome::Changed {
+                                    object: *object,
+                                    now: *now,
+                                }
+                            } else {
+                                jig_test_client_domain::connector_values::ApplicationOutcome::Exhausted
+                            }
+                        }
+                        _ => jig_test_client_domain::connector_values::ApplicationOutcome::Unknown,
+                    },
+                    _ => jig_test_client_domain::connector_values::ApplicationOutcome::Unknown,
+                };
+                family::Answer::Connector(jig_test_client_domain::connector_values::ConnectorAnswer { value: outcome })
+            }
         };
         Decision { answer, changes: vec![] }
     }
@@ -48,9 +87,24 @@ impl Application for Family {
     }
     fn fits(&self, value: ApplicationValue<'_, Self>, bounds: &engine::Bounds) -> bool {
         match value {
-            ApplicationValue::Document(doc) => doc.fits(bounds.rows),
-            ApplicationValue::State(state) => state.documents.values().all(|doc| doc.fits(bounds.rows)),
+            ApplicationValue::Document(doc) => family_document_fits(doc, bounds),
+            ApplicationValue::State(state) => state.documents.values().all(|doc| family_document_fits(doc, bounds)),
             ApplicationValue::Ask(_) | ApplicationValue::Answer(_) | ApplicationValue::Subject(_) => true,
+        }
+    }
+}
+fn family_document_fits(document: &family::Document, bounds: &engine::Bounds) -> bool {
+    match document {
+        family::Document::Item(_) | family::Document::Part(_) => document.fits(bounds.rows),
+        family::Document::Connector(value) => {
+            let limits = domain::connector_values::ConnectorLimits {
+                rows: bounds.rows,
+                paths: bounds.rows,
+                segments: bounds.rows,
+                segment_bytes: bounds.text,
+                bytes: bounds.document_bytes,
+            };
+            value.matches_subject() && domain::connector_bounds::document_fits(value, &limits)
         }
     }
 }
@@ -208,10 +262,12 @@ impl Front<Test> for Scripted {
                         self.engine.send(now, wall, party, key, attempt, *ask).expect("jig send fits");
                     }
                     Ask::First(ask) => {
-                        let family::Ask::Touch { project, .. } = &ask;
+                        let project = match &ask {
+                            family::Ask::Touch { project, .. } | family::Ask::ChangeObject { project, .. } => *project,
+                        };
                         let digest: [u8; 32] = Sha256::digest(format!("{ask:?}").as_bytes()).into();
                         self.engine
-                            .send_application(now, wall, party, key, attempt, 1, *project, digest, ask)
+                            .send_application(now, wall, party, key, attempt, 1, project, digest, ask)
                             .expect("family send fits");
                     }
                 }

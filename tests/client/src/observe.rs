@@ -37,6 +37,14 @@ pub fn sent(request: &Request) -> Option<Sent> {
             Some((0, revision.value)),
             None,
         ),
+        domain::Ask::First(family::Ask::ChangeObject { project, object, revision, .. }) => (
+            Some(CardKey::of(jig_test_client_view::family_key(&family::Subject {
+                scope: family::Scope::Project(*project),
+                kind: family::Kind::Item(*object),
+            }))),
+            Some((0, revision.value)),
+            None,
+        ),
         domain::Ask::Jig(ask) => return Some(jig_sent(*attempt, *k, ask)),
     };
     Some(Sent { attempt: *attempt, key: *k, card, revision, words })
@@ -125,12 +133,13 @@ fn frame(frame: &Frame) -> Vec<Receipt> {
 }
 fn family(doc: &family::Document) -> Receipt {
     let revision = match doc {
-        family::Document::Item(item) => item.revision,
-        family::Document::Part(part) => part.parameters.map_or(part.revision, |p| p.revision),
+        family::Document::Item(item) => Some(item.revision),
+        family::Document::Part(part) => Some(part.parameters.map_or(part.revision, |p| p.revision)),
+        family::Document::Connector(_) => doc.revision(),
     };
     Receipt::Card {
         key: CardKey::of(jig_test_client_view::family_key(&doc.subject())),
-        revisions: vec![(0, revision.value)],
+        revisions: revision.map_or_else(Vec::new, |revision| vec![(0, revision.value)]),
     }
 }
 #[must_use]
@@ -235,7 +244,9 @@ fn explained(tree: &Tree, start: usize, end: usize) -> bool {
 fn card_key(k: Key) -> bool {
     match k.owner {
         Owner::Jig => k.kind <= 6 || k.kind == 29,
-        Owner::Side { connector } => connector == domain::FIRST && ((10..=16).contains(&k.kind) || k.kind == 19),
+        Owner::Side { connector } => {
+            connector == domain::FIRST && ((10..=16).contains(&k.kind) || k.kind == 19 || k.kind == 20)
+        }
         Owner::Other { .. } => false,
     }
 }
@@ -302,7 +313,8 @@ fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
                 && contains(tree, at, end, Role::Text, b"Finding how this ended");
             let done = contains(tree, at, end, Role::Status, b"Touched")
                 || contains(tree, at, end, Role::Status, b"Moved to revision")
-                || contains(tree, at, end, Role::Status, b"Gone");
+                || contains(tree, at, end, Role::Status, b"Gone")
+                || (include_test_family && contains(tree, at, end, Role::Status, b"Application outcome"));
             let state = if leaving && !looking {
                 CardSeen::Left { reason: explained(tree, at, end) }
             } else if deciding || looking {

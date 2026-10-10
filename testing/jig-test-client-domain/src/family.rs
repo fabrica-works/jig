@@ -13,6 +13,8 @@ pub enum Kind {
     Panel(u64),
     Result(u64),
     Effect(ProposalKey),
+    /// A raw proposal reference owned by this connector, separate from jig makers.
+    OwnerEffect(u64),
     Outbox(u64),
     Hold(u64),
     Project(u32),
@@ -58,6 +60,8 @@ pub struct PartDocument {
 pub enum Document {
     Item(Item),
     Part(PartDocument),
+    /// Complete actual owner value; seven part variants have no revision.
+    Connector(crate::connector_values::ConnectorDocument),
 }
 impl Document {
     #[must_use]
@@ -65,13 +69,18 @@ impl Document {
         match self {
             Self::Item(item) => Subject { scope: Scope::Project(item.project), kind: Kind::Item(item.key) },
             Self::Part(part) => part.subject,
+            Self::Connector(value) => value.subject,
         }
     }
     #[must_use]
-    pub fn revision(&self) -> Revision {
+    pub fn revision(&self) -> Option<Revision> {
         match self {
-            Self::Item(item) => item.revision,
-            Self::Part(part) => part.revision,
+            Self::Item(item) => Some(item.revision),
+            Self::Part(part) => Some(part.revision),
+            Self::Connector(value) => match value.revision() {
+                Some(value) => Some(Revision { value }),
+                None => None,
+            },
         }
     }
     #[must_use]
@@ -79,6 +88,8 @@ impl Document {
         match self {
             Self::Item(item) => item.proposals.capacity() <= rows,
             Self::Part(_) => true,
+            // Rows alone cannot admit the owner's nested paths and allocation.
+            Self::Connector(_) => false,
         }
     }
     #[must_use]
@@ -94,14 +105,26 @@ impl Document {
                     }
                 }
             }
-            Self::Part(_) => {}
+            Self::Part(_) | Self::Connector(_) => {}
         }
         objects
     }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
-    Touch { project: u32, item: u64, revision: Revision, parameters: Option<u64> },
+    Touch {
+        project: u32,
+        item: u64,
+        revision: Revision,
+        parameters: Option<u64>,
+    },
+    /// The application's complete value-bearing request from its own Object form.
+    ChangeObject {
+        project: u32,
+        object: u64,
+        revision: Revision,
+        value: u64,
+    },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answer {
@@ -116,6 +139,8 @@ pub enum Answer {
     Gone,
     /// A refusal at the shared application entrance, retaining its actual facts.
     Refused(EntranceRefusal),
+    /// Complete closed application terminal; no maker or role is inferred.
+    Connector(crate::connector_values::ConnectorAnswer),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReadResult {

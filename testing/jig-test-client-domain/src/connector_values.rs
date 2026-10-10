@@ -15,6 +15,38 @@ pub struct ConnectorDocument {
     pub value: Box<ClientDocument>,
 }
 impl ConnectorDocument {
+    /// The original request supplies scope; the value supplies its own inner identity.
+    /// Individual documents have project scope, never a reconstructed deployment project.
+    #[must_use]
+    pub fn matches_subject(&self) -> bool {
+        use crate::family::{Kind, Scope};
+        match self.value.as_ref() {
+            ClientDocument::Deployment { .. } => {
+                self.subject.scope == Scope::Deployment && self.subject.kind == Kind::Deployment
+            }
+            ClientDocument::Project { project, .. } => {
+                self.subject.scope == Scope::Project(*project) && self.subject.kind == Kind::Project(*project)
+            }
+            ClientDocument::Object { object, .. } => {
+                project_scope(self.subject.scope) && self.subject.kind == Kind::Item(*object)
+            }
+            ClientDocument::Panel { task, .. } => {
+                project_scope(self.subject.scope) && self.subject.kind == Kind::Panel(*task)
+            }
+            ClientDocument::Result { task, .. } => {
+                project_scope(self.subject.scope) && self.subject.kind == Kind::Result(*task)
+            }
+            ClientDocument::Effect { proposal, .. } => {
+                project_scope(self.subject.scope) && self.subject.kind == Kind::OwnerEffect(*proposal)
+            }
+            ClientDocument::Outbox { entry, .. } => {
+                project_scope(self.subject.scope) && self.subject.kind == Kind::Outbox(entry.number)
+            }
+            ClientDocument::Hold { task, .. } => {
+                project_scope(self.subject.scope) && self.subject.kind == Kind::Hold(*task)
+            }
+        }
+    }
     /// Only an Object supplies a revision. Parts are unversioned snapshots.
     #[must_use]
     pub fn revision(&self) -> Option<u64> {
@@ -47,4 +79,11 @@ pub struct ConnectorLimits {
     pub segment_bytes: u32,
     /// Inline carrier plus every owned allocation, excluding allocator overhead.
     pub bytes: u64,
+}
+
+fn project_scope(scope: crate::family::Scope) -> bool {
+    match scope {
+        crate::family::Scope::Project(_) => true,
+        crate::family::Scope::Deployment => false,
+    }
 }

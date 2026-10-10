@@ -90,6 +90,7 @@ fn world_with_heap(seed: u64, memory: bool) -> Outcome {
             family::Document::Part(part) => {
                 part.value = rng.below(64);
             }
+            family::Document::Connector(_) => {}
         }
     }
     world
