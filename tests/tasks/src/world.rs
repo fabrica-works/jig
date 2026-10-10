@@ -1,6 +1,7 @@
 //! Durable parent and scripted executors at the retained tasks boundary
 //! (domain/tasks.md, 11; domain/engine.md, 7).
 use crate::referee::{Seen, Stimulus, Tasks};
+use crate::stories::{RetryEnd, Story};
 use crate::trace::Trace;
 use jig_core_tasks::{
     self as tasks, Accepted, Authority, Budget, Cause, Contract, Delegation, Domain, End, Ending, Event, Executor,
@@ -1060,30 +1061,38 @@ pub fn run_story(seed: u64) -> (Trace, Frozen) {
 
 #[must_use]
 pub fn run_story_facts(seed: u64, consume_facts: bool) -> (Trace, Frozen) {
-    story(seed, consume_facts, Trace::default())
+    story(seed, consume_facts, Trace::default(), None)
 }
 
 /// Replay one complete story with an explicit diagnostic setting.
 #[must_use]
 pub fn run_story_traced(seed: u64, consume_facts: bool, enabled: bool) -> (Trace, Frozen) {
-    story(seed, consume_facts, Trace::with_enabled(enabled))
+    story(seed, consume_facts, Trace::with_enabled(enabled), None)
 }
 
-fn story(seed: u64, consume_facts: bool, trace: Trace) -> (Trace, Frozen) {
+/// Run one enumerated branch combination with drawn arrival/pricing times.
+#[must_use]
+pub fn run_story_branches(seed: u64, branches: Story) -> (Trace, Frozen) {
+    story(seed, true, Trace::default(), Some(branches))
+}
+
+fn story(seed: u64, consume_facts: bool, trace: Trace, branches: Option<Story>) -> (Trace, Frozen) {
     let mut w = World::start(seed, &LIMITS, trace);
     w.consume_facts = consume_facts;
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| story_run(seed, &mut w))).unwrap_or_else(|cause| {
-        let detail = cause
-            .downcast_ref::<String>()
-            .map(String::as_str)
-            .or_else(|| cause.downcast_ref::<&str>().copied())
-            .unwrap_or("non-string panic");
-        panic!("task seed {seed}: {detail}\n{}", w.trace.lines.join("\n"));
-    });
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| story_run(seed, &mut w, branches))).unwrap_or_else(
+        |cause| {
+            let detail = cause
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| cause.downcast_ref::<&str>().copied())
+                .unwrap_or("non-string panic");
+            panic!("task seed {seed}, branches {branches:?}: {detail}\n{}", w.trace.lines.join("\n"));
+        },
+    );
     (std::mem::take(&mut w.trace), w.frozen())
 }
 
-fn story_run(seed: u64, w: &mut World) {
+fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
     let mut rng = Rng::new(seed);
     let arrival = Duration::from_millis(rng.between(1, 20));
     w.env.now = w.env.now.saturating_add(arrival);
@@ -1094,28 +1103,35 @@ fn story_run(seed: u64, w: &mut World) {
     w.claim_fresh(2);
     let reply_to = w.to();
     w.stage(Event::Turn { reply_to, task: 1, attempt: 1, turn: 1, read: None, offered: None, cumulative: 5 });
-    if rng.chance(500) {
+    // Defaults remain eager draws at their original positions: an ordinary
+    // seeded replay's random stream and every action stay unchanged.
+    if branches.map_or(rng.chance(500), |story| story.durable_turn) {
         w.durable();
     }
     w.restart();
-    match rng.below(3) {
-        0 => {
+    let drawn_retry = match rng.below(3) {
+        0 => RetryEnd::Refused,
+        1 => RetryEnd::Lost,
+        2 => RetryEnd::None,
+        _ => unreachable!(),
+    };
+    match branches.map_or(drawn_retry, |story| story.retry) {
+        RetryEnd::Refused => {
             w.terminal(2, End::Refused);
             w.advance();
             w.claim_fresh(2);
         }
-        1 => {
+        RetryEnd::Lost => {
             w.terminal(2, End::Failed(tasks::Class::Lost));
             w.advance();
             w.claim_fresh(2);
         }
-        2 => {}
-        _ => unreachable!(),
+        RetryEnd::None => {}
     }
-    if rng.chance(500) {
+    if branches.map_or(rng.chance(500), |story| story.restart_after_retry) {
         w.restart();
     }
-    if rng.chance(200) {
+    if branches.map_or(rng.chance(200), |story| story.child_failure) {
         w.terminal(2, End::Finished { result: TaskResult::Failure { reason: Box::new([1]) }, cancel_delegates: false });
         w.settle(2);
         assert!(matches!(w.record(3).phase, tasks::Phase::Held { .. }));
@@ -1134,7 +1150,7 @@ fn story_run(seed: u64, w: &mut World) {
     w.claim_fresh(4);
     w.make(Party::Task(4), vec![task(5, &[])]);
     w.claim_fresh(5);
-    if rng.chance(500) {
+    if branches.map_or(rng.chance(500), |story| story.restart_before_close) {
         w.restart();
     }
     for task in [3, 4] {

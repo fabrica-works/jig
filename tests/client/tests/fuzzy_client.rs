@@ -1,13 +1,18 @@
 //! Replayable random people over every story start and seeded random documents.
 use jig_client_world::random::{self, Start};
 use skein_world::domain::Verdict;
+// Every first dedicated seed reached 8 faults in the unchanged 16-seed inventory.
+// Two keep drawn slack. Chat retains 16: the 32 worlds never opened its original address.
+const FIRST_START_SEED: u64 = 100;
+const SHORT_START_SEEDS: u64 = 2;
+const CHAT_START_SEEDS: u64 = 16;
 fn sweep(start: Start) {
     let mut faults = 0;
-    for seed in 100..116 {
+    let count = if start == Start::Chat { CHAT_START_SEEDS } else { SHORT_START_SEEDS };
+    for seed in FIRST_START_SEED..FIRST_START_SEED + count {
         eprintln!("{start:?} seed {seed}");
         let outcome = random::story_without_heap(seed, start);
         assert_eq!(outcome.verdict, Verdict::Passed, "{start:?} seed {seed}");
-        eprintln!("coverage start={start:?} seed={seed} faults={}", outcome.faults);
         faults += outcome.faults;
     }
     assert!(faults > 0);
@@ -49,10 +54,6 @@ fn random_truth_worlds_sweep_documents_addresses_and_persons_with_faults() {
         if reach.original_address {
             tally.2 += outcome.faults;
         }
-        eprintln!(
-            "coverage truth seed={seed} start={:?} original_address={} faults={}",
-            reach.start, reach.original_address, outcome.faults
-        );
         assert_eq!(outcome.verdict, Verdict::Passed, "seed {seed}");
         faults += outcome.faults;
     }
@@ -60,6 +61,9 @@ fn random_truth_worlds_sweep_documents_addresses_and_persons_with_faults() {
     for start in Start::ALL {
         let counts = reached.get(&start).expect("random documents reach every actual story fixture");
         assert!(counts.0 > 0 && counts.1 > 0, "{start:?} truth reach {counts:?}");
+        if start != Start::Chat {
+            assert!(counts.2 > 0, "shrunk {start:?} retains original-address fault reach: {counts:?}");
+        }
     }
     eprintln!("coverage truth starts={reached:?}");
 }

@@ -7,6 +7,11 @@ use jig_host::Limits;
 use jig_host_world::engine::ENDINGS;
 use jig_host_world::{Settings, Span, World};
 
+// The unchanged 1000-seed inventory stops growing at 372: 20 endings and 23 paths.
+// Keep twice that exact prefix, including the rare agent-start cancellation.
+const COVERAGE_PREFIX: u64 = 372;
+const SWEEP_SEEDS: u64 = 2 * COVERAGE_PREFIX;
+
 const ITERATIONS: u32 = 200_000;
 
 fn run(settings: &Settings) -> World {
@@ -30,7 +35,7 @@ fn random_worlds_settle_and_reach_every_ending() {
     let mut reached = BTreeSet::new();
     let mut seen = BTreeSet::new();
     let mut last_growth = 0;
-    for seed in 0..1_000 {
+    for seed in 0..SWEEP_SEEDS {
         let previous = (reached.len(), seen.len());
         let stats = run(&rough(seed)).stats();
         for ending in stats.endings.keys() {
@@ -63,10 +68,9 @@ fn random_worlds_settle_and_reach_every_ending() {
         }
         if previous != (reached.len(), seen.len()) {
             last_growth = seed + 1;
-            eprintln!("coverage host prefix={last_growth} endings={reached:?} paths={seen:?}");
         }
     }
-    eprintln!("coverage host plateau={last_growth} endings={} paths={}", reached.len(), seen.len());
+    assert!(last_growth <= COVERAGE_PREFIX, "coverage prefix grew to {last_growth}");
     let missing: Vec<&str> = ENDINGS.iter().copied().filter(|ending| !reached.contains(ending)).collect();
     assert!(missing.is_empty(), "every ending is reached: {missing:?} are not");
     let paths = [
