@@ -283,7 +283,7 @@ impl ScenarioApplication for Testing {
                     44,
                     people::Ask::DecideProposal {
                         project: 1,
-                        proposer: parent(world).0,
+                        proposer: people::Proposer::Task(parent(world).0),
                         proposal,
                         decision: people::ProposalDecision::Accept,
                     },
