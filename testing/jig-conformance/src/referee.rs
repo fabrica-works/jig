@@ -334,7 +334,7 @@ pub struct Violation {
 }
 
 /// Persistent observer state; restart clears none of its evidence or deadlines.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Referee {
     applications: application::Applications,
     pub policy: Policy,

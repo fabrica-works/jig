@@ -192,7 +192,7 @@ fn call(key: core::CallKey) -> r::Receipt {
 }
 
 /// The testing root adapter, reusable with the ordinary referee by other worlds.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Observer {
     pub referee: r::Referee,
     roles: BTreeMap<(u32, u32), r::Scope>,

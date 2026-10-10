@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 type OpaqueName = (u64, u64, Box<[u8]>);
 
 /// Scripted peers and the ordinary world's correlation ledger.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Peers {
     pub workers: Vec<workers::Worker>,
     pub parties: Vec<parties::Party>,

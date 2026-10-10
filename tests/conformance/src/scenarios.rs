@@ -78,13 +78,7 @@ fn release_writes(world: &mut World) {
     }
 }
 
-fn wake(world: &mut World, task: u64) -> Result<(), Violation> {
-    if !world.peers.assignments.iter().any(|(number, _)| *number == task) {
-        world.advance(6_000_000_000);
-        world.drain()?;
-        world.advance(1_000_000_000);
-        world.drain()?;
-    }
+fn message(world: &mut World, task: u64) {
     let (task, attempt) =
         *world.peers.assignments.iter().rev().find(|(number, _)| *number == task).expect("independent assignment");
     let worker = world
@@ -95,7 +89,6 @@ fn wake(world: &mut World, task: u64) -> Result<(), Violation> {
         .find(|worker| worker.seen.iter().any(|run| run.task == task && run.attempt == attempt))
         .expect("assigned host");
     worker.message(task, attempt, 100, b"complete scripted work".as_slice().into());
-    Ok(())
 }
 
 fn ended(world: &World, task: u64) -> bool {
@@ -107,266 +100,10 @@ impl ScenarioApplication for Testing {
         Some(Config::new(seed, false, if scenario == Scenario::ShrinkingPool { 3 } else { 2 }, Some(scenario)))
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one exhaustive binding keeps shared story actions at outside boundaries"
-    )]
     fn action(world: &mut World, action: Action) -> Result<(), Violation> {
-        match action {
-            Action::Ready => {
-                if world.peers.assignments.is_empty() {
-                    world.advance(6_000_000_000);
-                    world.drain()?;
-                    world.advance(1_000_000_000);
-                    world.drain()?;
-                }
-                check(!world.peers.assignments.is_empty(), "caller was not assigned")?;
-                world.peers.initial_assignments = world.peers.assignments.len();
-            }
-            Action::Late => world.peers.next_fault = jig_test_system::Fault::Late,
-            Action::Effect(completion) => effect(world, completion, false),
-            Action::DeliverLate => {
-                for index in 0..2 {
-                    while let Some(event) = world.systems[index].deliver_late() {
-                        world.send(root::Event::Connector {
-                            number: u16::try_from(index + 1).expect("two systems"),
-                            event: connector::Event::System(event),
-                        });
-                    }
-                }
-            }
-            Action::OtherHand => world.systems[0].other_hand(&jig_test_connector_world::path(1, 1), 13),
-            Action::HoldWrites => world.peers.hold_writes = true,
-            Action::ReleaseWrites => release_writes(world),
-            Action::CheckDeadline => {
-                let deadline = world
-                    .store
-                    .rows
-                    .values()
-                    .find_map(|row| match row {
-                        root::Record::Connector { number: 1, record: connector::Record::Outbox(entry) } => {
-                            entry.attempt.map(|attempt| attempt.deadline)
-                        }
-                        root::Record::Core(_) | root::Record::Connector { .. } => None,
-                    })
-                    .expect("durable uncertain attempt");
-                if let Some(saved) = world.peers.saved_deadline {
-                    check(deadline == saved, "cold restart changed the uncertain deadline")?;
-                    check(world.clock().now < saved.as_nanos(), "restarts passed the uncertain deadline")?;
-                } else {
-                    world.peers.saved_deadline = Some(deadline);
-                }
-            }
-            Action::ChangeJudge => {
-                world.systems[1].other_hand(&jig_test_connector_world::path(1, 1), 14);
-                let event = world.systems[1].answer(
-                    connector::SystemRequest::ReadFact {
-                        resource: jig_test_connector_world::path(1, 1),
-                        observed: Wall::from_nanos(world.clock().now),
-                    },
-                    jig_test_system::Fault::None,
-                );
-                world.send(root::Event::Connector { number: 2, event: connector::Event::System(event) });
-            }
-            Action::FillPool => {
-                world.send(root::Event::Connector {
-                    number: 1,
-                    event: connector::Event::Adopt {
-                        project: 1,
-                        resource: jig_test_connector_world::path(1, 2),
-                        role: connector::ResourceRole::Owned,
-                    },
-                });
-                pool(world, 2);
-                world.drain()?;
-                for completion in 1..=3 {
-                    for _ in 0..2 {
-                        let mut authority = authority(world);
-                        authority.budget.spend = 10;
-                        authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
-                        let (task, attempt) = parent(world);
-                        world.send(root::Event::Core(core::Event::DelegateValidated {
-                            to: ReplyTo::new(Token::new(8000 + u64::from(completion))),
-                            key: core::CallKey { task, attempt, completion, position: 0 },
-                            batch: Box::new([core::Delegate {
-                                executor: tasks::Executor::Agent { charter: 1 },
-                                spec: tasks::Spec {
-                                    words: b"pool work".as_slice().into(),
-                                    parameters: Box::new([tasks::Parameter::Resource {
-                                        name: 1,
-                                        connector: 1,
-                                        resource: 2,
-                                    }]),
-                                    inputs: Box::new([]),
-                                },
-                                contract: tasks::Contract::Report { words: 128 },
-                                authority,
-                                symbolic_grants: Box::new([]),
-                                dependencies: Box::new([]),
-                                wake: tasks::WakePolicy::DEFAULT,
-                            }]),
-                            stubs: Box::new([]),
-                        }));
-                        world.drain()?;
-                        if named_part(world, completion).is_some() {
-                            break;
-                        }
-                    }
-                    let core::CallPart::Delegated(members) =
-                        named_part(world, completion).expect("durable delegate reply")
-                    else {
-                        panic!("delegate refused: {:?}", named_part(world, completion));
-                    };
-                    world.peers.children.push(members[0]);
-                }
-                if world
-                    .peers
-                    .children
-                    .iter()
-                    .filter(|child| world.peers.assignments.iter().any(|(task, _)| task == *child))
-                    .count()
-                    < 2
-                {
-                    world.advance(6_000_000_000);
-                    world.drain()?;
-                    world.advance(1_000_000_000);
-                    world.drain()?;
-                }
-                check(world.peers.assignments.len() == 3, "two holders and parent were not assigned")?;
-            }
-            Action::ShrinkPool => {
-                pool(world, 1);
-            }
-            Action::FinishHolder(index) => {
-                let task = world.peers.children[usize::try_from(index).expect("three holders")];
-                wake(world, task)?;
-                world.drain()?;
-                check(ended(world, task), "pool holder did not end")?;
-                if index == 0 {
-                    check(world.peers.assignments.len() == 3, "shrinking pool admitted its waiter too soon")?;
-                }
-            }
-            Action::Propose => {
-                effect(world, 2, true);
-                world.drain()?;
-                if named_part(world, 2).is_none() {
-                    effect(world, 2, true);
-                    world.drain()?;
-                }
-                let core::CallPart::Proposed { proposal } = named_part(world, 2).expect("durable proposal reply")
-                else {
-                    panic!("proposal refused: {:?}", world.peers.calls);
-                };
-                world.peers.pending_proposal = Some(*proposal);
-            }
-            Action::NarrowPolicy => ask(
-                world,
-                43,
-                people::Ask::ChangePolicy {
-                    project: 1,
-                    change: people::PolicyChange::Requirements {
-                        requirements: Box::new([people::Requirement {
-                            connector: 1,
-                            kind: 5,
-                            pattern: people::Pattern { segments: Box::new([]), last: people::Last::Open(Box::new([])) },
-                            judge: people::Judge { connector: 2, requirement: 9, parameters: 0 },
-                            guard: people::Guard::Guarded,
-                            must_be_guarded: true,
-                        }]),
-                    },
-                },
-            ),
-            Action::AcceptProposal => {
-                let proposal = world.peers.pending_proposal.expect("waiting proposal");
-                ask(
-                    world,
-                    44,
-                    people::Ask::DecideProposal {
-                        project: 1,
-                        proposer: people::Proposer::Task(parent(world).0),
-                        proposal,
-                        decision: people::ProposalDecision::Accept,
-                    },
-                );
-            }
-            Action::StartStanding => {
-                let (task, attempt) = parent(world);
-                let worker = world
-                    .peers
-                    .peers
-                    .workers
-                    .iter_mut()
-                    .find(|worker| worker.seen.iter().any(|run| run.task == task))
-                    .expect("parent host");
-                worker.cancel(task, attempt);
-                world.drain()?;
-                let mut authority = authority(world);
-                authority.budget.spend = 30;
-                authority.delegation =
-                    tasks::Delegation { kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]), tasks: 1, depth: 1 };
-                let mut child = authority.clone();
-                child.budget.spend = 10;
-                child.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
-                world.send(root::Event::Core(core::Event::StartRecurring {
-                    project: 1,
-                    authority,
-                    template: tasks::RecurringTemplate {
-                        key: 1,
-                        overlap: tasks::RecurringOverlap::Skip,
-                        batch: Box::new([tasks::New {
-                            number: 1,
-                            project: 1,
-                            executor: tasks::Executor::Agent { charter: 1 },
-                            spec: tasks::Spec {
-                                words: b"period work".as_slice().into(),
-                                parameters: Box::new([]),
-                                inputs: Box::new([]),
-                            },
-                            contract: tasks::Contract::Report { words: 128 },
-                            authority: child,
-                            numbers: tasks::Numbers { budget: 10, spent: 0, spent_below: 0, reserved: 0 },
-                            funder: tasks::Funder::Period { project: 1, period: 0 },
-                            dependencies: Box::new([]),
-                            holdings: Box::new([]),
-                            wake: tasks::WakePolicy::DEFAULT,
-                            recurring: None,
-                            tracked: None,
-                        }]),
-                    },
-                }));
-            }
-            Action::Period(period) => {
-                let task = world
-                    .store
-                    .rows
-                    .values()
-                    .filter_map(|row| match row {
-                        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
-                            if row.spec.words.as_ref() == b"period work" =>
-                        {
-                            Some(row.number)
-                        }
-                        root::Record::Core(_) | root::Record::Connector { .. } => None,
-                    })
-                    .max()
-                    .expect("durable standing batch");
-                wake(world, task)?;
-                world.drain()?;
-                check(ended(world, task), "standing batch did not finish")?;
-                let before = world.peers.assignments.len();
-                for _ in 0..2 {
-                    world.send(root::Event::Core(core::Event::Period { project: 1, period, budget: 1000, next: None }));
-                    world.drain()?;
-                }
-                if world.peers.assignments.len() == before {
-                    world.advance(6_000_000_000);
-                    world.drain()?;
-                    world.advance(1_000_000_000);
-                    world.drain()?;
-                }
-                check(world.peers.assignments.len() == before + 1, "period did not make exactly one batch")?;
-            }
-            Action::Resume => wake(world, parent(world).0)?,
+        let mut continuation = Continuation::new(action);
+        while continuation.advance(world)? {
+            world.drain()?;
         }
         Ok(())
     }
@@ -420,4 +157,429 @@ impl ScenarioApplication for Testing {
             }
         }
     }
+}
+
+/// Concrete script position across nested drains, with every live local retained.
+/// Both fresh actions and cold-cut continuations execute this same code.
+#[derive(Clone, Debug)]
+pub(crate) struct Continuation {
+    action: Action,
+    phase: u8,
+    completion: u32,
+    tries: u8,
+    task: u64,
+    before: usize,
+}
+impl Continuation {
+    pub(crate) fn new(action: Action) -> Self {
+        Self { action, phase: 0, completion: 1, tries: 0, task: 0, before: 0 }
+    }
+
+    // Phases 1–3 retain wake's original two conditional waits and message.
+    fn wake(&mut self, world: &mut World) -> bool {
+        if self.phase == 1 {
+            if world.peers.assignments.iter().any(|(number, _)| *number == self.task) {
+                self.phase = 3;
+            } else {
+                world.advance(6_000_000_000);
+                self.phase = 2;
+                return true;
+            }
+        }
+        if self.phase == 2 {
+            world.advance(1_000_000_000);
+            self.phase = 3;
+            return true;
+        }
+        message(world, self.task);
+        self.phase = 4;
+        false
+    }
+
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one concrete exhaustive continuation preserves every nested action drain"
+    )]
+    pub(crate) fn advance(&mut self, world: &mut World) -> Result<bool, Violation> {
+        loop {
+            match self.action {
+                Action::Ready => match self.phase {
+                    0 if world.peers.assignments.is_empty() => {
+                        world.advance(6_000_000_000);
+                        self.phase = 1;
+                        return Ok(true);
+                    }
+                    1 => {
+                        world.advance(1_000_000_000);
+                        self.phase = 2;
+                        return Ok(true);
+                    }
+                    _ => {
+                        check(!world.peers.assignments.is_empty(), "caller was not assigned")?;
+                        world.peers.initial_assignments = world.peers.assignments.len();
+                        return Ok(false);
+                    }
+                },
+                Action::FillPool => match self.phase {
+                    0 => {
+                        world.send(root::Event::Connector {
+                            number: 1,
+                            event: connector::Event::Adopt {
+                                project: 1,
+                                resource: jig_test_connector_world::path(1, 2),
+                                role: connector::ResourceRole::Owned,
+                            },
+                        });
+                        pool(world, 2);
+                        self.phase = 1;
+                        return Ok(true);
+                    }
+                    1 => {
+                        let completion = self.completion;
+                        let mut authority = authority(world);
+                        authority.budget.spend = 10;
+                        authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+                        let (task, attempt) = parent(world);
+                        world.send(root::Event::Core(core::Event::DelegateValidated {
+                            to: ReplyTo::new(Token::new(8000 + u64::from(completion))),
+                            key: core::CallKey { task, attempt, completion, position: 0 },
+                            batch: Box::new([core::Delegate {
+                                executor: tasks::Executor::Agent { charter: 1 },
+                                spec: tasks::Spec {
+                                    words: b"pool work".as_slice().into(),
+                                    parameters: Box::new([tasks::Parameter::Resource {
+                                        name: 1,
+                                        connector: 1,
+                                        resource: 2,
+                                    }]),
+                                    inputs: Box::new([]),
+                                },
+                                contract: tasks::Contract::Report { words: 128 },
+                                authority,
+                                symbolic_grants: Box::new([]),
+                                dependencies: Box::new([]),
+                                wake: tasks::WakePolicy::DEFAULT,
+                            }]),
+                            stubs: Box::new([]),
+                        }));
+
+                        self.tries += 1;
+                        self.phase = 2;
+                        return Ok(true);
+                    }
+                    2 => {
+                        if named_part(world, self.completion).is_none() && self.tries < 2 {
+                            self.phase = 1;
+                            continue;
+                        }
+                        let core::CallPart::Delegated(members) =
+                            named_part(world, self.completion).expect("durable delegate reply")
+                        else {
+                            panic!("delegate refused: {:?}", named_part(world, self.completion));
+                        };
+                        world.peers.children.push(members[0]);
+                        self.completion += 1;
+                        self.tries = 0;
+                        self.phase = if self.completion <= 3 { 1 } else { 3 };
+                    }
+                    3 if world
+                        .peers
+                        .children
+                        .iter()
+                        .filter(|child| world.peers.assignments.iter().any(|(task, _)| task == *child))
+                        .count()
+                        < 2 =>
+                    {
+                        world.advance(6_000_000_000);
+                        self.phase = 4;
+                        return Ok(true);
+                    }
+                    4 => {
+                        world.advance(1_000_000_000);
+                        self.phase = 5;
+                        return Ok(true);
+                    }
+                    _ => {
+                        check(world.peers.assignments.len() == 3, "two holders and parent were not assigned")?;
+                        return Ok(false);
+                    }
+                },
+                Action::FinishHolder(index) => {
+                    if self.phase == 0 {
+                        self.task = world.peers.children[usize::try_from(index).expect("three holders")];
+                        self.phase = 1;
+                    }
+                    if self.phase < 4 && self.wake(world) {
+                        return Ok(true);
+                    }
+                    if self.phase == 4 {
+                        self.phase = 5;
+                        return Ok(true);
+                    }
+                    check(ended(world, self.task), "pool holder did not end")?;
+                    if index == 0 {
+                        check(world.peers.assignments.len() == 3, "shrinking pool admitted its waiter too soon")?;
+                    }
+                    return Ok(false);
+                }
+                Action::Propose => match self.phase {
+                    0 => {
+                        effect(world, 2, true);
+                        self.phase = 1;
+                        return Ok(true);
+                    }
+                    1 if named_part(world, 2).is_none() => {
+                        effect(world, 2, true);
+                        self.phase = 2;
+                        return Ok(true);
+                    }
+                    _ => {
+                        let core::CallPart::Proposed { proposal } =
+                            named_part(world, 2).expect("durable proposal reply")
+                        else {
+                            panic!("proposal refused: {:?}", world.peers.calls);
+                        };
+                        world.peers.pending_proposal = Some(*proposal);
+                        return Ok(false);
+                    }
+                },
+                Action::StartStanding => {
+                    if self.phase == 0 {
+                        let (task, attempt) = parent(world);
+                        let worker = world
+                            .peers
+                            .peers
+                            .workers
+                            .iter_mut()
+                            .find(|worker| worker.seen.iter().any(|run| run.task == task))
+                            .expect("parent host");
+                        worker.cancel(task, attempt);
+                        self.phase = 1;
+                        return Ok(true);
+                    }
+                    let mut authority = authority(world);
+                    authority.budget.spend = 30;
+                    authority.delegation = tasks::Delegation {
+                        kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]),
+                        tasks: 1,
+                        depth: 1,
+                    };
+                    let mut child = authority.clone();
+                    child.budget.spend = 10;
+                    child.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+                    world.send(root::Event::Core(core::Event::StartRecurring {
+                        project: 1,
+                        authority,
+                        template: tasks::RecurringTemplate {
+                            key: 1,
+                            overlap: tasks::RecurringOverlap::Skip,
+                            batch: Box::new([tasks::New {
+                                number: 1,
+                                project: 1,
+                                executor: tasks::Executor::Agent { charter: 1 },
+                                spec: tasks::Spec {
+                                    words: b"period work".as_slice().into(),
+                                    parameters: Box::new([]),
+                                    inputs: Box::new([]),
+                                },
+                                contract: tasks::Contract::Report { words: 128 },
+                                authority: child,
+                                numbers: tasks::Numbers { budget: 10, spent: 0, spent_below: 0, reserved: 0 },
+                                funder: tasks::Funder::Period { project: 1, period: 0 },
+                                dependencies: Box::new([]),
+                                holdings: Box::new([]),
+                                wake: tasks::WakePolicy::DEFAULT,
+                                recurring: None,
+                                tracked: None,
+                            }]),
+                        },
+                    }));
+                    return Ok(false);
+                }
+                Action::Period(period) => {
+                    if self.phase == 0 {
+                        self.task = world
+                            .store
+                            .rows
+                            .values()
+                            .filter_map(|row| match row {
+                                root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
+                                    if row.spec.words.as_ref() == b"period work" =>
+                                {
+                                    Some(row.number)
+                                }
+                                root::Record::Core(_) | root::Record::Connector { .. } => None,
+                            })
+                            .max()
+                            .expect("durable standing batch");
+                        self.phase = 1;
+                    }
+                    if self.phase < 4 && self.wake(world) {
+                        return Ok(true);
+                    }
+                    match self.phase {
+                        4 => {
+                            self.phase = 5;
+                            return Ok(true);
+                        }
+                        5 => {
+                            check(ended(world, self.task), "standing batch did not finish")?;
+                            self.before = world.peers.assignments.len();
+                            world.send(root::Event::Core(core::Event::Period {
+                                project: 1,
+                                period,
+                                budget: 1000,
+                                next: None,
+                            }));
+                            self.phase = 6;
+                            return Ok(true);
+                        }
+                        6 => {
+                            world.send(root::Event::Core(core::Event::Period {
+                                project: 1,
+                                period,
+                                budget: 1000,
+                                next: None,
+                            }));
+                            self.phase = 7;
+                            return Ok(true);
+                        }
+                        7 if world.peers.assignments.len() == self.before => {
+                            world.advance(6_000_000_000);
+                            self.phase = 8;
+                            return Ok(true);
+                        }
+                        8 => {
+                            world.advance(1_000_000_000);
+                            self.phase = 9;
+                            return Ok(true);
+                        }
+                        _ => {
+                            check(
+                                world.peers.assignments.len() == self.before + 1,
+                                "period did not make exactly one batch",
+                            )?;
+                            return Ok(false);
+                        }
+                    }
+                }
+                Action::Resume => {
+                    if self.phase == 0 {
+                        self.task = parent(world).0;
+                        self.phase = 1;
+                    }
+                    if self.phase < 4 && self.wake(world) {
+                        return Ok(true);
+                    }
+                    return Ok(false);
+                }
+                Action::Late
+                | Action::Effect(_)
+                | Action::DeliverLate
+                | Action::OtherHand
+                | Action::HoldWrites
+                | Action::ReleaseWrites
+                | Action::CheckDeadline
+                | Action::ChangeJudge
+                | Action::ShrinkPool
+                | Action::NarrowPolicy
+                | Action::AcceptProposal => {
+                    atomic(world, self.action)?;
+                    return Ok(false);
+                }
+            }
+        }
+    }
+}
+
+fn atomic(world: &mut World, action: Action) -> Result<(), Violation> {
+    match action {
+        Action::Late => world.peers.next_fault = jig_test_system::Fault::Late,
+        Action::Effect(completion) => effect(world, completion, false),
+        Action::DeliverLate => {
+            for index in 0..2 {
+                while let Some(event) = world.systems[index].deliver_late() {
+                    world.send(root::Event::Connector {
+                        number: u16::try_from(index + 1).expect("two systems"),
+                        event: connector::Event::System(event),
+                    });
+                }
+            }
+        }
+        Action::OtherHand => world.systems[0].other_hand(&jig_test_connector_world::path(1, 1), 13),
+        Action::HoldWrites => world.peers.hold_writes = true,
+        Action::ReleaseWrites => release_writes(world),
+        Action::CheckDeadline => {
+            let deadline = world
+                .store
+                .rows
+                .values()
+                .find_map(|row| match row {
+                    root::Record::Connector { number: 1, record: connector::Record::Outbox(entry) } => {
+                        entry.attempt.map(|attempt| attempt.deadline)
+                    }
+                    root::Record::Core(_) | root::Record::Connector { .. } => None,
+                })
+                .expect("durable uncertain attempt");
+            if let Some(saved) = world.peers.saved_deadline {
+                check(deadline == saved, "cold restart changed the uncertain deadline")?;
+                check(world.clock().now < saved.as_nanos(), "restarts passed the uncertain deadline")?;
+            } else {
+                world.peers.saved_deadline = Some(deadline);
+            }
+        }
+        Action::ChangeJudge => {
+            world.systems[1].other_hand(&jig_test_connector_world::path(1, 1), 14);
+            let event = world.systems[1].answer(
+                connector::SystemRequest::ReadFact {
+                    resource: jig_test_connector_world::path(1, 1),
+                    observed: Wall::from_nanos(world.clock().now),
+                },
+                jig_test_system::Fault::None,
+            );
+            world.send(root::Event::Connector { number: 2, event: connector::Event::System(event) });
+        }
+        Action::ShrinkPool => {
+            pool(world, 1);
+        }
+        Action::NarrowPolicy => ask(
+            world,
+            43,
+            people::Ask::ChangePolicy {
+                project: 1,
+                change: people::PolicyChange::Requirements {
+                    requirements: Box::new([people::Requirement {
+                        connector: 1,
+                        kind: 5,
+                        pattern: people::Pattern { segments: Box::new([]), last: people::Last::Open(Box::new([])) },
+                        judge: people::Judge { connector: 2, requirement: 9, parameters: 0 },
+                        guard: people::Guard::Guarded,
+                        must_be_guarded: true,
+                    }]),
+                },
+            },
+        ),
+        Action::AcceptProposal => {
+            let proposal = world.peers.pending_proposal.expect("waiting proposal");
+            ask(
+                world,
+                44,
+                people::Ask::DecideProposal {
+                    project: 1,
+                    proposer: people::Proposer::Task(parent(world).0),
+                    proposal,
+                    decision: people::ProposalDecision::Accept,
+                },
+            );
+        }
+
+        Action::Ready
+        | Action::FillPool
+        | Action::FinishHolder(_)
+        | Action::Propose
+        | Action::StartStanding
+        | Action::Period(_)
+        | Action::Resume => unreachable!("continued action"),
+    }
+    Ok(())
 }

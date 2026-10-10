@@ -23,7 +23,7 @@ pub enum Write<K, R> {
 }
 
 /// A numbered transaction waiting for the fake store to apply it.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Pending<K, R> {
     /// Journal-issued commit number.
     pub number: u64,
@@ -34,7 +34,7 @@ pub struct Pending<K, R> {
 }
 
 /// One captured key-ordered page, possibly delivered later.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Page<K, R> {
     /// Durable rows from one read instant.
     pub rows: Box<[R]>,
@@ -56,7 +56,7 @@ pub enum Fault {
 }
 
 /// Ordered durable rows, transactions and independently scheduled pages.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Store<K, R> {
     /// Last transaction whose whole write set applied.
     pub applied: u64,

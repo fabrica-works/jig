@@ -111,7 +111,7 @@ pub enum Up {
     Answer { channel: u64, task: u64, attempt: u64, spent: u64, end: End },
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Run {
     assignment: Assignment,
     script: VecDeque<Script>,
@@ -137,7 +137,7 @@ pub struct Expense {
 }
 
 /// A bounded host, with a script per new assignment and observations of its own.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Worker {
     pub channel: u64,
     pub slots: u32,

@@ -95,17 +95,19 @@ pub trait ScenarioApplication: Application + Sized {
     fn check(world: &Harness<Self>, scenario: Scenario) -> Result<(), Violation>;
 }
 
-/// Run one shared scenario, including the referee at every iteration.
-///
-/// # Errors
-/// Returns the first broken promise or an application story whose ending failed.
-pub fn run<A: ScenarioApplication>(scenario: Scenario, cut: Cut, seed: u64) -> Result<Option<Outcome>, Violation> {
-    let Some(config) = A::configuration(scenario, seed) else { return Ok(None) };
-    let mut world = Harness::<A>::new(config, seed);
-    world.cut(cut);
-    world.drain()?;
-    A::action(&mut world, Action::Ready).map_err(|violation| world.diagnostic(violation))?;
-    world.drain()?;
+/// One outside operation in the shared story, independent of replay storage.
+#[derive(Clone, Copy, Debug)]
+pub enum Step {
+    Action(Action),
+    Drain,
+    Advance(u64),
+    Crash,
+}
+
+/// The same action/cut order used by fresh replay and snapshot continuation.
+#[must_use]
+pub fn program(scenario: Scenario) -> Vec<Step> {
+    let mut steps = vec![Step::Drain, Step::Action(Action::Ready), Step::Drain];
     let actions: &[Action] = match scenario {
         Scenario::LateCopy => &[Action::Late, Action::Effect(1)],
         Scenario::OtherHand => &[Action::Late, Action::Effect(1), Action::OtherHand],
@@ -135,48 +137,59 @@ pub fn run<A: ScenarioApplication>(scenario: Scenario, cut: Cut, seed: u64) -> R
         Scenario::RunBudget => &[Action::Resume],
     };
     for &action in actions {
-        A::action(&mut world, action).map_err(|violation| world.diagnostic(violation))?;
-        world.drain()?;
+        steps.extend([Step::Action(action), Step::Drain]);
     }
     match scenario {
         Scenario::LateCopy | Scenario::OtherHand => {
-            // A cut may hide the first release; the second interval also lets
-            // that restored attempt pass its original deadline before the copy.
+            // Both intervals retain the restored attempt's original deadline.
             for _ in 0..2 {
-                world.advance(2_000_000_000);
-                world.drain()?;
+                steps.extend([Step::Advance(2_000_000_000), Step::Drain]);
             }
-            A::action(&mut world, Action::DeliverLate).map_err(|violation| world.diagnostic(violation))?;
-            world.drain()?;
+            steps.extend([Step::Action(Action::DeliverLate), Step::Drain]);
         }
         Scenario::UncertainRestarts => {
-            A::action(&mut world, Action::CheckDeadline).map_err(|violation| world.diagnostic(violation))?;
+            steps.push(Step::Action(Action::CheckDeadline));
             for _ in 0..3 {
-                world.crash().map_err(|violation| world.diagnostic(violation))?;
-                world.drain()?;
-                A::action(&mut world, Action::CheckDeadline).map_err(|violation| world.diagnostic(violation))?;
+                steps.extend([Step::Crash, Step::Drain, Step::Action(Action::CheckDeadline)]);
             }
-            A::action(&mut world, Action::ReleaseWrites).map_err(|violation| world.diagnostic(violation))?;
+            steps.push(Step::Action(Action::ReleaseWrites));
             for _ in 0..2 {
-                world.advance(2_000_000_000);
-                world.drain()?;
+                steps.extend([Step::Advance(2_000_000_000), Step::Drain]);
             }
         }
         Scenario::ChangedJudge | Scenario::NarrowingPolicy => {
             for _ in 0..2 {
-                world.advance(2_000_000_000);
-                world.drain()?;
+                steps.extend([Step::Advance(2_000_000_000), Step::Drain]);
             }
             if scenario == Scenario::ChangedJudge {
-                A::action(&mut world, Action::Effect(2)).map_err(|violation| world.diagnostic(violation))?;
+                steps.push(Step::Action(Action::Effect(2)));
             } else {
-                A::action(&mut world, Action::NarrowPolicy).map_err(|violation| world.diagnostic(violation))?;
-                world.drain()?;
-                A::action(&mut world, Action::AcceptProposal).map_err(|violation| world.diagnostic(violation))?;
+                steps.extend([Step::Action(Action::NarrowPolicy), Step::Drain, Step::Action(Action::AcceptProposal)]);
             }
-            world.drain()?;
+            steps.push(Step::Drain);
         }
         Scenario::ShrinkingPool | Scenario::StandingTask | Scenario::RunBudget => {}
+    }
+    steps
+}
+
+/// Run one shared scenario, including the referee at every iteration.
+///
+/// # Errors
+/// Returns the first broken promise or an application story whose ending failed.
+pub fn run<A: ScenarioApplication>(scenario: Scenario, cut: Cut, seed: u64) -> Result<Option<Outcome>, Violation> {
+    let Some(config) = A::configuration(scenario, seed) else { return Ok(None) };
+    let mut world = Harness::<A>::new(config, seed);
+    world.cut(cut);
+    for step in program(scenario) {
+        match step {
+            Step::Action(action) => A::action(&mut world, action).map_err(|violation| world.diagnostic(violation))?,
+            Step::Drain => {
+                world.drain()?;
+            }
+            Step::Advance(nanos) => world.advance(nanos),
+            Step::Crash => world.crash().map_err(|violation| world.diagnostic(violation))?,
+        }
     }
     A::check(&world, scenario).map_err(|violation| world.diagnostic(violation))?;
     Ok(Some(world.outcome()))

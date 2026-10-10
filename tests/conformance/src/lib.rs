@@ -107,7 +107,7 @@ pub enum Delivery {
 }
 
 /// The outside correlation state of the application's scripted peers.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Neighbours {
     pub peers: Peers,
     observer: Observer,
@@ -130,7 +130,7 @@ pub struct Neighbours {
     routes: Vec<jig_conformance::referee::Observed>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Restore {
     step: core::RestartStep,
     first: root::Key,
@@ -658,6 +658,7 @@ impl Application for Testing {
 }
 
 pub mod actions;
+pub mod replay;
 pub mod scenarios;
 
 pub mod negative;

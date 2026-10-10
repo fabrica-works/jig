@@ -2,7 +2,7 @@
 use std::{fmt::Arguments, ops::Deref, sync::OnceLock};
 
 /// Off in sweeps; `JIG_WORLD_TRACE` enables complete debug diagnostics on replay.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Trace {
     enabled: bool,
     lines: Vec<String>,

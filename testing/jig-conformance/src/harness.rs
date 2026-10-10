@@ -122,7 +122,7 @@ pub trait Application {
 }
 
 /// A finite run's evidence, retained independently of the engine.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Outcome {
     pub commits: u64,
     pub iterations: u64,
@@ -144,6 +144,8 @@ pub enum Cut {
 /// The application engine, its independent peers, and durable store.
 /// The heap meter begins before engine construction; counting the test peers
 /// too is a conservative engine bound. Configuration ownership is added back.
+type CommitHook<A> = Box<dyn FnMut(&Harness<A>)>;
+
 pub struct Harness<A: Application> {
     pub domain: A::Domain,
     pub systems: A::Systems,
@@ -163,6 +165,7 @@ pub struct Harness<A: Application> {
     stopped: bool,
     cut: Cut,
     crashes: Vec<u64>,
+    commit_hook: Option<CommitHook<A>>,
 }
 
 impl<A: Application> Harness<A> {
@@ -210,7 +213,14 @@ impl<A: Application> Harness<A> {
             stopped: false,
             cut: Cut::None,
             crashes: Vec::new(),
+            commit_hook: None,
         }
+    }
+
+    /// Observe each durable application before acknowledgement or polling.
+    /// The hook reads only outside state; it never copies the live engine.
+    pub fn on_commit(&mut self, hook: impl FnMut(&Self) + 'static) {
+        self.commit_hook = Some(Box::new(hook));
     }
 
     /// Arm one cold restart before its selected durable completion is released.
@@ -311,6 +321,10 @@ impl<A: Application> Harness<A> {
             }
             self.inspect()?;
             if self.store.applied != previous {
+                if let Some(mut hook) = self.commit_hook.take() {
+                    hook(self);
+                    self.commit_hook = Some(hook);
+                }
                 let should_cut = match self.cut {
                     Cut::None => false,
                     Cut::AfterCommit(number) => number == self.store.applied,
@@ -369,16 +383,25 @@ impl<A: Application> Harness<A> {
     /// # Errors
     /// Returns a broken promise or a story that exceeded its bound.
     pub fn drain(&mut self) -> Result<Outcome, Violation> {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.drain_iterations())).unwrap_or_else(
-            |cause| {
+        self.drain_from(self.iterations)
+    }
+
+    /// Continue a captured drain with its original finite iteration allowance.
+    ///
+    /// # Errors
+    /// Returns the same broken promise or exhausted bound as a fresh drain.
+    pub fn drain_from(&mut self, started: u64) -> Result<Outcome, Violation> {
+        let spent = self.iterations.checked_sub(started).expect("drain starts before its snapshot");
+        let remaining = self.referee.policy.story_steps.saturating_sub(spent);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.drain_iterations(remaining)))
+            .unwrap_or_else(|cause| {
                 let detail = cause
                     .downcast_ref::<String>()
                     .map(String::as_str)
                     .or_else(|| cause.downcast_ref::<&str>().copied())
                     .unwrap_or("non-string panic");
                 panic!("application seed {}: {detail}\n{}", self.seed, self.trace.join("\n"));
-            },
-        );
+            });
         result.map_err(|violation| self.diagnostic(violation))
     }
 
@@ -389,8 +412,8 @@ impl<A: Application> Harness<A> {
         violation
     }
 
-    fn drain_iterations(&mut self) -> Result<Outcome, Violation> {
-        for _ in 0..self.referee.policy.story_steps {
+    fn drain_iterations(&mut self, remaining: u64) -> Result<Outcome, Violation> {
+        for _ in 0..remaining {
             if !self.iterate()? {
                 return Ok(self.outcome());
             }
@@ -410,5 +433,80 @@ impl<A: Application> Harness<A> {
             stopped: self.stopped,
             crashes: self.crashes.clone(),
         }
+    }
+}
+
+/// Owned outside state at a durable commit, before its acknowledgement.
+/// No domain, boundary event, journal or reply capability belongs here.
+pub struct ColdSnapshot<A: Application> {
+    config: A::Config,
+    seed: u64,
+    systems: A::Systems,
+    peers: A::Peers,
+    store: Store<A::Key, A::Record>,
+    referee: Referee,
+    trace: Trace,
+    maximum: u64,
+    configuration_heap: u64,
+    clock: Clock,
+    iterations: u64,
+    crashes: Vec<u64>,
+}
+
+impl<A: Application> Harness<A>
+where
+    A::Config: Clone,
+    A::Systems: Clone,
+    A::Peers: Clone,
+{
+    /// Capture the outside state only; resuming necessarily performs a cold start.
+    #[must_use]
+    pub fn cold_snapshot(&self) -> ColdSnapshot<A> {
+        ColdSnapshot {
+            config: self.config.clone(),
+            seed: self.seed,
+            systems: self.systems.clone(),
+            peers: self.peers.clone(),
+            store: self.store.clone(),
+            referee: self.referee.clone(),
+            trace: self.trace.clone(),
+            maximum: self.maximum,
+            configuration_heap: self.configuration_heap,
+            clock: self.clock,
+            iterations: self.iterations,
+            crashes: self.crashes.clone(),
+        }
+    }
+
+    /// Fork a captured durable cut through the same crash/restart path as fresh replay.
+    ///
+    /// # Errors
+    /// Returns the same missing receipt or broken promise as `crash`.
+    pub fn from_snapshot(snapshot: ColdSnapshot<A>) -> Result<Self, Violation> {
+        let meter = skein_world::domain::heap::Meter::new();
+        let domain = A::build(&snapshot.config);
+        let mut world = Self {
+            domain,
+            systems: snapshot.systems,
+            peers: snapshot.peers,
+            store: snapshot.store,
+            referee: snapshot.referee,
+            trace: snapshot.trace,
+            maximum: snapshot.maximum,
+            configuration_heap: snapshot.configuration_heap,
+            config: snapshot.config,
+            seed: snapshot.seed,
+            events: VecDeque::new(),
+            outputs: Vec::new(),
+            meter,
+            clock: snapshot.clock,
+            iterations: snapshot.iterations,
+            stopped: false,
+            cut: Cut::None,
+            crashes: snapshot.crashes,
+            commit_hook: None,
+        };
+        world.crash()?;
+        Ok(world)
     }
 }

@@ -21,7 +21,7 @@ pub struct ApplicationAnswer {
     pub outcome: Box<[u8]>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub(super) struct Applications {
     offered: BTreeMap<u64, (ApplicationKey, u16, [u8; 32])>,
     pending: BTreeMap<u64, Vec<ApplicationAnswer>>,
