@@ -448,10 +448,19 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
         hold: Some(Box::new(hold())),
     });
     let linked_tree = build(&linked, &w).0;
-    assert!(has(&linked_tree, b"whole linked failure"));
-    assert!(has(&linked_tree, b"Resource kind: 65535"));
-    assert!(has(&linked_tree, b"Writer effect: 18446744073709551615"));
-    assert!(has(&linked_tree, b"Resource list incomplete"));
+    assert!(has(&linked_tree, b"Retained ended task"));
+    assert!(!has(&linked_tree, b"whole linked failure"));
+    assert!(!has(&linked_tree, b"Resource kind: 65535"));
+    assert!(!has(&linked_tree, b"Writer effect: 18446744073709551615"));
+    assert!(!has(&linked_tree, b"Resource list incomplete"));
+    let (linked_client, linked_id) = super::cards_objects::loaded(
+        ObjectKey::Proposal(linked.key),
+        ReadValue::OwnerProposal(Box::new(linked.clone())),
+    );
+    assert_eq!(
+        jig_client::objects::proposal::owner_facts(linked_client.objects().get(linked_id).unwrap()),
+        Some(&linked),
+    );
     let mut maker_keys = List::with_capacity(2);
     for maker in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
         let mut v = source(OwnerProposalAction::Release {
