@@ -205,6 +205,8 @@ fn task() -> Task {
             cut: false,
         },
         spec_revision: Revision { value: 1 },
+        person_revision: None,
+        taken_by: None,
         instructions: text(b"instructions"),
         wake: WakePolicy { words: false, results: false, topics: list([]), subscriptions: list([]) },
         result_contract: ResultContract::Report,

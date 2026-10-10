@@ -36,7 +36,7 @@ pub fn person_task(
     crate::specification::document(b, &document.spec, words);
     super::common::recipient(b, &document.addressed, words);
     if let Some(by) = &document.taken {
-        words.text(b, JigPhrase::TakenBy, &[name(by.name.bytes())]);
+        super::common::taken_by(b, by, words);
     }
     if let Some(since) = document.since {
         words.text(b, JigPhrase::Since, &[Hole::Wall(words.adjusted_wall(since))]);

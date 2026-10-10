@@ -103,6 +103,8 @@ pub(super) fn escalation() -> Escalation {
             spend: List::with_capacity(0),
         },
         steering: Box::new(Steering {
+            person_revision: None,
+            taken_by: None,
             addressed: None,
             revision: Revision { value: 1 },
             spec: specification(text(b"held work")),

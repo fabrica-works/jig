@@ -83,7 +83,7 @@ pub enum ChipPhase {
     WaitingForWords { attempt: u32, since: Wall },
     BackingOff { at: Wall, attempt: u32, tries: u32, class: FailureClass, reason: Text },
     Procedure { panel: Part },
-    Person { addressed: Recipient, taken: Option<Party>, since: Option<Wall> },
+    Person { addressed: Recipient, taken: Option<TakenBy>, since: Option<Wall> },
     Closing(Closing),
     Held { reason: HoldReason, since: Wall, revision: Revision },
     Ended { how: Ending, at: Wall },
@@ -102,6 +102,10 @@ pub struct Task {
     pub lineage: List<u64>,
     pub spec: super::SpecificationDocument,
     pub spec_revision: Revision,
+    /// The independent person-task revision, when supplied by its owner.
+    pub person_revision: Option<Revision>,
+    /// Exact current taker identity; a display name is not required.
+    pub taken_by: Option<u64>,
     pub instructions: Text,
     pub wake: WakePolicy,
     pub result_contract: ResultContract,
@@ -259,9 +263,9 @@ pub enum Recipient {
     /// At a named party.
     Party(u64),
     /// At a policy role.
-    Role { project: u32, role: u16 },
+    Role { project: u32, role: u32 },
     /// Every policy role that may accept this kind of proposal, in supplied order.
-    Roles { project: u32, roles: List<u16> },
+    Roles { project: u32, roles: List<u32> },
 }
 
 /// A hold revision and the facts it decides.
@@ -348,6 +352,9 @@ pub struct Escalation {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Steering {
     pub addressed: Option<Recipient>,
+    /// Absent when retained owner facts do not supply the independent revision.
+    pub person_revision: Option<Revision>,
+    pub taken_by: Option<u64>,
     pub revision: Revision,
     pub spec: super::SpecificationDocument,
     pub instructions: Text,
@@ -419,7 +426,14 @@ pub struct Question {
     pub ending: Option<Ending>,
 }
 
-/// The revision, form and inputs a person answers.
+/// A numeric person identity with an optional supplied display name.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TakenBy {
+    pub number: u64,
+    pub name: Option<Text>,
+}
+
+/// A person-task document with its own revision and exact taker identity.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PersonTask {
     pub task: Chip,
@@ -429,7 +443,7 @@ pub struct PersonTask {
     pub contract: PersonContract,
     pub inputs: List<Result>,
     pub addressed: Recipient,
-    pub taken: Option<Party>,
+    pub taken: Option<TakenBy>,
     pub since: Option<Wall>,
     pub stall: Option<Duration>,
     pub deadline: Option<Wall>,

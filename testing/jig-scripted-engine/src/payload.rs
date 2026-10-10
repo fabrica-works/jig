@@ -14,7 +14,7 @@ use jig_client::contract::{
     Pool, Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read,
     ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
     ResultValue, Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, Specification,
-    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, Task, TaskFilter, TaskLine, TaskSpend,
+    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskFilter, TaskLine, TaskSpend,
     Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent,
     WriterSlot,
 };
@@ -234,6 +234,7 @@ impl Payload for PartyKind {
     }
 }
 fields!(Party { number, kind, name });
+fields!(TakenBy { number, name });
 impl Payload for Actor {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -381,6 +382,8 @@ fields!(Task {
     lineage,
     spec,
     spec_revision,
+    person_revision,
+    taken_by,
     instructions,
     wake,
     result_contract,
@@ -511,7 +514,18 @@ impl Payload for FailureClass {
     }
 }
 fields!(Escalation { ending, task, hold, steering, impact, waiting, trail, acts });
-fields!(Steering { addressed, revision, spec, instructions, wake, dependencies, authority, budget });
+fields!(Steering {
+    addressed,
+    person_revision,
+    taken_by,
+    revision,
+    spec,
+    instructions,
+    wake,
+    dependencies,
+    authority,
+    budget
+});
 fields!(Passed { by, at, reason, lacking });
 fields!(Proposal { key, project, proposer, why, action, needs, funding, waiting, trail, since, acts, ending });
 impl Payload for ProposalAction {

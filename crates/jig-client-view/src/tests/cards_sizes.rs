@@ -195,7 +195,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     person_value.task = full_chip(8);
     person_value.spec = specification(full_text());
     person_value.inputs = list([full_result(), full_result()]);
-    person_value.taken.as_mut().unwrap().name = full_name();
+    person_value.taken.as_mut().unwrap().name = Some(full_name());
     person_value.deadline = Some(Wall::from_nanos(u64::MAX));
     let root = ObjectKey::PersonTask(8);
     let (mut d, id, watch) = loaded_with_watch(root, ReadValue::PersonTask(Box::new(person_value)));

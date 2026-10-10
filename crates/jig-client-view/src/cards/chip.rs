@@ -169,7 +169,7 @@ pub fn details(
         ChipPhase::Person { addressed, taken, since } => {
             super::common::recipient(b, addressed, words);
             if let Some(by) = taken {
-                words.text(b, JigPhrase::TakenBy, &[name(by.name.bytes())]);
+                super::common::taken_by(b, by, words);
             }
             if let Some(since) = since {
                 words.text(b, JigPhrase::Since, &[Hole::Wall(words.adjusted_wall(*since))]);

@@ -848,6 +848,10 @@ pub fn language() -> Language {
             JigPhrase::TakenBy => {
                 Box::new([Segment::Text(copy_of(b"Taken by ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
             }
+            JigPhrase::TakenByNumber => Box::new([
+                Segment::Text(copy_of(b"Taken by party ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::StallSpan => Box::new([
                 Segment::Text(copy_of(b"Becomes news for its requester after ")),
                 Segment::Hole { index: 0, kind: HoleKind::Span },

@@ -90,7 +90,7 @@ fn person(contract: PersonContract) -> PersonTask {
         contract,
         inputs: list([result()]),
         addressed: Recipient::Party(1),
-        taken: Some(document().party),
+        taken: Some(TakenBy { number: document().party.number, name: Some(document().party.name) }),
         since: Some(Wall::EPOCH),
         stall: Some(Duration::from_secs(240)),
         deadline: None,
@@ -492,7 +492,7 @@ fn all_chip_phases(words: &crate::words::Words) {
         (
             ChipPhase::Person {
                 addressed: Recipient::Role { project: 4, role: 2 },
-                taken: Some(document().party),
+                taken: Some(TakenBy { number: document().party.number, name: Some(document().party.name) }),
                 since: Some(Wall::EPOCH),
             },
             b"Taken by Pat",
@@ -671,6 +671,8 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
             ]),
         },
         steering: Box::new(Steering {
+            person_revision: Some(Revision { value: 12 }),
+            taken_by: None,
             addressed: Some(Recipient::Role { project: 4, role: 2 }),
             revision: Revision { value: 6 },
             spec: specification(text(b"held specification")),
@@ -715,6 +717,8 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         lineage: list([]),
         spec: specification(text(b"whole task specification")),
         spec_revision: Revision { value: 6 },
+        person_revision: None,
+        taken_by: None,
         instructions: text(b"whole task instructions"),
         wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
         result_contract: ResultContract::Report,
@@ -1356,4 +1360,46 @@ fn cut_specification_is_shown_and_cannot_be_reconstructed_by_the_words_editor() 
     let tree = dialog(&domain, &words, &mut bindings);
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
     assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
+}
+
+#[test]
+fn person_task_cards_preserve_numeric_takers_without_inventing_names() {
+    let words = words();
+    for supplied_name in [None, Some(text(b"actual taker"))] {
+        let mut value = person(PersonContract::Words);
+        value.revision = Revision { value: u64::MAX };
+        value.addressed = Recipient::Role { project: 4, role: u32::MAX };
+        value.task.executor = Executor::Role { project: 4, role: u32::MAX };
+        value.taken = Some(TakenBy { number: u64::MAX, name: supplied_name.clone() });
+        let (domain, object, _) = loaded_with_watch(ObjectKey::PersonTask(8), ReadValue::PersonTask(Box::new(value)));
+        let mut bindings = JigBindings::new(16, CLIENT.text);
+        let tree = render(&domain, object, &words, &mut bindings);
+        assert!(contains(&tree, b"Waiting for project 4, role 4294967295"));
+        assert_eq!(contains(&tree, b"Taken by party 18446744073709551615"), supplied_name.is_none());
+        assert_eq!(contains(&tree, b"Taken by actual taker"), supplied_name.is_some());
+        assert!(!contains(&tree, b"Taken by Pat"));
+    }
+}
+
+#[test]
+fn retained_task_facts_keep_person_revision_taker_and_full_executor_identity_independent() {
+    for (executor, person_revision, taken_by) in [
+        (Executor::Role { project: 4, role: u32::MAX }, Some(Revision { value: u64::MAX }), Some(u64::MAX - 1)),
+        (Executor::Procedure { connector: 2, kind: u32::MAX }, None, None),
+    ] {
+        let mut value = task_doc(&[ActKind::Amend]);
+        value.goal = false;
+        value.chip.executor = executor.clone();
+        value.person_revision = person_revision;
+        value.taken_by = taken_by;
+        let (domain, object, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(value)));
+        let Some(jig_client::objects::Body::Task(retained)) = &domain.objects().get(object).unwrap().body else {
+            panic!("the actual task document remains retained");
+        };
+        assert_eq!(retained.chip.executor, executor);
+        assert_eq!(retained.person_revision, person_revision);
+        assert_eq!(retained.taken_by, taken_by);
+        assert_eq!(retained.spec_revision, Revision { value: 6 });
+        assert_eq!(retained.hold.as_ref().unwrap().revision, Revision { value: 4 });
+    }
 }

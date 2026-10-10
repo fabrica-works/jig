@@ -52,6 +52,8 @@ pub(super) fn task() -> Task {
         lineage: List::with_capacity(0),
         spec: specification(text(b"spec")),
         spec_revision: Revision { value: 9 },
+        person_revision: None,
+        taken_by: None,
         instructions: text(b"instructions"),
         wake: WakePolicy {
             words: true,

@@ -38,7 +38,7 @@ pub fn edit(before: &Amendment, field: Field, value: Box<[u8]>, text_limit: u32)
         Field::Role { project } => {
             change.addressed = Some(jig_client::contract::Recipient::Role {
                 project,
-                role: u16::try_from(crate::number(&value)?).ok()?,
+                role: u32::try_from(crate::number(&value)?).ok()?,
             });
         }
     }

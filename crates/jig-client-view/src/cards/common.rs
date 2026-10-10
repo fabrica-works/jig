@@ -7,7 +7,7 @@ use crate::{
 use jig_client::{
     Domain,
     action::Act,
-    contract::{ActKind, Admission, Authority, Budget, Offered, Part, Passed, Recipient},
+    contract::{ActKind, Admission, Authority, Budget, Offered, Part, Passed, Recipient, TakenBy},
     fields::Purpose,
     objects::{Card, Object},
 };
@@ -115,6 +115,13 @@ pub fn recipient(b: &mut Builder, to: &Recipient, words: &Words) {
                 words.text(b, JigPhrase::RoleNumber, &[Hole::Number(u64::from(*role))]);
             }
         }
+    }
+}
+
+pub fn taken_by(b: &mut Builder, by: &TakenBy, words: &Words) {
+    match &by.name {
+        Some(value) => words.text(b, JigPhrase::TakenBy, &[name(value.bytes())]),
+        None => words.text(b, JigPhrase::TakenByNumber, &[Hole::Number(by.number)]),
     }
 }
 /// Show the whole authority facts, with grants' connector descriptions in slots.

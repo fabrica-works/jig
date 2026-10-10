@@ -100,11 +100,11 @@ pub enum Executor {
     /// An agent and its charter.
     Agent { charter: u32 },
     /// A connector procedure.
-    Procedure { connector: u16, kind: u16 },
+    Procedure { connector: u16, kind: u32 },
     /// A named party.
     Party { party: u64 },
     /// Any party holding a role.
-    Role { project: u32, role: u16 },
+    Role { project: u32, role: u32 },
 }
 
 /// The task phase, without words from the view.

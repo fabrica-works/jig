@@ -198,6 +198,8 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
             spend: list(vec![SpendLine { task: 8, attempt: None, spent: 100 }]),
         },
         steering: Box::new(Steering {
+            person_revision: None,
+            taken_by: None,
             addressed: None,
             revision: Revision { value: 1 },
             spec: specification(text(b"held work")),
@@ -299,6 +301,8 @@ fn task() -> Task {
         lineage: list(vec![]),
         spec: specification(text(b"spec")),
         spec_revision: Revision { value: 1 },
+        person_revision: None,
+        taken_by: None,
         instructions: text(b"instructions"),
         wake: WakePolicy { words: true, results: true, topics: list(vec![]), subscriptions: list(vec![]) },
         result_contract: ResultContract::Report,
@@ -936,7 +940,7 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
     );
     let mut bounds = Bounds { rows: 2, ..Bounds::default() };
     bounds.document_bytes =
-        u64::try_from(core::mem::size_of::<Recipient>()).unwrap() + List::<u16>::worst_case(2).unwrap();
+        u64::try_from(core::mem::size_of::<Recipient>()).unwrap() + List::<u32>::worst_case(2).unwrap();
     assert!(crate::payload::fits(&recipient, &bounds));
     bounds.document_bytes = bounds.document_bytes.checked_sub(1).unwrap();
     assert!(!crate::payload::fits(&recipient, &bounds));
