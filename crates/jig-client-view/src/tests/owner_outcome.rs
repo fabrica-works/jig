@@ -35,9 +35,8 @@ fn render(value: &OwnerOutcome, words: &Words) -> Tree {
     assert!(tree.len() <= required.nodes);
     let mut bytes = 0_usize;
     for node in tree.nodes() {
-        match &node.name {
-            Some(name) => bytes = bytes.checked_add(name.len()).unwrap(),
-            None => {}
+        if let Some(name) = &node.name {
+            bytes = bytes.checked_add(name.len()).unwrap();
         }
         for run in &node.text {
             bytes = bytes.checked_add(run.text.len()).unwrap();
@@ -331,7 +330,10 @@ fn selected_outcome_language_is_checked_and_maximum_fragment_fits() {
     );
     let mut missing = phrases::english();
     missing.phrases = Box::new([]);
-    assert!(Phrasebook::load(phrases::shapes(), Box::new([missing]), &phrase_limits()).is_err());
+    assert_eq!(
+        Phrasebook::load(phrases::shapes(), Box::new([missing]), &phrase_limits()).unwrap_err(),
+        Invalid::Missing { id: phrases::OutcomePhrase::Closing.id() }
+    );
     let mut wrong = phrases::english();
     for phrase in &mut wrong.phrases {
         if phrase.id == phrases::OutcomePhrase::Revision.id() {
@@ -404,5 +406,8 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
         }
     }
     incomplete.phrases = kept.into_boxed();
-    assert!(Phrasebook::load(jig::shapes(super::cards::CLIENT.text), Box::new([incomplete]), &limits).is_err());
+    assert_eq!(
+        Phrasebook::load(jig::shapes(super::cards::CLIENT.text), Box::new([incomplete]), &limits).unwrap_err(),
+        Invalid::Missing { id: phrases::OutcomePhrase::ReleasedYes.id() }
+    );
 }
