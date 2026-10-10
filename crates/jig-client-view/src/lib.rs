@@ -18,6 +18,7 @@ pub mod literal_segment;
 pub mod notices;
 pub mod owner_wake;
 pub mod owner_wake_words;
+pub mod owner_words;
 pub mod pages;
 pub mod proposed_task;
 pub mod proposed_task_words;

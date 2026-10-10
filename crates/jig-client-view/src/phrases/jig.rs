@@ -2736,5 +2736,5 @@ pub fn shapes(text: u32) -> Box<[PhraseShape]> {
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }
-    rows.into_boxed()
+    crate::owner_words::shapes(rows.into_boxed())
 }

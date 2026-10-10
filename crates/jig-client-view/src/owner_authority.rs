@@ -4,6 +4,7 @@ use crate::{
     Builder, Role, Run,
     owner_authority_words::{AuthorityPhrase, OwnerAuthorityWords},
     phrases::Hole,
+    words::Words,
 };
 use jig_client::contract::{
     OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerPattern, OwnerPatternEnd,
@@ -18,8 +19,8 @@ pub struct AuthorityFragment {
     pub depth: u32,
 }
 impl AuthorityFragment {
-    fn phrase(&mut self, words: &OwnerAuthorityWords, phrase: AuthorityPhrase) -> Option<()> {
-        self.leaf(words.capacity(phrase))
+    fn phrase(&mut self, words: &Words, phrase: AuthorityPhrase) -> Option<()> {
+        self.leaf(words.book.capacity(phrase.id())?)
     }
     fn leaf(&mut self, bytes: u32) -> Option<()> {
         self.nodes = self.nodes.checked_add(1)?;
@@ -27,19 +28,19 @@ impl AuthorityFragment {
         self.text_per_node = self.text_per_node.max(bytes);
         Some(())
     }
-    fn pattern(&mut self, pattern: &OwnerPattern, words: &OwnerAuthorityWords) -> Option<()> {
+    fn pattern(&mut self, pattern: &OwnerPattern, words: &Words) -> Option<()> {
         self.phrase(words, AuthorityPhrase::Segments)?;
         for segment in &pattern.segments {
-            self.leaf(u32::try_from(segment.len()).ok()?)?;
+            self.leaf(crate::literal_segment::display_bytes(segment)?)?;
         }
         match &pattern.last {
             OwnerPatternEnd::Exact(bytes) => {
                 self.phrase(words, AuthorityPhrase::Exact)?;
-                self.leaf(u32::try_from(bytes.len()).ok()?)?;
+                self.leaf(crate::literal_segment::display_bytes(bytes)?)?;
             }
             OwnerPatternEnd::Open(bytes) => {
                 self.phrase(words, AuthorityPhrase::Open)?;
-                self.leaf(u32::try_from(bytes.len()).ok()?)?;
+                self.leaf(crate::literal_segment::display_bytes(bytes)?)?;
             }
         }
         Some(())
@@ -47,7 +48,7 @@ impl AuthorityFragment {
 }
 /// Checked fragment capacities; phrase capacities cover every loaded language.
 #[must_use]
-pub fn required(value: &OwnerAuthority, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
+pub fn required_words(value: &OwnerAuthority, words: &Words) -> Option<AuthorityFragment> {
     let mut result = AuthorityFragment { nodes: 1, text_bytes: 0, text_per_node: 0, depth: 2 };
     for phrase in [
         AuthorityPhrase::Tools,
@@ -85,8 +86,8 @@ pub fn required(value: &OwnerAuthority, words: &OwnerAuthorityWords) -> Option<A
 }
 /// Include the owner's cut fact without inferring completeness from other facts.
 #[must_use]
-pub fn document_required(value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
-    let mut result = required(&value.authority, words)?;
+pub fn document_required_words(value: &OwnerAuthorityDocument, words: &Words) -> Option<AuthorityFragment> {
+    let mut result = required_words(&value.authority, words)?;
     if value.cut {
         result.phrase(words, AuthorityPhrase::Cut)?;
     }
@@ -94,41 +95,43 @@ pub fn document_required(value: &OwnerAuthorityDocument, words: &OwnerAuthorityW
 }
 /// Configured envelope for full rows of grants, resource scopes and pattern segments.
 #[must_use]
-pub fn worst_case(rows: u32, text: u32, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
+pub fn worst_case_words(rows: u32, text: u32, words: &Words) -> Option<AuthorityFragment> {
     let mut phrase = 0;
     for id in crate::owner_authority_words::ALL {
-        phrase = phrase.max(words.capacity(id));
+        phrase = phrase.max(words.book.capacity(id.id())?);
     }
     let patterns = rows.checked_mul(2)?;
     let raw = rows.checked_add(1)?.checked_mul(patterns)?;
     let sayings = rows.checked_mul(8)?.checked_add(10)?;
-    let nodes = raw.checked_add(sayings)?.checked_add(1)?;
+    let nodes = document_nodes(rows)?;
+    let text = crate::literal_segment::max_bytes(text)?;
     let text_bytes = raw.checked_mul(text)?.checked_add(sayings.checked_mul(phrase)?)?;
     Some(AuthorityFragment { nodes, text_bytes, text_per_node: text.max(phrase), depth: 2 })
 }
-fn text(b: &mut Builder, words: &OwnerAuthorityWords, phrase: AuthorityPhrase, holes: &[Hole]) {
-    b.text(Run::Plain, &words.say(phrase, holes));
+fn text(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, holes: &[Hole]) {
+    let saying = words.book.say(words.language, phrase.id(), holes).expect("checked authority words and facts");
+    b.text(Run::Plain, &saying.text);
 }
-fn number(b: &mut Builder, words: &OwnerAuthorityWords, phrase: AuthorityPhrase, value: u64) {
+fn number(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, value: u64) {
     text(b, words, phrase, &[Hole::Number(value)]);
 }
-fn pattern(b: &mut Builder, words: &OwnerAuthorityWords, value: &OwnerPattern) {
+fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern) {
     text(b, words, AuthorityPhrase::Segments, &[]);
     for segment in &value.segments {
-        b.text(Run::Code, segment);
+        crate::literal_segment::render(b, segment);
     }
     match &value.last {
         OwnerPatternEnd::Exact(bytes) => {
             text(b, words, AuthorityPhrase::Exact, &[]);
-            b.text(Run::Code, bytes);
+            crate::literal_segment::render(b, bytes);
         }
         OwnerPatternEnd::Open(bytes) => {
             text(b, words, AuthorityPhrase::Open, &[]);
-            b.text(Run::Code, bytes);
+            crate::literal_segment::render(b, bytes);
         }
     }
 }
-fn body(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords) {
+fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
     number(b, words, AuthorityPhrase::Tools, value.tools);
     number(b, words, AuthorityPhrase::Tasks, u64::from(value.delegation.tasks));
     number(b, words, AuthorityPhrase::Depth, u64::from(value.delegation.depth));
@@ -158,17 +161,47 @@ fn body(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords) {
     }
 }
 /// Render a whole admitted payload using a separately reserved fragment capacity.
-pub fn render(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords) {
+pub fn render_words(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
     b.open(Role::Region);
     body(b, value, words);
     b.close();
 }
 /// Render a document projection and its explicit cut metadata.
-pub fn document(b: &mut Builder, value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) {
+pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &Words) {
     b.open(Role::Region);
     body(b, &value.authority, words);
     if value.cut {
         text(b, words, AuthorityPhrase::Cut, &[]);
     }
     b.close();
+}
+
+/// Maximum nodes for a supplied authority document, including its cut marker.
+#[must_use]
+pub fn document_nodes(rows: u32) -> Option<u32> {
+    let raw = rows.checked_add(1)?.checked_mul(rows.checked_mul(2)?)?;
+    raw.checked_add(rows.checked_mul(8)?.checked_add(10)?)?.checked_add(1)
+}
+/// Standalone capacity API shares the original checked book.
+#[must_use]
+pub fn required(value: &OwnerAuthority, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
+    required_words(value, words.words())
+}
+/// Standalone document capacity API shares the original checked book.
+#[must_use]
+pub fn document_required(value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
+    document_required_words(value, words.words())
+}
+/// Standalone configured envelope includes escaped literal presentation.
+#[must_use]
+pub fn worst_case(rows: u32, text: u32, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
+    worst_case_words(rows, text, words.words())
+}
+/// Render a standalone authority with its selected checked language.
+pub fn render(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords) {
+    render_words(b, value, words.words());
+}
+/// Render a standalone authority document and its supplied cut marker.
+pub fn document(b: &mut Builder, value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) {
+    document_words(b, value, words.words());
 }

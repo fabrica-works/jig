@@ -77,6 +77,7 @@ impl Limits {
         for id in crate::phrases::jig::ALL {
             phrase = phrase.max(words.book.capacity(id.id())?);
         }
+        phrase = phrase.max(crate::owner_words::phrase_bytes(&words.book)?);
         Self::with_phrase_bytes(client, phrase, 0, 0, 0)
     }
 
@@ -96,6 +97,7 @@ impl Limits {
         for id in crate::phrases::jig::ALL {
             phrase = phrase.max(words.book.capacity(id.id())?);
         }
+        phrase = phrase.max(crate::owner_words::phrase_bytes(&words.book)?);
         Self::with_phrase_bytes(client, phrase, application_nodes, slot_nodes, slot_depth)
     }
     fn with_phrase_bytes(
@@ -114,7 +116,10 @@ impl Limits {
             .checked_add(1)?;
         // A field carries a saying as its name and the full domain value.
         // Markdown links may carry both label and external target.
-        let text_per_node = phrase.checked_mul(2)?.checked_add(client.text.checked_mul(2)?)?;
+        let text_per_node = phrase
+            .checked_mul(2)?
+            .checked_add(client.text.checked_mul(2)?)?
+            .max(crate::literal_segment::max_bytes(client.text)?);
         Some(Self {
             nodes,
             // Page, card/input result, verdict proposal, and its deepest

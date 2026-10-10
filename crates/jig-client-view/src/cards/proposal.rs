@@ -82,38 +82,25 @@ pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings:
 }
 pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Item);
-    words.text(b, JigPhrase::BatchTask, &[Hole::Number(u64::from(task.local))]);
+    words.text(b, JigPhrase::BatchTask, &[Hole::Number(task.number)]);
     crate::specification::document(b, &task.spec, words);
-    words.executor(b, task.executor);
+    crate::proposed_task::executor(b, task.executor, words);
+    crate::proposed_task::contract(b, &task.contract, words, bindings);
+    crate::owner_authority::document_words(b, &task.authority, words);
     words.text(b, JigPhrase::Budget, &[Hole::Amount(task.budget)]);
-    if let Some(at) = task.deadline {
-        words.deadline(b, at);
+    crate::proposed_task::funder(b, task.funder, words);
+    crate::owner_wake::policy(b, &task.wake, &words.book, words.language);
+    if let Some(priority) = task.priority {
+        words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(priority))]);
     }
     for dependency in &task.dependencies {
-        words.text(b, JigPhrase::AfterTask, &[Hole::Number(u64::from(*dependency))]);
+        words.text(b, JigPhrase::AfterTask, &[Hole::Number(*dependency)]);
     }
-    for grant in &task.grants {
-        words.text(
-            b,
-            JigPhrase::Grant,
-            &[
-                Hole::Number(u64::from(grant.kind)),
-                Hole::Number(u64::from(grant.connector)),
-                crate::words::name(grant.pattern.bytes()),
-            ],
-        );
-        super::common::part(
-            b,
-            &jig_client::contract::Part::Kind { connector: grant.connector, kind: grant.kind },
-            words,
-            bindings,
-        );
-        super::common::part(
-            b,
-            &jig_client::contract::Part::Resource { connector: grant.connector, path: grant.pattern.clone() },
-            words,
-            bindings,
-        );
+    for resource in &task.resources {
+        crate::proposed_task::part(b, resource, words, bindings);
+    }
+    if task.cut {
+        crate::proposed_task::text(b, words, crate::proposed_task_words::ProposedPhrase::TaskCut, &[]);
     }
     b.close();
 }

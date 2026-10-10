@@ -1262,12 +1262,12 @@ pub fn language() -> Language {
             .push(Phrase { id: phrase.id(), forms: Box::new([Form { class: PluralClass::Other, segments }]) })
             .expect("all English phrases fit");
     }
-    Language {
+    crate::owner_words::language(Language {
         plural: PluralRule::English,
         span_unit: SpanUnit::Minutes,
         wall: WallFormat::Clock,
         phrases: phrases.into_boxed(),
-    }
+    })
 }
 /// A ready English phrasebook whose names fit the client's text limit.
 pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
@@ -1276,7 +1276,7 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
         Box::new([language()]),
         &PhraseLimits {
             languages: 1,
-            phrases: u32::try_from(ALL.len()).expect("phrase count fits"),
+            phrases: crate::owner_words::phrase_count(),
             holes: 3,
             segments: 2000,
             text_bytes: 20000,

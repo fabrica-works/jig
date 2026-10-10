@@ -55,7 +55,13 @@ fn amendment(limits: &Limits) -> Option<u32> {
 }
 /// A whole proposed task, reusable by the recurring-template owner.
 pub(crate) fn proposed_task_nodes(limits: &Limits) -> Option<u32> {
-    crate::specification::nodes(limits)?.checked_add(limits.rows.checked_mul(6)?)?.checked_add(5)
+    crate::specification::nodes(limits)?
+        .checked_add(crate::proposed_task::contract_nodes(limits)?)?
+        .checked_add(crate::owner_authority::document_nodes(limits.rows)?)?
+        .checked_add(crate::owner_wake::policy_nodes())?
+        .checked_add(limits.rows)?
+        .checked_add(crate::proposed_task::part_nodes(limits)?.checked_mul(limits.rows)?)?
+        .checked_add(7)
 }
 fn proposal_action(limits: &Limits) -> Option<u32> {
     let batch = proposed_task_nodes(limits)?.checked_mul(limits.rows)?.checked_add(3)?;

@@ -158,9 +158,7 @@ pub fn english() -> Language {
 /// A checked closed phrasebook with selected language and person's UTC offset.
 #[derive(Debug)]
 pub struct OwnerAuthorityWords {
-    book: Phrasebook,
-    language: u16,
-    offset_minutes: i32,
+    words: crate::words::Words,
 }
 impl OwnerAuthorityWords {
     /// Check every language whole before retaining it and its selected index.
@@ -177,29 +175,27 @@ impl OwnerAuthorityWords {
             return Err(Invalid::Overflow);
         }
         let book = Phrasebook::load(shapes(), languages, limits)?;
-        Ok(Self { book, language, offset_minutes })
+        Ok(Self { words: crate::words::Words { book, language, offset_minutes } })
     }
     /// Maximum saying capacity across all loaded languages.
     #[must_use]
     pub fn capacity(&self, phrase: AuthorityPhrase) -> u32 {
-        self.book.capacity(phrase.id()).expect("whole closed phrasebook checked")
+        self.words.book.capacity(phrase.id()).expect("whole closed phrasebook checked")
     }
     /// Say a checked phrase using typed holes in the selected language.
     #[must_use]
     pub fn say(&self, phrase: AuthorityPhrase, holes: &[Hole]) -> Box<[u8]> {
-        self.book.say(self.language, phrase.id(), holes).expect("checked phrase and typed facts").text
+        self.words.book.say(self.words.language, phrase.id(), holes).expect("checked phrase and typed facts").text
     }
     /// Apply the person's UTC offset before the language formats the instant.
     #[must_use]
     pub fn adjusted_wall(&self, at: Wall) -> Wall {
-        let nanos = u64::from(self.offset_minutes.unsigned_abs())
-            .checked_mul(60_000_000_000)
-            .expect("loaded UTC offset fits u64 nanos");
-        Wall::from_nanos(if self.offset_minutes < 0_i32 {
-            at.as_nanos().saturating_sub(nanos)
-        } else {
-            at.as_nanos().saturating_add(nanos)
-        })
+        self.words.adjusted_wall(at)
+    }
+    /// Borrow the same checked book for shared fragment helpers.
+    #[must_use]
+    pub fn words(&self) -> &crate::words::Words {
+        &self.words
     }
 }
 

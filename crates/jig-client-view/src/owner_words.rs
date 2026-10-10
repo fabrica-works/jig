@@ -6,10 +6,14 @@ use skein_lib::List;
 
 #[must_use]
 pub fn phrase_count() -> u32 {
-    u32::try_from(crate::phrases::jig::ALL.len()).expect("normal phrase count fits")
-        .checked_add(u32::try_from(crate::owner_authority_words::ALL.len()).expect("authority phrase count fits")).expect("composed phrase count fits")
-        .checked_add(u32::try_from(crate::owner_wake_words::ALL.len()).expect("wake phrase count fits")).expect("composed phrase count fits")
-        .checked_add(u32::try_from(crate::proposed_task_words::ALL.len()).expect("batch phrase count fits")).expect("composed phrase count fits")
+    u32::try_from(crate::phrases::jig::ALL.len())
+        .expect("normal phrase count fits")
+        .checked_add(u32::try_from(crate::owner_authority_words::ALL.len()).expect("authority phrase count fits"))
+        .expect("composed phrase count fits")
+        .checked_add(u32::try_from(crate::owner_wake_words::ALL.len()).expect("wake phrase count fits"))
+        .expect("composed phrase count fits")
+        .checked_add(u32::try_from(crate::proposed_task_words::ALL.len()).expect("batch phrase count fits"))
+        .expect("composed phrase count fits")
 }
 
 #[must_use]

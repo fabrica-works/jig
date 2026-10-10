@@ -91,7 +91,7 @@ fn exact_authority_fragment_keeps_opaque_boundaries_full_codes_and_explicit_cut(
     assert_eq!(tree.len(), 26, "one region and every independent fact/segment/end leaf");
     for text in [
         &b"a/b"[..],
-        &[255, 0, 128],
+        &b"\\xFF\\x00\\x80"[..],
         &b"tail/"[..],
         &b"*raw/"[..],
         &b"Exact ending"[..],
@@ -105,6 +105,7 @@ fn exact_authority_fragment_keeps_opaque_boundaries_full_codes_and_explicit_cut(
     ] {
         assert!(has(&tree, text), "exact independent fact retained");
     }
+    assert_eq!(value.authority.grants.get(0).unwrap().pattern.segments.get(1).unwrap().as_ref(), &[255, 0, 128]);
     let mut complete = value;
     complete.cut = false;
     let tree = render(&complete, &words);

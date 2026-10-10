@@ -153,6 +153,9 @@ fn proposed_executor_and_funder_keep_full_width_codes_and_original_period_identi
         proposed_task::funder(&mut b, funder, &words);
     }
     let tree = finish(b);
+    assert_eq!(tree.len(), 5 + proposed_task::funder_nodes() * 4);
+    let actual = tree.nodes().iter().skip(5).flat_map(|node| &node.text).map(|run| run.text.len()).max().unwrap();
+    assert!(usize::try_from(proposed_task::funder_phrase_bytes(&words).unwrap()).unwrap() >= actual);
     assert!(contains(&tree, b"Agent charter 4294967295"));
     assert!(contains(&tree, b"Procedure connector 65535, code 4294967295"));
     assert!(contains(&tree, b"Person 18446744073709551615"));
@@ -282,5 +285,5 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
     assert!(!contains(&tree, b"Wake policy"));
     assert!(!contains(&tree, b"Funded by recurring task"));
     assert!(!contains(&tree, b"Agent charter"));
-    assert!(!contains(&tree, b"Allowed tool family bits"));
+    assert!(!contains(&tree, b"Tool bits: "));
 }
