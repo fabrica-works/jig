@@ -1,7 +1,7 @@
 use super::{
     confirmation::{change, reread, task},
     objects::{chip, live, text},
-    pages::project,
+    pages::{offers, project},
     spine::{LIMITS, delivered, drain, drive, frame},
 };
 use crate::{
@@ -166,6 +166,8 @@ fn closing_names_each_live_delegate_once_and_chat_about_sends_only_the_named_fir
     let mut current = frame(7);
     current.projects = List::with_capacity(1);
     current.projects.push(project(1, true)).unwrap();
+    current.charters = List::with_capacity(1);
+    current.charters.push(offers(1, true)).unwrap();
     let watch = domain.frame_watch.unwrap().token();
     delivered(&mut domain, Time::ZERO, watch, current);
     let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::ChatAbout { object: id.token() } });

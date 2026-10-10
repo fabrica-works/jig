@@ -31,7 +31,7 @@ pub(super) fn project(number: u32, _chats: bool) -> ProjectRole {
         }),
     }
 }
-fn offers(number: u32, chats: bool) -> OfferedCharters {
+pub(super) fn offers(number: u32, chats: bool) -> OfferedCharters {
     let mut charters = List::with_capacity(1);
     if chats {
         charters.push(Charter { number: 1, name: Some(DocumentText::complete(text(b"guide"))) }).unwrap();
