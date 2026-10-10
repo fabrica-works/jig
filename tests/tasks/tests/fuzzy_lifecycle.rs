@@ -1,6 +1,6 @@
-use jig_tasks_world::{run_story, run_story_branches, stories::Story};
+use jig_tasks_world::{run_story, run_story_choices, stories::Story};
 
-// Stable draw stream for timing/price and fault/cut variations after exhaustive branches.
+// Stable draw stream for timing/price and fault/cut variations after exhaustive choices.
 const DRAW_SOURCE: u64 = 47;
 const DRAWN_SEEDS: usize = 8;
 
@@ -8,12 +8,12 @@ const DRAWN_SEEDS: usize = 8;
 fn random_faults_and_restart_cuts_reach_every_retained_ending() {
     let mut seen = std::collections::BTreeSet::new();
     let markers = jig_tasks_world::coverage::MARKERS;
-    let branches = Story::all();
-    assert_eq!(branches.iter().copied().collect::<std::collections::BTreeSet<_>>().len(), 48);
-    for (index, branch) in branches.into_iter().enumerate() {
-        let timing_seed = u64::try_from(index).expect("48 branch timings");
-        let (trace, frozen) = run_story_branches(timing_seed, branch);
-        assert_eq!(frozen.results.len(), 5, "seed {timing_seed}, branch {branch:?}");
+    let choices = Story::all();
+    assert_eq!(choices.iter().copied().collect::<std::collections::BTreeSet<_>>().len(), 48);
+    for (index, choice) in choices.into_iter().enumerate() {
+        let timing_seed = u64::try_from(index).expect("48 choice timings");
+        let (trace, frozen) = run_story_choices(timing_seed, choice);
+        assert_eq!(frozen.results.len(), 5, "seed {timing_seed}, choice {choice:?}");
         seen.extend(trace.coverage.0);
     }
     let mut random = skein_lib::Rng::new(DRAW_SOURCE);

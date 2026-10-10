@@ -1,4 +1,4 @@
-//! The lifecycle's branch vocabulary, independent of drawn arrival/pricing times.
+//! The lifecycle's choice vocabulary, independent of drawn arrival/pricing times.
 
 /// The retry's independently observed ending before its fresh claim.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -39,7 +39,7 @@ pub struct Story {
     pub restart_before_close: Restart,
 }
 impl Story {
-    /// Enumerate every 2 × 3 × 2 × 2 × 2 branch combination, not a random sample.
+    /// Enumerate every 2 × 3 × 2 × 2 × 2 choice combination, not a random sample.
     #[must_use]
     pub fn all() -> Vec<Self> {
         let mut stories = Vec::with_capacity(48);

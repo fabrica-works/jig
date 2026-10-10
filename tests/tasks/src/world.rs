@@ -1070,29 +1070,29 @@ pub fn run_story_traced(seed: u64, consume_facts: bool, enabled: bool) -> (Trace
     story(seed, consume_facts, Trace::with_enabled(enabled), None)
 }
 
-/// Run one enumerated branch combination with drawn arrival/pricing times.
+/// Run one enumerated choice combination with drawn arrival/pricing times.
 #[must_use]
-pub fn run_story_branches(seed: u64, branches: Story) -> (Trace, Frozen) {
-    story(seed, true, Trace::default(), Some(branches))
+pub fn run_story_choices(seed: u64, choices: Story) -> (Trace, Frozen) {
+    story(seed, true, Trace::default(), Some(choices))
 }
 
-fn story(seed: u64, consume_facts: bool, trace: Trace, branches: Option<Story>) -> (Trace, Frozen) {
+fn story(seed: u64, consume_facts: bool, trace: Trace, choices: Option<Story>) -> (Trace, Frozen) {
     let mut w = World::start(seed, &LIMITS, trace);
     w.consume_facts = consume_facts;
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| story_run(seed, &mut w, branches))).unwrap_or_else(
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| story_run(seed, &mut w, choices))).unwrap_or_else(
         |cause| {
             let detail = cause
                 .downcast_ref::<String>()
                 .map(String::as_str)
                 .or_else(|| cause.downcast_ref::<&str>().copied())
                 .unwrap_or("non-string panic");
-            panic!("task seed {seed}, branches {branches:?}: {detail}\n{}", w.trace.lines.join("\n"));
+            panic!("task seed {seed}, choices {choices:?}: {detail}\n{}", w.trace.lines.join("\n"));
         },
     );
     (std::mem::take(&mut w.trace), w.frozen())
 }
 
-fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
+fn story_run(seed: u64, w: &mut World, choices: Option<Story>) {
     let mut rng = Rng::new(seed);
     let arrival = Duration::from_millis(rng.between(1, 20));
     w.env.now = w.env.now.saturating_add(arrival);
@@ -1105,7 +1105,7 @@ fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
     w.stage(Event::Turn { reply_to, task: 1, attempt: 1, turn: 1, read: None, offered: None, cumulative: 5 });
     // Defaults remain eager draws at their original positions: an ordinary
     // seeded replay's random stream and every action stay unchanged.
-    if branches.map_or(rng.chance(500), |story| story.turn == TurnState::Committed) {
+    if choices.map_or(rng.chance(500), |story| story.turn == TurnState::Committed) {
         w.durable();
     }
     w.restart();
@@ -1115,7 +1115,7 @@ fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
         2 => RetryEnd::None,
         _ => unreachable!(),
     };
-    match branches.map_or(drawn_retry, |story| story.retry) {
+    match choices.map_or(drawn_retry, |story| story.retry) {
         RetryEnd::Refused => {
             w.terminal(2, End::Refused);
             w.advance();
@@ -1128,10 +1128,10 @@ fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
         }
         RetryEnd::None => {}
     }
-    if branches.map_or(rng.chance(500), |story| story.restart_after_retry == Restart::Restore) {
+    if choices.map_or(rng.chance(500), |story| story.restart_after_retry == Restart::Restore) {
         w.restart();
     }
-    if branches.map_or(rng.chance(200), |story| story.child == ChildResult::Failed) {
+    if choices.map_or(rng.chance(200), |story| story.child == ChildResult::Failed) {
         w.terminal(2, End::Finished { result: TaskResult::Failure { reason: Box::new([1]) }, cancel_delegates: false });
         w.settle(2);
         assert!(matches!(w.record(3).phase, tasks::Phase::Held { .. }));
@@ -1150,7 +1150,7 @@ fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
     w.claim_fresh(4);
     w.make(Party::Task(4), vec![task(5, &[])]);
     w.claim_fresh(5);
-    if branches.map_or(rng.chance(500), |story| story.restart_before_close == Restart::Restore) {
+    if choices.map_or(rng.chance(500), |story| story.restart_before_close == Restart::Restore) {
         w.restart();
     }
     for task in [3, 4] {
