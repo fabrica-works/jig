@@ -67,7 +67,7 @@ fn has(tree: &Tree, text: &[u8]) -> bool {
     tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.as_ref() == text))
 }
 #[test]
-fn result_metadata_keeps_requester_variants_full_width_chooser_and_typed_proposer() {
+fn result_metadata_keeps_requester_variants_chooser_and_task_or_party_makers() {
     let mut value = details();
     let words = words();
     for (requester, expected) in [
