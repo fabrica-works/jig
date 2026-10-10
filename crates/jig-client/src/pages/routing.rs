@@ -350,39 +350,7 @@ pub(crate) fn delivery(
         Delivery::Goals(goals) => crate::pages::project::live(domain, env, source, *goals, out),
         Delivery::Tasks(tasks) => crate::pages::project::task_rows(domain, env, source, *tasks, out),
         Delivery::Conversations(conversations) => {
-            domain.chats.more = conversations.more;
-            if domain.conversation_rows.edges.reaches(End::Before) {
-                domain.conversation_rows.owner_after = Some(conversations.after.clone());
-                // A current live snapshot replaces live rows, while retained past rows
-                // still belong to the read window. An overlapping watch row wins whole.
-                let capacity = domain.conversation_rows.rows.capacity();
-                let old = core::mem::replace(&mut domain.conversation_rows.rows, List::with_capacity(capacity));
-                for row in old.into_boxed() {
-                    let mut named = false;
-                    for current in &conversations.rows {
-                        if current.chip.task == row.chip.task {
-                            named = true;
-                            break;
-                        }
-                    }
-                    if !super::conversations::live(row.chip.phase) && !named {
-                        domain.conversation_rows.rows.push(row).expect("retained rows fit their window");
-                    }
-                }
-                let after = domain.conversation_rows.edges.after.clone();
-                let mut rows = conversations.rows;
-                crate::pages::conversations::order(&mut rows);
-                let edges = Edges { before: Edge::End, after: Edge::More(conversations.after) };
-                let dropped = domain.conversation_rows.slide(rows, edges, End::Before);
-                if dropped == 0 {
-                    domain.conversation_rows.edges.after = after;
-                }
-                if dropped > 0 {
-                    refuse(domain, Limit::Objects);
-                }
-                crate::pages::replies::conversations(domain, env, source, out);
-            }
-            domain.changed();
+            super::conversations::delivered(domain, env, source, *conversations, out);
         }
         Delivery::Deployment(deployment) => crate::pages::deployment::document(domain, env, deployment, out),
     }

@@ -136,7 +136,7 @@ pub struct ConversationWindow {
     pub rows: List<ConversationLine>,
     pub edges: Edges,
     /// Original opaque owner continuation supplied by an admitted live snapshot.
-    pub(crate) owner_after: Option<Cursor>,
+    pub owner_after: Option<Cursor>,
 }
 impl ConversationWindow {
     /// Allocates a fixed row capacity and starts at both list ends.
@@ -230,7 +230,7 @@ fn conversation_keys(rows: &List<ConversationLine>, keys: &mut List<u64>) {
     }
 }
 fn conversation_count(rows: &List<ConversationLine>) -> u32 {
-    let mut count = 0;
+    let mut count = 0_u32;
     for index in 0..rows.len() {
         let key = rows.get(index).expect("row exists").chip.task;
         let mut present = false;
@@ -241,7 +241,7 @@ fn conversation_count(rows: &List<ConversationLine>) -> u32 {
             }
         }
         if !present {
-            count += 1;
+            count = count.checked_add(1).expect("a distinct key count fits the bounded rows");
         }
     }
     count

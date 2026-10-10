@@ -21,7 +21,7 @@ use crate::{
     intents::Origin,
     objects::{Body, Source},
     pages::{IntentPurpose, Page, inbox::Filter},
-    windows::Edge,
+    windows::{Edge, Edges},
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, Token};
@@ -463,4 +463,48 @@ fn later(b: Option<skein_lib::Wall>, a: Option<skein_lib::Wall>) -> bool {
         },
         None => false,
     }
+}
+
+/// Receives the whole live snapshot only at its reached end, preserving read
+/// rows and recording the exact supplied continuation independently of more.
+pub(crate) fn delivered(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    source: Source,
+    conversations: contract::Conversations,
+    out: &mut Queue<Request>,
+) {
+    domain.chats.more = conversations.more;
+    if domain.conversation_rows.edges.reaches(End::Before) {
+        domain.conversation_rows.owner_after = Some(conversations.after.clone());
+        // A current live snapshot replaces live rows, while retained past rows
+        // still belong to the read window. An overlapping watch row wins whole.
+        let capacity = domain.conversation_rows.rows.capacity();
+        let old = core::mem::replace(&mut domain.conversation_rows.rows, List::with_capacity(capacity));
+        for row in old.into_boxed() {
+            let mut named = false;
+            for current in &conversations.rows {
+                if current.chip.task == row.chip.task {
+                    named = true;
+                    break;
+                }
+            }
+            if !live(row.chip.phase) && !named {
+                domain.conversation_rows.rows.push(row).expect("retained rows fit their window");
+            }
+        }
+        let after = domain.conversation_rows.edges.after.clone();
+        let mut rows = conversations.rows;
+        order(&mut rows);
+        let edges = Edges { before: Edge::End, after: Edge::More(conversations.after) };
+        let dropped = domain.conversation_rows.slide(rows, edges, End::Before);
+        if dropped == 0 {
+            domain.conversation_rows.edges.after = after;
+        }
+        if dropped > 0 {
+            super::routing::refuse(domain, Limit::Objects);
+        }
+        crate::pages::replies::conversations(domain, env, source, out);
+    }
+    domain.changed();
 }

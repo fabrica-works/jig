@@ -1413,14 +1413,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
-                rows: rows.clone(),
-                more: true,
-                after: Cursor { value: text(b"fixture-watch-after") },
-            }))),
-        },
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows.clone(), true)) },
     );
     let eight = domain.objects().find(ObjectKey::Task(8)).unwrap();
     let nine = domain.objects().find(ObjectKey::Task(9)).unwrap();
@@ -1435,14 +1428,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
-                rows: rows.clone(),
-                more: true,
-                after: Cursor { value: text(b"fixture-watch-after") },
-            }))),
-        },
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows.clone(), true)) },
     );
     assert!(domain.objects().get(nine).unwrap().reply.is_none(), "committed seen facts remove stale unread metadata");
     let cursor = Cursor { value: text(b"older") };
@@ -2438,14 +2424,7 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
-                rows,
-                more: false,
-                after: Cursor { value: text(b"fixture-watch-after") },
-            }))),
-        },
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) },
     );
     let mut current = old.clone();
     current.runtime = None;
@@ -2460,14 +2439,7 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
-                rows,
-                more: true,
-                after: Cursor { value: text(b"fixture-watch-after") },
-            }))),
-        },
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, true)) },
     );
     let reply =
         domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.as_ref().unwrap();
@@ -2503,14 +2475,7 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
-                rows,
-                more: false,
-                after: Cursor { value: text(b"fixture-watch-after") },
-            }))),
-        },
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) },
     );
     assert_eq!(domain.conversation_rows().rows.get(0), Some(&zero));
 }
@@ -2530,14 +2495,7 @@ fn owner_conversation_order_keeps_missing_clock_rows_in_source_order_and_supplie
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Watch {
-                watch,
-                event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
-                    rows,
-                    more: false,
-                    after: Cursor { value: text(b"fixture-watch-after") },
-                }))),
-            },
+            Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) },
         );
         assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, if absent { 8 } else { 9 });
     }
@@ -2595,4 +2553,12 @@ fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget
     );
     assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
     assert_eq!(domain.project_page().listed_goals.len(), 2);
+}
+
+fn conversation_delivery(rows: List<ConversationLine>, more: bool) -> Delivery {
+    Delivery::Conversations(Box::new(Conversations {
+        rows,
+        more,
+        after: Cursor { value: text(b"fixture-watch-after") },
+    }))
 }
