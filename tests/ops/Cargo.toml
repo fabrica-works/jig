@@ -36,6 +36,13 @@ jig-ops-domain-infrastructure.workspace = true
 jig-ops-fake-production.workspace = true
 skein-lib.workspace = true
 jig-ops-connectors.workspace = true
+jig-ops-client-domain.workspace = true
+jig-ops-client-view.workspace = true
+jig-client.workspace = true
+jig-client-view.workspace = true
+jig-client-world.workspace = true
+jig-fake-person.workspace = true
+jig-scripted-engine.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"
