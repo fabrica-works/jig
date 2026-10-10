@@ -87,6 +87,10 @@ fn deadlines(first: usize) -> Harness {
         }
         h.stored.insert(Key::Live(number), Stored::Live(Box::new(row)));
     }
+    restore(h)
+}
+
+fn restore(mut h: Harness) -> Harness {
     let rows: Vec<_> = h
         .stored
         .values()
