@@ -24,6 +24,7 @@ mod owner_wake;
 mod refusal_facts;
 
 mod owner_authority;
+mod owner_budget;
 
 mod owner_result;
 mod policy_edit;

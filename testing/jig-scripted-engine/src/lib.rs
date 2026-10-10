@@ -416,3 +416,4 @@ impl<A: Application> Engine<A> {
 mod tests;
 
 pub mod owner_authority;
+pub mod owner_budget;
