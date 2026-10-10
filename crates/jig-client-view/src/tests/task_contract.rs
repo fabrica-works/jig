@@ -128,7 +128,10 @@ fn maximum_nested_task_contracts_fit_the_page_bound_and_preserve_every_raw_slot_
                     .nodes()
                     .iter()
                     .filter(|node| {
-                        node.text.as_ref().is_some_and(|text| text.bytes() == b"Field value byte limit 4294967295")
+                        node.text
+                            .iter()
+                            .flat_map(|run| run.text.iter().copied())
+                            .eq(b"Field value byte limit 4294967295".iter().copied())
                     })
                     .count();
                 assert_eq!(fields, usize::try_from(CLIENT.rows * CLIENT.rows).unwrap());
