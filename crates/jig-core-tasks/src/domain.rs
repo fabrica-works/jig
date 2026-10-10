@@ -90,6 +90,29 @@ pub fn view_phase(phase: &Phase) -> u32 {
 }
 
 impl Domain {
+    /// Earliest armed monotonic task deadline; observing it expires nothing.
+    #[must_use]
+    pub fn next_deadline(&self) -> Option<Time> {
+        let mut next: Option<Time> = None;
+        for at in [
+            self.alarms.next(),
+            self.chat_alarms.next(),
+            self.timers.next(),
+            self.wakes.next(),
+            self.proposal_alarms.next(),
+            self.escalation_alarms.next(),
+            self.hold_alarms.next(),
+        ] {
+            if let Some(at) = at {
+                next = Some(match next {
+                    Some(previous) => previous.min(at),
+                    None => at,
+                });
+            }
+        }
+        next
+    }
+
     /// Inspect the bounded waiting escalation cohort before an atomic role edit.
     pub fn project_escalations(
         &self,

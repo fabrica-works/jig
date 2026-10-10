@@ -516,6 +516,14 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
 /// Fire one due child timer, returning its whole bounded request batch.
 pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
     match timer {
+        Timer::People => {
+            let mut out = Queue::with_capacity(people::max_out(&env.limits.people));
+            people::fire(&mut core.people, &Env { now: env.now, wall: env.wall, limits: env.limits.people }, &mut out);
+            let mut work = Queue::with_capacity(route_room(&env.limits));
+            let requests = people_routes::tag_people(core, env, out, &mut work);
+            assert!(work.is_empty(), "people expirations produce no sibling continuations");
+            requests
+        }
         Timer::Tasks => {
             let mut out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
             tasks::fire(&mut core.tasks, &Env { now: env.now, wall: env.wall, limits: env.limits.tasks }, &mut out);

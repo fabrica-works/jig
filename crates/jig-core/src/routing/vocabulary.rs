@@ -634,6 +634,8 @@ pub enum EscalationChoice {
 /// route may change durable state.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Timer {
+    /// Sign-in and retained keyed-answer expiration.
+    People,
     /// Task deadlines and standing work.
     Tasks,
     /// Host, call and attempt deadlines.
