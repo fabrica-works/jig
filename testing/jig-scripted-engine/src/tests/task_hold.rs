@@ -47,3 +47,55 @@ fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at
     assert_eq!(row.heap(&bounds).unwrap() - absent, u64::try_from(size_of::<Hold>()).unwrap() + legacy_heap);
     assert_eq!(row.hold, Some(TaskHold::Document(Box::new(legacy))));
 }
+
+#[test]
+fn scripted_owner_hold_moves_return_exact_category_for_release_and_atomic_amend_release() {
+    for amendment in [false, true] {
+        let mut setup = script();
+        let mut row = task();
+        let reason = HoldCategory::Failures { class: HoldFailure::Agent };
+        row.hold = Some(TaskHold::Owner(Box::new(OwnerChipHold {
+            source: None,
+            reason,
+            revision: 7,
+            before: OwnerPriorPhase::Waiting,
+            escalation: None,
+            tries: OwnerFailureTries { transient: 1, permanent: 2, run: 3, agent: 4, lost: 5, invalid: 6 },
+            hold_wait_since: None,
+        })));
+        row.acts = list(vec![Offered {
+            act: if amendment { ActKind::AmendRelease } else { ActKind::Release },
+            admission: Admission::Allowed,
+        }]);
+        let spec_revision = row.spec_revision;
+        setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+        let mut engine = Engine::new(setup, 1).unwrap();
+        let ask = if amendment {
+            Ask::Amend {
+                reason: text(b""),
+                project: 1,
+                task: 8,
+                revision: spec_revision,
+                release: Some(Revision { value: 6 }),
+                change: Amendment {
+                    addressed: None,
+                    spec: None,
+                    wake: None,
+                    dependencies: None,
+                    authority: None,
+                    instructions: Some(text(b"")),
+                },
+            }
+        } else {
+            Ask::Release { project: 1, task: 8, revision: Revision { value: 6 }, again: None }
+        };
+        send(&mut engine, 0, 11, 1, 1, ask);
+        assert_eq!(
+            final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
+            &Answer::Refused(Refusal::Moved {
+                now: Revision { value: 7 },
+                what: Moved::Hold { reason: Some(CurrentHold::Reason(reason)) },
+            })
+        );
+    }
+}

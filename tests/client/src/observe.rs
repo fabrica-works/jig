@@ -88,7 +88,7 @@ pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> 
 fn task(t: &Task) -> Receipt {
     let mut revisions = vec![(1, t.spec_revision.value)];
     if let Some(hold) = &t.hold {
-        revisions.push((2, hold.revision.value));
+        revisions.push((2, hold.revision().value));
     }
     Receipt::Card { key: key(ObjectKey::Task(t.chip.task)), revisions }
 }

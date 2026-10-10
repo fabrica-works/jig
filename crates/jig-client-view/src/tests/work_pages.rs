@@ -282,10 +282,11 @@ fn history(words: &Words) {
         })
         .unwrap();
     let doc = super::cards_objects::task_doc(&[]);
+    let Some(TaskHold::Document(held)) = doc.hold else { panic!("supplied legacy historical hold") };
     let changes = [
         HistoryChange::Made { batch: 7 },
         HistoryChange::Amended { before: text(b"old instruction"), after: text(b"new instruction") },
-        HistoryChange::Held(doc.hold.unwrap()),
+        HistoryChange::Held(*held),
         HistoryChange::Released,
         HistoryChange::Cancelled { reason: text(b"cancel history") },
         HistoryChange::Moved { from: Actor::Party(1), to: Actor::Party(2), reason: text(b"move history") },
