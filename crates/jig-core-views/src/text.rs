@@ -368,6 +368,15 @@ pub fn revision(domain: &Domain, token: Token) -> Option<u64> {
     Some(domain.runs.get(&token)?.revision)
 }
 
+/// Whether the actual retained attempt has a current call, without copying bytes.
+#[must_use]
+pub fn has_current_call(domain: &Domain, token: Token, attempt: u64) -> bool {
+    match domain.runs.get(&token) {
+        Some(run) => run.attempt == attempt && run.call.is_some(),
+        None => false,
+    }
+}
+
 /// A current call is independent of a main completion's provisional text.
 /// Its whole identity is preserved and descriptions use the same document bound.
 #[must_use]

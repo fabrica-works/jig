@@ -486,6 +486,7 @@ pub(super) fn run_text(
         None => false,
     };
     if live {
+        let had_call = views::has_current_call(&core.views, run, attempt.raw());
         append_stream(
             route_view(
                 core,
@@ -500,6 +501,9 @@ pub(super) fn run_text(
             ),
             &mut out,
         );
+        if had_call && !views::has_current_call(&core.views, run, attempt.raw()) {
+            changed_run(core, env, run, &mut out);
+        }
     }
     out.push(Request::Decided);
     Requests::Out(out)
@@ -516,43 +520,47 @@ pub(super) fn run_call(core: &mut Core, env: &Env<Limits>, run: Token, attempt: 
         let before = (views::retained_attempt(&core.views, run), views::revision(&core.views, run));
         append_stream(route_view(core, env, views::Event::Called { run, attempt: attempt.raw(), call }), &mut out);
         if before != (views::retained_attempt(&core.views, run), views::revision(&core.views, run)) {
-            let mut named = None;
-            for (_, binding) in &core.view_subjects {
-                let subject = &core.view_names.get(binding.subject).expect("bound current-run subject").subject;
-                match subject {
-                    Subject::Run { task } if *task == run.raw() => {
-                        named = Some(binding.subject.token());
-                        break;
-                    }
-                    Subject::Frame { .. }
-                    | Subject::Task { .. }
-                    | Subject::Tree { .. }
-                    | Subject::Chips { .. }
-                    | Subject::Inbox { .. }
-                    | Subject::Goals { .. }
-                    | Subject::Tasks { .. }
-                    | Subject::Conversations { .. }
-                    | Subject::Run { .. }
-                    | Subject::Deployment
-                    | Subject::Proposal { .. }
-                    | Subject::Escalation { .. }
-                    | Subject::Question { .. }
-                    | Subject::PersonTask { .. }
-                    | Subject::Result { .. }
-                    | Subject::Project { .. }
-                    | Subject::Note { .. }
-                    | Subject::Application { .. } => {}
-                }
-            }
-            if let Some(name) = named {
-                let mut subjects = List::with_capacity(1);
-                subjects.push(name).expect("one watched run subject");
-                append_stream(route_view(core, env, views::Event::Changed { subjects }), &mut out);
-            }
+            changed_run(core, env, run, &mut out);
         }
     }
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+fn changed_run(core: &mut Core, env: &Env<Limits>, run: Token, out: &mut Queue<Request>) {
+    let mut named = None;
+    for (_, binding) in &core.view_subjects {
+        let subject = &core.view_names.get(binding.subject).expect("bound current-run subject").subject;
+        match subject {
+            Subject::Run { task } if *task == run.raw() => {
+                named = Some(binding.subject.token());
+                break;
+            }
+            Subject::Frame { .. }
+            | Subject::Task { .. }
+            | Subject::Tree { .. }
+            | Subject::Chips { .. }
+            | Subject::Inbox { .. }
+            | Subject::Goals { .. }
+            | Subject::Tasks { .. }
+            | Subject::Conversations { .. }
+            | Subject::Run { .. }
+            | Subject::Deployment
+            | Subject::Proposal { .. }
+            | Subject::Escalation { .. }
+            | Subject::Question { .. }
+            | Subject::PersonTask { .. }
+            | Subject::Result { .. }
+            | Subject::Project { .. }
+            | Subject::Note { .. }
+            | Subject::Application { .. } => {}
+        }
+    }
+    if let Some(name) = named {
+        let mut subjects = List::with_capacity(1);
+        subjects.push(name).expect("one watched run subject");
+        append_stream(route_view(core, env, views::Event::Changed { subjects }), out);
+    }
 }
 
 pub(super) fn stream_delivered(core: &mut Core, env: &Env<Limits>, watcher: Token) -> Requests {

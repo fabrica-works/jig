@@ -301,3 +301,55 @@ fn committed_main_text_keeps_its_independent_call_on_reopen_and_end_releases_it(
         Event::RunCall { run: Token::new(1), attempt: Token::new(7), call }
     )));
 }
+
+fn assert_current_call_clear_is_delivered(turn: u32, retry: u32) {
+    let (mut core, limits) = watch_core();
+    report(&mut core, &limits, 7, 0, 0, b"older main text");
+    open_run_watch(&mut core, &limits, 30);
+    let call = content_call(&[0xff, 0, 0x80]);
+    let shown = watch_outputs(
+        &mut core,
+        &limits,
+        Event::RunCall { run: Token::new(1), attempt: Token::new(7), call: call.clone() },
+    );
+    let old = delivered_run(&shown).expect("whole current call is in flight");
+    assert_eq!(old.call.as_ref().unwrap().identity, call.identity);
+    let stale = report(&mut core, &limits, 6, 99, 0, b"");
+    assert!(only_decided(&stale));
+    let replaced = watch_outputs(
+        &mut core,
+        &limits,
+        Event::RunText {
+            run: Token::new(1),
+            attempt: Token::new(7),
+            turn,
+            retry,
+            offset: 0,
+            text: Box::new([]),
+            call: None,
+        },
+    );
+    assert!(delivered_run(&replaced).is_none(), "normal document pacing keeps the old flight");
+    assert!(!has_write(&replaced));
+    assert_eq!(old.call.as_ref().unwrap().identity, call.identity, "captured old document stays immutable");
+    let taken = watch_outputs(&mut core, &limits, Event::Delivered { watcher: Token::new(30) });
+    let current = delivered_run(&taken).expect("taking the old document releases the actual call clear");
+    assert_eq!((current.attempt, current.committed_turn), (Some(7), 0));
+    assert!(current.call.is_none());
+    let writing = current.writing.as_ref().expect("the supplied empty completion starts writing");
+    assert_eq!(writing.turn, views::TurnName { attempt: 7, turn, retry });
+    assert_eq!((writing.from, writing.to), (0, 0));
+    assert!(writing.text.is_empty());
+    assert!(writing.call.is_none());
+    assert!(!has_write(&taken));
+}
+
+#[test]
+fn an_empty_retry_delivers_the_independent_call_clear_through_normal_document_pacing() {
+    assert_current_call_clear_is_delivered(1, 1);
+}
+
+#[test]
+fn a_new_main_turn_delivers_the_independent_call_clear_without_a_tool_end_fact() {
+    assert_current_call_clear_is_delivered(2, 0);
+}
