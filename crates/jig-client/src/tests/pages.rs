@@ -2135,3 +2135,47 @@ fn note_reads_keep_full_writer_identity_and_optional_time_without_changing_the_n
         }
     }
 }
+
+#[test]
+fn task_watch_replacements_preserve_requester_kinds_and_missing_link_facts_with_aggregate_loss() {
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut supplied = super::confirmation::task();
+    let mut chip = supplied.chip.clone();
+    chip.task = u64::MAX;
+    for requester in [
+        OwnerRequester::Task(u64::MAX),
+        OwnerRequester::Person(u64::MAX),
+        OwnerRequester::Deployment { project: u32::MAX },
+    ] {
+        for cut in [false, true] {
+            supplied.requester = requester;
+            supplied.cut = cut;
+            supplied.inputs = List::with_capacity(2);
+            supplied.inputs.push(OwnerTaskLink::Stored { number: u64::MAX, status: None }).unwrap();
+            supplied.dependencies = List::with_capacity(2);
+            supplied.dependencies.push(OwnerTaskLink::Retained { chip: chip.clone(), at: None }).unwrap();
+            supplied.references = List::with_capacity(2);
+            supplied.references.push(OwnerTaskLink::Live(chip.clone())).unwrap();
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(supplied.clone()))) },
+            );
+            let id = domain.task_page().header.unwrap();
+            let Some(crate::objects::Body::Task(document)) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole watched task");
+            };
+            assert_eq!(**document, supplied);
+            assert_eq!(document.inputs.capacity(), 2);
+            assert_eq!(document.dependencies.get(0).unwrap().number(), u64::MAX);
+            assert_eq!(document.references.get(0).unwrap().number(), u64::MAX);
+            assert_eq!(document.inputs.get(0), Some(&OwnerTaskLink::Stored { number: u64::MAX, status: None }));
+            assert_eq!(document.dependencies.get(0), Some(&OwnerTaskLink::Retained { chip: chip.clone(), at: None }));
+        }
+    }
+}
