@@ -676,7 +676,7 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
 fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserves_the_whole_offer() {
     for spend in [9_u64, 15] {
         for relation in 0_u8..4 {
-            let mut domain = domain();
+            let (mut domain, _) = live();
             let mut row = task();
             let pattern =
                 OwnerPattern { segments: List::with_capacity(0), last: OwnerPatternEnd::Exact(Box::from(*b"a/b\0")) };
