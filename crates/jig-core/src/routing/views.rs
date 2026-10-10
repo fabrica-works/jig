@@ -517,10 +517,11 @@ pub(super) fn run_call(core: &mut Core, env: &Env<Limits>, run: Token, attempt: 
         append_stream(route_view(core, env, views::Event::Called { run, attempt: attempt.raw(), call }), &mut out);
         if before != (views::retained_attempt(&core.views, run), views::revision(&core.views, run)) {
             let mut named = None;
-            for (name, subject) in &core.view_names {
-                match &subject.subject {
+            for (_, binding) in &core.view_subjects {
+                let subject = &core.view_names.get(binding.subject).expect("bound current-run subject").subject;
+                match subject {
                     Subject::Run { task } if *task == run.raw() => {
-                        named = Some(name.token());
+                        named = Some(binding.subject.token());
                         break;
                     }
                     Subject::Frame { .. }
