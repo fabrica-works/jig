@@ -13,6 +13,25 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::ResourceSegments => Box::new([Segment::Text(copy_of(b"Resource segments"))]),
+            JigPhrase::LiteralGrant => Box::new([
+                Segment::Text(copy_of(b"Grant kind ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" on connector ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::LiteralGrantMissing => Box::new([
+                Segment::Text(copy_of(b"Missing grant kind ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" on connector ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::ScopedResourceNotes => Box::new([
+                Segment::Text(copy_of(b"Resource notes in project ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" on connector ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
             JigPhrase::FrameLogin => {
                 Box::new([Segment::Text(copy_of(b"Login: ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
             }

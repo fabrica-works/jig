@@ -29,7 +29,11 @@ fn full_task() -> jig_client::contract::Task {
         jig_client::contract::WriterSlot {
             resource: jig_client::contract::Part::Resource {
                 connector: jig_test_client_domain::FIRST,
-                path: stories::text(&[b'r'; 32]),
+                path: {
+                    let mut rows = skein_lib::List::with_capacity(1);
+                    rows.push(stories::text(&[b'r'; 32]).into_bytes()).unwrap();
+                    rows
+                },
             },
             task: 9,
             attempt: Some(1),
@@ -37,7 +41,11 @@ fn full_task() -> jig_client::contract::Task {
         jig_client::contract::WriterSlot {
             resource: jig_client::contract::Part::Resource {
                 connector: jig_test_client_domain::FIRST,
-                path: stories::text(&[b'r'; 32]),
+                path: {
+                    let mut rows = skein_lib::List::with_capacity(1);
+                    rows.push(stories::text(&[b'r'; 32]).into_bytes()).unwrap();
+                    rows
+                },
             },
             task: 9,
             attempt: Some(2),

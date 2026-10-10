@@ -92,7 +92,8 @@ fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes()
     let mut row = task_doc(&[ActKind::Amend]);
     row.dependencies = list([chip()]);
     row.wake.topics = list([11, 22]);
-    row.wake.subscriptions = list([Part::Resource { connector: 2, path: text(b"actual subscribed path") }]);
+    row.wake.subscriptions =
+        list([Part::Resource { connector: 2, path: list([text(b"actual subscribed path").into_bytes()]) }]);
     let initial_wake = row.wake.clone();
     let (mut domain, _) = open(row);
     let words = words();

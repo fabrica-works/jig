@@ -21,7 +21,7 @@ pub fn new(limits: &Limits, seed: u64) -> Domain {
     Domain {
         jig: jig_client::Domain::new(&limits.jig, rng.next_u64()),
         first: first::Side::new(&limits.first, rng.next_u64()),
-        second: crate::second::Side::new(limits.second_parts, limits.first.text, rng.next_u64()),
+        second: crate::second::Side::new(limits.second_parts, limits.first.rows, limits.first.text, rng.next_u64()),
         table: RequestTable::new(&limits.table, rng.next_u64()),
     }
 }

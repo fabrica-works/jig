@@ -162,15 +162,11 @@ pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &m
     for grant in &facts.grants {
         words.text(
             b,
-            JigPhrase::Grant,
-            &[
-                Hole::Number(u64::from(grant.kind)),
-                Hole::Number(u64::from(grant.connector)),
-                name(grant.pattern.bytes()),
-            ],
+            JigPhrase::LiteralGrant,
+            &[Hole::Number(u64::from(grant.kind)), Hole::Number(u64::from(grant.connector))],
         );
+        crate::owner_authority::pattern(b, words, &grant.pattern);
         part(b, &Part::Kind { connector: grant.connector, kind: grant.kind }, words, bindings);
-        part(b, &Part::Resource { connector: grant.connector, path: grant.pattern.clone() }, words, bindings);
     }
     for tool in &facts.tools {
         words.text(b, JigPhrase::ToolAllowed, &[Hole::Number(u64::from(*tool))]);
@@ -183,9 +179,13 @@ pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &m
             }
             jig_client::contract::NoteScope::Resource { project, connector, pattern } => {
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
-                part(b, &Part::Resource { connector: *connector, path: pattern.clone() }, words, bindings);
+                words.text(b, JigPhrase::PartConnector, &[Hole::Number(u64::from(*connector))]);
+                crate::owner_authority::pattern(b, words, pattern);
             }
-            jig_client::contract::NoteScope::Goal(task) => words.text(b, JigPhrase::TaskPage, &[Hole::Number(*task)]),
+            jig_client::contract::NoteScope::Goal { project, goal } => {
+                words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
+                words.text(b, JigPhrase::TaskPage, &[Hole::Number(*goal)]);
+            }
         }
     }
 }

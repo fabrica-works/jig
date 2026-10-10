@@ -39,7 +39,8 @@ impl Limits {
         first: &words::Words,
     ) -> Option<Self> {
         let owner = crate::connector_values::requirements(&domain.first.connector, jig)?;
-        let fragment_nodes = family::PART_NODES.max(owner.nodes.checked_add(14)?);
+        let fragment_nodes =
+            family::PART_NODES.max(owner.nodes.checked_add(14)?).max(domain.first.rows.checked_add(2)?);
         let cards = domain.first.rows.checked_add(1)?;
         let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(3)?;
         // All nodes bound the possible slots in the public jig envelope.
@@ -55,8 +56,11 @@ impl Limits {
             slot_nodes,
             owner.depth.checked_add(4)?.max(8),
         )?;
-        tree.text_per_node =
-            tree.text_per_node.max(first.capacity()?.checked_mul(2)?.checked_add(20)?).max(owner.text_per_node);
+        tree.text_per_node = tree
+            .text_per_node
+            .max(first.capacity()?.checked_mul(2)?.checked_add(20)?)
+            .max(owner.text_per_node)
+            .max(jig_client_view::literal_segment::max_bytes(domain.first.text)?);
         tree.text_bytes = tree.nodes.checked_mul(tree.text_per_node)?;
         tree.drawing_bytes = drawing::BYTES;
         let limits = Self { tree, text: domain.first.text };

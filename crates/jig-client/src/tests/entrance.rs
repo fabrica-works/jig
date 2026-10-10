@@ -31,7 +31,14 @@ fn application_entrance_refusals_keep_sparse_facts_and_reject_variable_allocatio
     let words = || Text::new(Box::from(*b"facts"), 5).unwrap();
     for refusal in [
         Refusal::Authority {
-            lacking: Lacking::Grant(Grant { connector: 1, kind: 2, pattern: words() }),
+            lacking: Lacking::Grant(Grant {
+                connector: 1,
+                kind: 2,
+                pattern: OwnerPattern {
+                    segments: skein_lib::List::with_capacity(0),
+                    last: OwnerPatternEnd::Exact(words().into_bytes()),
+                },
+            }),
             proposable: None,
         },
         Refusal::Moved {

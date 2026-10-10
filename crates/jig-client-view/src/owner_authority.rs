@@ -115,7 +115,7 @@ fn text(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, holes: &[Hole])
 fn number(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, value: u64) {
     text(b, words, phrase, &[Hole::Number(value)]);
 }
-fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern) {
+pub(crate) fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern) {
     text(b, words, AuthorityPhrase::Segments, &[]);
     for segment in &value.segments {
         crate::literal_segment::render(b, segment);

@@ -115,7 +115,12 @@ impl Words {
         match part {
             Part::Connector { .. } => {}
             Part::Deployment { .. } => self.text(b, JigPhrase::Deployment, &[]),
-            Part::Resource { path, .. } => self.text(b, JigPhrase::PartResource, &[name(path.bytes())]),
+            Part::Resource { path, .. } => {
+                self.text(b, JigPhrase::ResourceSegments, &[]);
+                for segment in path {
+                    crate::literal_segment::render(b, segment);
+                }
+            }
             Part::Kind { kind, .. } => self.text(b, JigPhrase::PartKind, &[Hole::Number(u64::from(*kind))]),
             Part::Panel { task, .. } => {
                 self.text(b, JigPhrase::PanelPart, &[]);

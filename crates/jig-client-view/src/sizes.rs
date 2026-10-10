@@ -13,16 +13,16 @@ fn markdown(limits: &Limits) -> Option<u32> {
 fn authority(limits: &Limits) -> Option<u32> {
     // Four scalars; each row may occur in kinds, grants (two slots), tools,
     // and note scopes (one slot).
-    limits.rows.checked_mul(10)?.checked_add(4)
+    limits.rows.checked_mul(limits.rows.checked_mul(2)?.checked_add(14)?)?.checked_add(4)
 }
 fn trail(limits: &Limits) -> Option<u32> {
     // Introduction, actor, time, reason and a whole lacking-authority explanation.
-    limits.rows.checked_mul(6)
+    limits.rows.checked_mul(limits.rows.checked_add(9)?)
 }
 fn outcome(limits: &Limits) -> Option<u32> {
     // A moved hold includes its complete bounded attempt failures or exact
     // connector part identity; endings retain only supplied actor/decision facts.
-    limits.rows.checked_mul(6)?.checked_add(12)
+    limits.rows.checked_mul(limits.rows.checked_add(9)?)?.checked_add(12)
 }
 fn acts(limits: &Limits) -> Option<u32> {
     // Offered control (two nodes) or refused ending (up to eight leaves).

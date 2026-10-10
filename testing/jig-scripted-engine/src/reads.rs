@@ -338,9 +338,7 @@ impl<A: crate::Application> Engine<A> {
                     NoteScope::Project(project) | NoteScope::Resource { project, .. } => {
                         self.truth.visible(party, *project)
                     }
-                    NoteScope::Goal(task) => {
-                        self.truth.project(ObjectKey::Task(*task)).is_some_and(|p| self.truth.visible(party, p))
-                    }
+                    NoteScope::Goal { project, .. } => self.truth.visible(party, *project),
                 };
             }
             Read::Frame | Read::Conversations { .. } => return self.truth.frames.contains_key(&party),

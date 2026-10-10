@@ -345,7 +345,7 @@ impl Payload for NoteScope {
             Self::Resource { project, connector, pattern } => {
                 sum(&[project.heap(bounds), connector.heap(bounds), pattern.heap(bounds)])
             }
-            Self::Goal(value0) => sum(&[value0.heap(bounds)]),
+            Self::Goal { project, goal } => sum(&[project.heap(bounds), goal.heap(bounds)]),
         }
     }
 }

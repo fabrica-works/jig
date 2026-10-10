@@ -1,5 +1,5 @@
 //! Only supplied authority facts are said; client/domain/contract.md, 4.
-use super::{Words, name};
+use super::Words;
 use crate::{
     Builder,
     phrases::{Hole, jig::JigPhrase},
@@ -13,15 +13,14 @@ impl Words {
             Lacking::Budget { needed, left } => {
                 self.text(b, JigPhrase::BudgetMissing, &[Hole::Amount(*left), Hole::Amount(*needed)]);
             }
-            Lacking::Grant(grant) => self.text(
-                b,
-                JigPhrase::GrantMissing,
-                &[
-                    Hole::Number(u64::from(grant.kind)),
-                    Hole::Number(u64::from(grant.connector)),
-                    name(grant.pattern.bytes()),
-                ],
-            ),
+            Lacking::Grant(grant) => {
+                self.text(
+                    b,
+                    JigPhrase::LiteralGrantMissing,
+                    &[Hole::Number(u64::from(grant.kind)), Hole::Number(u64::from(grant.connector))],
+                );
+                crate::owner_authority::pattern(b, self, &grant.pattern);
+            }
             Lacking::GrantKind { kind } => self.text(b, JigPhrase::GrantKindMissing, &[Hole::Number(u64::from(*kind))]),
             Lacking::TaskKind { executor } => {
                 self.text(b, JigPhrase::KindMissing, &[]);

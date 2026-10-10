@@ -669,7 +669,7 @@ fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
     let watch = open_token(&opened);
     let mut document = super::confirmation::task();
     document.resources = List::with_capacity(1);
-    let resource = Part::Resource { connector: 2, path: text(b"resource") };
+    let resource = Part::Resource { connector: 2, path: resource_path(b"resource") };
     document.resources.push(resource.clone()).unwrap();
     document.parts = List::with_capacity(1);
     document.parts.push(Part::Panel { connector: 3, task: 8 }).unwrap();
@@ -1074,7 +1074,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
     );
     let read = project_read(&moved);
     let mut doc = project_document();
-    let resource = Part::Resource { connector: 1, path: text(b"resource") };
+    let resource = Part::Resource { connector: 1, path: resource_path(b"resource") };
     doc.resources = List::with_capacity(1);
     doc.resources.push(resource.clone()).unwrap();
     let shown = drive(
@@ -1969,4 +1969,10 @@ fn owner_goal_answers_preserve_numeric_proposals_and_late_started_task_facts() {
             }
         }
     }
+}
+
+fn resource_path(bytes: &[u8]) -> List<Box<[u8]>> {
+    let mut rows = List::with_capacity(1);
+    rows.push(Box::from(bytes)).unwrap();
+    rows
 }

@@ -103,7 +103,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     }
                     Some(Connector::Second) => match view.jig.part(slot.reference.token) {
                         Some(part) => {
-                            second(&mut fragment, root, part, &view.first_words);
+                            second(&mut fragment, root, part, &view.first_words, &view.words);
                             true
                         }
                         None => false,
@@ -121,7 +121,13 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     }
     view.render.finish(b, shown, out);
 }
-fn second(b: &mut Builder, root: &Domain, part: &jig_client::contract::Part, words: &words::Words) {
+fn second(
+    b: &mut Builder,
+    root: &Domain,
+    part: &jig_client::contract::Part,
+    words: &words::Words,
+    jig: &jig_client_view::words::Words,
+) {
     use jig_client::contract::Part;
     use jig_client_view::phrases::Hole;
     if !root.second().contains(part) {
@@ -131,7 +137,10 @@ fn second(b: &mut Builder, root: &Domain, part: &jig_client::contract::Part, wor
     match part {
         Part::Connector { connector } => words.text(b, words::Word::Connector, &[Hole::Number(u64::from(*connector))]),
         Part::Resource { path, .. } => {
-            words.text(b, words::Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(path.bytes()))]);
+            jig.text(b, jig_client_view::phrases::jig::JigPhrase::ResourceSegments, &[]);
+            for segment in path {
+                jig_client_view::literal_segment::render(b, segment);
+            }
         }
         Part::Kind { kind, .. } => words.text(b, words::Word::Kind, &[Hole::Number(u64::from(*kind))]),
         Part::Panel { .. }

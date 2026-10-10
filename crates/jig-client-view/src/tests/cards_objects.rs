@@ -1502,7 +1502,7 @@ fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_
             let note = Note {
                 number: 77,
                 revision: Revision { value: 123 },
-                scope: NoteScope::Goal(900),
+                scope: NoteScope::Goal { project: 1, goal: 900 },
                 description: DocumentText { bytes: text(b"note title"), cut: mask & 1 != 0 },
                 body: DocumentText { bytes: text(b"note body"), cut: mask & 2 != 0 },
                 by: Actor::Party(1),
@@ -1632,7 +1632,7 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
         let note = Note {
             number: 77,
             revision: Revision { value: 123 },
-            scope: NoteScope::Goal(900),
+            scope: NoteScope::Goal { project: 1, goal: 900 },
             description: DocumentText::complete(text(b"note title")),
             body: DocumentText::complete(text(b"note body")),
             by: Actor::Party(1),
@@ -1658,7 +1658,7 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
                 Request::Send { ask, .. } => match &**ask {
                     Ask::DeleteNote {
                         note: 77,
-                        scope: NoteScope::Goal(900),
+                        scope: NoteScope::Goal { project: 1, goal: 900 },
                         revision: Revision { value: 123 },
                         ..
                     } => true,

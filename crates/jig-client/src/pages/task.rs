@@ -246,7 +246,6 @@ pub fn parts(task: &Task, section: TaskSection, limit: u32) -> List<Part> {
         },
         TaskSection::Budget => {
             for grant in &task.authority.grants {
-                push(&mut parts, Part::Resource { connector: grant.connector, path: grant.pattern.clone() });
                 push(&mut parts, Part::Kind { connector: grant.connector, kind: grant.kind });
             }
         }

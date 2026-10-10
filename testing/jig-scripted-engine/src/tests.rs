@@ -940,7 +940,10 @@ fn bounded_offer_payloads_and_predictions() {
                 ceiling.grants = list(vec![Grant {
                     connector: 1,
                     kind: 1,
-                    pattern: Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap(),
+                    pattern: OwnerPattern {
+                        segments: List::with_capacity(0),
+                        last: OwnerPatternEnd::Exact(vec![0; 4097].into_boxed_slice()),
+                    },
                 }]);
             }
             if variant == 4 {
@@ -1680,7 +1683,14 @@ fn note_corrections_price_the_whole_scope_and_allocated_reference_capacity() {
     let ask = Ask::EditNote {
         project: 1,
         note: 77,
-        scope: NoteScope::Resource { project: 1, connector: u16::MAX, pattern: text(b"a/b") },
+        scope: NoteScope::Resource {
+            project: 1,
+            connector: u16::MAX,
+            pattern: OwnerPattern {
+                segments: List::with_capacity(0),
+                last: OwnerPatternEnd::Exact(Box::from(*b"a/b")),
+            },
+        },
         revision: Revision { value: u64::MAX },
         description: text(b"new"),
         body: text(b"body"),

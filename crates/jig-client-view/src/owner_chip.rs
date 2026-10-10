@@ -94,7 +94,7 @@ fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> {
         ResultValue::Connector { summary, part } => {
             text_fits(summary, limits)?;
             if let jig_client::contract::Part::Resource { path, .. } = part
-                && !path.fits(limits.text)
+                && !jig_client::contract::resource_path_fits(path, limits.rows, limits.text)
             {
                 return None;
             }

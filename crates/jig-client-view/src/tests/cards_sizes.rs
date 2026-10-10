@@ -15,16 +15,16 @@ fn full_name() -> Text {
 }
 fn full_authority() -> Authority {
     let mut value = authority();
-    let grant = Grant { kind: 2, connector: 2, pattern: full_name() };
+    let grant = Grant { kind: 2, connector: 2, pattern: full_pattern() };
     value.grants = list([grant.clone(), grant]);
     value.task_kinds = list([Executor::Party { party: 1 }, Executor::Agent { charter: 2 }]);
     value.tools = list([1, 2]);
-    let scope = NoteScope::Resource { project: 4, connector: 2, pattern: full_name() };
+    let scope = NoteScope::Resource { project: 4, connector: 2, pattern: full_pattern() };
     value.note_scopes = list([scope.clone(), scope]);
     value
 }
 fn full_wake() -> WakePolicy {
-    let part = Part::Resource { connector: 2, path: full_name() };
+    let part = Part::Resource { connector: 2, path: full_path() };
     WakePolicy { words: true, results: true, topics: list([1, 2]), subscriptions: list([part.clone(), part]) }
 }
 fn full_chip(task: u64) -> Chip {
@@ -35,7 +35,7 @@ fn full_chip(task: u64) -> Chip {
         phase: Phase::Waiting,
         details: Box::new(ChipPhase::Waiting {
             dependencies: list([9, 10]),
-            hold: Some(Part::Resource { connector: 2, path: full_name() }),
+            hold: Some(Part::Resource { connector: 2, path: full_path() }),
         }),
     }
 }
@@ -196,7 +196,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
         full_batch(),
         ProposalAction::Widen { before: full_authority(), after: full_authority() },
         ProposalAction::Amend { task: 8, before: full_text(), change: full_amendment() },
-        ProposalAction::Effect { part: Part::Resource { connector: 2, path: full_name() } },
+        ProposalAction::Effect { part: Part::Resource { connector: 2, path: full_path() } },
     ] {
         let person_value = full_proposal(action);
         let (d, id) = loaded(ObjectKey::Proposal(person_value.key), ReadValue::Proposal(Box::new(person_value)));
@@ -365,7 +365,7 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
         changed: Wall::EPOCH,
         runtime: Runtime::Waiting {
             dependencies: list([9, 10]),
-            hold: Some(Part::Resource { connector: 2, path: full_name() }),
+            hold: Some(Part::Resource { connector: 2, path: full_path() }),
         },
         delegates: 0,
         budget: Budget { total: 10, own: 10, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
@@ -444,4 +444,11 @@ fn specification(words: Text) -> SpecificationDocument {
         ]),
         inputs: list([u64::MAX, 0]),
     })
+}
+
+fn full_path() -> List<Box<[u8]>> {
+    list([full_name().into_bytes(), full_name().into_bytes()])
+}
+fn full_pattern() -> OwnerPattern {
+    OwnerPattern { segments: full_path(), last: OwnerPatternEnd::Exact(full_name().into_bytes()) }
 }

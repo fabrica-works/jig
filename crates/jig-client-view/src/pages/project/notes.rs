@@ -32,13 +32,17 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
     if let Some(doc) = &client.project_page().document {
         for part in &doc.resources {
             match part {
-                Part::Resource { connector, path } => scope_choice(
-                    b,
-                    words,
-                    bindings,
-                    &filter,
-                    NoteScope::Resource { project, connector: *connector, pattern: path.clone() },
-                ),
+                Part::Resource { connector, path } => {
+                    if let Some(pattern) = jig_client::contract::exact_resource_pattern(path) {
+                        scope_choice(
+                            b,
+                            words,
+                            bindings,
+                            &filter,
+                            NoteScope::Resource { project, connector: *connector, pattern },
+                        );
+                    }
+                }
                 Part::Connector { .. }
                 | Part::Kind { .. }
                 | Part::Panel { .. }
@@ -52,7 +56,7 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
         }
     }
     for goal in &client.project_page().goals {
-        scope_choice(b, words, bindings, &filter, NoteScope::Goal(goal.chip.task));
+        scope_choice(b, words, bindings, &filter, NoteScope::Goal { project, goal: goal.chip.task });
     }
     b.open(Role::List);
     for note in &client.project_page().notes {
@@ -72,15 +76,19 @@ fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filt
     let (phrase, holes): (JigPhrase, Box<[Hole]>) = match &scope {
         NoteScope::Deployment => (JigPhrase::Deployment, Box::new([])),
         NoteScope::Project(project) => (JigPhrase::ContextProject, Box::new([Hole::Number(u64::from(*project))])),
-        NoteScope::Goal(goal) => (JigPhrase::OnlyGoal, Box::new([Hole::Number(*goal)])),
-        NoteScope::Resource { pattern, .. } => {
-            (JigPhrase::ResourceScope, Box::new([crate::words::name(pattern.bytes())]))
-        }
+        NoteScope::Goal { goal, .. } => (JigPhrase::OnlyGoal, Box::new([Hole::Number(*goal)])),
+        NoteScope::Resource { project, connector, .. } => (
+            JigPhrase::ScopedResourceNotes,
+            Box::new([Hole::Number(u64::from(*project)), Hole::Number(u64::from(*connector))]),
+        ),
     };
     let label = words.say(phrase, &holes);
     b.open(Role::Button);
     b.name(&label);
     b.text(crate::Run::Plain, &label);
+    if let NoteScope::Resource { pattern, .. } = &scope {
+        crate::owner_authority::pattern(b, words, pattern);
+    }
     if scope == filter.scope {
         b.state(State::Selected);
     }

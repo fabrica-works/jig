@@ -6,6 +6,10 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    ResourceSegments,
+    LiteralGrant,
+    LiteralGrantMissing,
+    ScopedResourceNotes,
     ChipTitleCut,
     ChipDependenciesCut,
     ChipWaitingHolds,
@@ -1052,6 +1056,10 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::ResourceSegments => 630,
+            Self::LiteralGrant => 631,
+            Self::LiteralGrantMissing => 632,
+            Self::ScopedResourceNotes => 633,
             Self::ChipTitleCut => 620,
             Self::ChipDependenciesCut => 621,
             Self::ChipWaitingHolds => 622,
@@ -1925,6 +1933,7 @@ impl JigPhrase {
             | Self::Permanent
             | Self::Stall
             | Self::Held
+            | Self::ResourceSegments
             | Self::ChipTitleCut
             | Self::ChipDependenciesCut
             | Self::ChipWaitingHolds
@@ -2226,6 +2235,10 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
             ]),
+            Self::LiteralGrant | Self::LiteralGrantMissing | Self::ScopedResourceNotes => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
             Self::GrantMissing | Self::Grant => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -2288,7 +2301,11 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 592] = [
+pub const ALL: [JigPhrase; 596] = [
+    JigPhrase::ResourceSegments,
+    JigPhrase::LiteralGrant,
+    JigPhrase::LiteralGrantMissing,
+    JigPhrase::ScopedResourceNotes,
     JigPhrase::ChipTitleCut,
     JigPhrase::ChipDependenciesCut,
     JigPhrase::ChipWaitingHolds,

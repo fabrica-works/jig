@@ -77,7 +77,10 @@ pub fn part(
     match part {
         Part::Connector { connector } => words.text(b, Word::Connector, &[Hole::Number(u64::from(*connector))]),
         Part::Resource { path, .. } => {
-            words.text(b, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(path.bytes()))]);
+            jig.text(b, jig_client_view::phrases::jig::JigPhrase::ResourceSegments, &[]);
+            for segment in path {
+                jig_client_view::literal_segment::render(b, segment);
+            }
         }
         Part::Kind { kind, .. } => words.text(b, Word::Kind, &[Hole::Number(u64::from(*kind))]),
         Part::Panel { .. }

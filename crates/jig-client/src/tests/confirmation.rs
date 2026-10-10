@@ -188,7 +188,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
     let mut note = Note {
         number: 6,
         revision: Revision { value: 11 },
-        scope: NoteScope::Goal(900),
+        scope: NoteScope::Goal { project: 1, goal: 900 },
         description: DocumentText::complete(text(b"before")),
         body: DocumentText::complete(text(b"body")),
         by: Actor::Party(7),
@@ -209,7 +209,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
         Some(Ask::EditNote {
             project: 1,
             note: 6,
-            scope: NoteScope::Goal(900),
+            scope: NoteScope::Goal { project: 1, goal: 900 },
             revision: Revision { value: 11 },
             description: text(b"after"),
             body: text(b"new"),
@@ -218,7 +218,12 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
     );
     assert_eq!(
         acts::note_ask(1, &note, ActKind::DeleteNote, text(b""), text(b"")),
-        Some(Ask::DeleteNote { project: 1, note: 6, scope: NoteScope::Goal(900), revision: Revision { value: 11 } })
+        Some(Ask::DeleteNote {
+            project: 1,
+            note: 6,
+            scope: NoteScope::Goal { project: 1, goal: 900 },
+            revision: Revision { value: 11 }
+        })
     );
     for act in [ActKind::EditNote, ActKind::DeleteNote] {
         let (mut domain, _) = live();
@@ -231,14 +236,19 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
             Ask::EditNote {
                 project: 1,
                 note: 6,
-                scope: NoteScope::Goal(900),
+                scope: NoteScope::Goal { project: 1, goal: 900 },
                 revision: Revision { value: 11 },
                 description: text(b"after"),
                 body: text(b"new"),
                 references: note.tasks.clone(),
             }
         } else {
-            Ask::DeleteNote { project: 1, note: 6, scope: NoteScope::Goal(900), revision: Revision { value: 11 } }
+            Ask::DeleteNote {
+                project: 1,
+                note: 6,
+                scope: NoteScope::Goal { project: 1, goal: 900 },
+                revision: Revision { value: 11 },
+            }
         };
         assert_eq!(sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })), &expected);
         assert!(domain.confirmation().is_none());
@@ -313,7 +323,14 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
     for act in [ActKind::Amend, ActKind::AmendRelease] {
         let (mut domain, _) = live();
         let mut row = task();
-        let grant = Grant { connector: 1, kind: 2, pattern: text(b"listed") };
+        let grant = Grant {
+            connector: 1,
+            kind: 2,
+            pattern: OwnerPattern {
+                segments: List::with_capacity(0),
+                last: OwnerPatternEnd::Exact(Box::from(*b"listed")),
+            },
+        };
         let mut grants = List::with_capacity(1);
         grants.push(grant.clone()).unwrap();
         row.acts = offered(
@@ -540,7 +557,14 @@ fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation()
         let mut row = person();
         row.contract = PersonContract::Approval {
             state: text(&[0, 255, 1]),
-            part: Part::Resource { connector: 1, path: text(b"state") },
+            part: Part::Resource {
+                connector: 1,
+                path: {
+                    let mut path = List::with_capacity(1);
+                    path.push(Box::<[u8]>::from(*b"state")).unwrap();
+                    path
+                },
+            },
         };
         row.acts = offered(ActKind::Answer, Admission::Allowed);
         let id = install(&mut domain, Body::PersonTask(Box::new(row)));

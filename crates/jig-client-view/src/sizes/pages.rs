@@ -98,7 +98,7 @@ fn tasks(l: &Limits) -> Option<u32> {
         .checked_add(40)
 }
 fn notes(l: &Limits) -> Option<u32> {
-    card_nodes(l)?.checked_add(4)?.checked_mul(l.rows)?.checked_add(24)
+    card_nodes(l)?.checked_add(l.rows.checked_add(8)?)?.checked_mul(l.rows)?.checked_add(24)
 }
 fn spend(l: &Limits) -> Option<u32> {
     // Each past period has pools and task lines, each at the row bound.

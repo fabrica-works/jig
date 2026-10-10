@@ -8,6 +8,7 @@ pub struct Side {
     party: Option<u64>,
     shown: u64,
     text: u32,
+    rows: u32,
 }
 #[derive(Debug)]
 struct Held {
@@ -16,8 +17,8 @@ struct Held {
 }
 impl Side {
     #[must_use]
-    pub fn new(capacity: u32, text: u32, _seed: u64) -> Self {
-        Self { parts: List::with_capacity(capacity), link: Link::Starting, party: None, shown: 0, text }
+    pub fn new(capacity: u32, rows: u32, text: u32, _seed: u64) -> Self {
+        Self { parts: List::with_capacity(capacity), link: Link::Starting, party: None, shown: 0, text, rows }
     }
     #[must_use]
     pub const fn link(&self) -> Link {
@@ -38,7 +39,7 @@ impl Side {
     pub(crate) fn show(&mut self, part: Part, generation: u32) -> bool {
         match &part {
             Part::Resource { path, .. } => {
-                if !path.fits(self.text) {
+                if !jig_client::contract::resource_path_fits(path, self.rows, self.text) {
                     return false;
                 }
             }
@@ -91,6 +92,8 @@ impl Side {
     }
 }
 #[must_use]
-pub fn worst_case(parts: u32, text: u32) -> Option<u64> {
-    List::<Held>::worst_case(parts)?.checked_mul(2)?.checked_add(u64::from(parts).checked_mul(u64::from(text))?)
+pub fn worst_case(parts: u32, rows: u32, text: u32) -> Option<u64> {
+    List::<Held>::worst_case(parts)?.checked_mul(2)?.checked_add(u64::from(parts).checked_mul(
+        List::<alloc::boxed::Box<[u8]>>::worst_case(rows)?.checked_add(u64::from(rows).checked_mul(u64::from(text))?)?,
+    )?)
 }

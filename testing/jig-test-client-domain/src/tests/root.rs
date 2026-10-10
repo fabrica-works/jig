@@ -342,10 +342,7 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
         .unwrap();
     let mut parts = List::with_capacity(10);
     for part in [
-        contract::Part::Resource {
-            connector: crate::FIRST,
-            path: contract::Text::new(Box::from(*b"name"), 32).unwrap(),
-        },
+        contract::Part::Resource { connector: crate::FIRST, path: resource_path(b"name") },
         contract::Part::Kind { connector: crate::FIRST, kind: 4 },
         contract::Part::Panel { connector: crate::FIRST, task: 9 },
         contract::Part::Result { connector: crate::FIRST, task: 9 },
@@ -356,10 +353,7 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
         contract::Part::Hold { connector: crate::FIRST, task: 9 },
         contract::Part::Project { connector: crate::FIRST, project: 3 },
         contract::Part::Deployment { connector: crate::FIRST },
-        contract::Part::Resource {
-            connector: crate::SECOND,
-            path: contract::Text::new(Box::from(*b"other"), 32).unwrap(),
-        },
+        contract::Part::Resource { connector: crate::SECOND, path: resource_path(b"other") },
         contract::Part::Kind { connector: crate::SECOND, kind: 6 },
     ] {
         parts.push(part).unwrap();
@@ -639,17 +633,14 @@ fn family_capacities_refuse_overflow_and_resource_words_past_the_owner_bound() {
     bounds.first.retry = Duration::ZERO;
     assert!(crate::worst_case(&bounds).is_none());
     let mut root = ready(27);
-    let part = contract::Part::Resource {
-        connector: crate::FIRST,
-        path: contract::Text::new(Box::from([b'x'; 33]), 33).unwrap(),
-    };
+    let part = contract::Part::Resource { connector: crate::FIRST, path: resource_path(&[b'x'; 33]) };
     let rows = drive(
         &mut root,
         Event::First(first::Event::Show { part: part.clone(), generation: 4, scope: crate::family::Scope::Deployment }),
     );
     assert_eq!(rows, vec![Request::First(first::Out::Fact { fact: first::Fact::Full })]);
     assert!(!root.first().contains(&part, 4));
-    let mut side = crate::second::Side::new(1, 32, 1);
+    let mut side = crate::second::Side::new(1, 1, 32, 1);
     assert!(!side.show(part, 4));
     let part = contract::Part::Kind { connector: crate::SECOND, kind: 1 };
     assert!(side.show(part.clone(), 4));
@@ -1037,4 +1028,10 @@ fn whole_owner_parts_require_original_inner_identity_and_keep_unversioned_snapsh
             }
         }
     }
+}
+
+fn resource_path(bytes: &[u8]) -> List<Box<[u8]>> {
+    let mut rows = List::with_capacity(1);
+    rows.push(Box::from(bytes)).unwrap();
+    rows
 }

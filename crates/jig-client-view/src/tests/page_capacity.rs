@@ -35,8 +35,8 @@ fn authority() -> Authority {
     Authority {
         budget: u64::MAX,
         grants: list([
-            Grant { connector: 2, kind: 1, pattern: full() },
-            Grant { connector: 3, kind: 2, pattern: full() },
+            Grant { connector: 2, kind: 1, pattern: full_pattern() },
+            Grant { connector: 3, kind: 2, pattern: full_pattern() },
         ]),
         task_kinds: list([Executor::Agent { charter: 2 }, Executor::Procedure { connector: 3, kind: 1 }]),
         depth: 2,
@@ -44,8 +44,8 @@ fn authority() -> Authority {
         deadline: Some(Wall::from_nanos(u64::MAX)),
         tools: list([1, 2]),
         note_scopes: list([
-            NoteScope::Resource { project: 4, connector: 2, pattern: full() },
-            NoteScope::Resource { project: 4, connector: 3, pattern: full() },
+            NoteScope::Resource { project: 4, connector: 2, pattern: full_pattern() },
+            NoteScope::Resource { project: 4, connector: 3, pattern: full_pattern() },
         ]),
     }
 }
@@ -722,7 +722,7 @@ fn fill_notes(d: &mut Domain, read: Token) {
     let note = |number| Note {
         number,
         revision: Revision { value: 7 },
-        scope: NoteScope::Resource { project: 4, connector: 2, pattern: full() },
+        scope: NoteScope::Resource { project: 4, connector: 2, pattern: full_pattern() },
         description: DocumentText::complete(full()),
         body: DocumentText::complete(full()),
         by: Actor::Party(1),
@@ -768,4 +768,11 @@ fn specification(words: Text) -> SpecificationDocument {
         parameters: List::with_capacity(0),
         inputs: List::with_capacity(0),
     })
+}
+
+fn full_path() -> List<Box<[u8]>> {
+    list([full().into_bytes(), full().into_bytes()])
+}
+fn full_pattern() -> OwnerPattern {
+    OwnerPattern { segments: full_path(), last: OwnerPatternEnd::Exact(full().into_bytes()) }
 }
