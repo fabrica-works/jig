@@ -13,12 +13,12 @@ use jig_client::contract::{
     LiveDelegate, Made, Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered,
     OfferedCharters, OptionLine, Outcome, OwnerChipPhase, Parameter, ParameterDocument, Part, PartScope, Party,
     PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
-    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question, Read, ReadNone, ReadResult,
-    ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField, ResultValue,
-    RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunState, RunText, RunWork,
-    Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject,
-    TakenBy, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage,
-    VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question, Read,
+    ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
+    ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunState,
+    RunText, RunWork, Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod,
+    Steering, Subject, TakenBy, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits,
+    TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 

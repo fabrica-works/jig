@@ -396,7 +396,7 @@ impl<A: crate::Application> Engine<A> {
     ) -> Result<(), Invalid> {
         self.write_live(now, task, turn, Some(began), bytes, call.map(LiveCall::Decoded))
     }
-    /// Legacy scripted first-retry adapter; real retry sources use write_provisional.
+    /// Legacy scripted first-retry adapter; real retry sources use `write_provisional`.
     pub fn write_live(
         &mut self,
         now: Time,
