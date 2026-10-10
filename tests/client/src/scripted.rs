@@ -64,9 +64,20 @@ impl Application for Family {
                                 jig_test_client_domain::connector_values::ApplicationOutcome::Exhausted
                             }
                         }
-                        _ => jig_test_client_domain::connector_values::ApplicationOutcome::Unknown,
+                        jig_test_client_domain::connector_values::ClientDocument::Object { .. }
+                        | jig_test_client_domain::connector_values::ClientDocument::Panel { .. }
+                        | jig_test_client_domain::connector_values::ClientDocument::Result { .. }
+                        | jig_test_client_domain::connector_values::ClientDocument::Effect { .. }
+                        | jig_test_client_domain::connector_values::ClientDocument::Outbox { .. }
+                        | jig_test_client_domain::connector_values::ClientDocument::Hold { .. }
+                        | jig_test_client_domain::connector_values::ClientDocument::Project { .. }
+                        | jig_test_client_domain::connector_values::ClientDocument::Deployment { .. } => {
+                            jig_test_client_domain::connector_values::ApplicationOutcome::Unknown
+                        }
                     },
-                    _ => jig_test_client_domain::connector_values::ApplicationOutcome::Unknown,
+                    None | Some(family::Document::Item(_) | family::Document::Part(_)) => {
+                        jig_test_client_domain::connector_values::ApplicationOutcome::Unknown
+                    }
                 };
                 family::Answer::Connector(jig_test_client_domain::connector_values::ConnectorAnswer { value: outcome })
             }
