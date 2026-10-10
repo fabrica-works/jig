@@ -3,7 +3,7 @@
 //! the submitted words and their read position. See client/domain/client.md, 10.
 use crate::{
     Domain,
-    contract::{Answer, Ask, Limit, Made, Outcome, Party, Text},
+    contract::{Answer, Ask, Limit, Party, Text},
     intents::Intent,
 };
 use skein_lib::{Id, Token};
@@ -88,28 +88,22 @@ pub(crate) fn answered(domain: &mut Domain, request: Token, answer: &Answer) {
     if !domain.conversation.words.pending(request) {
         return;
     }
-    let message =
-        match answer {
-            Answer::Done(Outcome::Made { what: Made::Words { task, message } }) => {
-                if *task == domain.conversation.task { Some(*message) } else { None }
-            }
-            Answer::Done(
-                Outcome::Made {
-                    what:
-                        Made::Chat { .. }
-                        | Made::Goal { .. }
-                        | Made::Tasks { .. }
-                        | Made::Service { .. }
-                        | Made::PersonResult { .. }
-                        | Made::Note { .. },
+    let message = match answer {
+        Answer::Done(outcome) => match crate::outcome::route(outcome) {
+            crate::outcome::Route::Words { task, message } => {
+                if task == domain.conversation.task {
+                    Some(message)
+                } else {
+                    None
                 }
-                | Outcome::Proposed { .. }
-                | Outcome::Decided { .. }
-                | Outcome::DecidedFirst { .. }
-                | Outcome::Changed,
-            )
-            | Answer::Refused(_) => None,
-        };
+            }
+            crate::outcome::Route::Chat { .. }
+            | crate::outcome::Route::Goal { .. }
+            | crate::outcome::Route::Proposed
+            | crate::outcome::Route::Other => None,
+        },
+        Answer::Refused(_) => None,
+    };
     match message {
         Some(message) => {
             let applied = domain.conversation.words.sent(request, message);

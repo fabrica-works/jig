@@ -204,6 +204,7 @@ impl Payload for Ask {
 impl Payload for Outcome {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Owner(value) => value.heap(bounds),
             Self::Made { what } => sum(&[what.heap(bounds)]),
             Self::Proposed { proposal } => sum(&[proposal.heap(bounds)]),
             Self::Decided { by, how, at } => sum(&[by.heap(bounds), how.heap(bounds), at.heap(bounds)]),

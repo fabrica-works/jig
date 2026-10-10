@@ -411,3 +411,32 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
         Invalid::Missing { id: phrases::OutcomePhrase::ReleasedYes.id() }
     );
 }
+
+#[test]
+fn durable_answer_rendering_keeps_every_owner_fact_within_the_existing_notice_envelope() {
+    let words = words();
+    let required = view::required(&words).unwrap();
+    let limits = Limits {
+        nodes: required.nodes,
+        depth: required.depth,
+        text_per_node: required.text_per_node,
+        text_bytes: required.text_bytes,
+        drawing_bytes: 0,
+        styles_per_node: 0,
+        patches: 0,
+        bindings: 0,
+        slots: 0,
+        markdown_depth: 0,
+    };
+    for (value, expected) in max_cases() {
+        let mut builder = Builder::new(&limits);
+        words.outcome(&mut builder, &jig_client::contract::Outcome::Owner(value));
+        let tree = builder.finish();
+        expect_lines(&tree, expected);
+        assert!(tree.len() <= required.nodes);
+    }
+    // The enclosing notice bound includes at least twelve nodes even with no
+    // incoming rows; the owner fragment needs eight, including its region.
+    let client = jig_client::Limits { rows: 0, notices: 1, ..super::cards::CLIENT };
+    assert!(crate::notices_nodes(&client).unwrap() >= required.nodes + 4);
+}

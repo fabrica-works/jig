@@ -15,8 +15,7 @@ use crate::{
     action::End,
     address::{Address, Place, TaskSection},
     contract::{
-        self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, Made, ObjectKey, Outcome, Read,
-        Refusal, Seen, Text,
+        self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, Seen, Text,
     },
     fields::Purpose,
     intents::Origin,
@@ -153,8 +152,8 @@ pub(crate) fn answered(
             domain.chats.starting = None;
             match answer {
                 Answer::Refused(refusal) => domain.chats.refusal = Some(refusal),
-                Answer::Done(outcome) => match outcome {
-                    Outcome::Made { what: Made::Chat { task } } => {
+                Answer::Done(outcome) => match crate::outcome::route(&outcome) {
+                    crate::outcome::Route::Chat { task } => {
                         let same = match &domain.chats.words {
                             Some(words) => match domain.fields.get(Purpose::NewChat) {
                                 Some(field) => field.text == *words,
@@ -177,24 +176,20 @@ pub(crate) fn answered(
                                 domain,
                                 crate::notices::Kind::Answer {
                                     object: ObjectKey::Task(task),
-                                    answer: Answer::Done(Outcome::Made { what: Made::Chat { task } }),
+                                    answer: Answer::Done(outcome),
                                 },
                             );
                         }
                     }
-                    Outcome::Made {
-                        what:
-                            Made::Words { .. }
-                            | Made::Goal { .. }
-                            | Made::Tasks { .. }
-                            | Made::Service { .. }
-                            | Made::PersonResult { .. }
-                            | Made::Note { .. },
+                    crate::outcome::Route::Goal { .. }
+                    | crate::outcome::Route::Words { .. }
+                    | crate::outcome::Route::Proposed
+                    | crate::outcome::Route::Other => {
+                        crate::notices::show(
+                            domain,
+                            crate::notices::Kind::PageAnswer { answer: Answer::Done(outcome) },
+                        );
                     }
-                    | Outcome::Proposed { .. }
-                    | Outcome::Decided { .. }
-                    | Outcome::DecidedFirst { .. }
-                    | Outcome::Changed => {}
                 },
             }
             domain.chats.words = None;

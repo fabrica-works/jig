@@ -12,9 +12,7 @@
 use crate::{
     Domain, Request,
     address::{Address, Place},
-    contract::{
-        ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Made, Outcome, Phase, Recipient, Refusal, Text,
-    },
+    contract::{ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Phase, Recipient, Refusal, Text},
     fields::Purpose,
     intents::Origin,
     pages::IntentPurpose,
@@ -269,32 +267,21 @@ pub(crate) fn answered(
                 }
             }
             domain.project_page.form.answer = Some(outcome.clone());
-            match outcome {
-                Outcome::Made { what: Made::Goal { task } } => {
+            match crate::outcome::route(&outcome) {
+                crate::outcome::Route::Goal { task } => {
                     if generation == domain.generation && domain.confirmed == Some(pending.scope) {
                         crate::pages::routing::navigate(domain, env, Place::Jig(Address::task(task)), false, out);
                     } else {
                         crate::notices::show(
                             domain,
-                            crate::notices::Kind::PageAnswer {
-                                answer: Answer::Done(Outcome::Made { what: Made::Goal { task } }),
-                            },
+                            crate::notices::Kind::PageAnswer { answer: Answer::Done(outcome) },
                         );
                     }
                 }
-                Outcome::Made {
-                    what:
-                        Made::Chat { .. }
-                        | Made::Words { .. }
-                        | Made::Tasks { .. }
-                        | Made::Service { .. }
-                        | Made::PersonResult { .. }
-                        | Made::Note { .. },
-                }
-                | Outcome::Proposed { .. }
-                | Outcome::Decided { .. }
-                | Outcome::DecidedFirst { .. }
-                | Outcome::Changed => {
+                crate::outcome::Route::Chat { .. }
+                | crate::outcome::Route::Words { .. }
+                | crate::outcome::Route::Proposed
+                | crate::outcome::Route::Other => {
                     crate::notices::show(domain, crate::notices::Kind::PageAnswer { answer: Answer::Done(outcome) });
                 }
             }

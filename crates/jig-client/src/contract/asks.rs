@@ -178,6 +178,8 @@ pub enum Ask {
 /// The durable result of one ask.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Outcome {
+    /// Whole committed owner facts, without inferred names or explanations.
+    Owner(super::OwnerOutcome),
     /// A named thing was made.
     Made { what: Made },
     /// The act became a proposal.

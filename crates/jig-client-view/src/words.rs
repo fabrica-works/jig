@@ -199,6 +199,7 @@ impl Words {
     /// Say all durable outcomes, preserving who decided first and when.
     pub fn outcome(&self, b: &mut Builder, outcome: &Outcome) {
         match outcome {
+            Outcome::Owner(value) => crate::owner_outcome::render(b, value, self),
             Outcome::Made { what } => match what {
                 Made::Chat { task } => self.text(b, JigPhrase::MadeChat, &[Hole::Number(*task)]),
                 Made::Words { task, message } => {

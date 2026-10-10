@@ -700,3 +700,72 @@ fn changed_chip_membership(domain: &mut crate::Domain, old: skein_lib::Token) ->
     assert_eq!(domain.conversation().chips.as_slice(), &[55]);
     watch.token()
 }
+
+#[test]
+fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_edits() {
+    use super::spine::{LIMITS, drive};
+    use crate::{
+        Event,
+        action::Act,
+        address::{Address, Place, TaskSection},
+        contract::*,
+        fields::Purpose,
+    };
+    use skein_lib::Time;
+    for later in [false, true] {
+        for released in [false, true] {
+            for actual_task in [8, 9] {
+                let (mut domain, _) = super::objects::live();
+                drive(
+                    &mut domain,
+                    Time::ZERO,
+                    Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
+                );
+                let id = domain
+                    .objects
+                    .name(ObjectKey::Task(8), Source::Window { generation: domain.generation, number: 4 })
+                    .unwrap();
+                let mut document = super::confirmation::task();
+                document.acts = List::with_capacity(1);
+                document.acts.push(Offered { act: ActKind::Write, admission: Admission::Allowed }).unwrap();
+                assert!(domain.objects.put(ObjectKey::Task(8), crate::objects::Body::Task(Box::new(document))));
+                domain.objects.get_mut(id).unwrap().project = Some(1);
+                let request = submit_words(&mut domain, b"submitted");
+                let field = Purpose::Composer { task: 8 };
+                if later {
+                    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field, text: text(b"later") } });
+                }
+                let writes = domain.fields.get(field).unwrap().writes;
+                let answer =
+                    Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: actual_task, message: u64::MAX, released }));
+                drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() });
+                if actual_task == 8 {
+                    assert_eq!(
+                        domain.conversation().words.rows.get(0).unwrap().state,
+                        crate::conversation::Words::Sent { message: u64::MAX }
+                    );
+                } else {
+                    assert!(domain.conversation().words.rows.is_empty());
+                }
+                let cleared = actual_task == 8 && !later;
+                assert_eq!(domain.fields.get(field).unwrap().writes, writes + u64::from(cleared));
+                assert_eq!(domain.drafts.get(8).is_none(), cleared);
+                assert_eq!(
+                    domain.fields.get(field).unwrap().text.bytes(),
+                    if cleared {
+                        b"".as_slice()
+                    } else if later {
+                        b"later"
+                    } else {
+                        b"submitted"
+                    }
+                );
+                assert_eq!(domain.objects.get(id).unwrap().answer.as_ref(), Some(&answer));
+                let final_writes = domain.fields.get(field).unwrap().writes;
+                assert!(drive(&mut domain, Time::ZERO, Event::Answered { request, answer }).is_empty());
+                assert_eq!(domain.fields.get(field).unwrap().writes, final_writes);
+                assert_eq!(domain.conversation().words.rows.capacity(), LIMITS.conversation_words);
+            }
+        }
+    }
+}

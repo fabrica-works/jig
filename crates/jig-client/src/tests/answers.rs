@@ -246,3 +246,108 @@ fn full_requests_refuse_without_queueing_and_hidden_answers_and_unknowns_have_no
         assert!(domain.objects.find(ObjectKey::Task(8)).is_none());
     }
 }
+
+#[test]
+fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_terminals() {
+    use OwnerOutcome as O;
+    let outcomes = [
+        O::Closing { chat: 101, cancelled: 2, kept: 3 },
+        O::MarkedSeen { seen: Seen::Results { through: 103 } },
+        O::MarkedSeen { seen: Seen::Replies { chat: 104, through: 105 } },
+        O::NoteEdited { name: 106 },
+        O::ServiceMade { person: 107 },
+        O::Adopted { project: 108 },
+        O::GoalStarted { task: 109 },
+        O::GoalProposed { proposal: 110 },
+        O::Stopped { task: 111 },
+        O::Cancelled { task: 112 },
+        O::Released { task: 113 },
+        O::PersonTaken { task: 114 },
+        O::PersonHandedBack { task: 115 },
+        O::PersonAnswered { task: 116 },
+        O::Moved { task: 117 },
+        O::ProposalDecided {
+            proposal: ProposalKey { proposer: Proposer::Party(118), number: 119 },
+            by: 120,
+            at: Wall::from_nanos(121),
+            choice: OwnerProposalChoice::Stale,
+        },
+        O::Said { task: 122, message: 123, released: false },
+        O::QuestionAnswered { task: 124, question: 125, message: 126 },
+        O::Prioritised { project: 127 },
+        O::Amended { task: 128, released: true },
+        O::AmendProposed { task: 129, proposal: 130, released: false },
+        O::RolesSet { project: 131 },
+        O::PolicyChanged { project: 132 },
+        O::PoolSet { project: 133, person: 134 },
+        O::EscalationDecided {
+            task: 135,
+            revision: Revision { value: 136 },
+            by: 137,
+            at: Wall::from_nanos(138),
+            choice: OwnerEscalationChoice::Passed,
+        },
+        O::Started { task: 139 },
+    ];
+    for value in outcomes {
+        let (mut domain, _) = live();
+        let id = install(&mut domain, Body::Task(Box::new(task())));
+        let request = send(&mut domain, ObjectKey::Task(8));
+        let answer = Answer::Done(Outcome::Owner(value));
+        assert!(answered(&mut domain, request, answer.clone()).is_empty());
+        assert_eq!(domain.objects.get(id).unwrap().card, Card::Open);
+        assert_eq!(domain.objects.get(id).unwrap().answer.as_ref(), Some(&answer));
+        assert!(answered(&mut domain, request, Answer::Refused(Refusal::Unknown)).is_empty());
+        assert_eq!(domain.objects.get(id).unwrap().answer, Some(answer));
+    }
+}
+
+#[test]
+fn owner_historical_proposal_choices_keep_the_named_winner_and_clock_without_explanations() {
+    for maker in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
+        for choice in [
+            OwnerProposalChoice::Accepted,
+            OwnerProposalChoice::Rejected,
+            OwnerProposalChoice::Passed,
+            OwnerProposalChoice::Withdrawn,
+            OwnerProposalChoice::Stale,
+        ] {
+            let (mut domain, _) = live();
+            let mut value = proposal();
+            value.key = ProposalKey { proposer: maker, number: 41 };
+            let key = value.key;
+            let id = install(&mut domain, Body::Proposal(Box::new(value)));
+            let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
+            let request = send_card(
+                &mut domain,
+                ObjectKey::Proposal(key),
+                ActKind::Accept,
+                Box::new(Ask::DecideProposal { project: 1, proposal: key, decision: Decision::Accepted }),
+                &mut out,
+            )
+            .unwrap();
+            assert_eq!(drain(out).len(), 1);
+            let outcome = Outcome::Owner(OwnerOutcome::ProposalDecided {
+                proposal: key,
+                by: 71,
+                at: Wall::from_nanos(91),
+                choice,
+            });
+            answered(&mut domain, request, Answer::Done(outcome.clone()));
+            assert_eq!(
+                domain.objects.get(id).unwrap().card,
+                Card::Leaving {
+                    how: Left::Answered { outcome: outcome.clone() },
+                    until: Time::from_nanos(5_000_000_000)
+                }
+            );
+            assert_eq!(domain.objects.get(id).unwrap().answer, Some(Answer::Done(outcome)));
+        }
+    }
+    for value in [
+        OwnerOutcome::GoalProposed { proposal: u64::MAX },
+        OwnerOutcome::AmendProposed { task: 8, proposal: u64::MAX, released: true },
+    ] {
+        assert!(!crate::objects::stops_waiting(ObjectKey::Proposal(proposal().key), &Outcome::Owner(value)));
+    }
+}

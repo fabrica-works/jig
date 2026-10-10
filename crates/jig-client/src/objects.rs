@@ -396,9 +396,12 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
 /// Whether this answer ends the waiting object rather than steering a live task.
 #[must_use]
 pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
-    match outcome {
-        Outcome::Proposed { .. } => false,
-        Outcome::Made { .. } | Outcome::Decided { .. } | Outcome::DecidedFirst { .. } | Outcome::Changed => match key {
+    match crate::outcome::route(outcome) {
+        crate::outcome::Route::Proposed => false,
+        crate::outcome::Route::Chat { .. }
+        | crate::outcome::Route::Goal { .. }
+        | crate::outcome::Route::Words { .. }
+        | crate::outcome::Route::Other => match key {
             ObjectKey::Proposal(_)
             | ObjectKey::Escalation(_)
             | ObjectKey::Question { .. }

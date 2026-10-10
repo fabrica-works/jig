@@ -24,6 +24,7 @@ pub mod limits;
 pub mod link;
 pub mod notices;
 pub mod objects;
+mod outcome;
 pub mod pages;
 pub mod reads;
 pub mod signin;

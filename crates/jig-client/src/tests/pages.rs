@@ -1850,3 +1850,96 @@ fn procedure_goal_document(until: skein_lib::Wall) -> Project {
     };
     doc
 }
+
+#[test]
+fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers_whole() {
+    use crate::{action::Act, fields::Purpose, notices::Kind};
+    for away in [false, true] {
+        let mut domain = Domain::new(&LIMITS, 123);
+        let token = start(&mut domain, List::with_capacity(0));
+        let mut value = frame(7);
+        value.projects = List::with_capacity(1);
+        value.projects.push(project(1, true)).unwrap();
+        delivered(&mut domain, Time::ZERO, token, value);
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewChat, text: text(b"start") } });
+        let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::StartChat { project: 1 } });
+        let request = sent
+            .iter()
+            .find_map(|request| match request {
+                Request::Send { request, ask, .. } => {
+                    assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"start") });
+                    Some(*request)
+                }
+                _ => None,
+            })
+            .unwrap();
+        if away {
+            drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+        }
+        let answer = Answer::Done(Outcome::Owner(OwnerOutcome::Started { task: u64::MAX }));
+        drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() });
+        assert!(domain.chats().starting.is_none());
+        assert!(domain.fields().get(Purpose::NewChat).unwrap().text.bytes().is_empty());
+        if away {
+            let notice = domain.notices.ids().get(0).unwrap().0;
+            assert_eq!(
+                domain.notices.get(notice).unwrap().kind,
+                Kind::Answer { object: ObjectKey::Task(u64::MAX), answer }
+            );
+            assert_eq!(domain.page(), &Page::Elsewhere);
+        } else {
+            let Page::Work { address, .. } = domain.page() else { panic!("actual chat task") };
+            assert_eq!(*address, Address::Task { task: u64::MAX, section: crate::address::TaskSection::Activity });
+        }
+    }
+}
+
+#[test]
+fn owner_goal_answers_preserve_numeric_proposals_and_late_started_task_facts() {
+    use crate::{action::Act, fields::Purpose, notices::Kind, pages::project::goals::GoalForm};
+    for away in [false, true] {
+        for proposed in [false, true] {
+            let (mut domain, opened) = project_open(ProjectSection::Goals);
+            let read = project_read(&opened);
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project_document()))) },
+            );
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"goal") } },
+            );
+            let form =
+                GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 2 };
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+            let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+            let Request::Send { request, .. } = sent[0] else { panic!("original goal request") };
+            if away {
+                drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+            }
+            let outcome = Outcome::Owner(if proposed {
+                OwnerOutcome::GoalProposed { proposal: u64::MAX }
+            } else {
+                OwnerOutcome::GoalStarted { task: u64::MAX }
+            });
+            let answer = Answer::Done(outcome.clone());
+            drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() });
+            assert_eq!(domain.project_page().form.answer, Some(outcome));
+            assert!(domain.project_page().form.pending.is_none());
+            assert!(domain.fields().get(Purpose::NewGoal).unwrap().text.bytes().is_empty());
+            if away || proposed {
+                let notice = domain.notices.ids().get(0).unwrap().0;
+                assert_eq!(domain.notices.get(notice).unwrap().kind, Kind::PageAnswer { answer });
+                if away {
+                    assert_eq!(domain.page(), &Page::Elsewhere);
+                }
+            } else {
+                let Page::Work { address, .. } = domain.page() else { panic!("actual goal task") };
+                assert_eq!(*address, Address::task(u64::MAX));
+            }
+        }
+    }
+}

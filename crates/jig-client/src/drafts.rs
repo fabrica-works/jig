@@ -12,7 +12,7 @@
 use crate::{
     Domain, Request,
     address::Address,
-    contract::{Answer, Ask, Limit, Made, Outcome, Text},
+    contract::{Answer, Ask, Limit, Text},
     fields::Purpose,
     store::{Record, STORE_VERSION, StoreKey},
 };
@@ -277,19 +277,12 @@ pub(crate) fn sent(
         | Ask::SetPool { .. } => return,
     };
     let message_task = match answer {
-        Answer::Done(outcome) => match outcome {
-            Outcome::Made { what } => match what {
-                Made::Words { task, .. } => *task,
-                Made::Chat { .. }
-                | Made::Goal { .. }
-                | Made::PersonResult { .. }
-                | Made::Tasks { .. }
-                | Made::Note { .. }
-                | Made::Service { .. } => return,
-            },
-            Outcome::Proposed { .. } | Outcome::Decided { .. } | Outcome::DecidedFirst { .. } | Outcome::Changed => {
-                return;
-            }
+        Answer::Done(outcome) => match crate::outcome::route(outcome) {
+            crate::outcome::Route::Words { task, .. } => task,
+            crate::outcome::Route::Chat { .. }
+            | crate::outcome::Route::Goal { .. }
+            | crate::outcome::Route::Proposed
+            | crate::outcome::Route::Other => return,
         },
         Answer::Refused(_) => return,
     };
