@@ -1007,3 +1007,87 @@ fn whole_current_call_replacement_copies_each_supplied_current_clock_without_a_h
     assert!(c.current.is_none());
     assert!(c.live.is_empty());
 }
+
+#[test]
+fn mandatory_empty_retry_replaces_same_turn_and_stale_retries_cannot_restore_old_bytes() {
+    let mut c = Conversation::new(9, 2);
+    assert!(c.stream(stream(1, 0, 3, b"one", false), 100));
+    let old = stream(2, 0, 3, b"old", false);
+    assert!(c.stream(old.clone(), 100));
+    let mut retry = stream(2, 0, 0, b"", false);
+    retry.turn.retry = u32::MAX;
+    retry.began = None;
+    assert!(c.stream(retry.clone(), 100), "replacement fits even when the provisional row table is full");
+    assert_eq!(c.live.len(), 2);
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one");
+    assert_eq!(c.live.get(1).unwrap().text.bytes(), b"");
+    assert_eq!(c.live.get(1).unwrap().name, retry.turn);
+    assert_eq!(c.current, Some(retry.turn));
+    assert_eq!(c.offset(), 0);
+    assert!(c.stream(old.clone(), 100));
+    assert_eq!(old.text.bytes(), b"old", "captured earlier delivery stays immutable");
+    assert_eq!(c.live.get(1).unwrap().text.bytes(), b"");
+    retry.text = text(b"new");
+    retry.through = 3;
+    assert!(c.stream(retry.clone(), 100));
+    assert_eq!(c.live.get(1).unwrap().text.bytes(), b"new");
+    assert_eq!(c.offset(), 3);
+    assert!(c.stream(retry.clone(), 100));
+    assert_eq!(c.live.get(1).unwrap().text.bytes(), b"new", "exact retry/offset duplicate is absorbed once");
+    let mut invalid = retry.clone();
+    invalid.attempt = 2;
+    assert!(!c.stream(invalid, 100));
+    assert_eq!(c.current, Some(retry.turn));
+    assert!(c.moved(1).is_some());
+    let mut rows = List::with_capacity(1);
+    rows.push(calls(1, 2)).unwrap();
+    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.live.len(), 1, "committed attempt/turn replaces all provisional retries of that turn");
+    assert_eq!(c.live.get(0).unwrap().name.number, 1);
+    assert!(c.stream(retry, 100));
+    assert_eq!(c.live.len(), 1, "a retry number cannot evade the committed turn fence");
+}
+
+#[test]
+fn explicit_cut_and_reopened_origin_replace_retry_text_while_valid_suffixes_deduplicate() {
+    let mut c = Conversation::new(9, 3);
+    let mut value = stream(1, 0, 6, b"abcdef", false);
+    value.turn.retry = 7;
+    assert!(c.stream(value.clone(), 100));
+    value.from = 3;
+    value.through = 8;
+    value.text = text(b"deXYZ");
+    value.cut = true;
+    assert!(c.stream(value.clone(), 100));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"deXYZ", "cut never joins a retained prefix across a lost origin");
+    assert!(c.live.get(0).unwrap().cut);
+    value.from = 5;
+    value.through = 10;
+    value.text = text(b"XYZ++");
+    value.cut = false;
+    assert!(c.stream(value.clone(), 100));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"deXYZ++");
+    assert!(c.stream(value.clone(), 100));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"deXYZ++");
+    let mut stale = value.clone();
+    stale.from = 3;
+    stale.through = 8;
+    stale.text = text(b"stale");
+    stale.cut = true;
+    assert!(c.stream(stale, 100));
+    assert_eq!(
+        c.live.get(0).unwrap().text.bytes(),
+        b"deXYZ++",
+        "older captured cut document cannot move a retained position backward"
+    );
+    c.interrupted();
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"deXYZ++", "brief interruption keeps the visible text");
+    value.from = 0;
+    value.through = 4;
+    value.text = text(b"boot");
+    assert!(c.stream(value.clone(), 100));
+    assert_eq!(c.live.get(0).unwrap().text.bytes(), b"boot");
+    assert!(!c.live.get(0).unwrap().cut);
+    assert_eq!(c.current, Some(value.turn));
+    assert_eq!(c.offset(), 4);
+}

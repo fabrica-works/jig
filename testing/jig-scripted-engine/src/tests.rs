@@ -570,7 +570,7 @@ fn scenario_run_offsets_cut_names_and_activity() {
     let Up::Watch { event: WatchEvent::Delivered(Delivery::Run(run)), .. } = &up[0] else {
         panic!("run text");
     };
-    assert_eq!((run.from, run.through, run.cut), (20, 40, true));
+    assert_eq!((run.from, run.through, run.cut), (20, 40, false), "a valid acknowledged suffix needs no replacement");
     assert_eq!(run.text.bytes(), b"uvwxyz0123456789ABCD");
     engine.continue_run(Token::new(1), Some(provisional(name)), 0).expect("lagging offset");
     let up = engine.poll(at(1));
@@ -578,6 +578,7 @@ fn scenario_run_offsets_cut_names_and_activity() {
         panic!("cut text");
     };
     assert_eq!((run.from, run.through), (8, 40));
+    assert!(run.cut, "the actual lagging origin still proves retained-prefix loss");
     let second = TurnName { attempt: 1, number: 1 };
     engine.write(at(2), 8, second, Wall::EPOCH, &text(b"second"), None).expect("new turn");
     engine.continue_run(Token::new(1), Some(provisional(name)), 40).expect("old turn position");
@@ -2010,4 +2011,78 @@ mod chip_facts;
 
 fn provisional(name: TurnName) -> ProvisionalTurnName {
     ProvisionalTurnName { attempt: name.attempt, number: name.number, retry: 0 }
+}
+
+#[test]
+fn scripted_provisional_retry_reopens_exact_positions_and_replaces_on_empty_start() {
+    let mut setup = live_script();
+    setup.bounds.text = 32;
+    let mut engine = Engine::new(setup, 28).unwrap();
+    let old = ProvisionalTurnName { attempt: u64::MAX, number: u32::MAX, retry: u32::MAX - 1 };
+    engine.write_provisional(Time::ZERO, 8, old, None, &text(b"abcdefghijklmnopqrst"), None).unwrap();
+    engine.write_provisional(Time::ZERO, 8, old, None, &text(b"uvwxyz0123456789ABCD"), None).unwrap();
+    let token = Token::new(1);
+    engine.open(Time::ZERO, 11, token, Subject::Run { task: 8, turn: Some(old), offset: 20 }).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let suffix = RunText {
+        attempt: old.attempt,
+        began: None,
+        turn: old,
+        from: 20,
+        through: 40,
+        text: text(b"uvwxyz0123456789ABCD"),
+        cut: false,
+        call: None,
+    };
+    assert!(up.contains(&Up::Watch { token, event: WatchEvent::Delivered(Delivery::Run(Box::new(suffix))) }));
+    engine.continue_run(token, Some(old), 99).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Watch { event: WatchEvent::Delivered(Delivery::Run(value)), .. } = &up[0] else {
+        panic!("bounded retained restart");
+    };
+    assert_eq!((value.turn, value.from, value.through, value.cut), (old, 8, 40, true));
+    assert_eq!(value.text.bytes(), b"ijklmnopqrstuvwxyz0123456789ABCD");
+    let captured = value.clone();
+    let current = ProvisionalTurnName { retry: u32::MAX, ..old };
+    engine.write_provisional(Time::ZERO, 8, current, None, &text(b""), None).unwrap();
+    engine.continue_run(token, Some(old), 40).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let empty = RunText {
+        attempt: current.attempt,
+        began: None,
+        turn: current,
+        from: 0,
+        through: 0,
+        text: text(b""),
+        cut: false,
+        call: None,
+    };
+    assert!(up.contains(&Up::Watch { token, event: WatchEvent::Delivered(Delivery::Run(Box::new(empty))) }));
+    assert_eq!(captured.turn, old);
+    assert_eq!(
+        captured.text.bytes(),
+        b"ijklmnopqrstuvwxyz0123456789ABCD",
+        "captured delivery is immutable across replacement"
+    );
+    engine.write_provisional(Time::ZERO, 8, old, Some(Wall::EPOCH), &text(b"stale"), None).unwrap();
+    engine.continue_run(token, Some(current), 0).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Watch { event: WatchEvent::Delivered(Delivery::Run(value)), .. } = &up[0] else {
+        panic!("current retry");
+    };
+    assert_eq!((value.turn, value.from, value.through, value.cut), (current, 0, 0, false));
+    assert_eq!(value.began, None);
+    assert_eq!(value.text.bytes(), b"");
+    engine.write_provisional(Time::ZERO, 8, current, Some(Wall::EPOCH), &text(b"retry"), None).unwrap();
+    engine.close(Time::ZERO, token);
+    drop(engine.poll(Time::ZERO));
+    let reopened = Token::new(2);
+    engine.open(Time::ZERO, 11, reopened, Subject::Run { task: 8, turn: Some(old), offset: 99 }).unwrap();
+    let up = engine.poll(Time::ZERO);
+    let Up::Watch { event: WatchEvent::Delivered(Delivery::Run(value)), .. } = &up[1] else {
+        panic!("reopened current retry");
+    };
+    assert_eq!((value.turn, value.from, value.through, value.cut), (current, 0, 5, false));
+    assert_eq!(value.text.bytes(), b"retry");
+    assert_eq!(value.began, Some(Wall::EPOCH));
 }

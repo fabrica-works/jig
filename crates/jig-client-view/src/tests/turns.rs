@@ -813,3 +813,47 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
     assert!(contains(&tree, &escaped));
     assert_eq!(d.conversation().live.len(), CLIENT.rows);
 }
+
+#[test]
+fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position() {
+    let words = words();
+    let (mut d, _, run, _) = ready();
+    live(&mut d, run, 1);
+    drive(
+        &mut d,
+        Event::Act {
+            act: Act::FoldCall {
+                name: jig_client::conversation::CallName { attempt: 2, turn: 1, call: 1 },
+                open: true,
+            },
+        },
+    );
+    assert!(contains(&build(&d, 3, &words).0, b"whole private input"), "existing rich call detail is still available");
+    let name = ProvisionalTurnName { attempt: 2, number: 1, retry: u32::MAX };
+    let mut value =
+        RunText { attempt: 2, began: None, turn: name, from: 0, through: 0, text: text(b""), cut: false, call: None };
+    let out = deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
+    assert!(
+        out.contains(&Request::Continue { watch: run, subject: Subject::Run { task: 8, turn: Some(name), offset: 0 } })
+    );
+    assert_eq!(d.conversation().live.len(), 1);
+    assert_eq!(d.conversation().live.get(0).unwrap().name, name);
+    assert_eq!(d.conversation().live.get(0).unwrap().text.bytes(), b"");
+    let empty = build(&d, 3, &words).0;
+    access(&empty);
+    assert!(!contains(&empty, b"provisional first"));
+    assert!(!contains(&empty, b"whole private input"), "a removed retry's rich detail cannot remain visible");
+    value.text = text(b"new retry bytes");
+    value.through = 15;
+    let out = deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
+    assert!(
+        out.contains(&Request::Continue {
+            watch: run,
+            subject: Subject::Run { task: 8, turn: Some(name), offset: 15 }
+        })
+    );
+    assert!(contains(&build(&d, 3, &words).0, b"new retry bytes"));
+    deliver(&mut d, run, Delivery::Run(Box::new(value)));
+    assert_eq!(d.conversation().live.get(0).unwrap().text.bytes(), b"new retry bytes");
+    assert_eq!(d.conversation().offset(), 15);
+}

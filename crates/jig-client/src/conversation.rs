@@ -301,6 +301,12 @@ impl Conversation {
         {
             return false;
         }
+        if let Some(run) = &self.current_run
+            && let Some(attempt) = run.attempt
+            && value.attempt < attempt
+        {
+            return true;
+        }
         if let Some(committed) = self.committed_turn
             && !later(value.turn.turn(), committed)
         {
