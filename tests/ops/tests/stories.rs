@@ -95,7 +95,7 @@ fn assert_alert(world: &jig_conformance::Harness<jig_ops_world::conformance::Ops
             assert_eq!(row.authority.delegation.tasks, 0, "triage has no delegate authority");
             assert_eq!(row.authority.delegation.depth, 0);
             assert!(row.delegates.is_empty());
-            let jig_core_tasks::Contract::Verdict { choices } = &row.spec.contract else {
+            let jig_core_tasks::Contract::Verdict { choices } = &row.contract else {
                 panic!("triage's closed verdict")
             };
             assert_eq!(choices.len(), 2);

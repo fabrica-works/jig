@@ -804,6 +804,10 @@ fn alert_documents(seed: u64, cut: jig_conformance::Cut, documents: bool) -> jig
     world.advance(config::root(seed).1.infrastructure.retry_after_seconds * 1_000_000_000);
     world.drain().expect("settle an uncertain restart after its retry deadline");
     world.advance(10_000_000_000);
+    world.drain().expect("restart after recovered triage");
+    // A cut before the lead receipt can postpone triage until the retry deadline.
+    // Let the restart effect occur before giving production its recovery window.
+    world.advance(10_000_000_000);
     world.drain().expect("production recovery clock");
     let refreshed = world.systems.infrastructure(infra::SystemRequest::Service {
         service: infra::Service::new(b"production".as_slice().into(), b"checkout".as_slice().into()),
@@ -844,7 +848,7 @@ fn read_report(world: &mut jig_conformance::Harness<Ops>, cut: jig_conformance::
     assert!(holdings.iter().any(|holding| holding.person == *person && holding.role == people::Role::Owner));
     let result = world.store.rows.get(&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(5)))).unwrap_or_else(|| {
         panic!(
-            "incident report missing {cut:?}: {:?}",
+            "incident report missing {cut:?}: {:?}\n{}",
             world
                 .store
                 .rows
@@ -854,7 +858,8 @@ fn read_report(world: &mut jig_conformance::Harness<Ops>, cut: jig_conformance::
                         Some((task.phase.clone(), task.inbox.clone(), task.numbers)),
                     root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>(),
+            world.trace.join("\n")
         )
     });
     let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(task))) = result else {

@@ -673,3 +673,71 @@ fn an_unknown_connector_refuses_the_restart_without_loading_a_child() {
         assert!(!domain.core.restart_ready(), "unknown owner cannot open decisions");
     }
 }
+
+fn triage_fields(alerts: &[u8]) -> Box<[jig_core_tasks::ResultField]> {
+    Box::new([
+        jig_core_tasks::ResultField { name: Box::from(&b"alerts"[..]), value: Box::from(alerts) },
+        jig_core_tasks::ResultField { name: Box::from(&b"environment"[..]), value: Box::from(&b"production"[..]) },
+        jig_core_tasks::ResultField { name: Box::from(&b"service"[..]), value: Box::from(&b"checkout"[..]) },
+        jig_core_tasks::ResultField { name: Box::from(&b"severity"[..]), value: Box::from(&b"3"[..]) },
+    ])
+}
+
+#[test]
+fn a_closed_verdict_translates_only_explicit_machine_fields_to_the_watch() {
+    let (_, env) = fixture();
+    let limits = &env.limits.observability;
+    assert_eq!(
+        crate::translate::watch_result(
+            100,
+            &jig_core_tasks::ResultKind::Verdict { code: 1, fields: Box::new([]) },
+            limits
+        ),
+        observability::WatchMessage::Triage { child: 100, verdict: observability::TriageVerdict::Noise }
+    );
+    assert_eq!(
+        crate::translate::watch_result(
+            100,
+            &jig_core_tasks::ResultKind::Verdict { code: 2, fields: triage_fields(b"12 13") },
+            limits
+        ),
+        observability::WatchMessage::Triage {
+            child: 100,
+            verdict: observability::TriageVerdict::Incident {
+                alerts: Box::new([12, 13]),
+                service: observability::Service::new(Box::from(&b"production"[..]), Box::from(&b"checkout"[..])),
+                severity: 3,
+            }
+        }
+    );
+}
+
+#[test]
+fn malformed_machine_fields_are_refused_without_reading_an_explanation() {
+    let (_, env) = fixture();
+    let limits = &env.limits.observability;
+    for alerts in [b"".as_slice(), b"12 ", b"12 report 13", b"18446744073709551616"] {
+        assert_eq!(
+            crate::translate::watch_result(
+                100,
+                &jig_core_tasks::ResultKind::Verdict { code: 2, fields: triage_fields(alerts) },
+                limits
+            ),
+            observability::WatchMessage::InvalidTriage { child: 100 }
+        );
+    }
+    let mut fields = triage_fields(b"12");
+    fields[1].name = Box::from(&b"alerts"[..]);
+    assert_eq!(
+        crate::translate::watch_result(100, &jig_core_tasks::ResultKind::Verdict { code: 2, fields }, limits),
+        observability::WatchMessage::InvalidTriage { child: 100 }
+    );
+    assert_eq!(
+        crate::translate::watch_result(
+            100,
+            &jig_core_tasks::ResultKind::Verdict { code: 2, fields: Box::new([]) },
+            limits
+        ),
+        observability::WatchMessage::InvalidTriage { child: 100 }
+    );
+}

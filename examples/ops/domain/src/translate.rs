@@ -619,7 +619,7 @@ pub(crate) mod nested {
                 let mut out = List::with_capacity(capacity);
                 for choice in choices {
                     let Ok(()) = out.push(tasks::Verdict {
-                        fields: Box::new([]),
+                        fields: field_rules(choice)?,
                         code: choice.required(b"code")?.small()?,
                         words: choice.required(b"words")?.small()?,
                         followups: 0,
@@ -631,6 +631,22 @@ pub(crate) mod nested {
             }
             _ => Err(Problem::Range),
         }
+    }
+
+    fn field_rules(value: &Value) -> Result<Box<[tasks::FieldRule]>, Problem> {
+        let Some(fields) = value.field(b"fields")? else { return Ok(Box::new([])) };
+        let fields = fields.array()?;
+        let Ok(capacity) = u32::try_from(fields.len()) else { return Err(Problem::TooLarge) };
+        let mut rules = List::with_capacity(capacity);
+        for field in fields {
+            let Ok(()) = rules.push(tasks::FieldRule {
+                name: field.required(b"name")?.text()?,
+                max: field.required(b"max")?.small()?,
+            }) else {
+                return Err(Problem::TooLarge);
+            };
+        }
+        Ok(rules.into_boxed())
     }
 
     pub(crate) fn authority(value: &Value) -> Result<tasks::Authority, Problem> {
@@ -1181,6 +1197,74 @@ pub(crate) fn lead(delegate: &[u8]) -> Option<Box<[core::Delegate]>> {
 }
 
 /// The closed result shape is handed to its owner, without its explanation.
-pub(crate) fn watch_result(child: u64, _result: &tasks::ResultKind) -> observability::WatchMessage {
-    observability::WatchMessage::Ended { child }
+pub(crate) fn watch_result(
+    child: u64,
+    result: &tasks::ResultKind,
+    limits: &observability::Limits,
+) -> observability::WatchMessage {
+    let verdict = match result {
+        tasks::ResultKind::Verdict { code: 1, fields } if fields.is_empty() => {
+            Some(observability::TriageVerdict::Noise)
+        }
+        tasks::ResultKind::Verdict { code: 2, fields } => triage_fields(fields, limits),
+        tasks::ResultKind::Verdict { .. } => None,
+        tasks::ResultKind::Approved { .. }
+        | tasks::ResultKind::Report
+        | tasks::ResultKind::Change { .. }
+        | tasks::ResultKind::Failed
+        | tasks::ResultKind::Cancelled => return observability::WatchMessage::Ended { child },
+    };
+    match verdict {
+        Some(verdict) => observability::WatchMessage::Triage { child, verdict },
+        None => observability::WatchMessage::InvalidTriage { child },
+    }
+}
+
+// Ops's declared machine-field vocabulary. These are explicit result values,
+// never task numbers derived from report text or from the alerts they cover.
+fn triage_fields(
+    fields: &[tasks::ResultField],
+    limits: &observability::Limits,
+) -> Option<observability::TriageVerdict> {
+    if fields.len() != 4 {
+        return None;
+    }
+    let mut alerts = None;
+    let mut environment = None;
+    let mut service = None;
+    let mut severity = None;
+    for field in fields {
+        match field.name.as_ref() {
+            b"alerts" if alerts.is_none() => {
+                let mut numbers = List::with_capacity(limits.alerts_per_batch);
+                let mut start = 0;
+                for (end, byte) in field.value.iter().enumerate() {
+                    if *byte == b' ' {
+                        numbers.push(decimal(field.value.get(start..end)?)?).ok()?;
+                        start = end.checked_add(1)?;
+                    }
+                }
+                numbers.push(decimal(field.value.get(start..)?)?).ok()?;
+                alerts = Some(numbers.into_boxed());
+            }
+            b"environment" if environment.is_none() => environment = Some(field.value.clone()),
+            b"service" if service.is_none() => service = Some(field.value.clone()),
+            b"severity" if severity.is_none() => severity = Some(u8::try_from(decimal(&field.value)?).ok()?),
+            _ => return None,
+        }
+    }
+    let environment = environment?;
+    let service = service?;
+    if environment.is_empty()
+        || service.is_empty()
+        || u32::try_from(environment.len()).ok()? > limits.name_bytes
+        || u32::try_from(service.len()).ok()? > limits.name_bytes
+    {
+        return None;
+    }
+    Some(observability::TriageVerdict::Incident {
+        alerts: alerts?,
+        service: observability::Service::new(environment, service),
+        severity: severity?,
+    })
 }

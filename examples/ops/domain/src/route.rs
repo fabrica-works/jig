@@ -524,7 +524,7 @@ fn core_ask(
                                 }
                                 tasks::MessageKind::Result(result) => match word.from {
                                     tasks::Party::Task(child) => messages
-                                        .push(translate::watch_result(child, result))
+                                        .push(translate::watch_result(child, result, &env.limits.observability))
                                         .expect("offered inbox bound"),
                                     tasks::Party::Person(_) | tasks::Party::Deployment { .. } => {}
                                 },
