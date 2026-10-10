@@ -13,10 +13,42 @@ fn full_contract() -> jig_client::contract::TaskContractDocument {
     let choice = VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields };
     TaskContractDocument::Verdict { choices: jig_client_world::test::list([choice.clone(), choice]), cut: true }
 }
+fn full_authority() -> jig_client::contract::OwnerAuthorityDocument {
+    use jig_client::contract::{
+        OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
+        OwnerPatternEnd, OwnerResourceScope,
+    };
+    let pattern = OwnerPattern {
+        segments: jig_client_world::test::list([vec![0xff; 32].into_boxed_slice(), vec![0xfe; 32].into_boxed_slice()]),
+        last: OwnerPatternEnd::Open(vec![0xfd; 32].into_boxed_slice()),
+    };
+    let grant = OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern: pattern.clone() };
+    let resource = OwnerResourceScope { connector: u16::MAX, pattern };
+    OwnerAuthorityDocument {
+        authority: OwnerAuthority {
+            tools: u64::MAX,
+            grants: jig_client_world::test::list([grant.clone(), grant]),
+            delegation: OwnerDelegation {
+                kinds: jig_client_world::test::list([
+                    OwnerAuthorityExecutor::Charter(u32::MAX),
+                    OwnerAuthorityExecutor::Role(u32::MAX),
+                ]),
+                tasks: u32::MAX,
+                depth: u32::MAX,
+            },
+            spend: u64::MAX,
+            deadline: Some(Wall::from_nanos(u64::MAX)),
+            notes: u8::MAX,
+            note_resources: jig_client_world::test::list([resource.clone(), resource]),
+        },
+        cut: true,
+    }
+}
 fn full_task() -> jig_client::contract::Task {
     let mut task = stories::task();
     task.goal = Some(u64::MAX);
     task.result_contract = full_contract();
+    task.authority = full_authority();
     task.chip.title = jig_client::contract::DocumentText::complete(stories::text(&[b't'; 32]));
     task.lineage = jig_client_world::test::list([8, 7]);
     task.subscriptions.entries = jig_client_world::test::list([
