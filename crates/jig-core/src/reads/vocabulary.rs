@@ -274,6 +274,8 @@ pub struct Page {
     pub rows: List<PageRow>,
     pub next: Option<Cursor>,
     pub cut: bool,
+    /// Complete original membership contexts for Inbox rows only, when supplied.
+    pub inbox_selection: Option<List<documents::InboxSelection>>,
 }
 
 /// Exactly one terminal, held until its preceding decisions are durable.

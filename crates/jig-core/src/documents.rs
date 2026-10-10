@@ -27,6 +27,9 @@ pub use inbox_deployment::{
     Account, Capacity, ConversationLine, Conversations, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun,
     Inbox, InboxEntry, InboxObject, ProjectCapacity, RunLocation, conversation_from_row, make_with_clock,
 };
+mod inbox_selection;
+pub(crate) use inbox_selection::retained as inbox_selection_from_ancestry;
+pub use inbox_selection::{InboxSelection, inbox_selection_worst_case};
 mod objects;
 mod offers;
 mod project_note;
@@ -390,6 +393,8 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
 
 /// Checked allocation bound for one document; parents price each retained delivery separately.
 #[must_use]
+/// The inbox selection roots additionally require `document_with_context_worst_case`,
+/// because their configured requester depth belongs to the task limits.
 pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     if limits.rows == 0
         || limits.text_bytes == 0
@@ -418,6 +423,13 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
             .max(project_note::worst_case(limits)?)
             .max(inbox_deployment::worst_case(limits)?),
     )
+}
+
+/// Bound of a document including the inbox's requester selection context.
+#[must_use]
+pub fn document_with_context_worst_case(limits: &Limits) -> Option<u64> {
+    document_worst_case(&limits.documents)?
+        .checked_add(inbox_selection_worst_case(limits.documents.rows, limits.tasks.depth)?)
 }
 
 /// Peak scratch allocated while constructing party/deployment pages. Child

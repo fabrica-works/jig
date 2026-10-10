@@ -47,6 +47,8 @@ pub struct Inbox {
     pub cached_updates: Count,
     pub results_seen: u64,
     pub updates_time_complete: bool,
+    /// None is unsupplied; Some carries complete roots for each emitted row.
+    pub selection: Option<List<super::InboxSelection>>,
 }
 /// One directly requested chat, with committed reply positions.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -282,7 +284,9 @@ fn inbox_reply(
     }
 }
 
+#[expect(clippy::too_many_lines, reason = "one bounded projection preserves both groups and their parallel contexts")]
 pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -> Result<Inbox, Missing> {
+    super::inbox_selection_worst_case(window.rows, limits.tasks.depth).ok_or(Missing::TooLarge)?;
     let entries = core.people.inbox_needs(&limits.people, party).ok_or(Missing::Unknown)?;
     let recent = core.people.cached_updates(&limits.people, party).ok_or(Missing::Unknown)?;
     let mut ordered = Map::with_capacity(limits.people.inbox_entries.checked_mul(2).ok_or(Missing::TooLarge)?);
@@ -330,6 +334,7 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
     };
     let mut needs = List::with_capacity(window.rows);
     let mut changes = List::with_capacity(window.rows);
+    let mut selection = List::with_capacity(window.rows);
     let mut used = 0_u32;
     let mut last = None;
     let mut more = false;
@@ -364,6 +369,8 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
             unread: Some(*unread),
             cursor: *cursor,
         };
+        let context = super::inbox_selection::live(core, limits, *task, *cursor)?;
+        selection.push(context).expect("one context per bounded inbox row");
         if updates(*object) {
             changes.push(entry).expect("bounded updates");
         } else {
@@ -381,6 +388,7 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
         cached_updates: if counts.more_unread { Count::AtLeast(counts.unread) } else { Count::Known(counts.unread) },
         results_seen: core.people.results_seen(party).ok_or(Missing::Unknown)?,
         updates_time_complete: true,
+        selection: Some(selection),
     })
 }
 /// One authentic chat header, used by both the list and reply inbox entries.

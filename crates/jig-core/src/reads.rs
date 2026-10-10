@@ -365,7 +365,7 @@ pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, load: Token, result: Lo
 /// Maximum answer payload retained in a root's held-output slot.
 #[must_use]
 pub fn answer_worst_case(limits: &Limits) -> Option<u64> {
-    let document = documents::document_worst_case(&limits.documents)?;
+    let document = documents::document_with_context_worst_case(limits)?;
     u64::try_from(size_of::<Answer>()).ok()?.checked_add(
         document
             .checked_mul(u64::from(limits.documents.rows).checked_add(3)?)?

@@ -124,7 +124,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(crate::effect_worst_case(limits)?)?
         .checked_add(crate::conversation_worst_case(limits)?)?
         .checked_add(crate::reads::worst_case(limits)?)?
-        .checked_add(crate::documents::document_worst_case(&limits.documents)?)?
+        .checked_add(crate::documents::document_with_context_worst_case(limits)?)?
         .checked_add(crate::documents::document_scratch_worst_case(limits)?)?
         .checked_add(crate::acts::scratch_worst_case(limits)?)?
         .checked_add(List::<people::ProjectRole>::worst_case(limits.people.projects)?)?
@@ -258,7 +258,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total =
         total.checked_add(Map::<skein_lib::Token, crate::documents::Document>::worst_case(limits.views.watchers)?)?;
     total = total.checked_add(
-        u64::from(limits.views.watchers).checked_mul(crate::documents::document_worst_case(&limits.documents)?)?,
+        u64::from(limits.views.watchers).checked_mul(crate::documents::document_with_context_worst_case(limits)?)?,
     )?;
 
     // One decision may retain a routed event, a request, an owned row/load

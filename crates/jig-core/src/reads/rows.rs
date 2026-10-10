@@ -175,6 +175,7 @@ fn inbox_position(group: Group, cursor: documents::Cursor, activity: Option<u64>
     }
 }
 
+#[expect(clippy::manual_map, reason = "the strict subset uses an exhaustive match rather than a closure")]
 #[expect(clippy::too_many_lines, reason = "the exhaustive live-to-store seam keeps each document family visible")]
 pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, document: Document) -> Answer {
     let mut rows = List::with_capacity(limits.documents.rows);
@@ -210,10 +211,18 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                 }
                 Group::Updates | Group::Results | Group::Replies => value.updates,
             };
+            let mut selection = List::with_capacity(limits.documents.rows);
             let mut last = None;
             for entry in source.into_boxed() {
                 last = Some((entry.cursor, entry.activity));
                 if group.includes(entry.object) && inbox_filter(core, limits, *filter, &entry) {
+                    if let Some(contexts) = &value.selection {
+                        for context in contexts {
+                            if context.cursor == entry.cursor {
+                                selection.push(context.clone()).expect("one context per live inbox row");
+                            }
+                        }
+                    }
                     rows.push(PageRow::Inbox(entry)).expect("live page fits");
                 }
             }
@@ -244,7 +253,15 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                     Some(Cursor::Store { scope, after })
                 }
             };
-            return Answer::Page(Box::new(Page { rows, next, cut: false }));
+            return Answer::Page(Box::new(Page {
+                rows,
+                next,
+                cut: false,
+                inbox_selection: match value.selection {
+                    Some(_) => Some(selection),
+                    None => None,
+                },
+            }));
         }
         Document::Conversations(value) => {
             for row in value.lines.into_boxed() {
@@ -300,7 +317,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
         Some(after) => Cursor::Live { scope: page_scope, after, store_after: None },
         None => Cursor::Store { scope: page_scope, after: None },
     };
-    Answer::Page(Box::new(Page { rows, next: Some(next), cut: false }))
+    Answer::Page(Box::new(Page { rows, next: Some(next), cut: false, inbox_selection: None }))
 }
 
 /// Stable address supplied by the owning record, never by a client row number.
@@ -436,14 +453,29 @@ pub(super) fn from_store(
             None => None,
         },
         cut: false,
+        inbox_selection: inbox_contexts(&range.scope, range.rows),
     };
     for row in raw {
         if !row_visible(core, range.party, &row) {
             continue;
         }
         if is_page(&range.scope) {
+            let context = if page.inbox_selection.is_some() {
+                match inbox_selection_row(limits, &row) {
+                    Ok(context) => context,
+                    Err(Missing::TooLarge) => return Answer::None(Why::Busy),
+                    Err(Missing::Unknown | Missing::NotAllowed | Missing::Ended) => None,
+                }
+            } else {
+                None
+            };
             match page_row(core, limits, range, row) {
                 Ok(Some(value)) => {
+                    if let Some(contexts) = &mut page.inbox_selection {
+                        contexts
+                            .push(context.expect("accepted Inbox row has original selection context"))
+                            .expect("one context per bounded stored Inbox row");
+                    }
                     page.rows.push(value).expect("one bounded output per input row");
                 }
                 Ok(None) | Err(Missing::NotAllowed | Missing::Unknown | Missing::Ended) => {}
@@ -949,6 +981,59 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
         | Scope::Reply { .. }
         | Scope::Turn { .. } => Ok(None),
     }
+}
+
+fn inbox_contexts(scope: &Scope, rows: u32) -> Option<List<documents::InboxSelection>> {
+    match &scope {
+        Scope::Inbox { .. } => Some(List::with_capacity(rows)),
+        Scope::Task { .. }
+        | Scope::Proposal { .. }
+        | Scope::Escalation { .. }
+        | Scope::Question { .. }
+        | Scope::PersonTask { .. }
+        | Scope::Result { .. }
+        | Scope::Reply { .. }
+        | Scope::Turn { .. }
+        | Scope::EndedDelegates { .. }
+        | Scope::History { .. }
+        | Scope::Activity { .. }
+        | Scope::Conversations
+        | Scope::Goals { .. }
+        | Scope::Notes { .. }
+        | Scope::ScopedNotes { .. }
+        | Scope::Spend { .. } => None,
+    }
+}
+
+fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::InboxSelection>, Missing> {
+    let Some(cursor) = row.inbox else {
+        return Ok(None);
+    };
+    let task = match &row.value {
+        Record::Tasks(tasks::Stored::PersonProposal(proposal)) => {
+            let context = documents::inbox_selection_from_ancestry(limits, proposal.goal.number, cursor, &[])?;
+            return Ok(Some(context));
+        }
+        Record::Tasks(
+            tasks::Stored::Activity(_)
+            | tasks::Stored::History(_)
+            | tasks::Stored::Milestone(_)
+            | tasks::Stored::Live(_)
+            | tasks::Stored::Ended(_)
+            | tasks::Stored::Stub(_)
+            | tasks::Stored::Ledger(_)
+            | tasks::Stored::Writer(_)
+            | tasks::Stored::Pool(_),
+        )
+        | Record::Core(_)
+        | Record::People(_)
+        | Record::Notes(_) => match row_owner(row) {
+            Some(owner) => owner.number,
+            None => return Ok(None),
+        },
+    };
+    let context = documents::inbox_selection_from_ancestry(limits, task, cursor, &row.ancestors)?;
+    Ok(Some(context))
 }
 
 #[expect(clippy::too_many_lines, reason = "One exhaustive projection of the two inbox groups.")]
