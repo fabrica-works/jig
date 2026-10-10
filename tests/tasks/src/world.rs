@@ -1,7 +1,7 @@
 //! Durable parent and scripted executors at the retained tasks boundary
 //! (domain/tasks.md, 11; domain/engine.md, 7).
 use crate::referee::{Seen, Stimulus, Tasks};
-use crate::stories::{RetryEnd, Story};
+use crate::stories::{ChildResult, Restart, RetryEnd, Story, TurnState};
 use crate::trace::Trace;
 use jig_core_tasks::{
     self as tasks, Accepted, Authority, Budget, Cause, Contract, Delegation, Domain, End, Ending, Event, Executor,
@@ -1105,7 +1105,7 @@ fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
     w.stage(Event::Turn { reply_to, task: 1, attempt: 1, turn: 1, read: None, offered: None, cumulative: 5 });
     // Defaults remain eager draws at their original positions: an ordinary
     // seeded replay's random stream and every action stay unchanged.
-    if branches.map_or(rng.chance(500), |story| story.durable_turn) {
+    if branches.map_or(rng.chance(500), |story| story.turn == TurnState::Committed) {
         w.durable();
     }
     w.restart();
@@ -1128,10 +1128,10 @@ fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
         }
         RetryEnd::None => {}
     }
-    if branches.map_or(rng.chance(500), |story| story.restart_after_retry) {
+    if branches.map_or(rng.chance(500), |story| story.restart_after_retry == Restart::Restore) {
         w.restart();
     }
-    if branches.map_or(rng.chance(200), |story| story.child_failure) {
+    if branches.map_or(rng.chance(200), |story| story.child == ChildResult::Failed) {
         w.terminal(2, End::Finished { result: TaskResult::Failure { reason: Box::new([1]) }, cancel_delegates: false });
         w.settle(2);
         assert!(matches!(w.record(3).phase, tasks::Phase::Held { .. }));
@@ -1150,7 +1150,7 @@ fn story_run(seed: u64, w: &mut World, branches: Option<Story>) {
     w.claim_fresh(4);
     w.make(Party::Task(4), vec![task(5, &[])]);
     w.claim_fresh(5);
-    if branches.map_or(rng.chance(500), |story| story.restart_before_close) {
+    if branches.map_or(rng.chance(500), |story| story.restart_before_close == Restart::Restore) {
         w.restart();
     }
     for task in [3, 4] {
