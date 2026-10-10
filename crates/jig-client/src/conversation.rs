@@ -471,11 +471,10 @@ impl Conversation {
             }
             Fold::Open => {
                 if !self.opened.contains_key(&name)
-                    && self
-                        .opened
-                        .len()
-                        .checked_add(self.current_opened.len())
-                        .is_none_or(|n| n >= self.opened.capacity())
+                    && match self.opened.len().checked_add(self.current_opened.len()) {
+                        Some(total) => total >= self.opened.capacity(),
+                        None => true,
+                    }
                 {
                     return false;
                 }
@@ -509,12 +508,10 @@ impl Conversation {
                 if self.current_opened.as_slice().contains(&identity) {
                     return true;
                 }
-                if self
-                    .opened
-                    .len()
-                    .checked_add(self.current_opened.len())
-                    .is_none_or(|n| n >= self.current_opened.capacity())
-                {
+                if match self.opened.len().checked_add(self.current_opened.len()) {
+                    Some(total) => total >= self.current_opened.capacity(),
+                    None => true,
+                } {
                     return false;
                 }
                 self.current_opened.push(identity).is_ok()
