@@ -241,8 +241,7 @@ answer; *signed out*.
 - **jig's documents:**
   - *the frame:* the party, their kind, the projects they hold roles in
     and their roles; what needs them, counted exactly, and updates
-    unread, counted up to a limit; the engine's versions (section 8) and
-    the retention of its answers (3.1); the charters it offers for chats
+    unread, counted up to a limit; the retention of its answers (3.1); the charters it offers for chats
     and goals in each project;
   - *a task:* its header, overview, budget and authority, its hold and
     its escalation if held, the proposals waiting in its subtree, how far

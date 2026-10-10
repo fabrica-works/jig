@@ -347,7 +347,10 @@ next only once the root says this one is done (root.md, section 8).
 3. **The runs adopted.** Every task claimed or running names its attempt
    and the kind of host it was placed on. Claims placed in the engine
    died with it, and are settled at once as lost, or as not started if
-   they committed nothing (tasks.md, 5.2). Claims on workers reach the
+   they committed nothing (tasks.md, 5.2); so are claims on workers in
+   the engine's own process, which no worker outlives
+   (`../protocol/service.md`, section 10), when its configuration says
+   its workers are in process. Claims on other workers reach the
    fleet, which adopts each attempt a worker reports as it dials in,
    keeps waiting for one within its grace, and cancels any it does not
    name (section 8). Nothing new is assigned before every claim loaded has

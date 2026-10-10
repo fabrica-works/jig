@@ -256,9 +256,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   engine prints a link to its sign-in route carrying a one-time secret,
   valid for a short while; opening it signs that person in as the
   deployment's first owner, and spends the secret. One link is live at a
-  time: when a browser reaches the sign-in page and none is, the engine
-  prints a fresh one, and the page says to find it in the engine's
-  output. It is a provider of jig's, which an application enables by
+  time: when a browser reaches the link provider's sign-in route
+  without a live link's secret, the engine prints a fresh one, and the
+  page it answers says to find it in the engine's output. It is a provider of jig's, which an application enables by
   configuration (`configuration.md`, section 3), and only on a loopback
   listener.
 - **A service's credential** is issued when an owner makes the service:
@@ -343,8 +343,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   only from the module the origin serves (`'wasm-unsafe-eval'`, which
   compiling it needs), connections to the
   origin only.
-- **The native one** (`jig-shell-native`): skein's HTTP client and its
-  server-sent events reader on skein's io, for Linux and for the worlds
+- **The native one** (`jig-shell-native`): skein's HTTP client on
+  skein's io, handing the stream's body to the component, whose reader
+  cuts it into events, for Linux and for the worlds
   that make bytes real; with no view, it is a service's shell.
 
 ## 13. Limits and the worst case

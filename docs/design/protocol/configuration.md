@@ -68,7 +68,7 @@ the application's main (its shell)
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
 | projects | each project seeded on a first start: its number, its resources and their roles, its homes, its policy, its parties' roles | the core, on a first start |
 | charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget, which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several; and which charter chats run under | the core; `jig-charter` |
-| hosts | the engine's own slots, and the inline agent's limits, if it runs agents; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10) | the fleet; `jig-protocol-engine-workers` |
+| hosts | the engine's own slots, and the inline agent's limits, if it runs agents; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers` |
 | llm | endpoints, models and prices; accounts, each with its registration and its token endpoint, and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
 | clients | the clients' listener (a TCP address, or loopback on one person's machine) and its certificate and key files, but on loopback; the heartbeat; whether the engine prints a local sign-in link at start (`client.md`, sections 4 and 8) | `jig-protocol-engine-clients` |
 | connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5) | the core |
@@ -103,7 +103,7 @@ secret, and every credential its runs need comes with their assignments
   when the next begins if its source knows.
 - **A period's source is the application's:** a child of its root that
   keeps a calendar from the application's configuration (a monthly
-  period starting on a day, in a time zone), arms its deadline and says
+  period starting on a day, at a fixed offset from UTC), arms its deadline and says
   each period, or an operator's request that ends one. It is a decision,
   so it is a domain's, never the protocol layer's, which only fires the
   deadline. jig's configuration names none, and `ops`'s shows one

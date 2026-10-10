@@ -281,9 +281,12 @@ same parts as between hosts.
   assignment over the in-process link, and the worker's protocol layer
   fills smith's LLM component's table from them (`llm.md`, section 6).
 - **Starting and ending together:** configuration for all, then the
-  engine's start (section 3), then each worker's (section 6); a signal
-  drains the engine (section 5) while the workers stop their runs and
-  hand in what they hold, and the process ends when both have.
+  engine's start (section 3), then each worker's (section 6). A signal
+  drains the engine (section 5); once it has drained, the service ends
+  the workers at once, with no grace, since no engine will come back
+  while they live: their runs end with the process, as the engine's own
+  slots' do. The next start settles their claims at once
+  (`../domain/engine.md`, section 6).
 - **Its world** is the protocol world of section 8, with workers: the
   engine's and a test worker's services in one loop, joined by in-process
   addresses. Joined sockets are io's own and never reach skein's

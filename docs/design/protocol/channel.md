@@ -227,11 +227,13 @@ answer, and a **notice** is not answered.
   busy, a relayed call answered busy or as an error, and an answer
   acknowledged again when the engine has finished with its attempt
   (`../domain/engine.md`, section 8).
-- **Busy is resent by the link.** A turn, or a call, answered busy is
-  held by the worker's link component, which sends it again after a
-  jittered backoff, as it keeps the grace's clock (10.1); the hub arms
-  no timers (`../domain/hosts.md`, 6.2). An answer the engine leaves
-  unacknowledged is sent again after the next hello.
+- **Busy, sent again.** A turn answered busy is held by the worker's
+  link component, which sends it again after a jittered backoff, as it
+  keeps the grace's clock (10.1); the hub arms no timers
+  (`../domain/hosts.md`, 6.2). A call answered busy goes back to its
+  run, which asks it again after a backoff (smith's `domain/run.md`,
+  5.2). An answer the engine leaves unacknowledged is sent again after
+  the next hello.
 - **A refused worker** is refused by skein's channel, with jig's reasons;
   the domains have no record of their own for it.
 
@@ -516,8 +518,9 @@ tests in the default suite, randomized ones in the fuzzy suite.
   channels, and the grace passing and not.
 - **The channel's protocol world,** `tests/channel`: the engine's side
   with the core under jig's test root, and the worker's side with the hub
-  under a test worker's root (`testing/jig-test-worker`: the hub, smith's
-  scripted agent processes, and a scripted workspace), joined by in-memory
+  under the test worker's root, both as the reference service composes
+  them (`service.md`, section 7), with `testing/jig-test-worker`'s smith's
+  scripted agent processes and scripted workspace beneath, joined by in-memory
   streams cut and rejoined at random. It runs the hub's world's stories
   (`../domain/hosts.md`, section 11) through bytes, and adds:
   - connections cut mid-frame, and the worker redialling;

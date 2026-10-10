@@ -513,7 +513,8 @@ and the conformance world crashes the application at every commit.
     wasm32.
   - **A shell can sit on any HTTP stack.** The client's protocol layer
     sits above HTTP: it gives the shell a method, a path and a body, and
-    gets back whole bodies and whole stream events. A shell may use the
+    gets back whole bodies, and the stream's body as it comes, which the
+    protocol layer cuts into events itself. A shell may use the
     browser's fetch, the operating system's own HTTP stack, or skein's
     HTTP client, whose io is Linux's. Each shell is small.
   - **The view is optional.** The view tree is semantic, shaped as an
