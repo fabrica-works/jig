@@ -56,6 +56,36 @@ fn reply(domain: &Domain, task: u64) -> &crate::objects::result::Reply {
     domain.objects().get(domain.objects().find(ObjectKey::Task(task)).unwrap()).unwrap().reply.as_ref().unwrap()
 }
 #[test]
+fn live_watch_growth_keeps_a_continuation_to_known_dropped_past() {
+    let (mut domain, watch, first) = live_conversation_page(7107);
+    let eight = list_entry(8, Phase::Idle, 10);
+    let ended = list_entry(9, Phase::Done, 9);
+    watch_rows(&mut domain, watch, core::slice::from_ref(&eight));
+    // This owner cursor starts AFTER task 9; retaining it would skip the row
+    // which the later live replacement drops. It is not a reverse boundary.
+    let after_nine = cursor(b"owner-issued-after-nine");
+    read_rows(&mut domain, first, &[eight.clone(), ended], None, Some(after_nine), true);
+    let ten = list_entry(10, Phase::Idle, 11);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
+                rows: rows(&[ten.clone(), eight.clone()]),
+                more: false,
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.as_slice(), &[ten, eight]);
+    assert!(domain.conversation_rows().edges.reaches(End::Before));
+    assert!(domain.conversation_rows().cut);
+    assert!(
+        !domain.conversation_rows().edges.reaches(End::After),
+        "known stored task 9 was dropped; the list still needs an owner continuation before that task"
+    );
+}
+#[test]
 fn a_stale_read_preserves_one_current_conversation_and_its_reply() {
     let (mut domain, watch, first) = live_conversation_page(7101);
     let old = list_entry(8, Phase::Idle, 99);
