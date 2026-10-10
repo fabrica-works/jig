@@ -101,8 +101,8 @@ pub(crate) fn navigate(
         Place::Jig(address) => {
             domain.address = address;
             match domain.frame.document {
-                Some(_) => enter(domain, env, out),
-                None => {
+                Some(_) if domain.versions.is_some() => enter(domain, env, out),
+                Some(_) | None => {
                     domain.page = Page::Starting;
                     domain.changed();
                 }

@@ -1,7 +1,7 @@
 use super::spine::{LIMITS, drain, env, frame, open_token};
 use crate::{
     Domain, Event, Request,
-    address::Address,
+    address::{Address, Place},
     boundary::Offset,
     contract::{Delivery, VersionRange, WatchEvent},
     link::Link,
@@ -37,6 +37,14 @@ fn frame_identity_waits_for_a_genuine_hello_before_confirmation_or_live_link() {
         .is_empty()
     );
     assert_eq!(domain.frame().document.as_ref(), Some(&frame));
+    assert_eq!(domain.page(), &Page::Starting);
+    assert_eq!(domain.link(), Link::Starting);
+    let generation = domain.generation;
+    let address = Address::Inbox { project: None };
+    assert_eq!(
+        drive(&mut domain, Event::Went { place: Place::Jig(address) }).as_ref(),
+        &[Request::PartsLeft { generation }, Request::Show { address, replace: false }]
+    );
     assert_eq!(domain.page(), &Page::Starting);
     assert_eq!(domain.link(), Link::Starting);
     let out = drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
