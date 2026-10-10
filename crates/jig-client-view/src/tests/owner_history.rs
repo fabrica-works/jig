@@ -637,3 +637,54 @@ fn owner_history_full_row_and_byte_nested_batch_hits_exact_raw_slot_capacity_wit
     assert_eq!(slots, f.slots);
     assert_eq!(value, source);
 }
+
+#[test]
+fn owner_history_composed_normal_book_prices_every_entry_segment_literal_and_checked_hole_at_boundary() {
+    use std::io::Write;
+    let language = crate::phrases::english::language();
+    let shapes = crate::phrases::jig::shapes(8);
+    let entries = u32::try_from(language.phrases.len()).unwrap();
+    let mut segments = 0_u32;
+    let mut literals = 0_u32;
+    let mut holes = 0_u8;
+    for shape in &shapes {
+        holes = holes.max(u8::try_from(shape.holes.len()).unwrap());
+    }
+    for phrase in &language.phrases {
+        for form in &phrase.forms {
+            for segment in &form.segments {
+                segments = segments.checked_add(1).unwrap();
+                match segment {
+                    Segment::Text(bytes) => {
+                        literals = literals.checked_add(u32::try_from(bytes.len()).unwrap()).unwrap()
+                    }
+                    Segment::Hole { .. } => {}
+                }
+            }
+        }
+    }
+    std::io::stderr().write_fmt(format_args!("whole normal History book: entries={entries}, segments={segments}, literal_bytes={literals}, holes={holes}, languages=1, hole_bytes=8\n")).unwrap();
+    assert_eq!(entries, crate::owner_words::phrase_count());
+    assert_eq!(entries, u32::try_from(shapes.len()).unwrap());
+    let limits = PhraseLimits { languages: 1, phrases: entries, holes, segments, text_bytes: literals, hole_bytes: 8 };
+    assert!(Phrasebook::load(shapes.clone(), Box::new([language.clone()]), &limits).is_ok());
+    for below in [
+        PhraseLimits { phrases: entries.checked_sub(1).unwrap(), ..limits },
+        PhraseLimits { segments: segments.checked_sub(1).unwrap(), ..limits },
+        PhraseLimits { text_bytes: literals.checked_sub(1).unwrap(), ..limits },
+        PhraseLimits { holes: holes.checked_sub(1).unwrap(), ..limits },
+        PhraseLimits { languages: 0, ..limits },
+        PhraseLimits { hole_bytes: 7, ..limits },
+    ] {
+        assert_eq!(Phrasebook::load(shapes.clone(), Box::new([language.clone()]), &below).unwrap_err(), Invalid::Limit);
+    }
+    let above = PhraseLimits {
+        phrases: entries.checked_add(1).unwrap(),
+        segments: segments.checked_add(1).unwrap(),
+        text_bytes: literals.checked_add(1).unwrap(),
+        holes: holes.checked_add(1).unwrap(),
+        languages: 2,
+        hole_bytes: 9,
+    };
+    assert!(Phrasebook::load(shapes, Box::new([language]), &above).is_ok());
+}
