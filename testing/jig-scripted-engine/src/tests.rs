@@ -2224,3 +2224,4 @@ fn task_subscription_capacity_is_priced_separately_from_whole_activation_replace
 mod task_contract;
 
 mod page_loss;
+mod task_authority;

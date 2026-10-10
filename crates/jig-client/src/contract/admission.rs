@@ -1,7 +1,10 @@
 //! Compare concrete drafts with the engine's numbers and lists.
 //! The engine owns authorization; no role or policy is interpreted here.
 //! See client/domain/pages.md, 6.2, and objects.md, 11.
-use super::{Admission, Amendment, Beyond, Bounds, GoalExecutor, OwnerAuthority, OwnerAuthorityDocument, Refusal};
+use super::{
+    Admission, Amendment, Beyond, Bounds, GoalExecutor, OwnerAuthority, OwnerAuthorityDocument, OwnerGrant,
+    OwnerPattern, OwnerPatternEnd, Refusal,
+};
 use skein_lib::Wall;
 
 fn beyond(value: &Beyond) -> Admission {
@@ -83,8 +86,8 @@ pub fn amendment(offer: &Admission, change: &Amendment, before: &OwnerAuthorityD
                 let added = after.spend.saturating_sub(before.spend);
                 let mut listed = true;
                 for grant in &after.grants {
-                    if !before.grants.as_slice().contains(grant) {
-                        listed &= grants.as_slice().contains(grant);
+                    if !grant_covered(before.grants.as_slice(), grant) {
+                        listed &= grant_covered(grants.as_slice(), grant);
                     }
                 }
                 if narrowing || added <= *budget_left && listed && covers(&authority.authority, after) {
@@ -99,7 +102,8 @@ pub fn amendment(offer: &Admission, change: &Amendment, before: &OwnerAuthorityD
     }
 }
 
-// Membership compares complete engine-listed choices; it interprets no connector kind order.
+// Compare the supplied whole scalar/delegation facts and literal pattern order.
+// Connector kinds currently compare equal; configured implications require an owner fact.
 // The supported form changes spend/deadline while preserving each literal permission.
 fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority) -> bool {
     let mut fits = draft.spend <= facts.spend
@@ -109,13 +113,50 @@ fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority) -> bool {
         && draft.notes & !facts.notes == 0
         && deadline(draft.deadline, facts.deadline);
     for grant in &draft.grants {
-        fits &= facts.grants.as_slice().contains(grant);
+        fits &= facts.grant_covered(grants.as_slice(), grant);
     }
     for kind in &draft.delegation.kinds {
         fits &= facts.delegation.kinds.as_slice().contains(kind);
     }
     for scope in &draft.note_resources {
-        fits &= facts.note_resources.as_slice().contains(scope);
+        fits &= facts
+            .note_resources
+            .iter()
+            .any(|given| given.connector == scope.connector && pattern_at_most(&scope.pattern, &given.pattern));
     }
     fits
+}
+
+fn grant_covered(facts: &[OwnerGrant], draft: &OwnerGrant) -> bool {
+    for given in facts {
+        if given.connector == draft.connector
+            && given.kind == draft.kind
+            && pattern_at_most(&draft.pattern, &given.pattern)
+        {
+            return true;
+        }
+    }
+    false
+}
+// domain/authority.md, sections4–5: literal segment inclusion, with no path joining.
+fn pattern_at_most(draft: &OwnerPattern, given: &OwnerPattern) -> bool {
+    match &given.last {
+        OwnerPatternEnd::Exact(last) => match &draft.last {
+            OwnerPatternEnd::Exact(candidate) => draft.segments == given.segments && candidate == last,
+            OwnerPatternEnd::Open(_) => false,
+        },
+        OwnerPatternEnd::Open(last) => {
+            let prefix = given.segments.as_slice();
+            let segments = draft.segments.as_slice();
+            if segments.get(..prefix.len()) != Some(prefix) {
+                return false;
+            }
+            if let Some(segment) = segments.get(prefix.len()) {
+                return segment.starts_with(last);
+            }
+            match &draft.last {
+                OwnerPatternEnd::Exact(segment) | OwnerPatternEnd::Open(segment) => segment.starts_with(last),
+            }
+        }
+    }
 }

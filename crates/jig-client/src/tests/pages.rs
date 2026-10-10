@@ -2322,3 +2322,49 @@ fn task_watch_replacements_keep_served_goal_identity_and_whole_contract_loss_ind
         assert!(crate::pages::task::offered(&sections, crate::address::TaskSection::Overview));
     }
 }
+
+#[test]
+fn task_authority_watch_replacements_keep_bitmap_pattern_and_loss_facts_whole() {
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut row = super::confirmation::task();
+    row.authority.authority.tools = u64::MAX;
+    row.authority.authority.notes = u8::MAX;
+    row.authority.authority.delegation.kinds = List::with_capacity(2);
+    row.authority.authority.delegation.kinds.push(OwnerAuthorityExecutor::Role(u32::MAX)).unwrap();
+    let mut segments = List::with_capacity(2);
+    segments.push(Box::from(*b"a/b")).unwrap();
+    segments.push(Box::from(*b"\xff\0")).unwrap();
+    row.authority.authority.grants = List::with_capacity(2);
+    row.authority
+        .authority
+        .grants
+        .push(OwnerGrant {
+            connector: u16::MAX,
+            kind: u16::MAX,
+            pattern: OwnerPattern { segments, last: OwnerPatternEnd::Open(Box::from(*b"c/")) },
+        })
+        .unwrap();
+    for cut in [false, true, false] {
+        row.authority.cut = cut;
+        row.cut = !cut;
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row.clone()))) },
+        );
+        let id = domain.task_page().header.unwrap();
+        let Some(crate::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
+            panic!("whole watched task");
+        };
+        assert_eq!(**actual, row);
+        assert_eq!(actual.authority.cut, cut);
+        assert_eq!(actual.cut, !cut);
+        assert_eq!(actual.authority.authority.grants.capacity(), 2);
+        assert_eq!(actual.authority.authority.grants.get(0).unwrap().pattern.segments.get(0).unwrap().as_ref(), b"a/b");
+    }
+}

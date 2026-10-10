@@ -1839,3 +1839,6 @@ mod task_wake;
 
 #[path = "task_contract.rs"]
 mod task_contract;
+
+#[path = "task_authority.rs"]
+mod task_authority;

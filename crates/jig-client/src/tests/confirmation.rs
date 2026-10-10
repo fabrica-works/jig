@@ -605,3 +605,64 @@ fn specification(words: Text) -> SpecificationDocument {
         inputs: List::with_capacity(0),
     })
 }
+
+#[test]
+fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts() {
+    for cuts in 0_u8..8 {
+        for spend in [9_u64, 15] {
+            let (mut domain, _) = live();
+            let mut row = task();
+            let mut segments = List::with_capacity(2);
+            segments.push(Box::from(*b"env\0")).unwrap();
+            let current = OwnerGrant {
+                connector: u16::MAX,
+                kind: u16::MAX,
+                pattern: OwnerPattern { segments: segments.clone(), last: OwnerPatternEnd::Exact(Box::from(*b"a/b")) },
+            };
+            row.authority.authority.grants = List::with_capacity(2);
+            row.authority.authority.grants.push(current.clone()).unwrap();
+            row.authority.cut = cuts & 1 != 0;
+            let mut direct = row.authority.clone();
+            direct.authority.spend = 15;
+            direct.authority.grants.get_mut(0).unwrap().pattern.last = OwnerPatternEnd::Open(Box::from(*b"a"));
+            direct.cut = cuts & 2 != 0;
+            let mut ceiling = direct.clone();
+            ceiling.authority.spend = 100;
+            ceiling.cut = cuts & 4 != 0;
+            row.acts = offered(
+                ActKind::Amend,
+                Admission::Bounded {
+                    within: Bounds::Amend {
+                        budget_left: 5,
+                        grants: direct.authority.grants.clone(),
+                        authority: Box::new(direct),
+                        ceiling: Box::new(ceiling),
+                    },
+                    beyond: Beyond::Proposed { to: Recipient::Party(9) },
+                },
+            );
+            let id = install(&mut domain, Body::Task(Box::new(row.clone())));
+            intend(&mut domain, id, ActKind::Amend);
+            let mut after = row.authority.authority.clone();
+            after.spend = spend;
+            let mut draft = change();
+            draft.authority = Some(after);
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+            let refused = cuts & 1 != 0 || spend > 10 && cuts & 6 != 0;
+            if refused {
+                assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Refused { why: Refusal::NotOffered }));
+                assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+            } else {
+                assert!(domain.confirmation().unwrap().missing.is_none());
+                assert_eq!(domain.confirmation().unwrap().proposed, None);
+                let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+                assert_eq!(
+                    sent(&out),
+                    &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: None }
+                );
+            }
+            assert_eq!(row.authority.authority.grants.get(0), Some(&current));
+            assert_eq!(row.authority.authority.grants.capacity(), 2);
+        }
+    }
+}
