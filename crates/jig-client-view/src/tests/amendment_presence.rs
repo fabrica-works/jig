@@ -127,6 +127,9 @@ fn amendment_loss_in_specification_does_not_select_or_block_independent_fields()
         let tree = dialog(&domain, &words(), &mut bindings);
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
         assert!(contains(&tree, b"The specification is incomplete"));
+        assert!(contains(&tree, b"whole task specification"));
+        assert!(contains(&tree, &[0, 255]));
+        assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
         drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
         let out = drive(&mut domain, Event::Act { act: Action::Confirm });
         assert_eq!(sent(&out), &Amendment { instructions: Some(text(b"")), ..empty() });
@@ -157,7 +160,7 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
     assert_eq!(open.revision, Some(Revision { value: 6 }));
     assert_eq!(open.release_revision, Some(Revision { value: 4 }));
     let Body::Escalation(retained) = domain.objects().get(id).unwrap().body.as_ref().unwrap() else {
-        panic!("actual escalation");
+        panic!("retained escalation");
     };
     assert_eq!(retained.steering.person_revision, Some(Revision { value: 12 }));
     assert_eq!(retained.steering.instructions.bytes(), b"held instructions");
@@ -169,9 +172,9 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
             Request::Send { ask, .. } => Some(&**ask),
             _ => None,
         })
-        .expect("actual amendment request");
+        .expect("sent amendment request");
     let Ask::Amend { revision, release, .. } = ask else {
-        panic!("actual amendment request");
+        panic!("sent amendment request");
     };
     assert_eq!(*revision, Revision { value: 6 });
     assert_eq!(*release, Some(Revision { value: 4 }));

@@ -108,9 +108,17 @@ pub fn form(
     words.text(b, JigPhrase::Before, &[]);
     proposal::amendment(b, &before, words, bindings);
     match &object.body {
-        Some(Body::Task(doc)) if doc.spec.has_loss() => words.text(b, JigPhrase::SpecificationCut, &[]),
+        Some(Body::Task(doc)) if doc.spec.has_loss() => {
+            crate::specification::document(b, &doc.spec, words);
+            if !doc.spec.cut {
+                words.text(b, JigPhrase::SpecificationCut, &[]);
+            }
+        }
         Some(Body::Escalation(doc)) if doc.steering.spec.has_loss() => {
-            words.text(b, JigPhrase::SpecificationCut, &[]);
+            crate::specification::document(b, &doc.steering.spec, words);
+            if !doc.steering.spec.cut {
+                words.text(b, JigPhrase::SpecificationCut, &[]);
+            }
         }
         _ => {}
     }
