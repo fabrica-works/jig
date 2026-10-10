@@ -594,6 +594,10 @@ pub enum JigPhrase {
     NewSpec,
     /// New instructions.
     NewInstructions,
+    /// No instruction text was supplied by the document owner.
+    InstructionNotSupplied,
+    /// Supplied complete instructions contain no text.
+    InstructionEmpty,
     /// New budget.
     NewBudget,
     /// New deadline (UTC, YYYY-MM-DD HH:MM).
@@ -1354,6 +1358,8 @@ impl JigPhrase {
             Self::WriteOnly => 261,
             Self::NewSpec => 262,
             Self::NewInstructions => 263,
+            Self::InstructionNotSupplied => 580,
+            Self::InstructionEmpty => 581,
             Self::NewBudget => 264,
             Self::NewDeadline => 265,
             Self::DropDependency => 266,
@@ -1975,6 +1981,8 @@ impl JigPhrase {
             | Self::WriteOnly
             | Self::NewSpec
             | Self::NewInstructions
+            | Self::InstructionNotSupplied
+            | Self::InstructionEmpty
             | Self::NewBudget
             | Self::NewDeadline
             | Self::PriorityField
@@ -2224,7 +2232,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 574] = [
+pub const ALL: [JigPhrase; 576] = [
     JigPhrase::PolicyPeriodSpend,
     JigPhrase::PolicyEditRole,
     JigPhrase::PolicyRequests,
@@ -2548,6 +2556,8 @@ pub const ALL: [JigPhrase; 574] = [
     JigPhrase::WriteOnly,
     JigPhrase::NewSpec,
     JigPhrase::NewInstructions,
+    JigPhrase::InstructionNotSupplied,
+    JigPhrase::InstructionEmpty,
     JigPhrase::NewBudget,
     JigPhrase::NewDeadline,
     JigPhrase::DropDependency,

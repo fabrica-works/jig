@@ -114,7 +114,7 @@ pub(super) fn escalation() -> Escalation {
             addressed: None,
             revision: Revision { value: 1 },
             spec: specification(text(b"held work")),
-            instructions: text(b""),
+            instructions: Some(DocumentText::complete(text(b""))),
             wake: WakePolicy {
                 words: true,
                 results: true,

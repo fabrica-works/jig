@@ -208,7 +208,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     escalation_value.hold.result = Some(full_value());
     escalation_value.trail = full_trail();
     escalation_value.steering.spec = specification(full_text());
-    escalation_value.steering.instructions = full_text();
+    escalation_value.steering.instructions = Some(DocumentText { bytes: full_text(), cut: true });
     escalation_value.steering.authority = full_authority();
     escalation_value.steering.wake = full_wake();
     escalation_value.steering.dependencies = list([9, 10]);
@@ -253,7 +253,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     let mut task = task_doc(&[ActKind::Close, ActKind::AmendRelease]);
     task.chip = full_chip(8);
     task.spec = specification(full_text());
-    task.instructions = full_text();
+    task.instructions = Some(DocumentText { bytes: full_text(), cut: true });
     task.wake = full_wake();
     task.authority = full_authority();
     task.dependencies = list([full_chip(9), full_chip(10)]);

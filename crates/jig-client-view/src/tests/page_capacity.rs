@@ -136,7 +136,7 @@ fn task_pages(words: &Words) {
         doc.chip = full_chip(8);
         doc.chip.executor = Executor::Agent { charter: 2 };
         doc.spec = specification(full());
-        doc.instructions = full();
+        doc.instructions = Some(DocumentText { bytes: full(), cut: true });
         doc.authority = authority();
         doc.lineage_chips = list([full_chip(1), full_chip(2)]);
         doc.inputs = list([full_chip(9), full_chip(10)]);

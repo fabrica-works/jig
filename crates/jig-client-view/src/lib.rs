@@ -14,6 +14,7 @@ mod builder;
 pub mod cards;
 pub mod confirmation;
 pub mod document_text;
+mod instructions;
 pub mod literal_segment;
 pub mod notices;
 pub mod owner_wake;

@@ -206,7 +206,7 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
             addressed: None,
             revision: Revision { value: 1 },
             spec: specification(text(b"held work")),
-            instructions: text(b""),
+            instructions: Some(DocumentText::complete(text(b""))),
             wake: WakePolicy {
                 words: true,
                 results: true,
@@ -306,7 +306,7 @@ fn task() -> Task {
         spec_revision: Revision { value: 1 },
         person_revision: None,
         taken_by: None,
-        instructions: text(b"instructions"),
+        instructions: Some(DocumentText::complete(text(b"instructions"))),
         wake: WakePolicy { words: true, results: true, topics: list(vec![]), subscriptions: list(vec![]) },
         result_contract: ResultContract::Report,
         dependencies: list(vec![]),
@@ -1617,4 +1617,62 @@ fn note_corrections_price_the_whole_scope_and_allocated_reference_capacity() {
     bounds.rows = 4;
     bounds.text = 2;
     assert!(!crate::payload::fits(&ask, &bounds), "the supplied scope and body are refused rather than cut");
+}
+
+#[test]
+fn optional_instruction_sources_price_whole_task_and_steering_at_byte_and_text_boundaries() {
+    use crate::payload::Payload;
+    let mut bounds = Bounds { text: 33, document_bytes: u64::MAX, ..Bounds::default() };
+    for source in [
+        None,
+        Some(DocumentText::complete(text(b""))),
+        Some(DocumentText { bytes: text(b""), cut: true }),
+        Some(DocumentText::complete(text(&[b'x'; 33]))),
+        Some(DocumentText { bytes: text(&[b'x'; 33]), cut: true }),
+    ] {
+        let mut row = task();
+        row.instructions = source.clone();
+        let mut steering = Steering {
+            person_revision: Some(Revision { value: 12 }),
+            taken_by: None,
+            addressed: None,
+            revision: Revision { value: 6 },
+            spec: row.spec.clone(),
+            instructions: None,
+            wake: row.wake.clone(),
+            dependencies: List::with_capacity(0),
+            authority: row.authority.clone(),
+            budget: row.budget.clone(),
+        };
+        let mut absent = row.clone();
+        absent.instructions = None;
+        let bytes = source.as_ref().map_or(0, |value| value.bytes().len()) as u64;
+        assert_eq!(row.heap(&bounds).unwrap(), absent.heap(&bounds).unwrap() + bytes);
+        let steering_base = steering.heap(&bounds).unwrap();
+        steering.instructions = source.clone();
+        assert_eq!(steering.heap(&bounds).unwrap(), steering_base + bytes);
+        bounds.document_bytes = row.heap(&bounds).unwrap() + u64::try_from(core::mem::size_of::<Task>()).unwrap();
+        assert!(crate::payload::fits(&row, &bounds));
+        bounds.document_bytes -= 1;
+        assert!(!crate::payload::fits(&row, &bounds));
+        bounds.document_bytes += 2;
+        assert!(crate::payload::fits(&row, &bounds));
+        bounds.document_bytes =
+            steering.heap(&bounds).unwrap() + u64::try_from(core::mem::size_of::<Steering>()).unwrap();
+        assert!(crate::payload::fits(&steering, &bounds));
+        bounds.document_bytes -= 1;
+        assert!(!crate::payload::fits(&steering, &bounds));
+        bounds.document_bytes += 2;
+        assert!(crate::payload::fits(&steering, &bounds));
+        bounds.document_bytes = u64::MAX;
+        bounds.text = 32;
+        assert_eq!(crate::payload::fits(&row, &bounds), bytes <= 32);
+        assert_eq!(crate::payload::fits(&steering, &bounds), bytes <= 32);
+        bounds.text = 34;
+        assert!(crate::payload::fits(&row, &bounds));
+        assert!(crate::payload::fits(&steering, &bounds));
+        bounds.text = 33;
+        assert_eq!(row.instructions, source);
+        assert_eq!(steering.instructions, source);
+    }
 }

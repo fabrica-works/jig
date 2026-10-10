@@ -1275,6 +1275,8 @@ pub fn language() -> Language {
             JigPhrase::WriteOnly => Box::new([Segment::Text(copy_of(b"Write without releasing"))]),
             JigPhrase::NewSpec => Box::new([Segment::Text(copy_of(b"New specification"))]),
             JigPhrase::NewInstructions => Box::new([Segment::Text(copy_of(b"New instructions"))]),
+            JigPhrase::InstructionNotSupplied => Box::new([Segment::Text(copy_of(b"Instructions were not supplied"))]),
+            JigPhrase::InstructionEmpty => Box::new([Segment::Text(copy_of(b"Instructions are empty"))]),
             JigPhrase::NewBudget => Box::new([Segment::Text(copy_of(b"New budget"))]),
             JigPhrase::NewDeadline => Box::new([Segment::Text(copy_of(b"New deadline (UTC, YYYY-MM-DD HH:MM)"))]),
             JigPhrase::DropDependency => Box::new([

@@ -691,7 +691,7 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
             addressed: Some(Recipient::Role { project: 4, role: 2 }),
             revision: Revision { value: 6 },
             spec: specification(text(b"held specification")),
-            instructions: text(b"held instructions"),
+            instructions: Some(DocumentText::complete(text(b"held instructions"))),
             wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
             dependencies: list([9]),
             authority: authority(),
@@ -734,7 +734,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         spec_revision: Revision { value: 6 },
         person_revision: None,
         taken_by: None,
-        instructions: text(b"whole task instructions"),
+        instructions: Some(DocumentText::complete(text(b"whole task instructions"))),
         wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
         result_contract: ResultContract::Report,
         dependencies: list([]),
@@ -1650,3 +1650,5 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
         }
     }
 }
+#[path = "instruction_facts.rs"]
+mod instruction_facts;

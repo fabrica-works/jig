@@ -163,7 +163,7 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
         panic!("retained escalation");
     };
     assert_eq!(retained.steering.person_revision, Some(Revision { value: 12 }));
-    assert_eq!(retained.steering.instructions.bytes(), b"held instructions");
+    assert_eq!(retained.steering.instructions.as_ref().unwrap().bytes(), b"held instructions");
     let out = drive(&mut domain, Event::Act { act: Action::Confirm });
     assert_eq!(sent(&out), &expected);
     let ask = out

@@ -48,7 +48,7 @@ fn frame_of_card(limits: &Limits) -> Option<u32> {
 fn amendment(limits: &Limits) -> Option<u32> {
     // Recipient, spec, instructions, wake, dependencies, authority, separator.
     crate::specification::nodes(limits)?
-        .checked_add(markdown(limits)?)?
+        .checked_add(crate::instructions::nodes(limits)?)?
         .checked_add(authority(limits)?)?
         .checked_add(limits.rows.checked_mul(5)?)?
         .checked_add(5)

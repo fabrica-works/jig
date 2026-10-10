@@ -54,7 +54,7 @@ pub(super) fn task() -> Task {
         spec_revision: Revision { value: 9 },
         person_revision: None,
         taken_by: None,
-        instructions: text(b"instructions"),
+        instructions: Some(DocumentText::complete(text(b"instructions"))),
         wake: WakePolicy {
             words: true,
             results: true,

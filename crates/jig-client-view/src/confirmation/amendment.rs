@@ -195,6 +195,19 @@ pub fn form(
     }
 }
 fn loss(b: &mut Builder, object: &Object, words: &Words) {
+    match &object.body {
+        Some(Body::Task(doc)) => crate::instructions::before(b, &doc.instructions, words),
+        Some(Body::Escalation(doc)) => crate::instructions::before(b, &doc.steering.instructions, words),
+        Some(
+            Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => {}
+    }
     let doc = match &object.body {
         Some(Body::Task(doc)) => Some(&doc.spec),
         Some(Body::Escalation(doc)) => Some(&doc.steering.spec),
@@ -301,7 +314,7 @@ fn before(object: &Object) -> Option<Amendment> {
                 | jig_client::contract::ChipPhase::Ended { .. } => None,
             },
             spec: doc.spec.whole(),
-            instructions: Some(doc.instructions.clone()),
+            instructions: crate::instructions::whole(&doc.instructions),
             wake: Some(doc.wake.clone()),
             dependencies: Some(numbers(&doc.dependencies)),
             authority: Some(doc.authority.clone()),
@@ -309,7 +322,7 @@ fn before(object: &Object) -> Option<Amendment> {
         Some(Body::Escalation(doc)) => Amendment {
             addressed: doc.steering.addressed.clone(),
             spec: doc.steering.spec.whole(),
-            instructions: Some(doc.steering.instructions.clone()),
+            instructions: crate::instructions::whole(&doc.steering.instructions),
             wake: Some(doc.steering.wake.clone()),
             dependencies: Some(doc.steering.dependencies.clone()),
             authority: Some(doc.steering.authority.clone()),
