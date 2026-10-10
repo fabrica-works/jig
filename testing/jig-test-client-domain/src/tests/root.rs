@@ -946,7 +946,7 @@ fn actual_application_object_form_keeps_explicit_zero_observed_revision_and_orig
         &mut root,
         Event::Answer { attempt, envelope: RequestEnvelope::Final, answer: Some(Answered::First(answer.clone())) },
     );
-    assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer });
+    assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer: answer.clone() });
     drive(
         &mut root,
         Event::Answer {
@@ -957,7 +957,7 @@ fn actual_application_object_form_keeps_explicit_zero_observed_revision_and_orig
             }))),
         },
     );
-    assert!(matches!(root.first().object(id).unwrap().card, first::Card::Done { .. }));
+    assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer });
 }
 
 #[test]
@@ -995,16 +995,14 @@ fn whole_owner_parts_require_original_inner_identity_and_keep_unversioned_snapsh
                 })),
             }),
         );
-        assert!(
-            outputs.iter().any(|request| matches!(
-                request,
-                Request::First(first::Out::Fact { fact: first::Fact::InvalidDocument })
-            ))
-        );
-        assert!(matches!(
-            root.first().object(root.first().find(subject).unwrap()).unwrap().value,
-            first::Value::Loading
-        ));
+        let mut invalid = false;
+        for request in &outputs {
+            if let Request::First(first::Out::Fact { fact: first::Fact::InvalidDocument }) = request {
+                invalid = true;
+            }
+        }
+        assert!(invalid);
+        assert_eq!(root.first().object(root.first().find(subject).unwrap()).unwrap().value, first::Value::Loading);
     }
     for result in [None, Some(0), Some(u16::MAX)] {
         let document = Document::Connector(ConnectorDocument {
@@ -1033,6 +1031,10 @@ fn whole_owner_parts_require_original_inner_identity_and_keep_unversioned_snapsh
                 }),
             },
         );
-        assert!(!taken(&mut root).iter().any(|request| matches!(request, Request::Send { ask: Ask::First(_), .. })));
+        for request in taken(&mut root) {
+            if let Request::Send { ask: Ask::First(_), .. } = request {
+                panic!("an unversioned snapshot must not submit an Object form");
+            }
+        }
     }
 }

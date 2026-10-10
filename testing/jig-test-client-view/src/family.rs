@@ -162,24 +162,7 @@ fn object(
                 if let jig_test_client_domain::connector_values::ClientDocument::Object { now, .. } =
                     value.value.as_ref()
                 {
-                    let revision = jig_client::contract::Revision { value: now.revision };
-                    b.open(Role::TextField);
-                    b.name(&words.say(Word::Parameters, &[]));
-                    b.value(Decimal::of(object.draft.unwrap_or(now.value)).as_bytes(), now.revision);
-                    if disabled(&object.card) {
-                        b.state(State::Disabled);
-                    } else {
-                        b.bind(bindings.insert(Meaning::Parameters { object: id.token(), revision }));
-                    }
-                    b.close();
-                    button(
-                        b,
-                        Word::Apply,
-                        first::Act::Touch { object: id.token(), revision },
-                        &object.card,
-                        words,
-                        bindings,
-                    );
+                    owner_object_form(b, object, id, now, words, bindings);
                 }
             }
             Document::Part(part) => {
@@ -217,6 +200,26 @@ fn object(
     card(b, &object.card, words, jig);
     b.close();
     b.close();
+}
+fn owner_object_form(
+    b: &mut Builder,
+    object: &first::Object,
+    id: Id<first::Object>,
+    now: &jig_test_client_domain::connector_values::ApplicationObject,
+    words: &Words,
+    bindings: &mut Bindings,
+) {
+    let revision = jig_client::contract::Revision { value: now.revision };
+    b.open(Role::TextField);
+    b.name(&words.say(Word::Parameters, &[]));
+    b.value(Decimal::of(object.draft.unwrap_or(now.value)).as_bytes(), now.revision);
+    if disabled(&object.card) {
+        b.state(State::Disabled);
+    } else {
+        b.bind(bindings.insert(Meaning::Parameters { object: id.token(), revision }));
+    }
+    b.close();
+    button(b, Word::Apply, first::Act::Touch { object: id.token(), revision }, &object.card, words, bindings);
 }
 fn disabled(card: &Card) -> bool {
     match card {
