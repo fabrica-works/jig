@@ -160,7 +160,7 @@ pub fn task() -> Task {
         lineage_chips: list([]),
         inputs: list([]),
         project: 1,
-        requester: jig_client::contract::OwnerRequester::Person(7),
+        requester: OwnerRequester::Person(7),
         lineage: list([]),
         spec: specification(text(b"spec")),
         spec_revision: Revision { value: 1 },

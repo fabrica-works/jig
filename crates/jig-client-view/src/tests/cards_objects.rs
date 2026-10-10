@@ -743,7 +743,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         lineage_chips: list([]),
         inputs: list([]),
         project: 4,
-        requester: jig_client::contract::OwnerRequester::Person(1),
+        requester: OwnerRequester::Person(1),
         lineage: list([]),
         spec: specification(text(b"whole task specification")),
         spec_revision: Revision { value: 6 },

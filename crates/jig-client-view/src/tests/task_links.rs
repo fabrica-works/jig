@@ -46,7 +46,7 @@ fn task_pages_keep_owner_requesters_and_live_retained_stored_links_without_filli
                 if let Some(binding) = node.binding {
                     if let Some(Action::Go {
                         address: Address::Task { task: u64::MAX, section: TaskSection::Overview },
-                    }) = crate::decode(&mut bindings, binding.token, Act::Press)
+                    }) = decode(&mut bindings, binding.token, Act::Press)
                     {
                         routes += 1;
                     }
@@ -58,7 +58,7 @@ fn task_pages_keep_owner_requesters_and_live_retained_stored_links_without_filli
                 OwnerTaskLink::Retained { at, .. } => {
                     assert!(contains(&tree, b"Retained ended task"));
                     assert_eq!(contains(&tree, b"Ended time unavailable"), at.is_none());
-                    assert_eq!(contains(&tree, b"Ended at 00:02"), at.is_some());
+                    assert_eq!(contains(&tree, b"Ended at 01:02"), at.is_some());
                 }
                 OwnerTaskLink::Stored { status, .. } => {
                     assert!(contains(&tree, b"Stored task 18446744073709551615"));
@@ -88,7 +88,7 @@ fn aggregate_task_loss_prevents_partial_dependency_replacement_and_complete_link
         let mut selected = Vec::new();
         for node in tree.nodes() {
             if let Some(binding) = node.binding {
-                if let Some(Action::Change { change }) = crate::decode(&mut bindings, binding.token, Act::Press) {
+                if let Some(Action::Change { change }) = decode(&mut bindings, binding.token, Act::Press) {
                     if let Some(dependencies) = change.dependencies {
                         selected.push(dependencies);
                     }

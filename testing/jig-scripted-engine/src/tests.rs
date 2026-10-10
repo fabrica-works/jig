@@ -330,7 +330,7 @@ fn task() -> Task {
         lineage_chips: list(vec![]),
         inputs: list(vec![]),
         project: 1,
-        requester: jig_client::contract::OwnerRequester::Person(1),
+        requester: OwnerRequester::Person(1),
         lineage: list(vec![]),
         spec: specification(text(b"spec")),
         spec_revision: Revision { value: 1 },
