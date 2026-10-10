@@ -2,7 +2,11 @@ use super::*;
 
 #[test]
 fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repeat_bindings() {
-    let reference = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Hold, key: OwnerPartKey::Number(u64::MAX) };
+    let mut segments = List::with_capacity(CLIENT.rows);
+    for _ in 0..CLIENT.rows {
+        segments.push(Box::<[u8]>::from([255_u8; 32])).unwrap();
+    }
+    let reference = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Hold, key: OwnerPartKey::Path(segments) };
     for uncertain in [false, true] {
         for wait in [None, Some(Wall::from_nanos(u64::MAX))] {
             for prior in [
@@ -62,7 +66,18 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                     OwnerPriorPhase::Closing(_) => b"Prior closing effects",
                 };
                 assert!(contains(&tree, expected_prior));
+                let escaped = "\\xFF".repeat(32);
+                assert!(contains(&tree, escaped.as_bytes()));
+                for legacy_caption in [
+                    b"The next run resumes its conversation".as_slice(),
+                    b"Release to wait again",
+                    b"Release for the executor to decide afresh",
+                    b"Release with procedure counts reset",
+                ] {
+                    assert!(!contains(&tree, legacy_caption));
+                }
                 let mut choices = Vec::new();
+                let mut raw_slots = 0_u32;
                 for node in tree.nodes() {
                     if let Some(binding) = node.binding
                         && let Some(Action::Again { again }) = decode(&mut bindings, binding.token, Act::Press)
@@ -72,8 +87,10 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                     if let Some(slot) = node.slot {
                         assert_eq!(bindings.owner_part(slot.token), Some(&reference));
                         assert_eq!(bindings.part(slot.token), None);
+                        raw_slots += 1;
                     }
                 }
+                assert_eq!(raw_slots, 1);
                 assert_eq!(choices, if uncertain { vec![true, false] } else { vec![] });
                 assert!(!contains(&tree, b"whole report"));
                 let Some(jig_client::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
