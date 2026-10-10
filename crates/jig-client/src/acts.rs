@@ -200,20 +200,23 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
                 | ObjectKey::PersonTask(_)
                 | ObjectKey::Result(_) => return None,
             };
+            let Some(Body::Note { document, .. }) = &object.body else {
+                return None;
+            };
             if confirmation.act == ActKind::DeleteNote {
-                Some(Ask::DeleteNote { project, note, revision: confirmation.revision? })
+                Some(Ask::DeleteNote { project, note, scope: document.scope.clone(), revision: confirmation.revision? })
             } else {
-                if let Some(Body::Note { document, .. }) = &object.body
-                    && (document.cut || document.description.cut || document.body.cut)
-                {
+                if document.cut || document.description.cut || document.body.cut {
                     return None;
                 }
                 Some(Ask::EditNote {
                     project,
                     note,
+                    scope: document.scope.clone(),
                     revision: confirmation.revision?,
                     description: words(fields, Purpose::NoteDescription)?,
                     body: words(fields, Purpose::NoteBody)?,
+                    references: document.tasks.clone(),
                 })
             }
         }
@@ -341,9 +344,19 @@ pub fn note_ask(project: u32, note: &Note, act: ActKind, description: Text, body
             if note.cut || note.description.cut || note.body.cut {
                 return None;
             }
-            Some(Ask::EditNote { project, note: note.number, revision: note.revision, description, body })
+            Some(Ask::EditNote {
+                project,
+                note: note.number,
+                scope: note.scope.clone(),
+                revision: note.revision,
+                description,
+                body,
+                references: note.tasks.clone(),
+            })
         }
-        ActKind::DeleteNote => Some(Ask::DeleteNote { project, note: note.number, revision: note.revision }),
+        ActKind::DeleteNote => {
+            Some(Ask::DeleteNote { project, note: note.number, scope: note.scope.clone(), revision: note.revision })
+        }
         ActKind::Write
         | ActKind::Answer
         | ActKind::Take

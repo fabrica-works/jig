@@ -1603,3 +1603,50 @@ fn proposed_outcomes_and_effect_parts_keep_the_supplied_maker_kind_and_full_numb
         assert_eq!(contains(&tree, b"by task"), by_task);
     }
 }
+
+#[test]
+#[expect(clippy::match_like_matches_macro, reason = "scenario matching stays explicit; matches is disallowed")]
+fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_deletion() {
+    let words = words();
+    let mut bindings = JigBindings::new(512, CLIENT.text);
+    for act in [ActKind::EditNote, ActKind::DeleteNote] {
+        let note = Note {
+            number: 77,
+            revision: Revision { value: 123 },
+            scope: NoteScope::Goal(900),
+            description: DocumentText::complete(text(b"note title")),
+            body: DocumentText::complete(text(b"note body")),
+            by: Actor::Party(1),
+            tasks: list([91, u64::MAX]),
+            changed: Wall::EPOCH,
+            acts: offered(act),
+            cut: true,
+        };
+        let (mut domain, id) = note_loaded(note);
+        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act } });
+        let tree = dialog(&domain, &words, &mut bindings);
+        let outgoing = drive(&mut domain, Event::Act { act: Action::Confirm });
+        if act == ActKind::EditNote {
+            assert!(contains(&tree, b"This note has more references"));
+            assert!(tree.nodes().iter().all(|node| node.value.is_none()));
+            assert!(domain.confirmation().unwrap().missing.is_some());
+            assert!(outgoing.iter().all(|request| match request {
+                Request::Send { .. } => false,
+                _ => true,
+            }));
+        } else {
+            assert!(outgoing.iter().any(|request| match request {
+                Request::Send { ask, .. } => match &**ask {
+                    Ask::DeleteNote {
+                        note: 77,
+                        scope: NoteScope::Goal(900),
+                        revision: Revision { value: 123 },
+                        ..
+                    } => true,
+                    _ => false,
+                },
+                _ => false,
+            }));
+        }
+    }
+}

@@ -175,15 +175,17 @@ impl Payload for Ask {
             ]),
             Self::Prioritise { project, goals } => sum(&[project.heap(bounds), goals.heap(bounds)]),
             Self::MarkSeen { seen } => sum(&[seen.heap(bounds)]),
-            Self::EditNote { project, note, revision, description, body } => sum(&[
+            Self::EditNote { project, note, scope, revision, description, body, references } => sum(&[
                 project.heap(bounds),
                 note.heap(bounds),
                 revision.heap(bounds),
+                scope.heap(bounds),
                 description.heap(bounds),
                 body.heap(bounds),
+                references.heap(bounds),
             ]),
-            Self::DeleteNote { project, note, revision } => {
-                sum(&[project.heap(bounds), note.heap(bounds), revision.heap(bounds)])
+            Self::DeleteNote { project, note, scope, revision } => {
+                sum(&[project.heap(bounds), note.heap(bounds), scope.heap(bounds), revision.heap(bounds)])
             }
             Self::ChangePolicy { project, policy } => sum(&[project.heap(bounds), policy.heap(bounds)]),
             Self::SetRoles { project, holdings } => sum(&[project.heap(bounds), holdings.heap(bounds)]),

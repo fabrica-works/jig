@@ -181,18 +181,23 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
             assert_eq!(domain.fields().get(Purpose::Answer).unwrap().writes, 1);
         }
     }
-    note_decisions_name_the_revision();
 }
 
-fn note_decisions_name_the_revision() {
+#[test]
+fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
     let mut note = Note {
         number: 6,
         revision: Revision { value: 11 },
-        scope: NoteScope::Project(1),
+        scope: NoteScope::Goal(900),
         description: DocumentText::complete(text(b"before")),
         body: DocumentText::complete(text(b"body")),
         by: Actor::Party(7),
-        tasks: List::with_capacity(0),
+        tasks: {
+            let mut rows = List::with_capacity(2);
+            rows.push(91).unwrap();
+            rows.push(u64::MAX).unwrap();
+            rows
+        },
         changed: Wall::EPOCH,
         acts: List::with_capacity(2),
         cut: false,
@@ -204,14 +209,16 @@ fn note_decisions_name_the_revision() {
         Some(Ask::EditNote {
             project: 1,
             note: 6,
+            scope: NoteScope::Goal(900),
             revision: Revision { value: 11 },
             description: text(b"after"),
-            body: text(b"new")
+            body: text(b"new"),
+            references: note.tasks.clone()
         })
     );
     assert_eq!(
         acts::note_ask(1, &note, ActKind::DeleteNote, text(b""), text(b"")),
-        Some(Ask::DeleteNote { project: 1, note: 6, revision: Revision { value: 11 } })
+        Some(Ask::DeleteNote { project: 1, note: 6, scope: NoteScope::Goal(900), revision: Revision { value: 11 } })
     );
     for act in [ActKind::EditNote, ActKind::DeleteNote] {
         let (mut domain, _) = live();
@@ -224,12 +231,14 @@ fn note_decisions_name_the_revision() {
             Ask::EditNote {
                 project: 1,
                 note: 6,
+                scope: NoteScope::Goal(900),
                 revision: Revision { value: 11 },
                 description: text(b"after"),
                 body: text(b"new"),
+                references: note.tasks.clone(),
             }
         } else {
-            Ask::DeleteNote { project: 1, note: 6, revision: Revision { value: 11 } }
+            Ask::DeleteNote { project: 1, note: 6, scope: NoteScope::Goal(900), revision: Revision { value: 11 } }
         };
         assert_eq!(sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })), &expected);
         assert!(domain.confirmation().is_none());

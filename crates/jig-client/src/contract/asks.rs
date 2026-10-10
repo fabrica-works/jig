@@ -143,9 +143,17 @@ pub enum Ask {
     /// Move a read position explicitly.
     MarkSeen { seen: Seen },
     /// Correct the note revision seen.
-    EditNote { project: u32, note: u64, revision: Revision, description: Text, body: Text },
+    EditNote {
+        project: u32,
+        note: u64,
+        scope: NoteScope,
+        revision: Revision,
+        description: Text,
+        body: Text,
+        references: List<u64>,
+    },
     /// Delete the note revision seen.
-    DeleteNote { project: u32, note: u64, revision: Revision },
+    DeleteNote { project: u32, note: u64, scope: NoteScope, revision: Revision },
     /// Change a project policy.
     ChangePolicy { project: u32, policy: Policy },
     /// Replace project roles.

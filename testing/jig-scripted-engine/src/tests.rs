@@ -1590,3 +1590,30 @@ fn full_width_task_and_party_makers_remain_distinct_in_scripted_reads_decisions_
     assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), final_answer(&answers[1]));
     assert_eq!(engine.commits().len(), 2);
 }
+
+#[test]
+fn note_corrections_price_the_whole_scope_and_allocated_reference_capacity() {
+    let mut references = List::with_capacity(4);
+    references.push(u64::MAX).unwrap();
+    let ask = Ask::EditNote {
+        project: 1,
+        note: 77,
+        scope: NoteScope::Resource { project: 1, connector: u16::MAX, pattern: text(b"a/b") },
+        revision: Revision { value: u64::MAX },
+        description: text(b"new"),
+        body: text(b"body"),
+        references,
+    };
+    let mut bounds = Bounds { text: 4, rows: 4, document_bytes: u64::MAX, ..Bounds::default() };
+    bounds.document_bytes =
+        u64::try_from(core::mem::size_of::<Ask>() + 3 + 3 + 4).unwrap() + List::<u64>::worst_case(4).unwrap();
+    assert!(crate::payload::fits(&ask, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&ask, &bounds));
+    bounds.document_bytes += 1;
+    bounds.rows = 3;
+    assert!(!crate::payload::fits(&ask, &bounds), "allocated reference capacity is bounded as a whole");
+    bounds.rows = 4;
+    bounds.text = 2;
+    assert!(!crate::payload::fits(&ask, &bounds), "the supplied scope and body are refused rather than cut");
+}

@@ -56,7 +56,7 @@ pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> 
             (Some(key(ObjectKey::Escalation(*task))), Some((2, revision.value)), None)
         }
         Ask::Amend { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((1, revision.value)), None),
-        Ask::EditNote { project, note, revision, .. } | Ask::DeleteNote { project, note, revision } => {
+        Ask::EditNote { project, note, revision, .. } | Ask::DeleteNote { project, note, revision, .. } => {
             (Some(key(ObjectKey::Note { project: *project, note: *note })), Some((4, revision.value)), None)
         }
         Ask::DecideProposal { proposal, .. } => (Some(key(ObjectKey::Proposal(*proposal))), None, None),
