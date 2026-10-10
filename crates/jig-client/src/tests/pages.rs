@@ -2455,6 +2455,11 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
             event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: true }))),
         },
     );
+    let reply =
+        domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.as_ref().unwrap();
+    assert_eq!(reply.first_words, current.first_words);
+    assert_eq!(reply.chat, 8);
+    assert_eq!(reply.first_unread, 1);
     let mut rows = List::with_capacity(1);
     rows.push(old).unwrap();
     let cursor = Cursor { value: text(b"\xff\0opaque-row") };
@@ -2474,11 +2479,6 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
     assert_eq!(domain.conversation_rows().rows.get(0), Some(&current));
     assert!(domain.conversation_rows().cut);
     assert_eq!(domain.conversation_rows().edges.after, crate::windows::Edge::More(cursor));
-    let reply =
-        domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.as_ref().unwrap();
-    assert_eq!(reply.first_words, current.first_words);
-    assert_eq!(reply.chat, 8);
-    assert_eq!(reply.first_unread, 1);
     let mut zero = current.clone();
     zero.unread = Some(Count { value: 0, limited: false });
     zero.runtime = Some(Runtime::Idle);

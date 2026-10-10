@@ -388,8 +388,10 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
 }
 /// Sorts a bounded list with live chats first and most recent activity first.
 pub(crate) fn order(rows: &mut List<ConversationLine>) {
-    for first in 0..rows.len() {
-        for second in first.checked_add(1).expect("row index fits")..rows.len() {
+    // Adjacent swaps preserve source order when independent clocks are absent.
+    for _pass in 0..rows.len() {
+        for second in 1..rows.len() {
+            let first = second.checked_sub(1).expect("row has predecessor");
             let a = rows.get(first).expect("row exists");
             let b = rows.get(second).expect("row exists");
             let a_live = live(a.chip.phase);

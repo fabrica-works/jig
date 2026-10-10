@@ -320,7 +320,7 @@ fn owner_conversation_rows_render_whole_text_loss_independent_cache_and_only_sup
     let selected = row_selected_words();
     let tree = build(&domain, 1, &selected).0;
     assert!(contains(&tree, b"\xff\0whole words"));
-    assert!(contains(&tree, b"ALT Text is incomplete"));
+    assert!(contains(&tree, b"ALT Only part of this text was supplied"));
     assert!(contains(&tree, b"4294967295ALT Cached replies "));
     assert!(!contains(&tree, b"ALT Updates"));
     assert!(tree.len() <= crate::conversations_nodes(&super::cards::CLIENT, 0).unwrap());
