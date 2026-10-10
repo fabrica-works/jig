@@ -332,18 +332,13 @@ impl Conversation {
                 break;
             }
         }
+        let name = value.turn;
+        let through = value.through;
         match index {
             Some(at) => {
                 let live = self.live.get_mut(at).expect("live row exists");
                 if value.turn.retry > live.name.retry {
-                    *live = LiveTurn {
-                        name: value.turn,
-                        began: value.began,
-                        text: tail(&[], value.text.bytes(), text_limit),
-                        offset: value.through,
-                        cut: value.cut || value.from > 0 || !value.text.fits(text_limit),
-                        call: value.call,
-                    };
+                    *live = live_turn(value, text_limit);
                 } else if value.cut && value.through >= live.offset {
                     live.text = tail(&[], value.text.bytes(), text_limit);
                     live.offset = value.through;
@@ -381,20 +376,11 @@ impl Conversation {
                 if self.live.len() == self.live.capacity() {
                     return false;
                 }
-                let cut = value.cut || value.from > 0 || !value.text.fits(text_limit);
-                let text = tail(&[], value.text.bytes(), text_limit);
-                let live = LiveTurn {
-                    name: value.turn,
-                    began: value.began,
-                    text,
-                    offset: value.through,
-                    cut,
-                    call: value.call,
-                };
+                let live = live_turn(value, text_limit);
                 self.live.push(live).expect("live turn room checked");
             }
         }
-        self.followed(value.turn, value.through);
+        self.followed(name, through);
         self.prune_folds();
         true
     }
@@ -766,6 +752,18 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(List::<u64>::worst_case(limits.rows)?.checked_mul(2)?)?
         .checked_add(List::<ActivityLine>::worst_case(limits.rows)?.checked_mul(3)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(4)?)
+}
+
+fn live_turn(value: RunText, limit: u32) -> LiveTurn {
+    let cut = value.cut || value.from > 0 || !value.text.fits(limit);
+    LiveTurn {
+        name: value.turn,
+        began: value.began,
+        text: tail(&[], value.text.bytes(), limit),
+        offset: value.through,
+        cut,
+        call: value.call,
+    }
 }
 
 fn later(name: TurnName, other: TurnName) -> bool {
