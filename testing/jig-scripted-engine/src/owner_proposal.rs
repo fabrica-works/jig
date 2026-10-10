@@ -2,10 +2,14 @@
 //! Every allocated list slot, box and opaque byte is priced before admission.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_client::contract::{OwnerFundingOffer, OwnerProposal, OwnerProposalAction, OwnerProposalWaiting};
+use jig_client::contract::{
+    OwnerFundingOffer, OwnerHistoryHolder, OwnerProposal, OwnerProposalAction, OwnerProposalWaiting,
+};
 impl Payload for OwnerProposalWaiting {
-    fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        self.holder.heap(bounds)
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        match self.holder {
+            OwnerHistoryHolder::Task(_) | OwnerHistoryHolder::Person(_) | OwnerHistoryHolder::Policy { .. } => Some(0),
+        }
     }
 }
 impl Payload for OwnerFundingOffer {

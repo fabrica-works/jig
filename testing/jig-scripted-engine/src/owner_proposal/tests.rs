@@ -1,4 +1,5 @@
 use super::*;
+use crate::Bounds;
 use jig_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8]) -> DocumentText {

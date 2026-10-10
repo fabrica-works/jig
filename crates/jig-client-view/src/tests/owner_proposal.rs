@@ -65,8 +65,8 @@ fn state(words: &[u8], cut: bool) -> OwnerAmendmentState {
     let mut dependencies = List::with_capacity(3);
     for n in 0..3 {
         parameters.push(ParameterDocument::Bytes { name: n, value: doc(&[255; 32], true) }).unwrap();
-        inputs.push(u64::MAX - n as u64).unwrap();
-        dependencies.push(n as u64).unwrap();
+        inputs.push(u64::MAX - u64::from(n)).unwrap();
+        dependencies.push(u64::from(n)).unwrap();
     }
     OwnerAmendmentState {
         addressed: Some(PersonAddress::Role(u32::MAX)),
@@ -109,7 +109,7 @@ fn words(selected: bool) -> Words {
     let mut first = crate::phrases::english::language();
     first.wall = WallFormat::Nanos;
     first.span_unit = SpanUnit::Nanos;
-    let languages = if selected {
+    let languages: Box<[crate::phrases::Language]> = if selected {
         let mut second = first.clone();
         for p in &mut second.phrases {
             for f in &mut p.forms {
@@ -120,9 +120,9 @@ fn words(selected: bool) -> Words {
                 }
             }
         }
-        Box::new([first, second]) as Box<[_]>
+        Box::new([first, second])
     } else {
-        Box::new([first]) as Box<[_]>
+        Box::new([first])
     };
     Words {
         book: Phrasebook::load(
