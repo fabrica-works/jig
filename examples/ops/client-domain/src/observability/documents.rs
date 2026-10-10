@@ -73,6 +73,12 @@ pub struct Incident {
     pub lead: Option<u64>,
     pub proposals: List<ProposalKey>,
 }
+/// A qualified service and only the health its owner supplied.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ServiceState {
+    pub service: Service,
+    pub health: Option<Health>,
+}
 /// Current connector facts in a jig slot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PartDocument {
@@ -81,6 +87,8 @@ pub struct PartDocument {
     pub service: Option<Service>,
     pub health: Option<Health>,
     pub incident: Option<Incident>,
+    pub incidents: List<Incident>,
+    pub services: List<ServiceState>,
     pub effects: List<Effect>,
     pub watches: Option<u32>,
     pub request_limit: Option<u32>,
@@ -112,7 +120,7 @@ pub struct Effect {
 pub enum Document {
     Incidents { subject: Subject, revision: Revision, incidents: List<Incident> },
     Incident(Incident),
-    Part(PartDocument),
+    Part(Box<PartDocument>),
 }
 impl Document {
     /// The identity echoed by this whole document.
@@ -201,10 +209,23 @@ fn price(document: &Document, limits: &super::Limits) -> Option<u64> {
             Some(bytes)
         }
         Document::Part(part) => {
-            if part.effects.capacity() > limits.rows {
+            if part.effects.capacity() > limits.rows
+                || part.incidents.capacity() > limits.rows
+                || part.services.capacity() > limits.rows
+            {
                 return None;
             }
-            let mut bytes = List::<Effect>::worst_case(part.effects.capacity())?;
+            let mut bytes = u64::try_from(size_of::<PartDocument>())
+                .ok()?
+                .checked_add(List::<Effect>::worst_case(part.effects.capacity())?)?
+                .checked_add(List::<Incident>::worst_case(part.incidents.capacity())?)?
+                .checked_add(List::<ServiceState>::worst_case(part.services.capacity())?)?;
+            for incident in &part.incidents {
+                bytes = bytes.checked_add(incident_price(incident, limits)?)?;
+            }
+            for service in &part.services {
+                bytes = bytes.checked_add(service_price(&service.service, limits)?)?;
+            }
             if let Some(service) = &part.service {
                 bytes = bytes.checked_add(service_price(service, limits)?)?;
             }

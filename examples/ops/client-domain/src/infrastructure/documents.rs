@@ -195,7 +195,7 @@ pub struct Effect {
     pub task: u64,
     pub project: Option<u32>,
     pub origin: Creation,
-    pub description: Description,
+    pub description: Option<Description>,
     pub state: EffectState,
     pub attempt: u32,
     pub deadline: Wall,
@@ -381,7 +381,10 @@ fn price(document: &Document, limits: &super::Limits) -> Option<u64> {
             }
             for effect in &part.effects {
                 bytes = bytes
-                    .checked_add(description_price(&effect.description, limits)?)?
+                    .checked_add(match &effect.description {
+                        Some(description) => description_price(description, limits)?,
+                        None => 0,
+                    })?
                     .checked_add(effect_price(&effect.action, limits)?)?;
             }
             for drift in &part.drift {

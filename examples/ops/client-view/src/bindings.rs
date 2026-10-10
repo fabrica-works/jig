@@ -1,0 +1,84 @@
+//! Keep: owner-tagged bounded bindings, rebuilt each tree (view.md, 5).
+//! Replace: application actions and family document identities.
+use jig_client::contract::{ObjectKey, Revision};
+use jig_client_view::{Act, Binding, Owner};
+use jig_ops_client_domain::{Action, infrastructure};
+use skein_lib::{List, Token};
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Meaning {
+    Action(Action),
+    Until { object: Token, revision: Revision },
+    Object(ObjectKey),
+}
+#[derive(Debug)]
+struct Entry {
+    token: Token,
+    meaning: Meaning,
+}
+#[derive(Debug)]
+pub struct Bindings {
+    entries: List<Entry>,
+    next: u64,
+    connector: u16,
+    text: u32,
+}
+impl Bindings {
+    #[must_use]
+    pub fn new(capacity: u32, text: u32, connector: u16) -> Self {
+        Self { entries: List::with_capacity(capacity), next: 0, connector, text }
+    }
+    pub fn begin(&mut self) {
+        self.entries.clear();
+    }
+    #[must_use]
+    pub fn insert(&mut self, meaning: Meaning) -> Binding {
+        self.next = self.next.checked_add(1).expect("binding token fits");
+        let token = Token::new(self.next);
+        self.entries.push(Entry { token, meaning }).expect("binding capacity");
+        Binding { owner: Owner::Side { connector: self.connector }, token }
+    }
+    #[must_use]
+    pub fn object(&self, token: Token) -> Option<ObjectKey> {
+        for e in &self.entries {
+            if e.token == token {
+                return match &e.meaning {
+                    Meaning::Object(key) => Some(*key),
+                    Meaning::Action(_) | Meaning::Until { .. } => None,
+                };
+            }
+        }
+        None
+    }
+}
+#[must_use]
+pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
+    for e in &bindings.entries {
+        if e.token == token {
+            return match &e.meaning {
+                Meaning::Action(action) => match act {
+                    Act::Press | Act::Toggle | Act::Submit => Some(action.clone()),
+                    Act::Input { .. } => None,
+                },
+                Meaning::Until { object, revision } => match act {
+                    Act::Input { value } => {
+                        if value.len() > usize::try_from(bindings.text).ok()? {
+                            return None;
+                        }
+                        Some(Action::Infrastructure(infrastructure::Act::Until {
+                            object: *object,
+                            revision: *revision,
+                            value: crate::time::wall(jig_client_view::number(&value)?)?,
+                        }))
+                    }
+                    Act::Press | Act::Toggle | Act::Submit => None,
+                },
+                Meaning::Object(_) => None,
+            };
+        }
+    }
+    None
+}
+#[must_use]
+pub fn worst_case(capacity: u32) -> Option<u64> {
+    List::<Entry>::worst_case(capacity)
+}

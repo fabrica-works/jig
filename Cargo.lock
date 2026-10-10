@@ -368,6 +368,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-ops-client-view"
+version = "0.0.0"
+dependencies = [
+ "jig-client",
+ "jig-client-view",
+ "jig-ops-client-domain",
+ "jig-ops-connectors",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-ops-connectors"
 version = "0.0.0"
 dependencies = [

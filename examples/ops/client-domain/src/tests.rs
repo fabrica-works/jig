@@ -899,3 +899,68 @@ fn an_absent_owner_end_cannot_become_a_revision_naming_request() {
         _ => false,
     }));
 }
+
+#[test]
+fn observability_project_lists_are_admitted_and_priced_whole() {
+    use crate::observability::documents::{Document, Kind, PartDocument, Scope, Service, ServiceState, Subject};
+    let mut services = List::with_capacity(2);
+    services
+        .push(ServiceState {
+            service: Service { environment: Box::from(*b"production"), name: Box::from(*b"checkout") },
+            health: None,
+        })
+        .unwrap();
+    let mut part = PartDocument {
+        subject: Subject { scope: Scope::Project(1), kind: Kind::Project(1) },
+        revision: contract::Revision { value: 1 },
+        service: None,
+        health: None,
+        incident: None,
+        incidents: List::with_capacity(2),
+        services,
+        effects: List::with_capacity(2),
+        watches: None,
+        request_limit: None,
+        incident_limit: None,
+    };
+    assert!(Document::Part(Box::new(part.clone())).fits(&limits().observability));
+    part.services = List::with_capacity(3);
+    assert!(!Document::Part(Box::new(part)).fits(&limits().observability));
+}
+#[test]
+fn an_outbox_description_can_be_absent_without_becoming_a_proposal() {
+    use crate::infrastructure::documents::{
+        Creation, Document, Effect, EffectAction, EffectState, Kind, PartDocument, Purpose, Scope, Subject,
+    };
+    let mut effects = List::with_capacity(2);
+    effects
+        .push(Effect {
+            entry: 900,
+            task: 17,
+            project: Some(1),
+            origin: Creation { deployment: [1; 16], task: 17, origin: Purpose::Procedure { purpose: 3 }, purpose: 3 },
+            description: None,
+            state: EffectState::Kept,
+            attempt: 0,
+            deadline: Wall::EPOCH,
+            action: EffectAction::CreateEnvironment { environment: 7, until: Wall::EPOCH, price: 40 },
+        })
+        .unwrap();
+    let part = PartDocument {
+        subject: Subject { scope: Scope::Project(1), kind: Kind::Outbox(900) },
+        revision: contract::Revision { value: 1 },
+        panel: None,
+        description: None,
+        effect: None,
+        resources: List::with_capacity(2),
+        effects,
+        drift: List::with_capacity(2),
+        environments: List::with_capacity(2),
+        pools: List::with_capacity(2),
+        backend: None,
+        made: None,
+        request_limit: None,
+        staged_limit: None,
+    };
+    assert!(Document::Part(Box::new(part)).fits(&limits().infrastructure));
+}

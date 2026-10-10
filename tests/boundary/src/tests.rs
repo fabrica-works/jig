@@ -620,3 +620,18 @@ fn ops_client_domain_is_step_code_with_only_client_and_connector_vocabulary() {
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
 }
+
+#[test]
+fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
+    let roots: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-client-view")).collect();
+    assert_eq!(roots.len(), 1);
+    let mut dependencies = roots[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(
+        dependencies,
+        ["jig-client", "jig-client-view", "jig-ops-client-domain", "jig-ops-connectors", "skein-lib"]
+    );
+    let source = fs::read_to_string(kit_root().join("examples/ops/client-view/src/lib.rs")).expect("view source");
+    assert!(source.contains("cfg_attr(not(test), no_std)"));
+    assert!(source.contains("forbid(unsafe_code)"));
+}
