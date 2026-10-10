@@ -229,9 +229,8 @@ fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
     assert_eq!(words.adjusted_wall(skein_lib::Wall::from_nanos(7_200_000_000_000)).as_nanos(), 3_600_000_000_000);
 }
 
-#[test]
-fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_language() {
-    use crate::phrases::{PhraseLimits, Phrasebook, Segment, english, jig::shapes};
+fn selected_owner_language() -> crate::phrases::Language {
+    use crate::phrases::{Segment, english};
     let mut selected = english::language();
     for phrase in &mut selected.phrases {
         if phrase.id.number >= 3000 {
@@ -249,6 +248,12 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
         .unwrap()
         .forms[0]
         .segments[0] = Segment::Text(long.into_boxed_slice());
+    selected
+}
+#[test]
+fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_language() {
+    use crate::phrases::{PhraseLimits, Phrasebook, english, jig::shapes};
+    let selected = selected_owner_language();
     let limits = PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
@@ -257,7 +262,7 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
         text_bytes: 200_000,
         hole_bytes: CLIENT.text,
     };
-    let mut incomplete = selected.clone();
+    let mut incomplete = selected_owner_language();
     incomplete.phrases = incomplete
         .phrases
         .into_vec()
