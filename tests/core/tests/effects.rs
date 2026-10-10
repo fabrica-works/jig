@@ -270,7 +270,9 @@ fn kept_effect(
                 effect: authority::Effect {
                     connector: 1,
                     kind: 5,
-                    name: jig_test_connector_world::path(1, 1),
+                    name: authority::Name {
+                        segments: jig_test_connector_world::path(1, 1).segments().to_vec().into_boxed_slice(),
+                    },
                     state: [13; 32],
                     price: Some(1),
                     access: authority::EffectAccess::Owned,
@@ -329,11 +331,11 @@ fn retained_effect_deadline_is_a_pure_minimum_including_equal_walls_and_epoch() 
         let second_part = kept_effect(&mut domain, limits, second_key, Wall::from_nanos(second), 302);
         let earliest = first.min(second);
         let caller = domain.tasks.task(first_key.task).expect("caller").clone();
-        let quiescent = domain.quiescent();
+        let quiescence = [domain.quiescent(false), domain.quiescent(true)];
         for _ in 0..3 {
             assert_eq!(domain.effect_deadline(), Some(Wall::from_nanos(earliest)));
             assert_eq!(domain.tasks.task(first_key.task), Some(&caller), "a query changes no owner fact");
-            assert_eq!(domain.quiescent(), quiescent);
+            assert_eq!([domain.quiescent(false), domain.quiescent(true)], quiescence);
         }
         if earliest != 0 {
             assert!(
