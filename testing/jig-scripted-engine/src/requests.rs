@@ -3,7 +3,7 @@
 use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
 use jig_client::contract::{
     ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
-    Outcome, Phase, ReadValue, Recipient, Refusal, Revision, Runtime,
+    Outcome, OwnerRequester, Phase, ReadValue, Recipient, Refusal, Revision, Runtime,
 };
 use skein_lib::{List, Time, Token, Wall};
 
@@ -420,7 +420,7 @@ pub(crate) fn recipient(truth: &crate::Truth, party: u64, to: &Recipient) -> boo
             })
         }),
         Recipient::Task(task) => truth.objects.get(&ObjectKey::Task(*task)).is_some_and(|value| {
-            if let ReadValue::Task(v) = value { v.requester == Actor::Party(party) } else { false }
+            if let ReadValue::Task(v) = value { v.requester == OwnerRequester::Person(party) } else { false }
         }),
     }
 }

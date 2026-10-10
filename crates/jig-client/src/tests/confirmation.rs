@@ -48,7 +48,7 @@ pub(super) fn task() -> Task {
         lineage_chips: List::with_capacity(0),
         inputs: List::with_capacity(0),
         project: 1,
-        requester: jig_client::contract::OwnerRequester::Person(7),
+        requester: OwnerRequester::Person(7),
         lineage: List::with_capacity(0),
         spec: specification(text(b"spec")),
         spec_revision: Revision { value: 9 },
