@@ -6,7 +6,7 @@ components with its own, `iterate`, which carries every event between
 io, the components and the root, and `main`, which reads configuration,
 opens the store, starts the loop and ends it. It is to the protocol layer
 what `../domain/root.md` is to the domain: one shape every application
-copies, from `ops`. The mechanics are skein's programming-model.md,
+copies, from the reference service (section 7). The mechanics are skein's programming-model.md,
 sections 2 and 4. What is still open is listed in section 9.
 
 ## 1. In one page
@@ -185,6 +185,17 @@ down:  released and door outputs → components → io submissions
 
 ## 7. `ops` as the reference
 
+- **The test application's service first.** Until `ops`'s service is
+  built, the reference is `jig-test-service`, among jig's test kits but
+  written as step code, so that it can be copied: jig's test
+  application's engine protocol layer (the store's port, the accounts',
+  smith's LLM component, the host tools' translation, the clients' side,
+  the workers' side, its test connector's system answered in memory) and
+  a test worker's, each with its `iterate`, composed in one process
+  (section 10), with a startup function that takes configuration's bytes
+  and returns the service. jig's protocol world runs it (section 8).
+  What follows is `ops`'s, to be built after it.
+
 `ops`'s engine is the second of `../domain/hosts.md`'s shapes: agents in
 the engine, no workers.
 
@@ -218,17 +229,19 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The components' worlds** test each component alone (`channel.md`,
   section 12; `llm.md`, section 8; the store's design; `client.md`,
   section 14).
-- **`ops`'s protocol world:** its service, every component in it, over
+- **The protocol world:** the reference service (section 7), the test
+  application's until `ops`'s is built, every component in it, over
   skein's simulated io (testing-strategy.md, 2.7): a store on the
   simulator's crashing disk, scripted parties' connections, skein's fake
-  LLM peer and the fake production's APIs, the process killed and
+  LLM peer and the application's systems' fakes, the process killed and
   started again at drawn moments, and drained by a shutdown. Its referee
   is the conformance world's, seen through bytes: nothing a party, a host
   or a system saw depended on a commit that was lost; and a drained
   shutdown ends with nothing waiting for a commit.
-- **The real loop:** `ops`'s binary started on a scratch directory, a
-  party's requests answered, killed and restarted; it checks integration,
-  as skein's real-loop tests do.
+- **The real loop:** an application's binary started on a scratch
+  directory, a party's requests answered, killed and restarted; it checks
+  integration, as skein's real-loop tests do. `ops`'s binary is the first,
+  once built.
 
 ## 9. Open questions
 

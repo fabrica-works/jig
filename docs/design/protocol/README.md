@@ -164,8 +164,8 @@ contained processes (smith's `protocol/hosts.md`).
 
 | Part | In | Written |
 |---|---|---|
-| the protocol layer's routing: io's tokens, events to the root, outputs to components, values between components, timers | each process | copied from `ops` (`service.md`) |
-| `iterate` and `main` | each process | copied from `ops` |
+| the protocol layer's routing: io's tokens, events to the root, outputs to components, values between components, timers | each process | copied from the reference service (`service.md`, section 7) |
+| `iterate` and `main` | each process | copied from the reference service |
 | its configuration's own members, and their parsing | each process | its own |
 | its connectors' protocols: their systems' clients, credentials, webhooks | the engine | its own |
 | its connectors' host tools: schemas, decoding, rendering | the engine | beside each tool, as `jig-protocol-tools` is for the core's (`../domain/hosts.md`, section 8) |

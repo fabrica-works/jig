@@ -232,7 +232,7 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The translation's step tests:** every request and event each way;
   every failure class mapped; the table's generations, expiry and
   pushing out.
-- **The engine's LLM path and accounts,** in `ops`'s protocol world
+- **The engine's LLM path and accounts,** in the protocol world
   (`service.md`, section 8): the root, the inline agent, smith's
   component, skein's connection component and the driver, against skein's
   fake LLM peer and fake issuer (skein's `fake-llm.md`; skein's
