@@ -13,7 +13,9 @@ fn task_specification_keeps_source_inputs_and_separate_page_loss() {
     assert!(!task.spec.cut, "the entire specification still fits");
     assert_eq!(task.spec.words, task.words);
     assert_eq!(task.spec.parameters, task.parameters);
-    assert_eq!(task.spec.inputs.iter().copied().collect::<Vec<_>>(), [1, u64::MAX]);
+    assert_eq!(task.spec.inputs.len(), 2);
+    assert_eq!(task.spec.inputs.get(0), Some(&1));
+    assert_eq!(task.spec.inputs.get(1), Some(&u64::MAX));
     let TaskLink::Live(input) = task.inputs.get(0).unwrap() else { panic!("live input") };
     assert_eq!(input.number, 1);
     assert_eq!(task.inputs.get(1), Some(&TaskLink::Stored { number: u64::MAX, status: None }));
