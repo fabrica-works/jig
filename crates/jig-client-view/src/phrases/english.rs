@@ -13,6 +13,55 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::PolicyPeriodSpend => Box::new([
+                Segment::Text(copy_of(b"Period spend: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+            ]),
+            JigPhrase::PolicyEditRole => {
+                Box::new([Segment::Text(copy_of(b"Replace role ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::PolicyRequests => Box::new([
+                Segment::Text(copy_of(b"Request flags: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::PolicyDecides => Box::new([
+                Segment::Text(copy_of(b"Proposal decision flags: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::PolicyRequirements => Box::new([Segment::Text(copy_of(b"Replace effect requirements"))]),
+            JigPhrase::PolicyProjections => Box::new([Segment::Text(copy_of(b"Replace goal projection grants"))]),
+            JigPhrase::PolicyPermissions => Box::new([Segment::Text(copy_of(b"Replace permission mappings"))]),
+            JigPhrase::PolicyEffect => Box::new([
+                Segment::Text(copy_of(b"Effect connector ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" kind ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::PolicyJudge => Box::new([
+                Segment::Text(copy_of(b"Judge connector ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" requirement ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" parameters ")),
+                Segment::Hole { index: 2, kind: HoleKind::Number },
+            ]),
+            JigPhrase::PolicyGuarded => Box::new([Segment::Text(copy_of(b"Verdict checked at application"))]),
+            JigPhrase::PolicyObserved => Box::new([
+                Segment::Text(copy_of(b"Observed verdict freshness: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" ns")),
+            ]),
+            JigPhrase::PolicyMustGuard => Box::new([Segment::Text(copy_of(b"Guard is required"))]),
+            JigPhrase::PolicyGuardNotRequired => Box::new([Segment::Text(copy_of(b"Guard is not required"))]),
+            JigPhrase::PolicyPermission => Box::new([
+                Segment::Text(copy_of(b"Connector ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" permission ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" maps to role ")),
+                Segment::Hole { index: 2, kind: HoleKind::Number },
+            ]),
+
             JigPhrase::RunIdle => Box::new([Segment::Text(copy_of(b"Activation idle"))]),
             JigPhrase::RunDue => Box::new([Segment::Text(copy_of(b"Activation due"))]),
             JigPhrase::RunPreparing => Box::new([Segment::Text(copy_of(b"Preparing an activation"))]),

@@ -155,7 +155,7 @@ pub enum Ask {
     /// Delete the note revision seen.
     DeleteNote { project: u32, note: u64, scope: NoteScope, revision: Revision },
     /// Change a project policy.
-    ChangePolicy { project: u32, policy: Policy },
+    ChangePolicy { project: u32, edit: super::PolicyEdit },
     /// Replace project roles.
     SetRoles { project: u32, holdings: List<Holding> },
     /// Make a service with a project role.

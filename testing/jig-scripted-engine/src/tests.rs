@@ -4,6 +4,7 @@ use crate::Decision as ApplicationDecision;
 use jig_client::contract::Decision;
 use jig_client::contract::*;
 use skein_lib::List;
+mod policy;
 mod recurring;
 fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), 4096).expect("fixture text fits")

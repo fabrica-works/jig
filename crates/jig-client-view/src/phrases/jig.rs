@@ -6,6 +6,21 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    PolicyPeriodSpend,
+    PolicyEditRole,
+    PolicyRequests,
+    PolicyDecides,
+    PolicyRequirements,
+    PolicyProjections,
+    PolicyPermissions,
+    PolicyEffect,
+    PolicyJudge,
+    PolicyGuarded,
+    PolicyObserved,
+    PolicyMustGuard,
+    PolicyGuardNotRequired,
+    PolicyPermission,
+
     /// A proposal made by an actual party.
     ProposedByParty,
     /// A task maker's proposal part.
@@ -1014,6 +1029,21 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::PolicyPeriodSpend => 590,
+            Self::PolicyEditRole => 591,
+            Self::PolicyRequests => 592,
+            Self::PolicyDecides => 593,
+            Self::PolicyRequirements => 594,
+            Self::PolicyProjections => 595,
+            Self::PolicyPermissions => 596,
+            Self::PolicyEffect => 597,
+            Self::PolicyJudge => 598,
+            Self::PolicyGuarded => 599,
+            Self::PolicyObserved => 600,
+            Self::PolicyMustGuard => 601,
+            Self::PolicyGuardNotRequired => 602,
+            Self::PolicyPermission => 603,
+
             Self::ProposedByParty => 570,
             Self::PartProposalTask => 571,
             Self::PartProposalParty => 572,
@@ -1584,6 +1614,32 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
+            Self::PolicyPeriodSpend => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
+            Self::PolicyEditRole => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::PolicyRequests => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::PolicyDecides => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::PolicyRequirements => Box::new([]),
+            Self::PolicyProjections => Box::new([]),
+            Self::PolicyPermissions => Box::new([]),
+            Self::PolicyEffect => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
+            Self::PolicyJudge => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
+            Self::PolicyGuarded => Box::new([]),
+            Self::PolicyObserved => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::PolicyMustGuard => Box::new([]),
+            Self::PolicyGuardNotRequired => Box::new([]),
+            Self::PolicyPermission => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
+
             Self::SpecificationResource => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -2182,7 +2238,21 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 560] = [
+pub const ALL: [JigPhrase; 574] = [
+    JigPhrase::PolicyPeriodSpend,
+    JigPhrase::PolicyEditRole,
+    JigPhrase::PolicyRequests,
+    JigPhrase::PolicyDecides,
+    JigPhrase::PolicyRequirements,
+    JigPhrase::PolicyProjections,
+    JigPhrase::PolicyPermissions,
+    JigPhrase::PolicyEffect,
+    JigPhrase::PolicyJudge,
+    JigPhrase::PolicyGuarded,
+    JigPhrase::PolicyObserved,
+    JigPhrase::PolicyMustGuard,
+    JigPhrase::PolicyGuardNotRequired,
+    JigPhrase::PolicyPermission,
     JigPhrase::ProposedByParty,
     JigPhrase::PartProposalTask,
     JigPhrase::PartProposalParty,
