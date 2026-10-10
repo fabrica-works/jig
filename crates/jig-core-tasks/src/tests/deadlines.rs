@@ -33,6 +33,7 @@ fn deadlines(first: usize) -> Harness {
         match i {
             0 => {
                 row.phase = Phase::Active(Active::BackingOff { until: at });
+                row.holdings = Box::new([Holding::Write { resource: name.clone(), kind: 1 }]);
                 row.refusals = 1;
                 row.retry_notice = Some(RetryNotice::Refused { count: 1 });
             }
