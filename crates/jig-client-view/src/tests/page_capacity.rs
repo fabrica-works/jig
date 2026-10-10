@@ -16,6 +16,7 @@ use jig_client::{
     address::{Address, Place, ProjectSection, TaskSection},
     contract::*,
 };
+use skein_lib::List;
 use skein_lib::{Token, Wall};
 fn full() -> Text {
     let mut bytes = Vec::new();
@@ -27,7 +28,7 @@ fn full_chip(number: u64) -> Chip {
     value.title = full();
     value
 }
-fn parts() -> skein_lib::List<Part> {
+fn parts() -> List<Part> {
     list([part(), Part::Panel { connector: 3, task: 8 }])
 }
 fn authority() -> Authority {
@@ -134,7 +135,7 @@ fn task_pages(words: &Words) {
         let mut doc = super::cards_objects::task_doc(&[ActKind::Cancel, ActKind::Amend]);
         doc.chip = full_chip(8);
         doc.chip.executor = Executor::Agent { charter: 2 };
-        doc.spec = full();
+        doc.spec = specification(full());
         doc.instructions = full();
         doc.authority = authority();
         doc.lineage_chips = list([full_chip(1), full_chip(2)]);
@@ -661,4 +662,11 @@ fn fill_spend(d: &mut Domain, read: Token, doc: &Project) {
             }))),
         },
     );
+}
+
+fn specification(words: Text) -> SpecificationDocument {
+    SpecificationDocument {
+        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
+        cut: false,
+    }
 }

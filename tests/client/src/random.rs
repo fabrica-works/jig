@@ -65,7 +65,7 @@ pub fn world(seed: u64) -> Outcome {
     if let Some(ReadValue::Task(task)) = world.front().engine.truth().objects.get(&ObjectKey::Task(9)) {
         let mut task = task.clone();
         task.spec_revision.value = rng.between(1, 16);
-        task.spec = stories::text(if rng.chance(500) { b"Investigate" } else { b"Check service" });
+        task.spec.specification.words = stories::text(if rng.chance(500) { b"Investigate" } else { b"Check service" });
         task.priority = Some(u32::try_from(rng.between(1, 3)).expect("small priority"));
         world
             .front()

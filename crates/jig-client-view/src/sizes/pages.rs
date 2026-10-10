@@ -54,8 +54,8 @@ fn plan(l: &Limits) -> Option<u32> {
         .checked_add(24)
 }
 fn overview(l: &Limits) -> Option<u32> {
-    markdown(l)?
-        .checked_mul(2)?
+    crate::specification::nodes(l)?
+        .checked_add(markdown(l)?)?
         .checked_add(chip_nodes(l)?.checked_mul(l.rows)?.checked_mul(3)?)?
         .checked_add(card_nodes(l)?.checked_mul(l.rows.checked_add(2)?)?)?
         .checked_add(l.rows.checked_mul(36)?)?

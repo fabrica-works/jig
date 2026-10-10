@@ -200,7 +200,7 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
         steering: Box::new(Steering {
             addressed: None,
             revision: Revision { value: 1 },
-            spec: text(b"held work"),
+            spec: specification(text(b"held work")),
             instructions: text(b""),
             wake: WakePolicy {
                 words: true,
@@ -297,7 +297,7 @@ fn task() -> Task {
         project: 1,
         requester: Actor::Party(1),
         lineage: list(vec![]),
-        spec: text(b"spec"),
+        spec: specification(text(b"spec")),
         spec_revision: Revision { value: 1 },
         instructions: text(b"instructions"),
         wake: WakePolicy { words: true, results: true, topics: list(vec![]), subscriptions: list(vec![]) },
@@ -767,7 +767,7 @@ fn nested_escalation_payload_bounds(escalation: &Escalation) {
         let mut invalid_setup = script();
         let mut row = escalation.clone();
         if text_or_capacity {
-            row.steering.spec = Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap();
+            row.steering.spec = specification(Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap());
         } else {
             row.hold.spend = List::with_capacity(33);
         }
@@ -822,7 +822,7 @@ fn bounded_offer_payloads_and_predictions() {
             release: None,
             change: Amendment {
                 addressed: None,
-                words: None,
+                spec: None,
                 wake: None,
                 dependencies: None,
                 authority: Some(after),
@@ -1004,7 +1004,7 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
                 release: Some(Revision { value: if stale_hold { 6 } else { 7 } }),
                 change: Amendment {
                     addressed: None,
-                    words: Some(text(b"new spec")),
+                    spec: Some(specification(text(b"new spec")).specification),
                     wake: None,
                     dependencies: None,
                     authority: None,
@@ -1120,4 +1120,51 @@ fn approved_documents_preserve_opaque_state_optional_words_and_exact_byte_bounds
     assert!(crate::payload::fits(&failure, &bounds));
     bounds.document_bytes -= 1;
     assert!(!crate::payload::fits(&failure, &bounds));
+}
+
+fn specification(words: jig_client::contract::Text) -> jig_client::contract::SpecificationDocument {
+    jig_client::contract::SpecificationDocument {
+        specification: jig_client::contract::Specification {
+            words,
+            parameters: List::with_capacity(0),
+            inputs: List::with_capacity(0),
+        },
+        cut: false,
+    }
+}
+
+#[test]
+fn whole_specification_prices_parameter_and_input_capacity_and_refuses_partial_values() {
+    let mut parameters = List::with_capacity(4);
+    parameters.push(Parameter::Number { name: u32::MAX, value: u64::MAX }).unwrap();
+    parameters.push(Parameter::Bytes { name: 7, value: text(&[0, 255, 1]) }).unwrap();
+    parameters.push(Parameter::Resource { name: 8, connector: u16::MAX, resource: u64::MAX }).unwrap();
+    let mut inputs = List::with_capacity(3);
+    inputs.push(u64::MAX).unwrap();
+    let value =
+        SpecificationDocument { specification: Specification { words: text(b"whole"), parameters, inputs }, cut: true };
+    let allocated = u64::try_from(core::mem::size_of::<SpecificationDocument>() + 5 + 3).unwrap()
+        + List::<Parameter>::worst_case(4).unwrap()
+        + List::<u64>::worst_case(3).unwrap();
+    let mut bounds = Bounds { text: 5, rows: 4, document_bytes: allocated, ..Bounds::default() };
+    assert!(crate::payload::fits(&value, &bounds));
+    assert!(value.cut, "actual owner marker remains a fact");
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&value, &bounds));
+    bounds.document_bytes = allocated;
+    bounds.rows = 3;
+    assert!(!crate::payload::fits(&value, &bounds), "allocated parameter slots are bounded");
+    bounds.rows = 4;
+    bounds.text = 4;
+    assert!(!crate::payload::fits(&value, &bounds), "whole words are never clipped");
+    bounds.text = 5;
+    let mut too_long = value.clone();
+    too_long
+        .specification
+        .parameters
+        .get_mut(1)
+        .unwrap()
+        .clone_from(&Parameter::Bytes { name: 7, value: text(b"longer") });
+    bounds.document_bytes = u64::MAX;
+    assert!(!crate::payload::fits(&too_long, &bounds), "whole opaque bytes parameter is never clipped");
 }

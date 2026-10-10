@@ -100,7 +100,7 @@ pub struct Task {
     pub project: u32,
     pub requester: Actor,
     pub lineage: List<u64>,
-    pub spec: Text,
+    pub spec: super::SpecificationDocument,
     pub spec_revision: Revision,
     pub instructions: Text,
     pub wake: WakePolicy,
@@ -349,7 +349,7 @@ pub struct Escalation {
 pub struct Steering {
     pub addressed: Option<Recipient>,
     pub revision: Revision,
-    pub spec: Text,
+    pub spec: super::SpecificationDocument,
     pub instructions: Text,
     pub wake: WakePolicy,
     pub dependencies: List<u64>,
@@ -400,7 +400,7 @@ pub enum ProposalAction {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ProposedTask {
     pub local: u16,
-    pub spec: Text,
+    pub spec: super::SpecificationDocument,
     pub executor: Executor,
     pub budget: u64,
     pub deadline: Option<Wall>,
@@ -425,7 +425,7 @@ pub struct PersonTask {
     pub task: Chip,
     pub revision: Revision,
     pub requester: Actor,
-    pub spec: Text,
+    pub spec: super::SpecificationDocument,
     pub contract: PersonContract,
     pub inputs: List<Result>,
     pub addressed: Recipient,

@@ -116,7 +116,10 @@ pub fn sections(task: &Task) -> Sections {
             task.budget.total > 0 || task.budget.own > 0 || task.budget.ended > 0 || task.budget.reserved > 0
         }
     };
-    let overview = !task.spec.bytes().is_empty()
+    let overview = !task.spec.specification.words.bytes().is_empty()
+        || !task.spec.specification.parameters.is_empty()
+        || !task.spec.specification.inputs.is_empty()
+        || task.spec.cut
         || task.result.is_some()
         || !task.resources.is_empty()
         || !task.inputs.is_empty()

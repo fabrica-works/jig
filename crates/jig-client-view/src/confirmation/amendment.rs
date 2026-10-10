@@ -29,7 +29,7 @@ pub enum Field {
 pub fn edit(before: &Amendment, field: Field, value: Box<[u8]>, text_limit: u32) -> Option<Act> {
     let mut change = before.clone();
     match field {
-        Field::Words => change.words = Some(Text::new(value, text_limit).ok()?),
+        Field::Words => change.spec.as_mut()?.words = Text::new(value, text_limit).ok()?,
         Field::Instructions => change.instructions = Some(Text::new(value, text_limit).ok()?),
         Field::Budget => change.authority.as_mut()?.budget = crate::number(&value)?,
         Field::Deadline => change.authority.as_mut()?.deadline = Some(deadline(&value)?),
@@ -91,6 +91,11 @@ pub fn form(
     bindings: &mut JigBindings,
 ) {
     let Some(before) = before(object) else {
+        match &object.body {
+            Some(Body::Task(doc)) if doc.spec.cut => words.text(b, JigPhrase::SpecificationCut, &[]),
+            Some(Body::Escalation(doc)) if doc.steering.spec.cut => words.text(b, JigPhrase::SpecificationCut, &[]),
+            _ => {}
+        }
         return;
     };
     words.text(b, JigPhrase::Before, &[]);
@@ -196,8 +201,8 @@ fn input(
     b.name(&words.say(phrase, &[]));
     match field {
         Field::Words => {
-            if let Some(value) = &change.words {
-                b.value(value.bytes(), written);
+            if let Some(value) = &change.spec {
+                b.value(value.words.bytes(), written);
             }
         }
         Field::Instructions => {
@@ -217,6 +222,11 @@ fn input(
 }
 
 fn before(object: &Object) -> Option<Amendment> {
+    match &object.body {
+        Some(Body::Task(doc)) if doc.spec.cut => return None,
+        Some(Body::Escalation(doc)) if doc.steering.spec.cut => return None,
+        _ => {}
+    }
     Some(match &object.body {
         Some(Body::Task(doc)) => Amendment {
             addressed: match &*doc.chip.details {
@@ -232,7 +242,7 @@ fn before(object: &Object) -> Option<Amendment> {
                 | jig_client::contract::ChipPhase::Held { .. }
                 | jig_client::contract::ChipPhase::Ended { .. } => None,
             },
-            words: Some(doc.spec.clone()),
+            spec: Some(doc.spec.specification.clone()),
             instructions: Some(doc.instructions.clone()),
             wake: Some(doc.wake.clone()),
             dependencies: Some(numbers(&doc.dependencies)),
@@ -240,7 +250,7 @@ fn before(object: &Object) -> Option<Amendment> {
         },
         Some(Body::Escalation(doc)) => Amendment {
             addressed: doc.steering.addressed.clone(),
-            words: Some(doc.steering.spec.clone()),
+            spec: Some(doc.steering.spec.specification.clone()),
             instructions: Some(doc.steering.instructions.clone()),
             wake: Some(doc.steering.wake.clone()),
             dependencies: Some(doc.steering.dependencies.clone()),

@@ -9,13 +9,14 @@ use jig_client::contract::{
     Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, FieldRule, Frame, GoalLine,
     GoalPage, Goals, Grant, HeldRole, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure,
     HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made,
-    Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Part,
-    PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool,
-    Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone,
-    ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
-    ResultValue, Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage,
-    SpendPeriod, Steering, Subject, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn,
-    TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter,
+    Part, PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy,
+    Pool, Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read,
+    ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
+    ResultValue, Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, Specification,
+    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, Task, TaskFilter, TaskLine, TaskSpend,
+    Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent,
+    WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
@@ -80,7 +81,7 @@ macro_rules! fields {
         }
     };
 }
-fields!(Amendment { addressed, words, wake, dependencies, authority, instructions });
+fields!(Amendment { addressed, spec, wake, dependencies, authority, instructions });
 fields!(WakePolicy { words, results, topics, subscriptions });
 impl Payload for PersonAnswer {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -1015,6 +1016,20 @@ impl Payload for HoldFailure {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Transient | Self::Permanent | Self::Run | Self::Agent | Self::Lost | Self::Invalid => Some(0),
+        }
+    }
+}
+
+fields!(Specification { words, parameters, inputs });
+fields!(SpecificationDocument { specification, cut });
+impl Payload for Parameter {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Number { name, value } => sum(&[name.heap(bounds), value.heap(bounds)]),
+            Self::Bytes { name, value } => sum(&[name.heap(bounds), value.heap(bounds)]),
+            Self::Resource { name, connector, resource } => {
+                sum(&[name.heap(bounds), connector.heap(bounds), resource.heap(bounds)])
+            }
         }
     }
 }

@@ -1228,7 +1228,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     let mut task = super::confirmation::task();
     task.chip.task = 8;
     task.chip.title = text(b"current task title");
-    task.spec = text(b"whole task specification");
+    task.spec = specification(text(b"whole task specification"));
     drive(
         &mut domain,
         Time::ZERO,
@@ -1317,7 +1317,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
     assert!(domain.objects().get(eight).unwrap().sources.contains(&Source::Watch(skein_lib::Id::from_token(watch))));
     let mut task = super::confirmation::task();
     task.chip.task = 9;
-    task.spec = text(b"retained full document");
+    task.spec = specification(text(b"retained full document"));
     assert!(domain.objects.put(ObjectKey::Task(9), Body::Task(Box::new(task.clone()))));
     rows.get_mut(1).unwrap().seen = 3;
     rows.get_mut(1).unwrap().unread.value = 0;
@@ -1432,4 +1432,11 @@ fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
             deadline: None,
         }
     );
+}
+
+fn specification(words: Text) -> SpecificationDocument {
+    SpecificationDocument {
+        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
+        cut: false,
+    }
 }

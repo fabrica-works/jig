@@ -30,7 +30,7 @@ fn intend(domain: &mut Domain, id: Id<Object>, act: ActKind) -> Box<[Request]> {
 pub(super) fn change() -> Amendment {
     Amendment {
         addressed: None,
-        words: Some(text(b"amended")),
+        spec: Some(specification(text(b"amended")).specification),
         wake: None,
         dependencies: None,
         authority: None,
@@ -50,7 +50,7 @@ pub(super) fn task() -> Task {
         project: 1,
         requester: Actor::Party(7),
         lineage: List::with_capacity(0),
-        spec: text(b"spec"),
+        spec: specification(text(b"spec")),
         spec_revision: Revision { value: 9 },
         instructions: text(b"instructions"),
         wake: WakePolicy {
@@ -545,5 +545,12 @@ fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation()
                 answer: PersonAnswer::Approved { state: Box::new([0, 255, 1]), words: explanation },
             }
         );
+    }
+}
+
+fn specification(words: Text) -> SpecificationDocument {
+    SpecificationDocument {
+        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
+        cut: false,
     }
 }

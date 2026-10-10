@@ -80,10 +80,10 @@ pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings:
         }
     }
 }
-fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Item);
     words.text(b, JigPhrase::BatchTask, &[Hole::Number(u64::from(task.local))]);
-    crate::markdown::read(task.spec.bytes(), 2, b);
+    crate::specification::document(b, &task.spec, words);
     words.executor(b, task.executor);
     words.text(b, JigPhrase::Budget, &[Hole::Amount(task.budget)]);
     if let Some(at) = task.deadline {
@@ -122,8 +122,8 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &
     if let Some(to) = &change.addressed {
         super::common::recipient(b, to, words);
     }
-    if let Some(text) = &change.words {
-        crate::markdown::read(text.bytes(), 2, b);
+    if let Some(spec) = &change.spec {
+        crate::specification::specification(b, spec, words);
     }
     if let Some(text) = &change.instructions {
         crate::markdown::read(text.bytes(), 2, b);

@@ -110,7 +110,7 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
     }
 }
 fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
-    crate::markdown::read(doc.spec.bytes(), 2, b);
+    crate::specification::document(b, &doc.spec, words);
     crate::markdown::read(doc.instructions.bytes(), 2, b);
     result_contract(b, &doc.result_contract, words, bindings);
     words.actor(b, doc.requester);

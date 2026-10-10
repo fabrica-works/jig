@@ -47,20 +47,18 @@ fn frame_of_card(limits: &Limits) -> Option<u32> {
 }
 fn amendment(limits: &Limits) -> Option<u32> {
     // Recipient, spec, instructions, wake, dependencies, authority, separator.
-    markdown(limits)?
-        .checked_mul(2)?
+    crate::specification::nodes(limits)?
+        .checked_add(markdown(limits)?)?
         .checked_add(authority(limits)?)?
         .checked_add(limits.rows.checked_mul(5)?)?
         .checked_add(5)
 }
+/// A whole proposed task, reusable by the recurring-template owner.
+pub(crate) fn proposed_task_nodes(limits: &Limits) -> Option<u32> {
+    crate::specification::nodes(limits)?.checked_add(limits.rows.checked_mul(6)?)?.checked_add(5)
+}
 fn proposal_action(limits: &Limits) -> Option<u32> {
-    // Batch: list and introductions; each task has five scalars, Markdown,
-    // dependencies and grants (each grant adds two loading slots).
-    let batch = markdown(limits)?
-        .checked_add(limits.rows.checked_mul(6)?)?
-        .checked_add(5)?
-        .checked_mul(limits.rows)?
-        .checked_add(3)?;
+    let batch = proposed_task_nodes(limits)?.checked_mul(limits.rows)?.checked_add(3)?;
     let widen = authority(limits)?.checked_mul(2)?.checked_add(3)?;
     let amend = amendment(limits)?.checked_add(markdown(limits)?)?.checked_add(3)?;
     Some(batch.max(widen).max(amend).max(3))
@@ -109,7 +107,7 @@ pub fn person_task_nodes(limits: &Limits) -> Option<u32> {
         .checked_mul(limits.rows)?
         .checked_add(frame_of_card(limits)?)?
         .checked_add(chip_nodes(limits)?)?
-        .checked_add(markdown(limits)?)?
+        .checked_add(crate::specification::nodes(limits)?)?
         .checked_add(person_contract(limits)?)?
         .checked_add(outcome(limits)?)?
         .checked_add(limits.rows)?

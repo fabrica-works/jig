@@ -17,6 +17,7 @@ pub mod notices;
 pub mod owner_wake;
 pub mod owner_wake_words;
 pub mod pages;
+pub mod specification;
 pub mod styles;
 pub mod turns;
 pub use styles::JigStyle;

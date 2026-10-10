@@ -51,7 +51,7 @@ fn full_trail() -> List<Passed> {
 fn full_amendment() -> Amendment {
     Amendment {
         addressed: Some(Recipient::Role { project: 4, role: 2 }),
-        words: Some(full_text()),
+        spec: Some(specification(full_text()).specification),
         instructions: Some(full_text()),
         wake: Some(full_wake()),
         dependencies: Some(list([9, 10])),
@@ -75,7 +75,7 @@ fn full_proposal(action: ProposalAction) -> Proposal {
 fn full_batch() -> ProposalAction {
     let row = ProposedTask {
         local: 1,
-        spec: full_text(),
+        spec: specification(full_text()),
         executor: Executor::Party { party: 1 },
         budget: u64::MAX,
         deadline: Some(Wall::from_nanos(u64::MAX)),
@@ -193,7 +193,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     ]);
     let mut person_value = person(PersonContract::Choice { options });
     person_value.task = full_chip(8);
-    person_value.spec = full_text();
+    person_value.spec = specification(full_text());
     person_value.inputs = list([full_result(), full_result()]);
     person_value.taken.as_mut().unwrap().name = full_name();
     person_value.deadline = Some(Wall::from_nanos(u64::MAX));
@@ -212,7 +212,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     escalation_value.task.title = full_name();
     escalation_value.hold.result = Some(full_value());
     escalation_value.trail = full_trail();
-    escalation_value.steering.spec = full_text();
+    escalation_value.steering.spec = specification(full_text());
     escalation_value.steering.instructions = full_text();
     escalation_value.steering.authority = full_authority();
     escalation_value.steering.wake = full_wake();
@@ -256,7 +256,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     super::super::cards_access::check(&tree);
     let mut task = task_doc(&[ActKind::Close, ActKind::AmendRelease]);
     task.chip = full_chip(8);
-    task.spec = full_text();
+    task.spec = specification(full_text());
     task.instructions = full_text();
     task.wake = full_wake();
     task.authority = full_authority();
@@ -411,4 +411,18 @@ pub(super) fn scenario(words: &crate::words::Words) {
     assert!(Limits::of(&excessive).is_none());
     full_cards(words, &localized);
     full_frame_notices(words, &localized);
+}
+
+fn specification(words: Text) -> SpecificationDocument {
+    SpecificationDocument {
+        specification: Specification {
+            words,
+            parameters: list([
+                Parameter::Bytes { name: u32::MAX, value: full_text() },
+                Parameter::Bytes { name: 0, value: full_text() },
+            ]),
+            inputs: list([u64::MAX, 0]),
+        },
+        cut: false,
+    }
 }

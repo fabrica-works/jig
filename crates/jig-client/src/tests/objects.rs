@@ -105,7 +105,7 @@ pub(super) fn escalation() -> Escalation {
         steering: Box::new(Steering {
             addressed: None,
             revision: Revision { value: 1 },
-            spec: text(b"held work"),
+            spec: specification(text(b"held work")),
             instructions: text(b""),
             wake: WakePolicy {
                 words: true,
@@ -136,7 +136,7 @@ pub(super) fn person() -> PersonTask {
         task: chip(8),
         revision: Revision { value: 4 },
         requester: Actor::Task(1),
-        spec: text(b"do it"),
+        spec: specification(text(b"do it")),
         contract: PersonContract::Words,
         inputs: List::with_capacity(0),
         addressed: Recipient::Role { project: 1, role: 2 },
@@ -357,5 +357,12 @@ fn a_drop_reads_how_the_card_ended_and_a_preexisting_read_can_supply_the_termina
         );
         assert_ne!(domain.page(), &crate::pages::Page::Missing);
         assert_eq!(domain.objects.get(id).unwrap().sources.len(), 0);
+    }
+}
+
+fn specification(words: Text) -> SpecificationDocument {
+    SpecificationDocument {
+        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
+        cut: false,
     }
 }

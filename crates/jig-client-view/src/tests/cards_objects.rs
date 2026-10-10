@@ -86,7 +86,7 @@ fn person(contract: PersonContract) -> PersonTask {
         task: chip(),
         revision: Revision { value: 4 },
         requester: Actor::Task(1),
-        spec: text(b"whole specification"),
+        spec: specification(text(b"whole specification")),
         contract,
         inputs: list([result()]),
         addressed: Recipient::Party(1),
@@ -411,7 +411,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
                 own: true,
                 tasks: list([ProposedTask {
                     local: 3,
-                    spec: text(b"full batch spec"),
+                    spec: specification(text(b"full batch spec")),
                     executor: Executor::Party { party: 1 },
                     budget: 40,
                     deadline: Some(Wall::EPOCH),
@@ -429,7 +429,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
                 before: text(b"full before"),
                 change: Amendment {
                     addressed: None,
-                    words: Some(text(b"full after")),
+                    spec: Some(specification(text(b"full after")).specification),
                     instructions: None,
                     wake: None,
                     dependencies: None,
@@ -673,7 +673,7 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
         steering: Box::new(Steering {
             addressed: Some(Recipient::Role { project: 4, role: 2 }),
             revision: Revision { value: 6 },
-            spec: text(b"held specification"),
+            spec: specification(text(b"held specification")),
             instructions: text(b"held instructions"),
             wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
             dependencies: list([9]),
@@ -713,7 +713,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         project: 4,
         requester: Actor::Party(1),
         lineage: list([]),
-        spec: text(b"whole task specification"),
+        spec: specification(text(b"whole task specification")),
         spec_revision: Revision { value: 6 },
         instructions: text(b"whole task instructions"),
         wake: WakePolicy { words: true, results: true, topics: list([]), subscriptions: list([]) },
@@ -1289,4 +1289,71 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
     let tree = builder.finish();
     assert!(contains(&tree, b"Failed"));
     assert!(contains(&tree, b"cannot complete"));
+}
+
+fn specification(words: Text) -> SpecificationDocument {
+    SpecificationDocument {
+        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
+        cut: false,
+    }
+}
+
+#[test]
+fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
+    let mut row = task_doc(&[ActKind::Amend]);
+    row.spec.specification.parameters = list([
+        Parameter::Number { name: u32::MAX, value: u64::MAX },
+        Parameter::Bytes { name: 8, value: text(&[0, 255, 1]) },
+        Parameter::Resource { name: 9, connector: u16::MAX, resource: u64::MAX },
+    ]);
+    row.spec.specification.inputs = list([u64::MAX, 0]);
+    let expected = row.spec.specification.clone();
+    let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+    drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    let words = words();
+    let mut bindings = JigBindings::new(256, CLIENT.text);
+    let tree = dialog(&domain, &words, &mut bindings);
+    assert!(contains(&tree, &[0, 255, 1]));
+    assert!(contains(&tree, b"Parameter 4294967295 has value 18446744073709551615"));
+    assert!(contains(&tree, b"Parameter 9 names connector 65535 resource 18446744073709551615"));
+    assert!(contains(&tree, b"Input task 18446744073709551615"));
+    drive(&mut domain, Event::Act { act: input(&tree, b"New specification", b"replacement", &mut bindings) });
+    let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+    let sent = out
+        .iter()
+        .find_map(|request| match request {
+            Request::Send { ask, .. } => Some(&**ask),
+            _ => None,
+        })
+        .expect("whole amendment sent");
+    let Ask::Amend { change, .. } = sent else { panic!("amendment") };
+    let replacement = change.spec.as_ref().expect("whole specification");
+    assert_eq!(replacement.words.bytes(), b"replacement");
+    assert_eq!(replacement.parameters, expected.parameters);
+    assert_eq!(replacement.inputs, expected.inputs);
+}
+
+#[test]
+fn cut_specification_is_shown_and_cannot_be_reconstructed_by_the_words_editor() {
+    let mut row = task_doc(&[ActKind::Amend]);
+    row.spec.cut = true;
+    let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+    let words = words();
+    let mut builder = Builder::new(&limits());
+    builder.open(Role::Page);
+    crate::specification::document(
+        &mut builder,
+        &SpecificationDocument {
+            specification: Specification { words: text(b"partial"), parameters: list([]), inputs: list([]) },
+            cut: true,
+        },
+        &words,
+    );
+    builder.close();
+    assert!(contains(&builder.finish(), b"The specification is incomplete"));
+    drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    let mut bindings = JigBindings::new(256, CLIENT.text);
+    let tree = dialog(&domain, &words, &mut bindings);
+    assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
+    assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
 }

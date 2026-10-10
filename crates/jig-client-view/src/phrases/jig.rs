@@ -945,6 +945,16 @@ pub enum JigPhrase {
     PartTask,
     PartProject,
     PartProposal,
+    /// Opaque numeric parameter name and value.
+    SpecificationNumber,
+    /// Opaque bytes parameter name.
+    SpecificationBytes,
+    /// Parameter name, connector and numbered resource.
+    SpecificationResource,
+    /// An input task identity.
+    SpecificationInput,
+    /// The owner supplied an incomplete specification.
+    SpecificationCut,
 }
 impl JigPhrase {
     /// Stable phrase identity within jig's owner.
@@ -952,6 +962,11 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::SpecificationNumber => 3200,
+            Self::SpecificationBytes => 3201,
+            Self::SpecificationResource => 3202,
+            Self::SpecificationInput => 3203,
+            Self::SpecificationCut => 3204,
             Self::LoadingNavigation => 0,
             Self::ByNamed => 1,
             Self::Refused => 2,
@@ -1470,7 +1485,13 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::HoldStalled
+            Self::SpecificationResource => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
+            Self::SpecificationCut
+            | Self::HoldStalled
             | Self::HoldStopped
             | Self::HoldDrift
             | Self::HoldEffects
@@ -1832,7 +1853,9 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::HoldDependency
+            Self::SpecificationBytes
+            | Self::SpecificationInput
+            | Self::HoldDependency
             | Self::HoldUncertainEntry
             | Self::HoldPoolLost
             | Self::ByProjectDeployment
@@ -1925,7 +1948,8 @@ impl JigPhrase {
             | Self::Priority
             | Self::Closing
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::RequiredJudgeMissing
+            Self::SpecificationNumber
+            | Self::RequiredJudgeMissing
             | Self::FailedJudge
             | Self::UnguardedJudge
             | Self::PartProposal
@@ -2014,7 +2038,12 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 509] = [
+pub const ALL: [JigPhrase; 514] = [
+    JigPhrase::SpecificationNumber,
+    JigPhrase::SpecificationBytes,
+    JigPhrase::SpecificationResource,
+    JigPhrase::SpecificationInput,
+    JigPhrase::SpecificationCut,
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,

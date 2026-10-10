@@ -8,7 +8,7 @@ use skein_lib::{List, Wall};
 pub struct Amendment {
     /// Retarget a person task, with admission decided by its engine document.
     pub addressed: Option<super::Recipient>,
-    pub words: Option<Text>,
+    pub spec: Option<super::Specification>,
     pub wake: Option<WakePolicy>,
     pub dependencies: Option<List<u64>>,
     pub authority: Option<Authority>,

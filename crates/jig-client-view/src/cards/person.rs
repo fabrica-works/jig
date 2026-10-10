@@ -33,7 +33,7 @@ pub fn person_task(
     }
     super::chip::chip(b, client, &document.task, words, bindings);
     words.actor(b, document.requester);
-    crate::markdown::read(document.spec.bytes(), 2, b);
+    crate::specification::document(b, &document.spec, words);
     super::common::recipient(b, &document.addressed, words);
     if let Some(by) = &document.taken {
         words.text(b, JigPhrase::TakenBy, &[name(by.name.bytes())]);

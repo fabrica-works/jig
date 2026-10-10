@@ -200,7 +200,10 @@ fn task() -> Task {
         project: 3,
         requester: Actor::Party(7),
         lineage: list([]),
-        spec: text(b"spec"),
+        spec: SpecificationDocument {
+            specification: Specification { words: text(b"spec"), parameters: list([]), inputs: list([]) },
+            cut: false,
+        },
         spec_revision: Revision { value: 1 },
         instructions: text(b"instructions"),
         wake: WakePolicy { words: false, results: false, topics: list([]), subscriptions: list([]) },

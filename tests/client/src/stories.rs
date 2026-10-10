@@ -106,7 +106,7 @@ pub fn task() -> Task {
         project: 1,
         requester: Actor::Party(7),
         lineage: list([]),
-        spec: text(b"spec"),
+        spec: specification(text(b"spec")),
         spec_revision: Revision { value: 1 },
         instructions: text(b"instructions"),
         wake: WakePolicy { words: false, results: false, topics: list([]), subscriptions: list([]) },
@@ -669,4 +669,15 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
         acts: list([]),
     });
     task
+}
+
+fn specification(words: jig_client::contract::Text) -> jig_client::contract::SpecificationDocument {
+    jig_client::contract::SpecificationDocument {
+        specification: jig_client::contract::Specification {
+            words,
+            parameters: skein_lib::List::with_capacity(0),
+            inputs: skein_lib::List::with_capacity(0),
+        },
+        cut: false,
+    }
 }

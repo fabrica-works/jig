@@ -13,6 +13,27 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::SpecificationNumber => Box::new([
+                Segment::Text(copy_of(b"Parameter ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" has value ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::SpecificationBytes => {
+                Box::new([Segment::Text(copy_of(b"Parameter ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::SpecificationResource => Box::new([
+                Segment::Text(copy_of(b"Parameter ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" names connector ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" resource ")),
+                Segment::Hole { index: 2, kind: HoleKind::Number },
+            ]),
+            JigPhrase::SpecificationInput => {
+                Box::new([Segment::Text(copy_of(b"Input task ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::SpecificationCut => Box::new([Segment::Text(copy_of(b"The specification is incomplete"))]),
             JigPhrase::HoldStalled => Box::new([Segment::Text(copy_of(b"The executor stopped progressing"))]),
             JigPhrase::HoldDependency => Box::new([
                 Segment::Text(copy_of(b"Dependency task ")),
