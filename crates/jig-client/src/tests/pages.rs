@@ -2125,7 +2125,7 @@ fn note_reads_keep_full_writer_identity_and_optional_time_without_changing_the_n
             let mut requests = List::with_capacity(1);
             for request in &output {
                 if let Request::Send { ask, .. } = request {
-                    requests.push(ask.clone()).unwrap();
+                    requests.push(ask.as_ref().clone()).unwrap();
                 }
             }
             assert_eq!(
