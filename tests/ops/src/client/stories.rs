@@ -141,9 +141,10 @@ pub fn incident_world(seed: u64) -> ClientWorld {
     restart.chip.executor = Executor::Procedure { connector: number(Connector::Infrastructure), kind: 1 };
     *restart.chip.details =
         ChipPhase::Procedure { panel: Part::Panel { connector: number(Connector::Infrastructure), task: 10 } };
-    restart.parts = list([Part::Panel { connector: number(Connector::Infrastructure), task: 10 }]);
+    restart.context.as_mut().expect("supplied task context").parts =
+        list([Part::Panel { connector: number(Connector::Infrastructure), task: 10 }]);
     lead.delegates = list([LiveDelegate { chip: restart.chip.clone(), takeover_budget: 1 }]);
-    lead.impact.tasks.running = 1;
+    lead.context.as_mut().expect("supplied task context").impact.tasks.running = 1;
     for (key, value) in [
         (ObjectKey::Task(9), ReadValue::Task(Box::new(lead.clone()))),
         (ObjectKey::Task(10), ReadValue::Task(Box::new(restart.clone()))),
