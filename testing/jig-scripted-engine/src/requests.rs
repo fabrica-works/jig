@@ -365,7 +365,7 @@ impl<A: crate::Application> Engine<A> {
             }
             let by = self.truth.frames.get(&party).expect("signed-in party has a frame").party.clone();
             let mut value = self.truth.objects.get(&key).expect("target checked").clone();
-            // Legacy terminal labels have no loss carrier; retain the exact actor
+            // Terminal Party labels have no loss carrier; retain the exact actor
             // number and only a complete supplied optional name. Frame keeps its cut.
             let label =
                 by.name.whole().map(|name| jig_client::contract::Party { number: by.number, kind: by.kind, name });
