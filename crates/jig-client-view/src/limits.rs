@@ -110,7 +110,7 @@ impl Limits {
         // Markdown links may carry both label and external target.
         let text_per_node = phrase
             .checked_mul(2)?
-            .checked_add(crate::literal_segment::max_bytes(client.text)?)?
+            .checked_add(client.text.checked_mul(2)?)?
             .max(crate::literal_segment::max_bytes(client.text)?);
         Some(Self {
             nodes,

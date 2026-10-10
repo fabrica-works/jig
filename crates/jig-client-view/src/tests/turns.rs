@@ -483,7 +483,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     value.began = Some(Wall::EPOCH);
     deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
     let supplied = build(&d, 3, &words).0;
-    assert_eq!(supplied.nodes().len(), missing_nodes + 1, "an actual epoch gets its own wall leaf");
+    assert_eq!(supplied.nodes().len(), missing_nodes + 2, "an actual epoch gets its own time and text nodes");
     assert_eq!(d.conversation().live.get(0).unwrap().began, Some(Wall::EPOCH));
     drive(
         &mut d,
@@ -506,7 +506,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     value.began = None;
     deliver(&mut d, run, Delivery::Run(Box::new(value)));
     let uncut = build(&d, 3, &words).0;
-    assert_eq!(uncut.nodes().len() + 2, expanded.nodes().len(), "wall and raw-call loss are independent leaves");
+    assert_eq!(uncut.nodes().len() + 4, expanded.nodes().len(), "wall and raw-call loss are independent leaves");
     assert!(contains(&uncut, b"\\x61\\x2F\\x62\\x00\\xFE"));
 }
 
@@ -586,4 +586,77 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
         })),
     );
     assert_eq!(reloaded.conversation().live.get(0).unwrap().began, None);
+}
+
+#[test]
+fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
+    use super::cards::CLIENT;
+    use crate::{
+        live_call_words::LiveCallPhrase,
+        phrases::{Form, PhraseLimits, Phrasebook, PluralClass, Segment, english},
+    };
+    let first = crate::owner_words::language(english::language());
+    let mut selected = crate::owner_words::language(english::language());
+    for phrase in &mut selected.phrases {
+        let label: Option<&[u8]> = if phrase.id == LiveCallPhrase::OpenCurrentCallInput.id() {
+            Some(b"Selected language opens actual current input")
+        } else if phrase.id == LiveCallPhrase::FoldCurrentCallInput.id() {
+            Some(b"Selected language folds actual current input")
+        } else {
+            None
+        };
+        if let Some(label) = label {
+            phrase.forms =
+                Box::new([Form { class: PluralClass::Other, segments: Box::new([Segment::Text(label.into())]) }]);
+        }
+    }
+    let book = Phrasebook::load(
+        crate::owner_words::shapes(crate::phrases::jig::shapes(CLIENT.text)),
+        Box::new([first, selected]),
+        &PhraseLimits {
+            languages: 2,
+            phrases: crate::owner_words::phrase_count(),
+            holes: 4,
+            segments: 8000,
+            text_bytes: 100000,
+            hole_bytes: CLIENT.text,
+        },
+    )
+    .unwrap();
+    let words = Words { book, language: 1, offset_minutes: 0 };
+    let (mut d, _, run, _) = ready();
+    deliver(
+        &mut d,
+        run,
+        Delivery::Run(Box::new(RunText {
+            attempt: 2,
+            began: None,
+            turn: TurnName { attempt: 2, number: 1 },
+            from: 0,
+            through: 0,
+            text: text(b""),
+            cut: false,
+            call: Some(LiveCall::Raw(CurrentCall {
+                number: u64::MAX,
+                tool: text(b"literal/tool"),
+                input: text(b"input"),
+                cut: false,
+            })),
+        })),
+    );
+    let (folded, mut bindings) = build(&d, 3, &words);
+    assert!(contains(&folded, b"Selected language opens actual current input"));
+    assert!(!contains(&folded, b"Open current call input"));
+    let act = crate::decode(
+        &mut bindings,
+        named_binding(&folded, b"Selected language opens actual current input"),
+        crate::Act::Press,
+    )
+    .unwrap();
+    drive(&mut d, Event::Act { act });
+    let opened = build(&d, 3, &words).0;
+    assert!(contains(&opened, b"Selected language folds actual current input"));
+    assert!(contains(&opened, b"input"));
+    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    assert!(limits.text_per_node >= words.book.capacity(LiveCallPhrase::OpenCurrentCallInput.id()).unwrap());
 }

@@ -90,12 +90,16 @@ fn raw(
 ) {
     let name = CallName { attempt: turn.attempt, turn: turn.number, call: call.number };
     let open = client.conversation().fold(name) == Fold::Open;
-    let tool = crate::literal_segment::display(call.tool.bytes());
     b.open(Role::Region);
     b.name(&words.say(JigPhrase::CallNumber, &[Hole::Number(call.number)]));
     words.text(b, JigPhrase::CallNumber, &[Hole::Number(call.number)]);
-    words.text(b, JigPhrase::Tool, &[crate::words::name(&tool)]);
-    let label = words.say(if open { JigPhrase::FoldCall } else { JigPhrase::OpenCall }, &[crate::words::name(&tool)]);
+    crate::literal_segment::render(b, call.tool.bytes());
+    let phrase = if open {
+        crate::live_call_words::LiveCallPhrase::FoldCurrentCallInput
+    } else {
+        crate::live_call_words::LiveCallPhrase::OpenCurrentCallInput
+    };
+    let label = words.book.say(words.language, phrase.id(), &[]).expect("checked live input control").text;
     b.open(Role::Button);
     b.name(&label);
     b.text(Run::Plain, &label);

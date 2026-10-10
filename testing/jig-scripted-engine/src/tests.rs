@@ -1817,20 +1817,37 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     bounds.document_bytes = exact;
     bounds.text = 8;
     assert!(!crate::payload::fits(&run, &bounds), "the whole raw tool must fit its own bound");
+    let large =
+        CurrentCall { number: u64::MAX, tool: text(&vec![0xff; 4096]), input: text(&vec![0xfe; 4096]), cut: true };
+    let held = RunText { call: Some(LiveCall::Raw(large)), ..run.clone() };
+    let delivery = Delivery::Run(Box::new(held.clone()));
+    let whole = u64::try_from(core::mem::size_of::<Delivery>()).unwrap() + delivery.heap(&original_bounds).unwrap();
+    let mut setup = setup;
+    setup.bounds.document_bytes = whole;
     let mut engine = Engine::new(setup, 26).unwrap();
-    engine.write_live(Time::ZERO, 8, name, None, &text(b"live"), run.call.clone()).unwrap();
-    let held = engine.runs.get(&8).unwrap().clone();
-    assert_eq!(held, run);
-    engine.bounds.document_bytes = exact - 1;
+    let token = Token::new(1);
+    engine.open(Time::ZERO, 11, token, Subject::Run { task: 8, turn: None, offset: 0 }).unwrap();
+    drop(engine.poll(Time::ZERO));
+    engine.write_live(Time::ZERO, 8, name, None, &held.text, held.call.clone()).unwrap();
+    assert!(engine.poll(Time::ZERO).contains(&Up::Watch { token, event: WatchEvent::Delivered(delivery.clone()) }));
+    let excess = core::mem::size_of::<Delivery>() + 1;
     assert_eq!(
-        engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(b""), run.call.clone()),
+        engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(&vec![b'!'; excess]), held.call.clone()),
         Err(Invalid::Payload)
     );
-    assert_eq!(engine.runs.get(&8), Some(&held));
-    engine.bounds.document_bytes = exact;
-    engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(b""), run.call.clone()).unwrap();
-    assert_eq!(engine.runs.get(&8).unwrap().began, Some(Wall::EPOCH));
-    assert_eq!(engine.runs.get(&8).unwrap().call, run.call);
+    engine.continue_run(token, Some(name), 0).unwrap();
+    assert!(
+        engine.poll(Time::ZERO).contains(&Up::Watch { token, event: WatchEvent::Delivered(delivery) }),
+        "refusal preserved the whole previously delivered value"
+    );
+    engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(b""), held.call.clone()).unwrap();
+    engine.continue_run(token, Some(name), 0).unwrap();
+    let supplied = RunText { began: Some(Wall::EPOCH), ..held };
+    assert!(
+        engine
+            .poll(Time::ZERO)
+            .contains(&Up::Watch { token, event: WatchEvent::Delivered(Delivery::Run(Box::new(supplied))) })
+    );
     let rich = LiveCall::Decoded(Call {
         number: u64::MAX,
         tool: text(b"rich"),

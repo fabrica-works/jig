@@ -4,7 +4,6 @@
     reason = "Q39 permits UTF-8 classification for display only; supplied literal bytes remain opaque"
 )]
 use crate::{Builder, Run};
-use alloc::boxed::Box;
 use skein_lib::List;
 
 /// Display byte count without changing the supplied segment.
@@ -26,15 +25,6 @@ pub fn render(b: &mut Builder, bytes: &[u8]) {
         b.text(Run::Code, bytes);
         return;
     }
-    let display = display(bytes);
-    b.text(Run::Code, &display);
-}
-/// Owned display bytes for a checked phrase hole; never changes the carrier.
-#[must_use]
-pub fn display(bytes: &[u8]) -> Box<[u8]> {
-    if core::str::from_utf8(bytes).is_ok() {
-        return skein_lib::bytes::copy_of(bytes);
-    }
     let capacity = display_bytes(bytes).expect("escaped segment fits");
     let mut display = List::with_capacity(capacity);
     let digits = b"0123456789ABCDEF";
@@ -48,5 +38,5 @@ pub fn display(bytes: &[u8]) -> Box<[u8]> {
             display.push(escaped).expect("four bytes per input byte fit");
         }
     }
-    display.into_boxed()
+    b.text(Run::Code, display.as_slice());
 }
