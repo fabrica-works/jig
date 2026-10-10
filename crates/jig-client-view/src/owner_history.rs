@@ -10,6 +10,7 @@ use jig_client::{
     },
 };
 
+/// Checked storage for the whole history and every nested retained fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HistoryFragment {
     pub nodes: u32,
@@ -101,8 +102,11 @@ pub fn required(value: &OwnerHistoryLine, limits: &Limits, words: &Words) -> Opt
         crate::owner_amendment::required(after, limits, words)?;
     }
     if let Some(proposal) = &value.proposal {
-        if let OwnerProposalHistoryState::Rejected { reason, .. } = &proposal.state {
-            text_fits(reason, limits)?;
+        match &proposal.state {
+            OwnerProposalHistoryState::Rejected { reason, .. } => text_fits(reason, limits)?,
+            OwnerProposalHistoryState::Pending { .. }
+            | OwnerProposalHistoryState::Accepted { .. }
+            | OwnerProposalHistoryState::Withdrawn => {}
         }
         match &proposal.action {
             OwnerRetainedAction::Batch(tasks) => {

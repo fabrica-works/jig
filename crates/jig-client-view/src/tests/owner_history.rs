@@ -656,7 +656,7 @@ fn owner_history_composed_normal_book_prices_every_entry_segment_literal_and_che
                 segments = segments.checked_add(1).unwrap();
                 match segment {
                     Segment::Text(bytes) => {
-                        literals = literals.checked_add(u32::try_from(bytes.len()).unwrap()).unwrap()
+                        literals = literals.checked_add(u32::try_from(bytes.len()).unwrap()).unwrap();
                     }
                     Segment::Hole { .. } => {}
                 }
@@ -667,7 +667,7 @@ fn owner_history_composed_normal_book_prices_every_entry_segment_literal_and_che
     assert_eq!(entries, crate::owner_words::phrase_count());
     assert_eq!(entries, u32::try_from(shapes.len()).unwrap());
     let limits = PhraseLimits { languages: 1, phrases: entries, holes, segments, text_bytes: literals, hole_bytes: 8 };
-    assert!(Phrasebook::load(shapes.clone(), Box::new([language.clone()]), &limits).is_ok());
+    let _exact_book = Phrasebook::load(shapes.clone(), Box::new([language.clone()]), &limits).unwrap();
     for below in [
         PhraseLimits { phrases: entries.checked_sub(1).unwrap(), ..limits },
         PhraseLimits { segments: segments.checked_sub(1).unwrap(), ..limits },
@@ -686,5 +686,5 @@ fn owner_history_composed_normal_book_prices_every_entry_segment_literal_and_che
         languages: 2,
         hole_bytes: 9,
     };
-    assert!(Phrasebook::load(shapes, Box::new([language]), &above).is_ok());
+    let _above_book = Phrasebook::load(shapes, Box::new([language]), &above).unwrap();
 }

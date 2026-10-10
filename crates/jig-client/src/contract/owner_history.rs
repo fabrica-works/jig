@@ -7,6 +7,7 @@ use super::{
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 
+/// One immutable semantic revision and its independently supplied retained facts.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerHistoryLine {
     pub task: u64,
@@ -20,6 +21,7 @@ pub struct OwnerHistoryLine {
     pub amendment: Option<(Box<OwnerAmendmentState>, Box<OwnerAmendmentState>)>,
     pub at: Option<Wall>,
 }
+/// The owner's ten recorded semantic changes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerHistoryChange {
     Cancelled,
@@ -33,6 +35,7 @@ pub enum OwnerHistoryChange {
     ProposalRejected,
     ProposalWithdrawn,
 }
+/// One retained task-origin proposal and its actual decision state.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerProposalHistory {
     pub action: OwnerRetainedAction,
@@ -42,6 +45,7 @@ pub struct OwnerProposalHistory {
     pub as_holder: bool,
     pub state: OwnerProposalHistoryState,
 }
+/// The recorded holder or decision, without invented actor or clock facts.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerProposalHistoryState {
     Pending { holder: OwnerHistoryHolder, since: Wall },
@@ -49,12 +53,14 @@ pub enum OwnerProposalHistoryState {
     Rejected { by: OwnerRequester, reason: DocumentText },
     Withdrawn,
 }
+/// The exact named holder category, independent of equal numeric identities.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerHistoryHolder {
     Task(u64),
     Person(u64),
     Policy { project: u32, kind: OwnerMessageProposalKind },
 }
+/// The whole retained action, distinct from a live request or inferred scope.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerRetainedAction {
     /// Whole admitted batch; no synthetic outer loss marker or clipped batch.
@@ -80,6 +86,7 @@ pub enum OwnerRetainedAction {
         task: u64,
     },
 }
+/// Selected retained replacements, distinct from immutable stored settings snapshots.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerRetainedAmendment {
     pub addressed: Option<AddressChange>,
