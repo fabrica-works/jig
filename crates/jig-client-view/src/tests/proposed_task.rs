@@ -38,6 +38,12 @@ pub(super) fn full_template(number: u64) -> ProposedTask {
     let choice =
         VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields: list([field.clone(), field]) };
     let mut task = super::work_pages::recurring_task(number, &vec![b'x'; usize::try_from(CLIENT.text).unwrap()]);
+    task.spec.specification.parameters = list([
+        Parameter::Bytes { name: u32::MAX, value: task.spec.specification.words.clone() },
+        Parameter::Bytes { name: 2, value: task.spec.specification.words.clone() },
+    ]);
+    task.spec.specification.inputs = list([u64::MAX, 9]);
+    task.spec.cut = true;
     task.executor = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
     task.contract = TaskContractDocument::Verdict {
         choices: list([choice.clone(), VerdictChoice { code: 2, ..choice }]),

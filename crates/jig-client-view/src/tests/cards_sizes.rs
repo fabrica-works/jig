@@ -73,15 +73,10 @@ fn full_proposal(action: ProposalAction) -> Proposal {
     value
 }
 fn full_batch() -> ProposalAction {
-    let row = ProposedTask {
-        local: 1,
-        spec: specification(full_text()),
-        executor: Executor::Party { party: 1 },
-        budget: u64::MAX,
-        deadline: Some(Wall::from_nanos(u64::MAX)),
-        dependencies: list([1, 2]),
-        grants: full_authority().grants,
-    };
+    let mut row = super::super::proposed_task::full_template(1);
+    row.spec.specification.words = full_text();
+    row.executor = OwnerExecutor::Person(PersonAddress::Party(1));
+    row.dependencies = list([1, 2]);
     ProposalAction::Batch { tasks: list([row.clone(), row]), own: true }
 }
 fn full_value() -> ResultValue {

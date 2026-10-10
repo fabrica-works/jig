@@ -411,13 +411,19 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
             ProposalAction::Batch {
                 own: true,
                 tasks: list([ProposedTask {
-                    local: 3,
+                    number: 3,
                     spec: specification(text(b"full batch spec")),
-                    executor: Executor::Party { party: 1 },
+                    executor: OwnerExecutor::Person(PersonAddress::Party(1)),
                     budget: 40,
-                    deadline: Some(Wall::EPOCH),
+                    authority: OwnerAuthorityDocument {
+                        authority: OwnerAuthority {
+                            deadline: Some(Wall::EPOCH),
+                            ..super::work_pages::recurring_task(3, b"full batch spec").authority.authority
+                        },
+                        cut: false,
+                    },
                     dependencies: list([2]),
-                    grants: list([]),
+                    ..super::work_pages::recurring_task(3, b"full batch spec")
                 }]),
             },
             b"full batch spec".as_slice(),

@@ -1,4 +1,4 @@
-use super::{list, task, text};
+use super::{list, specification, task, text};
 use crate::{Bounds, payload::fits};
 use jig_client::contract::*;
 use skein_lib::Wall;
@@ -6,7 +6,7 @@ use skein_lib::Wall;
 fn template(number: u64, words: &[u8]) -> ProposedTask {
     ProposedTask {
         number,
-        spec: text(words),
+        spec: specification(text(words)),
         executor: OwnerExecutor::Agent { charter: 1 },
         budget: 20,
         contract: TaskContractDocument::Report { words: 32 },
@@ -75,7 +75,7 @@ fn recurring_prices_the_whole_template_batch_and_final_members_owned_bytes() {
     assert!(!fits(&row, &bounds));
     bounds.document_bytes = bytes;
     let mut longer = row;
-    longer.batch.get_mut(1).unwrap().spec = text(b"seconds");
+    longer.batch.get_mut(1).unwrap().spec.specification.words = text(b"seconds");
     assert!(!fits(&longer, &bounds), "the final member is priced, even when the first still fits");
 }
 
@@ -138,8 +138,18 @@ fn recurring_checks_allocated_batch_last_batch_and_nested_member_capacities() {
     row.chip.details = Box::new(ChipPhase::Waiting { dependencies: skein_lib::List::with_capacity(3), hold: None });
     assert!(!fits(&row, &bounds));
     let mut row = recurring();
-    row.batch.get_mut(1).unwrap().spec = Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap();
+    row.batch.get_mut(1).unwrap().spec.specification.words = Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap();
     assert!(!fits(&row, &bounds), "the final template member's text is checked");
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().spec.specification.parameters = skein_lib::List::with_capacity(3);
+    assert!(!fits(&row, &bounds), "the final member's parameter allocation is checked");
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().spec.specification.inputs = skein_lib::List::with_capacity(3);
+    assert!(!fits(&row, &bounds), "the final member's input allocation is checked");
+    let mut row = recurring();
+    row.batch.get_mut(1).unwrap().spec.specification.parameters =
+        list(vec![Parameter::Bytes { name: 7, value: Text::new(vec![0; 4097].into_boxed_slice(), 5000).unwrap() }]);
+    assert!(!fits(&row, &bounds), "the final member's opaque parameter bytes are checked");
 }
 
 #[test]
