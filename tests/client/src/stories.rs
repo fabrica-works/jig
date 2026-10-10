@@ -258,7 +258,7 @@ pub fn project() -> Project {
         key: 1,
         batch: list([batch_task(1, specification(text(&[b'r'; 32])), OwnerExecutor::Agent { charter: 1 }, 10)]),
         budget: 10,
-        overlap: Overlap::Skip,
+        overlap: RecurringOverlap::Skip,
         current_period: 3,
         began: Some(Wall::EPOCH),
         next: Some(Wall::EPOCH),
