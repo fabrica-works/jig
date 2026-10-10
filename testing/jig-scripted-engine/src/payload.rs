@@ -544,9 +544,13 @@ impl Payload for jig_client::contract::Bounds {
                 maximum_budget.heap(bounds),
                 maximum_deadline.heap(bounds),
             ]),
-            Self::Amend { budget_left, grants, authority, ceiling } => {
-                sum(&[budget_left.heap(bounds), grants.heap(bounds), authority.heap(bounds), ceiling.heap(bounds)])
-            }
+            Self::Amend { budget_left, grants, implications, authority, ceiling } => sum(&[
+                budget_left.heap(bounds),
+                grants.heap(bounds),
+                implications.heap(bounds),
+                authority.heap(bounds),
+                ceiling.heap(bounds),
+            ]),
         }
     }
 }

@@ -71,7 +71,7 @@ pub fn goal(offer: &Admission, executor: GoalExecutor, budget: u64, at: Option<W
 pub fn amendment(offer: &Admission, change: &Amendment, before: &OwnerAuthorityDocument) -> Admission {
     match offer {
         Admission::Bounded { within, beyond: outside } => match within {
-            Bounds::Amend { budget_left, grants, authority, ceiling } => {
+            Bounds::Amend { budget_left, grants, implications, authority, ceiling } => {
                 let Some(after) = &change.authority else {
                     return Admission::Allowed;
                 };
@@ -79,18 +79,19 @@ pub fn amendment(offer: &Admission, change: &Amendment, before: &OwnerAuthorityD
                     return Admission::Refused(Refusal::NotOffered);
                 }
                 let before = &before.authority;
-                let narrowing = covers(before, after);
-                if !narrowing && (authority.cut || ceiling.cut || !covers(&ceiling.authority, after)) {
+                let order = implications.as_slice();
+                let narrowing = covers(before, after, order);
+                if !narrowing && (authority.cut || ceiling.cut || !covers(&ceiling.authority, after, order)) {
                     return Admission::Refused(Refusal::NotOffered);
                 }
                 let added = after.spend.saturating_sub(before.spend);
                 let mut listed = true;
                 for grant in &after.grants {
-                    if !grant_covered(before.grants.as_slice(), grant) {
-                        listed &= grant_covered(grants.as_slice(), grant);
+                    if !grant_covered(before.grants.as_slice(), grant, order) {
+                        listed &= grant_covered(grants.as_slice(), grant, order);
                     }
                 }
-                if narrowing || added <= *budget_left && listed && covers(&authority.authority, after) {
+                if narrowing || added <= *budget_left && listed && covers(&authority.authority, after, order) {
                     Admission::Allowed
                 } else {
                     beyond(outside)
@@ -103,9 +104,9 @@ pub fn amendment(offer: &Admission, change: &Amendment, before: &OwnerAuthorityD
 }
 
 // Compare the supplied whole scalar/delegation facts and literal pattern order.
-// Connector kinds currently compare equal; configured implications require an owner fact.
+// Connector kinds follow only equality or the supplied complete configured relation.
 // The supported form changes spend/deadline while preserving each literal permission.
-fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority) -> bool {
+fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority, order: &[super::OwnerKindImplication]) -> bool {
     let mut fits = draft.spend <= facts.spend
         && draft.delegation.depth <= facts.delegation.depth
         && draft.delegation.tasks <= facts.delegation.tasks
@@ -113,7 +114,7 @@ fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority) -> bool {
         && draft.notes & !facts.notes == 0
         && deadline(draft.deadline, facts.deadline);
     for grant in &draft.grants {
-        fits &= grant_covered(facts.grants.as_slice(), grant);
+        fits &= grant_covered(facts.grants.as_slice(), grant, order);
     }
     for kind in &draft.delegation.kinds {
         fits &= facts.delegation.kinds.as_slice().contains(kind);
@@ -128,12 +129,23 @@ fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority) -> bool {
     fits
 }
 
-fn grant_covered(facts: &[OwnerGrant], draft: &OwnerGrant) -> bool {
+fn grant_covered(facts: &[OwnerGrant], draft: &OwnerGrant, order: &[super::OwnerKindImplication]) -> bool {
     for given in facts {
         if given.connector == draft.connector
-            && given.kind == draft.kind
+            && kind_at_most(given.connector, draft.kind, given.kind, order)
             && pattern_at_most(&draft.pattern, &given.pattern)
         {
+            return true;
+        }
+    }
+    false
+}
+fn kind_at_most(connector: u16, needed: u16, given: u16, order: &[super::OwnerKindImplication]) -> bool {
+    if needed == given {
+        return true;
+    }
+    for row in order {
+        if row.connector == connector && row.kind == given && row.implies == needed {
             return true;
         }
     }

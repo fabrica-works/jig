@@ -343,6 +343,7 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
             Admission::Bounded {
                 within: Bounds::Amend {
                     budget_left: 5,
+                    implications: List::with_capacity(0),
                     grants: grants.clone(),
                     authority: Box::new({
                         let mut allowed = row.authority.clone();
@@ -380,6 +381,7 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
             Admission::Bounded {
                 within: Bounds::Amend {
                     budget_left: 5,
+                    implications: List::with_capacity(0),
                     grants: List::with_capacity(0),
                     authority: Box::new(row.authority.clone()),
                     ceiling: Box::new({
@@ -444,6 +446,7 @@ fn bounded_amendment_dimensions() {
     let offer = Admission::Bounded {
         within: Bounds::Amend {
             budget_left: 10,
+            implications: List::with_capacity(0),
             grants: List::with_capacity(0),
             authority: Box::new(OwnerAuthorityDocument::complete(facts.clone())),
             ceiling: Box::new(OwnerAuthorityDocument::complete(maximum)),
@@ -502,6 +505,7 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
         Admission::Bounded {
             within: Bounds::Amend {
                 budget_left: 5,
+                implications: List::with_capacity(0),
                 grants: List::with_capacity(0),
                 authority: Box::new(direct),
                 ceiling: Box::new(ceiling),
@@ -634,6 +638,7 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
                 Admission::Bounded {
                     within: Bounds::Amend {
                         budget_left: 5,
+                        implications: List::with_capacity(0),
                         grants: direct.authority.grants.clone(),
                         authority: Box::new(direct),
                         ceiling: Box::new(ceiling),
@@ -663,6 +668,66 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
             }
             assert_eq!(row.authority.authority.grants.get(0), Some(&current));
             assert_eq!(row.authority.authority.grants.capacity(), 2);
+        }
+    }
+}
+
+#[test]
+fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserves_the_whole_offer() {
+    for spend in [9_u64, 15] {
+        for relation in 0_u8..4 {
+            let mut domain = domain();
+            let mut row = task();
+            let pattern =
+                OwnerPattern { segments: List::with_capacity(0), last: OwnerPatternEnd::Exact(Box::from(*b"a/b\0")) };
+            let grant = OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern };
+            row.authority.authority.grants = List::with_capacity(1);
+            row.authority.authority.grants.push(grant).unwrap();
+            let mut after = row.authority.authority.clone();
+            after.spend = spend;
+            after.grants.get_mut(0).unwrap().kind = 0;
+            let mut direct = row.authority.clone();
+            direct.authority.spend = 15;
+            let mut ceiling = direct.clone();
+            ceiling.authority.spend = 100;
+            ceiling.authority.grants = after.grants.clone();
+            let entry = OwnerKindImplication {
+                connector: if relation == 3 { 0 } else { u16::MAX },
+                kind: if relation == 2 { 0 } else { u16::MAX },
+                implies: if relation == 2 { u16::MAX } else { 0 },
+            };
+            let mut implications = List::with_capacity(2);
+            if relation != 0 {
+                implications.push(entry).unwrap();
+                implications.push(entry).unwrap();
+            }
+            let within = Bounds::Amend {
+                budget_left: 5,
+                grants: direct.authority.grants.clone(),
+                implications: implications.clone(),
+                authority: Box::new(direct),
+                ceiling: Box::new(ceiling),
+            };
+            row.acts = offered(
+                ActKind::Amend,
+                Admission::Bounded { within: within.clone(), beyond: Beyond::Proposed { to: Recipient::Party(9) } },
+            );
+            let id = install(&mut domain, Body::Task(Box::new(row.clone())));
+            intend(&mut domain, id, ActKind::Amend);
+            let mut draft = change();
+            draft.authority = Some(after);
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+            let confirmation = domain.confirmation().unwrap();
+            assert!(confirmation.missing.is_none());
+            assert_eq!(confirmation.proposed, if relation == 1 { None } else { Some(Recipient::Party(9)) });
+            let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+            assert_eq!(
+                sent(&out),
+                &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: None }
+            );
+            let Bounds::Amend { implications: retained, .. } = within else { panic!("whole amendment offer") };
+            assert_eq!(retained, implications);
+            assert_eq!(retained.capacity(), 2);
         }
     }
 }

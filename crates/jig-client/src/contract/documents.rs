@@ -309,6 +309,8 @@ pub enum Bounds {
     Amend {
         budget_left: u64,
         grants: List<super::OwnerGrant>,
+        /// Complete configured connector kind order; equality is implicit.
+        implications: List<super::OwnerKindImplication>,
         /// Complete numbers and lists for directly made widening.
         authority: Box<super::OwnerAuthorityDocument>,
         /// Hard envelope of supported form choices.

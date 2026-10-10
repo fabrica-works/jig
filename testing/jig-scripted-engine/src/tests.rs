@@ -901,6 +901,7 @@ fn bounded_offer_payloads_and_predictions() {
     ceiling.authority.spend = 200;
     let within = DraftBounds::Amend {
         budget_left: 10,
+        implications: List::with_capacity(0),
         grants: list(vec![]),
         authority: Box::new(direct),
         ceiling: Box::new(ceiling),
@@ -980,7 +981,13 @@ fn bounded_offer_payloads_and_predictions() {
             if variant == 4 {
                 ceiling.authority.note_resources = List::with_capacity(33);
             }
-            DraftBounds::Amend { budget_left: 1, grants, authority: Box::new(direct), ceiling: Box::new(ceiling) }
+            DraftBounds::Amend {
+                budget_left: 1,
+                implications: List::with_capacity(0),
+                grants,
+                authority: Box::new(direct),
+                ceiling: Box::new(ceiling),
+            }
         };
         row.acts = list(vec![Offered {
             act: ActKind::Amend,
