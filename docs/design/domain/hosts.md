@@ -376,6 +376,10 @@ an open link only, after the hello. Nothing decides on a fact.
   begun or ended, are facts, fenced like everything a host sends
   (section 2). The engine shows a run as writing, or as running a tool,
   only on such a fact, never inferring it from an attempt being placed.
+  A tool begun names its call and its tool, with the call's input within
+  the views' bound, and a check begun or ended names the check, as
+  smith's host domain hands them up typed (smith's `domain/host.md`,
+  section 4); so a run's document shows the call it is making.
 
 ### 6.6 Losing contact
 

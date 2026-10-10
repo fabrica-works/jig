@@ -150,11 +150,13 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 | failed: sign in again, expired | failed, sign in again |
 | failed: client rejected | failed, misconfigured |
 | failed: unloaded | failed, unloaded, with where and why |
-| failed: cancelled | failed, cancelled |
+| failed: cancelled; a grant refused as closed | failed, cancelled |
+| a grant refused as full | failed, later, after the child's backoff |
 | closed | closed |
 
 - **Unreachable in the engine:** a sign-in's own failures (an invalid
-  redirect), since the engine runs no sign-in, and `expiring`, which only
+  redirect), since the engine runs no sign-in; a grant's other refusals,
+  for an account the driver was not made with; and `expiring`, which only
   an access-only record raises, while every account's source is a
   sign-in (section 10 keeps API keys open). The translation names them,
   and asserts they never come.
@@ -178,7 +180,10 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 - **The first record comes from a sign-in** by any process made with the
   same account's configuration: the driver's sign-in, with its loopback
   redirect, writes the account's file, which the engine then loads. An
-  application may ship that as a command beside its engine. Signing an
+  application may ship that as a command beside its engine. A sign-in at
+  a terminal serves a public client's registration only: a confidential
+  one is refused at its start, naming the account, until a provider
+  needs one. Signing an
   account in through the client is open (section 10).
 - **A file that cannot be read** fails the account as unloaded, saying
   where and why; the account stays unusable until its file is replaced.

@@ -262,8 +262,8 @@ answer; *signed out*.
     on it;
   - *an activity line:* one of a task's words, run boundaries, turns,
     results heard, news heard, decisions, in commit order (client.md,
-    section 10); a turn as its bytes, which the client's protocol layer
-    decodes;
+    section 10); a turn as its bytes, within the page's byte bound, which
+    the client's protocol layer decodes, with no read of its own;
   - *a conversation's line:* one of a party's chats, for their list;
   - *a goal's line,* a project's, its policy, roles and spend, a note;
     a project's document carries its recurring tasks' lines, each saying
@@ -440,7 +440,9 @@ commit, so they leave through the journal's door (`../../README.md`,
 - **Each owner's documents and requests are versioned,** jig's by jig and
   each application's by the application; the client's protocol layer
   encodes each with its version.
-- **The engine serves a range of versions,** which its frame says. A
+- **The engine serves a range of versions,** which the hello of its
+  stream of deliveries says (`../../protocol/client.md`, section 9); the
+  frame carries none. A
   browser's client comes from the engine and matches it; a phone's or a
   terminal's may not.
 - **Outside the range,** the client shows that it is out of date and how
@@ -449,7 +451,8 @@ commit, so they leave through the journal's door (`../../README.md`,
   its keys.
 - **How long a range is, and how a change of jig's reaches every
   application,** is jig's versioning, still open (`../../README.md`,
-  section 14).
+  section 14). Until upgrades are designed, each range is one version
+  (`../../protocol/README.md`, section 7).
 
 ## 9. What the engine's domain owes the client
 

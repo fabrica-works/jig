@@ -67,7 +67,7 @@ the application's main (its shell)
 | providers | each sign-in provider's number and kind; its settings are the application's | the people child; the client's protocol |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
 | projects | each project seeded on a first start: its number, its resources and their roles, its homes, its policy, its parties' roles | the core, on a first start |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (`../domain/hosts.md`, section 8) | the core; `jig-charter` |
+| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget, which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several; and which charter chats run under | the core; `jig-charter` |
 | hosts | the engine's own slots, and the inline agent's limits, if it runs agents; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10) | the fleet; `jig-protocol-engine-workers` |
 | llm | endpoints, models and prices; accounts, each with its registration and its token endpoint, and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
 | clients | the clients' listener (a TCP address, or loopback on one person's machine) and its certificate and key files, but on loopback; the heartbeat; whether the engine prints a local sign-in link at start (`client.md`, sections 4 and 8) | `jig-protocol-engine-clients` |
@@ -174,3 +174,17 @@ secret, and every credential its runs need comes with their assignments
 - **Profiles' numbers,** from the first deployments' measurements.
 - **A configuration's format version,** once a deployment's configuration
   must survive a release that changes it.
+
+## 10. Formats an operator writes
+
+- **An address** is one of three objects:
+  - `{"socket": "127.0.0.1:7100"}`, a socket address, IPv4 or IPv6;
+  - `{"host": "issuer.example", "port": 443}`, a host's name, which the
+    shell resolves at startup (skein's `shell.md`, section 6);
+  - `{"in_process": "<name>"}`, an in-process name within skein's bound
+    (skein's `io.md`, section 4), in one process only (`service.md`,
+    section 10).
+- **A digest file** holds one SHA-256 digest as 64 lowercase hexadecimal
+  digits, and nothing else but a final newline.
+- **A secret file** holds the secret's bytes as they are, and nothing
+  else but a final newline, which is not part of the secret.

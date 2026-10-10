@@ -80,7 +80,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   hello judged against the client's versions, and the translation between
   the wire's records and the client's vocabulary. It is step code, built
   for the host and for wasm32, and gives its shell a method, a path,
-  headers and a body, and takes back whole bodies and whole events
+  headers and a body, and takes back whole bodies, and the stream's body
+  as it comes, which skein's server-sent events reader, inside the
+  component, cuts into events, so every shell is as small as it can be
   (`../README.md`, section 10).
 - **The shell** is the platform's: its HTTP stack, its storage, its
   clock, its entropy, and its sign-in navigation
@@ -198,7 +200,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 - **Opening a watch** is an exchange: the stream's name, the client's name
   for the watch, its subject and window. It is answered admitted, or
   refused (unknown, not allowed, busy, signed out); the first delivery
-  follows on the stream. The engine names the party from the sign-in, so
+  follows on the stream. A subject an application's connector judges is
+  admitted at the end of the step that takes it, and the connector's
+  refusal, if it comes later, ends the watch with its reason
+  (`../client/domain/contract.md`, 7.2). The engine names the party from the sign-in, so
   a subject of the party's own (their frame, their inbox, their
   conversations) names none.
 - **A delivery** is one event on the stream: the watch's name, and the
@@ -234,6 +239,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   sign-in, which gives it its number; the engine's side keeps the digest
   of a fresh secret under that number, in the store's secrets' records;
   and only then hands the client the secret (`README.md`, section 8).
+  Secrets come from a cryptographic generator of the component's, seeded
+  from the kernel at start. The core says each sign-in that ends or
+  expires, and the component erases its digest then.
 - **A browser's secret** is a cookie the engine sets on its origin:
   HTTP-only, secure, same-site strict, scoped to the client's routes. The
   client's domain and its WebAssembly never see it. Every exchange and
@@ -247,9 +255,12 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 - **The deployment's own link,** on one person's machine: at start the
   engine prints a link to its sign-in route carrying a one-time secret,
   valid for a short while; opening it signs that person in as the
-  deployment's first owner, and spends the secret. It is a provider of
-  jig's, which an application enables by configuration
-  (`configuration.md`, section 3), and only on a loopback listener.
+  deployment's first owner, and spends the secret. One link is live at a
+  time: when a browser reaches the sign-in page and none is, the engine
+  prints a fresh one, and the page says to find it in the engine's
+  output. It is a provider of jig's, which an application enables by
+  configuration (`configuration.md`, section 3), and only on a loopback
+  listener.
 - **A service's credential** is issued when an owner makes the service:
   the engine's protocol layer draws it, keeps its digest, and answers the
   owner's request with it once, never again. The service's shell holds
@@ -328,7 +339,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 - **Served by the engine:** the engine's protocol layer serves the client's
   files (its HTML, its WebAssembly, its glue, the application's
   drawings) from its origin, under a strict content security policy:
-  scripts from the origin only, no inline script, connections to the
+  scripts from the origin only, no inline script, WebAssembly compiled
+  only from the module the origin serves (`'wasm-unsafe-eval'`, which
+  compiling it needs), connections to the
   origin only.
 - **The native one** (`jig-shell-native`): skein's HTTP client and its
   server-sent events reader on skein's io, for Linux and for the worlds

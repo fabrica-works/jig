@@ -196,7 +196,11 @@ the engine, no workers.
   `main`, reading its configuration and running the loop.
 - **Its periods** come from a child of its root that keeps the
   deployment's calendar from its configuration (a monthly period, from a
-  day, in a time zone), arms its deadline, and says each period to the
+  day, at a fixed offset from UTC; a day past a short month's end is its
+  last day; the projects a period opens, each with its budget, listed by
+  the calendar's configuration, so a project not listed has no period
+  until configuration names it and the engine restarts), arms its
+  deadline, and says each period to the
   core with the next one's start; the protocol layer only fires the
   deadline (`configuration.md`, section 5).
 - **Commented to be copied,** as its root is: a new application copies it,

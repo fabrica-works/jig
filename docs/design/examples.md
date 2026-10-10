@@ -345,8 +345,38 @@ section 12):
   - restarts and scaling through systemd units;
   - environments as local containers.
 
-  No cloud account is needed. It comes with the protocol layers, the
-  service and `main`.
+  No cloud account is needed. It comes after the protocol layers, which
+  are built on the fake production first (9.1).
+
+### 9.1 Their APIs, and `ops` standalone
+
+- **`ops`'s own APIs,** one per system, HTTP/1.1 with JSON bodies,
+  defined by `ops` and no real product's:
+  - observability's: a service's logs and metrics, read by service and
+    window; alerts as they fire;
+  - infrastructure's: services restarted and scaled; pools read;
+    environments made, read and removed; drift as it happens.
+- **Events nobody asked for** (alerts, drift) come on one stream of
+  server-sent events per system, which the connector's protocol keeps
+  open and opens again after a backoff; its connector hears each as a
+  system event.
+- **A read that fails** (an error, a timeout) reaches its connector as a
+  failed read: the system unreachable for that read. A run's read is
+  answered as an error; a fact is left as it was and read again at its
+  next pass.
+- **A refusal for the rate** is an answer saying when the rate resets,
+  which reaches its connector as its own event (`domain/connectors.md`,
+  section 13).
+- **The connectors' protocols,** `jig-ops-protocol-observability` and
+  `jig-ops-protocol-infrastructure`, are components of `ops`'s engine
+  protocol layer, over skein's HTTP client and server-sent events
+  reader.
+- **The fake production serves them:** `jig-ops-fake-production` gains a
+  server face speaking both APIs, ordinary Rust as the kit is: on
+  skein's simulated io in `ops`'s protocol world, and as a binary of its
+  own, `jig-ops-production`, on loopback beside `jig-ops` when `ops` runs
+  standalone. `ops`'s systems are outside its process, as any
+  application's are.
 
 ## 10. Its worlds
 

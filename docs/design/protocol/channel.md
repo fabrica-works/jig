@@ -227,6 +227,11 @@ answer, and a **notice** is not answered.
   busy, a relayed call answered busy or as an error, and an answer
   acknowledged again when the engine has finished with its attempt
   (`../domain/engine.md`, section 8).
+- **Busy is resent by the link.** A turn, or a call, answered busy is
+  held by the worker's link component, which sends it again after a
+  jittered backoff, as it keeps the grace's clock (10.1); the hub arms
+  no timers (`../domain/hosts.md`, 6.2). An answer the engine leaves
+  unacknowledged is sent again after the next hello.
 - **A refused worker** is refused by skein's channel, with jig's reasons;
   the domains have no record of their own for it.
 
@@ -258,7 +263,11 @@ answer, and a **notice** is not answered.
   and the last message it read, which the record carries beside the bytes
   (`../domain/engine.md`, 7.2).
 - **A run's result** crosses as smith's result, in its charter's version,
-  which `jig-charter`'s reader decodes in the engine's protocol layer.
+  which `jig-charter`'s reader decodes in the engine's protocol layer,
+  for runs on workers and in the engine alike, by the path of host tools'
+  calls (6.3): the core hands an answer's result out once the fleet has
+  fenced it, the protocol layer reads it, and the typed result comes
+  back. A result that does not decode fails its attempt as invalid.
 - **Calls committed since a resumed run's last turn** cross with their
   answers as the engine kept them, so the run is told of them, not asked
   them again (`../domain/engine.md`, 7.3).
@@ -304,8 +313,9 @@ answer, and a **notice** is not answered.
   sends one only while its output queue leaves room for everything else
   (section 9), and drops it, counted, otherwise.
 - **Activity** is the fleet's typed report: a run's phase, a tool or a
-  check begun or ended, as the views and the deployment's document show
-  them.
+  check begun or ended, a tool begun with its call's name and its input
+  within the views' bound, as the views and the deployment's document
+  show them (`../domain/hosts.md`, 6.5).
 - **A run's text** carries the turn it belongs to, named by the attempt
   and its number within it, its completion's retry, the offset within
   that retry's text at which it starts, and its bytes. The call the run is
@@ -333,8 +343,11 @@ answer, and a **notice** is not answered.
 - **A message is named by its number,** which the core gives each message
   as it commits it, unique in the deployment; a turn names the last it
   read, and a bounce the one it bounced.
-- **A call is named by the run,** as bytes the engine echoes and never
-  reads (`../domain/engine.md`, 7.3).
+- **A call is named by the run,** as bytes the engine echoes and no
+  domain reads (`../domain/engine.md`, 7.3). `jig-charter` reads from
+  them the call's key (its completion, and its position within it) as
+  the protocol layer decodes the call (6.3), and hands it over typed
+  with the call, so a connector keys the call's effects by it.
 - **A channel is named by the engine's side** with a token of its own,
   which the fleet uses and the component never reuses.
 
@@ -539,7 +552,9 @@ tests in the default suite, randomized ones in the fuzzy suite.
   the turn, the retry and the offset (smith's `domain/run.md`, 11.1); its
   channel carries them when the host asks at the run's start (smith's
   `protocol/channel.md`, 8.1); its host half and the inline agent pass
-  them on.
+  them on. Its host domain hands up tool and check facts typed, a tool
+  begun with its call's name and input (smith's `domain/host.md`,
+  section 4).
 - **skein owes** in-process addresses, for one process (skein's `io.md`,
   3.5), and, between hosts, TLS's server side with independent output,
   for the engine's listener (skein's `channel.md`, section 12; skein's

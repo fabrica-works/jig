@@ -38,9 +38,10 @@ open is listed in section 14.
   carry an application's value (a workspace's items, what a run left, an
   application's documents), they carry it as bytes the application
   encodes, versions and decodes in its own protocol layer.
-- **Nothing is parsed in a domain.** Host tools' calls are decoded, and
-  their answers rendered, in the engine's protocol layer, for runs on
-  workers and in the engine alike (`channel.md`, 6.3).
+- **Nothing is parsed in a domain.** Host tools' calls and runs' results
+  are decoded, and calls' answers rendered, in the engine's protocol
+  layer, for runs on workers and in the engine alike (`channel.md`, 6.1
+  and 6.3).
 - **The store is designed on its own,** as jig's subset of the store
   design its first application already has, which applications extend
   with their own families (section 9). The other components rely only on
@@ -288,6 +289,12 @@ Each is generic, and says nothing about jig.
   refusing a file that is not private to the process's user, for
   configuration's secrets (skein's `shell.md`, 6.1; skein's `io.md`,
   5.3).
+- **For the client's WebAssembly and its records:** skein-lib, skein-codec
+  and skein-http's machines built for `wasm32-unknown-unknown`, checked by
+  skein's gate; a bounded base64 module in skein-lib, for records in
+  server-sent events (`client.md`, section 1); and secret bytes in
+  generated records, whose `Debug` shows their length only, for
+  credentials' values (section 8).
 - **What it has, as it is:** the framed channel, codecs and their
   generator, the JSON reader and writer, the key-value store, the LLM
   client and connection component and their fake peer, OAuth's client and
@@ -299,6 +306,10 @@ Each is generic, and says nothing about jig.
 - **A completion with its contract:** smith's domain's completion request
   carries its run's result contract, so a consumer that runs many runs
   with one LLM component keeps nothing per run (`llm.md`, section 3).
+- **Tool and check facts, typed:** smith's host domain hands up a tool
+  begun with its call's name and input, and checks begun and ended, as it
+  hands text, so a run's document shows the call it is making
+  (`../domain/hosts.md`, 6.5).
 - **A run's text as content, by turn, retry and offset:** smith's LLM
   component hands its domain the text as it arrives, not only its count;
   its domain's text facts name the turn, its completion's retry and
@@ -367,7 +378,8 @@ section 6).
   input as the LLM wrote it, so a call from a run in the engine is inside
   the domain before anything could decode it, and only the fleet can tell
   a live attempt's call from a stale one. One path serves both shapes:
-  fenced, then handed out to be decoded, and handed back typed.
+  fenced, then handed out to be decoded, and handed back typed. A run's
+  result takes the same path (`channel.md`, 6.1).
 - **A run's text crosses with its turn, retry and offset,** which smith gives;
   gaps mark the turn cut (`channel.md`, 6.4).
 - **smith's LLM component for inline runs,** one per engine, over skein's

@@ -377,8 +377,9 @@ would make a commit:
 
 - **a party's request** is answered not ready, and an application's
   request likewise;
-- **a run's turn, answer or call** is answered busy, so its host keeps it
-  and sends it again to the next engine;
+- **a run's turn or call** is answered busy, and its answer left
+  unacknowledged, so its host keeps them and sends them again, to this
+  engine or the next;
 - **a connector's events and outcomes** stay with the connector, as when
   the journal is full;
 - **no run is placed, and no procedure stepped.**
@@ -421,8 +422,10 @@ When an agent task is due (tasks.md, 5.2), the core:
      section 8);
    - its transcript, when it resumes, and the calls committed since its
      last turn;
-   - the credential grants its models' accounts need (section 12), and
-     those its connectors' items need, which the protocol layer fills in.
+   - the credential grants its models' accounts need (section 12): one
+     account per charter, which its models' endpoints share, until a run
+     needs several; and those its connectors' items need, which the
+     protocol layer fills in.
 
 ### 7.2 Transcripts
 
@@ -552,7 +555,8 @@ The fleet child domain knows the hosts and the runs they host:
   are lost only with the engine (section 6).
 - **Relaying:** messages and cancels down, tool calls up and their
   answers back, each call answered once; a call the fleet cannot pass up
-  is answered at once, unserved, never left without an answer.
+  is answered at once, unserved, or busy while the engine stops
+  (section 6.1), never left without an answer.
 - **The graces are ordered.** The engine's grace is longer than the
   longest a worker may take to stop a run it lost contact for, which the
   worker says at its hello (hosts.md, 6.6); a worker whose bound is equal

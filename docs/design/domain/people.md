@@ -73,7 +73,8 @@ authority and to the tasks.
   their tokens, or digests of them, are written by the protocol layer
   into the store's secret records, and the domain names a sign-in only by
   its number. Each expires after a configured time, and a party may end
-  theirs.
+  theirs; the core says each that ends or expires, so the protocol layer
+  erases its digest.
 - **Services** are parties whose provider is the deployment: an owner
   makes one in a project, with a role, and the protocol layer issues its
   credential. A service makes requests (section 5) but starts no chat,
