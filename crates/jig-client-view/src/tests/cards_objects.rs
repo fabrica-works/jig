@@ -810,7 +810,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         result: None,
         delegates: list([LiveDelegate { chip: chip(), takeover_budget: 13 }]),
 
-        context: Some(Box::new(jig_client::contract::TaskContext {
+        context: Some(Box::new(TaskContext {
             escalation: None,
             parts: list([]),
             closing: None,

@@ -1,4 +1,5 @@
 use super::*;
+use crate::phrases::{Hole, jig::JigPhrase};
 use jig_client::address::{Address, TaskSection};
 
 #[test]
@@ -22,13 +23,13 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
         }
         for section in [TaskSection::Overview, TaskSection::Activity, TaskSection::Budget, TaskSection::Panels] {
             let (mut domain, out) = super::super::work_pages::entered(Address::Task { task: 8, section });
-            let watch = out
-                .iter()
-                .find_map(|request| match request {
-                    Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-                    _ => None,
-                })
-                .unwrap();
+            let mut task_watch = None;
+            for request in &out {
+                if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+                    assert!(task_watch.replace(*watch).is_none());
+                }
+            }
+            let watch = task_watch.unwrap();
             super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row.clone())));
             let (tree, bindings) = super::super::pages::build(&domain, 3, &words());
             super::super::cards_access::check(&tree);
@@ -45,9 +46,14 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
                 assert!(contains(&tree, b"Budget: 20"));
             }
             if section == TaskSection::Overview || section == TaskSection::Panels {
-                let parts: Vec<_> =
-                    tree.nodes().iter().filter_map(|node| node.slot).map(|slot| bindings.part(slot.token)).collect();
-                assert_eq!(parts, if present { vec![Some(&reference)] } else { vec![] });
+                let mut parts = 0;
+                for node in tree.nodes() {
+                    if let Some(slot) = node.slot {
+                        assert_eq!(bindings.part(slot.token), Some(&reference));
+                        parts += 1;
+                    }
+                }
+                assert_eq!(parts, u32::from(present));
             }
         }
         let (mut domain, id, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));

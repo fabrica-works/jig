@@ -46,13 +46,13 @@ fn supplied_task_context_routes_only_its_whole_parts_and_impact_without_recreati
             Time::ZERO,
             Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Panels }) },
         );
-        let watch = opened
-            .iter()
-            .find_map(|request| match request {
-                Request::Open { watch, subject: Subject::Task { task: 8 } } => Some(*watch),
-                _ => None,
-            })
-            .unwrap();
+        let mut task_watch = None;
+        for request in &opened {
+            if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+                assert!(task_watch.replace(*watch).is_none());
+            }
+        }
+        let watch = task_watch.unwrap();
         let mut row = super::confirmation::task();
         row.delegates = List::with_capacity(0);
         let context = row.context.as_mut().unwrap();
@@ -71,14 +71,14 @@ fn supplied_task_context_routes_only_its_whole_parts_and_impact_without_recreati
             Time::ZERO,
             Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row))) },
         );
-        let parts: Vec<_> = output
-            .iter()
-            .filter_map(|request| match request {
-                Request::ShowPart { part, .. } => Some(part),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(parts, if present { vec![&part] } else { vec![] });
+        let mut parts = 0;
+        for request in &output {
+            if let Request::ShowPart { part: supplied, .. } = request {
+                assert_eq!(supplied, &part);
+                parts += 1;
+            }
+        }
+        assert_eq!(parts, u32::from(present));
         let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
         assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(exact))));
     }
@@ -91,13 +91,13 @@ fn finished(phase: Option<OwnerChipPhase>, prior: Option<OwnerPriorPhase>) -> bo
         Time::ZERO,
         Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
     );
-    let watch = opened
-        .iter()
-        .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Task { task: 8 } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let mut task_watch = None;
+    for request in &opened {
+        if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+            assert!(task_watch.replace(*watch).is_none());
+        }
+    }
+    let watch = task_watch.unwrap();
     assert!(domain.conversation.stream(
         RunText {
             attempt: 1,
