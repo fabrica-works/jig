@@ -277,7 +277,8 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
                 assert_eq!(objects::person_task::revision(object), Some(Revision { value: 4 }));
             }
             ReadValue::Result(document) => assert_eq!(objects::result::facts(object), Some(document.as_ref())),
-            ReadValue::Frame(_)
+            ReadValue::OwnerProposal(_)
+            | ReadValue::Frame(_)
             | ReadValue::Task(_)
             | ReadValue::Ended(_)
             | ReadValue::History(_)

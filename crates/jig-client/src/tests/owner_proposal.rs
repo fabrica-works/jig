@@ -66,7 +66,7 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
         assert_ne!(pending.get(0).unwrap().0, pending.get(1).unwrap().0);
         assert_ne!(pending.get(0).unwrap().1, pending.get(1).unwrap().1);
         let answer = Answer::Done(Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH });
-        for (id, request) in pending {
+        for (id, request) in pending.into_boxed() {
             drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() });
             assert_eq!(domain.objects.get(id).unwrap().answer, Some(answer.clone()));
             assert!(matches!(domain.objects.get(id).unwrap().card, Card::Leaving { .. }));

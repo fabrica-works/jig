@@ -102,6 +102,7 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
         Some(Body::PersonTask(value)) => (None, Some(value.task.title.bytes.clone())),
         Some(Body::Result(value)) => (None, Some(value.task.title.bytes.clone())),
         Some(Body::Proposal(value)) => (Some(value.project), Some(value.why.clone())),
+        Some(Body::OwnerProposal(value)) => (Some(value.project), Some(value.reason.bytes.clone())),
         Some(Body::Note { project, document }) => (Some(*project), Some(document.description.bytes.clone())),
         None => (None, None),
     };

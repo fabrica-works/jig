@@ -120,7 +120,12 @@ pub(super) fn reread(domain: &mut Domain, body: Body, what: Read) {
         Body::Escalation(document) => ReadValue::Escalation(document),
         Body::Task(document) => ReadValue::Task(document),
         Body::PersonTask(document) => ReadValue::PersonTask(document),
-        Body::Proposal(_) | Body::Question(_) | Body::Result(_) | Body::Chip(_) | Body::Note { .. } => unreachable!(),
+        Body::Proposal(_)
+        | Body::OwnerProposal(_)
+        | Body::Question(_)
+        | Body::Result(_)
+        | Body::Chip(_)
+        | Body::Note { .. } => unreachable!(),
     };
     drive(domain, Time::ZERO, Event::Read { read: read.token(), result: ReadResult::Value(value) });
 }

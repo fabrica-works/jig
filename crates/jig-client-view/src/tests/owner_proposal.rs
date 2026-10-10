@@ -305,7 +305,7 @@ fn owner_proposal_amendment_contexts_address_and_release_presence_never_join_a_c
                     assert!(has(&tree, b"Proposed release revision: 0"));
                 }
                 if addressed.is_some() {
-                    assert!(has(&tree, b"Person address revision 18446744073709551615"));
+                    assert!(has(&tree, b"Person-task revision 18446744073709551615"));
                 }
                 if after.as_ref().is_some_and(|v| v.cut) {
                     assert!(has(&tree, b"exact effective after"));
@@ -361,7 +361,7 @@ fn owner_proposal_all_funders_independent_optional_amounts_and_holder_variants_p
     ] {
         let mut v = source(OwnerProposalAction::Batch(List::with_capacity(3)));
         v.waiting.holder = OwnerHistoryHolder::Policy { project: u32::MAX, kind };
-        assert!(has(&build(&v, &w).0, b"Policy holder project: 4294967295"));
+        assert!(has(&build(&v, &w).0, b"Holder policy project: 4294967295"));
     }
 }
 #[test]
@@ -393,4 +393,85 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
         })
         .is_err()
     );
+}
+#[test]
+fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current_facts_and_checked_confirmation() {
+    use jig_client::{Event, action::Act};
+    let w = words(false);
+    let mut chip = super::cards_objects::task_doc(&[]).chip;
+    chip.title = doc(b"supplied linked title", true);
+    let links = [
+        OwnerTaskLink::Live(chip.clone()),
+        OwnerTaskLink::Retained { chip: chip.clone(), at: None },
+        OwnerTaskLink::Retained { chip, at: Some(Wall::EPOCH) },
+        OwnerTaskLink::Stored { number: 8, status: None },
+        OwnerTaskLink::Stored { number: 8, status: Some(OwnerTaskStatus::Done) },
+        OwnerTaskLink::Stored { number: 8, status: Some(OwnerTaskStatus::Failed) },
+        OwnerTaskLink::Stored { number: 8, status: Some(OwnerTaskStatus::Cancelled) },
+    ];
+    for link in links {
+        let v = source(OwnerProposalAction::Release { task: link.clone(), hold: None });
+        let tree = build(&v, &w).0;
+        match link {
+            OwnerTaskLink::Live(_) => assert!(has(&tree, b"Live task")),
+            OwnerTaskLink::Retained { at, .. } => {
+                assert!(has(&tree, b"Retained ended task"));
+                assert_eq!(has(&tree, b"Ended time unavailable"), at.is_none());
+            }
+            OwnerTaskLink::Stored { status, .. } => {
+                assert!(has(&tree, b"Stored task 8"));
+                assert_eq!(has(&tree, b"Stored status unavailable"), status.is_none());
+                assert!(!has(&tree, b"supplied linked title"));
+            }
+        }
+    }
+    let mut maker_keys = Vec::new();
+    for maker in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
+        let mut v = source(OwnerProposalAction::Release {
+            task: OwnerTaskLink::Stored { number: 8, status: None },
+            hold: None,
+        });
+        v.key.proposer = maker;
+        v.funding = List::with_capacity(2);
+        v.acts = List::with_capacity(2);
+        v.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+        let (mut client, id) =
+            super::cards_objects::loaded(ObjectKey::Proposal(v.key), ReadValue::OwnerProposal(Box::new(v.clone())));
+        let f = view::worst_case(&limits(), &w).unwrap();
+        let mut expected = None;
+        for place in [
+            crate::cards::Place::Inbox { lineage: List::with_capacity(0) },
+            crate::cards::Place::Conversation,
+            crate::cards::Place::TaskPage,
+            crate::cards::Place::Elsewhere,
+        ] {
+            let mut b = Builder::new(&crate::Limits { nodes: f.nodes + 100, ..capacity(f) });
+            let mut bindings = JigBindings::new(f.bindings, 256);
+            assert!(crate::cards::card(&mut b, &client, id, &place, &w, &mut bindings));
+            let tree = b.finish();
+            super::cards_access::check(&tree);
+            assert!(has(&tree, b"Proposed release"));
+            assert!(has(&tree, b"Accept"));
+            let key = tree.nodes()[0].key.unwrap();
+            if let Some(previous) = expected {
+                assert_eq!(key, previous);
+            } else {
+                expected = Some(key);
+            }
+            assert_eq!(jig_client::objects::proposal::owner_facts(client.objects().get(id).unwrap()), Some(&v));
+        }
+        maker_keys.push(expected.unwrap());
+        super::cards::drive(&mut client, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Accept } });
+        assert_eq!(client.confirmation().unwrap().revision, None);
+        let mut b = Builder::new(&crate::Limits { nodes: f.nodes + 100, ..capacity(f) });
+        let mut bindings = JigBindings::new(f.bindings, 256);
+        crate::confirmation::confirmation(&mut b, &client, &w, &mut bindings);
+        let tree = b.finish();
+        super::cards_access::check(&tree);
+        assert!(has(&tree, b"Proposed release"));
+        assert!(has(&tree, b"Release hold not supplied"));
+        super::cards::drive(&mut client, Event::Act { act: Act::Dismiss });
+        assert!(client.confirmation().is_none());
+    }
+    assert_ne!(maker_keys[0], maker_keys[1]);
 }
