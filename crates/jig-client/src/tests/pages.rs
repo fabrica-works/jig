@@ -2015,7 +2015,7 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
     let shown = drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) },
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc.clone()))) },
     );
     let parts: Vec<_> = shown
         .iter()
@@ -2025,10 +2025,16 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
         })
         .collect();
     assert_eq!(parts, vec![one, two]);
-    let budget = drive(
+    let budget_opened = drive(
         &mut domain,
         Time::ZERO,
         Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Budget }) },
+    );
+    let budget_watch = open_token(&budget_opened);
+    let budget = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch: budget_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) },
     );
     let parts: Vec<_> = budget
         .iter()
