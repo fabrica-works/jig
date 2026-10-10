@@ -156,3 +156,8 @@ fn five_independent_read_stories_fit_the_shared_process_budget() {
     a_read_when_loads_are_full_is_busy();
     jig_core_world::stories::reads::a_backward_wall_correction_keeps_reply_paging_whole_after_restart();
 }
+
+#[test]
+fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_restart() {
+    jig_core_world::stories::reads::conversation_owner_replay_keeps_every_retained_page_after_durability_and_restart();
+}

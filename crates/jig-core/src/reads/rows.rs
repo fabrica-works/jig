@@ -234,7 +234,13 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                         Some((cursor, activity)) => inbox_position(*group, cursor, activity),
                         None => match super::cursor(read) {
                             Some(Cursor::Live { store_after, .. }) => store_after.clone(),
-                            Some(Cursor::Store { .. }) | None => None,
+                            Some(
+                                Cursor::Store { .. }
+                                | Cursor::ConversationsBefore { .. }
+                                | Cursor::ConversationsLiveBefore { .. }
+                                | Cursor::ConversationsStart,
+                            )
+                            | None => None,
                         },
                     },
                     after: match last {
@@ -247,7 +253,13 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
                         Some((cursor, activity)) => inbox_position(*group, cursor, activity),
                         None => match super::cursor(read) {
                             Some(Cursor::Live { store_after, .. }) => store_after.clone(),
-                            Some(Cursor::Store { .. }) | None => None,
+                            Some(
+                                Cursor::Store { .. }
+                                | Cursor::ConversationsBefore { .. }
+                                | Cursor::ConversationsLiveBefore { .. }
+                                | Cursor::ConversationsStart,
+                            )
+                            | None => None,
                         },
                     };
                     Some(Cursor::Store { scope, after })
@@ -255,6 +267,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
             };
             return Answer::Page(Box::new(Page {
                 rows,
+                before: None,
                 next,
                 cut: false,
                 inbox_selection: match value.selection {
@@ -264,10 +277,12 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
             }));
         }
         Document::Conversations(value) => {
+            let next = super::conversations_cursor(&value);
+            let before = super::cursors::live_prefix(read, &value);
             for row in value.lines.into_boxed() {
                 rows.push(PageRow::Conversation(row)).expect("live conversations fit");
             }
-            (Scope::Conversations, value.next)
+            return Answer::Page(Box::new(Page { rows, before, next: Some(next), cut: false, inbox_selection: None }));
         }
         Document::Goals(value) => {
             let project = match read {
@@ -317,7 +332,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, _party: u64, read: &Read, 
         Some(after) => Cursor::Live { scope: page_scope, after, store_after: None },
         None => Cursor::Store { scope: page_scope, after: None },
     };
-    Answer::Page(Box::new(Page { rows, next: Some(next), cut: false, inbox_selection: None }))
+    Answer::Page(Box::new(Page { rows, before: None, next: Some(next), cut: false, inbox_selection: None }))
 }
 
 /// Stable address supplied by the owning record, never by a client row number.
@@ -400,12 +415,11 @@ fn ended(task: &tasks::TaskRecord) -> bool {
     }
 }
 
-#[expect(clippy::manual_map, reason = "the strict subset uses an exhaustive match rather than a closure")]
 pub(super) fn from_store(
     core: &Core,
     limits: &Limits,
     range: &Range,
-    raw: Box<[Row]>,
+    mut raw: Box<[Row]>,
     next: Option<Position>,
 ) -> Answer {
     if raw.len() > usize::try_from(range.rows).expect("row bound fits") {
@@ -446,13 +460,12 @@ pub(super) fn from_store(
             return Answer::None(Why::Unknown);
         }
     }
+    let (before, next) = super::cursors::stored_edges(core, limits, range, &raw, next);
+    if range.scope == Scope::Conversations && !range.backwards {
+        raw.reverse();
+    }
     let mut page = Page {
-        rows: List::with_capacity(range.rows),
-        next: match next {
-            Some(after) => Some(Cursor::Store { scope: range.scope.clone(), after: Some(after) }),
-            None => None,
-        },
-        cut: false,
+        rows: List::with_capacity(range.rows), before, next, cut: false,
         inbox_selection: inbox_contexts(&range.scope, range.rows),
     };
     for row in raw {

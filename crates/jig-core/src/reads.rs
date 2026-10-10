@@ -20,6 +20,8 @@ pub use vocabulary::{
 };
 mod rows;
 pub use rows::row_key;
+mod cursors;
+pub use cursors::conversations_cursor;
 
 use crate::documents::{self, DocumentClock, Missing, Subject, Window};
 use crate::{Core, Held, Limits, Request, Requests};
@@ -252,34 +254,69 @@ fn bounded_query(read: &Read, limits: &Limits) -> bool {
     }
 }
 
+struct ReadStart {
+    after_live: Option<documents::Cursor>,
+    after_store: Option<Position>,
+    stored: bool,
+    live_before: Option<documents::Cursor>,
+    reverse_live: bool,
+}
+
+fn read_start(read: &Read, party: u64) -> Option<ReadStart> {
+    let target = scope(read);
+    let mut live_before = None;
+    let mut reverse_live = false;
+    let mut after_live = None;
+    let mut after_store = None;
+    let mut stored = false;
+    match cursor(read) {
+        Some(Cursor::Live { scope, after, store_after }) => {
+            if Some(scope) != target.as_ref() {
+                return None;
+            }
+            subject(read, party)?;
+            after_live = Some(*after);
+            after_store.clone_from(store_after);
+        }
+        Some(Cursor::ConversationsBefore { before }) => {
+            if target != Some(Scope::Conversations) {
+                return None;
+            }
+            stored = true;
+            after_store = Some(before.clone());
+        }
+        Some(Cursor::ConversationsLiveBefore { before }) => {
+            if target != Some(Scope::Conversations) {
+                return None;
+            }
+            live_before = *before;
+            reverse_live = true;
+        }
+        Some(Cursor::ConversationsStart) if target != Some(Scope::Conversations) => return None,
+        Some(Cursor::Store { scope, after }) => {
+            if Some(scope) != target.as_ref() {
+                return None;
+            }
+            stored = true;
+            after_store.clone_from(after);
+        }
+        Some(Cursor::ConversationsStart) | None => {}
+    }
+    Some(ReadStart { after_live, after_store, stored, live_before, reverse_live })
+}
+
 fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, party: u64, read: Read) -> Requests {
     if !bounded_query(&read, &env.limits) {
         return terminal(reply, Answer::None(Why::Busy));
     }
     let target = scope(&read);
-    let mut after_live = None;
-    let mut after_store = None;
-    let mut stored = false;
-    match cursor(&read) {
-        Some(Cursor::Live { scope, after, store_after }) => {
-            if Some(scope) != target.as_ref() {
-                return terminal(reply, Answer::None(Why::Unknown));
-            }
-            if subject(&read, party).is_none() {
-                return terminal(reply, Answer::None(Why::Unknown));
-            }
-            after_live = Some(*after);
-            after_store.clone_from(store_after);
-        }
-        Some(Cursor::Store { scope, after }) => {
-            if Some(scope) != target.as_ref() {
-                return terminal(reply, Answer::None(Why::Unknown));
-            }
-            stored = true;
-            after_store.clone_from(after);
-        }
-        None => {}
+    let Some(start) = read_start(&read, party) else {
+        return terminal(reply, Answer::None(Why::Unknown));
+    };
+    if start.reverse_live {
+        return terminal(reply, cursors::live_before(core, env, party, start.live_before.as_ref()));
     }
+    let ReadStart { after_live, after_store, stored, live_before: _, reverse_live: _ } = start;
     if let Some(position) = &after_store
         && match &target {
             Some(scope) => !rows::position_allowed(scope, position),
@@ -320,7 +357,16 @@ fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, p
     }
     let range = Range {
         party,
-        backwards: backwards(&scope),
+        backwards: match cursor(&read) {
+            Some(Cursor::ConversationsBefore { .. }) => false,
+            Some(
+                Cursor::ConversationsLiveBefore { .. }
+                | Cursor::ConversationsStart
+                | Cursor::Live { .. }
+                | Cursor::Store { .. },
+            )
+            | None => backwards(&scope),
+        },
         scope,
         after: after_store,
         rows: env.limits.documents.rows,
@@ -371,6 +417,7 @@ pub fn answer_worst_case(limits: &Limits) -> Option<u64> {
             .checked_mul(u64::from(limits.documents.rows).checked_add(3)?)?
             .checked_add(limits.load_bytes.checked_mul(2)?)?
             .checked_add(List::<PageRow>::worst_case(limits.documents.rows)?)?
+            .checked_add(u64::try_from(size_of::<Page>()).ok()?)?
             .checked_add(query_worst_case(limits)?)?,
     )
 }
@@ -395,5 +442,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.load_slots).checked_add(3)?.checked_mul(query_worst_case(limits)?)?)?
         .checked_add(u64::from(limits.load_slots).checked_mul(u64::try_from(size_of::<Position>()).ok()?)?)?
         .checked_add(limits.load_bytes)?
+        // Reverse live reads retain one bounded tail while making producer pages.
+        .checked_add(Queue::<PageRow>::worst_case(limits.documents.rows)?)?
         .checked_add(answer_worst_case(limits)?)
 }

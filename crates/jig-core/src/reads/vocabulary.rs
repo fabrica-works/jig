@@ -112,6 +112,12 @@ pub enum Cursor {
     Live { scope: Scope, after: documents::Cursor, store_after: Option<Position> },
     /// Exclusive owner key; `None` starts the stored portion after live rows.
     Store { scope: Scope, after: Option<Position> },
+    /// Preceding stored conversations, before this examined owner key.
+    ConversationsBefore { before: Position },
+    /// Earlier live conversations; absent position starts from the live tail.
+    ConversationsLiveBefore { before: Option<documents::Cursor> },
+    /// The original conversation list, beginning with its live rows.
+    ConversationsStart,
 }
 
 /// One document or bounded page, without a request key.
@@ -272,6 +278,8 @@ pub enum PageRow {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Page {
     pub rows: List<PageRow>,
+    /// Conversation prefix continuation; other scopes supply none.
+    pub before: Option<Cursor>,
     pub next: Option<Cursor>,
     pub cut: bool,
     /// Complete original membership contexts for Inbox rows only, when supplied.

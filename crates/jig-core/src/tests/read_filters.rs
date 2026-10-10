@@ -253,6 +253,11 @@ fn each_inbox_kind_selects_its_owner_objects_and_the_cursor_keeps_that_kind() {
             match &from {
                 Some(reads::Cursor::Live { .. }) => {}
                 Some(reads::Cursor::Store { .. }) | None => break,
+                Some(
+                    reads::Cursor::ConversationsBefore { .. }
+                    | reads::Cursor::ConversationsLiveBefore { .. }
+                    | reads::Cursor::ConversationsStart,
+                ) => panic!("inbox cursor scope"),
             }
         }
         assert_eq!(found.into_boxed().as_ref(), [expected], "{group:?} selects its exact owner kind");

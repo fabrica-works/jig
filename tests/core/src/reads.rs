@@ -294,6 +294,10 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 inbox: None,
             })
         }
+        reads::Scope::Conversations => {
+            let core::Record::Tasks(tasks::Stored::Ended(owner)) = value else { return None };
+            Some(row(store, value, owner))
+        }
         reads::Scope::Turn { task, attempt, turn } => {
             let core::Record::Core(core::CoreRecord::Turn(line)) = value else { return None };
             if line.task != *task || line.attempt != *attempt || line.turn != *turn {
@@ -315,7 +319,6 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 | reads::Group::PersonTasks,
             ..
         }
-        | reads::Scope::Conversations
         | reads::Scope::Goals { .. }
         | reads::Scope::Spend { .. } => None,
     }
