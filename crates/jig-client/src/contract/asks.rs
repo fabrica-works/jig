@@ -106,6 +106,10 @@ pub struct Decider {
 }
 
 /// Every jig request, without keys owned by the root table.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "whole amendments remain inline; the keyed payload envelope prices the largest variant"
+)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ask {
     /// Start a chat.
