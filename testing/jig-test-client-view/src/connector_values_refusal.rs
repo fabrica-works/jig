@@ -3,9 +3,8 @@
 use jig_client::contract as client;
 use jig_test_client_domain::connector_values::application_core as owner;
 
-#[expect(clippy::manual_map, reason = "step code uses exhaustive matches without closures")]
-pub(super) fn refusal(value: owner::Refusal) -> client::Refusal {
-    match value {
+pub(super) fn refusal(value: owner::Refusal) -> Option<client::Refusal> {
+    Some(match value {
         owner::Refusal::Disposal { task, issue } => client::Refusal::Disposal {
             task,
             issue: match issue {
@@ -14,12 +13,9 @@ pub(super) fn refusal(value: owner::Refusal) -> client::Refusal {
                 owner::DisposalIssue::Repeated => client::DisposalIssue::Repeated,
             },
         },
-        owner::Refusal::Role { held } => client::Refusal::Role {
-            held: match held {
-                Some(role) => Some(client::HeldRole::Policy { role }),
-                None => None,
-            },
-        },
+        // A raw connector role supplies no client policy-role category.
+        // The owner renderer shows this complete fact directly.
+        owner::Refusal::Role { .. } => return None,
         owner::Refusal::Authority { lacking, proposable } => {
             client::Refusal::Authority { lacking: lack(lacking), proposable }
         }
@@ -44,7 +40,7 @@ pub(super) fn refusal(value: owner::Refusal) -> client::Refusal {
         owner::Refusal::Unknown => client::Refusal::Unknown,
         owner::Refusal::NotOffered => client::Refusal::NotOffered,
         owner::Refusal::KeyConflict => client::Refusal::KeyConflict,
-    }
+    })
 }
 fn lack(value: owner::Lack) -> client::Lacking {
     match value {

@@ -547,6 +547,8 @@ fn connector_values_view_exact_core_refusals_cover_all_admission_categories_and_
             &[b"18446744073709551615", label],
         );
     }
+    assert_eq!(crate::connector_values_refusal::refusal(Refusal::Role { held: Some(u32::MAX) }), None);
+    assert_eq!(crate::connector_values_refusal::refusal(Refusal::Role { held: None }), None);
     for (why, label) in [
         (Refusal::Role { held: None }, b"No held role was supplied".as_slice()),
         (Refusal::Role { held: Some(u32::MAX) }, b"Held connector role: 4294967295"),
@@ -599,14 +601,17 @@ fn connector_values_view_all_sparse_authority_categories_keep_absent_requested_f
             lacking: Lack::Tasks { left: 9 },
             proposable: None
         }),
-        ClientRefusal::Authority { lacking: Lacking::Tasks { needed: None, left: 9 }, proposable: None }
+        Some(ClientRefusal::Authority { lacking: Lacking::Tasks { needed: None, left: 9 }, proposable: None })
     );
     assert_eq!(
         crate::connector_values_refusal::refusal(Refusal::Authority {
             lacking: Lack::Deadline,
             proposable: Some(true)
         }),
-        ClientRefusal::Authority { lacking: Lacking::Deadline { asked: None, latest: None }, proposable: Some(true) }
+        Some(ClientRefusal::Authority {
+            lacking: Lacking::Deadline { asked: None, latest: None },
+            proposable: Some(true)
+        })
     );
 }
 #[test]
