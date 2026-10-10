@@ -802,6 +802,15 @@ fields!(Host { number, connected, grace, used, free, runs, refused });
 fields!(Account { number, usable, reason, runs, waiting });
 fields!(Capacity { project, live, limit });
 fields!(HistoryLine { position, task, by, at, change });
+impl Payload for jig_client::contract::HistoryRow {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Legacy(value) => value.heap(bounds),
+            Self::Change(value) => value.heap(bounds),
+            Self::Milestone(value) => value.heap(bounds),
+        }
+    }
+}
 impl Payload for HistoryChange {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {

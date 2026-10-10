@@ -4,7 +4,7 @@
 //! See client/domain/client.md, 7. Row owners supply cursors for re-reading drops.
 use crate::{
     action::End,
-    contract::{ActivityLine, ConversationLine, Cursor, HistoryLine, ObjectKey},
+    contract::{ActivityLine, ConversationLine, Cursor, HistoryRow, ObjectKey},
 };
 use skein_lib::List;
 
@@ -247,7 +247,7 @@ fn move_turnwindow(rows: List<ActivityLine>, start: u32, count: u32, out: &mut L
 pub struct HistoryWindow {
     /// A retained read reported page loss; independent from its row edges.
     pub cut: bool,
-    pub rows: List<HistoryLine>,
+    pub rows: List<HistoryRow>,
     pub edges: Edges,
 }
 impl HistoryWindow {
@@ -257,7 +257,7 @@ impl HistoryWindow {
         Self { cut: false, rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
     }
     /// Slides from one end, returning the number dropped from the other.
-    pub fn slide(&mut self, incoming: List<HistoryLine>, incoming_edges: Edges, end: End) -> u32 {
+    pub fn slide(&mut self, incoming: List<HistoryRow>, incoming_edges: Edges, end: End) -> u32 {
         let capacity = self.rows.capacity();
         let empty = self.rows.is_empty();
         let slide = plan(self.rows.len(), incoming.len(), capacity, end);
@@ -279,7 +279,7 @@ impl HistoryWindow {
         slide.dropped
     }
     /// Adds live rows only if this window reaches their end.
-    pub fn live(&mut self, incoming: List<HistoryLine>, incoming_edges: Edges, end: End) -> bool {
+    pub fn live(&mut self, incoming: List<HistoryRow>, incoming_edges: Edges, end: End) -> bool {
         if !self.edges.reaches(end) {
             return false;
         }
@@ -290,7 +290,7 @@ impl HistoryWindow {
         true
     }
 }
-fn move_historywindow(rows: List<HistoryLine>, start: u32, count: u32, out: &mut List<HistoryLine>) {
+fn move_historywindow(rows: List<HistoryRow>, start: u32, count: u32, out: &mut List<HistoryRow>) {
     let until = start.saturating_add(count);
     for (index, row) in rows.into_boxed().into_iter().enumerate() {
         let index = u32::try_from(index).expect("a bounded list index fits u32");
@@ -306,6 +306,6 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let mut total = List::<ObjectKey>::worst_case(limits.rows)?;
     total = total.checked_add(List::<ConversationLine>::worst_case(limits.rows)?)?;
     total = total.checked_add(List::<ActivityLine>::worst_case(limits.rows)?)?;
-    total = total.checked_add(List::<HistoryLine>::worst_case(limits.rows)?)?;
+    total = total.checked_add(List::<HistoryRow>::worst_case(limits.rows)?)?;
     total.checked_mul(2)?.checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(6)?)
 }

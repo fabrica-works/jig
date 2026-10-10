@@ -59,8 +59,14 @@ fn activity(position: u64) -> ActivityLine {
         event: Activity::Decision { object: ObjectKey::Task(1), by: Actor::Party(7), how: Decision::Accepted },
     }
 }
-fn history(position: u64) -> HistoryLine {
-    HistoryLine { position, task: 1, by: Actor::Party(7), at: Wall::EPOCH, change: HistoryChange::Released }
+fn history(position: u64) -> HistoryRow {
+    HistoryRow::Legacy(Box::new(HistoryLine {
+        position,
+        task: 1,
+        by: Actor::Party(7),
+        at: Wall::EPOCH,
+        change: HistoryChange::Released,
+    }))
 }
 
 #[test]

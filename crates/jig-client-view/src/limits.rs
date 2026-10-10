@@ -111,7 +111,7 @@ impl Limits {
         let text_per_node = phrase
             .checked_mul(2)?
             .checked_add(client.text.checked_mul(2)?)?
-            .max(crate::literal_segment::max_bytes(client.text)?);
+            .max(crate::literal_segment::max_bytes(client.text)?.checked_mul(2)?);
         Some(Self {
             nodes,
             // Page, card/input result, verdict proposal, and its deepest

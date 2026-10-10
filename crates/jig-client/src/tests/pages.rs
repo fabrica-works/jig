@@ -637,13 +637,13 @@ fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
     };
     let cursor = Cursor { value: text(b"opaque history edge") };
     let mut rows = List::with_capacity(1);
-    rows.push(HistoryLine {
+    rows.push(HistoryRow::Legacy(Box::new(HistoryLine {
         position: 1,
         task: 9,
         by: Actor::Party(7),
         at: skein_lib::Wall::EPOCH,
         change: HistoryChange::Released,
-    })
+    })))
     .unwrap();
     let page = HistoryPage { cut: false, rows, before: None, after: Some(cursor.clone()) };
     drive(

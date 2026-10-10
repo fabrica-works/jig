@@ -297,12 +297,14 @@ fn history(words: &Words) {
                 read,
                 result: ReadResult::Value(ReadValue::History(Box::new(HistoryPage {
                     cut: false,
-                    rows: list(changes.iter().enumerate().map(|(index, change)| HistoryLine {
-                        position: u64::try_from(page.checked_mul(2).unwrap().checked_add(index).unwrap()).unwrap(),
-                        task: 8,
-                        by: Actor::Party(1),
-                        at: Wall::EPOCH,
-                        change: change.clone(),
+                    rows: list(changes.iter().enumerate().map(|(index, change)| {
+                        HistoryRow::Legacy(Box::new(HistoryLine {
+                            position: u64::try_from(page.checked_mul(2).unwrap().checked_add(index).unwrap()).unwrap(),
+                            task: 8,
+                            by: Actor::Party(1),
+                            at: Wall::EPOCH,
+                            change: change.clone(),
+                        }))
                     })),
                     before: Some(Cursor { value: text(b"before") }),
                     after: Some(Cursor { value: text(b"after") }),

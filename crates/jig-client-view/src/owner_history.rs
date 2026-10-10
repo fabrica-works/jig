@@ -128,20 +128,25 @@ pub fn required(value: &OwnerHistoryLine, limits: &Limits, words: &Words) -> Opt
     }
     worst_case(limits, words)
 }
-/// Finite nested envelope; raw reference bindings never acquire an application scope.
+/// Finite whole-node envelope reused by bounded history pages.
 #[must_use]
-pub fn worst_case(limits: &Limits, words: &Words) -> Option<HistoryFragment> {
-    let amendment = crate::owner_amendment::worst_case(limits, words)?;
-    let authority = crate::owner_authority::worst_case_words(limits.rows, limits.text, words)?;
+pub fn max_nodes(limits: &Limits) -> Option<u32> {
+    let amendment = crate::owner_amendment::max_nodes(limits)?;
+    let authority = crate::owner_authority::document_nodes(limits.rows)?;
     let batch = limits.rows.checked_mul(crate::sizes::proposed_task_nodes(limits)?)?;
     let delta = crate::specification::nodes(limits)?
-        .checked_add(authority.nodes)?
+        .checked_add(authority)?
         .checked_add(crate::markdown::max_nodes(limits.text)?.checked_mul(2)?)?
         .checked_add(limits.rows)?
         .checked_add(crate::owner_wake::policy_nodes())?
         .checked_add(30)?;
-    let effect = crate::proposed_task::part_nodes(limits)?.checked_add(authority.nodes)?.checked_add(8)?;
-    let nodes = 100_u32.checked_add(amendment.nodes.checked_mul(2)?)?.checked_add(batch.max(delta).max(effect))?;
+    let effect = crate::proposed_task::part_nodes(limits)?.checked_add(authority)?.checked_add(8)?;
+    100_u32.checked_add(amendment.checked_mul(2)?)?.checked_add(batch.max(delta).max(effect))
+}
+/// Finite nested envelope; raw reference bindings never acquire an application scope.
+#[must_use]
+pub fn worst_case(limits: &Limits, words: &Words) -> Option<HistoryFragment> {
+    let nodes = max_nodes(limits)?;
     let mut phrase = crate::owner_words::phrase_bytes(&words.book)?;
     for saying in crate::phrases::jig::ALL {
         phrase = phrase.max(words.book.capacity(saying.id())?);

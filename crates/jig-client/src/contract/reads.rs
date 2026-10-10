@@ -1,7 +1,7 @@
 //! One-terminal reads, bounded pages and opaque cursors; client/domain/contract.md, 6.
 //! A cursor is never decoded by the client. Live watches may overlap retained read pages.
 use super::{
-    ActivityLine, ConversationLine, Deployment, Escalation, Frame, GoalLine, HistoryLine, InboxEntry, InboxGroup, Note,
+    ActivityLine, ConversationLine, Deployment, Escalation, Frame, GoalLine, HistoryRow, InboxEntry, InboxGroup, Note,
     NoteScope, PersonTask, Project, Proposal, ProposalKey, Question, Result, Task, Text,
 };
 use alloc::boxed::Box;
@@ -113,7 +113,7 @@ pub struct ActivityPage {
 pub struct HistoryPage {
     /// The source page is incomplete, independent of row loss and continuations.
     pub cut: bool,
-    pub rows: List<HistoryLine>,
+    pub rows: List<HistoryRow>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
 }

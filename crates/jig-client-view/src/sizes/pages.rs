@@ -70,7 +70,9 @@ fn overview(l: &Limits) -> Option<u32> {
         .checked_add(24)
 }
 fn history(l: &Limits) -> Option<u32> {
-    markdown(l)?.checked_mul(2)?.checked_add(authority(l)?)?.checked_add(24)?.checked_mul(l.rows)?.checked_add(18)
+    let legacy = markdown(l)?.checked_mul(2)?.checked_add(authority(l)?)?.checked_add(24)?;
+    let row = legacy.max(crate::owner_history::max_nodes(l)?).max(crate::owner_milestone::max_nodes(l)?);
+    row.checked_add(3)?.checked_mul(l.rows)?.checked_add(18)
 }
 /// Task header, lineage and the largest available executor section.
 #[must_use]

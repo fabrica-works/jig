@@ -78,17 +78,21 @@ pub fn required(value: &OwnerAmendmentState, limits: &Limits, words: &Words) -> 
     authority_fits(&value.authority, limits)?;
     worst_case(limits, words)
 }
+/// Finite whole-node envelope shared by standalone and enclosing page renderers.
+#[must_use]
+pub fn max_nodes(limits: &Limits) -> Option<u32> {
+    20_u32
+        .checked_add(crate::markdown::max_nodes(limits.text)?)?
+        .checked_add(crate::specification::nodes(limits)?)?
+        .checked_add(crate::owner_authority::document_nodes(limits.rows)?)?
+        .checked_add(limits.rows)
+}
 /// Configured envelope; it does not attest that an absent field was supplied.
 /// The authority fragment includes escaped opaque pattern bytes; other fragment
 /// bounds include Markdown, per-text loss, specification arrays and wake facts.
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<AmendmentFragment> {
-    let authority = crate::owner_authority::worst_case_words(limits.rows, limits.text, words)?;
-    let nodes = 20_u32
-        .checked_add(crate::markdown::max_nodes(limits.text)?)?
-        .checked_add(crate::specification::nodes(limits)?)?
-        .checked_add(authority.nodes)?
-        .checked_add(limits.rows)?;
+    let nodes = max_nodes(limits)?;
     let mut phrase_bytes = crate::owner_words::phrase_bytes(&words.book)?;
     for phrase in crate::phrases::jig::ALL {
         phrase_bytes = phrase_bytes.max(words.book.capacity(phrase.id())?);

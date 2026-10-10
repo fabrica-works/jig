@@ -1,8 +1,8 @@
 //! Retained rows and scoped opaque cursors; contract.md, 6.
 use crate::{Bounds, Engine, Invalid, Up, payload};
 use jig_client::contract::{
-    ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryLine,
-    HistoryPage, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Note, NotePage, NoteScope, ObjectKey, ObjectPage,
+    ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryPage,
+    HistoryRow, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Note, NotePage, NoteScope, ObjectKey, ObjectPage,
     Read, ReadNone, ReadResult, ReadValue, Result, SpendPage, SpendPeriod, Text,
 };
 use skein_lib::{List, Time, Token};
@@ -12,7 +12,7 @@ use skein_lib::{List, Time, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Rows {
     Ended(Vec<Result>),
-    History(Vec<HistoryLine>),
+    History(Vec<HistoryRow>),
     Activity(Vec<ActivityLine>),
     Inbox(Vec<InboxEntry>),
     Conversations(Vec<ConversationLine>),

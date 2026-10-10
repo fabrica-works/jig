@@ -639,20 +639,20 @@ fn fill_history(d: &mut Domain, read: Token) {
             result: ReadResult::Value(ReadValue::History(Box::new(HistoryPage {
                 cut: false,
                 rows: list([
-                    HistoryLine {
+                    HistoryRow::Legacy(Box::new(HistoryLine {
                         position: 2,
                         task: 8,
                         by: Actor::Party(1),
                         at: Wall::EPOCH,
                         change: HistoryChange::Amended { before: full(), after: full() },
-                    },
-                    HistoryLine {
+                    })),
+                    HistoryRow::Legacy(Box::new(HistoryLine {
                         position: 1,
                         task: 9,
                         by: Actor::Party(1),
                         at: Wall::EPOCH,
                         change: HistoryChange::Amended { before: full(), after: full() },
-                    },
+                    })),
                 ]),
                 before: Some(Cursor { value: full() }),
                 after: Some(Cursor { value: full() }),
