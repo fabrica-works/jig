@@ -42,3 +42,27 @@ fn a_worlds_sole_watcher_reopens_from_an_unwatched_retry_without_a_replay_source
     } if *turn == name(1) && text.as_ref() == b"retained")));
     world.settle();
 }
+
+#[test]
+fn world_run_admission_survives_detach_and_late_text_starts_when_an_ended_run_frees_room() {
+    let mut limits = jig_views_world::LIMITS;
+    limits.runs = 1;
+    let mut world = World::new(limits);
+    world.text(7, name(0), b"first", None);
+    world.text(8, name(0), b"old", None);
+    open(&mut world, 1);
+    let second = world.watch_from(2, 8, Some(Follow { run: Token::new(8), turn: None, offset: 0 }));
+    assert!(!second.iter().any(|request| matches!(request, Request::Refused { .. } | Request::Stream { .. })));
+    world.settle();
+    assert_eq!(
+        world.step(Event::Unwatch { watcher: Token::new(1) }),
+        vec![Request::Ended { watcher: Token::new(1), end: End::Unwatched }]
+    );
+    assert!(world.text(8, name(0), b"later", None).is_empty(), "detaching does not free retained admission");
+    world.step(Event::RunEnded { run: Token::new(7) });
+    let late = world.text(8, name(0), b"kept", None);
+    assert!(late.iter().any(|request| matches!(request, Request::Stream {
+        watcher, turn, from: 8, to: 12, text, cut: true, ..
+    } if *watcher == Token::new(2) && *turn == name(0) && text.as_ref() == b"kept")));
+    world.settle();
+}

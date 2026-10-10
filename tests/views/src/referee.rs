@@ -107,8 +107,8 @@ impl Expectations for Checks {
                 }
                 assert!(parties.values().all(|count| *count <= self.limits.watchers_per_party), "party watch capacity");
                 assert!(
-                    runs.len() <= usize::try_from(self.limits.runs).expect("run capacity"),
-                    "followed run capacity"
+                    runs.len() <= usize::try_from(self.limits.watchers).expect("watch capacity"),
+                    "followed runs are bounded by open watches, independently of retained-run admission"
                 );
             }
             Seen::Make { watcher, subject, window } => {
