@@ -275,7 +275,7 @@ fn task() -> Task {
         result: None,
         delegates: list([]),
 
-        context: Some(Box::new(jig_client::contract::TaskContext {
+        context: Some(Box::new(TaskContext {
             escalation: None,
             parts: list([]),
             closing: None,
