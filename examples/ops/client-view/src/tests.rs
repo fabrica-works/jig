@@ -697,7 +697,7 @@ fn a_common_entrance_refusal_prints_supplied_budget_facts_without_claiming_gone(
 
 #[test]
 fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys_distinct() {
-    for scope in [PartScope::Project(91), PartScope::Deployment] {
+    for scope in [PartScope::Project(0), PartScope::Project(u32::MAX), PartScope::Project(91), PartScope::Deployment] {
         let mut root = ready();
         let rows = drive(
             &mut root,
@@ -750,7 +750,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
         build(&mut view, &root, &mut patches);
         let value = match scope {
             PartScope::Project(project) => u64::from(project),
-            PartScope::Deployment => 0,
+            PartScope::Deployment => u64::MAX,
         };
         let expected_key =
             jig_client_view::Key { owner: jig_client_view::Owner::Side { connector: 2 }, kind: 6, a: value, b: 17 };
