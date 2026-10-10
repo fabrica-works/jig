@@ -160,7 +160,7 @@ pub fn task() -> Task {
         lineage_chips: list([]),
         inputs: list([]),
         project: 1,
-        requester: Actor::Party(7),
+        requester: jig_client::contract::OwnerRequester::Person(7),
         lineage: list([]),
         spec: specification(text(b"spec")),
         spec_revision: Revision { value: 1 },
@@ -170,6 +170,7 @@ pub fn task() -> Task {
         wake: WakePolicy { words: false, results: false, topics: list([]), subscriptions: list([]) },
         result_contract: ResultContract::Report,
         dependencies: list([]),
+        cut: false,
         references: list([]),
         resources: list([]),
         budget: budget(),
@@ -724,7 +725,7 @@ fn incident_delegate() -> Task {
     delegate.chip.title = DocumentText::complete(text(b"Delegate ten"));
     delegate.chip.details =
         Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 } });
-    delegate.requester = Actor::Task(9);
+    delegate.requester = OwnerRequester::Task(9);
     delegate.parts = list([Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 }]);
     delegate.proposals = list([proposal().key]);
     delegate

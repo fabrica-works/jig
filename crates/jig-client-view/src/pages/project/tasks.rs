@@ -78,7 +78,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         if let Some(id) = client.objects().find(ObjectKey::Task(row.chip.task)) {
             cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
         }
-        words.actor(b, row.requester);
+        crate::owner_result::requester(b, row.requester, words);
         words.wall(b, row.changed);
         if let Some(goal) = row.goal {
             crate::frame::control(

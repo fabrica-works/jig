@@ -1,7 +1,7 @@
 //! One in-flight document and a dirty mark per watch; contract.md, 7.
 use crate::{Engine, Invalid, Rows, Up, payload, reads::list};
 use jig_client::contract::{
-    Actor, Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, Phase, ProvisionalTurnName, Read,
+    Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, OwnerRequester, Phase, ProvisionalTurnName, Read,
     ReadValue, RunState, RunText, Subject, TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
 };
 use skein_lib::{Time, Token, Wall};
@@ -276,7 +276,7 @@ impl<A: crate::Application> Engine<A> {
                 let mut rows = Vec::new();
                 for doc in self.truth.objects.values() {
                     if let ReadValue::Task(task) = doc {
-                        let asked_by_me = task.requester == Actor::Party(party);
+                        let asked_by_me = task.requester == OwnerRequester::Person(party);
                         let goal = task
                             .lineage
                             .iter()

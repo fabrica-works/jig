@@ -281,7 +281,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     task.instructions = Some(DocumentText { bytes: full_text(), cut: true });
     task.wake = full_wake();
     task.authority = full_authority();
-    task.dependencies = list([full_chip(9), full_chip(10)]);
+    task.dependencies = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
     task.delegates = list([
         LiveDelegate { chip: full_chip(9), takeover_budget: 10 },
         LiveDelegate { chip: full_chip(10), takeover_budget: 20 },

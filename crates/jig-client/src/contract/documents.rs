@@ -154,9 +154,9 @@ pub struct Task {
     pub goal: bool,
     pub priority: Option<u32>,
     pub lineage_chips: List<Chip>,
-    pub inputs: List<Chip>,
+    pub inputs: List<super::OwnerTaskLink>,
     pub project: u32,
-    pub requester: Actor,
+    pub requester: super::OwnerRequester,
     pub lineage: List<u64>,
     pub spec: super::SpecificationDocument,
     pub spec_revision: Revision,
@@ -168,8 +168,10 @@ pub struct Task {
     pub instructions: Option<DocumentText>,
     pub wake: WakePolicy,
     pub result_contract: ResultContract,
-    pub dependencies: List<Chip>,
-    pub references: List<Chip>,
+    pub dependencies: List<super::OwnerTaskLink>,
+    pub references: List<super::OwnerTaskLink>,
+    /// At least one task list was omitted; this does not identify which list.
+    pub cut: bool,
     pub resources: List<Part>,
     pub budget: Budget,
     pub authority: Authority,
@@ -1013,7 +1015,7 @@ pub struct TaskLine {
     pub asked_by_me: bool,
     pub chip: Chip,
     pub goal: Option<u64>,
-    pub requester: Actor,
+    pub requester: super::OwnerRequester,
     pub changed: Wall,
 }
 /// Bounded live project tasks in last-change order.

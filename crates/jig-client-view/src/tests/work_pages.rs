@@ -74,8 +74,8 @@ pub(super) fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Req
     doc.chip.executor = executor;
     doc.resources = list([part()]);
     doc.parts = list([part()]);
-    doc.inputs = list([chip(9)]);
-    doc.dependencies = list([chip(9)]);
+    doc.inputs = list([OwnerTaskLink::Live(chip(9))]);
+    doc.dependencies = list([OwnerTaskLink::Live(chip(9))]);
     let mut outputs = deliver(&mut d, watch, Delivery::Task(Box::new(doc)));
     outputs.extend(out);
     (d, outputs)
@@ -361,7 +361,7 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                         rows: list([TaskLine {
                             chip: chip(8),
                             goal: Some(8),
-                            requester: Actor::Party(1),
+                            requester: OwnerRequester::Person(1),
                             changed: Wall::EPOCH,
                             asked_by_me: true,
                         }]),

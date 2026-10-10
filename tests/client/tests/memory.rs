@@ -17,10 +17,13 @@ fn full_task() -> jig_client::contract::Task {
     );
     task.spec.specification.words.bytes = stories::text(&[b's'; 32]);
     task.instructions = Some(jig_client::contract::DocumentText::complete(stories::text(&[b'i'; 32])));
-    task.dependencies = jig_client_world::test::list([task.chip.clone(), task.chip.clone()]);
+    task.dependencies = jig_client_world::test::list([
+        jig_client::contract::OwnerTaskLink::Live(task.chip.clone()),
+        jig_client::contract::OwnerTaskLink::Live(task.chip.clone()),
+    ]);
     task.references = task.dependencies.clone();
     task.inputs = task.dependencies.clone();
-    task.lineage_chips = task.dependencies.clone();
+    task.lineage_chips = jig_client_world::test::list([task.chip.clone(), task.chip.clone()]);
     task.delegates = jig_client_world::test::list([
         jig_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
         jig_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },

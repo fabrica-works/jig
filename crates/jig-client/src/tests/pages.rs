@@ -1118,7 +1118,7 @@ fn project_task_filters_and_spend_pages() {
     rows.push(TaskLine {
         chip: tree_node(8, Phase::Running, 0).chip,
         goal: Some(10),
-        requester: Actor::Party(7),
+        requester: OwnerRequester::Person(7),
         asked_by_me: true,
         changed: skein_lib::Wall::from_nanos(1),
     })
@@ -1126,7 +1126,7 @@ fn project_task_filters_and_spend_pages() {
     rows.push(TaskLine {
         chip: tree_node(9, Phase::Running, 0).chip,
         goal: Some(10),
-        requester: Actor::Party(8),
+        requester: OwnerRequester::Person(8),
         asked_by_me: false,
         changed: skein_lib::Wall::from_nanos(2),
     })

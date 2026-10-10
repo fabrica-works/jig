@@ -12,6 +12,8 @@ pub enum JigPhrase {
     NoteWriterTask,
     /// No changed time was supplied for this note.
     NoteChangedNotSupplied,
+    /// Some owner task lists were omitted.
+    TaskListsCut,
     ResourceSegments,
     LiteralGrant,
     LiteralGrantMissing,
@@ -1065,6 +1067,7 @@ impl JigPhrase {
             Self::NoteWriterParty => 634,
             Self::NoteWriterTask => 635,
             Self::NoteChangedNotSupplied => 636,
+            Self::TaskListsCut => 637,
             Self::ResourceSegments => 630,
             Self::LiteralGrant => 631,
             Self::LiteralGrantMissing => 632,
@@ -1684,6 +1687,7 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
             Self::NoteChangedNotSupplied
+            | Self::TaskListsCut
             | Self::FramePerson
             | Self::FrameService
             | Self::FrameProjectsCut
@@ -2312,10 +2316,11 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 599] = [
+pub const ALL: [JigPhrase; 600] = [
     JigPhrase::NoteWriterParty,
     JigPhrase::NoteWriterTask,
     JigPhrase::NoteChangedNotSupplied,
+    JigPhrase::TaskListsCut,
     JigPhrase::ResourceSegments,
     JigPhrase::LiteralGrant,
     JigPhrase::LiteralGrantMissing,

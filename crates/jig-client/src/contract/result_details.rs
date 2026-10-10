@@ -36,6 +36,17 @@ pub enum OwnerTaskLink {
     Stored { number: u64, status: Option<OwnerTaskStatus> },
 }
 
+impl OwnerTaskLink {
+    /// The supplied task identity, including references without a chip.
+    #[must_use]
+    pub const fn number(&self) -> u64 {
+        match self {
+            Self::Live(chip) | Self::Retained { chip, .. } => chip.task,
+            Self::Stored { number, .. } => *number,
+        }
+    }
+}
+
 /// Result owner facts, separate from its value, ending, timestamp and acts.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ResultDetails {

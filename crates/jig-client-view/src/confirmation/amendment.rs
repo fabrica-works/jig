@@ -109,6 +109,20 @@ pub fn form(
     words.text(b, JigPhrase::Before, &[]);
     proposal::amendment(b, &before, words, bindings);
     loss(b, object, words);
+    match &object.body {
+        Some(Body::Task(doc)) if doc.cut => words.text(b, JigPhrase::TaskListsCut, &[]),
+        Some(
+            Body::Task(_)
+            | Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Escalation(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => {}
+    }
     let empty = empty();
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     let value = values(&before, change);
@@ -230,10 +244,10 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
         words.text(b, JigPhrase::SpecificationCut, &[]);
     }
 }
-fn numbers(chips: &skein_lib::List<jig_client::contract::Chip>) -> skein_lib::List<u64> {
+fn numbers(chips: &skein_lib::List<jig_client::contract::OwnerTaskLink>) -> skein_lib::List<u64> {
     let mut numbers = skein_lib::List::with_capacity(chips.capacity());
     for chip in chips {
-        numbers.push(chip.task).expect("one number per chip fits");
+        numbers.push(chip.number()).expect("one number per supplied reference fits");
     }
     numbers
 }
@@ -301,7 +315,7 @@ fn before(object: &Object) -> Option<Amendment> {
             spec: doc.spec.whole(),
             instructions: crate::instructions::whole(doc.instructions.as_ref()),
             wake: Some(doc.wake.clone()),
-            dependencies: Some(numbers(&doc.dependencies)),
+            dependencies: if doc.cut { None } else { Some(numbers(&doc.dependencies)) },
             authority: Some(doc.authority.clone()),
         },
         Some(Body::Escalation(doc)) => Amendment {

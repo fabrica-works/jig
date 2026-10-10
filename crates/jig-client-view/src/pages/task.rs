@@ -116,17 +116,20 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
     crate::specification::document(b, &doc.spec, words);
     crate::instructions::document(b, doc.instructions.as_ref(), words);
     result_contract(b, &doc.result_contract, words, bindings);
-    words.actor(b, doc.requester);
+    crate::owner_result::requester(b, doc.requester, words);
+    if doc.cut {
+        words.text(b, JigPhrase::TaskListsCut, &[]);
+    }
     cards::chip::wake(b, &doc.wake, words, bindings);
-    for chip in &doc.dependencies {
-        cards::chip::chip(b, client, chip, words, bindings);
+    for link in &doc.dependencies {
+        task_link(b, client, link, words, bindings);
     }
-    for chip in &doc.references {
-        cards::chip::chip(b, client, chip, words, bindings);
+    for link in &doc.references {
+        task_link(b, client, link, words, bindings);
     }
-    for chip in &doc.inputs {
-        cards::chip::chip(b, client, chip, words, bindings);
-        if let Some(id) = client.objects().find(ObjectKey::Result(chip.task)) {
+    for link in &doc.inputs {
+        task_link(b, client, link, words, bindings);
+        if let Some(id) = client.objects().find(ObjectKey::Result(link.number())) {
             cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
         }
     }
@@ -157,6 +160,27 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
             }
         }
         Executor::Procedure { .. } => {}
+    }
+}
+fn task_link(
+    b: &mut Builder,
+    client: &Domain,
+    link: &jig_client::contract::OwnerTaskLink,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    crate::owner_result::link(b, client, link, words, bindings);
+    match link {
+        jig_client::contract::OwnerTaskLink::Live(_) | jig_client::contract::OwnerTaskLink::Retained { .. } => {}
+        jig_client::contract::OwnerTaskLink::Stored { number, .. } => crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Link,
+            JigPhrase::ContextTask,
+            &[Hole::Number(*number)],
+            Act::Go { address: Address::task(*number) },
+        ),
     }
 }
 fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {

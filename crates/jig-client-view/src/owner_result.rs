@@ -10,7 +10,7 @@ fn text(b: &mut Builder, words: &Words, phrase: ResultPhrase, holes: &[Hole]) {
     let saying = words.book.say(words.language, phrase.id(), holes).expect("result words and typed holes checked");
     b.text(Run::Plain, &saying.text);
 }
-fn requester(b: &mut Builder, value: OwnerRequester, words: &Words) {
+pub(crate) fn requester(b: &mut Builder, value: OwnerRequester, words: &Words) {
     match value {
         OwnerRequester::Task(number) => text(b, words, ResultPhrase::RequesterTask, &[Hole::Number(number)]),
         OwnerRequester::Person(number) => text(b, words, ResultPhrase::RequesterPerson, &[Hole::Number(number)]),
@@ -19,7 +19,7 @@ fn requester(b: &mut Builder, value: OwnerRequester, words: &Words) {
         }
     }
 }
-fn link(b: &mut Builder, client: &Domain, value: &OwnerTaskLink, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn link(b: &mut Builder, client: &Domain, value: &OwnerTaskLink, words: &Words, bindings: &mut JigBindings) {
     match value {
         OwnerTaskLink::Live(chip) => {
             text(b, words, ResultPhrase::Live, &[]);

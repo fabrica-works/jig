@@ -485,7 +485,8 @@ fields!(Task {
     runtime,
     impact,
     delegates,
-    writer_slots
+    writer_slots,
+    cut
 });
 fields!(Closing { delegates, connectors, stage, ending });
 fields!(SpendLine { task, attempt, spent });

@@ -90,7 +90,7 @@ fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_i
 #[test]
 fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes() {
     let mut row = task_doc(&[ActKind::Amend]);
-    row.dependencies = list([chip()]);
+    row.dependencies = list([OwnerTaskLink::Live(chip())]);
     row.wake.topics = list([11, 22]);
     row.wake.subscriptions =
         list([Part::Resource { connector: 2, path: list([text(b"actual subscribed path").into_bytes()]) }]);

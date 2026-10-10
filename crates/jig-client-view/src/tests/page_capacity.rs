@@ -154,7 +154,7 @@ fn task_pages(words: &Words) {
         doc.instructions = Some(DocumentText { bytes: full(), cut: true });
         doc.authority = authority();
         doc.lineage_chips = list([full_chip(1), full_chip(2)]);
-        doc.inputs = list([full_chip(9), full_chip(10)]);
+        doc.inputs = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
         doc.dependencies = doc.inputs.clone();
         doc.references = doc.inputs.clone();
         doc.resources = parts();
@@ -709,7 +709,7 @@ fn fill_tasks(d: &mut Domain, watch: Token, filter: TaskFilter) {
         asked_by_me: true,
         chip: full_chip(number),
         goal: Some(8),
-        requester: Actor::Party(1),
+        requester: OwnerRequester::Person(1),
         changed: Wall::EPOCH,
     };
     deliver(

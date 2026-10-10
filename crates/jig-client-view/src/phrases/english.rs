@@ -24,6 +24,7 @@ pub fn language() -> Language {
                 Segment::Hole { index: 1, kind: HoleKind::Number },
             ]),
             JigPhrase::NoteChangedNotSupplied => Box::new([Segment::Text(copy_of(b"Note changed time not supplied"))]),
+            JigPhrase::TaskListsCut => Box::new([Segment::Text(copy_of(b"Some task lists are incomplete"))]),
             JigPhrase::ResourceSegments => Box::new([Segment::Text(copy_of(b"Resource segments"))]),
             JigPhrase::LiteralGrant => Box::new([
                 Segment::Text(copy_of(b"Grant kind ")),
