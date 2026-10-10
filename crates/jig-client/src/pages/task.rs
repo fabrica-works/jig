@@ -117,29 +117,8 @@ pub fn sections(task: &Task) -> Sections {
             task.budget.total > 0 || task.budget.own > 0 || task.budget.ended > 0 || task.budget.reserved > 0
         }
     };
-    let overview = match task.chip.details.as_ref() {
-        contract::ChipPhase::Owner { .. } => true,
-        contract::ChipPhase::Active(_)
-        | contract::ChipPhase::Waiting { .. }
-        | contract::ChipPhase::Idle { .. }
-        | contract::ChipPhase::Starting
-        | contract::ChipPhase::Running { .. }
-        | contract::ChipPhase::WaitingForWords { .. }
-        | contract::ChipPhase::BackingOff { .. }
-        | contract::ChipPhase::Procedure { .. }
-        | contract::ChipPhase::Person { .. }
-        | contract::ChipPhase::Closing(_)
-        | contract::ChipPhase::Held { .. }
-        | contract::ChipPhase::Ended { .. } => false,
-    } || !task.spec.specification.words.bytes().is_empty()
-        || !task.spec.specification.parameters.is_empty()
-        || !task.spec.specification.inputs.is_empty()
-        || task.spec.has_loss()
-        || task.result.is_some()
-        || !task.resources.is_empty()
-        || !task.inputs.is_empty()
-        || !task.dependencies.is_empty()
-        || !task.subscriptions.entries.is_empty();
+    // The mandatory result contract supplies overview content even with an empty spec.
+    let overview = true;
     let mut offered = List::with_capacity(6);
     for section in [
         TaskSection::Overview,

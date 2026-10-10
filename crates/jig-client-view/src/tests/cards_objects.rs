@@ -746,7 +746,7 @@ fn dialog(d: &Domain, words: &crate::words::Words, bindings: &mut JigBindings) -
 pub(super) fn task_doc(acts: &[ActKind]) -> Task {
     Task {
         chip: chip(),
-        goal: true,
+        goal: Some(8),
         priority: Some(1),
         lineage_chips: list([]),
         inputs: list([]),
@@ -768,7 +768,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
             timers: false,
         },
         subscriptions: Subscriptions { entries: List::with_capacity(0) },
-        result_contract: ResultContract::Report,
+        result_contract: TaskContractDocument::Report { words: 32 },
         dependencies: list([]),
         cut: false,
         references: list([]),
@@ -1453,7 +1453,7 @@ fn retained_task_facts_keep_person_revision_taker_and_full_executor_identity_ind
         (Executor::Procedure { connector: 2, kind: u32::MAX }, None, None),
     ] {
         let mut value = task_doc(&[ActKind::Amend]);
-        value.goal = false;
+        value.goal = None;
         value.chip.executor = executor;
         value.person_revision = person_revision;
         value.taken_by = taken_by;

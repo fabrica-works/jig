@@ -43,7 +43,7 @@ fn counts() -> PhaseCounts {
 pub(super) fn task() -> Task {
     Task {
         chip: chip(8),
-        goal: false,
+        goal: None,
         priority: None,
         lineage_chips: List::with_capacity(0),
         inputs: List::with_capacity(0),
@@ -65,7 +65,7 @@ pub(super) fn task() -> Task {
             timers: false,
         },
         subscriptions: Subscriptions { entries: List::with_capacity(0) },
-        result_contract: ResultContract::Report,
+        result_contract: TaskContractDocument::Report { words: 32 },
         dependencies: List::with_capacity(0),
         cut: false,
         references: List::with_capacity(0),

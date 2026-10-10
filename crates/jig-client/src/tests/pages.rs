@@ -803,7 +803,7 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
         panic!("goal task facts read");
     };
     let mut task = super::confirmation::task();
-    task.goal = true;
+    task.goal = Some(task.chip.task);
     task.priority = Some(1);
     task.acts = List::with_capacity(1);
     task.acts.push(Offered { act: ActKind::Prioritise, admission: Admission::Allowed }).unwrap();

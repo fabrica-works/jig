@@ -151,7 +151,8 @@ pub enum ChipPhase {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Task {
     pub chip: Chip,
-    pub goal: bool,
+    /// The actual goal this task serves, including itself when it is a goal.
+    pub goal: Option<u64>,
     pub priority: Option<u32>,
     pub lineage_chips: List<Chip>,
     pub inputs: List<super::OwnerTaskLink>,
@@ -169,7 +170,7 @@ pub struct Task {
     pub wake: super::OwnerWakePolicy,
     /// Standing interests supplied separately from activation policy.
     pub subscriptions: super::Subscriptions,
-    pub result_contract: ResultContract,
+    pub result_contract: super::TaskContractDocument,
     pub dependencies: List<super::OwnerTaskLink>,
     pub references: List<super::OwnerTaskLink>,
     /// At least one task list was omitted; this does not identify which list.

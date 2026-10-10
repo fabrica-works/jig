@@ -48,8 +48,19 @@ pub fn task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
         | None => return,
     };
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(doc.project))]);
-    if doc.goal {
+    if let Some(goal) = doc.goal {
         words.text(b, JigPhrase::Goal, &[]);
+        if goal != doc.chip.task {
+            crate::frame::control(
+                b,
+                words,
+                bindings,
+                Role::Link,
+                JigPhrase::ContextTask,
+                &[Hole::Number(goal)],
+                Act::Go { address: Address::task(goal) },
+            );
+        }
     }
     if let Some(priority) = doc.priority {
         words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(priority))]);
@@ -115,7 +126,8 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
     }
     crate::specification::document(b, &doc.spec, words);
     crate::instructions::document(b, doc.instructions.as_ref(), words);
-    result_contract(b, &doc.result_contract, words, bindings);
+    words.text(b, JigPhrase::ResultExpected, &[]);
+    crate::proposed_task::contract(b, &doc.result_contract, words, bindings);
     crate::owner_result::requester(b, doc.requester, words);
     if doc.cut {
         words.text(b, JigPhrase::TaskListsCut, &[]);
@@ -221,32 +233,6 @@ fn budget(b: &mut Builder, doc: &Task, words: &Words, bindings: &mut JigBindings
             cards::common::authority(b, &doc.authority, words, bindings);
         }
         Executor::Party { .. } | Executor::Role { .. } => {}
-    }
-}
-
-fn result_contract(
-    b: &mut Builder,
-    contract: &jig_client::contract::ResultContract,
-    words: &Words,
-    bindings: &mut JigBindings,
-) {
-    use jig_client::contract::ResultContract;
-    words.text(b, JigPhrase::ResultExpected, &[]);
-    match contract {
-        ResultContract::Report => words.text(b, JigPhrase::ReportExpected, &[]),
-        ResultContract::Words => words.text(b, JigPhrase::WordsExpected, &[]),
-        ResultContract::Approval => words.text(b, JigPhrase::ApprovalExpected, &[]),
-        ResultContract::Verdict { choices } | ResultContract::Choice { options: choices } => {
-            for choice in choices {
-                b.text(Run::Plain, choice.words.bytes());
-            }
-        }
-        ResultContract::Connector { connector, kind } => cards::common::part(
-            b,
-            &jig_client::contract::Part::Kind { connector: *connector, kind: *kind },
-            words,
-            bindings,
-        ),
     }
 }
 

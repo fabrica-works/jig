@@ -57,6 +57,7 @@ fn overview(l: &Limits) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?
         .checked_add(crate::specification::nodes(l)?)?
         .checked_add(crate::instructions::nodes(l)?)?
+        .checked_add(crate::proposed_task::contract_nodes(l)?)?
         .checked_add(crate::owner_wake::policy_nodes())?
         .checked_add(crate::owner_wake::subscription_nodes(l.rows)?)?
         .checked_add(chip_nodes(l)?.checked_add(4)?.checked_mul(l.rows)?.checked_mul(3)?)?
@@ -77,7 +78,7 @@ pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     card_nodes(l)?
         .checked_add(chip_nodes(l)?.checked_mul(l.rows)?)?
         .checked_add(section)?
-        .checked_add(32)?
+        .checked_add(35)?
         .checked_add(slot_nodes)
 }
 fn goals(l: &Limits) -> Option<u32> {
