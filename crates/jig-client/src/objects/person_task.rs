@@ -1,6 +1,7 @@
 //! Person task facts are carried whole; this module supplies its typed projection.
 //! Nothing computes authority or supplies words. See client/domain/objects.md, 7.
 use super::{Body, Object};
+use alloc::boxed::Box;
 /// Reads the document without copying the working set's one object.
 #[must_use]
 pub fn facts(object: &Object) -> Option<&crate::contract::PersonTask> {
@@ -61,7 +62,7 @@ pub fn answer(
                 if choice.code == option && choice.fields.is_empty() {
                     let reason = match fields.get(Purpose::Reason) {
                         Some(field) => field.text.clone(),
-                        None => Text::new(alloc::boxed::Box::from([]), 0).expect("empty text fits"),
+                        None => Text::new(Box::from([]), 0).expect("empty text fits"),
                     };
                     if !reason.fits(choice.words) {
                         return None;
