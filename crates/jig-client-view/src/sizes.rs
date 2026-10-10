@@ -71,18 +71,24 @@ fn proposal_action(limits: &Limits) -> Option<u32> {
     let amend = amendment(limits)?.checked_add(markdown(limits)?)?.checked_add(3)?;
     Some(batch.max(widen).max(amend).max(3))
 }
-/// Whole proposal, including the shared card and inbox context.
-#[must_use]
-pub fn proposal_nodes(limits: &Limits) -> Option<u32> {
-    let existing = frame_of_card(limits)?
+// The retained-result renderer projects only the original Proposal document.
+fn proposal_document_nodes(limits: &Limits) -> Option<u32> {
+    frame_of_card(limits)?
         .checked_add(markdown(limits)?)?
         .checked_add(proposal_action(limits)?)?
         .checked_add(authority(limits)?)?
         .checked_add(trail(limits)?)?
         .checked_add(outcome(limits)?)?
         .checked_add(limits.rows)?
-        .checked_add(8)?;
-    Some(existing.max(frame_of_card(limits)?.checked_add(crate::owner_proposal::max_nodes(limits)?)?))
+        .checked_add(8)
+}
+/// Whole proposal card, including either exact document and shared context.
+#[must_use]
+pub fn proposal_nodes(limits: &Limits) -> Option<u32> {
+    Some(
+        proposal_document_nodes(limits)?
+            .max(frame_of_card(limits)?.checked_add(crate::owner_proposal::max_nodes(limits)?)?),
+    )
 }
 fn result_value(limits: &Limits) -> Option<u32> {
     // Verdict contains explanation words, each named field, follow-up chips and a retained proposal.
@@ -90,7 +96,7 @@ fn result_value(limits: &Limits) -> Option<u32> {
         .checked_add(1)?
         .checked_add(chip_nodes(limits)?)?
         .checked_mul(limits.rows)?
-        .checked_add(proposal_nodes(limits)?)?
+        .checked_add(proposal_document_nodes(limits)?)?
         .checked_add(markdown(limits)?)?
         .checked_add(2)?;
     let change = markdown(limits)?.checked_add(crate::proposed_task::part_nodes(limits)?)?.checked_add(2)?;

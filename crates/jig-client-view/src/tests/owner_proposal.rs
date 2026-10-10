@@ -423,6 +423,35 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             }
         }
     }
+    let mut details = super::owner_chip::details();
+    details.hold = Some(hold());
+    details.ending = Some(OwnerChipEnding::Failed(doc(b"whole linked failure", true)));
+    details.resources = List::with_capacity(3);
+    for _ in 0_u32..3 {
+        details
+            .resources
+            .push(OwnerResourceLine {
+                part: part(),
+                kind: u16::MAX,
+                taken: false,
+                holder: None,
+                writer: Some(OwnerResourceWriter::Effect { entry: u64::MAX }),
+                writer_lost: true,
+            })
+            .unwrap();
+    }
+    details.resources_cut = true;
+    let mut owner_chip = super::cards_objects::task_doc(&[]).chip;
+    owner_chip.details = Box::new(ChipPhase::Owner { phase: OwnerChipPhase::Ended, details: Box::new(details) });
+    let linked = source(OwnerProposalAction::Release {
+        task: OwnerTaskLink::Retained { chip: owner_chip, at: Some(Wall::EPOCH) },
+        hold: Some(Box::new(hold())),
+    });
+    let linked_tree = build(&linked, &w).0;
+    assert!(has(&linked_tree, b"whole linked failure"));
+    assert!(has(&linked_tree, b"Resource kind: 65535"));
+    assert!(has(&linked_tree, b"Writer effect: 18446744073709551615"));
+    assert!(has(&linked_tree, b"Resource list incomplete"));
     let mut maker_keys = List::with_capacity(2);
     for maker in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
         let mut v = source(OwnerProposalAction::Release {

@@ -101,7 +101,7 @@ pub fn required(value: &OwnerProposal, limits: &Limits, words: &Words) -> Option
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
     let markdown = crate::markdown::max_nodes(limits.text)?;
     let authority = crate::owner_authority::document_nodes(limits.rows)?;
-    let link = crate::chip_nodes(limits)?.checked_add(3)?;
+    let link = crate::chip_nodes(limits)?.max(crate::owner_chip::max_nodes(limits)?).checked_add(3)?;
     let part = crate::proposed_task::part_nodes(limits)?;
     let batch = crate::sizes::proposed_task_nodes(limits)?.checked_mul(limits.rows)?.checked_add(1)?;
     let effect = part.checked_add(authority)?.checked_add(5)?;
