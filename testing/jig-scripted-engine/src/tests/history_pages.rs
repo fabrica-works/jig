@@ -50,8 +50,8 @@ fn milestone() -> HistoryRow {
         at: Some(Wall::EPOCH),
     }))
 }
-fn legacy() -> HistoryRow {
-    HistoryRow::Legacy(Box::new(HistoryLine {
+fn line() -> HistoryRow {
+    HistoryRow::Line(Box::new(HistoryLine {
         position: u64::MAX,
         task: 8,
         by: Actor::Party(7),
@@ -60,11 +60,11 @@ fn legacy() -> HistoryRow {
     }))
 }
 #[test]
-fn whole_history_page_prices_all_typed_boxes_stored_presence_and_reserved_rows_without_trimming() {
+fn whole_history_page_prices_all_boxes_stored_presence_and_reserved_rows_without_trimming() {
     let mut bounds = live_script().bounds;
     bounds.rows = 3;
     bounds.document_bytes = u64::MAX;
-    let values = [semantic(), milestone(), legacy()];
+    let values = [semantic(), milestone(), line()];
     let page = HistoryPage {
         cut: true,
         rows: list(values.to_vec()),
@@ -78,7 +78,7 @@ fn whole_history_page_prices_all_typed_boxes_stored_presence_and_reserved_rows_w
         match value {
             HistoryRow::Change(line) => expected += crate::owner_history::bytes(line, &bounds).unwrap(),
             HistoryRow::Milestone(line) => expected += crate::owner_milestone::bytes(line, &bounds).unwrap(),
-            HistoryRow::Legacy(_) => {
+            HistoryRow::Line(_) => {
                 // The supplied Made row has only inline scalar fields; its one box is charged once.
                 expected += u64::try_from(size_of::<HistoryLine>()).unwrap();
             }
@@ -101,8 +101,8 @@ fn whole_history_page_prices_all_typed_boxes_stored_presence_and_reserved_rows_w
     assert_eq!(source.rows, Rows::History(vec![row]));
 }
 #[test]
-fn scripted_history_pages_keep_all_owner_and_legacy_rows_under_opaque_source_continuations() {
-    let values = vec![semantic(), milestone(), legacy()];
+fn scripted_history_pages_keep_all_change_milestone_and_line_rows_under_opaque_source_continuations() {
+    let values = vec![semantic(), milestone(), line()];
     let mut setup = live_script();
     setup.bounds.rows = 1;
     setup.truth.sources.push(Source {

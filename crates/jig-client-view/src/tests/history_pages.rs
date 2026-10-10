@@ -58,7 +58,7 @@ fn history_page() -> HistoryPage {
         },
     })))
     .unwrap();
-    rows.push(HistoryRow::Legacy(Box::new(HistoryLine {
+    rows.push(HistoryRow::Line(Box::new(HistoryLine {
         task: u64::MAX,
         position: u64::MAX,
         by: Actor::Party(7),

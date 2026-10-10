@@ -31,8 +31,8 @@ fn milestone(task: u64, position: u64) -> HistoryRow {
         at: Some(Wall::EPOCH),
     }))
 }
-fn legacy(task: u64, position: u64) -> HistoryRow {
-    HistoryRow::Legacy(Box::new(HistoryLine {
+fn line(task: u64, position: u64) -> HistoryRow {
+    HistoryRow::Line(Box::new(HistoryLine {
         task,
         position,
         by: Actor::Party(7),
@@ -51,22 +51,22 @@ fn edges() -> Edges {
     Edges { before: Edge::End, after: Edge::End }
 }
 #[test]
-fn mixed_history_window_retains_revision_position_and_legacy_identity_in_source_order() {
+fn mixed_history_window_retains_revision_position_and_line_identity_in_source_order() {
     let semantic = change(u64::MAX, 9);
     let lifecycle = milestone(u64::MAX, 9);
-    let supplied_legacy = legacy(u64::MAX, 9);
+    let supplied_line = line(u64::MAX, 9);
     let mut window = HistoryWindow::new(2);
     assert_eq!(window.slide(rows([semantic.clone(), lifecycle.clone()]), edges(), End::After), 0);
     assert_eq!(window.rows.as_slice(), &[semantic.clone(), lifecycle.clone()]);
     let opaque = Cursor { value: text(b"opaque reverse") };
     let mut next = List::with_capacity(2);
-    next.push(supplied_legacy.clone()).unwrap();
+    next.push(supplied_line.clone()).unwrap();
     assert_eq!(window.slide(next, Edges { before: Edge::More(opaque.clone()), after: Edge::End }, End::After), 1);
-    assert_eq!(window.rows.as_slice(), &[lifecycle, supplied_legacy]);
+    assert_eq!(window.rows.as_slice(), &[lifecycle, supplied_line]);
     assert_eq!(window.edges.before, Edge::More(opaque));
     assert!(!window.live(rows([change(0, 0), milestone(0, 0)]), edges(), End::Before));
-    assert_eq!(window.slide(rows([semantic.clone(), legacy(0, 0)]), edges(), End::Before), 2);
-    assert_eq!(window.rows.as_slice(), &[semantic, legacy(0, 0)]);
+    assert_eq!(window.slide(rows([semantic.clone(), line(0, 0)]), edges(), End::Before), 2);
+    assert_eq!(window.rows.as_slice(), &[semantic, line(0, 0)]);
     assert!(window.edges.reaches(End::Before));
 }
 fn history_read(requests: &[Request]) -> Token {

@@ -805,7 +805,7 @@ fields!(HistoryLine { position, task, by, at, change });
 impl Payload for jig_client::contract::HistoryRow {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Legacy(value) => value.heap(bounds),
+            Self::Line(value) => value.heap(bounds),
             Self::Change(value) => value.heap(bounds),
             Self::Milestone(value) => value.heap(bounds),
         }

@@ -60,7 +60,7 @@ fn activity(position: u64) -> ActivityLine {
     }
 }
 fn history(position: u64) -> HistoryRow {
-    HistoryRow::Legacy(Box::new(HistoryLine {
+    HistoryRow::Line(Box::new(HistoryLine {
         position,
         task: 1,
         by: Actor::Party(7),

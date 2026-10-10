@@ -7,7 +7,7 @@ use alloc::boxed::Box;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HistoryRow {
     /// Previously supplied application history, including its independent position.
-    Legacy(Box<HistoryLine>),
+    Line(Box<HistoryLine>),
     /// An immutable semantic change named by its task and revision.
     Change(Box<OwnerHistoryLine>),
     /// A lifecycle transition named by its task and activity position.

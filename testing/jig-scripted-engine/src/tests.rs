@@ -425,7 +425,7 @@ fn scenario_pages_and_read_barriers() {
         rows: Rows::History(
             (0..3)
                 .map(|position| {
-                    HistoryRow::Legacy(Box::new(HistoryLine {
+                    HistoryRow::Line(Box::new(HistoryLine {
                         position,
                         task: 8,
                         by: Actor::Party(1),
@@ -468,7 +468,7 @@ fn scenario_pages_and_read_barriers() {
             panic!("history page");
         };
         assert_eq!(page.rows.len(), 1);
-        let HistoryRow::Legacy(row) = page.rows.iter().next().expect("row") else {
+        let HistoryRow::Line(row) = page.rows.iter().next().expect("row") else {
             panic!("supplied legacy history");
         };
         assert_eq!(row.position, position);
@@ -672,7 +672,7 @@ fn scenario_byte_bound_pages_and_watch_windows() {
         rows: Rows::History(
             (0..2)
                 .map(|position| {
-                    HistoryRow::Legacy(Box::new(HistoryLine {
+                    HistoryRow::Line(Box::new(HistoryLine {
                         position,
                         task: 8,
                         by: Actor::Party(1),
