@@ -1595,7 +1595,11 @@ fn proposed_outcomes_and_effect_parts_keep_the_supplied_maker_kind_and_full_numb
         let tree = b.finish();
         assert!(contains(&tree, outcome));
         assert!(contains(&tree, part));
-        assert_eq!(contains(&tree, b"by party"), matches!(maker, Proposer::Party(_)));
-        assert_eq!(contains(&tree, b"by task"), matches!(maker, Proposer::Task(_)));
+        let (by_party, by_task) = match maker {
+            Proposer::Task(_) => (false, true),
+            Proposer::Party(_) => (true, false),
+        };
+        assert_eq!(contains(&tree, b"by party"), by_party);
+        assert_eq!(contains(&tree, b"by task"), by_task);
     }
 }

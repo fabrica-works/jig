@@ -437,7 +437,7 @@ mod tests {
                 [7; 16],
                 &Ask::DecideProposal { project: 4, proposal, decision: Decision::Accepted },
             );
-            assert_eq!(sent.card, Some(card));
+            assert_eq!(sent.card, Some(card.clone()));
             builder.open(Role::Item);
             builder.key(Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX });
             builder.text(jig_client_view::Run::Plain, b"supplied proposal");
