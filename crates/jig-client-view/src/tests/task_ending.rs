@@ -29,7 +29,7 @@ fn task_overview_shows_only_supplied_ending_facts_with_opaque_state_loss_and_raw
         let (tree, bindings) = task_contract::page(row.clone());
         assert!(contains(&tree, b"Cancelled with reason"));
         assert!(contains(&tree, b"source reason"));
-        assert!(contains(&tree, b"Only part of this text was supplied"));
+        assert!(contains(&tree, b"Supplied words incomplete"));
         assert!(contains(&tree, b"Cancellation requester deployment project: 4294967295"));
         assert!(contains(&tree, b"Cancelled at:"));
         assert!(!contains(&tree, b"Result time was not supplied"));
