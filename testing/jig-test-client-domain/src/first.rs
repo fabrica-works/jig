@@ -83,6 +83,7 @@ pub struct Limits {
 pub enum Value {
     Loading,
     Unknown,
+    Unsupported,
     Known(Document),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -338,7 +339,7 @@ fn parameters_revision(value: &Value) -> Option<Revision> {
             | crate::connector_values::ClientDocument::Project { .. }
             | crate::connector_values::ClientDocument::Deployment { .. } => None,
         },
-        Value::Known(Document::Item(_)) | Value::Loading | Value::Unknown => None,
+        Value::Known(Document::Item(_)) | Value::Loading | Value::Unknown | Value::Unsupported => None,
     }
 }
 fn hold(side: &mut Side, env: &Env<Limits>, subject: Subject, out: &mut Queue<Request>) {
@@ -365,7 +366,7 @@ fn acquire(side: &mut Side, _env: &Env<Limits>, subject: Subject, out: &mut Queu
     };
     let object = side.objects.get_mut(id).expect("named object exists");
     match object.value {
-        Value::Unknown => return,
+        Value::Unknown | Value::Unsupported => return,
         Value::Known(_) | Value::Loading => {}
     }
     if object.read.is_none() && matches_loading(&object.value) {
@@ -395,7 +396,7 @@ fn acquire(side: &mut Side, _env: &Env<Limits>, subject: Subject, out: &mut Queu
 fn matches_loading(value: &Value) -> bool {
     match value {
         Value::Loading => true,
-        Value::Known(_) | Value::Unknown => false,
+        Value::Known(_) | Value::Unknown | Value::Unsupported => false,
     }
 }
 fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Document, out: &mut Queue<Request>) {
@@ -429,7 +430,7 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
                 object.draft = None;
             }
         }
-        Value::Loading | Value::Unknown => {}
+        Value::Loading | Value::Unknown | Value::Unsupported => {}
     }
     object.value = Value::Known(document);
     match object.card {
@@ -440,7 +441,7 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
         let object = side.objects.get(id).expect("page object exists");
         match &object.value {
             Value::Known(document) => out.push(Request::ShowObjects { objects: document.objects(env.limits.rows) }),
-            Value::Loading | Value::Unknown => {}
+            Value::Loading | Value::Unknown | Value::Unsupported => {}
         }
     }
     side.changed();
@@ -448,6 +449,14 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
 fn unknown(side: &mut Side, subject: Subject) {
     if let Some(id) = side.find(subject) {
         side.objects.get_mut(id).expect("named object exists").value = Value::Unknown;
+        side.changed();
+    }
+}
+fn unsupported(side: &mut Side, subject: Subject) {
+    if let Some(id) = side.find(subject) {
+        let object = side.objects.get_mut(id).expect("named object exists");
+        object.value = Value::Unsupported;
+        object.draft = None;
         side.changed();
     }
 }
@@ -552,6 +561,10 @@ fn ended(side: &mut Side, env: &Env<Limits>, id: Id<Watching>, end: WatchEnd, ou
                 retire_watch(side, id);
                 unknown(side, subject);
             }
+            WatchEnd::Unsupported => {
+                retire_watch(side, id);
+                unsupported(side, subject);
+            }
             WatchEnd::SignedOut => {
                 retire_watch(side, id);
                 out.push(Request::Out(Out::Fact { fact: Fact::SignedOut }));
@@ -583,7 +596,7 @@ fn touch(side: &mut Side, id: Id<Object>, revision: Revision, out: &mut Queue<Re
     }
     let document = match &object.value {
         Value::Known(document) => document,
-        Value::Loading | Value::Unknown => return,
+        Value::Loading | Value::Unknown | Value::Unsupported => return,
     };
     match document {
         Document::Connector(_) => {
@@ -734,6 +747,7 @@ fn read_result(side: &mut Side, env: &Env<Limits>, read: Token, result: ReadResu
     match result {
         ReadResult::Value(document) => received(side, env, subject, document, out),
         ReadResult::Unknown => unknown(side, subject),
+        ReadResult::Unsupported => unsupported(side, subject),
         ReadResult::Busy => full(out),
         ReadResult::SignedOut => out.push(Request::Out(Out::Fact { fact: Fact::SignedOut })),
     }
@@ -840,7 +854,9 @@ fn connector_touch(side: &mut Side, id: Id<Object>, revision: Revision, party: u
     };
     let document = match &object.value {
         Value::Known(Document::Connector(value)) => value,
-        Value::Known(Document::Item(_) | Document::Part(_)) | Value::Loading | Value::Unknown => return,
+        Value::Known(Document::Item(_) | Document::Part(_)) | Value::Loading | Value::Unknown | Value::Unsupported => {
+            return;
+        }
     };
     let (number, now) = match document.value.as_ref() {
         crate::connector_values::ClientDocument::Object { object, now } => (*object, *now),

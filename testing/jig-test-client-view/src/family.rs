@@ -50,7 +50,10 @@ pub fn page(
                 jig_slot(b, ObjectKey::Proposal(*proposal), words, bindings);
             }
         }
-        Value::Known(Document::Part(_) | Document::Connector(_)) | Value::Loading | Value::Unknown => {}
+        Value::Known(Document::Part(_) | Document::Connector(_))
+        | Value::Loading
+        | Value::Unknown
+        | Value::Unsupported => {}
     }
     b.close();
 }
@@ -116,7 +119,9 @@ fn object(
     let title = match &object.value {
         Value::Known(Document::Item(item)) => words.say(Word::Item, &[Hole::Number(item.key)]),
         Value::Known(Document::Part(part)) => words.say(Word::Part, &[Hole::Number(part.revision.value)]),
-        Value::Known(Document::Connector(_)) | Value::Loading | Value::Unknown => words.say(Word::Family, &[]),
+        Value::Known(Document::Connector(_)) | Value::Loading | Value::Unknown | Value::Unsupported => {
+            words.say(Word::Family, &[])
+        }
     };
     b.name(&title);
     match &object.value {
@@ -128,6 +133,7 @@ fn object(
             b.close();
         }
         Value::Unknown => words.status(b, Word::Unknown, &[]),
+        Value::Unsupported => words.status(b, Word::Unshowable, &[]),
         Value::Known(document) => match document {
             Document::Item(item) => {
                 b.open(Role::Heading { level: 2 });

@@ -146,6 +146,8 @@ pub enum Answer {
 pub enum ReadResult {
     Value(Document),
     Unknown,
+    /// The supplied subject has no representation in this owner's scoped API.
+    Unsupported,
     Busy,
     SignedOut,
 }
@@ -160,6 +162,7 @@ pub enum WatchEnd {
     Closed,
     Dropped,
     Unknown,
+    Unsupported,
     SignedOut,
 }
 #[must_use]

@@ -616,7 +616,7 @@ fn effect_family_keys_keep_equal_task_and_party_makers_in_distinct_public_items(
 #[test]
 fn raw_owner_effect_keys_keep_full_scope_and_numbers_separate_from_equal_core_makers() {
     let reference = u64::MAX;
-    let mut keys = std::collections::BTreeSet::new();
+    let mut keys = Vec::new();
     for scope in [family::Scope::Project(0), family::Scope::Project(u32::MAX), family::Scope::Deployment] {
         let key = crate::family_key(&family::Subject { scope, kind: family::Kind::OwnerEffect(reference) });
         assert_eq!(key.kind, 20);
@@ -628,13 +628,16 @@ fn raw_owner_effect_keys_keep_full_scope_and_numbers_separate_from_equal_core_ma
                 family::Scope::Deployment => u64::MAX,
             }
         );
-        assert!(keys.insert(key));
+        assert!(!keys.contains(&key));
+        keys.push(key);
     }
     for proposer in [Proposer::Task(reference), Proposer::Party(reference)] {
-        assert!(keys.insert(crate::family_key(&family::Subject {
+        let key = crate::family_key(&family::Subject {
             scope: family::Scope::Project(0),
             kind: family::Kind::Effect(ProposalKey { proposer, number: reference }),
-        })));
+        });
+        assert!(!keys.contains(&key));
+        keys.push(key);
     }
     assert_eq!(keys.len(), 5);
 }
@@ -669,10 +672,10 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
         .tree()
         .nodes()
         .iter()
-        .find(|node| node.role == Role::TextField && node.name.as_ref() == b"Parameters")
+        .find(|node| node.role == Role::TextField && node.name.as_deref() == Some(b"Parameters".as_slice()))
         .unwrap()
         .id;
-    let changed = decode(&view, &Act::Change { node: field, value: Box::from(*b"0") }).unwrap();
+    let changed = decode(&mut view, field, Act::Input { value: Box::from(*b"0") }).unwrap();
     assert_eq!(
         changed,
         jig_test_client_domain::Action::First(first::Act::Parameters {
@@ -687,10 +690,10 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
         .tree()
         .nodes()
         .iter()
-        .find(|node| node.role == Role::Button && node.name.as_ref() == b"Apply parameters")
+        .find(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Apply parameters".as_slice()))
         .unwrap()
         .id;
-    drive(&mut root, Event::Act { action: decode(&view, &Act::Activate { node: apply }).unwrap() });
+    drive(&mut root, Event::Act { action: decode(&mut view, apply, Act::Press).unwrap() });
     let mut sends = Queue::with_capacity(jig_test_client_domain::max_out(&limits()));
     jig_test_client_domain::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut sends);
     let mut attempt = None;
@@ -719,10 +722,54 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
         view.tree()
             .nodes()
             .iter()
-            .any(|node| node.role == Role::Status && node.name.as_ref() == b"Application outcome")
+            .any(|node| node.role == Role::Status && node.name.as_deref() == Some(b"Application outcome".as_slice()))
     );
     assert!(contains(&view, b"Changed"));
     assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer });
     assert!(view.tree().len() <= view.limits().tree.nodes);
     assert!(patches(&mut view, &root).is_empty());
+}
+
+#[test]
+fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_unknown_value() {
+    let mut root = ready();
+    let part = Part::Outbox { connector: jig_test_client_domain::FIRST, scope: PartScope::Deployment, entry: u64::MAX };
+    let opened = drive(
+        &mut root,
+        Event::First(first::Event::Show { part: part.clone(), generation: 1, scope: family::Scope::Deployment }),
+    );
+    let read = family_read(&opened);
+    let watch = opened
+        .iter()
+        .find_map(|request| match request {
+            Request::First(first::Out::Open { watch, .. }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    drive(&mut root, Event::First(first::Event::Read { read, result: first::ReadResult::Unsupported }));
+    drive(&mut root, Event::First(first::Event::Ended { watch, end: first::WatchEnd::Unsupported }));
+    let subject = family::Subject { scope: family::Scope::Deployment, kind: family::Kind::Outbox(u64::MAX) };
+    assert_eq!(root.first().object(root.first().find(subject).unwrap()).unwrap().value, first::Value::Unsupported);
+    let jig = words();
+    let family_words = words::Words::english(limits().first.text).unwrap();
+    let bounds = Limits::of(&limits(), &jig, &family_words).unwrap();
+    let mut builder = jig_client_view::Builder::new(&bounds.tree);
+    let mut bindings = crate::bindings::Bindings::new(bounds.tree.bindings, limits().first.text);
+    builder.open(Role::Page);
+    crate::family::part(&mut builder, root.first(), &part, 1, &family_words, &jig, &mut bindings);
+    builder.close();
+    let tree = builder.finish();
+    assert!(
+        tree.nodes()
+            .iter()
+            .any(|node| node.role == Role::Status && node.name.as_deref() == Some(b"Cannot show this part".as_slice()))
+    );
+    assert!(
+        !tree
+            .nodes()
+            .iter()
+            .any(|node| node.role == Role::Status && node.name.as_deref() == Some(b"Unknown family object".as_slice()))
+    );
+    assert!(!tree.nodes().iter().any(|node| node.role == Role::TextField));
+    assert!(tree.nodes().iter().filter_map(|node| node.key).all(|key| key.kind != 10 || key.a != 0));
 }
