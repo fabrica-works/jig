@@ -465,7 +465,10 @@ pub(super) fn from_store(
         raw.reverse();
     }
     let mut page = Page {
-        rows: List::with_capacity(range.rows), before, next, cut: false,
+        rows: List::with_capacity(range.rows),
+        before,
+        next,
+        cut: false,
         inbox_selection: inbox_contexts(&range.scope, range.rows),
     };
     for row in raw {
