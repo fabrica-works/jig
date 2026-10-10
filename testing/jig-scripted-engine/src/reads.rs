@@ -174,6 +174,15 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
     (read, position)
 }
 impl<A: crate::Application> Engine<A> {
+    /// The retained source is authoritative even when live rows are interleaved
+    /// with past rows. Replay it from its actual beginning, in supplied order,
+    /// through the existing party/query-scoped registry; no row key is a cursor.
+    pub(crate) fn conversations_cursor(&mut self, party: u64) -> Cursor {
+        let number = self.next_position;
+        self.positions.insert(number, Position { party, read: Read::Conversations { after: None }, index: 0 });
+        self.next_position += 1;
+        cursor(number, &self.bounds)
+    }
     /// Captures one read at the latest numbered commit. A token receives one terminal.
     pub fn read(&mut self, now: Time, sign_in: u64, token: Token, read: Read) -> core::result::Result<(), Invalid> {
         if !payload::fits(&read, &self.bounds) {

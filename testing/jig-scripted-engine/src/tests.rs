@@ -2281,3 +2281,4 @@ mod task_ending;
 mod task_resources;
 
 mod task_hold;
+mod conversation_continuation;

@@ -370,7 +370,8 @@ pub(crate) fn delivery(
                 let after = domain.conversation_rows.edges.after.clone();
                 let mut rows = conversations.rows;
                 crate::pages::conversations::order(&mut rows);
-                let dropped = domain.conversation_rows.slide(rows, blank_edges(), End::Before);
+                let edges = Edges { before: Edge::End, after: Edge::More(conversations.after) };
+                let dropped = domain.conversation_rows.slide(rows, edges, End::Before);
                 if dropped == 0 {
                     domain.conversation_rows.edges.after = after;
                 }

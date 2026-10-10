@@ -270,6 +270,7 @@ impl<A: crate::Application> Engine<A> {
                 Delivery::Conversations(Box::new(Conversations {
                     rows: list(&live[..count]),
                     more: count < live.len(),
+                    after: self.conversations_cursor(party),
                 }))
             }
             Subject::Tasks { project, filter, window } => {

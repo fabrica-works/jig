@@ -1418,6 +1418,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
             event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
                 rows: rows.clone(),
                 more: true,
+                after: Cursor { value: text(b"fixture-watch-after") },
             }))),
         },
     );
@@ -1439,6 +1440,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
             event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
                 rows: rows.clone(),
                 more: true,
+                after: Cursor { value: text(b"fixture-watch-after") },
             }))),
         },
     );
@@ -2438,7 +2440,11 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
         Time::ZERO,
         Event::Watch {
             watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: false }))),
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
+                rows,
+                more: false,
+                after: Cursor { value: text(b"fixture-watch-after") },
+            }))),
         },
     );
     let mut current = old.clone();
@@ -2456,7 +2462,11 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
         Time::ZERO,
         Event::Watch {
             watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: true }))),
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
+                rows,
+                more: true,
+                after: Cursor { value: text(b"fixture-watch-after") },
+            }))),
         },
     );
     let reply =
@@ -2495,7 +2505,11 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
         Time::ZERO,
         Event::Watch {
             watch,
-            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: false }))),
+            event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
+                rows,
+                more: false,
+                after: Cursor { value: text(b"fixture-watch-after") },
+            }))),
         },
     );
     assert_eq!(domain.conversation_rows().rows.get(0), Some(&zero));
@@ -2518,7 +2532,11 @@ fn owner_conversation_order_keeps_missing_clock_rows_in_source_order_and_supplie
             Time::ZERO,
             Event::Watch {
                 watch,
-                event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations { rows, more: false }))),
+                event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
+                    rows,
+                    more: false,
+                    after: Cursor { value: text(b"fixture-watch-after") },
+                }))),
             },
         );
         assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, if absent { 8 } else { 9 });

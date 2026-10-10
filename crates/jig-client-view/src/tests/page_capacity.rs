@@ -407,7 +407,11 @@ fn conversations(words: &Words) {
     deliver(
         &mut d,
         watch,
-        Delivery::Conversations(Box::new(Conversations { rows: list([line(8), line(9)]), more: true })),
+        Delivery::Conversations(Box::new(Conversations {
+            rows: list([line(8), line(9)]),
+            more: true,
+            after: Cursor { value: full() },
+        })),
     );
     render(&d, words);
 }

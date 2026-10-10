@@ -3,7 +3,7 @@
 //! List capacities and Text byte bounds are validated by the protocol before entry;
 //! the working set keeps only what its own configured limits admit.
 use super::{
-    Actor, Amendment, Authority, Count, Decision, DocumentText, Ending, Executor, HeldRole, Holding, Lacking,
+    Actor, Amendment, Authority, Count, Cursor, Decision, DocumentText, Ending, Executor, HeldRole, Holding, Lacking,
     NoteScope, ObjectKey, Part, Party, PartyKind, Phase, Policy, PoolLedger, ProposalKey, Proposer, Refusal, Revision,
     Text, Turn, TurnName, WakePolicy,
 };

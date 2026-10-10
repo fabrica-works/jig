@@ -148,9 +148,14 @@ impl ConversationWindow {
         let empty = self.rows.is_empty();
         let key_capacity = self.rows.len().checked_add(incoming.len()).expect("admitted row counts fit");
         let mut keys = List::with_capacity(key_capacity);
-        conversation_keys(&self.rows, &mut keys);
-        let old_count = keys.len();
-        conversation_keys(&incoming, &mut keys);
+        let old_count = conversation_count(&self.rows);
+        match end {
+            End::After => conversation_after_keys(&self.rows, &incoming, &mut keys),
+            End::Before => {
+                conversation_keys(&self.rows, &mut keys);
+                conversation_keys(&incoming, &mut keys);
+            }
+        }
         let new_count = keys.len().checked_sub(old_count).expect("keys only append");
         let slide = plan(old_count, new_count, capacity, end);
         let mut rows = List::with_capacity(capacity);
@@ -158,8 +163,11 @@ impl ConversationWindow {
         let new_from = old_count.checked_add(slide.new_from).expect("bounded key range fits");
         match end {
             End::After => {
-                move_conversationwindow(old, &keys, slide.old_from, slide.old_count, &mut rows);
-                move_conversationwindow(incoming, &keys, new_from, slide.new_count, &mut rows);
+                let count = keys.len().min(capacity);
+                let start = keys.len().saturating_sub(count);
+                move_conversationwindow(old, &keys, start, count, &mut rows);
+                move_conversationwindow(incoming, &keys, start, count, &mut rows);
+                order_conversationwindow(&mut rows, &keys, start);
             }
             End::Before => {
                 move_conversationwindow(incoming, &keys, new_from, slide.new_count, &mut rows);
@@ -187,6 +195,78 @@ fn conversation_keys(rows: &List<ConversationLine>, keys: &mut List<u64>) {
     for row in rows {
         if !keys.as_slice().contains(&row.chip.task) {
             keys.push(row.chip.task).expect("one key per admitted row fits");
+        }
+    }
+}
+fn conversation_count(rows: &List<ConversationLine>) -> u32 {
+    let mut count = 0;
+    for index in 0..rows.len() {
+        let key = rows.get(index).expect("row exists").chip.task;
+        let mut present = false;
+        for earlier in 0..index {
+            if rows.get(earlier).expect("row exists").chip.task == key {
+                present = true;
+                break;
+            }
+        }
+        if !present {
+            count += 1;
+        }
+    }
+    count
+}
+fn conversation_named(rows: &List<ConversationLine>, key: u64) -> bool {
+    for row in rows {
+        if row.chip.task == key {
+            return true;
+        }
+    }
+    false
+}
+fn conversation_key(keys: &mut List<u64>, key: u64) {
+    if !keys.as_slice().contains(&key) {
+        keys.push(key).expect("the distinct union fits the admitted key capacity");
+    }
+}
+/// A replay may introduce source rows before a retained overlap. The supplied
+/// page's keys keep their order; current rows still supply the whole facts.
+/// Retained gaps remain beside their old preceding source anchor, without an
+/// inferred clock or numeric ordering. The bounded After slide selects its tail.
+fn conversation_after_keys(old: &List<ConversationLine>, incoming: &List<ConversationLine>, keys: &mut List<u64>) {
+    for row in old {
+        if conversation_named(incoming, row.chip.task) {
+            break;
+        }
+        conversation_key(keys, row.chip.task);
+    }
+    for row in incoming {
+        conversation_key(keys, row.chip.task);
+        let mut following = false;
+        for held in old {
+            if held.chip.task == row.chip.task {
+                following = true;
+            } else if following {
+                if conversation_named(incoming, held.chip.task) {
+                    break;
+                }
+                conversation_key(keys, held.chip.task);
+            }
+        }
+    }
+    conversation_keys(old, keys);
+}
+fn order_conversationwindow(rows: &mut List<ConversationLine>, keys: &List<u64>, start: u32) {
+    for first in 0..rows.len() {
+        let key = keys.get(start.checked_add(first).expect("selected key range fits")).expect("key exists");
+        for second in first..rows.len() {
+            if rows.get(second).expect("row exists").chip.task == *key {
+                if second != first {
+                    let row = rows.get(second).expect("row exists").clone();
+                    let row = core::mem::replace(rows.get_mut(first).expect("row exists"), row);
+                    *rows.get_mut(second).expect("row exists") = row;
+                }
+                break;
+            }
         }
     }
 }
