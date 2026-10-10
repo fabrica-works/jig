@@ -1,37 +1,32 @@
-//! Outside evidence retained without formatting (`domain/testing.md`, 5–6).
-use crate::referee::Observed;
-use std::ops::Deref;
+//! Whole application boundary traces, enabled for diagnostic replay only.
+use std::{fmt::Arguments, ops::Deref, sync::OnceLock};
 
-/// One concrete loop boundary or independent peer/store observation.
+/// Off in sweeps; JIG_WORLD_TRACE enables complete debug diagnostics on replay.
 #[derive(Debug)]
-pub enum Entry {
-    PeerInput,
-    Committed(u64),
-    Failed(u64),
-    RestoredRow,
-    Submitted { number: u64, writes: usize },
-    Delivery,
-    Stopped,
-    Observed(Observed),
+pub struct Trace {
+    enabled: bool,
+    lines: Vec<String>,
 }
-
-/// Diagnostic history; formatting is requested by a failing assertion only.
-#[derive(Default, Debug)]
-pub struct Trace(Vec<(u64, Entry)>);
-
+impl Default for Trace {
+    fn default() -> Self {
+        static ENABLED: OnceLock<bool> = OnceLock::new();
+        Self::with_enabled(*ENABLED.get_or_init(|| std::env::var_os("JIG_WORLD_TRACE").is_some()))
+    }
+}
 impl Trace {
-    pub fn push(&mut self, now: u64, entry: Entry) {
-        self.0.push((now, entry));
-    }
     #[must_use]
-    pub fn join(&self, separator: &str) -> String {
-        self.0.iter().map(|(now, entry)| format!("{now}: {entry:?}")).collect::<Vec<_>>().join(separator)
+    pub fn with_enabled(enabled: bool) -> Self {
+        Self { enabled, lines: Vec::new() }
+    }
+    pub fn log(&mut self, message: Arguments<'_>) {
+        if self.enabled {
+            self.lines.push(message.to_string());
+        }
     }
 }
-
 impl Deref for Trace {
-    type Target = [(u64, Entry)];
+    type Target = [String];
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.lines
     }
 }

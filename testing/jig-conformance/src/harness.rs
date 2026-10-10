@@ -2,7 +2,7 @@
 //! Applications translate boundaries; this loop owns commit application and
 //! checks observations after every iteration (`domain/testing.md`, 5–6).
 use crate::referee::{Observed, Policy, Recovery, Referee, Violation};
-use crate::trace::{Entry, Trace};
+use crate::trace::Trace;
 use jig_fake_store::{Store, Write};
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -154,6 +154,7 @@ pub struct Harness<A: Application> {
     maximum: u64,
     configuration_heap: u64,
     config: A::Config,
+    seed: u64,
     events: VecDeque<Input<A::Event, A::Record>>,
     outputs: Vec<Output<A::Key, A::Record, A::Delivery>>,
     meter: skein_world::domain::heap::Meter,
@@ -168,6 +169,16 @@ impl<A: Application> Harness<A> {
     /// Construct the scenario's concrete engine and independent neighbours.
     #[must_use]
     pub fn new(config: A::Config, seed: u64) -> Self {
+        Self::start(config, seed, Trace::default())
+    }
+
+    /// Explicit diagnostics for focused replay without process-global mutation.
+    #[must_use]
+    pub fn with_trace(config: A::Config, seed: u64, enabled: bool) -> Self {
+        Self::start(config, seed, Trace::with_enabled(enabled))
+    }
+
+    fn start(config: A::Config, seed: u64, trace: Trace) -> Self {
         let peers = A::peers(&config, seed);
         let systems = A::systems(&config, seed);
         let mut store = Store::new();
@@ -186,10 +197,11 @@ impl<A: Application> Harness<A> {
             peers,
             store,
             referee: Referee::new(policy),
-            trace: Trace::default(),
+            trace,
             maximum,
             configuration_heap,
             config,
+            seed,
             events,
             outputs: Vec::new(),
             meter,
@@ -224,7 +236,6 @@ impl<A: Application> Harness<A> {
     /// Returns a receipt missing after restart or another broken promise.
     pub fn crash(&mut self) -> Result<(), Violation> {
         self.crashes.push(self.store.applied);
-        self.trace.push(self.clock.now, Entry::Observed(Observed::Restart));
         self.referee.observe(self.clock.now, Observed::Restart)?;
         self.store.crash();
         self.events.clear();
@@ -266,28 +277,13 @@ impl<A: Application> Harness<A> {
                 A::inbound(&mut self.peers, &self.store, self.clock, event);
             }
             self.inspect()?;
-            self.trace.push(
-                self.clock.now,
-                match &input {
-                    Input::Event(_) => Entry::PeerInput,
-                    Input::Committed(number) => Entry::Committed(*number),
-                    Input::Failed(number) => Entry::Failed(*number),
-                    Input::Restore(_) => Entry::RestoredRow,
-                },
-            );
+            self.trace.log(format_args!("input {input:?}"));
             A::step(&mut self.domain, &self.config, self.clock, input);
         }
         self.outputs = A::release(&mut self.domain, &self.config, self.clock);
         let empty = self.outputs.is_empty();
         for output in std::mem::take(&mut self.outputs) {
-            self.trace.push(
-                self.clock.now,
-                match &output {
-                    Output::Commit { number, writes } => Entry::Submitted { number: *number, writes: writes.len() },
-                    Output::Deliver(_) => Entry::Delivery,
-                    Output::Stop => Entry::Stopped,
-                },
-            );
+            self.trace.log(format_args!("output {output:?}"));
             match output {
                 Output::Commit { number, writes } => {
                     self.store.submit(number, writes, 0);
@@ -363,7 +359,6 @@ impl<A: Application> Harness<A> {
             self.referee.policy.clone_from(policy);
         }
         for observed in observations {
-            self.trace.push(self.clock.now, Entry::Observed(observed.clone()));
             self.referee.observe(self.clock.now, observed)?;
         }
         Ok(())
@@ -375,13 +370,16 @@ impl<A: Application> Harness<A> {
     /// Returns a broken promise or a story that exceeded its bound.
     pub fn drain(&mut self) -> Result<Outcome, Violation> {
         for _ in 0..self.referee.policy.story_steps {
-            if !self.iterate()? {
+            if !self.iterate().map_err(|mut violation| {
+                violation.why = format!("seed {}: {}", self.seed, violation.why);
+                violation
+            })? {
                 return Ok(self.outcome());
             }
         }
         Err(Violation {
             promise: crate::referee::Promise::Bounded,
-            why: "scenario did not settle within its iteration bound".into(),
+            why: format!("seed {}: scenario did not settle within its iteration bound", self.seed),
         })
     }
 

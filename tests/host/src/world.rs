@@ -6,7 +6,7 @@ use skein_world::domain::{Ledger, Schedule, Span, Stage};
 
 use crate::engine::{self, Act, Engine, Plan};
 use crate::parent::{self, Out, Parent};
-use crate::trace::{Entry, Trace};
+use crate::trace::Trace;
 
 /// Room in the host's output queue beyond what one step may emit. Small, so
 /// the loop's flow control (take an event only while there is room for what
@@ -341,6 +341,16 @@ pub struct World {
 impl World {
     #[must_use]
     pub fn new(settings: Settings) -> World {
+        Self::start(settings, Trace::default())
+    }
+
+    /// Explicit trace setting for focused replay, without changing the process environment.
+    #[must_use]
+    pub fn with_trace(settings: Settings, enabled: bool) -> World {
+        Self::start(settings, Trace::with_enabled(enabled))
+    }
+
+    fn start(settings: Settings, trace: Trace) -> World {
         assert!(host::worst_case(&settings.host).is_some(), "the shell refuses limits it cannot provision");
         let mut rng = Rng::new(settings.seed);
         let engine = Engine::new(settings.engine, settings.host, rng.next_u64());
@@ -367,7 +377,7 @@ impl World {
             kept: BTreeSet::new(),
             shut: false,
             stats: Stats::default(),
-            trace: Trace::default(),
+            trace,
         };
         if let Some(outage) = settings.outage {
             let lost = Time::ZERO.saturating_add(outage.at.draw(&mut rng));
@@ -414,6 +424,20 @@ impl World {
     /// Runs until nothing is left to happen, then checks the invariants of a
     /// settled world. Panics if it takes more than `iterations`.
     pub fn run(&mut self, iterations: u32) {
+        let seed = self.settings.seed;
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.run_iterations(iterations))).unwrap_or_else(
+            |cause| {
+                let detail = cause
+                    .downcast_ref::<String>()
+                    .map(String::as_str)
+                    .or_else(|| cause.downcast_ref::<&str>().copied())
+                    .unwrap_or("non-string panic");
+                panic!("host seed {seed}: {detail}");
+            },
+        );
+    }
+
+    fn run_iterations(&mut self, iterations: u32) {
         for _ in 0..iterations {
             self.iterate();
             if self.has_work_now() {
@@ -436,13 +460,13 @@ impl World {
         let mut made = Vec::new();
         // The ready list first, at the start of the stage, then the events.
         while self.stage.has_room() && self.host.is_ready() {
-            self.trace.log(self.now, Entry::Resumes);
+            self.trace.log(self.now, format_args!("host resumes"));
             let before = self.stage.out.len();
             host::resume(&mut self.host, &self.stage.env, &mut self.stage.out);
             made.push((Taken::Other, self.stage.out.len() - before));
         }
         while let Some(Arrival { event, stale, duplicate }) = self.stage.next_event() {
-            self.trace.log(self.now, Entry::Input(event.clone()));
+            self.trace.log(self.now, format_args!("host <- {event:?}"));
             let taken = if duplicate { Taken::Duplicate } else { self.take(&event, stale) };
             let before = self.stage.out.len();
             host::step(&mut self.host, &self.stage.env, event, &mut self.stage.out);
@@ -719,7 +743,7 @@ impl World {
 
     /// Hands the host's `request` to whom it is for, checking it on the way.
     fn route(&mut self, request: Request) {
-        self.trace.log(self.now, Entry::Output(request.clone()));
+        self.trace.log(self.now, format_args!("host -> {request:?}"));
         match request {
             Request::Answer { to, run, attempt, answer } => {
                 if let Some(owner) = self.admitted.remove(&(run, attempt)) {

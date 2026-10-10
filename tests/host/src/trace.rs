@@ -1,37 +1,28 @@
-//! Complete host boundary trace, formatted only when diagnostics ask for it.
-use jig_host::{Event, Request};
+//! Complete boundary diagnostics, enabled for focused/failing-seed replay only.
 use skein_lib::Time;
-use std::sync::OnceLock;
+use std::{fmt::Arguments, sync::OnceLock};
 
 #[derive(Debug)]
-pub enum Entry {
-    Resumes,
-    Input(Event),
-    Output(Request),
-}
-#[derive(Default, Debug)]
 pub struct Trace {
-    entries: Vec<(Time, Entry)>,
-    lines: OnceLock<Vec<String>>,
+    enabled: bool,
+    trace: skein_world::domain::Trace,
+}
+impl Default for Trace {
+    fn default() -> Self {
+        static ENABLED: OnceLock<bool> = OnceLock::new();
+        Self::with_enabled(*ENABLED.get_or_init(|| std::env::var_os("JIG_WORLD_TRACE").is_some()))
+    }
 }
 impl Trace {
-    pub fn log(&mut self, now: Time, entry: Entry) {
-        self.lines.take();
-        self.entries.push((now, entry));
+    pub fn with_enabled(enabled: bool) -> Self {
+        Self { enabled, trace: skein_world::domain::Trace::default() }
+    }
+    pub fn log(&mut self, now: Time, message: Arguments<'_>) {
+        if self.enabled {
+            self.trace.log(now, message);
+        }
     }
     pub fn lines(&self) -> &[String] {
-        self.lines.get_or_init(|| {
-            self.entries
-                .iter()
-                .map(|(now, entry)| {
-                    let detail = match entry {
-                        Entry::Resumes => "host resumes".to_owned(),
-                        Entry::Input(event) => format!("host <- {event:?}"),
-                        Entry::Output(request) => format!("host -> {request:?}"),
-                    };
-                    format!("{now:?}: {detail}")
-                })
-                .collect()
-        })
+        self.trace.lines()
     }
 }

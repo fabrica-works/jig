@@ -185,6 +185,16 @@ pub struct World {
 impl World {
     #[must_use]
     pub fn new(seed: u64, limits: Limits) -> World {
+        Self::start(seed, limits, Trace::default())
+    }
+
+    /// Explicit trace setting for focused replay, without changing the process environment.
+    #[must_use]
+    pub fn with_trace(seed: u64, limits: Limits, enabled: bool) -> World {
+        Self::start(seed, limits, Trace::with_enabled(enabled))
+    }
+
+    fn start(seed: u64, limits: Limits, trace: Trace) -> World {
         let mut world = World {
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             domain: Domain::new(&limits, seed, Box::new([1])),
@@ -203,7 +213,7 @@ impl World {
             accounting_referee: crate::accounting_referee::Accounting::default(),
             consume_facts: true,
             referee: Referee::new(Tasks::default()),
-            trace: Trace::default(),
+            trace,
             seed,
             call: 0,
             message: 0,
@@ -1056,8 +1066,29 @@ pub fn run_story(seed: u64) -> (Trace, Frozen) {
 
 #[must_use]
 pub fn run_story_facts(seed: u64, consume_facts: bool) -> (Trace, Frozen) {
+    story(seed, consume_facts, Trace::default())
+}
+
+/// Replay one complete story with an explicit diagnostic setting.
+#[must_use]
+pub fn run_story_traced(seed: u64, consume_facts: bool, enabled: bool) -> (Trace, Frozen) {
+    story(seed, consume_facts, Trace::with_enabled(enabled))
+}
+
+fn story(seed: u64, consume_facts: bool, trace: Trace) -> (Trace, Frozen) {
+    std::panic::catch_unwind(|| story_run(seed, consume_facts, trace)).unwrap_or_else(|cause| {
+        let detail = cause
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| cause.downcast_ref::<&str>().copied())
+            .unwrap_or("non-string panic");
+        panic!("task seed {seed}: {detail}");
+    })
+}
+
+fn story_run(seed: u64, consume_facts: bool, trace: Trace) -> (Trace, Frozen) {
     let mut rng = Rng::new(seed);
-    let mut w = World::new(seed, LIMITS);
+    let mut w = World::start(seed, LIMITS, trace);
     w.consume_facts = consume_facts;
     let arrival = Duration::from_millis(rng.between(1, 20));
     w.env.now = w.env.now.saturating_add(arrival);

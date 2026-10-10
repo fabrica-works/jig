@@ -402,7 +402,7 @@ impl Request {
 }
 
 /// What the core gives the host for one run (domain/hosts.md, section 2).
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct RunAssignment {
     /// The engine's names for the run and for this attempt at it.
     pub run: Token,
@@ -417,7 +417,7 @@ pub struct RunAssignment {
 }
 
 /// An assignment with the conversation state the agent consumes (hosts.md, 2).
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Assignment {
     pub assignment: RunAssignment,
     /// Ordered committed turn bodies. An empty list starts a fresh conversation.
@@ -427,7 +427,7 @@ pub struct Assignment {
 }
 
 /// A call committed after the last turn, to tell the next activation.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct AnsweredCall {
     /// The run's opaque call name.
     pub name: Box<[u8]>,
@@ -437,7 +437,7 @@ pub struct AnsweredCall {
 }
 
 /// The committed answer to a host call or workspace delivery.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum SettledAnswer {
     /// A host tool's answer, including whether it is an error.
     Host { error: bool, body: Box<[u8]> },
@@ -446,7 +446,7 @@ pub enum SettledAnswer {
 }
 
 /// A turn's cumulative spend and last read message name are opaque accounting.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Turn {
     pub turn: u32,
     pub spent: u64,
@@ -454,21 +454,21 @@ pub struct Turn {
     pub body: Box<[u8]>,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Finish {
     Ended { outcome: Box<[u8]> },
     Parked,
     Failed { failure: RunFailure },
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Answer {
     pub turns: u32,
     pub spent: u64,
     pub ending: Ending,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Ending {
     Refused(Refusal),
     Ended { outcome: Box<[u8]>, work: Work },
@@ -486,7 +486,7 @@ pub struct Workspace {
 }
 
 /// A host call of a run.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Ask {
     /// A host tool call, carrying its charter name, write flag, input and time left.
     Relay {
@@ -502,7 +502,7 @@ pub enum Ask {
 }
 
 /// The answer to a host call.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Reply {
     /// The engine's answer to a relayed call, as it is.
     Relayed { answer: Box<[u8]> },
@@ -574,7 +574,7 @@ pub enum Phase {
 }
 
 /// The root's tokens for what a run delivered and saved on its workspace.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Work {
     pub left: Option<Token>,
     pub saved: Option<Token>,

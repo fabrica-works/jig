@@ -5,4 +5,4 @@ pub mod coverage;
 pub mod referee;
 pub mod trace;
 mod world;
-pub use world::{Frozen, LIMITS, RETRY, Reply, World, authority, run_story, run_story_facts, task};
+pub use world::{Frozen, LIMITS, RETRY, Reply, World, authority, run_story, run_story_facts, run_story_traced, task};

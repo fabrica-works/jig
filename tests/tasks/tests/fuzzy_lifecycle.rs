@@ -6,7 +6,7 @@ fn random_faults_and_restart_cuts_reach_every_retained_ending() {
     let markers = jig_tasks_world::coverage::MARKERS;
     for seed in 0..256 {
         let (trace, frozen) = run_story(seed);
-        assert_eq!(frozen.results.len(), 5);
+        assert_eq!(frozen.results.len(), 5, "seed {seed}");
         for marker in markers {
             if trace.coverage.0.contains(&marker) {
                 seen.insert(marker);
