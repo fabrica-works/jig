@@ -117,7 +117,7 @@ pub fn every_cut_traced(
         let cut = world.store.applied;
         let continuation = hook_position.borrow().clone();
         let result = World::from_snapshot(world.cold_snapshot()).and_then(|mut replay| {
-            finish(&mut replay, scenario, continuation, &RefCell::new(Position::default()))?;
+            finish(&mut replay, scenario, seed, continuation, &RefCell::new(Position::default()))?;
             visit(cut, replay);
             Ok(())
         });
