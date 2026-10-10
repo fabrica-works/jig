@@ -1389,7 +1389,7 @@ fn retained_task_facts_keep_person_revision_taker_and_full_executor_identity_ind
     ] {
         let mut value = task_doc(&[ActKind::Amend]);
         value.goal = false;
-        value.chip.executor = executor.clone();
+        value.chip.executor = executor;
         value.person_revision = person_revision;
         value.taken_by = taken_by;
         let (domain, object, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(value)));
