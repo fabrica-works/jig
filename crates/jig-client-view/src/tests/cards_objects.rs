@@ -103,9 +103,10 @@ fn result() -> Result {
     Result {
         task: chip(),
         ending: Ending::Failed { reason: Some(text(b"whole failure")) },
-        value: Some(ResultValue::Report(text(b"whole report"))),
-        at: Wall::EPOCH,
+        value: Some(ResultValue::Report(DocumentText::complete(text(b"whole report")))),
+        at: Some(Wall::EPOCH),
         acts: offered(ActKind::MarkSeen),
+        details: None,
     }
 }
 fn loaded_with_watch(key: ObjectKey, value: ReadValue) -> (Domain, Id<Object>, skein_lib::Token) {
@@ -372,12 +373,12 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
 fn result_value_payloads(words: &crate::words::Words, part: &Part) {
     let (d, _) = start();
     for (value, whole) in [
-        (ResultValue::Report(text(b"full report")), b"full report".as_slice()),
-        (ResultValue::Words(text(b"full words")), b"full words"),
+        (ResultValue::Report(DocumentText::complete(text(b"full report"))), b"full report".as_slice()),
+        (ResultValue::Words(DocumentText::complete(text(b"full words"))), b"full words"),
         (
             ResultValue::Verdict {
                 verdict: 2,
-                words: text(b"explanation"),
+                words: DocumentText::complete(text(b"explanation")),
                 fields: list([ResultField {
                     name: b"field".as_slice().into(),
                     value: b"full field".as_slice().into(),
@@ -387,13 +388,26 @@ fn result_value_payloads(words: &crate::words::Words, part: &Part) {
             },
             b"full field",
         ),
-        (ResultValue::Connector { summary: text(b"full connector"), part: part.clone() }, b"full connector"),
-        (ResultValue::Choice { option: 3, by: document().party, reason: text(b"full reason") }, b"full reason"),
         (
-            ResultValue::Approved { state: b"full state".as_slice().into(), words: Some(text(b"approved words")) },
+            ResultValue::Connector { summary: DocumentText::complete(text(b"full connector")), part: part.clone() },
+            b"full connector",
+        ),
+        (
+            ResultValue::Choice {
+                option: 3,
+                by: document().party,
+                reason: DocumentText::complete(text(b"full reason")),
+            },
+            b"full reason",
+        ),
+        (
+            ResultValue::Approved {
+                state: b"full state".as_slice().into(),
+                words: Some(DocumentText::complete(text(b"approved words"))),
+            },
             b"full state",
         ),
-        (ResultValue::Failure(text(b"full failure")), b"full failure"),
+        (ResultValue::Failure(DocumentText::complete(text(b"full failure"))), b"full failure"),
     ] {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
@@ -679,7 +693,7 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
             reason,
             before: Phase::Closing,
             since: Wall::EPOCH,
-            result: Some(ResultValue::Report(text(b"kept closing result"))),
+            result: Some(ResultValue::Report(DocumentText::complete(text(b"kept closing result")))),
             spend: list([
                 SpendLine { task: 8, attempt: Some(2), spent: 7 },
                 SpendLine { task: 9, attempt: None, spent: 3 },
@@ -1286,7 +1300,10 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
     let (domain, _) = start();
     let words = words();
     for explanation in [None, Some(text(b"")), Some(text(b"exact explanation"))] {
-        let value = ResultValue::Approved { state: Box::new([0, 255, 1]), words: explanation.clone() };
+        let value = ResultValue::Approved {
+            state: Box::new([0, 255, 1]),
+            words: explanation.clone().map(DocumentText::complete),
+        };
         let mut builder = Builder::new(&limits());
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
@@ -1307,7 +1324,7 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
     cards::result::value_nodes(
         &mut builder,
         &domain,
-        &ResultValue::Failure(text(b"cannot complete")),
+        &ResultValue::Failure(DocumentText::complete(text(b"cannot complete"))),
         &words,
         &mut bindings,
     );
@@ -1652,3 +1669,86 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
 }
 #[path = "instruction_facts.rs"]
 mod instruction_facts;
+
+#[test]
+fn result_documents_keep_each_words_loss_fact_and_the_exact_change_kind_and_owner_part() {
+    let (domain, _) = start();
+    let words = words();
+    let part = Part::Result { connector: 2, task: 8 };
+    let raw = OwnerPart {
+        connector: u16::MAX,
+        kind: OwnerPartKind::Resource,
+        key: OwnerPartKey::Path(list([b"a/b".as_slice().into(), b"c\xff".as_slice().into()])),
+    };
+    for cut in [false, true] {
+        let explanation = DocumentText { bytes: text(b"supplied words"), cut };
+        let values = [
+            ResultValue::Report(explanation.clone()),
+            ResultValue::Words(explanation.clone()),
+            ResultValue::Failure(explanation.clone()),
+            ResultValue::Verdict {
+                verdict: u32::MAX,
+                words: explanation.clone(),
+                fields: list([]),
+                tasks: list([]),
+                proposal: None,
+            },
+            ResultValue::Connector { summary: explanation.clone(), part: part.clone() },
+            ResultValue::Choice { option: u32::MAX, by: document().party, reason: explanation.clone() },
+            ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(explanation.clone()) },
+            ResultValue::Change { kind: u16::MAX, part: raw.clone(), words: explanation },
+        ];
+        for value in values {
+            let mut builder = Builder::new(&crate::Limits::of_words(&CLIENT, &words).unwrap());
+            builder.open(Role::Page);
+            let mut bindings = JigBindings::new(64, CLIENT.text);
+            cards::result::value_nodes(&mut builder, &domain, &value, &words, &mut bindings);
+            builder.close();
+            let tree = builder.finish();
+            assert!(contains(&tree, b"supplied words"));
+            assert_eq!(contains(&tree, b"Only part of this text was supplied"), cut);
+            if let ResultValue::Change { .. } = value {
+                assert!(contains(&tree, b"Change result kind 65535"));
+                assert!(contains(&tree, b"a/b"));
+                assert!(contains(&tree, b"\\x63\\xFF"));
+                let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
+                assert_eq!(bindings.owner_part(slot.token), Some(&raw));
+                assert_eq!(bindings.part(slot.token), None);
+            }
+        }
+    }
+}
+
+#[test]
+fn result_cards_distinguish_an_absent_completion_wall_from_epoch_and_render_supplied_metadata() {
+    let (domain, _) = start();
+    let words = words();
+    for at in [None, Some(Wall::EPOCH)] {
+        let mut value = result();
+        value.at = at;
+        value.details = Some(Box::new(ResultDetails {
+            contract: TaskContractDocument::Report { words: u32::MAX },
+            requester: OwnerRequester::Deployment { project: u32::MAX },
+            executor: OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
+            chosen_by: None,
+            delegates: list([
+                OwnerTaskLink::Retained { chip: chip(), at: None },
+                OwnerTaskLink::Stored { number: u64::MAX, status: None },
+            ]),
+            followups: Some(list([])),
+            proposal: None,
+            cut: false,
+        }));
+        let envelope = crate::Limits::of_words(&CLIENT, &words).unwrap();
+        let mut builder = Builder::new(&envelope);
+        builder.open(Role::Page);
+        let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
+        cards::result::facts(&mut builder, &domain, &value, &words, &mut bindings);
+        builder.close();
+        let tree = builder.finish();
+        assert_eq!(contains(&tree, b"Completion time not supplied"), at.is_none());
+        assert!(contains(&tree, b"whole report"));
+        assert!(contains(&tree, b"4294967295"));
+        assert!(contains(&tree, b"18446744073709551615"));
+    }
+}

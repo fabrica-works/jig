@@ -679,12 +679,13 @@ impl Payload for ResultValue {
                 proposal.heap(bounds),
             ]),
             Self::Connector { summary, part } => sum(&[summary.heap(bounds), part.heap(bounds)]),
+            Self::Change { kind, part, words } => sum(&[kind.heap(bounds), part.heap(bounds), words.heap(bounds)]),
             Self::Choice { option, by, reason } => sum(&[option.heap(bounds), by.heap(bounds), reason.heap(bounds)]),
             Self::Approved { state, words } => sum(&[state.heap(bounds), words.heap(bounds)]),
         }
     }
 }
-fields!(Result { task, ending, value, at, acts });
+fields!(Result { task, ending, value, at, details, acts });
 fields!(PhaseCounts { waiting, running, held, closing, done, failed, cancelled });
 fields!(TreeNode { chip, parent, dependencies, proposals, spend, folded, held_below });
 fields!(Tree { task, nodes, folded, held_below });

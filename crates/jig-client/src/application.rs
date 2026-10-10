@@ -243,6 +243,7 @@ fn parts(body: &Body, limit: u32) -> Parts {
                 Some(
                     contract::ResultValue::Report(_)
                     | contract::ResultValue::Verdict { .. }
+                    | contract::ResultValue::Change { .. }
                     | contract::ResultValue::Choice { .. }
                     | contract::ResultValue::Approved { .. }
                     | contract::ResultValue::Failure(_)

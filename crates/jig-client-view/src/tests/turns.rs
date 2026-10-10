@@ -241,9 +241,11 @@ fn activities(words: &Words) {
     let result = Result {
         task: super::work_pages::chip(9),
         ending: Ending::Done,
-        value: Some(ResultValue::Report(text(b"whole heard result"))),
-        at: Wall::EPOCH,
+        value: Some(ResultValue::Report(DocumentText::complete(text(b"whole heard result")))),
+        at: Some(Wall::EPOCH),
         acts: list([]),
+
+        details: None,
     };
     let values = [
         Activity::RunBegan { attempt: 1, how: RunBeginning::Resumed, why: text(b"resume reason") },
@@ -295,9 +297,11 @@ fn activities(words: &Words) {
                 let value = Result {
                     task: super::work_pages::chip(9),
                     ending: Ending::Done,
-                    value: Some(ResultValue::Report(text(b"whole heard result"))),
-                    at: Wall::EPOCH,
+                    value: Some(ResultValue::Report(DocumentText::complete(text(b"whole heard result")))),
+                    at: Some(Wall::EPOCH),
                     acts: list([]),
+
+                    details: None,
                 };
                 drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Result(Box::new(value))) });
             }

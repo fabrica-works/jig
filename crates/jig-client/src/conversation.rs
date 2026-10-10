@@ -402,6 +402,7 @@ impl Conversation {
                             crate::contract::ResultValue::Connector { part, .. } => add_part(&mut parts, part),
                             crate::contract::ResultValue::Report(_)
                             | crate::contract::ResultValue::Verdict { .. }
+                            | crate::contract::ResultValue::Change { .. }
                             | crate::contract::ResultValue::Choice { .. }
                             | crate::contract::ResultValue::Approved { .. }
                             | crate::contract::ResultValue::Failure(_)

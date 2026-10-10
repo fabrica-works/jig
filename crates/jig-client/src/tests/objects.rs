@@ -160,9 +160,10 @@ pub(super) fn result() -> Result {
     Result {
         task: chip(8),
         ending: Ending::Done,
-        value: Some(ResultValue::Report(text(b"report"))),
-        at: Wall::EPOCH,
+        value: Some(ResultValue::Report(DocumentText::complete(text(b"report")))),
+        at: Some(Wall::EPOCH),
         acts: List::with_capacity(0),
+        details: None,
     }
 }
 fn inbox(keys: &[ObjectKey]) -> Delivery {

@@ -43,7 +43,13 @@ pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &W
     b.name(&title);
     super::chip::chip(b, client, &facts.task, words, bindings);
     words.ending(b, &facts.ending);
-    words.wall(b, facts.at);
+    match facts.at {
+        Some(at) => words.wall(b, at),
+        None => words.text(b, JigPhrase::ResultTimeUnknown, &[]),
+    }
+    if let Some(details) = &facts.details {
+        crate::owner_result::render(b, client, details, words, bindings);
+    }
     if let Some(value) = &facts.value {
         value_nodes(b, client, value, words, bindings);
     }
@@ -52,10 +58,10 @@ pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &W
 /// The whole result vocabulary, including connector slots and follow-up chips.
 pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words: &Words, bindings: &mut JigBindings) {
     match value {
-        ResultValue::Report(text) | ResultValue::Words(text) => crate::markdown::read(text.bytes(), 2, b),
+        ResultValue::Report(text) | ResultValue::Words(text) => crate::document_text::markdown(b, text, words),
         ResultValue::Verdict { verdict, words: explanation, fields, tasks, proposal } => {
             words.text(b, JigPhrase::Verdict, &[Hole::Number(u64::from(*verdict))]);
-            crate::markdown::read(explanation.bytes(), 2, b);
+            crate::document_text::markdown(b, explanation, words);
             for field in fields {
                 b.text(Run::Plain, &field.name);
                 crate::markdown::read(&field.value, 2, b);
@@ -70,22 +76,27 @@ pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words:
             }
         }
         ResultValue::Connector { summary, part } => {
-            crate::markdown::read(summary.bytes(), 2, b);
+            crate::document_text::markdown(b, summary, words);
             super::common::part(b, part, words, bindings);
+        }
+        ResultValue::Change { kind, part, words: explanation } => {
+            words.text(b, JigPhrase::ChangeResultKind, &[Hole::Number(u64::from(*kind))]);
+            crate::document_text::markdown(b, explanation, words);
+            crate::proposed_task::part(b, part, words, bindings);
         }
         ResultValue::Choice { option, by, reason } => {
             words.text(b, JigPhrase::ChoiceResult, &[Hole::Number(u64::from(*option)), name(by.name.bytes())]);
-            crate::markdown::read(reason.bytes(), 2, b);
+            crate::document_text::markdown(b, reason, words);
         }
         ResultValue::Failure(reason) => {
             words.text(b, JigPhrase::FailedPhase, &[]);
-            crate::markdown::read(reason.bytes(), 2, b);
+            crate::document_text::markdown(b, reason, words);
         }
         ResultValue::Approved { state, words: explanation } => {
             words.text(b, JigPhrase::ApprovalExpected, &[]);
             b.text(Run::Plain, state);
             if let Some(explanation) = explanation {
-                crate::markdown::read(explanation.bytes(), 2, b);
+                crate::document_text::markdown(b, explanation, words);
             }
         }
     }

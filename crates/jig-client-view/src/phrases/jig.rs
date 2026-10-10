@@ -614,6 +614,10 @@ pub enum JigPhrase {
     DocumentTextCut,
     /// The named independent person-task revision (0).
     PersonAddressRevision,
+    /// No completion wall was supplied by the owner.
+    ResultTimeUnknown,
+    /// Exact owner change result kind (0).
+    ChangeResultKind,
     /// This note reference list is incomplete.
     NoteReferencesCut,
     /// Charter (0).
@@ -1370,6 +1374,8 @@ impl JigPhrase {
             Self::NoteBody => 269,
             Self::DocumentTextCut => 3500,
             Self::PersonAddressRevision => 3600,
+            Self::ResultTimeUnknown => 3700,
+            Self::ChangeResultKind => 3701,
             Self::NoteReferencesCut => 3300,
             Self::Charter => 270,
             Self::GoalProcedure => 510,
@@ -1992,6 +1998,7 @@ impl JigPhrase {
             | Self::NoteDescription
             | Self::NoteBody
             | Self::DocumentTextCut
+            | Self::ResultTimeUnknown
             | Self::NoteReferencesCut
             | Self::Notice
             | Self::UnknownAction
@@ -2112,6 +2119,7 @@ impl JigPhrase {
             | Self::AmendTask
             | Self::Verdict
             | Self::PersonAddressRevision
+            | Self::ChangeResultKind
             | Self::FirstUnread
             | Self::Topic
             | Self::DependencyEnded
@@ -2236,7 +2244,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 577] = [
+pub const ALL: [JigPhrase; 579] = [
     JigPhrase::PolicyPeriodSpend,
     JigPhrase::PolicyEditRole,
     JigPhrase::PolicyRequests,
@@ -2570,6 +2578,8 @@ pub const ALL: [JigPhrase; 577] = [
     JigPhrase::NoteBody,
     JigPhrase::DocumentTextCut,
     JigPhrase::PersonAddressRevision,
+    JigPhrase::ResultTimeUnknown,
+    JigPhrase::ChangeResultKind,
     JigPhrase::NoteReferencesCut,
     JigPhrase::Charter,
     JigPhrase::GoalProcedure,

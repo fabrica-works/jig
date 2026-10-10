@@ -1290,6 +1290,11 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b"Person-task revision ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
             ]),
+            JigPhrase::ResultTimeUnknown => Box::new([Segment::Text(copy_of(b"Completion time not supplied"))]),
+            JigPhrase::ChangeResultKind => Box::new([
+                Segment::Text(copy_of(b"Change result kind ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::DocumentTextCut => Box::new([Segment::Text(copy_of(b"Only part of this text was supplied"))]),
             JigPhrase::NoteReferencesCut => Box::new([Segment::Text(copy_of(
                 b"This note has more references; read the whole note before replacing it",

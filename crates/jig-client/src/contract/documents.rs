@@ -527,19 +527,27 @@ pub enum ResultContract {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ResultValue {
     /// A report.
-    Report(Text),
+    Report(DocumentText),
     /// A verdict and follow ups.
-    Verdict { verdict: u32, words: Text, fields: List<ResultField>, tasks: List<Chip>, proposal: Option<ProposalKey> },
+    Verdict {
+        verdict: u32,
+        words: DocumentText,
+        fields: List<ResultField>,
+        tasks: List<Chip>,
+        proposal: Option<ProposalKey>,
+    },
     /// A summary and connector result.
-    Connector { summary: Text, part: Part },
+    Connector { summary: DocumentText, part: Part },
+    /// Exact connector result kind and raw owner part, before any scoped application routing.
+    Change { kind: u16, part: super::OwnerPart, words: DocumentText },
     /// A party choice.
-    Choice { option: u32, by: Party, reason: Text },
+    Choice { option: u32, by: Party, reason: DocumentText },
     /// Whole approved state and its optional explanation.
-    Approved { state: Box<[u8]>, words: Option<Text> },
+    Approved { state: Box<[u8]>, words: Option<DocumentText> },
     /// A task that could not complete its contract.
-    Failure(Text),
+    Failure(DocumentText),
     /// An answer in words.
-    Words(Text),
+    Words(DocumentText),
 }
 
 /// A task ending and its result, as a card.
@@ -548,7 +556,10 @@ pub struct Result {
     pub task: Chip,
     pub ending: Ending,
     pub value: Option<ResultValue>,
-    pub at: Wall,
+    /// Completion wall when supplied; closing results may have no completion wall.
+    pub at: Option<Wall>,
+    /// Complete owner metadata when supplied; partial scripted values retain explicit absence.
+    pub details: Option<Box<super::ResultDetails>>,
     pub acts: List<Offered>,
 }
 

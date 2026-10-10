@@ -791,9 +791,11 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
     task.result = Some(Result {
         task: task.chip.clone(),
         ending: Ending::Done,
-        value: Some(ResultValue::Report(text(report))),
-        at: Wall::EPOCH,
+        value: Some(ResultValue::Report(DocumentText::complete(text(report)))),
+        at: Some(Wall::EPOCH),
         acts: list([]),
+
+        details: None,
     });
     task
 }

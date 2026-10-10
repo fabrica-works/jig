@@ -101,7 +101,9 @@ fn own_script() -> Script {
                 ending: Ending::Done,
                 acts: list(vec![]),
                 value: None,
-                at: Wall::EPOCH,
+                at: Some(Wall::EPOCH),
+
+                details: None,
             })),
         );
         setup.truth.object_projects.insert(entry.object, 1);

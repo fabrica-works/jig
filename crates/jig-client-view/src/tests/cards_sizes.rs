@@ -82,7 +82,7 @@ fn full_batch() -> ProposalAction {
 fn full_value() -> ResultValue {
     ResultValue::Verdict {
         verdict: 1,
-        words: full_text(),
+        words: DocumentText::complete(full_text()),
         fields: list([
             ResultField { name: full_text().bytes().into(), value: full_text().bytes().into() },
             ResultField { name: full_text().bytes().into(), value: full_text().bytes().into() },
@@ -96,6 +96,31 @@ fn full_result() -> Result {
     value.task = full_chip(8);
     value.ending = Ending::Cancelled { by: Actor::Party(1), reason: Some(full_name()), at: None };
     value.value = Some(full_value());
+    let choice = VerdictChoice {
+        code: u32::MAX,
+        words: u32::MAX,
+        followups: u32::MAX,
+        fields: list([
+            FieldRule { name: full_text().bytes().into(), max: u32::MAX },
+            FieldRule { name: full_text().bytes().into(), max: u32::MAX },
+        ]),
+    };
+    value.details = Some(Box::new(ResultDetails {
+        contract: TaskContractDocument::Verdict { choices: list([choice.clone(), choice]), cut: true },
+        requester: OwnerRequester::Deployment { project: u32::MAX },
+        executor: OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
+        chosen_by: Some(u64::MAX),
+        delegates: list([
+            OwnerTaskLink::Live(full_chip(13)),
+            OwnerTaskLink::Retained { chip: full_chip(14), at: None },
+        ]),
+        followups: Some(list([
+            OwnerTaskLink::Live(full_chip(15)),
+            OwnerTaskLink::Retained { chip: full_chip(16), at: Some(Wall::from_nanos(u64::MAX)) },
+        ])),
+        proposal: None,
+        cut: true,
+    }));
     value
 }
 fn acquire(d: &mut Domain, watch: Token, root: ObjectKey, key: ObjectKey, value: ReadValue) {

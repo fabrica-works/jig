@@ -1125,8 +1125,13 @@ fn moved_hold_refusal_prices_the_complete_reason_allocation_and_each_nested_fail
 #[test]
 fn verdict_documents_price_whole_machine_field_arrays_and_bytes() {
     let fields = list(vec![ResultField { name: b"state".as_slice().into(), value: Box::new([0, 255]) }]);
-    let value =
-        ResultValue::Verdict { verdict: u32::MAX, words: text(b"why"), fields, tasks: list(vec![]), proposal: None };
+    let value = ResultValue::Verdict {
+        verdict: u32::MAX,
+        words: DocumentText::complete(text(b"why")),
+        fields,
+        tasks: list(vec![]),
+        proposal: None,
+    };
     let mut bounds = Bounds { text: 8, rows: 1, ..Bounds::default() };
     bounds.document_bytes = u64::try_from(core::mem::size_of::<ResultValue>()).unwrap()
         + List::<ResultField>::worst_case(1).unwrap()
@@ -1158,9 +1163,13 @@ fn verdict_documents_price_whole_machine_field_arrays_and_bytes() {
 fn approved_documents_preserve_opaque_state_optional_words_and_exact_byte_bounds() {
     let mut bounds = Bounds { text: 3, document_bytes: u64::MAX, ..Bounds::default() };
     let absent = ResultValue::Approved { state: Box::new([0, 255, 1]), words: None };
-    let empty = ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(text(b"")) };
+    let empty = ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(DocumentText::complete(text(b""))) };
     assert_ne!(absent, empty);
-    for value in [absent, empty, ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(text(b"yes")) }] {
+    for value in [
+        absent,
+        empty,
+        ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(DocumentText::complete(text(b"yes"))) },
+    ] {
         let ResultValue::Approved { words, .. } = &value else {
             unreachable!("approval fixture");
         };
@@ -1174,7 +1183,7 @@ fn approved_documents_preserve_opaque_state_optional_words_and_exact_byte_bounds
         assert!(!crate::payload::fits(&value, &bounds), "whole opaque state is refused rather than cut");
         bounds.text = 3;
     }
-    let failure = ResultValue::Failure(text(b"bad"));
+    let failure = ResultValue::Failure(DocumentText::complete(text(b"bad")));
     bounds.document_bytes = u64::try_from(core::mem::size_of::<ResultValue>() + 3).unwrap();
     assert!(crate::payload::fits(&failure, &bounds));
     bounds.document_bytes -= 1;
@@ -1687,4 +1696,72 @@ fn addressed_changes_keep_named_person_revisions_and_whole_fixed_width_destinati
         bounds.document_bytes -= 1;
         assert!(!crate::payload::fits(&change, &bounds), "the complete named revision and target are charged together");
     }
+}
+
+#[test]
+fn result_document_loss_and_raw_change_paths_are_admitted_whole_at_exact_allocated_bounds() {
+    let mut path = List::with_capacity(4);
+    path.push(b"a/b".as_slice().into()).unwrap();
+    path.push(Box::new([255, 0])).unwrap();
+    let value = ResultValue::Change {
+        kind: u16::MAX,
+        part: OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path) },
+        words: DocumentText { bytes: text(b"why"), cut: true },
+    };
+    let exact = u64::try_from(core::mem::size_of::<ResultValue>()).unwrap()
+        + List::<Box<[u8]>>::worst_case(4).unwrap()
+        + 3
+        + 2
+        + 3;
+    let mut bounds = Bounds { rows: 4, text: 3, document_bytes: exact, ..Bounds::default() };
+    assert!(crate::payload::fits(&value, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&value, &bounds));
+    bounds.document_bytes = exact;
+    bounds.rows = 3;
+    assert!(!crate::payload::fits(&value, &bounds), "allocated path rows are charged even when unused");
+    bounds.rows = 4;
+    bounds.text = 2;
+    assert!(
+        !crate::payload::fits(&value, &bounds),
+        "an incomplete source text does not permit further byte truncation"
+    );
+}
+
+#[test]
+fn result_metadata_boxes_price_unfilled_delegate_and_followup_capacity_without_inventing_a_wall() {
+    use crate::payload::Payload;
+    let mut bounds = Bounds { rows: 4, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut result = jig_client::contract::Result {
+        task: task().chip,
+        ending: Ending::Done,
+        value: None,
+        at: None,
+        details: None,
+        acts: list(vec![]),
+    };
+    let base =
+        u64::try_from(core::mem::size_of::<jig_client::contract::Result>()).unwrap() + result.heap(&bounds).unwrap();
+    result.details = Some(Box::new(ResultDetails {
+        contract: TaskContractDocument::Report { words: u32::MAX },
+        requester: OwnerRequester::Deployment { project: u32::MAX },
+        executor: OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
+        chosen_by: None,
+        delegates: List::with_capacity(3),
+        followups: Some(List::with_capacity(4)),
+        proposal: None,
+        cut: true,
+    }));
+    let exact = base
+        + u64::try_from(core::mem::size_of::<ResultDetails>()).unwrap()
+        + List::<OwnerTaskLink>::worst_case(3).unwrap()
+        + List::<OwnerTaskLink>::worst_case(4).unwrap();
+    bounds.document_bytes = exact;
+    assert!(crate::payload::fits(&result, &bounds));
+    assert_eq!(result.at, None);
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&result, &bounds));
+    bounds.document_bytes = exact;
+    bounds.rows = 2;
+    assert!(!crate::payload::fits(&result, &bounds), "whole supplied capacity is enforced for empty retained lists");
 }

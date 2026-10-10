@@ -89,11 +89,15 @@ fn result_value(limits: &Limits) -> Option<u32> {
         .checked_mul(limits.rows)?
         .checked_add(proposal_nodes(limits)?)?
         .checked_add(markdown(limits)?)?
-        .checked_add(1)?;
-    Some(verdict.max(markdown(limits)?.checked_add(2)?))
+        .checked_add(2)?;
+    let change = markdown(limits)?.checked_add(crate::proposed_task::part_nodes(limits)?)?.checked_add(2)?;
+    Some(verdict.max(markdown(limits)?.checked_add(3)?).max(change))
 }
 fn result_facts(limits: &Limits) -> Option<u32> {
-    chip_nodes(limits)?.checked_add(result_value(limits)?)?.checked_add(10)
+    chip_nodes(limits)?
+        .checked_add(result_value(limits)?)?
+        .checked_add(crate::owner_result::nodes(limits)?)?
+        .checked_add(10)
 }
 /// Whole result, including follow-up chips and a kept verdict proposal.
 #[must_use]
