@@ -17,8 +17,8 @@ use jig_client::contract::{
     ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
     ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunState,
     RunText, RunWork, Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod,
-    Steering, Subject, TakenBy, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits,
-    TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Steering, Subject, TakenBy, Task, TaskFilter, TaskHold, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn,
+    TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 

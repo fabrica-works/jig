@@ -1141,14 +1141,14 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
     for stale_hold in [false, true] {
         let mut setup = script();
         let mut row = task();
-        row.hold = Some(Hold {
+        row.hold = Some(TaskHold::Document(Box::new(Hold {
             revision: Revision { value: 7 },
             reason: HoldReason::Stopped { by: party(1), at: Wall::EPOCH },
             before: Phase::Running,
             since: Wall::EPOCH,
             result: None,
             spend: list(vec![]),
-        });
+        })));
         row.acts = list(vec![Offered { act: ActKind::AmendRelease, admission: Admission::Allowed }]);
         setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         let mut engine = Engine::new(setup, 1).unwrap();

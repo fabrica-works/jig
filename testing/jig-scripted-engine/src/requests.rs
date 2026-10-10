@@ -138,9 +138,11 @@ impl<A: crate::Application> Engine<A> {
                     if seen != now {
                         let what = match what {
                             Moved::Hold { .. } => {
-                                let hold = match value {
-                                    ReadValue::Task(task) => task.hold.as_ref(),
-                                    ReadValue::Escalation(escalation) => Some(&escalation.hold),
+                                let reason = match value {
+                                    ReadValue::Task(task) => task.hold.as_ref().map(task_hold_reason),
+                                    ReadValue::Escalation(escalation) => {
+                                        Some(CurrentHold::Document(Box::new(escalation.hold.reason.clone())))
+                                    }
                                     ReadValue::Frame(_)
                                     | ReadValue::Proposal(_)
                                     | ReadValue::Question(_)
@@ -158,9 +160,7 @@ impl<A: crate::Application> Engine<A> {
                                     | ReadValue::Notes(_)
                                     | ReadValue::Deployment(_) => None,
                                 };
-                                Moved::Hold {
-                                    reason: hold.map(|hold| CurrentHold::Document(Box::new(hold.reason.clone()))),
-                                }
+                                Moved::Hold { reason }
                             }
                             Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting => what,
                         };
@@ -173,12 +173,12 @@ impl<A: crate::Application> Engine<A> {
             if let Ask::Amend { release: Some(seen), .. } = ask
                 && let ReadValue::Task(task) = value
                 && let Some(hold) = &task.hold
-                && *seen != hold.revision
+                && *seen != hold.revision()
             {
                 return Ok((
                     Answer::Refused(Refusal::Moved {
-                        now: hold.revision,
-                        what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(hold.reason.clone()))) },
+                        now: hold.revision(),
+                        what: Moved::Hold { reason: Some(task_hold_reason(hold)) },
                     }),
                     Vec::new(),
                 ));
@@ -445,6 +445,12 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => None,
+    }
+}
+fn task_hold_reason(value: &TaskHold) -> CurrentHold {
+    match value {
+        TaskHold::Document(value) => CurrentHold::Document(Box::new(value.reason.clone())),
+        TaskHold::Owner(value) => CurrentHold::Reason(value.reason),
     }
 }
 fn ending(value: &ReadValue) -> Option<Ending> {
