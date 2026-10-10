@@ -52,8 +52,8 @@ fn frame_tree_keeps_absent_empty_and_partial_names_separate_from_identity_loss()
             .collect();
         let expected = match name {
             None => b"Project 4".as_slice(),
-            Some(ref value) if value.bytes().is_empty() => b"Project ".as_slice(),
-            Some(_) => b"Project partial-name".as_slice(),
+            Some(ref value) if value.bytes().is_empty() => b"Project: ".as_slice(),
+            Some(_) => b"Project: partial-name".as_slice(),
         };
         assert!(labels.contains(&expected));
         assert_eq!(

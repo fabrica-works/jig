@@ -17,6 +17,12 @@ impl BudgetFragment {
     fn phrase(&mut self, words: &Words, phrase: BudgetPhrase) -> Option<()> {
         self.leaf(words.book.capacity(phrase.id())?)
     }
+    fn name(&mut self, words: &Words, phrase: BudgetPhrase) -> Option<()> {
+        let bytes = words.book.capacity(phrase.id())?;
+        self.text_bytes = self.text_bytes.checked_add(bytes)?;
+        self.text_per_node = self.text_per_node.max(bytes);
+        Some(())
+    }
     fn leaf(&mut self, bytes: u32) -> Option<()> {
         self.nodes = self.nodes.checked_add(1)?;
         self.text_bytes = self.text_bytes.checked_add(bytes)?;
@@ -63,6 +69,7 @@ pub fn required(value: &OwnerBudget, words: &Words) -> Option<BudgetFragment> {
 #[must_use]
 pub fn ledger_required(value: &PoolLedger, words: &Words) -> Option<BudgetFragment> {
     let mut result = region();
+    result.name(words, BudgetPhrase::Source)?;
     result.numbers(words)?;
     result.phrase(words, BudgetPhrase::Source)?;
     result.funder(words)?;
@@ -93,6 +100,7 @@ pub fn worst_case(words: &Words) -> Option<BudgetFragment> {
 #[must_use]
 pub fn ledger_worst_case(words: &Words) -> Option<BudgetFragment> {
     let mut result = region();
+    result.name(words, BudgetPhrase::Source)?;
     result.numbers(words)?;
     result.phrase(words, BudgetPhrase::Source)?;
     result.funder(words)?;
@@ -136,6 +144,9 @@ pub fn render(b: &mut Builder, value: &OwnerBudget, words: &Words) {
 /// Render one exact ledger, retaining its own source/parent period identities.
 pub fn ledger(b: &mut Builder, value: &PoolLedger, words: &Words) {
     b.open(Role::Region);
+    let label =
+        words.book.say(words.language, BudgetPhrase::Source.id(), &[]).expect("checked ledger region label").text;
+    b.name(&label);
     numbers(b, &value.numbers, value.left, words);
     text(b, words, BudgetPhrase::Source, &[]);
     proposed_task::funder(b, value.source, words);
