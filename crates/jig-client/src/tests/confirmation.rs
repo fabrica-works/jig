@@ -355,13 +355,13 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
                         maximum
                     }),
                 },
-                beyond: Beyond::Refused(Refusal::Role { project: 1, role: 2 }),
+                beyond: Beyond::Refused(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }),
             },
         );
         reread(&mut domain, Body::Task(Box::new(row.clone())), Read::Task { task: 8 });
         assert_eq!(
             domain.confirmation().unwrap().missing,
-            Some(Missing::Refused { why: Refusal::Role { project: 1, role: 2 } })
+            Some(Missing::Refused { why: Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) } })
         );
         assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
         draft.authority = None;

@@ -6,6 +6,37 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    /// The executor stopped progressing.
+    HoldStalled,
+    /// Dependency task .
+    HoldDependency,
+    /// Task stopped.
+    HoldStopped,
+    /// Required resource drifted.
+    HoldDrift,
+    /// Effects need a decision.
+    HoldEffects,
+    /// An effect failed permanently.
+    HoldEffectFailed,
+    /// Uncertain outbox entry .
+    HoldUncertainEntry,
+    /// Insufficient activation budget.
+    HoldBudget,
+    /// Deadline passed.
+    HoldDeadline,
+    /// Resource holds waited too long.
+    HoldWaited,
+    /// Allocation lost from pool .
+    HoldPoolLost,
+    /// Procedure needs a decision.
+    HoldProcedure,
+    /// Executor reported failure.
+    FailureRun,
+    /// Agent failed.
+    FailureAgent,
+    /// Result broke its contract.
+    FailureInvalid,
+
     /// Loading navigation.
     LoadingNavigation,
     /// By (0).
@@ -832,6 +863,87 @@ pub enum JigPhrase {
     TurnNumber,
     /// Instructions.
     TurnInstructions,
+    PanelPart,
+    ResultPart,
+    HoldPart,
+
+    EngineLimitWords,
+    EngineLimitIdentity,
+    EngineLimitRoles,
+    EngineLimitArithmetic,
+    EngineLimitDuplicate,
+    EngineLimitEmpty,
+    EngineLimitBatch,
+    EngineLimitProjectLiveTasks,
+    EngineLimitLiveTasks,
+    EngineLimitTree,
+    EngineLimitDepth,
+    EngineLimitDelegates,
+    EngineLimitSubscription,
+    EngineLimitDependencies,
+    EngineLimitCycle,
+    EngineLimitSpec,
+    EngineLimitContract,
+    EngineLimitAuthority,
+    EngineLimitInputs,
+    EngineLimitAttempts,
+    EngineLimitLiveDelegates,
+    EngineLimitRestore,
+    EngineLimitRead,
+    EngineLimitTurn,
+    EngineLimitHoldKind,
+    EngineLimitHoldTaken,
+    EngineLimitHolds,
+    EngineLimitInboxFull,
+    EngineLimitNotes,
+    EngineLimitRevision,
+    EngineLimitQuestion,
+    EngineLimitPriority,
+    EngineLimitPolicy,
+    EngineLimitResource,
+    EngineLimitService,
+    FailedBare,
+    CancelledBare,
+    DecidedBare,
+    DeletedEnding,
+    ByProjectDeployment,
+    RoleNotAllowed,
+    NoHeldRole,
+    HeldOwner,
+    HeldMaintainer,
+    HeldMember,
+    HeldObserver,
+    HeldPolicy,
+    DisposalMissing,
+    DisposalUnknown,
+    DisposalRepeated,
+    RefusalTakenBy,
+    NotWaitingForYou,
+    NoFurtherHolder,
+    GrantKindMissing,
+    FundingMissing,
+    DepthMaximum,
+    DeadlineAuthorityMissing,
+    TasksLeft,
+    ToolMissing,
+    ScopeMissing,
+    ReferenceMissing,
+    ResourceAccessMissing,
+    ResourceUnavailable,
+    AuthorityShapeMissing,
+    AgainRequired,
+    AgainUnexpected,
+    AccountMissing,
+    WriterMissing,
+    RequiredJudgeMissing,
+    FailedJudge,
+    UnguardedJudge,
+    PartConnector,
+    PartResource,
+    PartKind,
+    PartTask,
+    PartProject,
+    PartProposal,
 }
 impl JigPhrase {
     /// Stable phrase identity within jig's owner.
@@ -1252,6 +1364,102 @@ impl JigPhrase {
             Self::NewsTopic => 400,
             Self::TurnNumber => 401,
             Self::TurnInstructions => 402,
+            Self::PanelPart => 490,
+            Self::ResultPart => 491,
+            Self::HoldPart => 492,
+
+            Self::EngineLimitWords => 413,
+            Self::EngineLimitIdentity => 414,
+            Self::EngineLimitRoles => 415,
+            Self::EngineLimitArithmetic => 416,
+            Self::EngineLimitDuplicate => 417,
+            Self::EngineLimitEmpty => 418,
+            Self::EngineLimitBatch => 419,
+            Self::EngineLimitProjectLiveTasks => 420,
+            Self::EngineLimitLiveTasks => 421,
+            Self::EngineLimitTree => 422,
+            Self::EngineLimitDepth => 423,
+            Self::EngineLimitDelegates => 424,
+            Self::EngineLimitSubscription => 425,
+            Self::EngineLimitDependencies => 426,
+            Self::EngineLimitCycle => 427,
+            Self::EngineLimitSpec => 428,
+            Self::EngineLimitContract => 429,
+            Self::EngineLimitAuthority => 430,
+            Self::EngineLimitInputs => 431,
+            Self::EngineLimitAttempts => 432,
+            Self::EngineLimitLiveDelegates => 433,
+            Self::EngineLimitRestore => 434,
+            Self::EngineLimitRead => 435,
+            Self::EngineLimitTurn => 436,
+            Self::EngineLimitHoldKind => 437,
+            Self::EngineLimitHoldTaken => 438,
+            Self::EngineLimitHolds => 439,
+            Self::EngineLimitInboxFull => 440,
+            Self::EngineLimitNotes => 441,
+            Self::EngineLimitRevision => 442,
+            Self::EngineLimitQuestion => 443,
+            Self::EngineLimitPriority => 444,
+            Self::EngineLimitPolicy => 445,
+            Self::EngineLimitResource => 446,
+            Self::EngineLimitService => 447,
+            Self::FailedBare => 448,
+            Self::CancelledBare => 449,
+            Self::DecidedBare => 450,
+            Self::DeletedEnding => 451,
+            Self::ByProjectDeployment => 452,
+            Self::RoleNotAllowed => 453,
+            Self::NoHeldRole => 454,
+            Self::HeldOwner => 455,
+            Self::HeldMaintainer => 456,
+            Self::HeldMember => 457,
+            Self::HeldObserver => 458,
+            Self::HeldPolicy => 459,
+            Self::DisposalMissing => 460,
+            Self::DisposalUnknown => 461,
+            Self::DisposalRepeated => 462,
+            Self::RefusalTakenBy => 463,
+            Self::NotWaitingForYou => 464,
+            Self::NoFurtherHolder => 465,
+            Self::GrantKindMissing => 466,
+            Self::FundingMissing => 467,
+            Self::DepthMaximum => 468,
+            Self::DeadlineAuthorityMissing => 469,
+            Self::TasksLeft => 470,
+            Self::ToolMissing => 471,
+            Self::ScopeMissing => 472,
+            Self::ReferenceMissing => 473,
+            Self::ResourceAccessMissing => 474,
+            Self::ResourceUnavailable => 475,
+            Self::AuthorityShapeMissing => 476,
+            Self::AgainRequired => 477,
+            Self::AgainUnexpected => 478,
+            Self::AccountMissing => 479,
+            Self::WriterMissing => 480,
+            Self::RequiredJudgeMissing => 481,
+            Self::FailedJudge => 482,
+            Self::UnguardedJudge => 483,
+            Self::PartConnector => 484,
+            Self::PartResource => 485,
+            Self::PartKind => 486,
+            Self::PartTask => 487,
+            Self::PartProject => 488,
+            Self::PartProposal => 489,
+            Self::HoldStalled => 493,
+            Self::HoldDependency => 494,
+            Self::HoldStopped => 495,
+            Self::HoldDrift => 496,
+            Self::HoldEffects => 497,
+            Self::HoldEffectFailed => 498,
+            Self::HoldUncertainEntry => 499,
+            Self::HoldBudget => 500,
+            Self::HoldDeadline => 501,
+            Self::HoldWaited => 502,
+            Self::HoldPoolLost => 503,
+            Self::HoldProcedure => 504,
+            Self::FailureRun => 505,
+            Self::FailureAgent => 506,
+            Self::FailureInvalid => 507,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -1260,7 +1468,81 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::Overview
+            Self::HoldStalled
+            | Self::HoldStopped
+            | Self::HoldDrift
+            | Self::HoldEffects
+            | Self::HoldEffectFailed
+            | Self::HoldBudget
+            | Self::HoldDeadline
+            | Self::HoldWaited
+            | Self::HoldProcedure
+            | Self::FailureRun
+            | Self::FailureAgent
+            | Self::FailureInvalid
+            | Self::PanelPart
+            | Self::ResultPart
+            | Self::HoldPart
+            | Self::EngineLimitWords
+            | Self::EngineLimitIdentity
+            | Self::EngineLimitRoles
+            | Self::EngineLimitArithmetic
+            | Self::EngineLimitDuplicate
+            | Self::EngineLimitEmpty
+            | Self::EngineLimitBatch
+            | Self::EngineLimitProjectLiveTasks
+            | Self::EngineLimitLiveTasks
+            | Self::EngineLimitTree
+            | Self::EngineLimitDepth
+            | Self::EngineLimitDelegates
+            | Self::EngineLimitSubscription
+            | Self::EngineLimitDependencies
+            | Self::EngineLimitCycle
+            | Self::EngineLimitSpec
+            | Self::EngineLimitContract
+            | Self::EngineLimitAuthority
+            | Self::EngineLimitInputs
+            | Self::EngineLimitAttempts
+            | Self::EngineLimitLiveDelegates
+            | Self::EngineLimitRestore
+            | Self::EngineLimitRead
+            | Self::EngineLimitTurn
+            | Self::EngineLimitHoldKind
+            | Self::EngineLimitHoldTaken
+            | Self::EngineLimitHolds
+            | Self::EngineLimitInboxFull
+            | Self::EngineLimitNotes
+            | Self::EngineLimitRevision
+            | Self::EngineLimitQuestion
+            | Self::EngineLimitPriority
+            | Self::EngineLimitPolicy
+            | Self::EngineLimitResource
+            | Self::EngineLimitService
+            | Self::FailedBare
+            | Self::CancelledBare
+            | Self::DecidedBare
+            | Self::DeletedEnding
+            | Self::RoleNotAllowed
+            | Self::NoHeldRole
+            | Self::HeldOwner
+            | Self::HeldMaintainer
+            | Self::HeldMember
+            | Self::HeldObserver
+            | Self::NotWaitingForYou
+            | Self::NoFurtherHolder
+            | Self::FundingMissing
+            | Self::DeadlineAuthorityMissing
+            | Self::ToolMissing
+            | Self::ScopeMissing
+            | Self::ReferenceMissing
+            | Self::ResourceAccessMissing
+            | Self::ResourceUnavailable
+            | Self::AuthorityShapeMissing
+            | Self::AgainRequired
+            | Self::AgainUnexpected
+            | Self::AccountMissing
+            | Self::WriterMissing
+            | Self::Overview
             | Self::Activity
             | Self::Plan
             | Self::History
@@ -1528,7 +1810,8 @@ impl JigPhrase {
             | Self::ClaimedPhase
             | Self::ActivePhase
             | Self::ClosingPhase => Box::new([]),
-            Self::ResourceScope
+            Self::PartResource
+            | Self::ResourceScope
             | Self::OpaqueDialect
             | Self::OpenCall
             | Self::FoldCall
@@ -1547,7 +1830,23 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::HeldBelow
+            Self::HoldDependency
+            | Self::HoldUncertainEntry
+            | Self::HoldPoolLost
+            | Self::ByProjectDeployment
+            | Self::HeldPolicy
+            | Self::DisposalMissing
+            | Self::DisposalUnknown
+            | Self::DisposalRepeated
+            | Self::RefusalTakenBy
+            | Self::GrantKindMissing
+            | Self::DepthMaximum
+            | Self::TasksLeft
+            | Self::PartConnector
+            | Self::PartKind
+            | Self::PartTask
+            | Self::PartProject
+            | Self::HeldBelow
             | Self::BatchMade
             | Self::Period
             | Self::CurrentPeriod
@@ -1623,7 +1922,11 @@ impl JigPhrase {
             | Self::Priority
             | Self::Closing
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::Proposed
+            Self::RequiredJudgeMissing
+            | Self::FailedJudge
+            | Self::UnguardedJudge
+            | Self::PartProposal
+            | Self::Proposed
             | Self::MadeWords
             | Self::RoleMissing
             | Self::DepthMissing
@@ -1708,7 +2011,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 413] = [
+pub const ALL: [JigPhrase; 508] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -2122,11 +2425,106 @@ pub const ALL: [JigPhrase; 413] = [
     JigPhrase::NewsTopic,
     JigPhrase::TurnNumber,
     JigPhrase::TurnInstructions,
+    JigPhrase::PanelPart,
+    JigPhrase::ResultPart,
+    JigPhrase::HoldPart,
+    JigPhrase::EngineLimitWords,
+    JigPhrase::EngineLimitIdentity,
+    JigPhrase::EngineLimitRoles,
+    JigPhrase::EngineLimitArithmetic,
+    JigPhrase::EngineLimitDuplicate,
+    JigPhrase::EngineLimitEmpty,
+    JigPhrase::EngineLimitBatch,
+    JigPhrase::EngineLimitProjectLiveTasks,
+    JigPhrase::EngineLimitLiveTasks,
+    JigPhrase::EngineLimitTree,
+    JigPhrase::EngineLimitDepth,
+    JigPhrase::EngineLimitDelegates,
+    JigPhrase::EngineLimitSubscription,
+    JigPhrase::EngineLimitDependencies,
+    JigPhrase::EngineLimitCycle,
+    JigPhrase::EngineLimitSpec,
+    JigPhrase::EngineLimitContract,
+    JigPhrase::EngineLimitAuthority,
+    JigPhrase::EngineLimitInputs,
+    JigPhrase::EngineLimitAttempts,
+    JigPhrase::EngineLimitLiveDelegates,
+    JigPhrase::EngineLimitRestore,
+    JigPhrase::EngineLimitRead,
+    JigPhrase::EngineLimitTurn,
+    JigPhrase::EngineLimitHoldKind,
+    JigPhrase::EngineLimitHoldTaken,
+    JigPhrase::EngineLimitHolds,
+    JigPhrase::EngineLimitInboxFull,
+    JigPhrase::EngineLimitNotes,
+    JigPhrase::EngineLimitRevision,
+    JigPhrase::EngineLimitQuestion,
+    JigPhrase::EngineLimitPriority,
+    JigPhrase::EngineLimitPolicy,
+    JigPhrase::EngineLimitResource,
+    JigPhrase::EngineLimitService,
+    JigPhrase::FailedBare,
+    JigPhrase::CancelledBare,
+    JigPhrase::DecidedBare,
+    JigPhrase::DeletedEnding,
+    JigPhrase::ByProjectDeployment,
+    JigPhrase::RoleNotAllowed,
+    JigPhrase::NoHeldRole,
+    JigPhrase::HeldOwner,
+    JigPhrase::HeldMaintainer,
+    JigPhrase::HeldMember,
+    JigPhrase::HeldObserver,
+    JigPhrase::HeldPolicy,
+    JigPhrase::DisposalMissing,
+    JigPhrase::DisposalUnknown,
+    JigPhrase::DisposalRepeated,
+    JigPhrase::RefusalTakenBy,
+    JigPhrase::NotWaitingForYou,
+    JigPhrase::NoFurtherHolder,
+    JigPhrase::GrantKindMissing,
+    JigPhrase::FundingMissing,
+    JigPhrase::DepthMaximum,
+    JigPhrase::DeadlineAuthorityMissing,
+    JigPhrase::TasksLeft,
+    JigPhrase::ToolMissing,
+    JigPhrase::ScopeMissing,
+    JigPhrase::ReferenceMissing,
+    JigPhrase::ResourceAccessMissing,
+    JigPhrase::ResourceUnavailable,
+    JigPhrase::AuthorityShapeMissing,
+    JigPhrase::AgainRequired,
+    JigPhrase::AgainUnexpected,
+    JigPhrase::AccountMissing,
+    JigPhrase::WriterMissing,
+    JigPhrase::RequiredJudgeMissing,
+    JigPhrase::FailedJudge,
+    JigPhrase::UnguardedJudge,
+    JigPhrase::PartConnector,
+    JigPhrase::PartResource,
+    JigPhrase::PartKind,
+    JigPhrase::PartTask,
+    JigPhrase::PartProject,
+    JigPhrase::PartProposal,
+    JigPhrase::HoldStalled,
+    JigPhrase::HoldDependency,
+    JigPhrase::HoldStopped,
+    JigPhrase::HoldDrift,
+    JigPhrase::HoldEffects,
+    JigPhrase::HoldEffectFailed,
+    JigPhrase::HoldUncertainEntry,
+    JigPhrase::HoldBudget,
+    JigPhrase::HoldDeadline,
+    JigPhrase::HoldWaited,
+    JigPhrase::HoldPoolLost,
+    JigPhrase::HoldProcedure,
+    JigPhrase::FailureRun,
+    JigPhrase::FailureAgent,
+    JigPhrase::FailureInvalid,
 ];
 /// Shapes with names bounded by the client's text capacity.
 #[must_use]
 pub fn shapes(text: u32) -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(413);
+    let mut rows = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         rows.push(phrase.shape(text)).expect("all jig shapes fit");
     }

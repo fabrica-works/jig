@@ -35,7 +35,12 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
     proposal.ending = Some(if withdrawn {
         Ending::Withdrawn { reason: stories::text(b"Already healthy by hand") }
     } else {
-        Ending::Decided { by: stories::frame(7).party, how: Decision::Accepted, at: Wall::EPOCH }
+        Ending::Decided {
+            by: stories::frame(7).party.number,
+            party: Some(stories::frame(7).party),
+            how: Some(Decision::Accepted),
+            at: Wall::EPOCH,
+        }
     });
     w.front()
         .engine

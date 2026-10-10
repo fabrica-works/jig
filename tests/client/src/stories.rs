@@ -402,7 +402,12 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
 }
 fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
     let mut decided = p.clone();
-    decided.ending = Some(Ending::Decided { by: frame(7).party, how: Decision::Accepted, at: Wall::EPOCH });
+    decided.ending = Some(Ending::Decided {
+        by: frame(7).party.number,
+        party: Some(frame(7).party),
+        how: Some(Decision::Accepted),
+        at: Wall::EPOCH,
+    });
     let ReadValue::Task(lead) =
         world.front().engine.truth().objects.get(&ObjectKey::Task(9)).expect("lead task exists")
     else {

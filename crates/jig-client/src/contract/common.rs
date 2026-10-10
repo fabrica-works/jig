@@ -90,6 +90,8 @@ pub enum Actor {
     Task(u64),
     /// The deployment.
     Deployment,
+    /// A deployment decision scoped to this project.
+    ProjectDeployment { project: u32 },
 }
 
 /// The kind of executor carrying out a task.
@@ -199,13 +201,15 @@ pub enum Ending {
     /// Completed.
     Done,
     /// Failed with a reason.
-    Failed { reason: Text },
+    Failed { reason: Option<Text> },
     /// Cancelled by its actor.
-    Cancelled { by: Actor, reason: Text },
+    Cancelled { by: Actor, reason: Option<Text>, at: Option<Wall> },
     /// Withdrawn by its proposer.
     Withdrawn { reason: Text },
     /// Decided by a party.
-    Decided { by: Party, how: Decision, at: Wall },
+    Decided { by: u64, party: Option<Party>, how: Option<Decision>, at: Wall },
+    /// A corrected or deleted object is no longer present.
+    Deleted,
 }
 
 /// The decision made about a proposal or escalation.

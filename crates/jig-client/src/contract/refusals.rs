@@ -1,6 +1,7 @@
 //! Durable refusals with facts, never phrases; client/domain/contract.md, 4.
 //! These are final answers; busy and signed out are envelopes below this vocabulary.
-use super::{Ending, Executor, Grant, Revision};
+use super::{AdmissionLimit, Ending, Executor, Grant, HoldReason, Revision};
+use alloc::boxed::Box;
 use skein_lib::Wall;
 /// The authority the engine found lacking.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -8,22 +9,67 @@ pub enum Lacking {
     /// No policy role may accept this kind of proposal.
     Approver,
     /// The budget needed and left.
-    Budget { needed: u64, left: u64 },
+    Budget {
+        needed: u64,
+        left: u64,
+    },
     /// The grant missing.
     Grant(Grant),
+    /// Only the supplied operation kind is known.
+    GrantKind {
+        kind: u16,
+    },
+    /// No valid funding relation supports the request.
+    Funding,
+    Tool,
+    Scope,
+    Reference,
+    ResourceAccess,
+    ResourceUnavailable,
+    Shape,
+    Again {
+        required: bool,
+    },
+    Account,
+    Writer,
+    Required {
+        connector: u16,
+        kind: u16,
+    },
+    Failed {
+        connector: u16,
+        kind: u16,
+    },
+    Unguarded {
+        connector: u16,
+        kind: u16,
+    },
     /// The executor kind missing.
-    TaskKind(Executor),
+    TaskKind {
+        executor: Option<Executor>,
+    },
     /// Delegation beyond depth.
-    Depth { needed: u32, allowed: u32 },
+    Depth {
+        needed: Option<u32>,
+        allowed: u32,
+    },
     /// A deadline beyond authority.
-    Deadline { asked: Wall, latest: Wall },
+    Deadline {
+        asked: Option<Wall>,
+        latest: Option<Wall>,
+    },
     /// The tasks needed and left.
-    Tasks { needed: u32, left: u32 },
+    Tasks {
+        needed: Option<u32>,
+        left: u32,
+    },
 }
 
 /// The admission limit reached.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Limit {
+    /// An engine structural admission category, without an invented numerical bound.
+    Admission { which: AdmissionLimit },
     /// A project live task limit.
     LiveTasks { project: u32, limit: u32 },
     /// A task inbox limit.
@@ -46,11 +92,50 @@ pub enum Limit {
     Objects,
 }
 
-/// Which independently decidable facts changed.
+/// The current hold facts actually supplied by the owner.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum CurrentHold {
+    /// A complete held object's document.
+    Document(Box<HoldReason>),
+    /// Admission supplies only its exact category and numeric identities.
+    Reason(HoldCategory),
+}
+/// Sparse engine hold facts; absent words, clocks and parts stay absent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum HoldCategory {
+    Failures { class: HoldFailure },
+    Stalled,
+    Dependency { task: u64 },
+    Stopped,
+    StoppedBy { party: u64 },
+    Drift,
+    Effects,
+    EffectFailed,
+    Uncertain { entry: u64 },
+    Budget,
+    Deadline,
+    HoldsWaited,
+    ResourceUnavailable,
+    ResourceAccess,
+    PoolLost { pool: u64 },
+    Procedure,
+}
+/// Exact admission failure categories, independent of detailed attempt failures.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum HoldFailure {
+    Transient,
+    Permanent,
+    Run,
+    Agent,
+    Lost,
+    Invalid,
+}
+
+/// Which independently decidable facts changed.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Moved {
     /// The hold or its reason.
-    Hold,
+    Hold { reason: Option<CurrentHold> },
     /// The task specification.
     Spec,
     /// The person task question or options.
@@ -65,7 +150,15 @@ pub enum Moved {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Refusal {
     /// The project role does not allow the act.
-    Role { project: u32, role: u16 },
+    Role { held: Option<HeldRole> },
+    /// A named delegate disposal is absent or invalid.
+    Disposal { task: u64, issue: DisposalIssue },
+    /// Another person holds this role-addressed task.
+    Taken { by: u64 },
+    /// The object waits for someone else.
+    NotWaiting,
+    /// This holder cannot pass further.
+    NoFurther,
     /// Authority lacked a named permission or amount; proposal eligibility is supplied when known.
     Authority { lacking: Lacking, proposable: Option<bool> },
     /// An admission limit was reached.
@@ -80,4 +173,21 @@ pub enum Refusal {
     NotOffered,
     /// The key names another ask.
     KeyConflict,
+}
+
+/// The role the engine actually found held, when known.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum HeldRole {
+    Owner,
+    Maintainer,
+    Member,
+    Observer,
+    Policy { role: u32 },
+}
+/// Why a named delegate disposal failed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DisposalIssue {
+    Missing,
+    Unknown,
+    Repeated,
 }

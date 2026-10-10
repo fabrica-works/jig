@@ -3,18 +3,19 @@
 use crate::Bounds;
 use core::mem::size_of;
 use jig_client::contract::{
-    Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, Amendment, Answer, Ask, AttemptFailure,
-    Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing, ConversationLine,
-    ConversationPage, Conversations, Count, Cursor, Decider, Decision, Delivery, Deployment, Disposal, Ending,
-    Escalation, Executor, FailureClass, Frame, GoalLine, GoalPage, Goals, Grant, HistoryChange, HistoryLine,
-    HistoryPage, Hold, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit,
-    LiveDelegate, Made, Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine,
-    Outcome, Part, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy,
-    Pool, Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read,
-    ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultValue,
-    Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod,
-    Steering, Subject, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName,
-    Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, AdmissionLimit, Amendment, Answer, Ask,
+    AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing,
+    ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider, Decision, Delivery,
+    Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, Frame, GoalLine, GoalPage, Goals,
+    Grant, HeldRole, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding,
+    Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs,
+    Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Part, Party, PartyKind, Passed,
+    PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project, ProjectRole,
+    Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult, ReadValue, Recipient,
+    Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultValue, Revision, RolePolicy, RunBeginning,
+    RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod, Steering, Subject, Task, TaskFilter,
+    TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy,
+    WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
@@ -232,6 +233,7 @@ impl Payload for Actor {
         match self {
             Self::Party(value0) | Self::Task(value0) => sum(&[value0.heap(bounds)]),
             Self::Deployment => Some(0),
+            Self::ProjectDeployment { project } => project.heap(bounds),
         }
     }
 }
@@ -295,10 +297,13 @@ impl Payload for NoteScope {
 impl Payload for Ending {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Done => Some(0),
-            Self::Failed { reason } | Self::Withdrawn { reason } => sum(&[reason.heap(bounds)]),
-            Self::Cancelled { by, reason } => sum(&[by.heap(bounds), reason.heap(bounds)]),
-            Self::Decided { by, how, at } => sum(&[by.heap(bounds), how.heap(bounds), at.heap(bounds)]),
+            Self::Done | Self::Deleted => Some(0),
+            Self::Failed { reason } => reason.heap(bounds),
+            Self::Withdrawn { reason } => reason.heap(bounds),
+            Self::Cancelled { by, reason, at } => sum(&[by.heap(bounds), reason.heap(bounds), at.heap(bounds)]),
+            Self::Decided { by, party, how, at } => {
+                sum(&[by.heap(bounds), party.heap(bounds), how.heap(bounds), at.heap(bounds)])
+            }
         }
     }
 }
@@ -756,10 +761,24 @@ fields!(SpendPage { rows, before, after });
 impl Payload for Lacking {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Approver => Some(0),
             Self::Budget { needed, left } => sum(&[needed.heap(bounds), left.heap(bounds)]),
             Self::Grant(value0) => sum(&[value0.heap(bounds)]),
-            Self::TaskKind(value0) => sum(&[value0.heap(bounds)]),
+            Self::TaskKind { executor } => executor.heap(bounds),
+            Self::GrantKind { kind } => kind.heap(bounds),
+            Self::Approver
+            | Self::Funding
+            | Self::Tool
+            | Self::Scope
+            | Self::Reference
+            | Self::ResourceAccess
+            | Self::ResourceUnavailable
+            | Self::Shape
+            | Self::Account
+            | Self::Writer => Some(0),
+            Self::Again { required } => required.heap(bounds),
+            Self::Required { connector, kind }
+            | Self::Failed { connector, kind }
+            | Self::Unguarded { connector, kind } => sum(&[connector.heap(bounds), kind.heap(bounds)]),
             Self::Depth { needed, allowed } => sum(&[needed.heap(bounds), allowed.heap(bounds)]),
             Self::Deadline { asked, latest } => sum(&[asked.heap(bounds), latest.heap(bounds)]),
             Self::Tasks { needed, left } => sum(&[needed.heap(bounds), left.heap(bounds)]),
@@ -769,6 +788,7 @@ impl Payload for Lacking {
 impl Payload for Limit {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Admission { which } => which.heap(bounds),
             Self::LiveTasks { project, limit } => sum(&[project.heap(bounds), limit.heap(bounds)]),
             Self::Inbox { task, limit } => sum(&[task.heap(bounds), limit.heap(bounds)]),
             Self::Words { limit } | Self::ConversationWords { limit } => sum(&[limit.heap(bounds)]),
@@ -777,21 +797,24 @@ impl Payload for Limit {
     }
 }
 impl Payload for Moved {
-    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Hold | Self::Spec | Self::PersonTask | Self::Note | Self::Waiting => Some(0),
+            Self::Hold { reason } => reason.heap(bounds),
+            Self::Spec | Self::PersonTask | Self::Note | Self::Waiting => Some(0),
         }
     }
 }
 impl Payload for Refusal {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Role { project, role } => sum(&[project.heap(bounds), role.heap(bounds)]),
+            Self::Role { held } => held.heap(bounds),
+            Self::Disposal { task, issue } => sum(&[task.heap(bounds), issue.heap(bounds)]),
+            Self::Taken { by } => by.heap(bounds),
             Self::Authority { lacking, proposable } => sum(&[lacking.heap(bounds), proposable.heap(bounds)]),
             Self::Limit { which } => sum(&[which.heap(bounds)]),
             Self::Moved { now, what } => sum(&[now.heap(bounds), what.heap(bounds)]),
             Self::Ended { how } => sum(&[how.heap(bounds)]),
-            Self::Unknown | Self::NotOffered | Self::KeyConflict => Some(0),
+            Self::NotWaiting | Self::NoFurther | Self::Unknown | Self::NotOffered | Self::KeyConflict => Some(0),
         }
     }
 }
@@ -878,4 +901,99 @@ impl Payload for WatchEnd {
 
 fn sum(values: &[Option<u64>]) -> Option<u64> {
     values.iter().try_fold(0_u64, |total, value| total.checked_add((*value)?))
+}
+
+impl Payload for AdmissionLimit {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Words
+            | Self::Identity
+            | Self::Roles
+            | Self::Arithmetic
+            | Self::Duplicate
+            | Self::Empty
+            | Self::Batch
+            | Self::ProjectLiveTasks
+            | Self::LiveTasks
+            | Self::Tree
+            | Self::Depth
+            | Self::Delegates
+            | Self::Subscription
+            | Self::Dependencies
+            | Self::Cycle
+            | Self::Spec
+            | Self::Contract
+            | Self::Authority
+            | Self::Inputs
+            | Self::Attempts
+            | Self::LiveDelegates
+            | Self::Restore
+            | Self::Read
+            | Self::Turn
+            | Self::HoldKind
+            | Self::HoldTaken
+            | Self::Holds
+            | Self::InboxFull
+            | Self::Notes
+            | Self::Revision
+            | Self::Question
+            | Self::Priority
+            | Self::Policy
+            | Self::Resource
+            | Self::Service => Some(0),
+        }
+    }
+}
+impl Payload for HeldRole {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Owner | Self::Maintainer | Self::Member | Self::Observer => Some(0),
+            Self::Policy { role } => role.heap(bounds),
+        }
+    }
+}
+impl Payload for DisposalIssue {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Missing | Self::Unknown | Self::Repeated => Some(0),
+        }
+    }
+}
+
+impl Payload for CurrentHold {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Document(reason) => reason.heap(bounds),
+            Self::Reason(reason) => reason.heap(bounds),
+        }
+    }
+}
+impl Payload for HoldCategory {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Failures { .. }
+            | Self::Stalled
+            | Self::Dependency { .. }
+            | Self::Stopped
+            | Self::StoppedBy { .. }
+            | Self::Drift
+            | Self::Effects
+            | Self::EffectFailed
+            | Self::Uncertain { .. }
+            | Self::Budget
+            | Self::Deadline
+            | Self::HoldsWaited
+            | Self::ResourceUnavailable
+            | Self::ResourceAccess
+            | Self::PoolLost { .. }
+            | Self::Procedure => Some(0),
+        }
+    }
+}
+impl Payload for HoldFailure {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Transient | Self::Permanent | Self::Run | Self::Agent | Self::Lost | Self::Invalid => Some(0),
+        }
+    }
 }

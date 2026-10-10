@@ -87,7 +87,7 @@ fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines(
     assert_eq!(*object, key);
     assert_eq!(domain.notices().get(notice).unwrap().until, Time::from_nanos(Duration::from_secs(5).as_nanos()));
     let id = domain.objects.name(ObjectKey::Task(9), Source::Window { generation: 1, number: 1 }).unwrap();
-    assert!(domain.leave(id, Ending::Cancelled { by: Actor::Party(7), reason: text(b"done") }));
+    assert!(domain.leave(id, Ending::Cancelled { by: Actor::Party(7), reason: Some(text(b"done")), at: None }));
     out = Queue::with_capacity(crate::max_out(&limits));
     assert!(store::coalesce(
         &mut domain,

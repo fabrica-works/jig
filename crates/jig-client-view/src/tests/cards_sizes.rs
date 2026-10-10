@@ -44,7 +44,7 @@ fn full_trail() -> List<Passed> {
         by: Actor::Party(1),
         at: Wall::from_nanos(u64::MAX),
         reason: full_name(),
-        lacking: Some(Lacking::TaskKind(Executor::Party { party: 1 })),
+        lacking: Some(Lacking::TaskKind { executor: Some(Executor::Party { party: 1 }) }),
     };
     list([row.clone(), row])
 }
@@ -65,8 +65,9 @@ fn full_proposal(action: ProposalAction) -> Proposal {
     value.needs = full_authority();
     value.trail = full_trail();
     value.ending = Some(Ending::Decided {
-        by: Party { number: 1, kind: PartyKind::Person, name: full_name() },
-        how: Decision::Rejected { reason: full_name() },
+        by: 1,
+        party: Some(Party { number: 1, kind: PartyKind::Person, name: full_name() }),
+        how: Some(Decision::Rejected { reason: full_name() }),
         at: Wall::from_nanos(u64::MAX),
     });
     value
@@ -94,7 +95,7 @@ fn full_value() -> ResultValue {
 fn full_result() -> Result {
     let mut value = result();
     value.task = full_chip(8);
-    value.ending = Ending::Cancelled { by: Actor::Party(1), reason: full_name() };
+    value.ending = Ending::Cancelled { by: Actor::Party(1), reason: Some(full_name()), at: None };
     value.value = Some(full_value());
     value
 }
@@ -234,8 +235,9 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
         &mut builder,
         &Refusal::Ended {
             how: Ending::Decided {
-                by: Party { number: 1, kind: PartyKind::Person, name: full_name() },
-                how: Decision::Rejected { reason: full_name() },
+                by: 1,
+                party: Some(Party { number: 1, kind: PartyKind::Person, name: full_name() }),
+                how: Some(Decision::Rejected { reason: full_name() }),
                 at: Wall::from_nanos(u64::MAX),
             },
         },

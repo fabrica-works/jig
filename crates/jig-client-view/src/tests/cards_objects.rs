@@ -101,7 +101,7 @@ fn person(contract: PersonContract) -> PersonTask {
 fn result() -> Result {
     Result {
         task: chip(),
-        ending: Ending::Failed { reason: text(b"whole failure") },
+        ending: Ending::Failed { reason: Some(text(b"whole failure")) },
         value: Some(ResultValue::Report(text(b"whole report"))),
         at: Wall::EPOCH,
         acts: offered(ActKind::MarkSeen),
@@ -483,7 +483,7 @@ fn all_chip_phases(words: &crate::words::Words) {
         ),
         (
             ChipPhase::Ended {
-                how: Ending::Cancelled { by: Actor::Party(1), reason: text(b"actual cancellation") },
+                how: Ending::Cancelled { by: Actor::Party(1), reason: Some(text(b"actual cancellation")), at: None },
                 at: Wall::EPOCH,
             },
             b"actual cancellation",
@@ -500,7 +500,7 @@ fn all_chip_phases(words: &crate::words::Words) {
             ChipPhase::Closing(_) => Phase::Closing,
             ChipPhase::Held { .. } => Phase::Held,
             ChipPhase::Ended { how, .. } => match how {
-                Ending::Done | Ending::Decided { .. } => Phase::Done,
+                Ending::Done | Ending::Decided { .. } | Ending::Deleted => Phase::Done,
                 Ending::Failed { .. } => Phase::Failed,
                 Ending::Cancelled { .. } | Ending::Withdrawn { .. } => Phase::Cancelled,
             },
@@ -745,7 +745,7 @@ fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_se
             b"the person".as_slice(),
         ),
         (
-            HoldReason::Dependency { task: 9, how: Ending::Failed { reason: text(b"dependency refusal") } },
+            HoldReason::Dependency { task: 9, how: Ending::Failed { reason: Some(text(b"dependency refusal")) } },
             vec![AmendRelease, Cancel],
             b"dependency refusal".as_slice(),
         ),
@@ -1127,7 +1127,7 @@ fn changed_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindin
         &mut d,
         Event::Answered {
             request,
-            answer: Answer::Refused(Refusal::Moved { now: Revision { value: 5 }, what: Moved::Hold }),
+            answer: Answer::Refused(Refusal::Moved { now: Revision { value: 5 }, what: Moved::Hold { reason: None } }),
         },
     );
     let mut moved = row;

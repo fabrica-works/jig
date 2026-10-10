@@ -31,7 +31,11 @@ pub fn recovery(object: &Object) -> Recovery {
         Card::Refused { refusal } => match refusal {
             Refusal::Moved { .. } => recovery.look_again = true,
             Refusal::Authority { .. } | Refusal::Limit { .. } => recovery.change_ask = true,
-            Refusal::Role { .. }
+            Refusal::Disposal { .. }
+            | Refusal::Taken { .. }
+            | Refusal::NotWaiting
+            | Refusal::NoFurther
+            | Refusal::Role { .. }
             | Refusal::Ended { .. }
             | Refusal::Unknown
             | Refusal::NotOffered

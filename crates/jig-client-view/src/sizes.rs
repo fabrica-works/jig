@@ -20,9 +20,9 @@ fn trail(limits: &Limits) -> Option<u32> {
     limits.rows.checked_mul(6)
 }
 fn outcome(limits: &Limits) -> Option<u32> {
-    // An accepted batch may name every made task; other endings and refusals
-    // have at most eight leaves, including actor, reason and wall time.
-    limits.rows.checked_add(8)
+    // A moved hold includes its complete bounded attempt failures or exact
+    // connector part identity; endings retain only supplied actor/decision facts.
+    limits.rows.checked_mul(6)?.checked_add(12)
 }
 fn acts(limits: &Limits) -> Option<u32> {
     // Offered control (two nodes) or refused ending (up to eight leaves).

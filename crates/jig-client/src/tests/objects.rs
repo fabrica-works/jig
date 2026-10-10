@@ -46,9 +46,9 @@ pub(super) fn phase_details(phase: Phase) -> ChipPhase {
             revision: Revision { value: 3 },
         },
         Phase::Done => ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH },
-        Phase::Failed => ChipPhase::Ended { how: Ending::Failed { reason: text(b"failure") }, at: Wall::EPOCH },
+        Phase::Failed => ChipPhase::Ended { how: Ending::Failed { reason: Some(text(b"failure")) }, at: Wall::EPOCH },
         Phase::Cancelled => ChipPhase::Ended {
-            how: Ending::Cancelled { by: Actor::Party(7), reason: text(b"cancelled") },
+            how: Ending::Cancelled { by: Actor::Party(7), reason: Some(text(b"cancelled")), at: None },
             at: Wall::EPOCH,
         },
     }
@@ -338,7 +338,12 @@ fn a_drop_reads_how_the_card_ended_and_a_preexisting_read_can_supply_the_termina
             panic!("terminal read keeps card leaving");
         };
         assert_eq!(*how, Left::Looking);
-        let ending = Ending::Decided { by: frame(9).party, how: Decision::Accepted, at: Wall::EPOCH };
+        let ending = Ending::Decided {
+            by: frame(9).party.number,
+            party: Some(frame(9).party),
+            how: Some(Decision::Accepted),
+            at: Wall::EPOCH,
+        };
         let mut ended = question();
         ended.ending = Some(ending.clone());
         drive(

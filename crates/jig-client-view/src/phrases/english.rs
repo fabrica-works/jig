@@ -10,9 +10,208 @@ use skein_lib::{List, bytes::copy_of};
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "English data matches the closed phrase vocabulary whole")]
 pub fn language() -> Language {
-    let mut phrases = List::with_capacity(413);
+    let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::HoldStalled => Box::new([Segment::Text(copy_of(b"The executor stopped progressing"))]),
+            JigPhrase::HoldDependency => Box::new([
+                Segment::Text(copy_of(b"Dependency task ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::HoldStopped => Box::new([Segment::Text(copy_of(b"Task stopped"))]),
+            JigPhrase::HoldDrift => Box::new([Segment::Text(copy_of(b"Required resource drifted"))]),
+            JigPhrase::HoldEffects => Box::new([Segment::Text(copy_of(b"Effects need a decision"))]),
+            JigPhrase::HoldEffectFailed => Box::new([Segment::Text(copy_of(b"An effect failed permanently"))]),
+            JigPhrase::HoldUncertainEntry => Box::new([
+                Segment::Text(copy_of(b"Uncertain outbox entry ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::HoldBudget => Box::new([Segment::Text(copy_of(b"Insufficient activation budget"))]),
+            JigPhrase::HoldDeadline => Box::new([Segment::Text(copy_of(b"Deadline passed"))]),
+            JigPhrase::HoldWaited => Box::new([Segment::Text(copy_of(b"Resource holds waited too long"))]),
+            JigPhrase::HoldPoolLost => Box::new([
+                Segment::Text(copy_of(b"Allocation lost from pool ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::HoldProcedure => Box::new([Segment::Text(copy_of(b"Procedure needs a decision"))]),
+            JigPhrase::FailureRun => Box::new([Segment::Text(copy_of(b"Executor reported failure"))]),
+            JigPhrase::FailureAgent => Box::new([Segment::Text(copy_of(b"Agent failed"))]),
+            JigPhrase::FailureInvalid => Box::new([Segment::Text(copy_of(b"Result broke its contract"))]),
+
+            JigPhrase::PanelPart => Box::new([Segment::Text(copy_of(b"Task panel"))]),
+            JigPhrase::ResultPart => Box::new([Segment::Text(copy_of(b"Connector result"))]),
+            JigPhrase::HoldPart => Box::new([Segment::Text(copy_of(b"Connector hold"))]),
+
+            JigPhrase::EngineLimitWords => Box::new([Segment::Text(copy_of(b"Engine admission limit: words"))]),
+            JigPhrase::EngineLimitIdentity => Box::new([Segment::Text(copy_of(b"Engine admission limit: identity"))]),
+            JigPhrase::EngineLimitRoles => Box::new([Segment::Text(copy_of(b"Engine admission limit: roles"))]),
+            JigPhrase::EngineLimitArithmetic => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: arithmetic"))])
+            }
+            JigPhrase::EngineLimitDuplicate => Box::new([Segment::Text(copy_of(b"Engine admission limit: duplicate"))]),
+            JigPhrase::EngineLimitEmpty => Box::new([Segment::Text(copy_of(b"Engine admission limit: empty"))]),
+            JigPhrase::EngineLimitBatch => Box::new([Segment::Text(copy_of(b"Engine admission limit: batch"))]),
+            JigPhrase::EngineLimitProjectLiveTasks => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: project live tasks"))])
+            }
+            JigPhrase::EngineLimitLiveTasks => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: live tasks"))])
+            }
+            JigPhrase::EngineLimitTree => Box::new([Segment::Text(copy_of(b"Engine admission limit: tree"))]),
+            JigPhrase::EngineLimitDepth => Box::new([Segment::Text(copy_of(b"Engine admission limit: depth"))]),
+            JigPhrase::EngineLimitDelegates => Box::new([Segment::Text(copy_of(b"Engine admission limit: delegates"))]),
+            JigPhrase::EngineLimitSubscription => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: subscription"))])
+            }
+            JigPhrase::EngineLimitDependencies => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: dependencies"))])
+            }
+            JigPhrase::EngineLimitCycle => Box::new([Segment::Text(copy_of(b"Engine admission limit: cycle"))]),
+            JigPhrase::EngineLimitSpec => Box::new([Segment::Text(copy_of(b"Engine admission limit: spec"))]),
+            JigPhrase::EngineLimitContract => Box::new([Segment::Text(copy_of(b"Engine admission limit: contract"))]),
+            JigPhrase::EngineLimitAuthority => Box::new([Segment::Text(copy_of(b"Engine admission limit: authority"))]),
+            JigPhrase::EngineLimitInputs => Box::new([Segment::Text(copy_of(b"Engine admission limit: inputs"))]),
+            JigPhrase::EngineLimitAttempts => Box::new([Segment::Text(copy_of(b"Engine admission limit: attempts"))]),
+            JigPhrase::EngineLimitLiveDelegates => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: live delegates"))])
+            }
+            JigPhrase::EngineLimitRestore => Box::new([Segment::Text(copy_of(b"Engine admission limit: restore"))]),
+            JigPhrase::EngineLimitRead => Box::new([Segment::Text(copy_of(b"Engine admission limit: read"))]),
+            JigPhrase::EngineLimitTurn => Box::new([Segment::Text(copy_of(b"Engine admission limit: turn"))]),
+            JigPhrase::EngineLimitHoldKind => Box::new([Segment::Text(copy_of(b"Engine admission limit: hold kind"))]),
+            JigPhrase::EngineLimitHoldTaken => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: hold taken"))])
+            }
+            JigPhrase::EngineLimitHolds => Box::new([Segment::Text(copy_of(b"Engine admission limit: holds"))]),
+            JigPhrase::EngineLimitInboxFull => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: inbox full"))])
+            }
+            JigPhrase::EngineLimitNotes => Box::new([Segment::Text(copy_of(b"Engine admission limit: notes"))]),
+            JigPhrase::EngineLimitRevision => Box::new([Segment::Text(copy_of(b"Engine admission limit: revision"))]),
+            JigPhrase::EngineLimitQuestion => Box::new([Segment::Text(copy_of(b"Engine admission limit: question"))]),
+            JigPhrase::EngineLimitPriority => Box::new([Segment::Text(copy_of(b"Engine admission limit: priority"))]),
+            JigPhrase::EngineLimitPolicy => Box::new([Segment::Text(copy_of(b"Engine admission limit: policy"))]),
+            JigPhrase::EngineLimitResource => Box::new([Segment::Text(copy_of(b"Engine admission limit: resource"))]),
+            JigPhrase::EngineLimitService => Box::new([Segment::Text(copy_of(b"Engine admission limit: service"))]),
+            JigPhrase::DecidedBare => Box::new([Segment::Text(copy_of(b"Decided"))]),
+            JigPhrase::DeletedEnding => Box::new([Segment::Text(copy_of(b"Deleted"))]),
+            JigPhrase::ByProjectDeployment => Box::new([
+                Segment::Text(copy_of(b"By deployment in project ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::RoleNotAllowed => {
+                Box::new([Segment::Text(copy_of(b"The held role does not permit this action"))])
+            }
+            JigPhrase::NoHeldRole => Box::new([Segment::Text(copy_of(b"No held role was supplied"))]),
+            JigPhrase::HeldOwner => Box::new([Segment::Text(copy_of(b"Held role: owner"))]),
+            JigPhrase::HeldMaintainer => Box::new([Segment::Text(copy_of(b"Held role: maintainer"))]),
+            JigPhrase::HeldMember => Box::new([Segment::Text(copy_of(b"Held role: member"))]),
+            JigPhrase::HeldObserver => Box::new([Segment::Text(copy_of(b"Held role: observer"))]),
+            JigPhrase::HeldPolicy => Box::new([
+                Segment::Text(copy_of(b"Held policy role ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::DisposalMissing => Box::new([
+                Segment::Text(copy_of(b"Task ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" needs a disposal")),
+            ]),
+            JigPhrase::DisposalUnknown => Box::new([
+                Segment::Text(copy_of(b"Task ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" is not a named live delegate")),
+            ]),
+            JigPhrase::DisposalRepeated => Box::new([
+                Segment::Text(copy_of(b"Task ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" has repeated disposals")),
+            ]),
+            JigPhrase::RefusalTakenBy => Box::new([
+                Segment::Text(copy_of(b"Held by party ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::NotWaitingForYou => Box::new([Segment::Text(copy_of(b"This object waits for someone else"))]),
+            JigPhrase::NoFurtherHolder => Box::new([Segment::Text(copy_of(b"This holder cannot pass further"))]),
+            JigPhrase::GrantKindMissing => Box::new([
+                Segment::Text(copy_of(b"No grant covers operation kind ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::FundingMissing => {
+                Box::new([Segment::Text(copy_of(b"No valid funding relation supports this request"))])
+            }
+            JigPhrase::DepthMaximum => Box::new([
+                Segment::Text(copy_of(b"Permitted descendant depth: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::DeadlineAuthorityMissing => {
+                Box::new([Segment::Text(copy_of(b"The deadline is past or later than permitted"))])
+            }
+            JigPhrase::TasksLeft => Box::new([
+                Segment::Text(copy_of(b"Lifetime tasks left: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::ToolMissing => Box::new([Segment::Text(copy_of(b"The tool family is absent"))]),
+            JigPhrase::ScopeMissing => Box::new([Segment::Text(copy_of(b"The note scope is absent"))]),
+            JigPhrase::ReferenceMissing => {
+                Box::new([Segment::Text(copy_of(b"No verified reference permits this action"))])
+            }
+            JigPhrase::ResourceAccessMissing => {
+                Box::new([Segment::Text(copy_of(b"Current resource access forbids this action"))])
+            }
+            JigPhrase::ResourceUnavailable => {
+                Box::new([Segment::Text(copy_of(b"A required connector resource is unavailable"))])
+            }
+            JigPhrase::AuthorityShapeMissing => {
+                Box::new([Segment::Text(copy_of(b"The authority value has an invalid shape"))])
+            }
+            JigPhrase::AgainRequired => {
+                Box::new([Segment::Text(copy_of(b"An unrecoverable effect choice is required"))])
+            }
+            JigPhrase::AgainUnexpected => {
+                Box::new([Segment::Text(copy_of(b"An unrecoverable effect choice was unexpected"))])
+            }
+            JigPhrase::AccountMissing => Box::new([Segment::Text(copy_of(b"A required model account is unusable"))]),
+            JigPhrase::WriterMissing => Box::new([Segment::Text(copy_of(b"A written resource is held elsewhere"))]),
+            JigPhrase::RequiredJudgeMissing => Box::new([
+                Segment::Text(copy_of(b"Connector ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", kind ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+                Segment::Text(copy_of(b": a required judge has no usable fact")),
+            ]),
+            JigPhrase::FailedJudge => Box::new([
+                Segment::Text(copy_of(b"Connector ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", kind ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+                Segment::Text(copy_of(b": a required judge refused the effect")),
+            ]),
+            JigPhrase::UnguardedJudge => Box::new([
+                Segment::Text(copy_of(b"Connector ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", kind ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+                Segment::Text(copy_of(b": the effect cannot guard a required fact")),
+            ]),
+            JigPhrase::PartConnector => {
+                Box::new([Segment::Text(copy_of(b"Connector ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::PartResource => {
+                Box::new([Segment::Text(copy_of(b"Resource: ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
+            }
+            JigPhrase::PartKind => {
+                Box::new([Segment::Text(copy_of(b"Kind ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::PartProject => {
+                Box::new([Segment::Text(copy_of(b"Project ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::PartProposal => Box::new([
+                Segment::Text(copy_of(b"Proposal ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b", number ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+
             JigPhrase::ConversationLog => Box::new([Segment::Text(copy_of(b"Conversation"))]),
             JigPhrase::WordsBeingSent => Box::new([Segment::Text(copy_of(b"Being sent"))]),
             JigPhrase::WordsSent => Box::new([Segment::Text(copy_of(b"Sent"))]),
@@ -307,7 +506,7 @@ pub fn language() -> Language {
             JigPhrase::Conversations => Box::new([Segment::Text(copy_of(b"Conversations"))]),
             JigPhrase::ProjectPage => Box::new([Segment::Text(copy_of(b"Project"))]),
             JigPhrase::Deployment => Box::new([Segment::Text(copy_of(b"Deployment"))]),
-            JigPhrase::TaskPage | JigPhrase::ContextTask => {
+            JigPhrase::PartTask | JigPhrase::TaskPage | JigPhrase::ContextTask => {
                 Box::new([Segment::Text(copy_of(b"Task ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
             JigPhrase::Open => Box::new([Segment::Text(copy_of(b"Open"))]),
@@ -916,8 +1115,8 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b", replies through ")),
                 Segment::Hole { index: 1, kind: HoleKind::Number },
             ]),
-            JigPhrase::FailedPhase => Box::new([Segment::Text(copy_of(b"Failed"))]),
-            JigPhrase::CancelledPhase => Box::new([Segment::Text(copy_of(b"Cancelled"))]),
+            JigPhrase::FailedBare | JigPhrase::FailedPhase => Box::new([Segment::Text(copy_of(b"Failed"))]),
+            JigPhrase::CancelledBare | JigPhrase::CancelledPhase => Box::new([Segment::Text(copy_of(b"Cancelled"))]),
             JigPhrase::AddressParty => Box::new([Segment::Text(copy_of(b"Address to party number"))]),
             JigPhrase::AddressTask => Box::new([Segment::Text(copy_of(b"Address to task number"))]),
             JigPhrase::AddressRole => Box::new([Segment::Text(copy_of(b"Address to role number in this project"))]),
@@ -943,6 +1142,13 @@ pub fn english(text: u32) -> Result<Phrasebook, Invalid> {
     Phrasebook::load(
         shapes(text),
         Box::new([language()]),
-        &PhraseLimits { languages: 1, phrases: 413, holes: 3, segments: 2000, text_bytes: 20000, hole_bytes: text },
+        &PhraseLimits {
+            languages: 1,
+            phrases: u32::try_from(ALL.len()).expect("phrase count fits"),
+            holes: 3,
+            segments: 2000,
+            text_bytes: 20000,
+            hole_bytes: text,
+        },
     )
 }

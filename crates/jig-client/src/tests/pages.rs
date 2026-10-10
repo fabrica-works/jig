@@ -880,7 +880,7 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
             maximum_budget: 100,
             maximum_deadline: None,
         },
-        beyond: Beyond::Refused(Refusal::Role { project: 1, role: 2 }),
+        beyond: Beyond::Refused(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }),
     };
     drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"bounded") } });
@@ -906,7 +906,7 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
                 Some(if charter == 1 || budget > 100 {
                     Refusal::NotOffered
                 } else {
-                    Refusal::Role { project: 1, role: 2 }
+                    Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }
                 })
             );
             assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
@@ -931,10 +931,11 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
     assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
     let mut refused = domain.project_page().document.as_ref().unwrap().clone();
-    refused.acts.get_mut(0).unwrap().admission = Admission::Refused(Refusal::Role { project: 1, role: 2 });
+    refused.acts.get_mut(0).unwrap().admission =
+        Admission::Refused(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) });
     crate::pages::project::document(&mut domain, &super::spine::env(Time::ZERO), refused, &mut out);
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
-    assert_eq!(domain.project_page().form.refusal, Some(Refusal::Role { project: 1, role: 2 }));
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }));
     let nobody = Refusal::Authority { lacking: Lacking::Approver, proposable: Some(false) };
     let mut refused = domain.project_page().document.as_ref().unwrap().clone();
     refused.acts.get_mut(0).unwrap().admission = Admission::Bounded {

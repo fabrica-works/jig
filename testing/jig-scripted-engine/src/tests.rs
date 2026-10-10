@@ -170,6 +170,7 @@ fn nested_chip_payload_bounds(chip: &Chip) {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "whole revision and retention lifecycle retains all independent assertions")]
 fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     bounded_offer_payloads_and_predictions();
     let mut setup = script();
@@ -236,7 +237,12 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     send(&mut engine, 0, 11, 1, 1, ask);
     assert_eq!(
         final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
-        &Answer::Refused(Refusal::Moved { now: Revision { value: 2 }, what: Moved::Hold })
+        &Answer::Refused(Refusal::Moved {
+            now: Revision { value: 2 },
+            what: Moved::Hold {
+                reason: Some(CurrentHold::Document(Box::new(HoldReason::Budget { spent: 100, limit: 100 })))
+            }
+        })
     );
     let mut setup = script();
     let ask = Ask::StartChat { project: 1, words: text(b"hello") };
@@ -1010,8 +1016,49 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
             final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
             &Answer::Refused(Refusal::Moved {
                 now: Revision { value: if stale_hold { 7 } else { 1 } },
-                what: if stale_hold { Moved::Hold } else { Moved::Spec },
+                what: if stale_hold {
+                    Moved::Hold {
+                        reason: Some(CurrentHold::Document(Box::new(HoldReason::Stopped {
+                            by: party(1),
+                            at: Wall::EPOCH,
+                        }))),
+                    }
+                } else {
+                    Moved::Spec
+                },
             })
         );
     }
+}
+
+#[test]
+fn moved_hold_refusal_prices_the_complete_reason_allocation_and_each_nested_failure() {
+    let failures = list(vec![
+        AttemptFailure { attempt: 1, class: FailureClass::HostLost, reason: text(b"first"), at: Wall::EPOCH },
+        AttemptFailure { attempt: 2, class: FailureClass::Temporary, reason: text(b"second"), at: Wall::EPOCH },
+    ]);
+    let answer = Answer::Refused(Refusal::Moved {
+        now: Revision { value: 8 },
+        what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(HoldReason::Tries { failures }))) },
+    });
+    let mut bounds = Bounds {
+        document_bytes: u64::try_from(core::mem::size_of::<Answer>())
+            .unwrap()
+            .checked_add(u64::try_from(core::mem::size_of::<HoldReason>()).unwrap())
+            .unwrap()
+            .checked_add(List::<AttemptFailure>::worst_case(2).unwrap())
+            .unwrap()
+            .checked_add(11)
+            .unwrap(),
+        ..Bounds::default()
+    };
+    assert!(crate::payload::fits(&answer, &bounds));
+    bounds.document_bytes = bounds.document_bytes.checked_sub(1).unwrap();
+    assert!(!crate::payload::fits(&answer, &bounds));
+    bounds.document_bytes = u64::MAX;
+    bounds.rows = 1;
+    assert!(!crate::payload::fits(&answer, &bounds));
+    bounds.rows = 2;
+    bounds.text = 5;
+    assert!(!crate::payload::fits(&answer, &bounds));
 }

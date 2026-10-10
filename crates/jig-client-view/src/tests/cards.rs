@@ -200,7 +200,9 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
             until: Time::ZERO,
         },
         Card::Leaving {
-            how: Left::Ended { how: Ending::Cancelled { by: Actor::Party(3), reason: text(b"no longer needed") } },
+            how: Left::Ended {
+                how: Ending::Cancelled { by: Actor::Party(3), reason: Some(text(b"no longer needed")), at: None },
+            },
             until: Time::ZERO,
         },
         Card::Leaving { how: Left::Looking, until: Time::ZERO },

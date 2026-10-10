@@ -2,8 +2,8 @@
 //! Revision and decided-first checks precede scripted outcomes; contract.md, 3–4.
 use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
 use jig_client::contract::{
-    ActKind, Actor, Admission, Answer, Ask, ChipPhase, Decision, Ending, Moved, ObjectKey, Offered, Outcome, Phase,
-    ReadValue, Recipient, Refusal, Revision, Runtime,
+    ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
+    Outcome, Phase, ReadValue, Recipient, Refusal, Revision, Runtime,
 };
 use skein_lib::{List, Time, Token, Wall};
 
@@ -100,7 +100,7 @@ impl<A: crate::Application> Engine<A> {
             let Some(value) = self.truth.objects.get(&key) else {
                 return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
             };
-            if let Some(Ending::Decided { by, how, at }) = ending(value) {
+            if let Some(Ending::Decided { party: Some(by), how: Some(how), at, .. }) = ending(value) {
                 return Ok((
                     Answer::Done(Outcome::DecidedFirst { by: by.clone(), how: how.clone(), at: *at }),
                     Vec::new(),
@@ -110,10 +110,10 @@ impl<A: crate::Application> Engine<A> {
                 return Ok((Answer::Refused(Refusal::Ended { how: how.clone() }), Vec::new()));
             }
             if let Some((seen, what)) = revision {
-                let current = match (value, what) {
+                let current = match (value, &what) {
                     (ReadValue::Task(value), Moved::Spec) => Some(value.spec_revision),
-                    (ReadValue::Task(value), Moved::Hold) => value.hold.as_ref().map(|hold| hold.revision),
-                    (ReadValue::Escalation(value), Moved::Hold) => Some(value.hold.revision),
+                    (ReadValue::Task(value), Moved::Hold { .. }) => value.hold.as_ref().map(|hold| hold.revision),
+                    (ReadValue::Escalation(value), Moved::Hold { .. }) => Some(value.hold.revision),
                     (ReadValue::PersonTask(value), Moved::PersonTask) => Some(value.revision),
                     (
                         ReadValue::Frame(_)
@@ -133,11 +133,38 @@ impl<A: crate::Application> Engine<A> {
                         | ReadValue::Project(_)
                         | ReadValue::Notes(_)
                         | ReadValue::Deployment(_),
-                        Moved::Hold | Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting,
+                        Moved::Hold { .. } | Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting,
                     ) => None,
                 };
                 if let Some(now) = current {
                     if seen != now {
+                        let what = match what {
+                            Moved::Hold { .. } => {
+                                let hold = match value {
+                                    ReadValue::Task(task) => task.hold.as_ref(),
+                                    ReadValue::Escalation(escalation) => Some(&escalation.hold),
+                                    ReadValue::Frame(_)
+                                    | ReadValue::Proposal(_)
+                                    | ReadValue::Question(_)
+                                    | ReadValue::PersonTask(_)
+                                    | ReadValue::Result(_)
+                                    | ReadValue::Ended(_)
+                                    | ReadValue::Inbox(_)
+                                    | ReadValue::Conversations(_)
+                                    | ReadValue::Goals(_)
+                                    | ReadValue::Activity(_)
+                                    | ReadValue::History(_)
+                                    | ReadValue::Spend(_)
+                                    | ReadValue::Project(_)
+                                    | ReadValue::Notes(_)
+                                    | ReadValue::Deployment(_) => None,
+                                };
+                                Moved::Hold {
+                                    reason: hold.map(|hold| CurrentHold::Document(Box::new(hold.reason.clone()))),
+                                }
+                            }
+                            Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting => what,
+                        };
                         return Ok((Answer::Refused(Refusal::Moved { now, what }), Vec::new()));
                     }
                 } else {
@@ -149,7 +176,13 @@ impl<A: crate::Application> Engine<A> {
                 && let Some(hold) = &task.hold
                 && *seen != hold.revision
             {
-                return Ok((Answer::Refused(Refusal::Moved { now: hold.revision, what: Moved::Hold }), Vec::new()));
+                return Ok((
+                    Answer::Refused(Refusal::Moved {
+                        now: hold.revision,
+                        what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(hold.reason.clone()))) },
+                    }),
+                    Vec::new(),
+                ));
             }
             let waiting = match value {
                 ReadValue::Proposal(value) => Some(&value.waiting),
@@ -336,7 +369,7 @@ impl<A: crate::Application> Engine<A> {
             }
             let by = self.truth.frames.get(&party).expect("signed-in party has a frame").party.clone();
             let mut value = self.truth.objects.get(&key).expect("target checked").clone();
-            let terminal = Ending::Decided { by, how: how.clone(), at: wall };
+            let terminal = Ending::Decided { by: by.number, party: Some(by), how: Some(how.clone()), at: wall };
             match &mut value {
                 ReadValue::Proposal(v) => v.ending = Some(terminal),
                 ReadValue::Escalation(v) => v.ending = Some(terminal),
@@ -461,11 +494,14 @@ fn target(ask: &Ask) -> Target {
             Some(*project),
             Some(ObjectKey::Escalation(*task)),
             decision_kind(decision),
-            Some((*revision, Moved::Hold)),
+            Some((*revision, Moved::Hold { reason: None })),
         ),
-        Ask::Release { project, task, revision, .. } => {
-            (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Release, Some((*revision, Moved::Hold)))
-        }
+        Ask::Release { project, task, revision, .. } => (
+            Some(*project),
+            Some(ObjectKey::Task(*task)),
+            ActKind::Release,
+            Some((*revision, Moved::Hold { reason: None })),
+        ),
         Ask::Amend { project, task, revision, release, .. } => (
             Some(*project),
             Some(ObjectKey::Task(*task)),

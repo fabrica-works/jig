@@ -1,13 +1,16 @@
 //! Typed facts said through a checked phrasebook (client/domain/view.md, section 7).
 //! Keeps language data, a selected language and the person's UTC offset. It never
 //! computes authority. Each saying must fit the phrasebook's checked shape.
+mod held;
+mod lacking;
+mod refusals;
 use crate::{
     Builder, Role, Run,
     phrases::{Hole, Phrasebook, jig::JigPhrase},
 };
 use alloc::boxed::Box;
 use jig_client::{
-    contract::{Actor, Decision, Ending, Executor, Lacking, Limit, Made, Moved, Outcome, Refusal},
+    contract::{Actor, Decision, Ending, Executor, Made, Outcome},
     intents::Progress,
     link::Link,
 };
@@ -112,6 +115,9 @@ impl Words {
             Actor::Party(number) => self.text(b, JigPhrase::ByParty, &[Hole::Number(number)]),
             Actor::Task(number) => self.text(b, JigPhrase::ByTask, &[Hole::Number(number)]),
             Actor::Deployment => self.text(b, JigPhrase::ByDeployment, &[]),
+            Actor::ProjectDeployment { project } => {
+                self.text(b, JigPhrase::ByProjectDeployment, &[Hole::Number(u64::from(project))]);
+            }
         }
     }
     /// Say each possible durable decision, including the uncertain-effect choice.
@@ -135,17 +141,35 @@ impl Words {
     pub fn ending(&self, b: &mut Builder, how: &Ending) {
         match how {
             Ending::Done => self.text(b, JigPhrase::Done, &[]),
-            Ending::Failed { reason } => self.text(b, JigPhrase::Failed, &[name(reason.bytes())]),
-            Ending::Cancelled { by, reason } => {
-                self.text(b, JigPhrase::Cancelled, &[name(reason.bytes())]);
+            Ending::Failed { reason } => match reason {
+                Some(reason) => self.text(b, JigPhrase::Failed, &[name(reason.bytes())]),
+                None => self.text(b, JigPhrase::FailedBare, &[]),
+            },
+            Ending::Cancelled { by, reason, at } => {
+                match reason {
+                    Some(reason) => self.text(b, JigPhrase::Cancelled, &[name(reason.bytes())]),
+                    None => self.text(b, JigPhrase::CancelledBare, &[]),
+                }
                 self.actor(b, *by);
+                if let Some(at) = at {
+                    self.wall(b, *at);
+                }
             }
             Ending::Withdrawn { reason } => self.text(b, JigPhrase::Withdrawn, &[name(reason.bytes())]),
-            Ending::Decided { by, how, at } => {
-                self.text(b, JigPhrase::ByNamed, &[name(by.name.bytes())]);
-                self.decision(b, how);
+            Ending::Decided { by, party, how, at } => {
+                if how.is_none() {
+                    self.text(b, JigPhrase::DecidedBare, &[]);
+                }
+                match party {
+                    Some(party) => self.text(b, JigPhrase::ByNamed, &[name(party.name.bytes())]),
+                    None => self.actor(b, Actor::Party(*by)),
+                }
+                if let Some(how) = how {
+                    self.decision(b, how);
+                }
                 self.wall(b, *at);
             }
+            Ending::Deleted => self.text(b, JigPhrase::DeletedEnding, &[]),
         }
     }
     /// Say all durable outcomes, preserving who decided first and when.
@@ -180,96 +204,6 @@ impl Words {
                 self.wall(b, *at);
             }
             Outcome::Changed => self.text(b, JigPhrase::Changed, &[]),
-        }
-    }
-    /// Say the supplied missing authority without claiming proposal eligibility.
-    pub fn lacking(&self, b: &mut Builder, lacking: &Lacking) {
-        match lacking {
-            Lacking::Approver => self.text(b, JigPhrase::ApprovalAuthorityMissing, &[]),
-            Lacking::Budget { needed, left } => {
-                self.text(b, JigPhrase::BudgetMissing, &[Hole::Amount(*left), Hole::Amount(*needed)]);
-            }
-            Lacking::Grant(grant) => self.text(
-                b,
-                JigPhrase::GrantMissing,
-                &[
-                    Hole::Number(u64::from(grant.kind)),
-                    Hole::Number(u64::from(grant.connector)),
-                    name(grant.pattern.bytes()),
-                ],
-            ),
-            Lacking::TaskKind(executor) => {
-                self.text(b, JigPhrase::KindMissing, &[]);
-                self.executor(b, *executor);
-            }
-            Lacking::Depth { needed, allowed } => self.text(
-                b,
-                JigPhrase::DepthMissing,
-                &[Hole::Number(u64::from(*needed)), Hole::Number(u64::from(*allowed))],
-            ),
-            Lacking::Deadline { asked, latest } => {
-                self.text(
-                    b,
-                    JigPhrase::DeadlineMissing,
-                    &[Hole::Wall(self.adjusted_wall(*asked)), Hole::Wall(self.adjusted_wall(*latest))],
-                );
-            }
-            Lacking::Tasks { needed, left } => self.text(
-                b,
-                JigPhrase::TasksMissing,
-                &[Hole::Number(u64::from(*needed)), Hole::Number(u64::from(*left))],
-            ),
-        }
-    }
-    /// Say the refusal's facts, without deriving whether an act is permitted.
-    pub fn refusal(&self, b: &mut Builder, refusal: &Refusal) {
-        match refusal {
-            Refusal::Role { project, role } => self.text(
-                b,
-                JigPhrase::RoleMissing,
-                &[Hole::Number(u64::from(*project)), Hole::Number(u64::from(*role))],
-            ),
-            Refusal::Authority { lacking, proposable } => {
-                self.lacking(b, lacking);
-                if let Some(false) = proposable {
-                    self.text(b, JigPhrase::NobodyMayAccept, &[]);
-                }
-            }
-            Refusal::Limit { which } => match which {
-                Limit::LiveTasks { project, limit } => self.text(
-                    b,
-                    JigPhrase::LimitLive,
-                    &[Hole::Number(u64::from(*project)), Hole::Number(u64::from(*limit))],
-                ),
-                Limit::Inbox { task, limit } => {
-                    self.text(b, JigPhrase::LimitInbox, &[Hole::Number(*task), Hole::Number(u64::from(*limit))]);
-                }
-                Limit::Words { limit } => self.text(b, JigPhrase::LimitWords, &[Hole::Number(u64::from(*limit))]),
-                Limit::ConversationWords { limit } => {
-                    self.text(b, JigPhrase::LimitConversation, &[Hole::Number(u64::from(*limit))]);
-                }
-                Limit::Fields => self.text(b, JigPhrase::LimitFields, &[]),
-                Limit::Records => self.text(b, JigPhrase::LimitRecords, &[]),
-                Limit::Requests => self.text(b, JigPhrase::LimitRequests, &[]),
-                Limit::Reads => self.text(b, JigPhrase::LimitReads, &[]),
-                Limit::Watches => self.text(b, JigPhrase::LimitWatches, &[]),
-                Limit::Objects => self.text(b, JigPhrase::LimitObjects, &[]),
-            },
-            Refusal::Moved { now, what } => {
-                let phrase = match what {
-                    Moved::Hold => JigPhrase::MovedHold,
-                    Moved::Spec => JigPhrase::MovedSpec,
-                    Moved::PersonTask => JigPhrase::MovedPerson,
-                    Moved::Note => JigPhrase::MovedNote,
-                    Moved::Waiting => JigPhrase::MovedWaiting,
-                };
-                self.text(b, phrase, &[]);
-                self.text(b, JigPhrase::Revision, &[Hole::Number(now.value)]);
-            }
-            Refusal::Ended { how } => self.ending(b, how),
-            Refusal::Unknown => self.text(b, JigPhrase::NoObject, &[]),
-            Refusal::NotOffered => self.text(b, JigPhrase::NotOffered, &[]),
-            Refusal::KeyConflict => self.text(b, JigPhrase::KeyConflict, &[]),
         }
     }
 }

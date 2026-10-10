@@ -78,7 +78,23 @@ fn durable_outcomes_remain_on_open_cards_and_decided_first_leaves_with_all_facts
 #[test]
 fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_losing_the_refusal() {
     let refusals = [
-        Refusal::Role { project: 1, role: 2 },
+        Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) },
+        Refusal::Role { held: None },
+        Refusal::Disposal { task: 81, issue: DisposalIssue::Repeated },
+        Refusal::Taken { by: 71 },
+        Refusal::NotWaiting,
+        Refusal::NoFurther,
+        Refusal::Authority { lacking: Lacking::Deadline { asked: None, latest: None }, proposable: None },
+        Refusal::Limit { which: Limit::Admission { which: AdmissionLimit::InboxFull } },
+        Refusal::Moved {
+            now: Revision { value: 12 },
+            what: Moved::Hold { reason: Some(CurrentHold::Reason(HoldCategory::Uncertain { entry: 123 })) },
+        },
+        Refusal::Ended { how: Ending::Decided { by: 71, party: None, how: None, at: Wall::EPOCH } },
+        Refusal::Ended {
+            how: Ending::Cancelled { by: Actor::ProjectDeployment { project: 1 }, reason: None, at: Some(Wall::EPOCH) },
+        },
+        Refusal::Ended { how: Ending::Deleted },
         Refusal::Authority { lacking: Lacking::Budget { needed: 40, left: 12 }, proposable: None },
         Refusal::Limit { which: Limit::LiveTasks { project: 1, limit: 2 } },
         Refusal::Moved { now: Revision { value: 12 }, what: Moved::Spec },
@@ -119,7 +135,11 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
                 assert!(recovery(object).change_ask);
                 assert!(rows.is_empty());
             }
-            Refusal::Role { .. }
+            Refusal::Disposal { .. }
+            | Refusal::Taken { .. }
+            | Refusal::NotWaiting
+            | Refusal::NoFurther
+            | Refusal::Role { .. }
             | Refusal::Ended { .. }
             | Refusal::Unknown
             | Refusal::NotOffered
