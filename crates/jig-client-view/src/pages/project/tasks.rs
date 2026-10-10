@@ -40,6 +40,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         Phase::Active,
         Phase::Closing,
         Phase::Held,
+        Phase::Ended,
         Phase::Done,
         Phase::Failed,
         Phase::Cancelled,
