@@ -38,3 +38,5 @@ mod chip_facts;
 mod owner_activity;
 mod owner_amendment;
 mod resource_facts;
+
+mod owner_history;

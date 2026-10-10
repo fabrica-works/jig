@@ -64,3 +64,6 @@ pub use owner_amendment::OwnerAmendmentState;
 
 pub mod owner_activity;
 pub use owner_activity::*;
+
+pub mod owner_history;
+pub use owner_history::*;

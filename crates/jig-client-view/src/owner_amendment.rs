@@ -39,7 +39,7 @@ fn pattern_fits(value: &OwnerPattern, limits: &Limits) -> Option<()> {
     }
     Some(())
 }
-fn authority_fits(value: &OwnerAuthorityDocument, limits: &Limits) -> Option<()> {
+pub(crate) fn authority_fits(value: &OwnerAuthorityDocument, limits: &Limits) -> Option<()> {
     let value = &value.authority;
     if value.grants.capacity() > limits.rows
         || value.delegation.kinds.capacity() > limits.rows

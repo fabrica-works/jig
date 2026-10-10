@@ -432,3 +432,5 @@ pub mod owner_chip;
 pub mod owner_amendment;
 
 pub mod owner_activity;
+
+pub mod owner_history;

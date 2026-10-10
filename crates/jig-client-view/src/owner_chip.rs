@@ -37,7 +37,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
         .checked_add(limits.rows)?
         .checked_add(crate::result_nodes(limits)?)
 }
-fn part_fits(part: &OwnerPart, limits: &Limits) -> Option<()> {
+pub(crate) fn part_fits(part: &OwnerPart, limits: &Limits) -> Option<()> {
     match &part.key {
         OwnerPartKey::Number(_) => Some(()),
         OwnerPartKey::Path(segments) => {
