@@ -122,7 +122,7 @@ impl JigBindings {
         }
         None
     }
-    /// A link's typed address for the platform's address translation.
+    /// Resolve an exact reference slot's raw key; scope is supplied by its producer.
     #[must_use]
     pub fn owner_part(&self, token: Token) -> Option<&jig_client::contract::OwnerPart> {
         for entry in &self.entries {
