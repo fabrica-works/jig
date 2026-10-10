@@ -41,3 +41,6 @@ pub use watches::*;
 
 pub mod owner_authority;
 pub use owner_authority::*;
+
+pub mod result_details;
+pub use result_details::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, ResultDetails};

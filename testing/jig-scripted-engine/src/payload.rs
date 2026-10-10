@@ -21,6 +21,8 @@ use jig_client::contract::{
 };
 use skein_lib::{Duration, List, Token, Wall};
 
+mod result_details;
+
 pub(crate) trait Payload {
     fn heap(&self, bounds: &Bounds) -> Option<u64>;
 }

@@ -58,4 +58,6 @@ mod tests;
 
 pub mod owner_authority;
 pub mod owner_authority_words;
+pub mod owner_result;
+pub mod owner_result_words;
 pub mod policy_edit;
