@@ -72,7 +72,7 @@ fn full_task() -> jig_client::contract::Task {
             kind: jig_client::contract::SubscriptionKind::Topic { connector: jig_test_client_domain::SECOND, topic: 2 },
         },
     ]);
-    task.parts = jig_client_world::test::list(
+    task.context.as_mut().expect("supplied task context").parts = jig_client_world::test::list(
         (1..=8).map(|n| jig_client::contract::Part::Panel { connector: jig_test_client_domain::FIRST, task: n }),
     );
     task.resources = jig_client_world::test::list((1..=8).map(|n| {
@@ -94,7 +94,7 @@ fn full_task() -> jig_client::contract::Task {
         jig_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
         jig_client::contract::LiveDelegate { chip: task.chip.clone(), takeover_budget: 1 },
     ]);
-    task.writer_slots = jig_client_world::test::list([
+    task.context.as_mut().expect("supplied task context").writer_slots = jig_client_world::test::list([
         jig_client::contract::WriterSlot {
             resource: jig_client::contract::Part::Resource {
                 connector: jig_test_client_domain::FIRST,
