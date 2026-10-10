@@ -237,7 +237,6 @@ impl Front<Ops> for Scripted {
                     | Read::Ended { .. }
                     | Read::History { .. }
                     | Read::Activity { .. }
-                    | Read::InboxGroup { .. }
                     | Read::Inbox { .. }
                     | Read::Conversations { .. }
                     | Read::Goals { .. }

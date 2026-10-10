@@ -210,7 +210,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
     });
     truth.sources.push(jig_scripted_engine::Source {
         party: 7,
-        read: Read::Inbox { project: None, kind: None, goal: None, after: None },
+        read: Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: None, after: None },
         rows: jig_scripted_engine::Rows::Inbox(vec![InboxEntry {
             reply: None,
             lineage: list([]),
@@ -293,7 +293,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
             },
             jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
                 party: 7,
-                read: Read::Inbox { project: None, kind: None, goal: None, after: None },
+                read: Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: None, after: None },
                 rows: jig_scripted_engine::Rows::Inbox(vec![]),
             }),
         ],
@@ -413,7 +413,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
             },
             jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
                 party: 7,
-                read: Read::Conversations { project: None, after: None },
+                read: Read::Conversations { after: None },
                 rows: jig_scripted_engine::Rows::Conversations(vec![ConversationLine {
                     chip: {
                         let mut chip = task().chip;
