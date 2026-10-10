@@ -68,8 +68,12 @@ pub(super) fn limits() -> crate::Limits {
         markdown_depth: 3,
     }
 }
+pub(super) fn shared_words() -> &'static Words {
+    static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
+    WORDS.get_or_init(|| Words { book: english::english(CLIENT.text).unwrap(), language: 0, offset_minutes: 60 })
+}
 pub(super) fn words() -> Words {
-    Words { book: english::english(CLIENT.text).unwrap(), language: 0, offset_minutes: 60 }
+    shared_words().clone()
 }
 pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), CLIENT.text).unwrap()

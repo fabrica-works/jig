@@ -113,17 +113,29 @@ fn ready() -> Domain {
     );
     root
 }
+fn phrasebooks() -> (jig_client_view::words::Words, words::Words, words::Words) {
+    static WORDS: std::sync::OnceLock<(jig_client_view::words::Words, words::Words, words::Words)> =
+        std::sync::OnceLock::new();
+    WORDS
+        .get_or_init(|| {
+            (
+                jig_client_view::words::Words {
+                    book: jig_client_view::phrases::english::english(32).unwrap(),
+                    language: 0,
+                    offset_minutes: 0,
+                },
+                words::Words::english(1, 32).unwrap(),
+                words::Words::english(2, 32).unwrap(),
+            )
+        })
+        .clone()
+}
 fn view() -> View {
-    let jig = jig_client_view::words::Words {
-        book: jig_client_view::phrases::english::english(32).unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    };
-    let obs = words::Words::english(1, 32).unwrap();
-    let infra = words::Words::english(2, 32).unwrap();
+    let (jig, obs, infra) = phrasebooks();
     let v = Limits::of(&limits(), &jig, &obs, &infra).unwrap();
     View::new(&v, &limits(), jig, obs, infra, 1)
 }
+
 fn incident() -> observability::documents::Incident {
     use observability::documents::*;
     let mut timeline = List::with_capacity(2);

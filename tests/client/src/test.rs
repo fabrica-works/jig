@@ -6,6 +6,10 @@ use jig_client_view::{Act, NodeId, Patch, Tree};
 use jig_test_client_domain::{self as domain, Address, Event, JigOut, Request, first};
 use jig_test_client_view as view;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
+use std::{
+    collections::BTreeMap,
+    sync::{Mutex, OnceLock},
+};
 /// The test application’s client root and view adapter.
 pub struct Test;
 /// Returns the small focused-world capacities.
@@ -73,6 +77,27 @@ pub fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
     }
     out
 }
+
+// The world varies roots, not English. Load each configured book once;
+// each view still owns a clone of the immutable checked data.
+type Books = (jig_client_view::words::Words, view::words::Words);
+fn phrasebooks(limits: &domain::Limits) -> Books {
+    static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32), Books>>> = OnceLock::new();
+    let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
+    books
+        .entry((limits.jig.text, limits.first.text))
+        .or_insert_with(|| {
+            (
+                jig_client_view::words::Words {
+                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
+                    language: 0,
+                    offset_minutes: 0,
+                },
+                view::words::Words::english(limits.first.text).expect("family English fits"),
+            )
+        })
+        .clone()
+}
 impl App for Test {
     type Root = domain::Domain;
     type View = view::View;
@@ -87,12 +112,7 @@ impl App for Test {
     }
     fn new(seed: u64) -> (Self::Root, Self::View) {
         let limits = limits();
-        let words = jig_client_view::words::Words {
-            book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
-            language: 0,
-            offset_minutes: 0,
-        };
-        let family = view::words::Words::english(limits.first.text).expect("family English fits");
+        let (words, family) = phrasebooks(&limits);
         let bounds = view::Limits::of(&limits, &words, &family).expect("view bounds fit");
         let mut root = domain::new(&limits, seed);
         domain::provider(&mut root, jig_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
@@ -186,12 +206,7 @@ impl App for Test {
         view.limits().tree.patches
     }
     fn worst_case(limits: &Self::Limits) -> u64 {
-        let words = jig_client_view::words::Words {
-            book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
-            language: 0,
-            offset_minutes: 0,
-        };
-        let family = view::words::Words::english(limits.first.text).expect("family words fit");
+        let (words, family) = phrasebooks(limits);
         let bounds = view::Limits::of(limits, &words, &family).expect("view fits");
         domain::worst_case(limits).expect("root worst case")
             // The shell model and comparison projections are bounded by another renderer envelope.

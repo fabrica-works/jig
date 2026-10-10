@@ -3,14 +3,14 @@
     clippy::disallowed_types,
     reason = "ordinary tests inspect complete semantic trees"
 )]
-use super::cards::{CLIENT, contains, limits, text, words};
+use super::cards::{CLIENT, contains, limits, shared_words, text};
 use crate::{Builder, Role, Tree};
 use jig_client::contract::*;
 use skein_lib::{List, Wall};
 fn render(refusal: Refusal) -> Tree {
     let mut builder = Builder::new(&limits());
     builder.open(Role::Page);
-    words().refusal(&mut builder, &refusal);
+    shared_words().refusal(&mut builder, &refusal);
     builder.close();
     let tree = builder.finish();
     assert!(tree.len() <= crate::refusal_nodes(&CLIENT).unwrap().checked_add(1).unwrap());

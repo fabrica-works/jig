@@ -12,6 +12,11 @@ use jig_ops_client_view as view;
 use jig_ops_connectors::{Connector, number};
 use skein_lib::{Duration, Env, Queue, RequestEnvelope, RequestLimits, Time};
 
+use std::{
+    collections::BTreeMap,
+    sync::{Mutex, OnceLock},
+};
+
 /// Reference Ops client composed over the common shell world.
 pub struct Ops;
 /// Small explicit story capacities, also used to admit scripted whole documents.
@@ -79,18 +84,26 @@ pub fn limits() -> domain::Limits {
         },
     }
 }
-fn phrasebooks(limits: &domain::Limits) -> (jig_client_view::words::Words, view::words::Words, view::words::Words) {
-    (
-        jig_client_view::words::Words {
-            book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
-            language: 0,
-            offset_minutes: 0,
-        },
-        view::words::Words::english(number(Connector::Observability), limits.observability.text)
-            .expect("incident English fits"),
-        view::words::Words::english(number(Connector::Infrastructure), limits.infrastructure.text)
-            .expect("environment English fits"),
-    )
+type Books = (jig_client_view::words::Words, view::words::Words, view::words::Words);
+fn phrasebooks(limits: &domain::Limits) -> Books {
+    static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32, u32), Books>>> = OnceLock::new();
+    let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
+    books
+        .entry((limits.jig.text, limits.observability.text, limits.infrastructure.text))
+        .or_insert_with(|| {
+            (
+                jig_client_view::words::Words {
+                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
+                    language: 0,
+                    offset_minutes: 0,
+                },
+                view::words::Words::english(number(Connector::Observability), limits.observability.text)
+                    .expect("incident English fits"),
+                view::words::Words::english(number(Connector::Infrastructure), limits.infrastructure.text)
+                    .expect("environment English fits"),
+            )
+        })
+        .clone()
 }
 impl App for Ops {
     type Root = domain::Domain;

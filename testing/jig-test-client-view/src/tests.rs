@@ -118,15 +118,22 @@ fn ready() -> Domain {
     root
 }
 fn words() -> jig_client_view::words::Words {
-    jig_client_view::words::Words {
-        book: jig_client_view::phrases::english::english(limits().jig.text).unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    }
+    static WORDS: std::sync::OnceLock<jig_client_view::words::Words> = std::sync::OnceLock::new();
+    WORDS
+        .get_or_init(|| jig_client_view::words::Words {
+            book: jig_client_view::phrases::english::english(limits().jig.text).unwrap(),
+            language: 0,
+            offset_minutes: 0,
+        })
+        .clone()
+}
+fn family_words() -> words::Words {
+    static WORDS: std::sync::OnceLock<words::Words> = std::sync::OnceLock::new();
+    WORDS.get_or_init(|| words::Words::english(limits().first.text).unwrap()).clone()
 }
 fn view() -> View {
     let jig = words();
-    let first = words::Words::english(limits().first.text).unwrap();
+    let first = family_words();
     let bounds = Limits::of(&limits(), &jig, &first).unwrap();
     View::new(&bounds, &limits(), jig, first, first::Address { project: 3, item: 5 })
 }
@@ -345,7 +352,7 @@ fn the_drawing_has_a_named_readable_fallback_and_bounded_owner_bytes() {
     named(&view, Role::Status, b"Value: 18446744073709551615");
     assert!(contains(&view, b"Value: 18446744073709551615"));
     let jig = words();
-    let first = words::Words::english(limits().first.text).unwrap();
+    let first = family_words();
     let mut bounds = limits();
     bounds.first.rows = u32::MAX;
     assert!(Limits::of(&bounds, &jig, &first).is_none());

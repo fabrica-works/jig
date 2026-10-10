@@ -73,11 +73,7 @@ impl Limits {
     /// every loaded language; the root may switch language without resizing.
     #[must_use]
     pub fn of_words(client: &jig_client::Limits, words: &crate::words::Words) -> Option<Self> {
-        let mut phrase = 0;
-        for id in crate::phrases::jig::ALL {
-            phrase = phrase.max(words.book.capacity(id.id())?);
-        }
-        phrase = phrase.max(crate::owner_words::phrase_bytes(&words.book)?);
+        let phrase = words.book.jig_capacity()?;
         Self::with_phrase_bytes(client, phrase, 0, 0, 0)
     }
 
@@ -93,11 +89,7 @@ impl Limits {
         slot_nodes: u32,
         slot_depth: u32,
     ) -> Option<Self> {
-        let mut phrase = 0;
-        for id in crate::phrases::jig::ALL {
-            phrase = phrase.max(words.book.capacity(id.id())?);
-        }
-        phrase = phrase.max(crate::owner_words::phrase_bytes(&words.book)?);
+        let phrase = words.book.jig_capacity()?;
         Self::with_phrase_bytes(client, phrase, application_nodes, slot_nodes, slot_depth)
     }
     fn with_phrase_bytes(

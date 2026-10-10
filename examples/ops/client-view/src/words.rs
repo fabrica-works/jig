@@ -455,7 +455,7 @@ impl Word {
         PhraseId { owner: Owner::Side { connector }, number }
     }
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Words {
     pub book: Phrasebook,
     pub language: u16,

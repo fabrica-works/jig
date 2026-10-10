@@ -141,3 +141,72 @@ fn plural_selection_hole_values_and_longest_language_capacity_are_checked() {
     );
     assert!(crate::phrases::worst_case(&LIMITS).unwrap() > 200);
 }
+
+#[test]
+fn shuffled_languages_keep_owner_scoped_ids_capacities_and_whole_load_refusals() {
+    let rows = [
+        (PhraseId { owner: Owner::Other { child: u16::MAX }, number: 0 }, b"other maximum".as_slice()),
+        (PhraseId { owner: Owner::Jig, number: u16::MAX }, b"jig maximum".as_slice()),
+        (PhraseId { owner: Owner::Side { connector: 5 }, number: 1 }, b"side five".as_slice()),
+        (PhraseId { owner: Owner::Other { child: 4 }, number: 1 }, b"other four".as_slice()),
+        (PhraseId { owner: Owner::Jig, number: 1 }, b"jig one".as_slice()),
+        (PhraseId { owner: Owner::Side { connector: 4 }, number: 1 }, b"side four".as_slice()),
+    ];
+    let shapes = rows
+        .iter()
+        .map(|(id, _)| PhraseShape { id: *id, holes: Box::new([]), plural: None })
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+    let language = |long: bool| Language {
+        plural: PluralRule::English,
+        span_unit: SpanUnit::Seconds,
+        wall: WallFormat::Clock,
+        phrases: rows
+            .iter()
+            .rev()
+            .map(|(id, bytes)| Phrase {
+                id: *id,
+                forms: Box::new([Form {
+                    class: PluralClass::Other,
+                    segments: if long {
+                        Box::new([Segment::Text(bytes.to_vec().repeat(2).into_boxed_slice())])
+                    } else {
+                        Box::new([Segment::Text((*bytes).into())])
+                    },
+                }]),
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+    };
+    let limits = PhraseLimits { languages: 2, phrases: 6, holes: 0, segments: 12, text_bytes: 256, hole_bytes: 0 };
+    let book = Phrasebook::load(shapes.clone(), Box::new([language(false), language(true)]), &limits).unwrap();
+    for (id, bytes) in rows {
+        assert_eq!(book.say(0, id, &[]).unwrap().text.as_ref(), bytes);
+        assert_eq!(book.say(1, id, &[]).unwrap().text.as_ref(), bytes.to_vec().repeat(2));
+        assert_eq!(book.capacity(id), Some(u32::try_from(bytes.len().checked_mul(2).unwrap()).unwrap()));
+        assert_eq!(book.clone().say(1, id, &[]), book.say(1, id, &[]));
+    }
+    let absent = PhraseId { owner: Owner::Other { child: 5 }, number: 1 };
+    assert_eq!(book.capacity(absent), None);
+    assert_eq!(book.say(0, absent, &[]), Err(Invalid::Unknown { id: absent }));
+    assert_eq!(book.jig_capacity(), None, "partial jig words do not compose a complete jig page");
+    let mut duplicate_shapes = shapes.clone();
+    duplicate_shapes[4].id = duplicate_shapes[0].id;
+    assert_eq!(
+        Phrasebook::load(duplicate_shapes, Box::new([language(false)]), &limits).unwrap_err(),
+        Invalid::Duplicate { id: shapes[0].id },
+    );
+    let mut duplicate_language = language(false);
+    let duplicate = duplicate_language.phrases[0].id;
+    duplicate_language.phrases[4].id = duplicate;
+    assert_eq!(
+        Phrasebook::load(shapes.clone(), Box::new([duplicate_language]), &limits).unwrap_err(),
+        Invalid::Duplicate { id: duplicate },
+    );
+    let mut unknown_language = language(false);
+    unknown_language.phrases[4].id = absent;
+    assert_eq!(
+        Phrasebook::load(shapes, Box::new([unknown_language]), &limits).unwrap_err(),
+        Invalid::Unknown { id: absent },
+    );
+}

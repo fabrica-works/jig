@@ -17,7 +17,7 @@ use jig_client::{
 use skein_lib::{Duration, Wall, bytes::copy_of};
 
 /// Checked words and the person's time presentation for one tree build.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Words {
     pub book: Phrasebook,
     pub language: u16,

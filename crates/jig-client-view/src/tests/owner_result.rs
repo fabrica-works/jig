@@ -32,7 +32,10 @@ fn phrase_limits() -> PhraseLimits {
     }
 }
 fn words() -> Words {
-    Words { book: crate::phrases::english::english(128).unwrap(), language: 0, offset_minutes: 0 }
+    static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
+    WORDS
+        .get_or_init(|| Words { book: crate::phrases::english::english(128).unwrap(), language: 0, offset_minutes: 0 })
+        .clone()
 }
 fn chip() -> Chip {
     Chip {
