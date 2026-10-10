@@ -163,8 +163,8 @@ fn count(tree: &Tree, bytes: &[u8]) -> usize {
 fn owner_amendment_instruction_absence_empty_and_each_loss_keep_context_without_default_substitution() {
     let variants =
         [None, Some(doc(b"", false)), Some(doc(b"live", false)), Some(doc(b"", true)), Some(doc(b"live", true))];
-    let mut states = Vec::new();
-    let mut trees: Vec<Tree> = Vec::new();
+    let mut states = List::with_capacity(5);
+    let mut trees: List<Tree> = List::with_capacity(5);
     for (index, instructions) in variants.into_iter().enumerate() {
         let state = OwnerAmendmentState { instructions, ..fixture() };
         let tree = build(&state, normal_words());
@@ -178,18 +178,22 @@ fn owner_amendment_instruction_absence_empty_and_each_loss_keep_context_without_
         for previous in &trees {
             assert_ne!(tree.nodes(), previous.nodes(), "rendered None/empty/cut facts stay distinguishable");
         }
-        states.push(state);
-        trees.push(tree);
+        states.push(state).unwrap();
+        trees.push(tree).unwrap();
     }
-    assert_eq!(states[0].spec, states[2].spec, "retained None and live effective share other facts");
-    assert_eq!(crate::instructions::whole(states[0].instructions.as_ref()), None);
-    assert_eq!(crate::instructions::whole(states[1].instructions.as_ref()).unwrap().bytes(), b"");
-    assert_eq!(crate::instructions::whole(states[3].instructions.as_ref()), None);
+    assert_eq!(
+        states.get(0).unwrap().spec,
+        states.get(2).unwrap().spec,
+        "retained None and live effective share other facts"
+    );
+    assert_eq!(crate::instructions::whole(states.get(0).unwrap().instructions.as_ref()), None);
+    assert_eq!(crate::instructions::whole(states.get(1).unwrap().instructions.as_ref()).unwrap().bytes(), b"");
+    assert_eq!(crate::instructions::whole(states.get(3).unwrap().instructions.as_ref()), None);
     assert_eq!(states.len(), 5, "the consumer can retain every independent state");
 }
 #[test]
 fn owner_amendment_each_text_spec_authority_and_dependency_loss_is_independent() {
-    for flag in 0..5 {
+    for flag in 0_u32..5 {
         let mut value = fixture();
         match flag {
             0 => value.spec.specification.words.cut = true,
@@ -260,14 +264,14 @@ fn owner_amendment_address_taker_spec_wake_and_opaque_authority_keep_full_indepe
         ] {
             assert!(has(&tree, text));
         }
-        let input_order: Vec<_> = tree
+        let input_order: Box<[&[u8]]> = tree
             .nodes()
             .iter()
             .flat_map(|n| &n.text)
             .filter(|r| r.text.starts_with(b"Input task "))
             .map(|r| r.text.as_ref())
             .collect();
-        assert_eq!(input_order, [b"Input task 9".as_slice(), b"Input task 18446744073709551615"]);
+        assert_eq!(input_order.as_ref(), [b"Input task 9".as_slice(), b"Input task 18446744073709551615"].as_slice());
         assert_eq!(value.clone().addressed, Some(address));
         assert_eq!(
             value.authority.authority.grants.get(0).unwrap().pattern.segments.get(1).unwrap().as_ref(),
@@ -291,7 +295,7 @@ fn owner_amendment_address_taker_spec_wake_and_opaque_authority_keep_full_indepe
     assert!(has(&tree, b"Taker not supplied"));
     assert!(!has(&tree, b"Taken by party: 18446744073709551615"));
     for results in [ResultsWake::Never, ResultsWake::Each, ResultsWake::LastOrFailure] {
-        for switches in 0..8 {
+        for switches in 0_u8..8 {
             value.wake.results = results;
             value.wake.questions = switches & 1 != 0;
             value.wake.answers = switches & 2 != 0;
@@ -384,7 +388,7 @@ fn owner_amendment_whole_tree_envelope_checks_full_nested_capacities_and_overflo
         full.spec.specification.inputs.push(u64::MAX).unwrap();
         full.dependencies.push(u64::MAX).unwrap();
         let mut segments = List::with_capacity(3);
-        for _ in 0..3 {
+        for _ in 0_u32..3 {
             segments.push(copy_of(&[255; 8])).unwrap();
         }
         full.authority

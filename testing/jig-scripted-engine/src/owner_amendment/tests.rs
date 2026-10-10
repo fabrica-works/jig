@@ -168,29 +168,22 @@ fn owner_amendment_empty_reserved_capacities_and_each_nested_text_refuse_without
         |s| s.instructions = Some(DocumentText::complete(Text::new(copy_of(b"123456789"), 9).unwrap())),
         |s| s.spec.specification.words = DocumentText::complete(Text::new(copy_of(b"123456789"), 9).unwrap()),
         |s| {
-            s.spec
-                .specification
-                .parameters
-                .get_mut(1)
-                .map(|p| {
-                    *p = ParameterDocument::Bytes {
-                        name: 1,
-                        value: DocumentText::complete(Text::new(copy_of(b"123456789"), 9).unwrap()),
-                    }
-                })
-                .unwrap()
+            *s.spec.specification.parameters.get_mut(1).unwrap() = ParameterDocument::Bytes {
+                name: 1,
+                value: DocumentText::complete(Text::new(copy_of(b"123456789"), 9).unwrap()),
+            };
         },
         |s| {
             *s.authority.authority.grants.get_mut(0).unwrap().pattern.segments.get_mut(0).unwrap() =
-                copy_of(b"123456789")
+                copy_of(b"123456789");
         },
         |s| {
             s.authority.authority.grants.get_mut(0).unwrap().pattern.last =
-                OwnerPatternEnd::Exact(copy_of(b"123456789"))
+                OwnerPatternEnd::Exact(copy_of(b"123456789"));
         },
         |s| {
             s.authority.authority.note_resources.get_mut(0).unwrap().pattern.last =
-                OwnerPatternEnd::Open(copy_of(b"123456789"))
+                OwnerPatternEnd::Open(copy_of(b"123456789"));
         },
     ];
     for mutate in mutations {
