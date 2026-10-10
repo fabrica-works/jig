@@ -206,7 +206,7 @@ fn content_call(id: &[u8]) -> views::Call {
         began: None,
     }
 }
-fn delivered_run(out: &[Request]) -> Option<&documents::Run> {
+fn delivered_run(out: &[Request]) -> Option<&Run> {
     for request in out {
         match request {
             Request::Held(held) => {
