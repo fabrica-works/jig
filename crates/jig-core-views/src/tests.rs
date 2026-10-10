@@ -212,17 +212,31 @@ fn closing_waits_for_both_document_and_stream_terminals() {
         drive(&mut domain, Event::StreamDelivered { watcher: Token::new(1) }).as_ref(),
         &[Request::Ended { watcher: Token::new(1), end: End::Unwatched }]
     );
+    assert_eq!(domain.runs(), 1, "detaching does not end a live run");
+    drive(&mut domain, Event::RunEnded { run: Token::new(7) });
     assert_eq!(domain.runs(), 0);
 }
 #[test]
-fn followed_runs_past_the_limit_are_refused_busy() {
+fn retained_runs_past_the_limit_start_when_a_place_frees() {
     let mut domain = Domain::new(&LIMITS);
     follow(&mut domain, 1, 7, None, 0);
     follow(&mut domain, 2, 8, None, 0);
-    assert_eq!(
-        follow(&mut domain, 3, 9, None, 0).as_ref(),
-        &[Request::Refused { watcher: Token::new(3), refusal: Refusal::Busy }]
-    );
+    text(&mut domain, 1, 0, b"one");
+    let report = |run, offset| Event::Text {
+        run: Token::new(run),
+        turn: TurnName { attempt: 1, turn: 1, retry: 0 },
+        offset,
+        text: Box::from(&b"two"[..]),
+        call: None,
+    };
+    drive(&mut domain, report(8, 0));
+    assert_eq!(domain.runs(), 2);
+    assert_eq!(follow(&mut domain, 3, 9, None, 0).len(), 2, "watch admission is independent of retained runs");
+    assert!(drive(&mut domain, report(9, 0)).is_empty());
+    drive(&mut domain, Event::RunEnded { run: Token::new(8) });
+    let out = drive(&mut domain, report(9, 3));
+    assert!(matches!(&out[0], Request::Stream { watcher, from: 3, to: 6, cut: true, .. } if *watcher == Token::new(3)));
+    assert_eq!(domain.runs(), 2);
     assert_eq!(follow(&mut domain, 4, 7, None, 0).len(), 2);
 }
 #[test]
@@ -260,7 +274,13 @@ fn ending_a_run_discards_text_and_a_new_attempt_can_write() {
 fn current_calls_are_bounded_and_paced_with_the_stream() {
     let mut domain = Domain::new(&LIMITS);
     follow(&mut domain, 1, 7, None, 0);
-    let call = Call { number: 4, tool: Box::from(&b"tool"[..]), input: Box::from(&b"abcdefghijkl"[..]), cut: true };
+    let call = Call {
+        identity: CallIdentity { owner: Token::new(4), sequence: 1, retry: 0, id: Box::new([]) },
+        tool: Box::from(&b"tool"[..]),
+        input: Box::from(&b"abcdefghijkl"[..]),
+        cut: true,
+        began: Some(Wall::EPOCH),
+    };
     let out = drive(
         &mut domain,
         Event::Text {
@@ -281,11 +301,14 @@ fn current_calls_are_bounded_and_paced_with_the_stream() {
             text: Box::new([]),
             cut: false,
             call: Some(Call {
-                number: 4,
+                identity: CallIdentity { owner: Token::new(4), sequence: 1, retry: 0, id: Box::new([]) },
                 tool: Box::from(&b"tool"[..]),
                 input: Box::from(&b"abcdefghijkl"[..]),
-                cut: true
+                cut: true,
+                began: Some(Wall::EPOCH)
             })
         }]
     );
 }
+
+mod completion_retry;

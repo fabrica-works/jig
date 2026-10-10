@@ -33,6 +33,7 @@ pub(crate) struct Watcher {
     pub(crate) follow: Option<Follow>,
     pub(crate) flight: Option<crate::text::Flight>,
     pub(crate) revision: Option<u64>,
+    pub(crate) ended_turn: Option<crate::TurnName>,
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum State {
@@ -62,16 +63,11 @@ pub(crate) fn open(
             count = count.checked_add(1).expect("bounded watches");
         }
     }
-    if domain.names.len() >= limits.watchers
-        || count >= limits.watchers_per_party
-        || domain.watchers.is_full()
-        || crate::text::full(domain, limits, follow)
-    {
+    if domain.names.len() >= limits.watchers || count >= limits.watchers_per_party || domain.watchers.is_full() {
         domain.facts.push(Fact::Refused { refusal: Refusal::Busy });
         out.push(Request::Refused { watcher: token, refusal: Refusal::Busy });
         return;
     }
-    crate::text::attach(domain, limits, follow);
     let watch = Watcher {
         token,
         party,
@@ -81,6 +77,7 @@ pub(crate) fn open(
         follow,
         flight: None,
         revision: None,
+        ended_turn: None,
     };
     let id = domain.watchers.insert(watch).expect("admission checked");
     domain.names.insert(token, id).expect("one name per watch");
@@ -182,8 +179,6 @@ pub(crate) fn finish(domain: &mut Domain, id: Id<Watcher>, end: End, out: &mut Q
         return;
     }
     let token = watch.token;
-    let follow = watch.follow;
-    crate::text::detach(domain, follow);
     domain.names.remove(&token);
     domain.watchers.retire(id);
     domain.facts.push(Fact::Ended { end });

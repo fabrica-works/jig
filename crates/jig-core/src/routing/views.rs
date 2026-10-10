@@ -505,6 +505,18 @@ pub(super) fn run_text(
     Requests::Out(out)
 }
 
+pub(super) fn run_call(core: &mut Core, env: &Env<Limits>, run: Token, attempt: Token, call: views::Call) -> Requests {
+    let live =
+        core.proofs.get(&run.raw()).is_some_and(|proof| proof.attempt == attempt.raw() && proof.terminal.is_none());
+    if live {
+        route_view(core, env, views::Event::Called { run, call })
+    } else {
+        let mut out = Queue::with_capacity(1);
+        out.push(Request::Decided);
+        Requests::Out(out)
+    }
+}
+
 pub(super) fn stream_delivered(core: &mut Core, env: &Env<Limits>, watcher: Token) -> Requests {
     let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded stream terminal").held);
     append_stream(super::watch_marks::end_invalid(core, env), &mut out);

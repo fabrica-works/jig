@@ -2,7 +2,7 @@
 //! Observations come from the scripted parent and watcher terminals, never the
 //! child's state (`domain/engine.md`, 11; `client/domain/contract.md`, 7).
 use jig_core_views::{Call, End, Event, Follow, Limits, Request, TurnName, Window};
-use skein_lib::{Time, Token};
+use skein_lib::{Time, Token, Wall};
 use skein_world::domain::{Expectations, Judge, Referee as Harness};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -34,6 +34,7 @@ enum Seen {
     DocumentTaken { watcher: Token },
     StreamTaken { watcher: Token },
     Text { run: Token, turn: TurnName, offset: u32, text: Vec<u8>, call: Option<Call> },
+    Called { run: Token, call: Call },
     Watching { watcher: Token },
     Make { watcher: Token, subject: Token, window: Window },
     Deliver { watcher: Token },
@@ -155,14 +156,24 @@ impl Expectations for Checks {
                 assert_eq!(source.0.get(offset..), text.get(..source.0.len() - offset), "repeated host prefixes agree");
                 source.0.truncate(offset);
                 source.0.extend_from_slice(&text);
-                source.1 = call;
+                if let Some(call) = call {
+                    source.1 = Some(observed_call(call, source.1.as_ref()));
+                }
+            }
+            Seen::Called { run, call } => {
+                if let Some((_, source)) = self.text.iter_mut().filter(|((owner, _), _)| *owner == run).next_back() {
+                    source.1 = Some(observed_call(call, source.1.as_ref()));
+                }
             }
             Seen::Stream { watcher, turn, from, to, text, cut, call } => {
                 let watch = self.open.get_mut(&watcher).expect("open watch");
                 assert!(watch.stream_flight.is_none(), "one provisional stream in flight");
                 let follow = watch.follow.expect("watch follows this run");
                 let source = self.text.get(&(follow.run, turn)).expect("host wrote this named turn");
-                let position = *watch.positions.get(&turn).unwrap_or(&0);
+                let requested = *watch.positions.get(&turn).unwrap_or(&0);
+                let end = u32::try_from(source.0.len()).expect("source length");
+                let beginning = end.saturating_sub(self.limits.text_bytes);
+                let position = if (beginning..=end).contains(&requested) { requested } else { 0 };
                 if cut {
                     assert!(from > position, "cut says which prefix was omitted");
                 } else {
@@ -184,7 +195,7 @@ impl Expectations for Checks {
                 );
                 if let Some(call) = &call {
                     assert!(
-                        call.tool.len() + call.input.len()
+                        call.identity.id.len() + call.tool.len() + call.input.len()
                             <= usize::try_from(self.limits.text_bytes).expect("call bound"),
                         "bounded provisional call"
                     );
@@ -266,10 +277,12 @@ impl Referee {
                 text: text.to_vec(),
                 call: call.clone(),
             }),
+            Event::Called { run, call } => self.observe(Seen::Called { run: *run, call: call.clone() }),
             Event::Changed { .. }
             | Event::Unwatch { .. }
             | Event::Gone { .. }
             | Event::RunEnded { .. }
+            | Event::TurnCommitted { .. }
             | Event::EndWatch { .. } => {}
         }
     }
@@ -334,4 +347,12 @@ impl Referee {
             );
         }
     }
+}
+
+fn observed_call(mut call: Call, previous: Option<&Call>) -> Call {
+    call.began = Some(match previous {
+        Some(previous) if previous.identity == call.identity => previous.began.expect("source first seen"),
+        Some(_) | None => Wall::EPOCH,
+    });
+    call
 }

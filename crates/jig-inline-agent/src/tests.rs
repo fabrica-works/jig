@@ -8,7 +8,13 @@ use smith_protocol_channel as protocol;
 use crate::{Agent, Limits, Request, fire, max_out, step};
 
 fn fixture() -> (Agent, Limits, host::Start) {
-    let smith = smith_agent_world::Settings::calm(13).limits;
+    fixture_with(None, false)
+}
+fn fixture_with(facts: Option<u32>, agents: bool) -> (Agent, Limits, host::Start) {
+    let mut smith = smith_agent_world::Settings::calm(13).limits;
+    if let Some(facts) = facts {
+        smith.session.facts = facts;
+    }
     let limits = Limits {
         slots: 1,
         smith,
@@ -26,7 +32,7 @@ fn fixture() -> (Agent, Limits, host::Start) {
             instructions: Box::from(&b"Answer this task"[..]),
             tools: Box::new([]),
             wait: true,
-            agents: false,
+            agents,
             workspace: charter::WorkspaceTools { inspect: false, modify: false, shell: false },
             conventions: None,
             contract: charter::Contract {
@@ -71,6 +77,8 @@ fn fixture() -> (Agent, Limits, host::Start) {
     };
     (agent, limits, start)
 }
+
+mod completion_retry;
 
 #[test]
 fn inline_spawn_routes_admission_and_provider_request_then_grace_settles() {

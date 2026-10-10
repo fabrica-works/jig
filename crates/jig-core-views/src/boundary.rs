@@ -51,13 +51,27 @@ pub struct TurnName {
     pub retry: u32,
 }
 
-/// A tool call being made, within the configured provisional byte bound.
+/// A provider call's opaque identity (`QUESTIONS.md`, item 42).
+/// Compare only for equality. The same provider id in another issued completion
+/// or owner names a different call; none of these values is a routing number.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct CallIdentity {
+    pub owner: Token,
+    pub sequence: u32,
+    pub retry: u32,
+    pub id: Box<[u8]>,
+}
+
+/// A tool call being made, priced with its whole id within the byte bound.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Call {
-    pub number: u64,
+    pub identity: CallIdentity,
     pub tool: Box<[u8]>,
     pub input: Box<[u8]>,
     pub cut: bool,
+    /// Set by views when this identity is first reported; retained on repeats.
+    /// An ingress supplies None. No provider or adapter invents this clock.
+    pub began: Option<skein_lib::Wall>,
 }
 
 /// An opaque followed run and the client's acknowledged provisional position.
@@ -96,6 +110,10 @@ pub enum Event {
     StreamDelivered { watcher: Token },
     /// A live host wrote text starting at this turn's absolute offset.
     Text { run: Token, turn: TurnName, offset: u32, text: Box<[u8]>, call: Option<Call> },
+    /// Any content call, independently of the main completion's text identity.
+    Called { run: Token, call: Call },
+    /// A committed turn stops being provisional without ending its live run.
+    TurnCommitted { run: Token, attempt: u64, turn: u32 },
     /// The run ended; discard its provisional writing, leaving its watches open.
     RunEnded { run: Token },
     /// The watcher left.

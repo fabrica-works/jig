@@ -7,7 +7,8 @@ use skein_lib::{Id, List, Map, Queue, Slab, Token};
 /// Capacities fixed when the child is constructed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
-    /// Runs whose provisional text can be followed.
+    /// Live runs whose provisional text is retained, watched or not.
+    /// Configure at least the engine's maximum number of live runs.
     pub runs: u32,
     /// Open watches.
     pub watchers: u32,
@@ -15,7 +16,7 @@ pub struct Limits {
     pub watchers_per_party: u32,
     /// Subjects named by one change event.
     pub subjects_per_change: u32,
-    /// Retained provisional bytes per followed run.
+    /// Retained provisional bytes per live run.
     pub text_bytes: u32,
     /// Best effort observations waiting to be drained.
     pub facts: u32,
@@ -43,4 +44,5 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)?
         .checked_add(List::<Token>::worst_case(limits.subjects_per_change)?)?
         .checked_add(List::<Id<Watcher>>::worst_case(limits.watchers)?)
+        .and_then(|bytes| bytes.checked_add(List::<Token>::worst_case(limits.runs)?))
 }

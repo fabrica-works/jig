@@ -41,10 +41,16 @@ fn full_watches_runs_calls_and_retired_slots_fit_the_declared_worst_case() {
                         offset,
                         text: vec![1; usize::try_from(LIMITS.text_bytes).expect("text bound")].into_boxed_slice(),
                         call: Some(Call {
-                            number: 1,
+                            identity: jig_core_views::CallIdentity {
+                                owner: Token::new(1),
+                                sequence: 1,
+                                retry: 0,
+                                id: Box::new([]),
+                            },
                             tool: vec![2; 16].into_boxed_slice(),
                             input: vec![3; 16].into_boxed_slice(),
                             cut: false,
+                            began: Some(Wall::EPOCH),
                         }),
                     },
                 );
@@ -62,7 +68,11 @@ fn full_watches_runs_calls_and_retired_slots_fit_the_declared_worst_case() {
                 step(&mut domain, &mut out, Event::Delivered { watcher: token });
                 step(&mut domain, &mut out, Event::StreamDelivered { watcher: token });
             }
-            assert_eq!(domain.runs(), 0); // Retired watch slots remain until reclaim.
+            assert_eq!(domain.runs(), LIMITS.runs); // Retention survives the final follower.
+            for run in 0..LIMITS.runs {
+                step(&mut domain, &mut out, Event::RunEnded { run: Token::new(u64::from(run)) });
+            }
+            assert_eq!(domain.runs(), 0); // End releases retained runs; watch slots remain until reclaim.
         }
     }
     let measured = meter.end();

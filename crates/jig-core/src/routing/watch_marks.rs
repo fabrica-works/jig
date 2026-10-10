@@ -328,57 +328,30 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
 }
 
 pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
-    if core.view_subjects.is_empty() {
-        let mut out = Queue::with_capacity(1);
-        out.push(Request::Decided);
-        return Requests::Out(out);
-    }
     let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded watch finish").held);
     append(end_invalid(core, env), &mut out);
-    // Attempt endings discard volatile text without ending the task's watch.
-    for (_, binding) in &core.view_subjects {
-        let subject = &core.view_names.get(binding.subject).expect("bound watched subject").subject;
-        let task = match subject {
-            Subject::Run { task } => Some(*task),
-            Subject::Frame { .. }
-            | Subject::Task { .. }
-            | Subject::Tree { .. }
-            | Subject::Chips { .. }
-            | Subject::Inbox { .. }
-            | Subject::Goals { .. }
-            | Subject::Tasks { .. }
-            | Subject::Conversations { .. }
-            | Subject::Deployment
-            | Subject::Proposal { .. }
-            | Subject::Escalation { .. }
-            | Subject::Question { .. }
-            | Subject::PersonTask { .. }
-            | Subject::Result { .. }
-            | Subject::Project { .. }
-            | Subject::Note { .. }
-            | Subject::Application { .. } => None,
-        };
-        let Some(task) = task else { continue };
-        let ended = match views::position(&core.views, skein_lib::Token::new(task)) {
-            Some((writing, _)) => match core.proofs.get(&task) {
-                Some(proof) => {
-                    proof.terminal.is_some()
-                        || proof.attempt != writing.attempt
-                        || match proof.turn {
-                            Some(kept) => writing.turn <= kept.turn,
-                            None => false,
-                        }
-                }
-                None => true,
+    // Retained runs are live independently of watches (QUESTIONS.md, item 41).
+    // A committed turn stops being provisional; only an ended attempt frees
+    // its retained-run admission. Both are fenced by the core's durable proof.
+    for token in &core.views.retained_runs() {
+        let position = views::position(&core.views, *token);
+        let event = match core.proofs.get(&token.raw()) {
+            Some(proof) if proof.terminal.is_none() => match position {
+                Some((writing, _)) if writing.attempt != proof.attempt => Some(views::Event::RunEnded { run: *token }),
+                Some((writing, _)) => proof
+                    .turn
+                    .filter(|kept| writing.turn <= kept.turn)
+                    .map(|kept| views::Event::TurnCommitted { run: *token, attempt: proof.attempt, turn: kept.turn }),
+                None => None,
             },
-            None => false,
+            Some(_) | None => Some(views::Event::RunEnded { run: *token }),
         };
-        if ended {
+        if let Some(event) = event {
             let mut quiet = Queue::with_capacity(1);
             views::step(
                 &mut core.views,
                 &Env { now: env.now, wall: env.wall, limits: env.limits.views },
-                views::Event::RunEnded { run: skein_lib::Token::new(task) },
+                event,
                 &mut quiet,
             );
             assert!(quiet.is_empty(), "ending writing emits no output");

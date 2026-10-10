@@ -1,6 +1,7 @@
 use jig_core_views::{Call, Event, Follow, TurnName};
 use jig_views_world::{LIMITS, World};
-use skein_lib::{Rng, Token};
+use skein_lib::{Rng, Token, Wall};
+use std::boxed::Box;
 fn run(seed: u64) -> Vec<String> {
     let mut world = World::seeded(LIMITS, seed);
     for watcher in 1..=4 {
@@ -16,10 +17,16 @@ fn run(seed: u64) -> Vec<String> {
         world.changed(7 + state % 4);
         let call = if state.is_multiple_of(7) {
             Some(Call {
-                number: tick,
+                identity: jig_core_views::CallIdentity {
+                    owner: Token::new(tick),
+                    sequence: 1,
+                    retry: 0,
+                    id: Box::new([]),
+                },
                 tool: b"tool".as_slice().into(),
                 input: vec![u8::try_from(state % 256).expect("byte"); 8].into_boxed_slice(),
                 cut: false,
+                began: Some(Wall::EPOCH),
             })
         } else {
             None

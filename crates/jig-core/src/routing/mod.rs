@@ -325,6 +325,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::Delivered { .. }
         | Event::StreamDelivered { .. }
         | Event::RunText { .. }
+        | Event::RunCall { .. }
         | Event::Tasks(_)
         | Event::StartRecurring { .. }
         | Event::StartBrief { .. }
@@ -428,6 +429,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::Unwatch { watcher } => route_view(core, env, views::Event::Unwatch { watcher }),
         Event::Delivered { watcher } => route_view(core, env, views::Event::Delivered { watcher }),
         Event::StreamDelivered { watcher } => view_routes::stream_delivered(core, env, watcher),
+        Event::RunCall { run, attempt, call } => view_routes::run_call(core, env, run, attempt, call),
         Event::RunText { run, attempt, turn, retry, offset, text, call } => {
             view_routes::run_text(core, env, run, attempt, turn, retry, offset, text, call)
         }

@@ -371,6 +371,8 @@ pub enum Event {
     Delivered { watcher: Token },
     /// The protocol took one provisional stream delivery.
     StreamDelivered { watcher: Token },
+    /// A content call with its opaque source identity, independent of text.
+    RunCall { run: Token, attempt: Token, call: views::Call },
     /// A live host's text or no-text start, named by its activation turn and supplied retry.
     RunText {
         run: Token,

@@ -3,7 +3,7 @@
 use crate::facts::Facts;
 use crate::watch::{self, Watcher};
 use crate::{Event, Fact, Limits, Request};
-use skein_lib::{Env, Id, Map, Queue, Slab, Time, Token};
+use skein_lib::{Env, Id, List, Map, Queue, Slab, Time, Token};
 
 /// A bounded set of watches, discarded on restart.
 #[derive(Debug)]
@@ -29,15 +29,30 @@ impl Domain {
     pub fn watchers(&self) -> u32 {
         self.watchers.len()
     }
-    /// Opaque runs followed by admitted watches.
+    /// Live runs whose current writing is retained, watched or not.
     #[must_use]
     pub fn runs(&self) -> u32 {
         self.runs.len()
     }
+    /// Current retained live run names, bounded by `limits.runs`, for the
+    /// parent's proof fencing even when none of these runs is watched.
+    #[must_use]
+    pub fn retained_runs(&self) -> List<Token> {
+        let mut tokens = List::with_capacity(self.runs.len());
+        for (token, _) in &self.runs {
+            tokens.push(*token).expect("retained run count");
+        }
+        tokens
+    }
     /// Whether an opaque run has any admitted follower.
     #[must_use]
     pub fn follows(&self, run: Token) -> bool {
-        self.runs.contains_key(&run)
+        for (_, id) in &self.names {
+            if self.watchers.get(*id).expect("named watch").follow.is_some_and(|follow| follow.run == run) {
+                return true;
+            }
+        }
+        false
     }
     /// Watches have no timers.
     #[must_use]
@@ -80,8 +95,10 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Delivered { watcher } => watch::delivered(domain, watcher, out),
         Event::StreamDelivered { watcher } => crate::text::delivered(domain, watcher, out),
         Event::Text { run, turn, offset, text, call } => {
-            crate::text::written(domain, &env.limits, run, turn, offset, &text, call, out);
+            crate::text::written(domain, env, run, turn, offset, &text, call, out);
         }
+        Event::Called { run, call } => crate::text::called(domain, env, run, call, out),
+        Event::TurnCommitted { run, attempt, turn } => crate::text::committed(domain, run, attempt, turn),
         Event::RunEnded { run } => crate::text::ended(domain, run),
         Event::Unwatch { watcher } => watch::close(domain, watcher, crate::End::Unwatched, out),
         Event::Gone { subject, why } => watch::gone(domain, subject, why, out),
