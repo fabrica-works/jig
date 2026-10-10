@@ -100,7 +100,8 @@ impl KeptWords {
         if !self.begin(request, by, words) {
             return false;
         }
-        for row in &mut self.rows {
+        for at in 0..self.rows.len() {
+            let row = self.rows.get_mut(at).expect("word row exists");
             if row.request == Some(request) {
                 row.by_name_cut = cut;
                 break;
