@@ -62,6 +62,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
     let config = Config {
         core: jig_core_world::world::config(17).core,
         triage_templates: Box::new([]),
+        lead_templates: Box::new([]),
         backend: infrastructure::Backend::OperationIds,
         endpoints: Box::new([smith_domain_run::charter::Endpoint(1)]),
         endpoint_names: smith_protocol_channel::Endpoints::new(endpoints),
@@ -217,6 +218,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
             | Output::ApplicationDocument { .. }
             | Output::ApplicationRead { .. }
             | Output::Application { .. }
+            | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)
@@ -252,6 +254,7 @@ fn cold_restart_loads_every_child_before_opening_decisions() {
                 | Output::ApplicationDocument { .. }
                 | Output::ApplicationRead { .. }
                 | Output::Application { .. }
+                | Output::IncidentAssociationRefused { .. }
                 | Output::Read { .. }
                 | Output::Llm { .. }
                 | Output::Busy
@@ -309,6 +312,7 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
                 | Output::ApplicationDocument { .. }
                 | Output::ApplicationRead { .. }
                 | Output::Application { .. }
+                | Output::IncidentAssociationRefused { .. }
                 | Output::Read { .. }
                 | Output::Llm { .. }
                 | Output::Busy
@@ -362,6 +366,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::ApplicationDocument { .. }
             | Output::ApplicationRead { .. }
             | Output::Application { .. }
+            | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)
@@ -395,6 +400,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             | Output::ApplicationDocument { .. }
             | Output::ApplicationRead { .. }
             | Output::Application { .. }
+            | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
             | Output::ToChild(_)
             | Output::Busy
@@ -466,6 +472,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::ApplicationDocument { .. }
             | Output::ApplicationRead { .. }
             | Output::Application { .. }
+            | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)
@@ -494,6 +501,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
             | Output::ApplicationDocument { .. }
             | Output::ApplicationRead { .. }
             | Output::Application { .. }
+            | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)
@@ -612,6 +620,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
             | Output::Observability(_)
             | Output::Infrastructure(_)
             | Output::Application { .. }
+            | Output::IncidentAssociationRefused { .. }
             | Output::Read { .. }
             | Output::Llm { .. }
             | Output::ToChild(_)

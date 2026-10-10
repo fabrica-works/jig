@@ -61,6 +61,11 @@ fn belongs(domain: &Domain, project: u32, service: &Service) -> bool {
             return true;
         }
     }
+    for (_, alert) in &domain.alerts {
+        if alert.project == project && alert.alert.service == *service {
+            return true;
+        }
+    }
     for (_, incident) in &domain.incidents {
         if incident.project == project && incident.service == *service {
             return true;
@@ -100,13 +105,13 @@ fn make(
         }
         ClientSubject::Alert { project, alert } => {
             scoped(scope, *project)?;
-            let incident = domain.incidents.get(&(*project, *alert)).ok_or(DocumentMissing::Unknown)?;
-            let raised = incident.raised;
+            let account = domain.alerts.get(&(*project, *alert)).ok_or(DocumentMissing::Unknown)?;
+            let raised = account.raised;
             Ok(ClientDocument::Alert {
-                alert: crate::Alert { number: *alert, service: incident.service.clone(), severity: incident.severity },
+                alert: account.alert.clone(),
                 raised,
-                state: incident.state,
-                fact: domain.facts.get(&incident.service).cloned(),
+                state: account.state,
+                fact: domain.facts.get(&account.alert.service).cloned(),
             })
         }
         ClientSubject::Outbox { project, entry: number } => {
@@ -185,12 +190,14 @@ pub(crate) fn changed(domain: &Domain, env: &Env<Limits>, service: &Service, out
     for (token, subject) in &domain.client_subjects {
         let touched = match subject {
             ClientSubject::Service { service: named, .. } => named == service,
-            ClientSubject::Incident { project, incident } | ClientSubject::Alert { project, alert: incident } => {
-                match domain.incidents.get(&(*project, *incident)) {
-                    Some(incident) => incident.service == *service,
-                    None => false,
-                }
-            }
+            ClientSubject::Alert { project, alert } => match domain.alerts.get(&(*project, *alert)) {
+                Some(account) => account.alert.service == *service,
+                None => false,
+            },
+            ClientSubject::Incident { project, incident } => match domain.incidents.get(&(*project, *incident)) {
+                Some(incident) => incident.service == *service,
+                None => false,
+            },
             ClientSubject::Project { project } => belongs(domain, *project, service),
             ClientSubject::Deployment | ClientSubject::Outbox { .. } => false,
         };
@@ -209,12 +216,16 @@ pub fn document_worst_case(limits: &Limits) -> Option<u64> {
     let name = u64::from(limits.name_bytes).checked_mul(2)?;
     let fact = u64::from(limits.samples_per_service).checked_mul(u64::try_from(size_of::<crate::LoadPoint>()).ok()?)?;
     let timeline = List::<crate::IncidentPoint>::worst_case(limits.samples_per_service.max(1))?;
-    let incidents = List::<Incident>::worst_case(crate::incidents::capacity(limits)?)?
-        .checked_add(u64::from(crate::incidents::capacity(limits)?).checked_mul(name.checked_add(timeline)?)?)?;
+    let incidents = List::<Incident>::worst_case(crate::incidents::capacity(limits)?)?.checked_add(
+        u64::from(crate::incidents::capacity(limits)?).checked_mul(
+            name.checked_add(u64::from(limits.alerts_per_batch).checked_mul(8)?)?.checked_add(timeline)?,
+        )?,
+    )?;
     let services = List::<ClientService>::worst_case(limits.services)?
         .checked_add(u64::from(limits.services).checked_mul(name.checked_add(fact)?)?)?;
     let project = incidents.checked_add(services)?;
-    let incident = name.checked_add(timeline)?.checked_add(fact)?;
+    let alert_set = u64::from(limits.alerts_per_batch).checked_mul(8)?;
+    let incident = name.checked_add(alert_set)?.checked_add(timeline)?.checked_add(fact)?;
     let deployment = List::<crate::Entry>::worst_case(limits.effects)?
         .checked_add(u64::from(limits.effects).checked_mul(u64::from(limits.name_bytes))?)?;
     u64::try_from(size_of::<ClientDocument>()).ok()?.checked_add(project.max(incident).max(deployment))
@@ -230,12 +241,19 @@ pub(crate) fn records_changed(domain: &Domain, env: &Env<Limits>, out: &mut Queu
         let request = out.pop().expect("fixed output count");
         changed |= match &request {
             Request::Save { record } => match record {
-                crate::Record::Watch(_) | crate::Record::Outbox(_) | crate::Record::Incident(_) => true,
+                crate::Record::Watch(_)
+                | crate::Record::Outbox(_)
+                | crate::Record::Incident(_)
+                | crate::Record::Alert(_)
+                | crate::Record::Delegation(_) => true,
                 crate::Record::Subscription { .. } => false,
             },
             Request::Erase { key } => match key {
                 crate::RecordKey::Watch(_) | crate::RecordKey::Outbox(_) => true,
-                crate::RecordKey::Incident { .. } | crate::RecordKey::Subscription(..) => false,
+                crate::RecordKey::Incident { .. }
+                | crate::RecordKey::Alert { .. }
+                | crate::RecordKey::Delegation { .. }
+                | crate::RecordKey::Subscription(..) => false,
             },
             Request::Document { .. }
             | Request::ReadAnswered { .. }
@@ -249,6 +267,9 @@ pub(crate) fn records_changed(domain: &Domain, env: &Env<Limits>, out: &mut Queu
             | Request::Health { .. }
             | Request::WatchInterest { .. }
             | Request::Triage { .. }
+            | Request::WatchDecision { .. }
+            | Request::WakeProcedure { .. }
+            | Request::AssociationRefused { .. }
             | Request::Described { .. }
             | Request::Refused { .. }
             | Request::Make { .. }

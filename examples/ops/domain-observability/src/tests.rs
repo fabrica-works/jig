@@ -305,3 +305,242 @@ fn a_service_document_uses_the_projects_owned_watch_not_the_clients_claim() {
     );
     assert!(known.is_empty());
 }
+
+fn incident_owner() -> Domain {
+    let mut domain = Domain::with_templates(
+        &limits(),
+        Box::new([TriageTemplate { number: 3, delegate: Box::from(&b"triage"[..]) }]),
+    )
+    .with_leads(&limits(), Box::new([LeadTemplate { number: 3, delegate: Box::from(&b"lead"[..]) }]));
+    event(&mut domain, 1, Event::StartWatch { task: 7, project: 1, services: Box::new([service()]), template: 3 });
+    event(
+        &mut domain,
+        1,
+        Event::System(SystemEvent::Alert { own: false, alert: Alert { number: 12, service: service(), severity: 3 } }),
+    );
+    let requested = event(
+        &mut domain,
+        1,
+        Event::WatchStep { task: 7, step: 1, batch: 10, messages: Box::new([WatchMessage::News]) },
+    );
+    assert!(has_request(&requested, ExpectedRequest::Triage));
+    event(&mut domain, 1, Event::ProcedureDelegateOutcome { task: 7, step: 1, child: Some(100) });
+    domain
+}
+
+fn read_incident(domain: &mut Domain) -> Result<ClientDocument, DocumentMissing> {
+    let read = Token::new(501);
+    event(
+        domain,
+        2,
+        Event::DocumentPrepare { token: read, subject: ClientSubject::Incident { project: 1, incident: 12 } },
+    );
+    let mut result = event(domain, 2, Event::ReadDocument { scope: ClientScope::Project(1), read, party: 1 });
+    let Request::ReadAnswered { answer, .. } = result.pop().expect("one owner answer") else {
+        panic!("expected read answer")
+    };
+    answer
+}
+
+fn incident_verdict(child: u64) -> WatchMessage {
+    WatchMessage::Triage {
+        child,
+        verdict: TriageVerdict::Incident { alerts: Box::new([12]), service: service(), severity: 3 },
+    }
+}
+
+#[test]
+fn only_the_retained_triage_child_can_open_an_incident_and_noise_opens_none() {
+    let mut domain = incident_owner();
+    let unrelated = event(
+        &mut domain,
+        2,
+        Event::WatchStep { task: 7, step: 2, batch: 11, messages: Box::new([incident_verdict(999)]) },
+    );
+    assert!(has_request(&unrelated, ExpectedRequest::Wait));
+    assert_eq!(read_incident(&mut domain), Err(DocumentMissing::Unknown));
+    let malformed = event(
+        &mut domain,
+        2,
+        Event::WatchStep {
+            task: 7,
+            step: 4,
+            batch: 13,
+            messages: Box::new([WatchMessage::InvalidTriage { child: 100 }]),
+        },
+    );
+    assert!(has_request(&malformed, ExpectedRequest::Verdict));
+    let noise = event(
+        &mut domain,
+        2,
+        Event::WatchStep {
+            task: 7,
+            step: 3,
+            batch: 12,
+            messages: Box::new([WatchMessage::Triage { child: 100, verdict: TriageVerdict::Noise }]),
+        },
+    );
+    assert!(has_request(&noise, ExpectedRequest::Wait));
+    assert_eq!(read_incident(&mut domain), Err(DocumentMissing::Unknown));
+    event(&mut domain, 3, Event::System(SystemEvent::Fact { service: service(), fact: fact(3, 20) }));
+    let read = Token::new(502);
+    event(
+        &mut domain,
+        3,
+        Event::DocumentPrepare { token: read, subject: ClientSubject::Alert { project: 1, alert: 12 } },
+    );
+    let mut answer = event(&mut domain, 3, Event::ReadDocument { scope: ClientScope::Project(1), read, party: 1 });
+    let Some(Request::ReadAnswered {
+        answer: Ok(ClientDocument::Alert { alert, raised, state, fact: observed }), ..
+    }) = answer.pop()
+    else {
+        panic!("noise still has an alert account")
+    };
+    assert_eq!(alert.number, 12);
+    assert_eq!(raised, Wall::from_nanos(1_000_000_000));
+    assert_eq!(state, IncidentState::Resolved);
+    assert_eq!(observed, Some(fact(3, 20)));
+    assert_eq!(read_incident(&mut domain), Err(DocumentMissing::Unknown));
+}
+
+#[test]
+fn the_lead_is_unknown_until_the_same_step_outcome_and_a_conflict_never_replaces_it() {
+    let mut domain = incident_owner();
+    let selected = event(
+        &mut domain,
+        2,
+        Event::WatchStep { task: 7, step: 2, batch: 11, messages: Box::new([incident_verdict(100)]) },
+    );
+    assert!(has_request(&selected, ExpectedRequest::Lead));
+    let ClientDocument::Incident { incident, .. } = read_incident(&mut domain).expect("owner opened incident") else {
+        panic!()
+    };
+    assert_eq!(incident.lead, None);
+    let wrong = event(&mut domain, 2, Event::ProcedureDelegateOutcome { task: 7, step: 99, child: Some(999) });
+    assert!(has_request(&wrong, ExpectedRequest::UnknownStep));
+    event(&mut domain, 2, Event::ProcedureDelegateOutcome { task: 7, step: 2, child: Some(200) });
+    let conflict = event(&mut domain, 2, Event::ProcedureDelegateOutcome { task: 7, step: 2, child: Some(999) });
+    assert!(has_request(&conflict, ExpectedRequest::Conflict));
+    let ClientDocument::Incident { incident, .. } = read_incident(&mut domain).expect("owner retained incident") else {
+        panic!()
+    };
+    assert_eq!(incident.lead, Some(200));
+    assert_eq!(incident.alerts.as_ref(), &[12]);
+    assert_eq!(incident.watch, 7);
+    // A distinct retained step naming an already-owned incident cannot replace its lead.
+    event(
+        &mut domain,
+        2,
+        Event::Restore {
+            record: Record::Delegation(Delegation {
+                task: 7,
+                step: 3,
+                project: 1,
+                kind: DelegationKind::Lead { incident: 12 },
+                child: None,
+            }),
+        },
+    );
+    let other_step = event(&mut domain, 2, Event::ProcedureDelegateOutcome { task: 7, step: 3, child: Some(999) });
+    assert!(has_request(&other_step, ExpectedRequest::Conflict));
+    let ClientDocument::Incident { incident, .. } = read_incident(&mut domain).unwrap() else { panic!() };
+    assert_eq!(incident.lead, Some(200));
+}
+
+#[test]
+fn the_lead_step_and_incident_survive_a_cold_start_and_the_watch_ending() {
+    use alloc::collections::BTreeMap;
+    let mut domain = incident_owner();
+    let mut rows = BTreeMap::new();
+    let watch = Record::Watch(domain.watches.get(&7).expect("live W").clone());
+    rows.insert(watch.key(), watch);
+    // Independent committed receipts reconstruct the owner before and after the outcome.
+    for request in &event(
+        &mut domain,
+        2,
+        Event::WatchStep { task: 7, step: 2, batch: 11, messages: Box::new([incident_verdict(100)]) },
+    ) {
+        if let Request::Save { record } = request {
+            rows.insert(record.key(), record.clone());
+        }
+    }
+    let mut restarted = Domain::new(&limits());
+    for record in rows.values() {
+        event(&mut restarted, 2, Event::Restore { record: record.clone() });
+    }
+    let ClientDocument::Incident { incident, .. } = read_incident(&mut restarted).unwrap() else { panic!() };
+    assert_eq!(incident.lead, None, "no lead is invented at a journal cut before the outcome");
+    for request in &event(&mut restarted, 2, Event::ProcedureDelegateOutcome { task: 7, step: 2, child: Some(200) }) {
+        if let Request::Save { record } = request {
+            rows.insert(record.key(), record.clone());
+        }
+    }
+    for request in &event(&mut restarted, 2, Event::StopWatch { task: 7 }) {
+        if let Request::Erase { key } = request {
+            rows.remove(key);
+        }
+    }
+    assert!(!rows.contains_key(&RecordKey::Watch(7)), "watch ending is durable");
+    let mut again = Domain::new(&limits());
+    for record in rows.values() {
+        event(&mut again, 2, Event::Restore { record: record.clone() });
+    }
+    let ClientDocument::Incident { incident, .. } = read_incident(&mut again).unwrap() else { panic!() };
+    assert_eq!(incident.lead, Some(200));
+    let conflict = event(&mut again, 2, Event::ProcedureDelegateOutcome { task: 7, step: 2, child: Some(300) });
+    assert!(has_request(&conflict, ExpectedRequest::Conflict));
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExpectedRequest {
+    Triage,
+    Lead,
+    Wait,
+    UnknownStep,
+    Conflict,
+    Verdict,
+}
+
+fn has_request(requests: &Queue<Request>, expected: ExpectedRequest) -> bool {
+    for request in requests {
+        let found = match request {
+            Request::WatchDecision { decision, .. } => match decision {
+                WatchDecision::Triage { .. } => Some(ExpectedRequest::Triage),
+                WatchDecision::Lead { .. } => Some(ExpectedRequest::Lead),
+                WatchDecision::Wait => Some(ExpectedRequest::Wait),
+                WatchDecision::Hold => None,
+            },
+            Request::AssociationRefused { reason, .. } => match reason {
+                AssociationRefusal::UnknownStep => Some(ExpectedRequest::UnknownStep),
+                AssociationRefusal::Conflict => Some(ExpectedRequest::Conflict),
+                AssociationRefusal::Verdict => Some(ExpectedRequest::Verdict),
+                AssociationRefusal::Full | AssociationRefusal::Template => None,
+            },
+            Request::Document { .. }
+            | Request::ReadAnswered { .. }
+            | Request::Marked { .. }
+            | Request::WatchInterest { .. }
+            | Request::Closed { .. }
+            | Request::Released { .. }
+            | Request::Restarted { .. }
+            | Request::Verdict { .. }
+            | Request::Answer { .. }
+            | Request::News { .. }
+            | Request::Health { .. }
+            | Request::Triage { .. }
+            | Request::WakeProcedure { .. }
+            | Request::Described { .. }
+            | Request::Refused { .. }
+            | Request::Make { .. }
+            | Request::Outcome { .. }
+            | Request::Save { .. }
+            | Request::Erase { .. }
+            | Request::System(..)
+            | Request::Changed { .. } => None,
+        };
+        if found == Some(expected) {
+            return true;
+        }
+    }
+    false
+}

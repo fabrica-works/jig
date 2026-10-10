@@ -127,6 +127,8 @@ pub enum Output {
     ApplicationDocument { watcher: Token, document: ClientDocument },
     /// One connector-owned read terminal after all reflected commits are durable.
     ApplicationRead { reply: ReplyTo, answer: Result<ClientDocument, ClientMissing> },
+    /// A connector refused an incident association; the journal preserves the reason.
+    IncidentAssociationRefused { task: u64, step: u64, reason: observability::AssociationRefusal },
     /// Infrastructure's own outcome, released only by the commit barrier.
     Application { to: ReplyTo, outcome: infrastructure::ApplicationOutcome },
     /// One atomic transaction, numbered by the journal.

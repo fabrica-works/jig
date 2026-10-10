@@ -44,6 +44,8 @@ pub struct Config {
     pub core: core::Config,
     /// Observability owns the standing watches' delegate templates.
     pub triage_templates: Box<[observability::TriageTemplate]>,
+    /// Observability owns the matching incident lead templates.
+    pub lead_templates: Box<[observability::LeadTemplate]>,
     /// The infrastructure backend's available recovery promise.
     pub backend: infrastructure::Backend,
     /// Endpoint identities for the inline agent.
@@ -127,9 +129,15 @@ impl Domain {
             &mut configured,
         );
         assert!(configured.is_empty(), "configured hold rules decide nothing");
+        assert!(
+            limits.core.tasks.inbox_messages
+                <= observability::message_capacity(&limits.observability).expect("watch news bound"),
+            "offered watch inbox fits owner message bound"
+        );
         Self {
             core,
-            observability: observability::Domain::with_templates(&limits.observability, config.triage_templates),
+            observability: observability::Domain::with_templates(&limits.observability, config.triage_templates)
+                .with_leads(&limits.observability, config.lead_templates),
             infrastructure: infrastructure::Domain::new(config.backend, &limits.infrastructure),
             host: host::Domain::new(&limits.host),
             agents: agent::Agent::new(&limits.agent, config.endpoints, config.endpoint_names, config.seed),

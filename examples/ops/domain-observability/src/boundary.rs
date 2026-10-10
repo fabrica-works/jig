@@ -262,6 +262,10 @@ pub struct Entry {
 pub enum RecordKey {
     /// One scoped incident retained by this owner.
     Incident { project: u32, number: u64 },
+    /// One alert account, independently of a triage verdict.
+    Alert { project: u32, number: u64 },
+    /// The delegate selected by one owner procedure step.
+    Delegation { task: u64, step: u64 },
     /// One subscriber to a topic.
     Subscription(Topic, u64),
     /// One standing watch.
@@ -275,6 +279,10 @@ pub enum RecordKey {
 pub enum Record {
     /// Scoped incident state and its bounded observed timeline.
     Incident(crate::Incident),
+    /// An observed alert, including those triaged as noise.
+    Alert(crate::AlertAccount),
+    /// A retained owner-selected step association.
+    Delegation(crate::Delegation),
     /// A subscriber's thresholds.
     Subscription { topic: Topic, task: u64, subscription: u64, wake_at: u8, keep_at: u8 },
     /// A standing watch's progress.
@@ -290,6 +298,8 @@ impl Record {
         match self {
             Record::Subscription { topic, task, .. } => RecordKey::Subscription(topic.clone(), *task),
             Record::Watch(watch) => RecordKey::Watch(watch.task),
+            Record::Alert(alert) => RecordKey::Alert { project: alert.project, number: alert.alert.number },
+            Record::Delegation(value) => RecordKey::Delegation { task: value.task, step: value.step },
             Record::Incident(incident) => RecordKey::Incident { project: incident.project, number: incident.number },
             Record::Outbox(entry) => RecordKey::Outbox(entry.key),
         }
@@ -327,6 +337,10 @@ pub enum Event {
     StopWatch { task: u64 },
     /// A batched wake of a standing watch.
     WakeWatch { task: u64, batch: u64, alerts: Box<[u64]> },
+    /// Decide a standing watch step from its offered typed news.
+    WatchStep { task: u64, step: u64, batch: u64, messages: Box<[crate::WatchMessage]> },
+    /// The core reports the one delegate selected by this step in the same decision.
+    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// Describe and stage a silence pending the core's authority check.
     Describe { token: Token, effect: Effect },
     /// Keep an approved silence in the outbox.
@@ -402,6 +416,12 @@ pub enum Request {
     Health { service: Service, healthy: bool, subscribers: Box<[Classed]> },
     /// A watch asks for a triage task from its template and wake batch.
     Triage { watch: u64, template: u16, batch: u64, alerts: Box<[u64]>, delegate: Box<[u8]> },
+    /// One owner-selected procedure action, routed without a root decision.
+    WatchDecision { task: u64, step: u64, decision: crate::WatchDecision },
+    /// Make this owner procedure due after its current decision is durable.
+    WakeProcedure { task: u64 },
+    /// A conflicting or malformed owner association was refused.
+    AssociationRefused { task: u64, step: u64, reason: crate::AssociationRefusal },
     /// A description for the core's authority check.
     Described { token: Token, effect: Effect },
     /// A refused staged effect or invalid read.
@@ -436,5 +456,14 @@ pub struct TriageTemplate {
     /// Identity named by a watch.
     pub number: u16,
     /// One bounded delegate tool input.
+    pub delegate: Box<[u8]>,
+}
+
+/// The incident lead's configured delegate envelope, bounded as a triage template.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct LeadTemplate {
+    /// The triage template beside which this lead is configured.
+    pub number: u16,
+    /// One bounded delegate tool input containing its charter, budget and spec.
     pub delegate: Box<[u8]>,
 }

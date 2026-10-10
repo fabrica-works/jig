@@ -516,10 +516,18 @@ fn core_ask(
                                 }
                             }
                         }
-                        let mut news = false;
+                        let mut messages = List::with_capacity(env.limits.core.tasks.inbox_messages);
                         for word in &context.inbox {
-                            match word.kind {
-                                tasks::MessageKind::News { .. } => news = true,
+                            match &word.kind {
+                                tasks::MessageKind::News { .. } => {
+                                    messages.push(observability::WatchMessage::News).expect("offered inbox bound");
+                                }
+                                tasks::MessageKind::Result(result) => match word.from {
+                                    tasks::Party::Task(child) => messages
+                                        .push(translate::watch_result(child, result))
+                                        .expect("offered inbox bound"),
+                                    tasks::Party::Person(_) | tasks::Party::Deployment { .. } => {}
+                                },
                                 tasks::MessageKind::Escalation { .. }
                                 | tasks::MessageKind::Proposal { .. }
                                 | tasks::MessageKind::ProposalDecision { .. }
@@ -530,26 +538,15 @@ fn core_ask(
                                 | tasks::MessageKind::Answer { .. }
                                 | tasks::MessageKind::Notice { .. }
                                 | tasks::MessageKind::Timer { .. }
-                                | tasks::MessageKind::PersonStalled { .. }
-                                | tasks::MessageKind::Result(_) => {}
+                                | tasks::MessageKind::PersonStalled { .. } => {}
                             }
                         }
-                        if news {
-                            work.push(Work::Observability(observability::Event::WakeWatch {
-                                task,
-                                batch: context.last_message,
-                                alerts: Box::new([]),
-                            }));
-                        } else {
-                            domain.procedures.remove(&task);
-                            work.push(Work::Core(core::Event::ProcedureStep {
-                                task,
-                                step,
-                                connector: number,
-                                code,
-                                action: core::ProcedureAction::Wait,
-                            }));
-                        }
+                        work.push(Work::Observability(observability::Event::WatchStep {
+                            task,
+                            step,
+                            batch: context.last_message,
+                            messages: messages.into_boxed(),
+                        }));
                     }
                     None => work.push(Work::Core(core::Event::ProcedureStep {
                         task,
@@ -1151,6 +1148,31 @@ pub(crate) fn observability_out(
                     },
                 })));
             }
+            observability::Request::WatchDecision { task, step, decision: chosen } => {
+                let Some((offered, connector, code)) = domain.procedures.remove(&task) else { continue };
+                assert_eq!(offered, step, "owner answers its offered step");
+                let action = match chosen {
+                    observability::WatchDecision::Triage { delegate, alerts } => {
+                        match translate::triage(&delegate, &alerts) {
+                            Some(batch) => core::ProcedureAction::Delegate(batch),
+                            None => core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                        }
+                    }
+                    observability::WatchDecision::Lead { delegate } => match translate::lead(&delegate) {
+                        Some(batch) => core::ProcedureAction::Delegate(batch),
+                        None => core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                    },
+                    observability::WatchDecision::Wait => core::ProcedureAction::Wait,
+                    observability::WatchDecision::Hold => core::ProcedureAction::Hold(tasks::Hold::Procedure),
+                };
+                work.push(Work::Core(core::Event::ProcedureStep { task, step, connector, code, action }));
+            }
+            observability::Request::WakeProcedure { task } => {
+                child(decision, Released::Core(core::Event::Tasks(tasks::Event::WakeProcedure { task })));
+            }
+            observability::Request::AssociationRefused { task, step, reason } => {
+                held(decision, Output::IncidentAssociationRefused { task, step, reason });
+            }
             observability::Request::Triage { watch, delegate, alerts, .. } => {
                 let Some((step, connector, code)) = domain.procedures.remove(&watch) else { continue };
                 let action = match translate::triage(&delegate, &alerts) {
@@ -1323,7 +1345,34 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         | core::Now::HistoricalPersonTask { .. }) => {
             now(domain, Output::CoreLoad(load));
         }
-        core::Now::ProcedureDelegateOutcome { .. } => {}
+        core::Now::ProcedureDelegateOutcome { task, step, child } => {
+            let connector = match domain.core.tasks.task(task) {
+                Some(row) => match row.executor {
+                    tasks::Executor::Procedure { connector, .. } => Some(connector),
+                    tasks::Executor::Agent { .. } | tasks::Executor::Person(_) => None,
+                },
+                None => None,
+            };
+            if let Some(number) = connector {
+                match jig_ops_connectors::connector(number) {
+                    Some(Connector::Observability) => {
+                        work.push(Work::Observability(observability::Event::ProcedureDelegateOutcome {
+                            task,
+                            step,
+                            child,
+                        }));
+                    }
+                    Some(Connector::Infrastructure) => {
+                        work.push(Work::Infrastructure(infrastructure::Event::ProcedureDelegateOutcome {
+                            task,
+                            step,
+                            child,
+                        }));
+                    }
+                    None => {}
+                }
+            }
+        }
         core::Now::RestoreRefused => {
             let _request = domain.core.restart_refuse();
         }

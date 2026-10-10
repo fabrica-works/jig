@@ -75,6 +75,7 @@ pub struct Peers {
     pub application_answers: Vec<infra::ApplicationOutcome>,
     pub documents: Vec<(u64, root::ClientDocument)>,
     pub ended_documents: Vec<u64>,
+    pub lead_commits: Vec<(u64, obs::Incident, obs::Delegation)>,
     document_story: bool,
     watched_documents: std::collections::BTreeSet<u64>,
     document_rows: Vec<(u64, root::Record)>,
@@ -140,6 +141,7 @@ impl Application for Ops {
             document_story: config.documents,
             watched_documents: std::collections::BTreeSet::new(),
             document_rows: Vec::new(),
+            lead_commits: Vec::new(),
             pending_document_effects: Vec::new(),
             llm: scripts::Llm::new(config.seed),
             asked_accept: std::collections::BTreeSet::new(),
@@ -226,6 +228,7 @@ impl Application for Ops {
                 root::Output::Stop => outputs.push(Output::Stop),
                 other @ (root::Output::ApplicationDocument { .. }
                 | root::Output::ApplicationRead { .. }
+                | root::Output::IncidentAssociationRefused { .. }
                 | root::Output::Application { .. }
                 | root::Output::Load { .. }
                 | root::Output::CoreLoad(_)
@@ -495,6 +498,7 @@ impl Application for Ops {
                 peers.ended_documents.push(watcher.raw());
                 Vec::new()
             }
+            root::Output::IncidentAssociationRefused { .. } => panic!("owner association refused in conformance story"),
             root::Output::ApplicationRead { .. }
             | root::Output::Read { .. }
             | root::Output::Core(_)

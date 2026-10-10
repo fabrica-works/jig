@@ -286,7 +286,11 @@ fn observability_read(
 
 #[test]
 fn incident_parts_keep_raised_scope_and_cut_timeline_across_a_cold_start() {
-    let mut world = jig_ops_world::World::new(0);
+    let mut world = jig_ops_world::World::with_templates(
+        0,
+        Box::new([obs::TriageTemplate { number: 1, delegate: Box::from(&b"triage"[..]) }]),
+        Box::new([obs::LeadTemplate { number: 1, delegate: Box::from(&b"lead"[..]) }]),
+    );
     let service = jig_ops_world::service();
     world.event(obs::Event::StartWatch { task: 7, project: 1, services: Box::new([service.clone()]), template: 1 });
     world.event(obs::Event::System(obs::SystemEvent::Alert {
@@ -309,6 +313,7 @@ fn incident_parts_keep_raised_scope_and_cut_timeline_across_a_cold_start() {
         ),
         "a kept alert has an owned account without waking the watch"
     );
+    open_incident_from_triage(&mut world, &service);
     let subject = obs::ClientSubject::Incident { project: 1, incident: 12 };
     let scope = obs::ClientScope::Project(1);
     let obs::ClientDocument::Incident { incident: first, .. } =
@@ -429,4 +434,18 @@ fn observability_outbox_parts_use_retained_scope_and_end_when_settled() {
         Err(obs::DocumentMissing::Unknown),
         "unknown owner scope is never inferred from an entry number"
     );
+}
+
+fn open_incident_from_triage(world: &mut jig_ops_world::World, service: &obs::Service) {
+    world.event(obs::Event::WatchStep { task: 7, step: 1, batch: 1, messages: Box::new([obs::WatchMessage::News]) });
+    world.event(obs::Event::ProcedureDelegateOutcome { task: 7, step: 1, child: Some(100) });
+    world.event(obs::Event::WatchStep {
+        task: 7,
+        step: 2,
+        batch: 2,
+        messages: Box::new([obs::WatchMessage::Triage {
+            child: 100,
+            verdict: obs::TriageVerdict::Incident { alerts: Box::new([12]), service: service.clone(), severity: 3 },
+        }]),
+    });
 }

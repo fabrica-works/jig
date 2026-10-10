@@ -20,8 +20,12 @@
 
 extern crate alloc;
 
+mod watch_steps;
+pub use watch_steps::{
+    AssociationRefusal, Delegation, DelegationKind, TriageVerdict, WatchDecision, WatchMessage, message_capacity,
+};
 mod incidents;
-pub use incidents::{Incident, IncidentHealth, IncidentPoint, IncidentState};
+pub use incidents::{AlertAccount, Incident, IncidentHealth, IncidentPoint, IncidentState};
 mod client_documents;
 pub use client_documents::{
     ClientDocument, ClientScope, ClientService, ClientSubject, DocumentMissing, document_worst_case,
@@ -31,8 +35,8 @@ mod domain;
 mod limits;
 
 pub use boundary::{
-    Alert, Class, Classed, Effect, Entry, Event, Fact, Key, LoadPoint, Outcome, Phase, Purpose, Read, Record,
-    RecordKey, Request, Requirement, Resource, RestartStage, Service, SystemEvent, SystemRequest, Topic,
+    Alert, Class, Classed, Effect, Entry, Event, Fact, Key, LeadTemplate, LoadPoint, Outcome, Phase, Purpose, Read,
+    Record, RecordKey, Request, Requirement, Resource, RestartStage, Service, SystemEvent, SystemRequest, Topic,
     TriageTemplate, Verdict, Watch, Window,
 };
 pub use domain::{Domain, MAX_OUT, fire, next_deadline, step};

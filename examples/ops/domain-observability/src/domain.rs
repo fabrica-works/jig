@@ -21,7 +21,10 @@ struct Question {
 pub struct Domain {
     pub(crate) client_subjects: Map<Token, crate::ClientSubject>,
     restart: Option<crate::RestartStage>,
-    templates: Map<u16, Box<[u8]>>,
+    pub(crate) templates: Map<u16, Box<[u8]>>,
+    pub(crate) lead_templates: Map<u16, Box<[u8]>>,
+    pub(crate) delegations: Map<(u64, u64), crate::Delegation>,
+    pub(crate) alerts: Map<(u32, u64), crate::AlertAccount>,
     closing: Map<u64, bool>,
     refresh: Map<Service, bool>,
     pub(crate) facts: Map<Service, Fact>,
@@ -48,6 +51,9 @@ impl Domain {
             "incident and watch saves fit MAX_OUT"
         );
         Self {
+            lead_templates: Map::with_capacity(limits.watches),
+            delegations: Map::with_capacity(crate::watch_steps::capacity(limits).expect("step association bound")),
+            alerts: Map::with_capacity(crate::incidents::capacity(limits).expect("alert bound")),
             incidents: Map::with_capacity(crate::incidents::capacity(limits).expect("incident bound")),
             client_subjects: Map::with_capacity(limits.reads),
             templates: Map::with_capacity(limits.watches),
@@ -92,6 +98,21 @@ impl Domain {
             );
         }
         domain
+    }
+    /// Configure lead envelopes beside the watch's triage templates.
+    #[must_use]
+    pub fn with_leads(mut self, limits: &Limits, templates: Box<[crate::LeadTemplate]>) -> Self {
+        for template in templates {
+            assert!(
+                template.delegate.len() <= usize::try_from(limits.answer_bytes).expect("lead byte bound"),
+                "lead byte bound"
+            );
+            assert!(
+                self.lead_templates.insert(template.number, template.delegate).expect("lead count bound").is_none(),
+                "distinct lead templates"
+            );
+        }
+        self
     }
 }
 
@@ -367,6 +388,19 @@ fn stop_watch(domain: &mut Domain, task: u64, out: &mut Queue<Request>) {
             out.push(Request::Erase { key: RecordKey::Subscription(topic, task) });
         }
     }
+    let mut triages = List::with_capacity(1);
+    for (key, value) in &domain.delegations {
+        if value.task == task {
+            match value.kind {
+                crate::DelegationKind::Triage { .. } => triages.push(*key).expect("one retained triage per watch"),
+                crate::DelegationKind::Lead { .. } => {}
+            }
+        }
+    }
+    for key in &triages {
+        domain.delegations.remove(key);
+        out.push(Request::Erase { key: RecordKey::Delegation { task: key.0, step: key.1 } });
+    }
     out.push(Request::Erase { key: RecordKey::Watch(task) });
 }
 
@@ -408,6 +442,12 @@ fn restore(domain: &mut Domain, record: Record) {
         }
         Record::Watch(watch) => {
             domain.watches.insert(watch.task, watch).expect("restored watch fits");
+        }
+        Record::Alert(alert) => {
+            domain.alerts.insert((alert.project, alert.alert.number), alert).expect("restored alert fits");
+        }
+        Record::Delegation(value) => {
+            domain.delegations.insert((value.task, value.step), value).expect("restored step fits");
         }
         Record::Incident(incident) => {
             domain.incidents.insert((incident.project, incident.number), incident).expect("restored incident fits");
@@ -568,6 +608,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::StopWatch { task } => stop_watch(domain, task, out),
         Event::WakeWatch { task, batch, alerts } => wake_watch(domain, env, task, batch, alerts, out),
+        Event::WatchStep { task, step, batch, messages } => {
+            crate::watch_steps::step(domain, env, task, step, batch, messages, out);
+        }
+        Event::ProcedureDelegateOutcome { task, step, child } => {
+            crate::watch_steps::outcome(domain, task, step, child, out);
+        }
         Event::Describe { token, effect } => {
             if !effect.rule.is_empty()
                 && u32::try_from(effect.rule.len()).unwrap_or(u32::MAX) <= env.limits.name_bytes
@@ -683,6 +729,9 @@ fn read_afresh(domain: &mut Domain) {
         for service in &watch.services {
             domain.refresh.insert(service.clone(), false).expect("restored watched services fit");
         }
+    }
+    for (_, account) in &domain.alerts {
+        domain.refresh.insert(account.alert.service.clone(), false).expect("retained alert services fit");
     }
     for (_, incident) in &domain.incidents {
         domain.refresh.insert(incident.service.clone(), false).expect("retained incident services fit");

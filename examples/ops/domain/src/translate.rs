@@ -1112,6 +1112,9 @@ pub(crate) fn health_words(_service: &observability::Service, healthy: bool) -> 
 pub(crate) fn triage(delegate: &[u8], alerts: &[u64]) -> Option<Box<[core::Delegate]>> {
     let value = json::parse(delegate).ok()?;
     let mut batch = nested::delegates(value.required(b"batch").ok()?).ok()?;
+    if batch.len() != 1 {
+        return None;
+    }
     for member in &mut batch {
         let mut room = member.spec.words.len().checked_add(b"\nAlerts:".len())?;
         for alert in alerts {
@@ -1165,4 +1168,19 @@ pub(crate) fn hold_kinds(number: u16) -> Box<[tasks::Kind]> {
         kind: 1,
         hold: tasks::HoldKind::Exclusive { taken: tasks::Taken::Waits },
     }])
+}
+
+/// The owner templates always request one delegate, matching the outcome's one child.
+pub(crate) fn lead(delegate: &[u8]) -> Option<Box<[core::Delegate]>> {
+    let value = json::parse(delegate).ok()?;
+    let batch = nested::delegates(value.required(b"batch").ok()?).ok()?;
+    if batch.len() != 1 {
+        return None;
+    }
+    Some(batch)
+}
+
+/// The closed result shape is handed to its owner, without its explanation.
+pub(crate) fn watch_result(child: u64, _result: &tasks::ResultKind) -> observability::WatchMessage {
+    observability::WatchMessage::Ended { child }
 }

@@ -64,6 +64,8 @@ pub struct World {
     /// All outputs seen by the scripted root.
     pub seen: Vec<obs::Request>,
     domain: obs::Domain,
+    triage_templates: Box<[obs::TriageTemplate]>,
+    lead_templates: Box<[obs::LeadTemplate]>,
     records: BTreeMap<obs::RecordKey, obs::Record>,
     /// Number of root commits containing a record mutation.
     pub commits: u64,
@@ -81,9 +83,21 @@ impl World {
             now: 0,
             seen: Vec::new(),
             domain: obs::Domain::new(&limits()),
+            triage_templates: Box::new([]),
+            lead_templates: Box::new([]),
             records: BTreeMap::new(),
             commits: 0,
         }
+    }
+
+    /// The scripted root supplies the same bounded templates before every cold start.
+    #[must_use]
+    pub fn with_templates(seed: u64, triage: Box<[obs::TriageTemplate]>, lead: Box<[obs::LeadTemplate]>) -> Self {
+        let mut world = Self::new(seed);
+        world.domain = obs::Domain::with_templates(&limits(), triage.clone()).with_leads(&limits(), lead.clone());
+        world.triage_templates = triage;
+        world.lead_templates = lead;
+        world
     }
 
     /// One connector step; the root commits its writes before returning requests.
@@ -116,6 +130,9 @@ impl World {
                 | obs::Request::Health { .. }
                 | obs::Request::WatchInterest { .. }
                 | obs::Request::Triage { .. }
+                | obs::Request::WatchDecision { .. }
+                | obs::Request::WakeProcedure { .. }
+                | obs::Request::AssociationRefused { .. }
                 | obs::Request::Described { .. }
                 | obs::Request::Refused { .. }
                 | obs::Request::Make { .. }
@@ -159,6 +176,9 @@ impl World {
                 | obs::Request::Health { .. }
                 | obs::Request::WatchInterest { .. }
                 | obs::Request::Triage { .. }
+                | obs::Request::WatchDecision { .. }
+                | obs::Request::WakeProcedure { .. }
+                | obs::Request::AssociationRefused { .. }
                 | obs::Request::Described { .. }
                 | obs::Request::Refused { .. }
                 | obs::Request::Outcome { .. }
@@ -240,7 +260,8 @@ impl World {
 
     /// Rebuild the connector from committed records, then let it settle outbox entries.
     pub fn restart(&mut self) -> Vec<obs::Request> {
-        self.domain = obs::Domain::new(&limits());
+        self.domain = obs::Domain::with_templates(&limits(), self.triage_templates.clone())
+            .with_leads(&limits(), self.lead_templates.clone());
         let records: Vec<_> = self.records.values().cloned().collect();
         let mut live = BTreeSet::new();
         for record in &records {
@@ -256,7 +277,10 @@ impl World {
                 obs::Record::Incident(incident) => {
                     live.insert(incident.service.clone());
                 }
-                obs::Record::Outbox(..) => {}
+                obs::Record::Alert(account) => {
+                    live.insert(account.alert.service.clone());
+                }
+                obs::Record::Delegation(_) | obs::Record::Outbox(..) => {}
             }
         }
         for record in records {

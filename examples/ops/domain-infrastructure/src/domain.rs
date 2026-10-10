@@ -789,6 +789,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::StartProcedure { task, project, procedure } => {
             start_procedure(domain, env, task, project, procedure, out);
         }
+        Event::ProcedureDelegateOutcome { .. } => {}
         Event::Procedure { task, signal } => procedure(domain, env, task, signal, out),
         Event::Describe { token, effect } => stage(domain, env, token, effect, out),
         Event::DescribeProposal { token, number } => match domain.proposals.get(&number) {

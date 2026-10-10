@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use skein_lib::Map;
 
 use crate::{Entry, Fact, Record, Service, Watch};
@@ -54,7 +53,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .subscriptions
         .checked_add(limits.watches.checked_mul(limits.services_per_watch)?)?
         .checked_add(crate::incidents::capacity(limits)?)?;
-    crate::incidents::worst_case(limits)?
+    crate::watch_steps::worst_case(limits)?
+        .checked_add(crate::incidents::worst_case(limits)?)?
         .checked_add(Map::<Service, Fact>::worst_case(limits.services)?)?
         .checked_add(Map::<skein_lib::Token, crate::ClientSubject>::worst_case(limits.reads)?)?
         .checked_add(skein_lib::List::<skein_lib::Token>::worst_case(limits.reads)?)?
@@ -67,8 +67,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<(crate::Topic, u64), (u64, u8, u8)>::worst_case(limits.subscriptions)?)?
         .checked_add(Map::<u64, Watch>::worst_case(limits.watches)?)?
         .checked_add(u64::from(limits.watches).checked_mul(u64::from(limits.alerts_per_batch).checked_mul(8)?)?)?
-        .checked_add(Map::<u16, Box<[u8]>>::worst_case(limits.watches)?)?
-        .checked_add(u64::from(limits.watches).checked_mul(u64::from(limits.answer_bytes))?)?
         .checked_add(Map::<skein_lib::Token, crate::Effect>::worst_case(limits.staged)?)?
         .checked_add(Map::<crate::Key, Entry>::worst_case(limits.effects)?)?
         .checked_add(Map::<skein_lib::Token, (crate::Requirement, Service, u64)>::worst_case(limits.judges)?)?

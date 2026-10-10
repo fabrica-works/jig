@@ -1,5 +1,6 @@
 //! Incident history belongs to observability (`examples.md`, sections 3 and 8).
 use crate::{Alert, Domain, Fact, Limits, Record, Request, Service};
+use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, Wall};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -29,6 +30,10 @@ pub struct Incident {
     pub project: u32,
     pub number: u64,
     pub watch: u64,
+    /// The task created by the retained lead step, absent until its outcome.
+    pub lead: Option<u64>,
+    /// The explicit alert set covered by the triage verdict.
+    pub alerts: Box<[u64]>,
     pub raised: Wall,
     pub service: Service,
     pub severity: u8,
@@ -59,26 +64,68 @@ fn append(incident: &mut Incident, point: IncidentPoint) {
     }
 }
 
+/// An alert has an account before a triage names an incident.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AlertAccount {
+    pub project: u32,
+    pub watch: u64,
+    pub raised: Wall,
+    pub alert: Alert,
+    pub state: IncidentState,
+}
+
 pub(crate) fn raised(domain: &mut Domain, env: &Env<Limits>, task: u64, alert: &Alert, out: &mut Queue<Request>) {
     let Some(watch) = domain.watches.get(&task) else { return };
     let key = (watch.project, alert.number);
-    if domain.incidents.contains_key(&key) || domain.incidents.len() >= capacity(&env.limits).expect("incident bound") {
+    if domain.alerts.contains_key(&key) || domain.alerts.len() >= capacity(&env.limits).expect("alert bound") {
         return;
     }
-    let mut incident = Incident {
+    let account = AlertAccount {
         project: watch.project,
-        number: alert.number,
         watch: task,
         raised: env.wall,
-        service: alert.service.clone(),
-        severity: alert.severity,
+        alert: alert.clone(),
+        state: IncidentState::Alerting,
+    };
+    domain.alerts.insert(key, account.clone()).expect("alert capacity checked");
+    out.push(Request::Save { record: Record::Alert(account) });
+}
+
+pub(crate) fn open(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    watch: &crate::Watch,
+    alerts: Box<[u64]>,
+    service: Service,
+    severity: u8,
+    out: &mut Queue<Request>,
+) -> Option<u64> {
+    // The primary covered alert names this incident account; it never names a lead task.
+    let number = *alerts.first()?;
+    let project = watch.project;
+    let task = watch.task;
+    let key = (project, number);
+    let raised = domain.alerts.get(&key)?.raised;
+    if domain.incidents.contains_key(&key) || domain.incidents.len() >= capacity(&env.limits)? {
+        return None;
+    }
+    let mut incident = Incident {
+        project,
+        number,
+        watch: task,
+        lead: None,
+        alerts,
+        raised,
+        service,
+        severity,
         state: IncidentState::Alerting,
         timeline: List::with_capacity(env.limits.samples_per_service.max(1)),
         cut: false,
     };
-    append(&mut incident, IncidentPoint { at: env.wall, health: None });
+    append(&mut incident, IncidentPoint { at: raised, health: None });
     domain.incidents.insert(key, incident.clone()).expect("incident capacity checked");
     out.push(Request::Save { record: Record::Incident(incident) });
+    Some(number)
 }
 
 pub(crate) fn observed(
@@ -94,6 +141,10 @@ pub(crate) fn observed(
         errors: fact.errors,
         error_rate_percent: fact.error_rate_percent,
     };
+    if health.healthy_replicas > 0 && health.errors == 0 && health.error_rate_percent == 0 {
+        resolve_alerts(domain, env, service, out);
+    }
+
     let mut keys = List::with_capacity(capacity(&env.limits).expect("incident bound"));
     for (key, incident) in &domain.incidents {
         if incident.service == *service && incident.state == IncidentState::Alerting {
@@ -116,15 +167,32 @@ pub(crate) fn observed(
     }
 }
 
+fn resolve_alerts(domain: &mut Domain, env: &Env<Limits>, service: &Service, out: &mut Queue<Request>) {
+    let mut keys = List::with_capacity(capacity(&env.limits).expect("alert bound"));
+    for (key, account) in &domain.alerts {
+        if account.alert.service == *service && account.state == IncidentState::Alerting {
+            keys.push(*key).expect("bounded alert accounts");
+        }
+    }
+    for key in &keys {
+        let account = domain.alerts.get_mut(key).expect("selected account");
+        account.state = IncidentState::Resolved;
+        out.push(Request::Save { record: Record::Alert(account.clone()) });
+    }
+}
+
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let count = capacity(limits)?;
-    skein_lib::Map::<(u32, u64), Incident>::worst_case(count)?
+    skein_lib::Map::<(u32, u64), AlertAccount>::worst_case(count)?
+        .checked_add(u64::from(count).checked_mul(u64::from(limits.name_bytes).checked_mul(2)?)?)?
+        .checked_add(skein_lib::Map::<(u32, u64), Incident>::worst_case(count)?)?
         .checked_add(List::<(u32, u64)>::worst_case(count)?)?
         .checked_add(
-            u64::from(count).checked_mul(u64::from(limits.name_bytes).checked_mul(2)?.checked_add(List::<
-                IncidentPoint,
-            >::worst_case(
-                limits.samples_per_service.max(1),
-            )?)?)?,
+            u64::from(count).checked_mul(
+                u64::from(limits.name_bytes)
+                    .checked_mul(2)?
+                    .checked_add(u64::from(limits.alerts_per_batch).checked_mul(8)?)?
+                    .checked_add(List::<IncidentPoint>::worst_case(limits.samples_per_service.max(1))?)?,
+            )?,
         )
 }

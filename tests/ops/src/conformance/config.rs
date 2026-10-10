@@ -33,6 +33,8 @@ pub fn root(seed: u64) -> (Config, Limits) {
     core_limits.tasks.funders = 16;
     core_limits.tasks.inbox_messages = 16;
     core_limits.tasks.inbox_bytes = 2048;
+    core_limits.tasks.result_bytes = 512;
+    core_limits.tasks.contract_choices = 2;
     core_limits.tasks.message_bytes = 512;
     core_limits.tasks.proposal_stall = Duration::from_secs(60);
     core_limits.people.words = 512;
@@ -102,6 +104,10 @@ pub fn root(seed: u64) -> (Config, Limits) {
         triage_templates: Box::new([jig_ops_domain_observability::TriageTemplate {
             number: 1,
             delegate: super::scripts::triage(),
+        }]),
+        lead_templates: Box::new([jig_ops_domain_observability::LeadTemplate {
+            number: 1,
+            delegate: super::scripts::lead(),
         }]),
         backend: infrastructure::Backend::OperationIds,
         endpoints: Box::new([smith_domain_run::charter::Endpoint(1)]),

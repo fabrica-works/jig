@@ -67,7 +67,8 @@ fn the_alert_storm_reaches_triage_and_the_person_accepts_the_production_restart(
         .filter_map(|(commit, kind)| (*kind == 1).then_some(*commit))
         .min()
         .expect("restart entry");
-    for commit in [acceptance, entry, entry + 1] {
+    let lead_commit = world.peers.lead_commits.first().expect("same-decision incident lead receipt").0;
+    for commit in [lead_commit - 1, lead_commit, lead_commit + 1, acceptance, entry, entry + 1] {
         let recovered = jig_ops_world::conformance::alert(17, Cut::AfterCommit(commit));
         assert_eq!(recovered.outcome().crashes, vec![commit]);
         assert_alert(&recovered);
@@ -83,6 +84,20 @@ fn assert_alert(world: &jig_conformance::Harness<jig_ops_world::conformance::Ops
     for task in [3, 4, 5, 6] {
         assert!(ended(task).is_some(), "task {task} missing: {}", world.trace.join("\n"));
     }
+    for (number, requester) in [(3, 2), (4, 2), (5, 2), (6, 5)] {
+        let Some(jig_ops_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(row)))) =
+            ended(number)
+        else {
+            panic!("ended task {number}")
+        };
+        assert_eq!(row.requester, jig_core_tasks::Party::Task(requester), "W -> T1,T2,I -> R");
+    }
+    let (_, incident, association) = world.peers.lead_commits.first().expect("durable lead association");
+    assert_eq!(incident.lead, Some(5));
+    assert_eq!(incident.alerts.as_ref(), &[12]);
+    assert_eq!(association.task, 2);
+    assert_eq!(association.child, Some(5));
+    assert_eq!(association.kind, jig_ops_domain_observability::DelegationKind::Lead { incident: 12 });
     assert_eq!(world.peers.assignments.iter().filter(|(task, _)| *task == 3).count(), 1, "one triage for the storm");
     assert_eq!(
         world

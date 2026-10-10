@@ -263,6 +263,9 @@ pub(crate) fn read(
                     | observability::Request::News { .. }
                     | observability::Request::Health { .. }
                     | observability::Request::Triage { .. }
+                    | observability::Request::WatchDecision { .. }
+                    | observability::Request::WakeProcedure { .. }
+                    | observability::Request::AssociationRefused { .. }
                     | observability::Request::Described { .. }
                     | observability::Request::Refused { .. }
                     | observability::Request::Make { .. }

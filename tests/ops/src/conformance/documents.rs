@@ -5,6 +5,32 @@ use skein_lib::Token;
 pub fn submitted(peers: &mut Peers, store: &Store) {
     let pending = store.pending.back().expect("submitted transaction");
     for write in &pending.writes {
+        let jig_fake_store::Write::Save { row: root::Record::Observability(obs::Record::Incident(incident)), .. } =
+            write
+        else {
+            continue;
+        };
+        let Some(lead) = incident.lead else { continue };
+        let association = pending.writes.iter().find_map(|write| match write {
+            jig_fake_store::Write::Save {
+                row: root::Record::Observability(obs::Record::Delegation(value)), ..
+            } if value.project == incident.project
+                && value.kind == (obs::DelegationKind::Lead { incident: incident.number })
+                && value.child == Some(lead) =>
+            {
+                Some(value)
+            }
+            jig_fake_store::Write::Save { .. } | jig_fake_store::Write::Erase(_) => None,
+        });
+        if let Some(association) = association {
+            assert!(pending.writes.iter().any(|write| matches!(write,
+                jig_fake_store::Write::Save { row: root::Record::Core(core::Record::Tasks(jig_core_tasks::Stored::Live(task))), .. }
+                if task.number == lead && task.requester == jig_core_tasks::Party::Task(association.task)
+            )), "lead association and actual child are submitted together");
+            peers.lead_commits.push((pending.number, incident.clone(), association.clone()));
+        }
+    }
+    for write in &pending.writes {
         if let jig_fake_store::Write::Save { row, .. } = write
             && matches!(
                 row,

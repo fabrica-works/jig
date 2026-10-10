@@ -443,6 +443,8 @@ impl Record {
 /// Root-to-connector events.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    /// The core names the delegate made by this owner procedure step.
+    ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// Retain this root-minted name in the application's own vocabulary.
     DocumentPrepare { token: Token, subject: crate::ClientSubject },
     /// The paced watch ended; forget its owner binding.
