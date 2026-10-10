@@ -16,16 +16,110 @@ fn report(core: &mut Core, limits: &Limits, attempt: u64, retry: u32, offset: u3
     )
 }
 fn current_stream(out: &[Request]) -> &Request {
-    out.iter()
-        .find(|request| matches!(request, Request::Now(now) if matches!(now.as_ref(), Now::RunText { .. })))
-        .expect("current supplied retry reaches the public stream boundary")
+    for request in out {
+        match request {
+            Request::Now(now) => match now.as_ref() {
+                Now::RunText { .. } => return request,
+                Now::Relayed { .. }
+                | Now::EffectAnswer { .. }
+                | Now::SettledCallRefused { .. }
+                | Now::Call { .. }
+                | Now::DropCall { .. }
+                | Now::Undelivered { .. }
+                | Now::SignInRefused { .. }
+                | Now::WatchRefused { .. }
+                | Now::Account(..)
+                | Now::NotesIndexed { .. }
+                | Now::NotesRecalled { .. }
+                | Now::NotesRefused { .. }
+                | Now::NoteBusy { .. }
+                | Now::DropPayload { .. }
+                | Now::DropAssignment { .. }
+                | Now::TurnPayload { .. }
+                | Now::AnswerPayload { .. }
+                | Now::AcceptedTurn { .. }
+                | Now::RefusedPayload { .. }
+                | Now::Activate { .. }
+                | Now::PrepareAgent { .. }
+                | Now::StartPreparation { .. }
+                | Now::SeenChat { .. }
+                | Now::HistoricalProposal { .. }
+                | Now::HistoricalPersonTask { .. }
+                | Now::CompleteBrief { .. }
+                | Now::BriefCorePlanned { .. }
+                | Now::WorkspaceRequest { .. }
+                | Now::RunPreparationFailed { .. }
+                | Now::RunPrepared { .. }
+                | Now::HistoricalEscalation { .. }
+                | Now::ProcedureDelegateOutcome { .. }
+                | Now::RestoreRefused => {}
+            },
+            Request::Write(..) | Request::Ask { .. } | Request::Held(..) | Request::Decided => {}
+        }
+    }
+    panic!("current supplied retry reaches the public stream boundary")
+}
+fn only_decided(out: &[Request]) -> bool {
+    for request in out {
+        match request {
+            Request::Decided => {}
+            Request::Write(..) | Request::Ask { .. } | Request::Held(..) | Request::Now(..) => return false,
+        }
+    }
+    true
+}
+fn has_write(out: &[Request]) -> bool {
+    for request in out {
+        match request {
+            Request::Write(..) => return true,
+            Request::Decided | Request::Ask { .. } | Request::Held(..) | Request::Now(..) => {}
+        }
+    }
+    false
+}
+fn has_watch_end(out: &[Request]) -> bool {
+    for request in out {
+        match request {
+            Request::Held(held) => match held.as_ref() {
+                Held::WatchEnded { .. } => return true,
+                Held::ApplicationDelivery { .. }
+                | Held::ApplicationWatchEnded { .. }
+                | Held::ReadLoad { .. }
+                | Held::Read { .. }
+                | Held::Applied { .. }
+                | Held::Delivery { .. }
+                | Held::MakeEffect { .. }
+                | Held::SettledCall { .. }
+                | Held::Assign { .. }
+                | Held::Relayed { .. }
+                | Held::Inbound { .. }
+                | Held::Relay { .. }
+                | Held::PeopleReply { .. }
+                | Held::CallAnswer { .. }
+                | Held::Result { .. }
+                | Held::Acknowledge { .. }
+                | Held::TaskTerminalAcknowledged { .. }
+                | Held::TaskTurnKept { .. }
+                | Held::AcknowledgeTurn { .. }
+                | Held::Cancel { .. }
+                | Held::Refuse { .. }
+                | Held::TurnBusy { .. }
+                | Held::StopRun { .. }
+                | Held::NotesLoad { .. }
+                | Held::NotesWritten { .. }
+                | Held::NotesDeleted { .. } => {}
+            },
+            Request::Write(..) | Request::Ask { .. } | Request::Now(..) | Request::Decided => {}
+        }
+    }
+    false
 }
 
 #[test]
 fn an_unwatched_empty_retry_opens_as_its_current_supplied_identity() {
     let (mut core, limits) = watch_core();
-    assert!(report(&mut core, &limits, 7, 0, 0, b"older").iter().all(|r| matches!(r, Request::Decided)));
-    assert!(report(&mut core, &limits, 7, 1, 0, b"").iter().all(|r| matches!(r, Request::Decided)));
+    assert!(only_decided(&report(&mut core, &limits, 7, 0, 0, b"older")));
+    assert!(only_decided(&report(&mut core, &limits, 7, 1, 0, b"")));
     let opened = watch_outputs(
         &mut core,
         &limits,
@@ -38,7 +132,7 @@ fn an_unwatched_empty_retry_opens_as_its_current_supplied_identity() {
         },
     );
     assert_stream(current_stream(&opened), 30, views::TurnName { attempt: 7, turn: 1, retry: 1 }, 0, 0, b"", false);
-    assert!(!opened.iter().any(|r| matches!(r, Request::Write(_))));
+    assert!(!has_write(&opened));
 }
 
 #[test]
@@ -48,7 +142,7 @@ fn the_last_watch_can_close_and_reopen_after_an_unwatched_retry() {
     report(&mut core, &limits, 7, 0, 0, b"original");
     watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(30) });
     let ended = watch_outputs(&mut core, &limits, Event::Unwatch { watcher: Token::new(30) });
-    assert!(ended.iter().any(|r| matches!(r, Request::Held(held) if matches!(held.as_ref(), Held::WatchEnded { .. }))));
+    assert!(has_watch_end(&ended));
     report(&mut core, &limits, 7, 1, 0, b"replacement");
     let opened = watch_outputs(
         &mut core,
@@ -82,13 +176,13 @@ fn opaque_content_calls_are_attempt_fenced_without_deriving_a_text_turn() {
         &limits,
         Event::RunCall { run: Token::new(1), attempt: Token::new(6), call: call.clone() },
     );
-    assert!(stale.iter().all(|r| matches!(r, Request::Decided)));
+    assert!(only_decided(&stale));
     let supplied = watch_outputs(
         &mut core,
         &limits,
         Event::RunCall { run: Token::new(1), attempt: Token::new(7), call: call.clone() },
     );
-    assert!(supplied.iter().all(|r| matches!(r, Request::Decided)), "unwatched content decides nothing");
+    assert!(only_decided(&supplied), "unwatched content decides nothing");
     report(&mut core, &limits, 6, 99, 0, b"stale activation");
     let opened = watch_outputs(
         &mut core,
