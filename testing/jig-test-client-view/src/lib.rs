@@ -4,6 +4,9 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod bindings;
+pub mod connector_values;
+mod connector_values_refusal;
+pub mod connector_values_words;
 pub mod drawing;
 pub mod family;
 pub mod limits;

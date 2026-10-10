@@ -8,5 +8,6 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 jig-client.workspace = true
+jig-test-connector.workspace = true
 [lints]
 workspace = true

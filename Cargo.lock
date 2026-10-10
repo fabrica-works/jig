@@ -509,6 +509,16 @@ name = "jig-test-client-domain"
 version = "0.0.0"
 dependencies = [
  "jig-client",
+ "jig-test-connector",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-test-client-kit"
+version = "0.0.0"
+dependencies = [
+ "jig-test-client-domain",
+ "jig-test-connector",
  "skein-lib",
 ]
 

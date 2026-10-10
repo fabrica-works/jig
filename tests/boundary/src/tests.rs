@@ -543,7 +543,7 @@ fn scripted_engine_links_only_the_client_and_foundation() {
 }
 
 #[test]
-fn test_client_domain_links_only_its_child_and_foundation() {
+fn test_client_domain_links_only_its_child_owner_vocabulary_and_foundation() {
     let roots: Vec<_> =
         manifests().into_iter().filter(|manifest| manifest.name.as_deref() == Some("jig-test-client-domain")).collect();
     assert_eq!(roots.len(), 1, "one test application client domain");
@@ -551,13 +551,29 @@ fn test_client_domain_links_only_its_child_and_foundation() {
     dependencies.sort();
     assert_eq!(
         dependencies,
-        ["jig-client", "skein-lib"],
-        "the client root depends only on its client child and foundation"
+        ["jig-client", "jig-test-connector", "skein-lib"],
+        "the client root depends only on its client child, pure owner vocabulary and foundation"
     );
     let source = fs::read_to_string(kit_root().join("testing/jig-test-client-domain/src/lib.rs"))
         .expect("root source is readable");
     assert!(source.contains("cfg_attr(not(test), no_std)"), "the client root is step code");
     assert!(source.contains("forbid(unsafe_code)"), "the client root forbids unsafe code");
+}
+
+/// Sharing the test application's exact vocabulary adds no engine/core/Smith edge.
+#[test]
+fn test_connector_vocabulary_and_client_value_kit_keep_their_exact_roles() {
+    let all = manifests();
+    for (name, expected) in [
+        ("jig-test-connector", vec!["skein-lib"]),
+        ("jig-test-client-kit", vec!["jig-test-client-domain", "jig-test-connector", "skein-lib"]),
+    ] {
+        let selected: Vec<_> = all.iter().filter(|manifest| manifest.name.as_deref() == Some(name)).collect();
+        assert_eq!(selected.len(), 1, "one exact {name} role");
+        let mut dependencies = selected[0].dependencies.clone();
+        dependencies.sort();
+        assert_eq!(dependencies, expected, "{name} links only its owned vocabulary");
+    }
 }
 
 #[test]

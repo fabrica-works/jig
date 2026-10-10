@@ -4,6 +4,7 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary fixtures collect outputs and query public accessibility trees"
 )]
+mod connector_values;
 use crate::{Limits, View, build, decode, words};
 use jig_client::contract::*;
 use jig_client_view::{Act, NodeId, Owner, Patch, Role};
