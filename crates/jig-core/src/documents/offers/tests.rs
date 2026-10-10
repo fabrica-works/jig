@@ -2,12 +2,20 @@
 use super::*;
 use crate::documents::{AuthorityLine, GrantLine, NoteScope, PatternEnd, Versions};
 
+fn bytes(value: u8, count: u32) -> Box<[u8]> {
+    let mut result = List::with_capacity(count);
+    for _ in 0..count {
+        result.push(value).unwrap();
+    }
+    result.into_boxed()
+}
+
 fn bounded(limits: &DocumentLimits, order_rows: u32) -> Admission {
     let mut segments = List::with_capacity(limits.lines);
     for _ in 0..limits.lines {
-        segments.push(vec![255; usize::try_from(limits.text_bytes).unwrap()].into_boxed_slice()).unwrap();
+        segments.push(bytes(255, limits.text_bytes)).unwrap();
     }
-    let last = PatternEnd::Open(vec![254; usize::try_from(limits.text_bytes).unwrap()].into_boxed_slice());
+    let last = PatternEnd::Open(bytes(254, limits.text_bytes));
     let mut grants = List::with_capacity(limits.lines);
     let mut note_resources = List::with_capacity(limits.lines);
     let mut executors = List::with_capacity(limits.lines);
@@ -56,7 +64,7 @@ fn limits() -> DocumentLimits {
 fn two_maximal_amendment_offers_attain_the_whole_declared_heap_including_the_kind_relation() {
     let limits = limits();
     let admission = bounded(&limits, limits.lines);
-    assert!(receiving(admission.clone(), &limits).is_ok());
+    assert_eq!(receiving(admission.clone(), &limits), Ok(admission.clone()));
     let mut offers = List::with_capacity(MAX_ACTS);
     offers.push(Offered { act: Act::Amend, admission: admission.clone() }).unwrap();
     offers.push(Offered { act: Act::AmendRelease, admission }).unwrap();

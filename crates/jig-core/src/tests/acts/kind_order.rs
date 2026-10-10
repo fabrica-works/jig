@@ -80,7 +80,13 @@ fn amendment_offers_keep_every_configured_pair_in_order_with_duplicates_and_full
     let Document::Task(document) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap() else {
         panic!("task document")
     };
-    let offer = document.acts.iter().find(|offer| offer.act == Act::Amend).unwrap();
+    let mut received_offer = None;
+    for offer in &document.acts {
+        if offer.act == Act::Amend {
+            received_offer = Some(offer);
+        }
+    }
+    let offer = received_offer.unwrap();
     let Admission::Bounded { within: Bounds::Amend { implications: received, .. }, .. } = &offer.admission else {
         panic!("whole received relation")
     };
@@ -131,7 +137,7 @@ fn budget_only_amendments_preserve_narrower_implied_grants_and_follow_direct_har
 fn an_amendment_relation_at_its_receiving_boundary_fits_and_one_under_refuses_the_whole_document() {
     let pairs = Box::new([pair(1, 2, 1), pair(2, 2, 1), pair(u16::MAX, 2, 1), pair(1, 2, 1)]);
     let (core, mut limits) = configured(pairs, 4);
-    assert!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).is_ok());
+    make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap();
     limits.documents.lines = 3;
     assert_eq!(
         offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }),
