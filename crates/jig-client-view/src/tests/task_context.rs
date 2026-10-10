@@ -47,7 +47,7 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
             if section == TaskSection::Overview || section == TaskSection::Panels {
                 let parts: Vec<_> =
                     tree.nodes().iter().filter_map(|node| node.slot).map(|slot| bindings.part(slot.token)).collect();
-                assert_eq!(parts, if present { vec![Some(reference.clone())] } else { vec![] });
+                assert_eq!(parts, if present { vec![Some(&reference)] } else { vec![] });
             }
         }
         let (mut domain, id, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
@@ -60,6 +60,6 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
             panic!("whole task");
         };
         assert_eq!(retained.context, row.context);
-        assert_eq!(retained.chip.title.cut, true);
+        assert!(retained.chip.title.cut);
     }
 }
