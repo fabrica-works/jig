@@ -386,9 +386,13 @@ impl Front<Ops> for Scripted {
                     attempt: local,
                     envelope: envelope(env),
                     answer: answer.map(|result| {
-                        domain::Answered::Infrastructure(
-                            result.expect("entrance refusals require bounded typed carrier"),
-                        )
+                        domain::Answered::Infrastructure(match result {
+                            Ok(answer) => answer,
+                            Err(refusal) => infra::Answer::EntranceRefused(
+                                jig_client::contract::EntranceRefusal::new(refusal)
+                                    .expect("scripted engine supplies bounded entrance facts"),
+                            ),
+                        })
                     }),
                 },
                 Up::Read { terminal, .. } => Event::Jig(jig_client::Event::Read { read: local, result: terminal }),
