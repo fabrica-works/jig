@@ -230,10 +230,10 @@ pub(super) fn live() -> (Domain, Token) {
     super::pages::finish_initial_inbox_reads(&mut domain, &out);
     (domain, page)
 }
-fn watched(domain: &mut Domain, page: Token, keys: &[ObjectKey]) -> Box<[Request]> {
+pub(super) fn watched(domain: &mut Domain, page: Token, keys: &[ObjectKey]) -> Box<[Request]> {
     drive(domain, Time::ZERO, Event::Watch { watch: page, event: WatchEvent::Delivered(inbox(keys)) })
 }
-fn read_token(rows: &[Request]) -> Token {
+pub(super) fn read_token(rows: &[Request]) -> Token {
     for row in rows {
         if let Request::Read { read, .. } = row {
             return *read;

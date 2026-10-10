@@ -1855,3 +1855,6 @@ mod task_authority;
 
 #[path = "task_budget.rs"]
 mod task_budget;
+
+#[path = "task_ending.rs"]
+mod task_ending;

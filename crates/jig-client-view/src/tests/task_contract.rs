@@ -1,7 +1,7 @@
 use super::*;
 use jig_client::address::{Address, TaskSection};
 
-fn page(row: Task) -> (Tree, JigBindings) {
+pub(super) fn page(row: Task) -> (Tree, JigBindings) {
     let (mut domain, out) = super::super::work_pages::entered(Address::task(8));
     let watch = out
         .iter()

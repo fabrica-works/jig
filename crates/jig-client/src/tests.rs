@@ -50,3 +50,5 @@ mod hello;
 mod chip_facts;
 
 mod history_facts;
+
+mod task_ending;
