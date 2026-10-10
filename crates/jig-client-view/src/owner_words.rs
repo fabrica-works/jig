@@ -33,6 +33,7 @@ pub fn phrase_count() -> u32 {
         .checked_add(u32::try_from(crate::owner_history_words::ALL.len()).expect("history phrase count fits"))
         .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_tree_words::ALL.len()).expect("tree phrase count fits"))
+        .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_proposal_words::ALL.len()).expect("proposal phrase count fits"))
         .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_inbox_words::ALL.len()).expect("Inbox phrase count fits"))

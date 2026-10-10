@@ -187,6 +187,7 @@ impl<A: crate::Application> Engine<A> {
             }
             let waiting = match value {
                 ReadValue::Proposal(value) => Some(&value.waiting),
+                ReadValue::OwnerProposal(_) => None,
                 ReadValue::Escalation(value) => Some(&value.waiting),
                 ReadValue::Frame(_)
                 | ReadValue::Task(_)
@@ -384,7 +385,8 @@ impl<A: crate::Application> Engine<A> {
                     v.chip.phase = Phase::Due;
                     *v.chip.details = ChipPhase::Starting;
                 }
-                ReadValue::Frame(_)
+                ReadValue::OwnerProposal(_)
+                | ReadValue::Frame(_)
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)
                 | ReadValue::Result(_)

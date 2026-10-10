@@ -249,7 +249,6 @@ impl Payload for ObjectKey {
                 sum(&[value0.heap(bounds)])
             }
             Self::Proposal(value0) => sum(&[value0.heap(bounds)]),
-            Self::OwnerProposal(value0) => sum(&[value0.heap(bounds)]),
             Self::Question { task, message } => sum(&[task.heap(bounds), message.heap(bounds)]),
             Self::Note { project, note } => sum(&[project.heap(bounds), note.heap(bounds)]),
         }

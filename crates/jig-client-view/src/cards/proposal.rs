@@ -167,8 +167,8 @@ pub fn owner_proposal(
         return false;
     }
     crate::owner_proposal::render(b, client, document, words, bindings);
-    common::answer(b, facts, words);
-    common::acts(b, &facts.card, &document.acts, object, words, bindings);
+    super::common::answer(b, facts, words);
+    super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true
 }
