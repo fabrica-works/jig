@@ -592,8 +592,11 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
         ReadResult::None(_) => return true,
     };
     let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
-        return false;
+        return true;
     };
+    if read.abandoned || read.terminal || read.generation != domain.generation {
+        return true;
+    }
     let group = match &read.what {
         Read::Inbox { group, .. } => *group,
         Read::Frame
@@ -617,9 +620,13 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
         Source::Window { number, .. } => number,
         Source::Watch(_) | Source::Card(_) => return false,
     };
+    // A superseded terminal retires its own old obligation; the routing receipt
+    // will discard it without consuming or replacing the current query/window.
+    if domain.inbox.window(group).reading != Some(token) {
+        return true;
+    }
     if super::conversations::inbox_group(number) != Some(group)
         || super::inbox::query_filter(Some(&read.what)) != Some(domain.inbox.filter)
-        || domain.inbox.window(group).reading != Some(token)
         || page.rows.capacity() > env.limits.rows
     {
         return false;

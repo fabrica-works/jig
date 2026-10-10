@@ -47,7 +47,7 @@ impl InboxWindow {
         }
     }
     // Read rows past the watch remain; duplicate snapshots never resurrect a removed live key.
-    fn past(&mut self, live: &List<InboxRow>) {
+    fn past(&mut self, live: &List<InboxRow>, goal: Option<u64>) {
         if self.rows.is_empty() {
             return;
         }
@@ -56,7 +56,11 @@ impl InboxWindow {
         for row in rows.into_boxed() {
             let mut watched = false;
             for current in live {
-                if current.identity() == row.identity() {
+                let membership_known = match current {
+                    InboxRow::Entry(_) => true,
+                    InboxRow::Owner(_) => goal.is_none(),
+                };
+                if current.identity() == row.identity() && membership_known {
                     watched = true;
                     break;
                 }
@@ -172,8 +176,8 @@ impl Inbox {
             self.live.push(InboxRow::Entry(Box::new(entry))).expect("whole live source fits");
         }
         self.live_more = more;
-        self.needs_window.past(&self.live);
-        self.updates_window.past(&self.live);
+        self.needs_window.past(&self.live, self.filter.goal);
+        self.updates_window.past(&self.live, self.filter.goal);
         self.merge();
     }
     /// A read terminal moves only its group's rows and cursor.
@@ -189,8 +193,8 @@ impl Inbox {
         window.after = page.after;
         window.more = window.after.is_some();
         match group {
-            InboxReadGroup::Needs => self.needs_window.past(&self.live),
-            InboxReadGroup::Updates => self.updates_window.past(&self.live),
+            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal),
+            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal),
         }
         self.merge();
     }
@@ -206,8 +210,8 @@ impl Inbox {
             }
         }
         self.document = Some(InboxDocument::Owner(value));
-        self.needs_window.past(&self.live);
-        self.updates_window.past(&self.live);
+        self.needs_window.past(&self.live, self.filter.goal);
+        self.updates_window.past(&self.live, self.filter.goal);
         self.merge();
     }
     /// The source selected these rows using the original query; no guessed goal
@@ -225,8 +229,8 @@ impl Inbox {
         window.more = window.after.is_some();
         window.query = Some(query);
         match group {
-            InboxReadGroup::Needs => self.needs_window.past(&self.live),
-            InboxReadGroup::Updates => self.updates_window.past(&self.live),
+            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal),
+            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal),
         }
         self.merge();
     }

@@ -209,7 +209,7 @@ fn owner_inbox_live_goal_context_is_explicitly_pending_and_bounded_read_membersh
     assert!(page.goal_context_pending);
     assert!(page.rows.is_empty());
     let query = Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: Some(77), after: None };
-    let row = entry(4, OwnerInboxObject::Question { message: 6 });
+    let row = entry(3, OwnerInboxObject::Question { message: 5 });
     page.owner_page(
         InboxReadGroup::Needs,
         query,
@@ -262,4 +262,40 @@ fn owner_inbox_reply_keeps_preview_unread_runtime_options_and_activity_distinct_
         Request::Send { ask, .. } => **ask == Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 9 } },
         _ => false,
     }));
+}
+#[test]
+fn owner_inbox_superseded_query_terminal_retires_without_replacing_the_new_filter_source() {
+    let (mut domain, _, out) = begin();
+    super::pages::finish_initial_inbox_reads(&mut domain, &out);
+    let old = Filter { project: Some(1), kind: Some(InboxGroup::Questions), goal: Some(77) };
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter: old } });
+    let (token, query) = out
+        .iter()
+        .find_map(|request| match request {
+            Request::Read { read, what: what @ Read::Inbox { .. } } => Some((*read, what.clone())),
+            _ => None,
+        })
+        .unwrap();
+    let new = Filter { goal: Some(88), ..old };
+    drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter: new } });
+    let current = domain.inbox().needs_window.reading.unwrap();
+    assert_ne!(token, current);
+    let page = OwnerInboxPage {
+        selection: None,
+        cut: true,
+        rows: list([entry(3, OwnerInboxObject::Question { message: 5 })]),
+        before: None,
+        after: Some(Cursor { value: super::objects::text(b"obsolete") }),
+    };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(page))) },
+    );
+    assert!(!domain.reads.pending(&query));
+    assert_eq!(domain.inbox().filter, new);
+    assert_eq!(domain.inbox().needs_window.reading, Some(current));
+    assert!(domain.inbox().needs_window.rows.is_empty());
+    assert!(!domain.inbox().needs_window.cut);
+    assert_eq!(domain.inbox().needs_window.query, None);
 }
