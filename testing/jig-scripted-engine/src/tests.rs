@@ -1700,7 +1700,7 @@ fn addressed_changes_keep_named_person_revisions_and_whole_fixed_width_destinati
 
 #[test]
 fn result_document_loss_and_raw_change_paths_are_admitted_whole_at_exact_allocated_bounds() {
-    let mut path = List::with_capacity(4);
+    let mut path: List<Box<[u8]>> = List::with_capacity(4);
     path.push(b"a/b".as_slice().into()).unwrap();
     path.push(Box::new([255, 0])).unwrap();
     let value = ResultValue::Change {
