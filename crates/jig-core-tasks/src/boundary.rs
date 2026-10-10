@@ -1177,7 +1177,7 @@ pub enum Accepted {
 
 /// Root-issued semantic task/finance inputs after authorization and transport fencing;
 /// notifications have no reply destination and may be ignored if stale. (domain/tasks.md, sections 4–5).
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Event {
     /// One root-authorized chat close, with all direct delegate disposals and a durable grace.
     CloseChat {

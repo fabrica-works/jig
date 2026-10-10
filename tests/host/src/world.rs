@@ -2,10 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use jig_host::{self as host, AgentFailure, Event, Fact, Failure, Limits, Reason, Reply, Request, RunFailure};
 use skein_lib::{Duration, ReplyTo, Rng, Time, Token};
-use skein_world::domain::{Ledger, Schedule, Span, Stage, Trace};
+use skein_world::domain::{Ledger, Schedule, Span, Stage};
 
 use crate::engine::{self, Act, Engine, Plan};
 use crate::parent::{self, Out, Parent};
+use crate::trace::{Entry, Trace};
 
 /// Room in the host's output queue beyond what one step may emit. Small, so
 /// the loop's flow control (take an event only while there is room for what
@@ -435,13 +436,13 @@ impl World {
         let mut made = Vec::new();
         // The ready list first, at the start of the stage, then the events.
         while self.stage.has_room() && self.host.is_ready() {
-            self.trace.log(self.now, "host resumes");
+            self.trace.log(self.now, Entry::Resumes);
             let before = self.stage.out.len();
             host::resume(&mut self.host, &self.stage.env, &mut self.stage.out);
             made.push((Taken::Other, self.stage.out.len() - before));
         }
         while let Some(Arrival { event, stale, duplicate }) = self.stage.next_event() {
-            self.trace.log(self.now, format!("host <- {event:?}"));
+            self.trace.log(self.now, Entry::Input(event.clone()));
             let taken = if duplicate { Taken::Duplicate } else { self.take(&event, stale) };
             let before = self.stage.out.len();
             host::step(&mut self.host, &self.stage.env, event, &mut self.stage.out);
@@ -718,7 +719,7 @@ impl World {
 
     /// Hands the host's `request` to whom it is for, checking it on the way.
     fn route(&mut self, request: Request) {
-        self.trace.log(self.now, format!("host -> {request:?}"));
+        self.trace.log(self.now, Entry::Output(request.clone()));
         match request {
             Request::Answer { to, run, attempt, answer } => {
                 if let Some(owner) = self.admitted.remove(&(run, attempt)) {

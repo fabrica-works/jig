@@ -34,6 +34,7 @@
 pub mod engine;
 pub mod inline_world;
 pub mod parent;
+mod trace;
 pub mod turn_world;
 mod world;
 

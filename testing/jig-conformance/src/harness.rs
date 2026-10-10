@@ -2,6 +2,7 @@
 //! Applications translate boundaries; this loop owns commit application and
 //! checks observations after every iteration (`domain/testing.md`, 5–6).
 use crate::referee::{Observed, Policy, Recovery, Referee, Violation};
+use crate::trace::{Entry, Trace};
 use jig_fake_store::{Store, Write};
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -149,7 +150,9 @@ pub struct Harness<A: Application> {
     pub peers: A::Peers,
     pub store: Store<A::Key, A::Record>,
     pub referee: Referee,
-    pub trace: Vec<String>,
+    pub trace: Trace,
+    maximum: u64,
+    configuration_heap: u64,
     config: A::Config,
     events: VecDeque<Input<A::Event, A::Record>>,
     outputs: Vec<Output<A::Key, A::Record, A::Delivery>>,
@@ -173,6 +176,8 @@ impl<A: Application> Harness<A> {
         for (&(connector, kind), entry) in &policy.kinds {
             assert_eq!(entry.recovery, A::recovery(&config, connector, kind), "declared recovery class");
         }
+        let maximum = A::maximum(&config);
+        let configuration_heap = A::configuration_heap(&config);
         let meter = skein_world::domain::heap::Meter::new();
         let domain = A::build(&config);
         Self {
@@ -181,7 +186,9 @@ impl<A: Application> Harness<A> {
             peers,
             store,
             referee: Referee::new(policy),
-            trace: Vec::new(),
+            trace: Trace::default(),
+            maximum,
+            configuration_heap,
             config,
             events,
             outputs: Vec::new(),
@@ -217,6 +224,7 @@ impl<A: Application> Harness<A> {
     /// Returns a receipt missing after restart or another broken promise.
     pub fn crash(&mut self) -> Result<(), Violation> {
         self.crashes.push(self.store.applied);
+        self.trace.push(self.clock.now, Entry::Observed(Observed::Restart));
         self.referee.observe(self.clock.now, Observed::Restart)?;
         self.store.crash();
         self.events.clear();
@@ -258,13 +266,28 @@ impl<A: Application> Harness<A> {
                 A::inbound(&mut self.peers, &self.store, self.clock, event);
             }
             self.inspect()?;
-            self.trace.push(format!("input {input:?}"));
+            self.trace.push(
+                self.clock.now,
+                match &input {
+                    Input::Event(_) => Entry::PeerInput,
+                    Input::Committed(number) => Entry::Committed(*number),
+                    Input::Failed(number) => Entry::Failed(*number),
+                    Input::Restore(_) => Entry::RestoredRow,
+                },
+            );
             A::step(&mut self.domain, &self.config, self.clock, input);
         }
         self.outputs = A::release(&mut self.domain, &self.config, self.clock);
         let empty = self.outputs.is_empty();
         for output in std::mem::take(&mut self.outputs) {
-            self.trace.push(format!("output {output:?}"));
+            self.trace.push(
+                self.clock.now,
+                match &output {
+                    Output::Commit { number, writes } => Entry::Submitted { number: *number, writes: writes.len() },
+                    Output::Deliver(_) => Entry::Delivery,
+                    Output::Stop => Entry::Stopped,
+                },
+            );
             match output {
                 Output::Commit { number, writes } => {
                     self.store.submit(number, writes, 0);
@@ -319,8 +342,8 @@ impl<A: Application> Harness<A> {
         self.referee.observe(
             self.clock.now,
             Observed::Heap {
-                held: self.meter.held().checked_add(A::configuration_heap(&self.config)).expect("engine heap fits"),
-                maximum: A::maximum(&self.config),
+                held: self.meter.held().checked_add(self.configuration_heap).expect("engine heap fits"),
+                maximum: self.maximum,
             },
         )?;
         Ok(!self.stopped
@@ -340,6 +363,7 @@ impl<A: Application> Harness<A> {
             self.referee.policy.clone_from(policy);
         }
         for observed in observations {
+            self.trace.push(self.clock.now, Entry::Observed(observed.clone()));
             self.referee.observe(self.clock.now, observed)?;
         }
         Ok(())

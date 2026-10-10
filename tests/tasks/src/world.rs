@@ -1,13 +1,14 @@
 //! Durable parent and scripted executors at the retained tasks boundary
 //! (domain/tasks.md, 11; domain/engine.md, 7).
 use crate::referee::{Seen, Stimulus, Tasks};
+use crate::trace::Trace;
 use jig_core_tasks::{
     self as tasks, Accepted, Authority, Budget, Cause, Contract, Delegation, Domain, End, Ending, Event, Executor,
     Fact, Funder, Key, Limits, MessageKind, New, Numbers, Party, Problem, Request, ResultKind, Retries, Retry,
     RunContext, Scopes, Spec, Stored, TaskResult, Tools, Word,
 };
 use skein_lib::{Duration, Env, Queue, ReplyTo, Rng, Time, Token, Wall};
-use skein_world::domain::{Referee, Trace};
+use skein_world::domain::Referee;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const RETRY: Retry = Retry { retries: 2, base: Duration::from_millis(10), max: Duration::from_secs(1) };
@@ -123,16 +124,32 @@ pub struct Frozen {
     limits: Limits,
     seed: u64,
     priced: Option<(u64, u64)>,
-    domain: String,
-    referee: String,
-    accounting: String,
-    pending: String,
+    internal: std::sync::Arc<Internal>,
     now: Time,
     wall: Wall,
     call: u64,
     message: u64,
     commit: u64,
 }
+
+/// Retain complete non-cloneable deterministic state without eager dumps.
+#[derive(Debug)]
+struct Internal {
+    domain: Domain,
+    referee: Referee<Tasks>,
+    accounting: crate::accounting_referee::Accounting,
+    pending: Vec<Request>,
+    out: Queue<Request>,
+}
+impl PartialEq for Internal {
+    fn eq(&self, other: &Self) -> bool {
+        // Equality explicitly asks for the complete private-state evidence.
+        // This matches the former frozen strings, but routine sweeps format nothing.
+        format!("{:?}", (&self.domain, &self.referee, &self.accounting, &self.pending, &self.out))
+            == format!("{:?}", (&other.domain, &other.referee, &other.accounting, &other.pending, &other.out))
+    }
+}
+impl Eq for Internal {}
 
 #[derive(Debug)]
 pub struct World {
@@ -204,29 +221,32 @@ impl World {
     #[must_use]
     /// Capture all retained domain, parent and executor state between steps
     /// (domain/tasks.md, 11).
-    pub fn frozen(&self) -> Frozen {
+    pub fn frozen(self) -> Frozen {
         Frozen {
-            records: self.records.clone(),
-            replies: self.replies.clone(),
-            activations: self.activations.clone(),
-            contexts: self.contexts.clone(),
-            runs: self.runs.clone(),
-            stops: self.stops.clone(),
-            closing: self.closing.clone(),
-            results: self.results.clone(),
-            ended_topics: self.ended_topics.clone(),
-            deadlines: self.deadlines.clone(),
-            kinds: self.kinds.clone(),
+            records: self.records,
+            replies: self.replies,
+            activations: self.activations,
+            contexts: self.contexts,
+            runs: self.runs,
+            stops: self.stops,
+            closing: self.closing,
+            results: self.results,
+            ended_topics: self.ended_topics,
+            deadlines: self.deadlines,
+            kinds: self.kinds,
             restoring: self.restoring,
-            facts: self.facts.clone(),
+            facts: self.facts,
             consume_facts: self.consume_facts,
             limits: self.env.limits,
             seed: self.seed,
             priced: self.priced,
-            domain: format!("{:?}", self.domain),
-            referee: format!("{:?}", self.referee),
-            accounting: format!("{:?}", self.accounting_referee),
-            pending: format!("{:?} {:?}", self.pending, self.out),
+            internal: std::sync::Arc::new(Internal {
+                domain: self.domain,
+                referee: self.referee,
+                accounting: self.accounting_referee,
+                pending: self.pending,
+                out: self.out,
+            }),
             now: self.env.now,
             wall: self.env.wall,
             call: self.call,
@@ -257,7 +277,7 @@ impl World {
     }
 
     pub fn observe(&mut self, seen: Seen) {
-        self.trace.log(self.env.now, format_args!("{seen:?}"));
+        self.trace.observed(self.env.now, &seen);
         let mut stimuli = Vec::new();
         self.referee.observe(self.env.now, seen, &mut stimuli);
         self.referee.assert_holding(self.seed);
@@ -498,7 +518,7 @@ impl World {
             self.accounting_referee.procedure(*task, *step, *read);
         }
         self.remember_input(&event);
-        self.trace.log(self.env.now, format_args!("{event:?}"));
+        self.trace.input(self.env.now, &event);
         tasks::step(&mut self.domain, &self.env, event, &mut self.out);
         while let Some(request) = self.out.pop() {
             self.route_hint(&request);
@@ -1030,12 +1050,12 @@ fn result_notice(ending: Ending) -> (ResultKind, Box<[u8]>) {
 /// Seeded dependency, priced work, retry, crash and delegate-close story
 /// (domain/tasks.md, 11). Replay includes complete frozen state.
 #[must_use]
-pub fn run_story(seed: u64) -> (Vec<String>, Frozen) {
+pub fn run_story(seed: u64) -> (Trace, Frozen) {
     run_story_facts(seed, true)
 }
 
 #[must_use]
-pub fn run_story_facts(seed: u64, consume_facts: bool) -> (Vec<String>, Frozen) {
+pub fn run_story_facts(seed: u64, consume_facts: bool) -> (Trace, Frozen) {
     let mut rng = Rng::new(seed);
     let mut w = World::new(seed, LIMITS);
     w.consume_facts = consume_facts;
@@ -1100,5 +1120,5 @@ pub fn run_story_facts(seed: u64, consume_facts: bool) -> (Vec<String>, Frozen) 
     w.complete_cancel();
     assert_eq!(w.results.len(), 5);
     assert_eq!(w.live(), 0);
-    (w.trace.lines().to_vec(), w.frozen())
+    (std::mem::take(&mut w.trace), w.frozen())
 }
