@@ -509,3 +509,81 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     assert_eq!(uncut.nodes().len() + 2, expanded.nodes().len(), "wall and raw-call loss are independent leaves");
     assert!(contains(&uncut, b"\\x61\\x2F\\x62\\x00\\xFE"));
 }
+
+#[test]
+fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
+    use super::cards::CLIENT;
+    let words = words();
+    let (mut d, _, run, _) = ready();
+    let tool = Text::new(vec![0xff; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(), CLIENT.text).unwrap();
+    let input = Text::new(vec![0xfe; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(), CLIENT.text).unwrap();
+    for number in 1..=CLIENT.rows {
+        let name = TurnName { attempt: u64::MAX, number };
+        let call = CurrentCall { number: u64::MAX, tool: tool.clone(), input: input.clone(), cut: true };
+        deliver(
+            &mut d,
+            run,
+            Delivery::Run(Box::new(RunText {
+                attempt: name.attempt,
+                began: Some(Wall::from_nanos(u64::MAX)),
+                turn: name,
+                from: 0,
+                through: CLIENT.text,
+                text: Text::new(vec![b'x'; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(), CLIENT.text)
+                    .unwrap(),
+                cut: true,
+                call: Some(LiveCall::Raw(call)),
+            })),
+        );
+        drive(
+            &mut d,
+            Event::Act {
+                act: Act::FoldCall {
+                    name: jig_client::conversation::CallName { attempt: name.attempt, turn: number, call: u64::MAX },
+                    open: true,
+                },
+            },
+        );
+    }
+    assert_eq!(d.conversation().live.len(), CLIENT.rows);
+    assert_eq!(d.conversation().opened.len(), CLIENT.rows);
+    let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
+    let mut b = crate::Builder::new(&limits);
+    let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
+    b.open(Role::Page);
+    assert!(crate::jig(
+        &mut b,
+        &d,
+        crate::SlotRef { owner: crate::Owner::Other { child: 1 }, token: Token::new(1) },
+        &words,
+        &mut bindings
+    ));
+    b.close();
+    let tree = b.finish();
+    access(&tree);
+    assert!(u32::try_from(tree.nodes().len()).unwrap() <= limits.nodes);
+    let mut escaped = vec![];
+    for _ in 0..CLIENT.text {
+        escaped.extend_from_slice(b"\\xFE");
+    }
+    assert!(contains(&tree, &escaped));
+    assert_eq!(d.conversation().live.get(0).unwrap().call.as_ref().unwrap().number(), u64::MAX);
+    assert!(limits.text_per_node >= CLIENT.text * 4);
+    let (mut reloaded, _, run, _) = ready();
+    assert!(reloaded.conversation().live.is_empty());
+    deliver(
+        &mut reloaded,
+        run,
+        Delivery::Run(Box::new(RunText {
+            attempt: u64::MAX,
+            began: None,
+            turn: TurnName { attempt: u64::MAX, number: 1 },
+            from: 0,
+            through: 0,
+            text: text(b""),
+            cut: false,
+            call: Some(LiveCall::Raw(CurrentCall { number: u64::MAX, tool, input, cut: false })),
+        })),
+    );
+    assert_eq!(reloaded.conversation().live.get(0).unwrap().began, None);
+}

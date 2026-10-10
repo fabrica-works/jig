@@ -1805,7 +1805,7 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
         call: Some(LiveCall::Raw(raw.clone())),
     };
     let setup = live_script();
-    let original_bounds = original_bounds;
+    let original_bounds = setup.bounds;
     let heap = run.heap(&original_bounds).unwrap();
     assert_eq!(heap, 18, "four streamed bytes plus nine tool and five input bytes");
     let exact = u64::try_from(core::mem::size_of::<RunText>()).unwrap() + heap;
