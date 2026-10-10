@@ -49,6 +49,8 @@ pub enum Body {
     OwnerProposal(Box<crate::contract::OwnerProposal>),
     /// A held task escalation.
     Escalation(Box<Escalation>),
+    /// A task owner’s whole escalation document.
+    OwnerEscalation(Box<crate::contract::OwnerEscalation>),
     /// A question.
     Question(Box<Question>),
     /// A person task.

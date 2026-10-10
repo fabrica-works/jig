@@ -161,6 +161,8 @@ pub enum ReadValue {
     OwnerProposal(Box<super::OwnerProposal>),
     /// An escalation.
     Escalation(Box<Escalation>),
+    /// A task owner’s whole escalation document.
+    OwnerEscalation(Box<super::OwnerEscalation>),
     /// A question.
     Question(Box<Question>),
     /// A person task.
