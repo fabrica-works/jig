@@ -1548,3 +1548,5 @@ fn inbox_counts_follow_current_project_roles_without_losing_archived_census() {
     assert_eq!(updates[0], Update::Result(ResultRef { task: 8, project: 1, at: Wall::from_nanos(8), position: 8 }));
     assert_eq!(updates[1], Update::Result(ResultRef { task: 7, project: 2, at: Wall::from_nanos(7), position: 7 }));
 }
+
+mod need_counts;

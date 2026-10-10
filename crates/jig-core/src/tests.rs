@@ -385,7 +385,16 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
     };
     assert_eq!(frame.party, 1);
     assert_eq!(frame.kind, people::Kind::Person);
-    assert_eq!(frame.projects.as_slice(), &[people::ProjectRole { project: 1, role: people::Role::Owner }]);
+    assert_eq!(
+        frame.projects.as_slice(),
+        &[FrameProjectRole {
+            project: 1,
+            role: people::Role::Owner,
+            name: None,
+            pool: None,
+            chat_budget: core.settings.chat_authority.budget.spend
+        }]
+    );
     assert_eq!(frame.retention, limits.people.request_retention);
     assert_eq!(frame.charters.as_slice()[0].goals.as_slice(), &[1]);
     assert_eq!(frame.versions, limits.documents.versions);
@@ -2672,3 +2681,5 @@ mod last_batch;
 mod periods;
 
 mod project_tasks;
+
+mod frame_facts;

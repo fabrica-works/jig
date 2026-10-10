@@ -248,7 +248,7 @@ fn policy(limits: &Limits, value: &authority::Policy) -> Result<Policy, Missing>
     })
 }
 #[expect(clippy::manual_map, reason = "step code matches options without closures")]
-fn ledger(value: &tasks::FundingRecord) -> Ledger {
+pub(super) fn ledger(value: &tasks::FundingRecord) -> Ledger {
     Ledger {
         source: value.funder,
         parent: value.parent,

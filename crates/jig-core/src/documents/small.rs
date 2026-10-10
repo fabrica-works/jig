@@ -1,5 +1,5 @@
 //! Small live documents and the shared bounded chip construction.
-use super::{Chip, Count, ExecutorKind, Frame, Missing, OfferedCharter, PhaseLine, Run, Text};
+use super::{Chip, Count, ExecutorKind, Frame, FrameProjectRole, Missing, OfferedCharter, PhaseLine, Run, Text};
 use crate::{Core, Limits};
 use alloc::boxed::Box;
 use jig_core_tasks as tasks;
@@ -76,13 +76,30 @@ pub(super) fn chip_from_row(limits: &Limits, row: &tasks::TaskRecord) -> Result<
     Ok(Chip { number, title, executor, phase, details: Box::new(super::chip_phase::from_row(limits, row)?) })
 }
 
+#[expect(clippy::manual_map, reason = "step code explicitly matches optional owner ledgers without closures")]
 pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, Missing> {
     let identity = core.people.identity(party).ok_or(Missing::Unknown)?;
     let roles = core.people.project_roles(party).ok_or(Missing::Unknown)?;
     let mut projects = List::with_capacity(limits.documents.lines);
     let mut charters = List::with_capacity(limits.documents.lines);
     for role in roles.iter().take(usize::try_from(limits.documents.lines).expect("line count fits")) {
-        projects.push(*role).expect("bounded project list");
+        let pool = match core.tasks.funding(tasks::Funder::Pool {
+            project: role.project,
+            person: party,
+            period: core.settings.period,
+        }) {
+            Some(record) => Some(super::project_note::ledger(record)),
+            None => None,
+        };
+        projects
+            .push(FrameProjectRole {
+                project: role.project,
+                role: role.role,
+                name: None,
+                pool,
+                chat_budget: core.settings.chat_authority.budget.spend,
+            })
+            .expect("bounded project list");
         let mut goals = List::with_capacity(limits.documents.lines);
         for charter in
             core.tasks.charters().iter().take(usize::try_from(limits.documents.lines).expect("line count fits"))
@@ -104,6 +121,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         cut: projects.len() < roles.len(),
         projects,
         needs: counts.needs,
+        need_counts: core.people.need_counts(party).ok_or(Missing::Unknown)?,
         updates,
         results_seen: core.people.results_seen(party).ok_or(Missing::Unknown)?,
         charters,

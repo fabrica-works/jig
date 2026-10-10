@@ -825,9 +825,12 @@ pub(super) fn tag_tasks(
                         core.touch_project_objects(row.project);
                     }
                     tasks::Stored::Ledger(row) => match row.funder {
-                        tasks::Funder::Pool { project, .. }
-                        | tasks::Funder::Period { project, .. }
-                        | tasks::Funder::Recurring { project, .. } => core.touch_project_objects(project),
+                        tasks::Funder::Pool { project, person, .. } => {
+                            core.touch_project_objects(project);
+                            core.touch_party(person);
+                        }
+                        tasks::Funder::Period { project, .. } => core.touch_project_parties(project),
+                        tasks::Funder::Recurring { project, .. } => core.touch_project_objects(project),
                         tasks::Funder::Task(_) => {}
                     },
                     tasks::Stored::Live(_)

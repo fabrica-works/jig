@@ -238,6 +238,17 @@ pub struct OfferedCharter {
     pub cut: bool,
 }
 
+/// A held project role and the actual current funding facts available to the party.
+/// Names are absent until an owner supplies one; unopened pools have no ledger.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct FrameProjectRole {
+    pub project: u32,
+    pub role: people::Role,
+    pub name: Option<Text>,
+    pub pool: Option<Ledger>,
+    pub chat_budget: u64,
+}
+
 /// Party identity, current roles, bounded counts and contract configuration.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Frame {
@@ -245,8 +256,10 @@ pub struct Frame {
     pub kind: people::Kind,
     pub login: Text,
     pub name: Text,
-    pub projects: List<people::ProjectRole>,
+    pub projects: List<FrameProjectRole>,
     pub needs: u32,
+    /// Exact kinds, including needs beyond the recent inbox prefix.
+    pub need_counts: people::Needs,
     pub updates: Count,
     pub results_seen: u64,
     pub retention: Duration,
@@ -395,7 +408,8 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let chip = chip_phase::heap_worst_case(limits)?;
     let chips = List::<Chip>::worst_case(limits.chips)?.checked_add(u64::from(limits.chips).checked_mul(chip)?)?;
     let charter = List::<u32>::worst_case(limits.lines)?;
-    let frame = List::<people::ProjectRole>::worst_case(limits.lines)?
+    let frame = List::<FrameProjectRole>::worst_case(limits.lines)?
+        .checked_add(u64::from(limits.lines).checked_mul(u64::from(limits.text_bytes))?)?
         .checked_add(List::<OfferedCharter>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(charter)?)?
         .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?;

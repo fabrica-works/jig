@@ -3,8 +3,8 @@
 //! positions restore. Ended chats retain positions until the owner forgets them.
 use super::{ChatTotal, Domain, Need, Pending, Phase, Recent, decided, role};
 use crate::{
-    Again, Ask, Counts, Entry, EntryKind, Key, Limits, Outcome, ReplyRef, Request, ResultRef, Role, Seen, Stored,
-    Update, Whom,
+    Again, Ask, Counts, Entry, EntryKind, Key, Limits, Needs, Outcome, ReplyRef, Request, ResultRef, Role, Seen,
+    Stored, Update, Whom,
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, Id, List, Queue, Token, Wall};
@@ -125,16 +125,33 @@ impl Domain {
     /// Tallies are volatile projections rebuilt from task rows, never durable inbox state.
     #[must_use]
     pub fn needs(&self, person: u64) -> Option<u32> {
+        let counts = self.need_counts(person)?;
+        let total = counts.questions.checked_add(counts.proposals).expect("validated task projection bound");
+        let total = total.checked_add(counts.escalations).expect("validated task projection bound");
+        Some(total.checked_add(counts.person_tasks).expect("validated task projection bound"))
+    }
+
+    /// Every live addressed need by kind, independent of the recent cache's capacity.
+    #[must_use]
+    pub fn need_counts(&self, person: u64) -> Option<Needs> {
         self.identity(person)?;
-        let mut count = 0_u32;
+        let mut counts = Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 };
         for (_, tallies) in &self.needs {
             for tally in tallies {
-                if addressed(self, person, *tally) {
-                    count = count.checked_add(1).expect("validated task projection bound");
+                if !addressed(self, person, *tally) {
+                    continue;
                 }
+                let count = match tally.kind {
+                    EntryKind::Question { .. } => &mut counts.questions,
+                    EntryKind::Proposal { .. } => &mut counts.proposals,
+                    EntryKind::Escalation { .. } => &mut counts.escalations,
+                    EntryKind::PersonTask => &mut counts.person_tasks,
+                    EntryKind::Reply { .. } | EntryKind::ChatReply { .. } => continue,
+                };
+                *count = count.checked_add(1).expect("validated task projection bound");
             }
         }
-        Some(count)
+        Some(counts)
     }
 
     /// Whether this task currently contributes to the party's exact need count.

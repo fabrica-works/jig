@@ -176,6 +176,15 @@ pub enum Seen {
     Chat { task: u64, through: u64 },
 }
 
+/// Exact addressed work by kind, beyond the recent inbox cache (client/domain/pages.md, 2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Needs {
+    pub questions: u32,
+    pub proposals: u32,
+    pub escalations: u32,
+    pub person_tasks: u32,
+}
+
 /// Exact needs and unread updates capped at the configured count limit.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Counts {

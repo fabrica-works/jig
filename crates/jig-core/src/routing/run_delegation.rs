@@ -639,6 +639,9 @@ pub(super) fn route_period(
         None => false,
     };
     if period > 0 && period >= core.settings.period && allowed {
+        if period != core.settings.period {
+            core.touch_frames();
+        }
         core.settings.period = period;
         core.settings.period_budget = budget;
         if core.tasks.funding(tasks::Funder::Period { project, period }).is_none() {
