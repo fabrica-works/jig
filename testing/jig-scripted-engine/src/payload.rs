@@ -171,7 +171,6 @@ impl Payload for Ask {
             Self::DeleteNote { project, note, revision } => {
                 sum(&[project.heap(bounds), note.heap(bounds), revision.heap(bounds)])
             }
-            Self::Adopt { project, resource } => sum(&[project.heap(bounds), resource.heap(bounds)]),
             Self::ChangePolicy { project, policy } => sum(&[project.heap(bounds), policy.heap(bounds)]),
             Self::SetRoles { project, holdings } => sum(&[project.heap(bounds), holdings.heap(bounds)]),
             Self::MakeService { project, name, role } => {

@@ -1,4 +1,5 @@
 //! Objects offer the engine's acts verbatim; this module translates one act to one ask.
+//! Adoption stays in its connector form; generic confirmation emits no adoption ask (pages.md, 6.5).
 //! No authority, key or retry is computed here. Revisions come from the confirmation
 //! that the person opened. See client/domain/objects.md, 2, 4–9 and 11.
 use crate::{

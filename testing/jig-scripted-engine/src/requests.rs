@@ -231,7 +231,6 @@ impl<A: crate::Application> Engine<A> {
             | Ask::SetGoal { .. }
             | Ask::Prioritise { .. }
             | Ask::MarkSeen { .. }
-            | Ask::Adopt { .. }
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
@@ -280,7 +279,6 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::MarkSeen { .. }
                 | Ask::EditNote { .. }
                 | Ask::DeleteNote { .. }
-                | Ask::Adopt { .. }
                 | Ask::ChangePolicy { .. }
                 | Ask::SetRoles { .. }
                 | Ask::MakeService { .. }
@@ -357,7 +355,6 @@ impl<A: crate::Application> Engine<A> {
             | Ask::MarkSeen { .. }
             | Ask::EditNote { .. }
             | Ask::DeleteNote { .. }
-            | Ask::Adopt { .. }
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
@@ -517,7 +514,6 @@ fn target(ask: &Ask) -> Target {
         Ask::MarkSeen { .. } => (None, None, ActKind::MarkSeen, None),
         Ask::EditNote { project, .. } => (Some(*project), None, ActKind::EditNote, None),
         Ask::DeleteNote { project, .. } => (Some(*project), None, ActKind::DeleteNote, None),
-        Ask::Adopt { project, .. } => (Some(*project), None, ActKind::Adopt, None),
         Ask::ChangePolicy { project, .. } => (Some(*project), None, ActKind::ChangePolicy, None),
         Ask::SetRoles { project, .. } => (Some(*project), None, ActKind::SetRoles, None),
         Ask::MakeService { project, .. } => (Some(*project), None, ActKind::MakeService, None),

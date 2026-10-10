@@ -271,7 +271,6 @@ pub(crate) fn sent(
         | Ask::MarkSeen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
-        | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
         | Ask::MakeService { .. }

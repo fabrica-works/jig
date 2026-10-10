@@ -1,5 +1,6 @@
 //! Each visible act is one ask; client/domain/contract.md, 3.2 and 4.
 //! Requests carry jig facts alone and their outcomes are durable.
+//! Adoption uses the connector's application request (client/domain/pages.md, 6.5).
 use super::{Actor, Authority, Decision, Executor, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
@@ -137,8 +138,6 @@ pub enum Ask {
     EditNote { project: u32, note: u64, revision: Revision, description: Text, body: Text },
     /// Delete the note revision seen.
     DeleteNote { project: u32, note: u64, revision: Revision },
-    /// Adopt a resource without connector options.
-    Adopt { project: u32, resource: Part },
     /// Change a project policy.
     ChangePolicy { project: u32, policy: Policy },
     /// Replace project roles.

@@ -1,4 +1,5 @@
 //! The one named review dialog, from recalled facts (client.md, 9; objects.md, 2).
+//! Adoption belongs to the application slot rather than this jig form (client/domain/pages.md, 6.5).
 use crate::{
     Builder, JigBindings, JigMeaning, JigStyle, Role, Run, State,
     cards::{common, person, proposal},

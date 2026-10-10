@@ -35,7 +35,6 @@ fn words(ask: &Ask, task: u64) -> Option<&Text> {
         | Ask::MarkSeen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
-        | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
         | Ask::MakeService { .. }
