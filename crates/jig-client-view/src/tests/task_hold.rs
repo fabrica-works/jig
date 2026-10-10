@@ -68,13 +68,13 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                 assert!(contains(&tree, expected_prior));
                 let escaped = "\\xFF".repeat(32);
                 assert!(contains(&tree, escaped.as_bytes()));
-                for legacy_caption in [
+                for document_caption in [
                     b"The next run resumes its conversation".as_slice(),
                     b"Release to wait again",
                     b"Release for the executor to decide afresh",
                     b"Release with procedure counts reset",
                 ] {
-                    assert!(!contains(&tree, legacy_caption));
+                    assert!(!contains(&tree, document_caption));
                 }
                 let mut choices = Vec::new();
                 let mut raw_slots = 0_u32;

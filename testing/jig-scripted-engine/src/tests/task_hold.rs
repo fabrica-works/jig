@@ -34,7 +34,7 @@ fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at
     assert!(!payload::fits(&row, &Bounds { text: 31, ..bounds }));
     assert_eq!(row, before);
     assert_eq!(row.hold, Some(TaskHold::Owner(Box::new(held))));
-    let legacy = Hold {
+    let document = Hold {
         revision: Revision { value: 7 },
         reason: HoldReason::Budget { spent: 1, limit: 1 },
         before: Phase::Running,
@@ -42,10 +42,10 @@ fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at
         result: Some(ResultValue::Report(DocumentText::complete(text(b"legacy result")))),
         spend: List::with_capacity(2),
     };
-    let legacy_heap = legacy.heap(&bounds).unwrap();
-    row.hold = Some(TaskHold::Document(Box::new(legacy.clone())));
-    assert_eq!(row.heap(&bounds).unwrap() - absent, u64::try_from(size_of::<Hold>()).unwrap() + legacy_heap);
-    assert_eq!(row.hold, Some(TaskHold::Document(Box::new(legacy))));
+    let document_heap = document.heap(&bounds).unwrap();
+    row.hold = Some(TaskHold::Document(Box::new(document.clone())));
+    assert_eq!(row.heap(&bounds).unwrap() - absent, u64::try_from(size_of::<Hold>()).unwrap() + document_heap);
+    assert_eq!(row.hold, Some(TaskHold::Document(Box::new(document))));
 }
 
 #[test]

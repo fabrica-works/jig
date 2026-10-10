@@ -1,5 +1,5 @@
 //! A task's supplied hold facts remain distinct from an independently supplied
-//! legacy hold document (client/domain/objects.md, 5 and 11).
+//! Hold document (client/domain/objects.md, 5 and 11).
 use super::{Hold, HoldCategory, HoldReason, OwnerChipHold, Revision};
 use alloc::boxed::Box;
 
