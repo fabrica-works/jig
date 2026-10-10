@@ -131,6 +131,7 @@ fn call(domain: &mut Domain, owner: u64, sequence: u32, retry: u32, id: &[u8], w
         domain,
         &Env { now: Time::ZERO, wall, limits: LIMITS },
         Event::Called {
+            attempt: 1,
             run: Token::new(7),
             call: Call {
                 identity: CallIdentity { owner: Token::new(owner), sequence, retry, id: Box::from(id) },
@@ -188,7 +189,7 @@ fn repeated_ids_in_one_completion_replace_payload_and_keep_the_first_seen_clock(
     step(
         &mut domain,
         &Env { now: Time::ZERO, wall: Wall::from_nanos(5), limits: LIMITS },
-        Event::Called { run: Token::new(7), call: next },
+        Event::Called { run: Token::new(7), attempt: 1, call: next },
         &mut out,
     );
     let shown = writing(&domain, Token::new(7), 16).unwrap().call.unwrap();

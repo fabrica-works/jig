@@ -510,13 +510,48 @@ pub(super) fn run_call(core: &mut Core, env: &Env<Limits>, run: Token, attempt: 
         Some(proof) => proof.attempt == attempt.raw() && proof.terminal.is_none(),
         None => false,
     };
+    let mut out = Queue::with_capacity(crate::room_max(&env.limits).expect("bounded current-call route").held);
     if live {
-        route_view(core, env, views::Event::Called { run, call })
-    } else {
-        let mut out = Queue::with_capacity(1);
-        out.push(Request::Decided);
-        Requests::Out(out)
+        append_stream(super::watch_marks::end_invalid(core, env), &mut out);
+        let before = (views::retained_attempt(&core.views, run), views::revision(&core.views, run));
+        append_stream(route_view(core, env, views::Event::Called { run, attempt: attempt.raw(), call }), &mut out);
+        if before != (views::retained_attempt(&core.views, run), views::revision(&core.views, run)) {
+            let mut named = None;
+            for (name, subject) in &core.view_names {
+                match &subject.subject {
+                    Subject::Run { task } if *task == run.raw() => {
+                        named = Some(name.token());
+                        break;
+                    }
+                    Subject::Frame { .. }
+                    | Subject::Task { .. }
+                    | Subject::Tree { .. }
+                    | Subject::Chips { .. }
+                    | Subject::Inbox { .. }
+                    | Subject::Goals { .. }
+                    | Subject::Tasks { .. }
+                    | Subject::Conversations { .. }
+                    | Subject::Run { .. }
+                    | Subject::Deployment
+                    | Subject::Proposal { .. }
+                    | Subject::Escalation { .. }
+                    | Subject::Question { .. }
+                    | Subject::PersonTask { .. }
+                    | Subject::Result { .. }
+                    | Subject::Project { .. }
+                    | Subject::Note { .. }
+                    | Subject::Application { .. } => {}
+                }
+            }
+            if let Some(name) = named {
+                let mut subjects = List::with_capacity(1);
+                subjects.push(name).expect("one watched run subject");
+                append_stream(route_view(core, env, views::Event::Changed { subjects }), &mut out);
+            }
+        }
     }
+    out.push(Request::Decided);
+    Requests::Out(out)
 }
 
 pub(super) fn stream_delivered(core: &mut Core, env: &Env<Limits>, watcher: Token) -> Requests {

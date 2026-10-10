@@ -461,12 +461,12 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
         .unwrap();
     assert_eq!(
         make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()),
-        Ok(Document::Run(Run { task: 1, attempt: Some(7), committed_turn: 3, writing: None }))
+        Ok(Document::Run(Run { task: 1, attempt: Some(7), committed_turn: 3, writing: None, call: None }))
     );
     core.proofs.remove(&1);
     assert_eq!(
         make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()),
-        Ok(Document::Run(Run { task: 1, attempt: None, committed_turn: 0, writing: None }))
+        Ok(Document::Run(Run { task: 1, attempt: None, committed_turn: 0, writing: None, call: None }))
     );
 }
 

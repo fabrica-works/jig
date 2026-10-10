@@ -335,7 +335,11 @@ pub(crate) fn finish_watches(core: &mut Core, env: &Env<Limits>) -> Requests {
     // its retained-run admission. Both are fenced by the core's durable proof.
     for token in &core.views.retained_runs() {
         let position = views::position(&core.views, *token);
+        let attempt = views::retained_attempt(&core.views, *token);
         let event = match core.proofs.get(&token.raw()) {
+            Some(proof) if proof.terminal.is_none() && attempt != Some(proof.attempt) => {
+                Some(views::Event::RunEnded { run: *token })
+            }
             Some(proof) if proof.terminal.is_none() => match position {
                 Some((writing, _)) if writing.attempt != proof.attempt => Some(views::Event::RunEnded { run: *token }),
                 Some((writing, _)) => match proof.turn {

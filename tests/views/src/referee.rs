@@ -277,7 +277,7 @@ impl Referee {
                 text: text.to_vec(),
                 call: call.clone(),
             }),
-            Event::Called { run, call } => self.observe(Seen::Called { run: *run, call: call.clone() }),
+            Event::Called { run, call, .. } => self.observe(Seen::Called { run: *run, call: call.clone() }),
             Event::Changed { .. }
             | Event::Unwatch { .. }
             | Event::Gone { .. }

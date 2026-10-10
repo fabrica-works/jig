@@ -133,7 +133,7 @@ pub(super) fn run(core: &Core, limits: &Limits, party: u64, number: u64) -> Resu
     visible(core, party, number)?;
     let proof = match core.proofs.get(&number) {
         Some(proof) if proof.terminal.is_none() => proof,
-        Some(_) | None => return Ok(Run { task: number, attempt: None, committed_turn: 0, writing: None }),
+        Some(_) | None => return Ok(Run { task: number, attempt: None, committed_turn: 0, writing: None, call: None }),
     };
     let committed_turn = match proof.turn {
         Some(turn) => turn.turn,
@@ -144,5 +144,11 @@ pub(super) fn run(core: &Core, limits: &Limits, party: u64, number: u64) -> Resu
         Some(writing) if writing.turn.attempt == proof.attempt && writing.turn.turn > committed_turn => Some(writing),
         Some(_) | None => None,
     };
-    Ok(Run { task: number, attempt: Some(proof.attempt), committed_turn, writing })
+    let call = jig_core_views::current_call(
+        &core.views,
+        skein_lib::Token::new(number),
+        proof.attempt,
+        limits.documents.text_bytes,
+    );
+    Ok(Run { task: number, attempt: Some(proof.attempt), committed_turn, writing, call })
 }

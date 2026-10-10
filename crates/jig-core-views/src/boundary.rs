@@ -112,7 +112,7 @@ pub enum Event {
     /// A live host wrote text starting at this turn's absolute offset.
     Text { run: Token, turn: TurnName, offset: u32, text: Box<[u8]>, call: Option<Call> },
     /// Any content call, independently of the main completion's text identity.
-    Called { run: Token, call: Call },
+    Called { run: Token, attempt: u64, call: Call },
     /// A committed turn stops being provisional without ending its live run.
     TurnCommitted { run: Token, attempt: u64, turn: u32 },
     /// The run ended; discard its provisional writing, leaving its watches open.

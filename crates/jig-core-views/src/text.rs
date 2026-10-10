@@ -28,6 +28,7 @@ use skein_lib::{Env, Id, List, Queue, Token, Wall};
 /// One opaque live run's current bounded writing, watched or not.
 #[derive(Debug)]
 pub(crate) struct Run {
+    attempt: u64,
     turn: Option<TurnName>,
     from: u32,
     to: u32,
@@ -87,15 +88,12 @@ pub(crate) fn written(
         if domain.runs.len() >= limits.runs {
             return;
         }
-        domain
-            .runs
-            .insert(
-                token,
-                Run { turn: None, from: 0, to: 0, text: Box::new([]), call: None, revision: 0, committed: false },
-            )
-            .expect("retained live run admission checked");
+        domain.runs.insert(token, empty(turn.attempt)).expect("retained live run admission checked");
     }
     let run = domain.runs.get_mut(&token).expect("admitted live run");
+    if turn.attempt < run.attempt {
+        return;
+    }
     let new_turn = match run.turn {
         Some(current) => {
             if turn < current || (turn == current && run.committed) {
@@ -106,6 +104,7 @@ pub(crate) fn written(
         None => true,
     };
     if new_turn {
+        run.attempt = turn.attempt;
         run.turn = Some(turn);
         run.committed = false;
         run.from = offset;
@@ -173,11 +172,44 @@ fn timed(mut call: Call, previous: Option<&Call>, wall: Wall) -> Call {
     call
 }
 
-pub(crate) fn called(domain: &mut Domain, env: &Env<Limits>, token: Token, call: Call, out: &mut Queue<Request>) {
+fn empty(attempt: u64) -> Run {
+    Run { attempt, turn: None, from: 0, to: 0, text: Box::new([]), call: None, revision: 0, committed: false }
+}
+
+pub(crate) fn called(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    token: Token,
+    attempt: u64,
+    call: Call,
+    out: &mut Queue<Request>,
+) {
     if !fits(&call, env.limits.text_bytes) {
         return;
     }
-    let Some(run) = domain.runs.get_mut(&token) else { return };
+    for (_, id) in &domain.names {
+        let watch = domain.watchers.get(*id).expect("named watch");
+        if let Some(follow) = watch.follow
+            && follow.run == token
+            && let Some(ended) = watch.ended_turn
+            && attempt <= ended.attempt
+        {
+            return;
+        }
+    }
+    if !domain.runs.contains_key(&token) {
+        if domain.runs.len() >= env.limits.runs {
+            return;
+        }
+        domain.runs.insert(token, empty(attempt)).expect("retained live run admission checked");
+    }
+    let run = domain.runs.get_mut(&token).expect("admitted current call");
+    if attempt < run.attempt {
+        return;
+    }
+    if attempt != run.attempt {
+        *run = empty(attempt);
+    }
     let call = timed(call, run.call.as_ref(), env.wall);
     if run.call.as_ref() == Some(&call) {
         return;
@@ -204,7 +236,8 @@ pub(crate) fn committed(domain: &mut Domain, token: Token, attempt: u64, turn: u
         run.from = 0;
         run.to = 0;
         run.text = Box::new([]);
-        run.call = None;
+        // Accepting text attests no tool ending. The current content call
+        // remains independent until a supplied new turn/retry, call or run end.
     }
 }
 
@@ -321,4 +354,27 @@ pub fn writing(domain: &Domain, token: Token, capacity: u32) -> Option<crate::Wr
 pub fn position(domain: &Domain, token: Token) -> Option<(TurnName, u32)> {
     let run = domain.runs.get(&token)?;
     Some((run.turn?, run.to))
+}
+
+/// Actual attempt retained by the first text or call report, without a guessed turn.
+#[must_use]
+pub fn retained_attempt(domain: &Domain, token: Token) -> Option<u64> {
+    Some(domain.runs.get(&token)?.attempt)
+}
+
+/// Current source revision, for a parent to mark only an actual retained change.
+#[must_use]
+pub fn revision(domain: &Domain, token: Token) -> Option<u64> {
+    Some(domain.runs.get(&token)?.revision)
+}
+
+/// A current call is independent of a main completion's provisional text.
+/// Its whole identity is preserved and descriptions use the same document bound.
+#[must_use]
+pub fn current_call(domain: &Domain, token: Token, attempt: u64, capacity: u32) -> Option<Call> {
+    let run = domain.runs.get(&token)?;
+    if run.attempt != attempt {
+        return None;
+    }
+    bounded_call(run.call.clone(), capacity)
 }

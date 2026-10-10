@@ -268,6 +268,8 @@ pub struct Run {
     pub attempt: Option<u64>,
     pub committed_turn: u32,
     pub writing: Option<jig_core_views::Writing>,
+    /// Current content call, independently of committed or absent main writing.
+    pub call: Option<jig_core_views::Call>,
 }
 
 /// One whole typed document, within its configured limits.
@@ -409,7 +411,7 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     u64::try_from(size_of::<Document>()).ok()?.checked_add(
         chips
             .max(frame)
-            .max(u64::from(limits.text_bytes).checked_mul(2)?)
+            .max(u64::from(limits.text_bytes).checked_mul(3)?)
             .max(task_tree::worst_case(limits)?)
             .max(project_tasks::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
