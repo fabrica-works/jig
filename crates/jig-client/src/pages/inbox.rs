@@ -287,10 +287,7 @@ impl Inbox {
 // A missing association remains unknown; an associated empty root list is a
 // supplied negative membership answer. Historical pages keep their own query.
 fn owner_membership(entry: &OwnerInboxEntry, goal: Option<u64>, document: Option<&InboxDocument>) -> Option<bool> {
-    let goal = match goal {
-        Some(goal) => goal,
-        None => return Some(true),
-    };
+    let Some(goal) = goal else { return Some(true) };
     let selection = match document {
         Some(InboxDocument::Owner(value)) => value.selection.as_ref()?,
         Some(InboxDocument::Entry(_)) | None => return None,
