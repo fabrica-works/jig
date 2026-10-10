@@ -306,10 +306,7 @@ pub(super) fn line(b: &mut Builder, client: &Domain, goal: &GoalLine, words: &Wo
     words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(goal.priority))]);
     super::super::work::counts(b, goal.progress, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(goal.held_below))]);
-    super::super::work::budget(b, &goal.budget, words);
-    if let Some(deadline) = goal.deadline {
-        words.deadline(b, deadline);
-    }
+    crate::owner_budget::render(b, &goal.budget, words);
     b.close();
 }
 

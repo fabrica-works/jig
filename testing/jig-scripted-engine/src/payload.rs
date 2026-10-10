@@ -476,7 +476,6 @@ fields!(Task {
     escalation,
     proposals,
     activity,
-    deadline,
     changed,
     acts,
     parts,
@@ -746,7 +745,7 @@ fields!(Inbox { entries, needs, updates, results_seen, replies_seen, more });
 fields!(ReplyPosition { chat, through });
 fields!(ConversationLine { runtime, delegates, budget, chip, project, first_words, unread, seen, last_reply, changed });
 fields!(Conversations { rows, more });
-fields!(GoalLine { changed, chip, priority, progress, budget, deadline, held_below });
+fields!(GoalLine { changed, chip, priority, progress, budget, held_below });
 fields!(Goals { project, rows, more });
 fields!(Project {
     period,

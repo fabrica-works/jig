@@ -19,8 +19,12 @@ pub fn inbox_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
 /// Chat rows, every runtime alternative and all offered project forms.
 #[must_use]
 pub fn conversations_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
-    let row =
-        card_nodes(l)?.checked_add(chip_nodes(l)?)?.checked_add(runtime(l)?)?.checked_add(21)?.checked_mul(l.rows)?;
+    let row = card_nodes(l)?
+        .checked_add(chip_nodes(l)?)?
+        .checked_add(runtime(l)?)?
+        .checked_add(crate::owner_budget::budget_nodes())?
+        .checked_add(18)?
+        .checked_mul(l.rows)?;
     let forms = l.charters.max(l.rows).checked_mul(3)?.checked_add(9)?.checked_mul(l.projects.max(l.rows))?;
     row.checked_add(forms)?.checked_add(66)?.checked_add(slot_nodes)
 }
@@ -71,8 +75,10 @@ fn history(l: &Limits) -> Option<u32> {
 /// Task header, lineage and the largest available executor section.
 #[must_use]
 pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
-    let budget =
-        crate::owner_authority::document_nodes(l.rows)?.checked_add(l.rows.checked_mul(4)?)?.checked_add(12)?;
+    let budget = crate::owner_authority::document_nodes(l.rows)?
+        .checked_add(crate::owner_budget::budget_nodes())?
+        .checked_add(l.rows.checked_mul(4)?)?
+        .checked_add(4)?;
     let activity = conversation_nodes(l, 0)?.checked_add(runtime(l)?)?.checked_add(card_nodes(l)?.checked_mul(2)?)?;
     let panels = l.rows.checked_mul(4)?.checked_add(2)?.checked_mul(5)?;
     let section = plan(l)?.max(overview(l)?).max(history(l)?).max(budget).max(activity).max(panels);
@@ -83,7 +89,12 @@ pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
         .checked_add(slot_nodes)
 }
 fn goals(l: &Limits) -> Option<u32> {
-    let board = card_nodes(l)?.checked_add(chip_nodes(l)?)?.checked_add(20)?.checked_mul(l.rows)?.checked_mul(2)?;
+    let board = card_nodes(l)?
+        .checked_add(chip_nodes(l)?)?
+        .checked_add(crate::owner_budget::budget_nodes())?
+        .checked_add(13)?
+        .checked_mul(l.rows)?
+        .checked_mul(2)?;
     // A bounded goal offers whole charter and procedure lists independently.
     let choices = l.charters.max(l.rows).checked_add(l.rows)?;
     let form = choices

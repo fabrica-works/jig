@@ -215,10 +215,7 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
     }
 }
 fn budget(b: &mut Builder, doc: &Task, words: &Words, _bindings: &mut JigBindings) {
-    super::work::budget(b, &doc.budget, words);
-    if let Some(deadline) = doc.deadline {
-        words.deadline(b, deadline);
-    }
+    crate::owner_budget::render(b, &doc.budget, words);
     for spend in &doc.spend {
         match spend.attempt {
             Some(attempt) => words.text(

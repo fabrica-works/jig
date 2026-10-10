@@ -51,9 +51,7 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
             &[Hole::Number(u64::from(row.unread.value))],
         );
         words.text(b, JigPhrase::Delegates, &[Hole::Number(u64::from(row.delegates))]);
-        words.text(b, JigPhrase::Budget, &[Hole::Amount(row.budget.total)]);
-        words.text(b, JigPhrase::OwnSpend, &[Hole::Amount(row.budget.own)]);
-        words.text(b, JigPhrase::DelegateSpend, &[Hole::Amount(row.budget.ended)]);
+        crate::owner_budget::render(b, &row.budget, words);
         b.close();
     }
     b.close();

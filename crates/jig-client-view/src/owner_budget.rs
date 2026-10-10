@@ -52,6 +52,11 @@ impl BudgetFragment {
 fn region() -> BudgetFragment {
     BudgetFragment { nodes: 1, text_bytes: 0, text_per_node: 0, depth: 2 }
 }
+/// Maximum whole budget region: five numbers, the funder and an optional deadline.
+#[must_use]
+pub const fn budget_nodes() -> u32 {
+    9
+}
 
 /// Whole supplied budget's storage, using capacities across all loaded languages.
 #[must_use]

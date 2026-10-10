@@ -176,13 +176,12 @@ pub struct Task {
     /// At least one task list was omitted; this does not identify which list.
     pub cut: bool,
     pub resources: List<Part>,
-    pub budget: Budget,
+    pub budget: super::OwnerBudget,
     pub authority: super::OwnerAuthorityDocument,
     pub hold: Option<Hold>,
     pub escalation: Option<Escalation>,
     pub proposals: List<ProposalKey>,
     pub activity: u64,
-    pub deadline: Option<Wall>,
     pub changed: Wall,
     pub acts: List<Offered>,
     pub parts: List<Part>,
@@ -722,7 +721,7 @@ pub struct ReplyPosition {
 pub struct ConversationLine {
     pub runtime: Runtime,
     pub delegates: u32,
-    pub budget: Budget,
+    pub budget: super::OwnerBudget,
     pub chip: Chip,
     pub project: u32,
     pub first_words: Text,
@@ -746,8 +745,7 @@ pub struct GoalLine {
     pub chip: Chip,
     pub priority: u32,
     pub progress: PhaseCounts,
-    pub budget: Budget,
-    pub deadline: Option<Wall>,
+    pub budget: super::OwnerBudget,
     pub held_below: u32,
 }
 
