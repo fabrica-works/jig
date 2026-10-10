@@ -95,7 +95,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
         Time::ZERO,
         Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(original.clone()))) },
     );
-    assert!(!out.iter().any(|r| side_or_send(r)));
+    assert!(!out.iter().any(side_or_send));
     let id = domain.objects.find(key).unwrap();
     assert_eq!(objects::proposal::owner_facts(domain.objects.get(id).unwrap()), Some(&original));
     let mut changed = original.clone();
@@ -126,7 +126,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
     changed.acts = List::with_capacity(2);
     assert!(domain.objects.put(key, Body::OwnerProposal(Box::new(changed.clone()))));
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-    assert!(!out.iter().any(|r| sent(r)));
+    assert!(!out.iter().any(sent));
     assert_eq!(objects::proposal::owner_facts(domain.objects.get(id).unwrap()), Some(&changed));
     assert_eq!(
         domain.confirmation().unwrap().missing,
@@ -147,7 +147,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
     drive(&mut control, Time::ZERO, Event::Act { act: Act::Intend { object: old_id.token(), act: ActKind::Accept } });
     old.acts.clear();
     assert!(control.objects.put(old_key, Body::Proposal(Box::new(old))));
-    assert!(!drive(&mut control, Time::ZERO, Event::Act { act: Act::Confirm }).iter().any(|r| sent(r)));
+    assert!(!drive(&mut control, Time::ZERO, Event::Act { act: Act::Confirm }).iter().any(sent));
     assert_eq!(control.confirmation().unwrap().missing, domain.confirmation().unwrap().missing);
     assert_eq!(control.objects.get(old_id).unwrap().card, domain.objects.get(id).unwrap().card);
     for admission in
@@ -156,11 +156,12 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
         changed.acts.push(Offered { act: ActKind::Reject, admission }).unwrap();
         assert!(domain.objects.put(key, Body::OwnerProposal(Box::new(changed.clone()))));
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Reject } });
-        assert!(!drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).iter().any(|r| sent(r)));
+        assert!(!drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).iter().any(sent));
         changed.acts.clear();
     }
 }
 
+#[expect(clippy::match_like_matches_macro, reason = "The native test subset excludes the matches macro.")]
 fn sent(request: &Request) -> bool {
     if let Request::Send { .. } = request { true } else { false }
 }
