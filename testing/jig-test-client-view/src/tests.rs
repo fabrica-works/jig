@@ -135,9 +135,7 @@ fn ready() -> Domain {
 }
 fn words() -> jig_client_view::words::Words {
     static WORDS: std::sync::OnceLock<jig_client_view::words::Words> = std::sync::OnceLock::new();
-    WORDS
-        .get_or_init(|| crate::connector_values_words::english(limits().jig.text).unwrap())
-        .clone()
+    WORDS.get_or_init(|| crate::connector_values_words::english(limits().jig.text).unwrap()).clone()
 }
 fn family_words() -> words::Words {
     static WORDS: std::sync::OnceLock<words::Words> = std::sync::OnceLock::new();
