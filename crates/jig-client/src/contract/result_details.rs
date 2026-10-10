@@ -44,7 +44,7 @@ pub struct ResultDetails {
     pub executor: OwnerExecutor,
     pub chosen_by: Option<u64>,
     pub delegates: List<OwnerTaskLink>,
-    /// None means unavailable; Some(empty) records a known empty batch.
+    /// None means unavailable; Some(empty) supplies an empty reference list.
     pub followups: Option<List<OwnerTaskLink>>,
     pub proposal: Option<ProposalKey>,
     /// Aggregate owner list loss; it does not identify a particular list.
