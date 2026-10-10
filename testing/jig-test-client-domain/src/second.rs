@@ -93,10 +93,7 @@ impl Side {
 }
 #[must_use]
 pub fn worst_case(parts: u32, rows: u32, text: u32) -> Option<u64> {
-    List::<Held>::worst_case(parts)?.checked_mul(2)?.checked_add(
-        u64::from(parts).checked_mul(
-            List::<Box<[u8]>>::worst_case(rows)?
-                .checked_add(u64::from(rows).checked_mul(u64::from(text))?)?,
-        )?,
-    )
+    List::<Held>::worst_case(parts)?.checked_mul(2)?.checked_add(u64::from(parts).checked_mul(
+        List::<Box<[u8]>>::worst_case(rows)?.checked_add(u64::from(rows).checked_mul(u64::from(text))?)?,
+    )?)
 }
