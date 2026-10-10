@@ -169,7 +169,14 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
 /// Full frame, behind status, project switching, navigation and its fallback.
 #[must_use]
 pub fn frame_nodes(limits: &Limits) -> Option<u32> {
-    limits.projects.max(limits.rows).checked_add(limits.navigation_entries)?.checked_mul(2)?.checked_add(15)
+    // One membership button, optional local name loss, exact role and whole
+    // retained ledger; separate offers may each carry their goal-list loss.
+    limits
+        .projects
+        .max(limits.rows)
+        .checked_mul(19)?
+        .checked_add(limits.navigation_entries.checked_mul(2)?)?
+        .checked_add(23)
 }
 /// One object or goal dialog, with every delegate and amendment field.
 #[must_use]

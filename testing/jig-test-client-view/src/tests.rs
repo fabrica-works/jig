@@ -105,13 +105,22 @@ fn ready() -> Domain {
         Event::Jig(jig_client::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
-                party: Party { number: 7, kind: PartyKind::Person, name: text(b"Pat") },
+                party: FrameParty {
+                    number: 7,
+                    kind: PartyKind::Person,
+                    login: DocumentText::complete(text(b"fixture-login")),
+                    name: DocumentText::complete(text(b"Pat")),
+                },
                 projects: List::with_capacity(0),
                 needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+                needs_total: 0,
+                results_seen: 0,
+                charters: List::with_capacity(0),
+                cut: false,
                 updates: Count { value: 0, limited: false },
 
                 retention: Duration::from_secs(1000),
-                deployment_role: Some(1),
+                deployment_role: Some(HeldRole::Policy { role: 1 }),
             }))),
         }),
     );

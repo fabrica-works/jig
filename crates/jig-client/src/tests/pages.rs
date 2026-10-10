@@ -14,26 +14,39 @@ use skein_lib::{List, Time};
 fn text(value: &[u8]) -> Text {
     Text::new(Box::from(value), LIMITS.text).unwrap()
 }
-pub(super) fn project(number: u32, chats: bool) -> ProjectRole {
-    let mut charters = List::with_capacity(1);
-    if chats {
-        charters.push(Charter { number: 1, name: text(b"guide") }).unwrap();
-    }
+pub(super) fn project(number: u32, _chats: bool) -> ProjectRole {
     ProjectRole {
         project: number,
-        name: text(b"shop"),
-        roles: List::with_capacity(0),
-        chats: charters,
+        name: Some(DocumentText::complete(text(b"shop"))),
+        role: HeldRole::Policy { role: 1 },
         chat_budget: 10,
-        goals: List::with_capacity(0),
-        pool: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(7) },
+        pool: Some(PoolLedger {
+            source: Funder::Pool { project: number, person: 7, period: 1 },
+            parent: None,
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            closed: false,
+            began: None,
+            next: None,
+        }),
     }
+}
+fn offers(number: u32, chats: bool) -> OfferedCharters {
+    let mut charters = List::with_capacity(1);
+    if chats {
+        charters.push(Charter { number: 1, name: Some(DocumentText::complete(text(b"guide"))) }).unwrap();
+    }
+    OfferedCharters { project: number, chats: charters, goals: List::with_capacity(0), cut: false }
+}
+fn budget() -> Budget {
+    Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(7) }
 }
 fn the_frame_counts_needs_exactly_and_caps_updates_on_every_page() {
     let mut domain = Domain::new(&LIMITS, 1);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     value.needs = Needs { questions: u32::MAX, proposals: 2, escalations: 3, person_tasks: 4 };
+    value.needs_total = u32::MAX;
     value.updates = Count { value: 100, limited: false };
     delivered(&mut domain, Time::ZERO, f, value.clone());
     let summary = domain.frame_summary();
@@ -80,6 +93,9 @@ fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     value.projects = List::with_capacity(2);
     value.projects.push(project(1, false)).unwrap();
     value.projects.push(project(2, true)).unwrap();
+    value.charters = List::with_capacity(2);
+    value.charters.push(offers(1, false)).unwrap();
+    value.charters.push(offers(2, true)).unwrap();
     value.deployment_role = Some(1);
     delivered(&mut domain, Time::ZERO, f, value);
     assert!(domain.navigation().offered(chat, domain.frame().document.as_ref()));
@@ -358,6 +374,8 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
     let mut value = frame(7);
     value.projects = List::with_capacity(1);
     value.projects.push(project(1, true)).unwrap();
+    value.charters = List::with_capacity(1);
+    value.charters.push(offers(1, true)).unwrap();
     let page = open_token(&delivered(&mut about, Time::ZERO, f, value));
     let mut rows = List::with_capacity(1);
     rows.push(entry(8, InboxGroup::Escalations, 10)).unwrap();
@@ -376,6 +394,8 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
     let mut value = frame(7);
     value.projects = List::with_capacity(1);
     value.projects.push(project(1, true)).unwrap();
+    value.charters = List::with_capacity(1);
+    value.charters.push(offers(1, true)).unwrap();
     delivered(&mut domain, Time::ZERO, f, value);
     drive(
         &mut domain,
@@ -702,7 +722,7 @@ fn project_document() -> Project {
             deciders: List::with_capacity(0),
         },
         roles: List::with_capacity(0),
-        spend: project(1, false).pool,
+        spend: budget(),
         pools: List::with_capacity(0),
         resources: List::with_capacity(0),
         services: List::with_capacity(0),
@@ -715,9 +735,12 @@ fn project_open(section: ProjectSection) -> (Domain, Box<[Request]>) {
     let mut domain = Domain::new(&LIMITS, 22);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
-    let mut role = project(1, true);
-    role.goals = List::with_capacity(1);
-    role.goals.push(Charter { number: 1, name: text(b"lead") }).unwrap();
+    let role = project(1, true);
+    let mut offered = offers(1, true);
+    offered.goals = List::with_capacity(1);
+    offered.goals.push(Charter { number: 1, name: Some(DocumentText::complete(text(b"lead"))) }).unwrap();
+    value.charters = List::with_capacity(1);
+    value.charters.push(offered).unwrap();
     value.projects = List::with_capacity(1);
     value.projects.push(role).unwrap();
     let out = delivered(&mut domain, Time::ZERO, f, value);
@@ -742,7 +765,7 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine
         chip,
         priority,
         progress: empty_phase_counts(),
-        budget: project(1, false).pool,
+        budget: budget(),
         deadline: None,
         held_below: 2,
         changed: skein_lib::Wall::from_nanos(changed),
@@ -1149,7 +1172,7 @@ fn project_task_filters_and_spend_pages() {
     let mut rows = List::with_capacity(1);
     rows.push(SpendPeriod {
         period: 1,
-        budget: project(1, false).pool,
+        budget: budget(),
         pools: List::with_capacity(0),
         tasks: List::with_capacity(0),
     })

@@ -181,9 +181,7 @@ impl Truth {
         document_project(self.objects.get(&key)?).or_else(|| self.object_projects.get(&key).copied())
     }
     pub(crate) fn visible(&self, party: u64, project: u32) -> bool {
-        self.frames
-            .get(&party)
-            .is_some_and(|frame| frame.projects.iter().any(|role| role.project == project && !role.roles.is_empty()))
+        self.frames.get(&party).is_some_and(|frame| frame.projects.iter().any(|role| role.project == project))
     }
 }
 

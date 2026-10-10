@@ -6,6 +6,15 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    FrameProjectNumber,
+    FrameLogin,
+    FramePerson,
+    FrameService,
+    FrameResultsSeen,
+    FrameNeedsKinds,
+    FrameProjectsCut,
+    FrameChartersCut,
+    FramePoolUnopened,
     PolicyPeriodSpend,
     PolicyEditRole,
     PolicyRequests,
@@ -1039,6 +1048,15 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::FrameProjectNumber => 610,
+            Self::FrameLogin => 611,
+            Self::FramePerson => 612,
+            Self::FrameService => 613,
+            Self::FrameResultsSeen => 614,
+            Self::FrameNeedsKinds => 615,
+            Self::FrameProjectsCut => 616,
+            Self::FrameChartersCut => 617,
+            Self::FramePoolUnopened => 618,
             Self::PolicyPeriodSpend => 590,
             Self::PolicyEditRole => 591,
             Self::PolicyRequests => 592,
@@ -1629,6 +1647,20 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
+            Self::FrameProjectNumber => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::FrameLogin => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
+            Self::FramePerson => Box::new([]),
+            Self::FrameService => Box::new([]),
+            Self::FrameResultsSeen => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::FrameNeedsKinds => Box::new([
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+                HoleShape { kind: HoleKind::Number, bytes: 0 },
+            ]),
+            Self::FrameProjectsCut => Box::new([]),
+            Self::FrameChartersCut => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
+            Self::FramePoolUnopened => Box::new([]),
             Self::PolicyJudge | Self::PolicyPermission | Self::SpecificationResource => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -2244,7 +2276,16 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 579] = [
+pub const ALL: [JigPhrase; 588] = [
+    JigPhrase::FrameProjectNumber,
+    JigPhrase::FrameLogin,
+    JigPhrase::FramePerson,
+    JigPhrase::FrameService,
+    JigPhrase::FrameResultsSeen,
+    JigPhrase::FrameNeedsKinds,
+    JigPhrase::FrameProjectsCut,
+    JigPhrase::FrameChartersCut,
+    JigPhrase::FramePoolUnopened,
     JigPhrase::PolicyPeriodSpend,
     JigPhrase::PolicyEditRole,
     JigPhrase::PolicyRequests,

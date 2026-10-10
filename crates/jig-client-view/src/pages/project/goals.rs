@@ -56,39 +56,52 @@ pub(super) fn goals(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
 }
 fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
     let state = &client.project_page().form;
+    let mut pool_left = None;
+    let mut bounds = None;
+    let mut offered = false;
     if let Some(frame) = &client.frame().document {
         for role in &frame.projects {
-            if role.project != doc.number {
-                continue;
+            if role.project == doc.number {
+                pool_left = match &role.pool {
+                    Some(ledger) => Some(ledger.left),
+                    None => None,
+                };
             }
-            let mut pool_left = role.pool.left;
-            for pool in &doc.pools {
-                if pool.party == frame.party.number {
-                    pool_left = pool.budget.left;
+        }
+        for pool in &doc.pools {
+            if pool.party == frame.party.number {
+                pool_left = Some(pool.budget.left);
+            }
+        }
+        for offers in &frame.charters {
+            if offers.project == doc.number && !offers.goals.is_empty() {
+                offered = true;
+            }
+        }
+    }
+    for offer in &doc.acts {
+        if offer.act == ActKind::SetGoal {
+            match &offer.admission {
+                Admission::Bounded { within: Bounds::Goal { pool_left: left, .. }, .. } => {
+                    pool_left = Some(*left);
+                    bounds = Some(&offer.admission);
                 }
+                Admission::Allowed
+                | Admission::Proposed { .. }
+                | Admission::Refused(_)
+                | Admission::Bounded { within: Bounds::Amend { .. }, .. } => {}
             }
-            let mut bounds = None;
-            for offer in &doc.acts {
-                if offer.act == ActKind::SetGoal {
-                    bounds = match &offer.admission {
-                        Admission::Bounded { within: Bounds::Goal { pool_left: left, .. }, .. } => {
-                            pool_left = *left;
-                            Some(&offer.admission)
-                        }
-                        Admission::Allowed
-                        | Admission::Proposed { .. }
-                        | Admission::Refused(_)
-                        | Admission::Bounded { within: Bounds::Amend { .. }, .. } => None,
-                    };
-                }
+        }
+    }
+    if bounds.is_some() || offered {
+        match pool_left {
+            Some(left) => {
+                words.text(b, JigPhrase::PoolLeft, &[Hole::Amount(left)]);
+                cards::common::field(b, client, Purpose::NewGoal, JigPhrase::GoalWords, words, bindings);
+                choices(b, client, doc, words, bindings, left, bounds);
+                inputs(b, client, doc, words, bindings, left);
             }
-            if bounds.is_none() && role.goals.is_empty() {
-                continue;
-            }
-            words.text(b, JigPhrase::PoolLeft, &[Hole::Amount(pool_left)]);
-            cards::common::field(b, client, Purpose::NewGoal, JigPhrase::GoalWords, words, bindings);
-            choices(b, client, doc, words, bindings, pool_left, bounds);
-            inputs(b, client, doc, words, bindings, pool_left);
+            None => words.text(b, JigPhrase::FramePoolUnopened, &[]),
         }
     }
     if let Some(submission) = &state.pending {
@@ -142,7 +155,7 @@ fn choices(
             | Admission::Bounded { within: Bounds::Amend { .. }, .. },
         ) => {
             if let Some(frame) = &client.frame().document {
-                for role in &frame.projects {
+                for role in &frame.charters {
                     if role.project == doc.number {
                         for charter in &role.goals {
                             choice(
@@ -197,11 +210,11 @@ fn choice(
     match executor {
         GoalExecutor::Charter(number) => {
             if let Some(frame) = &client.frame().document {
-                for role in &frame.projects {
+                for role in &frame.charters {
                     if role.project == project {
                         for charter in &role.goals {
                             if charter.number == number {
-                                b.text(crate::Run::Plain, charter.name.bytes());
+                                crate::frame_facts::charter_name(b, words, charter);
                                 return;
                             }
                         }

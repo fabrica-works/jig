@@ -59,7 +59,7 @@ impl Words {
             Refusal::KeyConflict => self.text(b, JigPhrase::KeyConflict, &[]),
         }
     }
-    fn held_role(&self, b: &mut Builder, held: Option<HeldRole>) {
+    pub(crate) fn held_role(&self, b: &mut Builder, held: Option<HeldRole>) {
         match held {
             None => self.text(b, JigPhrase::NoHeldRole, &[]),
             Some(HeldRole::Owner) => self.text(b, JigPhrase::HeldOwner, &[]),

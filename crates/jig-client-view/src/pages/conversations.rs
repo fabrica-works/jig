@@ -76,19 +76,34 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
     if let Some(refusal) = &state.refusal {
         words.refusal(b, refusal);
     }
+    forms(b, client, words, bindings);
+    super::excess(b, client, words);
+}
+fn forms(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     let mut field_built = false;
     if let Some(frame) = &client.frame().document {
-        for project in &frame.projects {
-            if !project.chats.is_empty() {
+        for offers in &frame.charters {
+            let mut membership = None;
+            for project in &frame.projects {
+                if project.project == offers.project {
+                    membership = Some(project);
+                    break;
+                }
+            }
+            let Some(project) = membership else {
+                continue;
+            };
+            if !offers.chats.is_empty() {
                 if !field_built {
                     cards::common::field(b, client, Purpose::NewChat, JigPhrase::NewChat, words, bindings);
                     field_built = true;
                 }
                 b.open(Role::Region);
-                b.name(&words.say(JigPhrase::Project, &[crate::words::name(project.name.bytes())]));
-                for charter in &project.chats {
+                b.name(&crate::frame_facts::project_label(words, project));
+                crate::frame_facts::project_loss(b, words, project);
+                for charter in &offers.chats {
                     words.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(charter.number))]);
-                    b.text(Run::Plain, charter.name.bytes());
+                    crate::frame_facts::charter_name(b, words, charter);
                 }
                 words.text(b, JigPhrase::Budget, &[Hole::Amount(project.chat_budget)]);
                 crate::frame::control(
@@ -104,7 +119,6 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
             }
         }
     }
-    super::excess(b, client, words);
 }
 pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {
     match runtime {

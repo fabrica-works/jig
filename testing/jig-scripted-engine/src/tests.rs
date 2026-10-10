@@ -4,6 +4,7 @@ use crate::Decision as ApplicationDecision;
 use jig_client::contract::Decision;
 use jig_client::contract::*;
 use skein_lib::List;
+mod frame_facts;
 mod policy;
 mod recurring;
 fn text(bytes: &[u8]) -> Text {
@@ -24,21 +25,41 @@ fn budget() -> Budget {
 }
 fn frame(number: u64) -> Frame {
     Frame {
-        party: party(number),
+        party: FrameParty {
+            number,
+            kind: PartyKind::Person,
+            login: DocumentText::complete(text(b"fixture-login")),
+            name: DocumentText::complete(text(b"party")),
+        },
         projects: list(vec![ProjectRole {
             project: 1,
-            name: text(b"project"),
-            roles: list(vec![1]),
-            chats: list(vec![Charter { number: 1, name: text(b"chat") }]),
-            goals: list(vec![]),
-            pool: budget(),
+            name: Some(DocumentText::complete(text(b"project"))),
+            role: HeldRole::Policy { role: 1 },
+            pool: Some(PoolLedger {
+                source: Funder::Pool { project: 1, person: number, period: 1 },
+                parent: None,
+                numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
+                left: 100,
+                closed: false,
+                began: None,
+                next: None,
+            }),
             chat_budget: 100,
         }]),
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+        needs_total: 0,
+        results_seen: 0,
+        charters: list(vec![OfferedCharters {
+            project: 1,
+            chats: list(vec![Charter { number: 1, name: Some(DocumentText::complete(text(b"chat"))) }]),
+            goals: list(vec![]),
+            cut: false,
+        }]),
+        cut: false,
         updates: Count { value: 0, limited: false },
 
         retention: Duration::from_secs(1),
-        deployment_role: Some(1),
+        deployment_role: Some(HeldRole::Policy { role: 1 }),
     }
 }
 fn authority() -> Authority {

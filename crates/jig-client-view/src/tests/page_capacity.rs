@@ -53,14 +53,29 @@ fn entered(address: Address) -> (Domain, Vec<Request>) {
     let (mut d, watch) = start();
     let mut frame = document();
     let mut project = frame.projects.get(0).unwrap().clone();
-    project.name = full();
-    project.roles = list([1, 2]);
-    project.chats = list([Charter { number: 1, name: full() }, Charter { number: 2, name: full() }]);
-    project.goals = project.chats.clone();
+    project.name = Some(DocumentText::complete(full()));
+    project.role = HeldRole::Policy { role: 1 };
+    let offers = OfferedCharters {
+        project: project.project,
+        chats: list([
+            Charter { number: 1, name: Some(DocumentText::complete(full())) },
+            Charter { number: 2, name: Some(DocumentText::complete(full())) },
+        ]),
+        goals: list([
+            Charter { number: 1, name: Some(DocumentText::complete(full())) },
+            Charter { number: 2, name: Some(DocumentText::complete(full())) },
+        ]),
+        cut: true,
+    };
+    let mut other_offers = offers.clone();
+    other_offers.project = 5;
+    frame.charters = list([offers, other_offers]);
     let mut second = project.clone();
     second.project = 5;
+    second.role = HeldRole::Policy { role: 2 };
     frame.projects = list([project, second]);
-    frame.party.name = full();
+    frame.party.name = DocumentText::complete(full());
+    frame.party.login = DocumentText::complete(full());
     deliver(&mut d, watch, Delivery::Frame(Box::new(frame)));
     let out = drive(&mut d, Event::Went { place: Place::Jig(address) });
     (d, out)
@@ -203,7 +218,10 @@ fn project_pages(words: &Words) {
         ]);
         doc.policy.requirements = parts();
         doc.policy.deciders = list([Decider { kind: 1, role: 1 }, Decider { kind: 2, role: 2 }]);
-        doc.roles = list([Holding { party: 1, role: 1 }, Holding { party: 2, role: 2 }]);
+        doc.roles = list([
+            Holding { party: 1, role: HeldRole::Policy { role: 1 } },
+            Holding { party: 2, role: HeldRole::Policy { role: 2 } },
+        ]);
         doc.services = list([
             Party { number: 1, kind: PartyKind::Service, name: full() },
             Party { number: 2, kind: PartyKind::Service, name: full() },

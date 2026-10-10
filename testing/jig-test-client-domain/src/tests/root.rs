@@ -9,7 +9,10 @@
 use crate::{Address, Answered, Ask, Domain, Event, JigOut, Limits, Request, first, new, step, take};
 use jig_client::{
     boundary::Offset,
-    contract::{self, Answer, Delivery, Frame, Needs, Outcome, Party, PartyKind, VersionRange, WatchEnd, WatchEvent},
+    contract::{
+        self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, Outcome, PartyKind, VersionRange,
+        WatchEnd, WatchEvent,
+    },
     limits::Backoff,
     link::Link,
 };
@@ -106,17 +109,22 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
     drive(root, Event::Jig(jig_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
     let frame = Frame {
-        party: Party {
+        party: FrameParty {
             number: party,
             kind: PartyKind::Person,
-            name: contract::Text::new(Box::from(*b"Pat"), 32).unwrap(),
+            login: DocumentText::complete(contract::Text::new(Box::from(*b"fixture-login"), 32).unwrap()),
+            name: DocumentText::complete(contract::Text::new(Box::from(*b"Pat"), 32).unwrap()),
         },
         projects: List::with_capacity(0),
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+        needs_total: 0,
+        results_seen: 0,
+        charters: List::with_capacity(0),
+        cut: false,
         updates: contract::Count { value: 0, limited: false },
 
         retention: Duration::from_secs(1000),
-        deployment_role: Some(1),
+        deployment_role: Some(HeldRole::Policy { role: 1 }),
     };
     drive(
         root,

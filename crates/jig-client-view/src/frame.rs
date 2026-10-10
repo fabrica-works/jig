@@ -5,7 +5,7 @@
 use crate::{
     Builder, JigBindings, JigMeaning, Role, Run, SlotRef, State,
     phrases::{Hole, jig::JigPhrase},
-    words::{Words, name},
+    words::Words,
 };
 use jig_client::{Domain, action::Act, address::Address, pages::navigation::Destination};
 
@@ -20,7 +20,8 @@ pub fn frame(b: &mut Builder, client: &Domain, nav: SlotRef, words: &Words, bind
     }
     match &client.frame().document {
         Some(frame) => {
-            words.status(b, JigPhrase::SignedIn, &[name(frame.party.name.bytes())]);
+            crate::frame_facts::identity(b, words, &frame.party);
+            crate::frame_facts::counts(b, words, frame);
             let phrase = if summary.updates.limited { JigPhrase::MoreUpdates } else { JigPhrase::Updates };
             control(
                 b,
@@ -37,25 +38,11 @@ pub fn frame(b: &mut Builder, client: &Domain, nav: SlotRef, words: &Words, bind
                 bindings,
                 Role::Link,
                 JigPhrase::Needs,
-                &[Hole::Number(summary.needs)],
+                &[Hole::Number(u64::from(summary.needs_total))],
                 Act::Go { address: Address::Inbox { project: None } },
             );
             for project in &frame.projects {
-                let selected = summary.project == Some(project.project);
-                let label = words.say(JigPhrase::Project, &[name(project.name.bytes())]);
-                b.open(Role::Button);
-                b.name(&label);
-                b.text(Run::Plain, &label);
-                if selected {
-                    b.state(State::Current);
-                }
-                b.bind(bindings.insert(JigMeaning::Action(Act::Go {
-                    address: Address::Project {
-                        project: project.project,
-                        section: jig_client::address::ProjectSection::Overview,
-                    },
-                })));
-                b.close();
+                membership(b, project, summary.project, words, bindings);
             }
         }
         None => words.status(b, JigPhrase::SignedOut, &[]),
@@ -124,4 +111,27 @@ pub fn control(
     }
     b.bind(binding);
     b.close();
+}
+
+fn membership(
+    b: &mut Builder,
+    project: &jig_client::contract::ProjectRole,
+    selected_project: Option<u32>,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let selected = selected_project == Some(project.project);
+    let label = crate::frame_facts::project_label(words, project);
+    b.open(Role::Button);
+    b.name(&label);
+    b.text(Run::Plain, &label);
+    if selected {
+        b.state(State::Current);
+    }
+    b.bind(bindings.insert(JigMeaning::Action(Act::Go {
+        address: Address::Project { project: project.project, section: jig_client::address::ProjectSection::Overview },
+    })));
+    b.close();
+    crate::frame_facts::project_loss(b, words, project);
+    crate::frame_facts::membership(b, words, project);
 }

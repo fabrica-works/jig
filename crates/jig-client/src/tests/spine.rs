@@ -2,7 +2,10 @@ use crate::{Domain, Event, Limits, Request, fire, max_out, step};
 use crate::{
     address::{Address, Place},
     boundary::Offset,
-    contract::{Count, Delivery, Frame, Inbox, Needs, Party, PartyKind, VersionRange, WatchEnd, WatchEvent},
+    contract::{
+        Count, Delivery, DocumentText, Frame, FrameParty, HeldRole, Inbox, Needs, PartyKind, VersionRange, WatchEnd,
+        WatchEvent,
+    },
     limits::Backoff,
     link::Link,
     pages::Page,
@@ -93,17 +96,22 @@ fn needs() -> Needs {
 }
 pub(super) fn frame(party: u64) -> Frame {
     Frame {
-        party: Party {
+        party: FrameParty {
             number: party,
             kind: PartyKind::Person,
-            name: crate::contract::Text::new(Box::from(*b"Pat"), 32).unwrap(),
+            login: DocumentText::complete(crate::contract::Text::new(Box::from(*b"fixture-login"), 32).unwrap()),
+            name: DocumentText::complete(crate::contract::Text::new(Box::from(*b"Pat"), 32).unwrap()),
         },
         projects: List::with_capacity(0),
         needs: needs(),
+        needs_total: 0,
+        results_seen: 0,
+        charters: List::with_capacity(0),
+        cut: false,
         updates: Count { value: 0, limited: false },
 
         retention: Duration::from_secs(1000),
-        deployment_role: Some(1),
+        deployment_role: Some(HeldRole::Policy { role: 1 }),
     }
 }
 pub(super) fn start(domain: &mut Domain, kept: List<Record>) -> Token {

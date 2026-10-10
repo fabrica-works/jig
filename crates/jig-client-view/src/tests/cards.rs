@@ -118,22 +118,47 @@ pub(super) fn document() -> Frame {
     projects
         .push(ProjectRole {
             project: 4,
-            name: text(b"One"),
-            roles: List::with_capacity(0),
-            chats: List::with_capacity(0),
-            goals: List::with_capacity(0),
-            pool: Budget { total: 0, own: 0, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
+            name: Some(DocumentText::complete(text(b"One"))),
+            role: HeldRole::Policy { role: 1 },
+            pool: Some(PoolLedger {
+                source: Funder::Pool { project: 4, person: 1, period: 1 },
+                parent: None,
+                numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
+                left: 0,
+                closed: false,
+                began: None,
+                next: None,
+            }),
             chat_budget: 0,
         })
         .unwrap();
     Frame {
-        party: Party { number: 1, kind: PartyKind::Person, name: text(b"Pat") },
+        party: FrameParty {
+            number: 1,
+            kind: PartyKind::Person,
+            login: DocumentText::complete(text(b"fixture-login")),
+            name: DocumentText::complete(text(b"Pat")),
+        },
         projects,
         needs: Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: 4 },
+        needs_total: 10,
+        results_seen: 0,
+        charters: {
+            let mut rows = List::with_capacity(2);
+            rows.push(OfferedCharters {
+                project: 4,
+                chats: List::with_capacity(0),
+                goals: List::with_capacity(0),
+                cut: false,
+            })
+            .unwrap();
+            rows
+        },
+        cut: false,
         updates: Count { value: 120, limited: false },
 
         retention: Duration::from_secs(1000),
-        deployment_role: Some(1),
+        deployment_role: Some(HeldRole::Policy { role: 1 }),
     }
 }
 pub(super) fn start() -> (Domain, Token) {

@@ -250,8 +250,14 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
 fn conversations_form(words: &crate::words::Words) {
     let (mut d, f) = start();
     let mut frame = document();
-    frame.projects.get_mut(0).unwrap().chats = List::with_capacity(1);
-    frame.projects.get_mut(0).unwrap().chats.push(Charter { number: 2, name: text(b"guide") }).unwrap();
+    frame.charters.get_mut(0).unwrap().chats = List::with_capacity(1);
+    frame
+        .charters
+        .get_mut(0)
+        .unwrap()
+        .chats
+        .push(Charter { number: 2, name: Some(DocumentText::complete(text(b"guide"))) })
+        .unwrap();
     frame.projects.get_mut(0).unwrap().chat_budget = 20;
     deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
     drive(&mut d, Event::Went { place: Place::Jig(Address::Conversations { project: Some(4) }) });

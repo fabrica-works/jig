@@ -91,7 +91,7 @@ fn person(contract: PersonContract) -> PersonTask {
         contract,
         inputs: list([result()]),
         addressed: Recipient::Party(1),
-        taken: Some(TakenBy { number: document().party.number, name: Some(document().party.name) }),
+        taken: Some(TakenBy { number: document().party.number, name: Some(document().party.name.bytes) }),
         since: Some(Wall::EPOCH),
         stall: Some(Duration::from_secs(240)),
         deadline: None,
@@ -513,7 +513,7 @@ fn all_chip_phases(words: &crate::words::Words) {
         (
             ChipPhase::Person {
                 addressed: Recipient::Role { project: 4, role: 2 },
-                taken: Some(TakenBy { number: document().party.number, name: Some(document().party.name) }),
+                taken: Some(TakenBy { number: document().party.number, name: Some(document().party.name.bytes) }),
                 since: Some(Wall::EPOCH),
             },
             b"Taken by Pat",
@@ -941,7 +941,8 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
     use jig_client::address::{Address, Place, ProjectSection};
     let (mut d, frame) = start();
     let mut doc = document();
-    doc.projects.get_mut(0).unwrap().goals = list([Charter { number: 1, name: text(b"lead") }]);
+    doc.charters.get_mut(0).unwrap().goals =
+        list([Charter { number: 1, name: Some(DocumentText::complete(text(b"lead"))) }]);
     drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(doc))) });
     let out = drive(
         &mut d,

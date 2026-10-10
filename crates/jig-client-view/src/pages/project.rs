@@ -169,7 +169,7 @@ fn settings(
         ProjectSection::Roles => {
             for holding in &doc.roles {
                 words.text(b, JigPhrase::PartyNumber, &[Hole::Number(holding.party)]);
-                words.text(b, JigPhrase::RoleNumber, &[Hole::Number(u64::from(holding.role))]);
+                words.held_role(b, Some(holding.role));
             }
             for service in &doc.services {
                 b.text(Run::Plain, service.name.bytes());

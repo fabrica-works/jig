@@ -14,21 +14,41 @@ pub fn text(bytes: &[u8]) -> Text {
 #[must_use]
 pub fn frame(party: u64) -> Frame {
     Frame {
-        party: Party { number: party, kind: PartyKind::Person, name: text(b"Pat") },
+        party: FrameParty {
+            number: party,
+            kind: PartyKind::Person,
+            login: DocumentText::complete(text(b"fixture-login")),
+            name: DocumentText::complete(text(b"Pat")),
+        },
         projects: list([ProjectRole {
             project: 1,
-            name: text(b"First"),
-            roles: list([1]),
-            chats: list([Charter { number: 1, name: text(b"Chat") }]),
-            goals: list([Charter { number: 1, name: text(b"Goal") }]),
-            pool: Budget { total: 100, own: 0, ended: 0, reserved: 0, left: 100, funder: Actor::Party(party) },
+            name: Some(DocumentText::complete(text(b"First"))),
+            role: HeldRole::Policy { role: 1 },
+            pool: Some(PoolLedger {
+                source: Funder::Pool { project: 1, person: party, period: 1 },
+                parent: None,
+                numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
+                left: 100,
+                closed: false,
+                began: None,
+                next: None,
+            }),
             chat_budget: 10,
         }]),
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+        needs_total: 0,
+        results_seen: 0,
+        cut: false,
+        charters: list([OfferedCharters {
+            project: 1,
+            chats: list([Charter { number: 1, name: Some(DocumentText::complete(text(b"Chat"))) }]),
+            goals: list([Charter { number: 1, name: Some(DocumentText::complete(text(b"Goal"))) }]),
+            cut: false,
+        }]),
         updates: Count { value: 0, limited: false },
 
         retention: Duration::from_secs(1000),
-        deployment_role: Some(1),
+        deployment_role: Some(HeldRole::Policy { role: 1 }),
     }
 }
 /// Starts the standard fixture at the requested seed.
@@ -282,7 +302,10 @@ pub fn project() -> Project {
             requirements: list([part.clone(), part.clone()]),
             deciders: list([Decider { kind: 1, role: 1 }, Decider { kind: 2, role: 2 }]),
         },
-        roles: list([Holding { party: 7, role: 1 }, Holding { party: 7, role: 2 }]),
+        roles: list([
+            Holding { party: 7, role: HeldRole::Policy { role: 1 } },
+            Holding { party: 7, role: HeldRole::Policy { role: 2 } },
+        ]),
         spend: task.budget,
         pools: list([
             Pool { party: 7, period: 3, budget: task.budget },
@@ -620,7 +643,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
 pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     let mut world = world(seed);
     let mut procedure_frame = frame(7);
-    procedure_frame.projects.get_mut(0).expect("project exists").goals = list([]);
+    procedure_frame.charters.get_mut(0).expect("charter offers exist").goals = list([]);
     world
         .front()
         .engine

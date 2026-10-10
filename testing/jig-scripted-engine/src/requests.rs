@@ -291,7 +291,7 @@ impl<A: crate::Application> Engine<A> {
         }
         if let Ask::StartChat { project, .. } = ask
             && !self.truth.frames.get(&party).is_some_and(|frame| {
-                frame.projects.iter().any(|role| role.project == *project && !role.chats.is_empty())
+                frame.charters.iter().any(|offer| offer.project == *project && !offer.chats.is_empty())
             })
         {
             return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
@@ -404,11 +404,15 @@ pub(crate) fn recipient(truth: &crate::Truth, party: u64, to: &Recipient) -> boo
     match to {
         Recipient::Party(number) => *number == party,
         Recipient::Role { project, role } => truth.frames.get(&party).is_some_and(|frame| {
-            frame.projects.iter().any(|p| p.project == *project && p.roles.iter().any(|r| u32::from(*r) == *role))
+            frame
+                .projects
+                .iter()
+                .any(|p| p.project == *project && p.role == jig_client::contract::HeldRole::Policy { role: *role })
         }),
         Recipient::Roles { project, roles } => truth.frames.get(&party).is_some_and(|frame| {
             frame.projects.iter().any(|p| {
-                p.project == *project && roles.iter().any(|role| p.roles.iter().any(|r| u32::from(*r) == *role))
+                p.project == *project
+                    && roles.iter().any(|role| p.role == jig_client::contract::HeldRole::Policy { role: *role })
             })
         }),
         Recipient::Task(task) => truth.objects.get(&ObjectKey::Task(*task)).is_some_and(|value| {

@@ -13,6 +13,34 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::FrameProjectNumber => {
+                Box::new([Segment::Text(copy_of(b"Project ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
+            }
+            JigPhrase::FrameLogin => {
+                Box::new([Segment::Text(copy_of(b"Login: ")), Segment::Hole { index: 0, kind: HoleKind::Name }])
+            }
+            JigPhrase::FramePerson => Box::new([Segment::Text(copy_of(b"Person"))]),
+            JigPhrase::FrameService => Box::new([Segment::Text(copy_of(b"Service"))]),
+            JigPhrase::FrameResultsSeen => Box::new([
+                Segment::Text(copy_of(b"Results read through ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::FrameNeedsKinds => Box::new([
+                Segment::Text(copy_of(b"Questions: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b"; proposals: ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+                Segment::Text(copy_of(b"; escalations: ")),
+                Segment::Hole { index: 2, kind: HoleKind::Number },
+                Segment::Text(copy_of(b"; person tasks: ")),
+                Segment::Hole { index: 3, kind: HoleKind::Number },
+            ]),
+            JigPhrase::FrameProjectsCut => Box::new([Segment::Text(copy_of(b"More project memberships than shown"))]),
+            JigPhrase::FrameChartersCut => Box::new([
+                Segment::Text(copy_of(b"More goal charters in project ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::FramePoolUnopened => Box::new([Segment::Text(copy_of(b"Pool ledger not supplied"))]),
             JigPhrase::PolicyPeriodSpend => Box::new([
                 Segment::Text(copy_of(b"Period spend: ")),
                 Segment::Hole { index: 0, kind: HoleKind::Amount },

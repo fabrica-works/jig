@@ -322,8 +322,9 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
         })
         .unwrap();
     let mut f = document();
-    f.party.name = full_name();
-    f.projects.get_mut(0).unwrap().name = full_name();
+    f.party.name = DocumentText::complete(full_name());
+    f.party.login = DocumentText::complete(full_name());
+    f.projects.get_mut(0).unwrap().name = Some(DocumentText::complete(full_name()));
     let mut second = f.projects.get(0).unwrap().clone();
     second.project = 5;
     f.projects.push(second).unwrap();

@@ -72,6 +72,8 @@ fn name_fits(name: Option<&crate::contract::DocumentText>, text: u32) -> bool {
 pub struct Summary {
     pub party: Option<u64>,
     pub needs: u64,
+    /// Independently supplied owner total, alongside the sum of supplied kinds.
+    pub needs_total: u32,
     pub updates: crate::contract::Count,
     pub project: Option<u32>,
     pub link: Link,
@@ -84,6 +86,7 @@ impl FrameState {
         let mut summary = Summary {
             party: None,
             needs: 0,
+            needs_total: 0,
             updates: crate::contract::Count { value: 0, limited: false },
             project: None,
             link,
@@ -91,7 +94,14 @@ impl FrameState {
         };
         if let Some(frame) = &self.document {
             summary.party = Some(frame.party.number);
-            summary.needs = u64::from(frame.needs_total);
+            summary.needs_total = frame.needs_total;
+            summary.needs = u64::from(frame.needs.questions)
+                .checked_add(u64::from(frame.needs.proposals))
+                .expect("two u32 counts fit u64")
+                .checked_add(u64::from(frame.needs.escalations))
+                .expect("three u32 counts fit u64")
+                .checked_add(u64::from(frame.needs.person_tasks))
+                .expect("four u32 counts fit u64");
             summary.updates = crate::contract::Count {
                 value: frame.updates.value.min(limit),
                 limited: frame.updates.limited || frame.updates.value > limit,

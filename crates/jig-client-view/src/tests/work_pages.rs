@@ -38,8 +38,9 @@ pub(super) fn chip(task: u64) -> Chip {
 pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     let (mut d, f) = start();
     let mut frame = document();
-    frame.projects.get_mut(0).unwrap().goals = list([Charter { number: 2, name: text(b"Guide") }]);
-    frame.projects.get_mut(0).unwrap().pool.left = 20;
+    frame.charters.get_mut(0).unwrap().goals =
+        list([Charter { number: 2, name: Some(DocumentText::complete(text(b"Guide"))) }]);
+    frame.projects.get_mut(0).unwrap().pool.as_mut().unwrap().left = 20;
     let initial = deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
     for request in &initial {
         if let Request::Read { read, what: Read::Inbox { .. } } = request {
@@ -225,7 +226,7 @@ pub(super) fn project_doc() -> Project {
             requirements: list([part()]),
             deciders: list([Decider { kind: 2, role: 1 }]),
         },
-        roles: list([Holding { party: 1, role: 1 }]),
+        roles: list([Holding { party: 1, role: HeldRole::Policy { role: 1 } }]),
         spend: doc.budget,
         pools: list([Pool { party: 1, period: 3, budget: doc.budget }]),
         resources: list([part()]),
@@ -592,7 +593,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     let words = words();
     let (mut d, f) = start();
     let mut frame = document();
-    frame.projects.get_mut(0).unwrap().goals = List::with_capacity(0);
+    frame.charters.get_mut(0).unwrap().goals = List::with_capacity(0);
     deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
     let out = drive(
         &mut d,
