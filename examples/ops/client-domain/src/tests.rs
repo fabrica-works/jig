@@ -1110,12 +1110,11 @@ fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_conne
                 if accepted {
                     assert!(out.is_empty());
                 } else {
-                    assert!(matches!(
-                        out.pop(),
-                        Some(crate::observability::Request::Out(crate::observability::Out::Fact {
-                            fact: crate::observability::Fact::Full
-                        }))
-                    ));
+                    let Some(crate::observability::Request::Out(crate::observability::Out::Fact { fact })) = out.pop()
+                    else {
+                        panic!("rejected resource emits its Full fact");
+                    };
+                    assert_eq!(fact, crate::observability::Fact::Full);
                     assert!(out.is_empty());
                 }
             } else {
@@ -1135,12 +1134,10 @@ fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_conne
                 if accepted {
                     assert!(out.is_empty());
                 } else {
-                    assert!(matches!(
-                        out.pop(),
-                        Some(infrastructure::Request::Out(infrastructure::Out::Fact {
-                            fact: infrastructure::Fact::Full
-                        }))
-                    ));
+                    let Some(infrastructure::Request::Out(infrastructure::Out::Fact { fact })) = out.pop() else {
+                        panic!("rejected resource emits its Full fact");
+                    };
+                    assert_eq!(fact, infrastructure::Fact::Full);
                     assert!(out.is_empty());
                 }
             }
