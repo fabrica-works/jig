@@ -3,7 +3,7 @@
 //! undurable snapshots and provisional text, retaining durable answers by key.
 use crate::{Application, Engine, Envelope, Up};
 use jig_client::contract::{ReadNone, ReadResult, VersionRange, WatchEnd, WatchEvent};
-use skein_lib::{Duration, Time, Token, Wall};
+use skein_lib::{Duration, Time, Token};
 
 /// Transport and engine faults chosen by a scenario or seeded world.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

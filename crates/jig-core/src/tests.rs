@@ -400,7 +400,7 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
     assert_eq!(frame.needs, 0);
     assert_eq!(frame.updates, Count::Known(0));
     let mut upgraded = limits;
-    upgraded.documents.versions = Versions { minimum: u16::MAX, maximum: u16::MAX };
+    upgraded.documents.versions = Versions { minimum: u32::MAX, maximum: u32::MAX };
     assert_eq!(
         make(&core, &upgraded, 1, &Subject::Frame { party: 1 }, &window()).unwrap(),
         Document::Frame(frame),
