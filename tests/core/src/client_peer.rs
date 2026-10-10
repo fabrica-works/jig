@@ -3,6 +3,8 @@
 //! their release. Workers and systems remain the world's independent fakes.
 use jig_core as core;
 use jig_test_domain as root;
+use skein_lib::{ReplyTo, Token};
+use std::collections::BTreeSet;
 
 /// Untranslated outputs for a client-backed peer. The protocol adapter owns
 /// sign-ins, request attempts and watch tokens, and takes these owned values.
@@ -10,9 +12,66 @@ use jig_test_domain as root;
 pub struct ClientPeer {
     pub delivered: Vec<(u64, root::Delivery)>,
     pub now: Vec<core::Now>,
+    replies: Option<BTreeSet<Token>>,
 }
 
 impl ClientPeer {
+    /// Capture held people replies only at explicitly registered destinations.
+    #[must_use]
+    pub fn routed() -> Self {
+        Self { replies: Some(BTreeSet::new()), ..Self::default() }
+    }
+
+    /// Retain a destination actually issued by the client's protocol adapter.
+    /// Taking or capturing replies never retires this registration.
+    pub fn register_reply(&mut self, token: Token) {
+        if let Some(replies) = &mut self.replies {
+            replies.insert(token);
+        }
+    }
+
+    /// Explicitly retire a protocol destination, after its waiters have ended.
+    #[must_use]
+    pub fn unregister_reply(&mut self, token: Token) -> bool {
+        self.replies.as_mut().is_some_and(|replies| replies.remove(&token))
+    }
+
+    /// Reset explicit reply ownership without changing the capture mode.
+    pub fn clear_replies(&mut self) {
+        if let Some(replies) = &mut self.replies {
+            replies.clear();
+        }
+    }
+
+    /// Consume a client delivery or return its complete unowned envelope.
+    /// The caller has already observed its durable release exactly once.
+    ///
+    /// # Errors
+    /// Returns the same delivery when its external consumer is another peer.
+    pub fn capture(&mut self, commit: u64, delivery: root::Delivery) -> Result<(), root::Delivery> {
+        let delivery = if let Some(replies) = &self.replies {
+            if let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery {
+                let token = to.into_token();
+                let delivery =
+                    root::Delivery::Core(core::Held::PeopleReply { to: ReplyTo::new(token), sign_in, reply });
+                if !replies.contains(&token) {
+                    return Err(delivery);
+                }
+                delivery
+            } else {
+                delivery
+            }
+        } else {
+            delivery
+        };
+        if Self::accepts(&delivery) {
+            self.delivered.push((commit, delivery));
+            Ok(())
+        } else {
+            Err(delivery)
+        }
+    }
+
     /// Whether this held output crosses the boundary to a party's client.
     #[must_use]
     pub fn accepts(delivery: &root::Delivery) -> bool {

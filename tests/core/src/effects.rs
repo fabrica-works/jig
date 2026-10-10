@@ -544,11 +544,11 @@ impl World {
         if let Some(watches) = &mut self.watches {
             watches.released(&delivery, self.store.applied);
         }
-        if let Some(peer) = &mut self.client_peer
-            && crate::client_peer::ClientPeer::accepts(&delivery)
-        {
-            peer.delivered.push((self.store.applied, delivery));
-            return;
+        if let Some(peer) = &mut self.client_peer {
+            match peer.capture(self.store.applied, delivery) {
+                Ok(()) => return,
+                Err(unowned) => delivery = unowned,
+            }
         }
         if let Some(peers) = &mut self.peers {
             peers.delivered(&delivery);
