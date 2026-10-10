@@ -28,6 +28,7 @@ fn chip() -> Chip {
             reason: HoldReason::Budget { spent: 10, limit: 10 },
             since: Wall::EPOCH,
             revision: Revision { value: 4 },
+            was: None,
         }),
     }
 }
@@ -497,12 +498,16 @@ fn all_chip_phases(words: &crate::words::Words) {
             },
             b"Taken by Pat",
         ),
-        (ChipPhase::Closing(Closing { delegates: 2, connectors: list([1]) }), b"Closing: 2 delegates"),
+        (
+            ChipPhase::Closing(Closing { delegates: 2, connectors: Some(list([1])), stage: None, ending: None }),
+            b"Closing: 2 delegates",
+        ),
         (
             ChipPhase::Held {
                 reason: HoldReason::Stopped { by: document().party, at: Wall::EPOCH },
                 since: Wall::EPOCH,
                 revision: Revision { value: 7 },
+                was: None,
             },
             b"Held: stopped by Pat",
         ),
@@ -521,7 +526,7 @@ fn all_chip_phases(words: &crate::words::Words) {
             ChipPhase::Starting => Phase::Due,
             ChipPhase::Running { .. } | ChipPhase::WaitingForWords { .. } => Phase::Running,
             ChipPhase::BackingOff { .. } => Phase::BackingOff,
-            ChipPhase::Procedure { .. } | ChipPhase::Person { .. } => Phase::Active,
+            ChipPhase::Active(_) | ChipPhase::Procedure { .. } | ChipPhase::Person { .. } => Phase::Active,
             ChipPhase::Closing(_) => Phase::Closing,
             ChipPhase::Held { .. } => Phase::Held,
             ChipPhase::Ended { how, .. } => match how {
@@ -655,8 +660,12 @@ fn impact() -> Impact {
 }
 fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
     let mut task = chip();
-    task.details =
-        Box::new(ChipPhase::Held { reason: reason.clone(), since: Wall::EPOCH, revision: Revision { value: 4 } });
+    task.details = Box::new(ChipPhase::Held {
+        reason: reason.clone(),
+        since: Wall::EPOCH,
+        revision: Revision { value: 4 },
+        was: None,
+    });
     Escalation {
         task,
         hold: Hold {
@@ -738,7 +747,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         closing: None,
         spend: list([]),
         result: None,
-        runtime: Runtime::Held,
+        runtime: Runtime::Held { was: None },
         impact: impact(),
         delegates: list([LiveDelegate { chip: chip(), takeover_budget: 13 }]),
         writer_slots: list([]),
@@ -1198,7 +1207,12 @@ fn closing_connectors_use_their_owners_words(words: &crate::words::Words) {
     let mut b = Builder::new(&limits());
     let mut bindings = JigBindings::new(16, CLIENT.text);
     b.open(Role::Page);
-    cards::common::closing(&mut b, &Closing { delegates: 2, connectors: list([7, 11]) }, words, &mut bindings);
+    cards::common::closing(
+        &mut b,
+        &Closing { delegates: 2, connectors: Some(list([7, 11])), stage: Some(ClosingStage::Effects), ending: None },
+        words,
+        &mut bindings,
+    );
     b.close();
     let slots = b.slots(0);
     assert_eq!(slots.len(), 2);

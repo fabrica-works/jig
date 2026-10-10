@@ -183,6 +183,7 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
             reason: HoldReason::Budget { spent: 100, limit: 100 },
             since: Wall::EPOCH,
             revision: Revision { value: 2 },
+            was: None,
         }),
     };
     nested_chip_payload_bounds(&chip);
@@ -919,7 +920,12 @@ fn closing_connector_payload_bounds() {
     let mut setup = live_script();
     let mut row = task();
     row.chip.phase = Phase::Closing;
-    row.chip.details = Box::new(ChipPhase::Closing(Closing { delegates: 1, connectors: List::with_capacity(33) }));
+    row.chip.details = Box::new(ChipPhase::Closing(Closing {
+        delegates: 1,
+        connectors: Some(List::with_capacity(33)),
+        stage: None,
+        ending: None,
+    }));
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
     assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload));
 }
@@ -1477,4 +1483,45 @@ fn document_text_loss_is_preserved_and_priced_with_whole_document_parameter_capa
     bounds.document_bytes = size;
     bounds.rows = 3;
     assert!(!crate::payload::fits(&value, &bounds));
+}
+
+#[test]
+fn activation_observations_and_prior_closing_are_admitted_whole_with_their_allocated_bounds() {
+    let mut setup = script();
+    let mut row = task();
+    let mut active = ActiveRun {
+        stage: RunStage::Running { attempt: u64::MAX },
+        phase_since: Wall::EPOCH,
+        attempt: Some(u64::MAX),
+        placement: Some(Wall::EPOCH),
+        retry: Some(RetryNotice::Refused { count: u32::MAX }),
+        observation: Some(RunObservation {
+            channel: Token::new(u64::MAX),
+            work: RunWork::Tool { call: text(b"call"), tool: text(b"tool") },
+            since: Wall::EPOCH,
+            reported_at: Wall::EPOCH,
+            started: None,
+        }),
+    };
+    *row.chip.details = ChipPhase::Active(active.clone());
+    row.runtime = Runtime::Active(active.clone());
+    setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
+    assert!(Engine::new(setup.clone(), 1).is_ok());
+    active.observation.as_mut().unwrap().work = RunWork::Tool {
+        call: Text::new(vec![b'x'; setup.bounds.text as usize + 1].into_boxed_slice(), setup.bounds.text + 1).unwrap(),
+        tool: text(b"tool"),
+    };
+    row.runtime = Runtime::Active(active);
+    setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
+    assert_eq!(Engine::new(setup.clone(), 1).err(), Some(Invalid::Payload));
+    row.runtime = Runtime::Held {
+        was: Some(HeldRuntime::Closing(Closing {
+            delegates: 0,
+            connectors: Some(List::with_capacity(setup.bounds.rows + 1)),
+            stage: Some(ClosingStage::Run { attempt: u64::MAX }),
+            ending: None,
+        })),
+    };
+    setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+    assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload));
 }

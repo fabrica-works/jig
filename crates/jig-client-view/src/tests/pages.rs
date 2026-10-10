@@ -313,16 +313,18 @@ fn conversation_states(words: &crate::words::Words) {
         (
             Runtime::Closing(Closing {
                 delegates: 1,
-                connectors: {
+                stage: None,
+                ending: None,
+                connectors: Some({
                     let mut rows = List::with_capacity(2);
                     rows.push(1).unwrap();
                     rows.push(2).unwrap();
                     rows
-                },
+                }),
             }),
             b"Closing: 1 delegates".as_slice(),
         ),
-        (Runtime::Held, b"Held".as_slice()),
+        (Runtime::Held { was: None }, b"Held".as_slice()),
         (Runtime::Ended, b"Ended".as_slice()),
     ];
     for (runtime, expected) in cases {

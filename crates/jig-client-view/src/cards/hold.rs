@@ -12,7 +12,7 @@ pub fn reason(b: &mut Builder, reason: &HoldReason, words: &Words, bindings: &mu
         HoldReason::Tries { failures } => {
             words.text(b, JigPhrase::TriesExhausted, &[]);
             for failure in failures {
-                words.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(failure.attempt))]);
+                words.text(b, JigPhrase::Attempt, &[Hole::Number(failure.attempt)]);
                 super::chip::failure(b, failure.class, words);
                 words.text(b, JigPhrase::Reason, &[name(failure.reason.bytes())]);
                 words.wall(b, failure.at);

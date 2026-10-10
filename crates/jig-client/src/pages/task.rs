@@ -235,8 +235,10 @@ pub fn parts(task: &Task, section: TaskSection, limit: u32) -> List<Part> {
             }
         }
         TaskSection::Panels => {
-            if let Some(closing) = &task.closing {
-                for connector in &closing.connectors {
+            if let Some(closing) = &task.closing
+                && let Some(connectors) = &closing.connectors
+            {
+                for connector in connectors {
                     push(&mut parts, Part::Panel { connector: *connector, task: task.chip.task });
                 }
             }

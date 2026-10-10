@@ -494,8 +494,9 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
         spend: list([]),
     });
     held.chip.phase = Phase::Held;
-    held.chip.details = Box::new(ChipPhase::Held { reason, since: Wall::EPOCH, revision: Revision { value: 4 } });
-    held.runtime = Runtime::Held;
+    held.chip.details =
+        Box::new(ChipPhase::Held { reason, since: Wall::EPOCH, revision: Revision { value: 4 }, was: None });
+    held.runtime = Runtime::Held { was: None };
     held.acts = list([Offered { act: ActKind::Release, admission: Admission::Allowed }]);
     world
         .front()

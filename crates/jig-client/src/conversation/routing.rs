@@ -43,15 +43,21 @@ pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request
         Executor::Procedure { .. } | Executor::Party { .. } | Executor::Role { .. } => return,
     }
     domain.conversation.run_finished = match &task.runtime {
+        Runtime::Active(value) => active_finished(value),
         Runtime::Running { .. } | Runtime::WaitingForWords { .. } => false,
+        Runtime::Closing(value) => closing_finished(value),
+        Runtime::Held { was } => match was {
+            Some(crate::contract::HeldRuntime::Waiting) => true,
+            Some(crate::contract::HeldRuntime::Active(value)) => active_finished(value),
+            Some(crate::contract::HeldRuntime::Closing(value)) => closing_finished(value),
+            None => false,
+        },
         Runtime::Waiting { .. }
         | Runtime::Idle
         | Runtime::Starting
         | Runtime::BackingOff { .. }
         | Runtime::Procedure { .. }
         | Runtime::Person { .. }
-        | Runtime::Closing(_)
-        | Runtime::Held
         | Runtime::Ended => true,
     };
     let what = domain.conversation.moved(task.activity);
@@ -95,6 +101,27 @@ fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Re
     }
     let parts = domain.conversation.parts(env.limits.parts);
     crate::pages::routing::parts(domain, env, parts.as_slice(), out);
+}
+fn active_finished(value: &crate::contract::ActiveRun) -> bool {
+    match value.stage {
+        crate::contract::RunStage::Claimed { .. } | crate::contract::RunStage::Running { .. } => false,
+        crate::contract::RunStage::Idle
+        | crate::contract::RunStage::Due
+        | crate::contract::RunStage::Preparing
+        | crate::contract::RunStage::BackingOff { .. } => true,
+    }
+}
+// Absence of the joined closing stage is not evidence that the live run ended.
+fn closing_finished(value: &crate::contract::Closing) -> bool {
+    match value.stage {
+        None | Some(crate::contract::ClosingStage::Run { .. }) => false,
+        Some(
+            crate::contract::ClosingStage::Delegates
+            | crate::contract::ClosingStage::Effects
+            | crate::contract::ClosingStage::Releases
+            | crate::contract::ClosingStage::Settled,
+        ) => true,
+    }
 }
 fn finish(domain: &mut Domain) {
     if domain.conversation.run_finished && domain.conversation.loaded >= domain.conversation.committed {

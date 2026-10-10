@@ -17,7 +17,7 @@ pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words
         }
         Activity::Turn { name, turn } => super::turn::turn(b, client, *name, turn, words, bindings),
         Activity::RunBegan { attempt, how, why } => {
-            words.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(*attempt))]);
+            words.text(b, JigPhrase::Attempt, &[Hole::Number(*attempt)]);
             match how {
                 RunBeginning::Resumed => words.text(b, JigPhrase::RunResumed, &[]),
                 RunBeginning::Fresh { tail } => {
@@ -27,7 +27,7 @@ pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words
             b.text(Run::Plain, why.bytes());
         }
         Activity::RunEnded { attempt, how, spent } => {
-            words.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(*attempt))]);
+            words.text(b, JigPhrase::Attempt, &[Hole::Number(*attempt)]);
             match how {
                 RunEnding::Parked => words.text(b, JigPhrase::Parked, &[]),
                 RunEnding::Finished => words.text(b, JigPhrase::RunFinished, &[]),

@@ -27,7 +27,10 @@ fn read(out: &[Request]) -> Token {
         .unwrap()
 }
 fn ready() -> (Domain, Token, Token, Token) {
-    let (mut d, out) = entered(Address::Task { task: 8, section: TaskSection::Activity });
+    ready_task(8)
+}
+fn ready_task(task: u64) -> (Domain, Token, Token, Token) {
+    let (mut d, out) = entered(Address::Task { task, section: TaskSection::Activity });
     let watch = out
         .iter()
         .find_map(|r| match r {
@@ -36,6 +39,7 @@ fn ready() -> (Domain, Token, Token, Token) {
         })
         .unwrap();
     let mut doc = super::cards_objects::task_doc(&[ActKind::Write]);
+    doc.chip.task = task;
     doc.chip.executor = Executor::Agent { charter: 2 };
     doc.chip.phase = Phase::Running;
     *doc.chip.details = ChipPhase::Running { attempt: 2, since: Wall::EPOCH, tool: None };
@@ -311,4 +315,138 @@ fn conversation_keeps_word_states_activity_call_folds_and_provisional_turn_ident
     replacement(&words);
     words_states(&words);
     activities(&words);
+}
+
+#[test]
+fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope() {
+    let words = words();
+    let (mut d, _, run, read) = ready_task(u64::MAX);
+    for attempt in [u64::MAX - 1, u64::MAX] {
+        deliver(
+            &mut d,
+            run,
+            Delivery::Run(Box::new(RunText {
+                attempt,
+                began: Wall::EPOCH,
+                turn: TurnName { attempt, number: u32::MAX },
+                from: 0,
+                through: 4,
+                text: text(b"live"),
+                cut: false,
+                call: None,
+            })),
+        );
+    }
+    let before = build(&d, 3, &words).0;
+    let prior = keys(&before);
+    assert_eq!(prior.len(), 2);
+    assert_ne!(prior[0], prior[1]);
+    let scope =
+        before.nodes().iter().position(|n| n.key.is_some_and(|key| key.kind == 28 && key.a == u64::MAX)).unwrap();
+    assert_eq!(before.nodes()[scope].role, Role::Item);
+    assert_eq!(before.nodes()[scope + 1].role, Role::Log);
+    assert!(before.nodes()[scope + 1].key.is_none());
+    drive(
+        &mut d,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                rows: list([
+                    ActivityLine {
+                        position: 2,
+                        at: Wall::EPOCH,
+                        event: Activity::Turn { name: TurnName { attempt: u64::MAX, number: u32::MAX }, turn: turn() },
+                    },
+                    ActivityLine {
+                        position: 1,
+                        at: Wall::EPOCH,
+                        event: Activity::Turn {
+                            name: TurnName { attempt: u64::MAX - 1, number: u32::MAX },
+                            turn: turn(),
+                        },
+                    },
+                ]),
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(keys(&build(&d, 3, &words).0), prior);
+    assert!(d.conversation().live.is_empty());
+    let (other, _, _, _) = ready_task(u64::MAX - 1);
+    let other = build(&other, 3, &words).0;
+    let log = |tree: &Tree| tree.nodes().iter().find_map(|n| n.key.filter(|key| key.kind == 28));
+    assert_ne!(log(&before), log(&other));
+}
+#[test]
+fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
+    let (mut d, task_watch, run, read) = ready();
+    drive(
+        &mut d,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                rows: list([ActivityLine {
+                    position: 2,
+                    at: Wall::EPOCH,
+                    event: Activity::RunBegan {
+                        attempt: u64::MAX,
+                        how: RunBeginning::Fresh { tail: 0 },
+                        why: text(b"actual activation"),
+                    },
+                }]),
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    deliver(
+        &mut d,
+        run,
+        Delivery::Run(Box::new(RunText {
+            attempt: u64::MAX,
+            began: Wall::EPOCH,
+            turn: TurnName { attempt: u64::MAX, number: 1 },
+            from: 0,
+            through: 4,
+            text: text(b"live"),
+            cut: false,
+            call: None,
+        })),
+    );
+    let active = ActiveRun {
+        stage: RunStage::Running { attempt: u64::MAX },
+        phase_since: Wall::EPOCH,
+        attempt: Some(u64::MAX),
+        placement: None,
+        retry: None,
+        observation: None,
+    };
+    for runtime in [
+        Runtime::Active(active.clone()),
+        Runtime::Held { was: None },
+        Runtime::Held { was: Some(HeldRuntime::Active(active)) },
+        Runtime::Closing(Closing { delegates: 0, connectors: None, stage: None, ending: None }),
+        Runtime::Closing(Closing {
+            delegates: 0,
+            connectors: Some(list([])),
+            stage: Some(ClosingStage::Run { attempt: u64::MAX }),
+            ending: None,
+        }),
+    ] {
+        let mut doc = super::cards_objects::task_doc(&[]);
+        doc.chip.executor = Executor::Agent { charter: 2 };
+        doc.runtime = runtime;
+        doc.activity = 2;
+        deliver(&mut d, task_watch, Delivery::Task(Box::new(doc)));
+        assert!(!d.conversation().run_finished);
+        assert_eq!(d.conversation().live.len(), 1);
+    }
+    let mut doc = super::cards_objects::task_doc(&[]);
+    doc.chip.executor = Executor::Agent { charter: 2 };
+    doc.runtime = Runtime::Ended;
+    doc.activity = 2;
+    deliver(&mut d, task_watch, Delivery::Task(Box::new(doc)));
+    assert!(d.conversation().run_finished);
+    assert!(d.conversation().live.is_empty());
 }

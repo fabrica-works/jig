@@ -14,6 +14,9 @@ mod turn;
 /// Show an agent task's activity in its page's already opened section.
 pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     let state = client.conversation();
+    b.open(Role::List);
+    b.open(Role::Item);
+    b.key(Key { owner: Owner::Jig, kind: 28, a: state.task, b: 0 });
     b.open(Role::Log);
     b.name(&words.say(JigPhrase::ConversationLog, &[]));
     if state.reading.is_some() {
@@ -31,7 +34,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
             .expect("reverse line exists");
         let line = state.lines.rows.get(index).expect("retained line exists");
         let key = match &line.event {
-            Activity::Turn { name, .. } => turn_key(state.task, *name),
+            Activity::Turn { name, .. } => turn_key(*name),
             Activity::Words { message, .. } => word_key(state, *message),
             Activity::RunBegan { .. }
             | Activity::RunEnded { .. }
@@ -51,7 +54,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     pending(b, state, words);
     for live in &state.live {
         b.open(Role::Item);
-        b.key(turn_key(state.task, live.name));
+        b.key(turn_key(live.name));
         b.open(Role::Region);
         b.name(&words.say(JigPhrase::Provisional, &[]));
         words.status(b, JigPhrase::Provisional, &[]);
@@ -66,6 +69,8 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         b.close();
         b.close();
     }
+    b.close();
+    b.close();
     b.close();
     edges(b, state, words, bindings);
 }
@@ -129,18 +134,12 @@ fn word_key(state: &Conversation, message: u64) -> Key {
     }
     Key { owner: Owner::Jig, kind: 25, a: state.task, b: message }
 }
-fn turn_key(task: u64, name: TurnName) -> Key {
-    Key {
-        owner: Owner::Jig,
-        kind: 24,
-        a: task,
-        b: u64::from(name.attempt)
-            .checked_mul(4_294_967_296)
-            .expect("u32 attempt fits")
-            .checked_add(u64::from(name.number))
-            .expect("u32 turn fits"),
-    }
+// Keys are matched only below matched parents (view.md, 6). The log's enclosing item
+// task key supplies the first identity; these two words keep full attempt/turn.
+fn turn_key(name: TurnName) -> Key {
+    Key { owner: Owner::Jig, kind: 24, a: name.attempt, b: u64::from(name.number) }
 }
+
 fn party(b: &mut Builder, by: &Party, words: &Words) {
     words.actor(b, jig_client::contract::Actor::Party(by.number));
     b.text(Run::Plain, by.name.bytes());

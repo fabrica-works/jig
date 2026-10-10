@@ -142,7 +142,7 @@ fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
             Act::Go { address: Address::task(slot.task) },
         );
         if let Some(attempt) = slot.attempt {
-            words.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(attempt))]);
+            words.text(b, JigPhrase::Attempt, &[Hole::Number(attempt)]);
         }
     }
     slots(b, doc, TaskSection::Overview, words, bindings);
@@ -183,7 +183,7 @@ fn budget(b: &mut Builder, doc: &Task, words: &Words, bindings: &mut JigBindings
             Some(attempt) => words.text(
                 b,
                 JigPhrase::SpentRun,
-                &[Hole::Number(spend.task), Hole::Number(u64::from(attempt)), Hole::Amount(spend.spent)],
+                &[Hole::Number(spend.task), Hole::Number(attempt), Hole::Amount(spend.spent)],
             ),
             None => words.text(b, JigPhrase::SpentDelegate, &[Hole::Number(spend.task), Hole::Amount(spend.spent)]),
         }

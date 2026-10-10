@@ -234,6 +234,7 @@ fn before(object: &Object) -> Option<Amendment> {
             addressed: match &*doc.chip.details {
                 jig_client::contract::ChipPhase::Person { addressed, .. } => Some(addressed.clone()),
                 jig_client::contract::ChipPhase::Waiting { .. }
+                | jig_client::contract::ChipPhase::Active(_)
                 | jig_client::contract::ChipPhase::Idle { .. }
                 | jig_client::contract::ChipPhase::Starting
                 | jig_client::contract::ChipPhase::Running { .. }

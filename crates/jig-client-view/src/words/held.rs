@@ -48,7 +48,7 @@ impl Words {
             HoldReason::Tries { failures } => {
                 self.text(b, JigPhrase::TriesExhausted, &[]);
                 for failure in failures {
-                    self.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(failure.attempt))]);
+                    self.text(b, JigPhrase::Attempt, &[Hole::Number(failure.attempt)]);
                     crate::cards::chip::failure(b, failure.class, self);
                     self.text(b, JigPhrase::Reason, &[name(failure.reason.bytes())]);
                     self.wall(b, failure.at);

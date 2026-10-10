@@ -3,23 +3,23 @@
 use crate::Bounds;
 use core::mem::size_of;
 use jig_client::contract::{
-    Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, AdmissionLimit, Amendment, Answer, Ask,
-    AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing,
-    ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider, Decision, Delivery,
-    Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending, Escalation, Executor,
+    Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, Admission, AdmissionLimit, Amendment,
+    Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing,
+    ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider, Decision,
+    Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending, Escalation, Executor,
     FailureClass, FieldRule, Frame, GoalExecutor, GoalLine, GoalPage, GoalProcedure, Goals, Grant, HeldRole,
-    HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox,
-    InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs, Note, NotePage,
-    NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter, ParameterDocument, Part, PartScope,
-    Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority,
-    Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult,
-    ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField, ResultValue,
-    Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, Specification,
-    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskFilter, TaskLine,
-    TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd,
-    WatchEvent, WriterSlot,
+    HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host,
+    Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs, Note,
+    NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter, ParameterDocument, Part,
+    PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool,
+    Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone,
+    ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
+    ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunText,
+    RunWork, Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering,
+    Subject, TakenBy, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName,
+    Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
-use skein_lib::{Duration, List, Wall};
+use skein_lib::{Duration, List, Token, Wall};
 
 pub(crate) trait Payload {
     fn heap(&self, bounds: &Bounds) -> Option<u64>;
@@ -34,7 +34,7 @@ pub(crate) fn fits<T: Payload>(value: &T, bounds: &Bounds) -> bool {
 macro_rules! plain {
     ($($t:ty),*) => { $(impl Payload for $t { fn heap(&self, _bounds: &Bounds) -> Option<u64> { Some(0) } })* };
 }
-plain!(bool, u16, u32, u64, Duration, Wall);
+plain!(bool, u16, u32, u64, Duration, Wall, Token, RunStage, RetryNotice, ClosingStage);
 impl Payload for Text {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         if self.fits(bounds.text) { u64::try_from(self.bytes().len()).ok() } else { None }
@@ -352,9 +352,29 @@ fields!(ProjectRole { project, name, roles, chats, goals, pool, chat_budget });
 fields!(Charter { number, name });
 fields!(Budget { total, own, ended, reserved, left, funder });
 fields!(Chip { task, title, executor, phase, details });
+fields!(ActiveRun { stage, phase_since, attempt, placement, retry, observation });
+fields!(RunObservation { channel, work, since, reported_at, started });
+impl Payload for RunWork {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Tool { call, tool } => sum(&[call.heap(bounds), tool.heap(bounds)]),
+            Self::Preparing | Self::Starting | Self::Active | Self::Writing | Self::Waiting | Self::Ending => Some(0),
+        }
+    }
+}
+impl Payload for HeldRuntime {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Waiting => Some(0),
+            Self::Active(value) => value.heap(bounds),
+            Self::Closing(value) => value.heap(bounds),
+        }
+    }
+}
 impl Payload for ChipPhase {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Active(value) => value.heap(bounds),
             Self::Waiting { dependencies, hold } => sum(&[dependencies.heap(bounds), hold.heap(bounds)]),
             Self::Idle { wake } => wake.heap(bounds),
             Self::Starting => Some(0),
@@ -374,8 +394,8 @@ impl Payload for ChipPhase {
                 sum(&[addressed.heap(bounds), taken.heap(bounds), since.heap(bounds)])
             }
             Self::Closing(value) => value.heap(bounds),
-            Self::Held { reason, since, revision } => {
-                sum(&[reason.heap(bounds), since.heap(bounds), revision.heap(bounds)])
+            Self::Held { reason, since, revision, was } => {
+                sum(&[reason.heap(bounds), since.heap(bounds), revision.heap(bounds), was.heap(bounds)])
             }
             Self::Ended { how, at } => sum(&[how.heap(bounds), at.heap(bounds)]),
         }
@@ -418,7 +438,7 @@ fields!(Task {
     delegates,
     writer_slots
 });
-fields!(Closing { delegates, connectors });
+fields!(Closing { delegates, connectors, stage, ending });
 fields!(SpendLine { task, attempt, spent });
 impl Payload for ActKind {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
@@ -698,8 +718,10 @@ impl Payload for RunEnding {
 impl Payload for Runtime {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Active(value) => value.heap(bounds),
             Self::Waiting { dependencies, hold } => sum(&[dependencies.heap(bounds), hold.heap(bounds)]),
-            Self::Idle | Self::Starting | Self::Held | Self::Ended => Some(0),
+            Self::Idle | Self::Starting | Self::Ended => Some(0),
+            Self::Held { was } => was.heap(bounds),
             Self::Running { attempt, since, tool } => {
                 sum(&[attempt.heap(bounds), since.heap(bounds), tool.heap(bounds)])
             }

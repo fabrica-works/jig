@@ -57,7 +57,7 @@ pub enum Delivery {
 /// Provisional text named by turn, with explicit offset and truncation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RunText {
-    pub attempt: u32,
+    pub attempt: u64,
     pub began: Wall,
     pub turn: TurnName,
     pub from: u32,

@@ -78,7 +78,7 @@ pub(super) fn task() -> Task {
         closing: None,
         spend: List::with_capacity(0),
         result: None,
-        runtime: Runtime::Held,
+        runtime: Runtime::Held { was: None },
         impact: Impact {
             tasks: counts(),
             live_runs: 0,

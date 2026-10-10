@@ -25,7 +25,7 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
         b.text(Run::Plain, row.first_words.bytes());
         runtime(b, client, &row.runtime, words, bindings);
         match row.runtime {
-            Runtime::Held => {
+            Runtime::Held { .. } => {
                 if let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Task(row.chip.task)) {
                     cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
                 }
@@ -33,7 +33,8 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
             Runtime::Ended => {
                 cards::chip::chip(b, client, &row.chip, words, bindings);
             }
-            Runtime::Waiting { .. }
+            Runtime::Active(_)
+            | Runtime::Waiting { .. }
             | Runtime::Idle
             | Runtime::Starting
             | Runtime::Running { .. }
@@ -107,6 +108,7 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
 }
 pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {
     match runtime {
+        Runtime::Active(value) => crate::runtime::active(b, value, words),
         Runtime::Waiting { dependencies, hold } => {
             words.text(b, JigPhrase::Waiting, &[]);
             for task in dependencies {
@@ -139,11 +141,7 @@ pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words
             words.text(
                 b,
                 JigPhrase::RetryAt,
-                &[
-                    Hole::Wall(words.adjusted_wall(*at)),
-                    Hole::Number(u64::from(*attempt)),
-                    Hole::Number(u64::from(*tries)),
-                ],
+                &[Hole::Wall(words.adjusted_wall(*at)), Hole::Number(*attempt), Hole::Number(u64::from(*tries))],
             );
             cards::chip::failure(b, *class, words);
             b.text(Run::Plain, reason.bytes());
@@ -151,7 +149,12 @@ pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words
         Runtime::Procedure { panel } => cards::common::part(b, panel, words, bindings),
         Runtime::Person { addressed, .. } => cards::common::recipient(b, addressed, words),
         Runtime::Closing(closing) => cards::common::closing(b, closing, words, bindings),
-        Runtime::Held => words.text(b, JigPhrase::Held, &[]),
+        Runtime::Held { was } => {
+            words.text(b, JigPhrase::Held, &[]);
+            if let Some(was) = was {
+                crate::runtime::prior(b, was, words, bindings);
+            }
+        }
         Runtime::Ended => words.text(b, JigPhrase::Ended, &[]),
     }
 }

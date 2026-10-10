@@ -77,16 +77,17 @@ pub struct Chip {
 /// See client/domain/objects.md, 3, and contract.md, 5.1.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ChipPhase {
+    Active(super::ActiveRun),
     Waiting { dependencies: List<u64>, hold: Option<Part> },
     Idle { wake: WakePolicy },
     Starting,
-    Running { attempt: u32, since: Wall, tool: Option<Text> },
-    WaitingForWords { attempt: u32, since: Wall },
-    BackingOff { at: Wall, attempt: u32, tries: u32, class: FailureClass, reason: Text },
+    Running { attempt: u64, since: Wall, tool: Option<Text> },
+    WaitingForWords { attempt: u64, since: Wall },
+    BackingOff { at: Wall, attempt: u64, tries: u32, class: FailureClass, reason: Text },
     Procedure { panel: Part },
     Person { addressed: Recipient, taken: Option<TakenBy>, since: Option<Wall> },
     Closing(Closing),
-    Held { reason: HoldReason, since: Wall, revision: Revision },
+    Held { reason: HoldReason, since: Wall, revision: Revision, was: Option<super::HeldRuntime> },
     Ended { how: Ending, at: Wall },
 }
 
@@ -136,14 +137,18 @@ pub struct Task {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Closing {
     pub delegates: u32,
-    pub connectors: List<u16>,
+    /// None for an unjoined owner row; Some(empty) means known no connector waits.
+    pub connectors: Option<List<u16>>,
+    pub stage: Option<super::ClosingStage>,
+    /// Actual pending outcome, not an ending reconstructed from settlement facts.
+    pub ending: Option<Ending>,
 }
 
 /// Spend attributed to a run or delegate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SpendLine {
     pub task: u64,
-    pub attempt: Option<u32>,
+    pub attempt: Option<u64>,
     pub spent: u64,
 }
 
@@ -322,7 +327,7 @@ pub enum HoldReason {
 /// One failed attempt and its failure class.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AttemptFailure {
-    pub attempt: u32,
+    pub attempt: u64,
     pub class: FailureClass,
     pub reason: Text,
     pub at: Wall,
@@ -808,9 +813,9 @@ pub enum Activity {
     /// Words as the party wrote them.
     Words { by: Party, message: u64, words: Text },
     /// A run began.
-    RunBegan { attempt: u32, how: RunBeginning, why: Text },
+    RunBegan { attempt: u64, how: RunBeginning, why: Text },
     /// A run ended.
-    RunEnded { attempt: u32, how: RunEnding, spent: u64 },
+    RunEnded { attempt: u64, how: RunEnding, spent: u64 },
     /// A committed decoded turn.
     Turn { name: TurnName, turn: Turn },
     /// A result heard.
@@ -846,6 +851,8 @@ pub enum RunEnding {
 /// Facts about a task phase that a chip alone does not carry.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Runtime {
+    /// Exact owner activation, including absent observation or actual start.
+    Active(super::ActiveRun),
     /// Waiting on dependencies or a named resource hold.
     Waiting { dependencies: List<u64>, hold: Option<Part> },
     /// Idle and waiting on its wake policy.
@@ -853,19 +860,19 @@ pub enum Runtime {
     /// A run is due, preparing or claimed.
     Starting,
     /// A run is writing or calling a tool.
-    Running { attempt: u32, since: Wall, tool: Option<Text> },
+    Running { attempt: u64, since: Wall, tool: Option<Text> },
     /// A live run keeps its slot while waiting for the person.
-    WaitingForWords { attempt: u32, since: Wall },
+    WaitingForWords { attempt: u64, since: Wall },
     /// A failed attempt waits until its retry time.
-    BackingOff { at: Wall, attempt: u32, tries: u32, class: FailureClass, reason: Text },
+    BackingOff { at: Wall, attempt: u64, tries: u32, class: FailureClass, reason: Text },
     /// A connector procedure is active, shown in its panel.
     Procedure { panel: Part },
     /// A person task is waiting for its named recipient.
     Person { addressed: Recipient, since: Option<Wall> },
     /// Closing while its children and effects settle.
     Closing(Closing),
-    /// Held, with its cause in the task hold.
-    Held,
+    /// Held, with separately retained prior lifecycle when supplied.
+    Held { was: Option<super::HeldRuntime> },
     /// Ended, with its outcome in the task result.
     Ended,
 }
@@ -886,7 +893,7 @@ pub struct Impact {
 pub struct WriterSlot {
     pub resource: Part,
     pub task: u64,
-    pub attempt: Option<u32>,
+    pub attempt: Option<u64>,
 }
 
 /// A live chat delegate and the funding a takeover would reserve.

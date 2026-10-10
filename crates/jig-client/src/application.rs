@@ -263,19 +263,28 @@ fn chip_parts(parts: &mut Parts, chip: &contract::Chip) {
             }
         }
         contract::ChipPhase::Procedure { panel } => push(parts, panel.clone()),
-        contract::ChipPhase::Held { reason, .. } => hold_parts(parts, reason),
-        contract::ChipPhase::Closing(closing) => {
-            for connector in &closing.connectors {
-                push(parts, Part::Connector { connector: *connector });
+        contract::ChipPhase::Held { reason, was, .. } => {
+            hold_parts(parts, reason);
+            if let Some(contract::HeldRuntime::Closing(closing)) = was {
+                closing_parts(parts, closing);
             }
         }
-        contract::ChipPhase::Idle { .. }
+        contract::ChipPhase::Closing(closing) => closing_parts(parts, closing),
+        contract::ChipPhase::Active(_)
+        | contract::ChipPhase::Idle { .. }
         | contract::ChipPhase::Starting
         | contract::ChipPhase::Running { .. }
         | contract::ChipPhase::WaitingForWords { .. }
         | contract::ChipPhase::BackingOff { .. }
         | contract::ChipPhase::Person { .. }
         | contract::ChipPhase::Ended { .. } => {}
+    }
+}
+fn closing_parts(parts: &mut Parts, closing: &contract::Closing) {
+    if let Some(connectors) = &closing.connectors {
+        for connector in connectors {
+            push(parts, Part::Connector { connector: *connector });
+        }
     }
 }
 fn hold_parts(parts: &mut Parts, reason: &contract::HoldReason) {

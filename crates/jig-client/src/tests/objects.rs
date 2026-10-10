@@ -39,11 +39,17 @@ pub(super) fn phase_details(phase: Phase) -> ChipPhase {
             reason: text(b"temporary"),
         },
         Phase::Active => ChipPhase::Person { addressed: Recipient::Party(7), taken: None, since: Some(Wall::EPOCH) },
-        Phase::Closing => ChipPhase::Closing(Closing { delegates: 0, connectors: List::with_capacity(0) }),
+        Phase::Closing => ChipPhase::Closing(Closing {
+            delegates: 0,
+            connectors: Some(List::with_capacity(0)),
+            stage: None,
+            ending: None,
+        }),
         Phase::Held => ChipPhase::Held {
             reason: HoldReason::Stopped { by: frame(7).party, at: Wall::EPOCH },
             since: Wall::EPOCH,
             revision: Revision { value: 3 },
+            was: None,
         },
         Phase::Done => ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH },
         Phase::Failed => ChipPhase::Ended { how: Ending::Failed { reason: Some(text(b"failure")) }, at: Wall::EPOCH },

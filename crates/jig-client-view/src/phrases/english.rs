@@ -13,6 +13,79 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::RunIdle => Box::new([Segment::Text(copy_of(b"Activation idle"))]),
+            JigPhrase::RunDue => Box::new([Segment::Text(copy_of(b"Activation due"))]),
+            JigPhrase::RunPreparing => Box::new([Segment::Text(copy_of(b"Preparing an activation"))]),
+            JigPhrase::RunClaimed => Box::new([
+                Segment::Text(copy_of(b"Claimed attempt ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::RunOwnerActive => Box::new([
+                Segment::Text(copy_of(b"Active attempt ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::RunBackingOff => Box::new([
+                Segment::Text(copy_of(b"Activation paused until ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::RunPhaseSince => {
+                Box::new([Segment::Text(copy_of(b"Phase since ")), Segment::Hole { index: 0, kind: HoleKind::Wall }])
+            }
+            JigPhrase::RunPlacement => Box::new([
+                Segment::Text(copy_of(b"Placement recorded at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::RunUnobserved => Box::new([Segment::Text(copy_of(b"Run observation not supplied"))]),
+            JigPhrase::RunObservedSince => Box::new([
+                Segment::Text(copy_of(b"Observed work since ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::RunReportedAt => Box::new([
+                Segment::Text(copy_of(b"Observation received at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::RunActualStart => Box::new([
+                Segment::Text(copy_of(b"Start observed at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::RunStartUnknown => Box::new([Segment::Text(copy_of(b"Start observation not supplied"))]),
+            JigPhrase::WorkPreparing => Box::new([Segment::Text(copy_of(b"Observed work: preparing"))]),
+            JigPhrase::WorkStarting => Box::new([Segment::Text(copy_of(b"Observed work: starting"))]),
+            JigPhrase::WorkActive => Box::new([Segment::Text(copy_of(b"Observed work: active"))]),
+            JigPhrase::WorkWriting => Box::new([Segment::Text(copy_of(b"Observed work: writing"))]),
+            JigPhrase::WorkTool => Box::new([
+                Segment::Text(copy_of(b"Observed tool ")),
+                Segment::Hole { index: 0, kind: HoleKind::Name },
+                Segment::Text(copy_of(b", call ")),
+                Segment::Hole { index: 1, kind: HoleKind::Name },
+            ]),
+            JigPhrase::WorkWaiting => Box::new([Segment::Text(copy_of(b"Observed work: waiting"))]),
+            JigPhrase::WorkEnding => Box::new([Segment::Text(copy_of(b"Observed work: ending"))]),
+            JigPhrase::RunRetryFailed => Box::new([
+                Segment::Text(copy_of(b"Failure count ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+                Segment::Text(copy_of(b" of allowance ")),
+                Segment::Hole { index: 1, kind: HoleKind::Number },
+            ]),
+            JigPhrase::RunRetryRefused => Box::new([
+                Segment::Text(copy_of(b"Activation refusal count ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::ClosingRun => Box::new([
+                Segment::Text(copy_of(b"Waiting for attempt ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::ClosingDelegates => Box::new([Segment::Text(copy_of(b"Waiting for delegates"))]),
+            JigPhrase::ClosingStageEffects => Box::new([Segment::Text(copy_of(b"Waiting for effects to settle"))]),
+            JigPhrase::ClosingReleases => Box::new([Segment::Text(copy_of(b"Waiting for resource releases"))]),
+            JigPhrase::ClosingSettled => Box::new([Segment::Text(copy_of(b"Closing obligations settled"))]),
+            JigPhrase::ClosingStageUnknown => Box::new([Segment::Text(copy_of(b"Closing stage not supplied"))]),
+            JigPhrase::ClosingConnectorsUnknown => Box::new([Segment::Text(copy_of(b"Connector waits not supplied"))]),
+            JigPhrase::ClosingConnectorsEmpty => Box::new([Segment::Text(copy_of(b"No connector waits"))]),
+            JigPhrase::ClosingPendingEnding => Box::new([Segment::Text(copy_of(b"Pending ending"))]),
+            JigPhrase::HeldPriorLifecycle => Box::new([Segment::Text(copy_of(b"Prior lifecycle before the hold"))]),
+            JigPhrase::HeldPriorWaiting => Box::new([Segment::Text(copy_of(b"Prior lifecycle: waiting"))]),
+
             JigPhrase::SpecificationNumber => Box::new([
                 Segment::Text(copy_of(b"Parameter ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

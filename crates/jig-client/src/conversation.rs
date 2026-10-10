@@ -40,7 +40,7 @@ pub enum Fold {
 /// A call is named within a turn, so calls in different attempts stay distinct.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CallName {
-    pub attempt: u32,
+    pub attempt: u64,
     pub turn: u32,
     pub call: u64,
 }

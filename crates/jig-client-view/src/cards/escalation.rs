@@ -87,7 +87,7 @@ pub fn spend(b: &mut Builder, rows: &List<SpendLine>, words: &Words) {
             Some(attempt) => words.text(
                 b,
                 JigPhrase::SpentRun,
-                &[Hole::Number(row.task), Hole::Number(u64::from(attempt)), Hole::Amount(row.spent)],
+                &[Hole::Number(row.task), Hole::Number(attempt), Hole::Amount(row.spent)],
             ),
             None => words.text(b, JigPhrase::SpentDelegate, &[Hole::Number(row.task), Hole::Amount(row.spent)]),
         }

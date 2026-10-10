@@ -16,7 +16,7 @@ pub(super) fn turn(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
-    words.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(name.attempt))]);
+    words.text(b, JigPhrase::Attempt, &[Hole::Number(name.attempt)]);
     words.text(b, JigPhrase::TurnNumber, &[Hole::Number(u64::from(name.number))]);
     for message in &turn.messages {
         b.open(Role::Region);

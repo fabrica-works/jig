@@ -874,6 +874,39 @@ pub enum JigPhrase {
     HoldPart,
     OutboxEntry,
     TakenByNumber,
+    RunIdle,
+    RunDue,
+    RunPreparing,
+    RunClaimed,
+    RunOwnerActive,
+    RunBackingOff,
+    RunPhaseSince,
+    RunPlacement,
+    RunUnobserved,
+    RunObservedSince,
+    RunReportedAt,
+    RunActualStart,
+    RunStartUnknown,
+    WorkPreparing,
+    WorkStarting,
+    WorkActive,
+    WorkWriting,
+    WorkTool,
+    WorkWaiting,
+    WorkEnding,
+    RunRetryFailed,
+    RunRetryRefused,
+    ClosingRun,
+    ClosingDelegates,
+    ClosingStageEffects,
+    ClosingReleases,
+    ClosingSettled,
+    ClosingStageUnknown,
+    ClosingConnectorsUnknown,
+    ClosingConnectorsEmpty,
+    ClosingPendingEnding,
+    HeldPriorLifecycle,
+    HeldPriorWaiting,
 
     EngineLimitWords,
     EngineLimitIdentity,
@@ -969,6 +1002,40 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::RunIdle => 530,
+            Self::RunDue => 531,
+            Self::RunPreparing => 532,
+            Self::RunClaimed => 533,
+            Self::RunOwnerActive => 534,
+            Self::RunBackingOff => 535,
+            Self::RunPhaseSince => 536,
+            Self::RunPlacement => 537,
+            Self::RunUnobserved => 538,
+            Self::RunObservedSince => 539,
+            Self::RunReportedAt => 540,
+            Self::RunActualStart => 541,
+            Self::RunStartUnknown => 542,
+            Self::WorkPreparing => 543,
+            Self::WorkStarting => 544,
+            Self::WorkActive => 545,
+            Self::WorkWriting => 546,
+            Self::WorkTool => 547,
+            Self::WorkWaiting => 548,
+            Self::WorkEnding => 549,
+            Self::RunRetryFailed => 550,
+            Self::RunRetryRefused => 551,
+            Self::ClosingRun => 552,
+            Self::ClosingDelegates => 553,
+            Self::ClosingStageEffects => 554,
+            Self::ClosingReleases => 555,
+            Self::ClosingSettled => 556,
+            Self::ClosingStageUnknown => 557,
+            Self::ClosingConnectorsUnknown => 558,
+            Self::ClosingConnectorsEmpty => 559,
+            Self::ClosingPendingEnding => 560,
+            Self::HeldPriorLifecycle => 561,
+            Self::HeldPriorWaiting => 562,
+
             Self::SpecificationNumber => 3200,
             Self::SpecificationBytes => 3201,
             Self::SpecificationResource => 3202,
@@ -1501,7 +1568,28 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::SpecificationCut
+            Self::RunIdle
+            | Self::RunDue
+            | Self::RunPreparing
+            | Self::RunUnobserved
+            | Self::RunStartUnknown
+            | Self::WorkPreparing
+            | Self::WorkStarting
+            | Self::WorkActive
+            | Self::WorkWriting
+            | Self::WorkWaiting
+            | Self::WorkEnding
+            | Self::ClosingDelegates
+            | Self::ClosingStageEffects
+            | Self::ClosingReleases
+            | Self::ClosingSettled
+            | Self::ClosingStageUnknown
+            | Self::ClosingConnectorsUnknown
+            | Self::ClosingConnectorsEmpty
+            | Self::ClosingPendingEnding
+            | Self::HeldPriorLifecycle
+            | Self::HeldPriorWaiting
+            | Self::SpecificationCut
             | Self::HoldStalled
             | Self::HoldStopped
             | Self::HoldDrift
@@ -1866,7 +1954,11 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::SpecificationBytes
+            Self::RunClaimed
+            | Self::RunOwnerActive
+            | Self::RunRetryRefused
+            | Self::ClosingRun
+            | Self::SpecificationBytes
             | Self::SpecificationInput
             | Self::HoldDependency
             | Self::HoldUncertainEntry
@@ -1962,7 +2054,8 @@ impl JigPhrase {
             | Self::Priority
             | Self::Closing
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::SpecificationNumber
+            Self::RunRetryFailed
+            | Self::SpecificationNumber
             | Self::GoalProcedure
             | Self::RequiredJudgeMissing
             | Self::FailedJudge
@@ -1980,7 +2073,13 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::NextRun
+            Self::RunBackingOff
+            | Self::RunPhaseSince
+            | Self::RunPlacement
+            | Self::RunObservedSince
+            | Self::RunReportedAt
+            | Self::RunActualStart
+            | Self::NextRun
             | Self::PeriodBegan
             | Self::Grace
             | Self::PassesUp
@@ -2031,7 +2130,7 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
                 HoleShape { kind: HoleKind::Amount, bytes: 0 },
             ]),
-            Self::ApprovalYes | Self::ApprovalNo => Box::new([
+            Self::WorkTool | Self::ApprovalYes | Self::ApprovalNo => Box::new([
                 HoleShape { kind: HoleKind::Name, bytes: text },
                 HoleShape { kind: HoleKind::Name, bytes: text },
             ]),
@@ -2053,7 +2152,40 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 518] = [
+pub const ALL: [JigPhrase; 551] = [
+    JigPhrase::RunIdle,
+    JigPhrase::RunDue,
+    JigPhrase::RunPreparing,
+    JigPhrase::RunClaimed,
+    JigPhrase::RunOwnerActive,
+    JigPhrase::RunBackingOff,
+    JigPhrase::RunPhaseSince,
+    JigPhrase::RunPlacement,
+    JigPhrase::RunUnobserved,
+    JigPhrase::RunObservedSince,
+    JigPhrase::RunReportedAt,
+    JigPhrase::RunActualStart,
+    JigPhrase::RunStartUnknown,
+    JigPhrase::WorkPreparing,
+    JigPhrase::WorkStarting,
+    JigPhrase::WorkActive,
+    JigPhrase::WorkWriting,
+    JigPhrase::WorkTool,
+    JigPhrase::WorkWaiting,
+    JigPhrase::WorkEnding,
+    JigPhrase::RunRetryFailed,
+    JigPhrase::RunRetryRefused,
+    JigPhrase::ClosingRun,
+    JigPhrase::ClosingDelegates,
+    JigPhrase::ClosingStageEffects,
+    JigPhrase::ClosingReleases,
+    JigPhrase::ClosingSettled,
+    JigPhrase::ClosingStageUnknown,
+    JigPhrase::ClosingConnectorsUnknown,
+    JigPhrase::ClosingConnectorsEmpty,
+    JigPhrase::ClosingPendingEnding,
+    JigPhrase::HeldPriorLifecycle,
+    JigPhrase::HeldPriorWaiting,
     JigPhrase::SpecificationNumber,
     JigPhrase::SpecificationBytes,
     JigPhrase::SpecificationResource,

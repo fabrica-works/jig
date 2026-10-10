@@ -96,6 +96,7 @@ pub fn details(
     seen: &mut skein_lib::Set<u64>,
 ) {
     match phase {
+        ChipPhase::Active(value) => crate::runtime::active(b, value, words),
         ChipPhase::Waiting { dependencies, hold } => {
             words.text(b, JigPhrase::Waiting, &[]);
             for dependency in dependencies {
@@ -128,7 +129,7 @@ pub fn details(
         ChipPhase::Starting => words.text(b, JigPhrase::TaskStarting, &[]),
         ChipPhase::Running { attempt, since, tool } => {
             words.text(b, JigPhrase::Running, &[]);
-            words.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(*attempt))]);
+            words.text(b, JigPhrase::Attempt, &[Hole::Number(*attempt)]);
             words.text(
                 b,
                 JigPhrase::ElapsedSpan,
@@ -143,7 +144,7 @@ pub fn details(
         }
         ChipPhase::WaitingForWords { attempt, since } => {
             words.text(b, JigPhrase::WaitingWords, &[]);
-            words.text(b, JigPhrase::Attempt, &[Hole::Number(u64::from(*attempt))]);
+            words.text(b, JigPhrase::Attempt, &[Hole::Number(*attempt)]);
             words.text(
                 b,
                 JigPhrase::ElapsedSpan,
@@ -156,11 +157,7 @@ pub fn details(
             words.text(
                 b,
                 JigPhrase::RetryAt,
-                &[
-                    Hole::Wall(words.adjusted_wall(*at)),
-                    Hole::Number(u64::from(*attempt)),
-                    Hole::Number(u64::from(*tries)),
-                ],
+                &[Hole::Wall(words.adjusted_wall(*at)), Hole::Number(*attempt), Hole::Number(u64::from(*tries))],
             );
             failure(b, *class, words);
             words.text(b, JigPhrase::Reason, &[name(reason.bytes())]);
@@ -176,7 +173,10 @@ pub fn details(
             }
         }
         ChipPhase::Closing(closing) => super::common::closing(b, closing, words, bindings),
-        ChipPhase::Held { reason, since, revision: _ } => {
+        ChipPhase::Held { reason, since, revision: _, was } => {
+            if let Some(was) = was {
+                crate::runtime::prior(b, was, words, bindings);
+            }
             super::hold::reason(b, reason, words, bindings);
             words.text(b, JigPhrase::Since, &[Hole::Wall(words.adjusted_wall(*since))]);
         }

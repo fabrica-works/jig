@@ -232,7 +232,7 @@ pub enum Decision {
 /// A turn named independently of its text offset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TurnName {
-    pub attempt: u32,
+    pub attempt: u64,
     pub number: u32,
 }
 

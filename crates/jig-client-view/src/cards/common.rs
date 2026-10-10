@@ -95,10 +95,34 @@ pub fn part(b: &mut Builder, part: &Part, words: &Words, bindings: &mut JigBindi
 /// The connector's words fill a name-only part; effect details remain in its task panel.
 pub fn closing(b: &mut Builder, closing: &jig_client::contract::Closing, words: &Words, bindings: &mut JigBindings) {
     words.text(b, JigPhrase::Closing, &[Hole::Number(u64::from(closing.delegates))]);
-    for connector in &closing.connectors {
-        words.text(b, JigPhrase::ClosingConnector, &[]);
-        part(b, &Part::Connector { connector: *connector }, words, bindings);
-        words.text(b, JigPhrase::ClosingEffects, &[]);
+    match closing.stage {
+        Some(jig_client::contract::ClosingStage::Run { attempt }) => {
+            words.text(b, JigPhrase::ClosingRun, &[Hole::Number(attempt)]);
+        }
+        Some(jig_client::contract::ClosingStage::Delegates) => words.text(b, JigPhrase::ClosingDelegates, &[]),
+        Some(jig_client::contract::ClosingStage::Effects) => words.text(b, JigPhrase::ClosingStageEffects, &[]),
+        Some(jig_client::contract::ClosingStage::Releases) => words.text(b, JigPhrase::ClosingReleases, &[]),
+        Some(jig_client::contract::ClosingStage::Settled) => words.text(b, JigPhrase::ClosingSettled, &[]),
+        None => words.text(b, JigPhrase::ClosingStageUnknown, &[]),
+    }
+    if let Some(ending) = &closing.ending {
+        words.text(b, JigPhrase::ClosingPendingEnding, &[]);
+        words.ending(b, ending);
+    }
+    match &closing.connectors {
+        Some(connectors) => {
+            if connectors.is_empty() {
+                words.text(b, JigPhrase::ClosingConnectorsEmpty, &[]);
+            }
+            for connector in connectors {
+                words.text(b, JigPhrase::ClosingConnector, &[]);
+                part(b, &Part::Connector { connector: *connector }, words, bindings);
+                if closing.stage == Some(jig_client::contract::ClosingStage::Effects) {
+                    words.text(b, JigPhrase::ClosingEffects, &[]);
+                }
+            }
+        }
+        None => words.text(b, JigPhrase::ClosingConnectorsUnknown, &[]),
     }
 }
 /// Say where an object is waiting, without deriving its policy recipient.
