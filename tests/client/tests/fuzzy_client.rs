@@ -7,7 +7,7 @@ fn sweep(start: Start) {
     let mut faults = 0;
     for seed in 100..116 {
         eprintln!("{start:?} seed {seed}");
-        let outcome = random::story(seed, start);
+        let outcome = random::story_without_heap(seed, start);
         assert_eq!(outcome.verdict, Verdict::Passed, "{start:?} seed {seed}");
         faults += outcome.faults;
     }
@@ -42,7 +42,7 @@ fn random_truth_worlds_sweep_documents_addresses_and_persons_with_faults() {
     let mut faults = 0;
     for seed in 200..232 {
         eprintln!("random truth seed {seed}");
-        let outcome = random::world(seed);
+        let outcome = random::world_without_heap(seed);
         assert_eq!(outcome.verdict, Verdict::Passed, "seed {seed}");
         faults += outcome.faults;
     }

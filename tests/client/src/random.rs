@@ -34,9 +34,11 @@ fn fixture(seed: u64, start: Start) -> (World<Test, Scripted>, RootAddress) {
         Start::Incident => (stories::incident_world(seed), stories::incident()),
     }
 }
-fn explore(mut world: World<Test, Scripted>, address: RootAddress, seed: u64) -> Outcome {
+fn explore(mut world: World<Test, Scripted>, address: RootAddress, seed: u64, memory: bool) -> Outcome {
     world.randomness(16, 150, 8);
-    world.measure_heap();
+    if memory {
+        world.measure_heap();
+    }
     let mut rng = Rng::new(seed);
     for party in [7, 8] {
         let first = world.client(party, address);
@@ -54,11 +56,11 @@ fn explore(mut world: World<Test, Scripted>, address: RootAddress, seed: u64) ->
 #[must_use]
 pub fn story(seed: u64, start: Start) -> Outcome {
     let (world, address) = fixture(seed, start);
-    explore(world, address, seed)
+    explore(world, address, seed, true)
 }
 /// Random whole documents, addresses, family values and offers behind the same shell.
 #[must_use]
-pub fn world(seed: u64) -> Outcome {
+fn world_with_heap(seed: u64, memory: bool) -> Outcome {
     let mut rng = Rng::new(seed);
     let start = Start::ALL[usize::try_from(rng.below(6)).expect("six starts")];
     let (mut world, mut address) = fixture(seed, start);
@@ -103,5 +105,25 @@ pub fn world(seed: u64) -> Outcome {
         }
         _ => {}
     }
-    explore(world, address, seed)
+    explore(world, address, seed, memory)
+}
+
+/// Random whole documents with allocator accounting for the focused smoke.
+#[must_use]
+pub fn world(seed: u64) -> Outcome {
+    world_with_heap(seed, true)
+}
+
+/// The same story exploration without heap bookkeeping; memory tests and
+/// the focused smoke retain that check independently.
+#[must_use]
+pub fn story_without_heap(seed: u64, start: Start) -> Outcome {
+    let (world, address) = fixture(seed, start);
+    explore(world, address, seed, false)
+}
+
+/// The same random documents and faults without heap bookkeeping.
+#[must_use]
+pub fn world_without_heap(seed: u64) -> Outcome {
+    world_with_heap(seed, false)
 }
