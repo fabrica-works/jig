@@ -212,10 +212,7 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
         if address == PersonAddress::Role(u32::MAX) {
             let token =
                 tree.nodes().iter().find(|node| node.name.as_deref() == Some(label)).unwrap().binding.unwrap().token;
-            assert_eq!(
-                crate::decode(&mut bindings, token, crate::Act::Input { value: Box::from(b"4294967296".as_slice()) }),
-                None
-            );
+            assert_eq!(decode(&mut bindings, token, Act::Input { value: Box::from(b"4294967296".as_slice()) }), None);
             assert!(domain.confirmation().unwrap().choices.change.as_ref().unwrap().addressed.is_none());
         }
         drive(&mut domain, Event::Act { act: input(&tree, label, bytes, &mut bindings) });

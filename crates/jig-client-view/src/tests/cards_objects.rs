@@ -1135,7 +1135,7 @@ fn escalation_row_scenario(
         drive(&mut d, Event::Act { act: change });
         assert_eq!(
             d.confirmation().unwrap().choices.change.as_ref().unwrap().addressed,
-            Some(Recipient::Role { project: 4, role: 7 })
+            Some(AddressChange { revision: Revision { value: 12 }, address: PersonAddress::Role(7) })
         );
     }
     if expected == b"spent 10" {
