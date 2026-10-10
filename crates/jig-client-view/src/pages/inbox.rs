@@ -68,51 +68,7 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
         }
         b.close();
         let parent = if group { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
-        if page.filter.kind.is_none_or(|kind| InboxReadGroup::of(kind) == parent) {
-            let window = page.window(parent);
-            if window.reading.is_some() {
-                words.status(b, JigPhrase::Looking, &[]);
-            }
-            if window.more {
-                words.status(b, JigPhrase::MoreRows, &[]);
-            }
-            for end in [End::Before, End::After] {
-                let more = match end {
-                    End::Before => window.before.is_some(),
-                    End::After => window.after.is_some() || window.more,
-                };
-                if more {
-                    crate::frame::control(
-                        b,
-                        words,
-                        bindings,
-                        Role::Button,
-                        match end {
-                            End::Before => JigPhrase::ReadEarlier,
-                            End::After => JigPhrase::ReadLater,
-                        },
-                        &[],
-                        Act::More {
-                            window: skein_lib::Token::new(if group {
-                                jig_client::pages::conversations::INBOX_WINDOW
-                            } else {
-                                jig_client::pages::conversations::INBOX_UPDATES_WINDOW
-                            }),
-                            end,
-                        },
-                    );
-                } else {
-                    words.text(
-                        b,
-                        match end {
-                            End::Before => JigPhrase::WindowStart,
-                            End::After => JigPhrase::WindowEnd,
-                        },
-                        &[],
-                    );
-                }
-            }
-        }
+        window(b, client, words, bindings, parent);
         b.close();
     }
     if page.live_more {
@@ -122,6 +78,56 @@ pub fn inbox(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
         words.refusal(b, refusal);
     }
     super::excess(b, client, words);
+}
+fn window(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings, parent: InboxReadGroup) {
+    let page = client.inbox();
+    if let Some(kind) = page.filter.kind
+        && InboxReadGroup::of(kind) != parent
+    {
+        return;
+    }
+    let window = page.window(parent);
+    if window.reading.is_some() {
+        words.status(b, JigPhrase::Looking, &[]);
+    }
+    if window.more {
+        words.status(b, JigPhrase::MoreRows, &[]);
+    }
+    for end in [End::Before, End::After] {
+        let more = match end {
+            End::Before => window.before.is_some(),
+            End::After => window.after.is_some() || window.more,
+        };
+        if more {
+            crate::frame::control(
+                b,
+                words,
+                bindings,
+                Role::Button,
+                match end {
+                    End::Before => JigPhrase::ReadEarlier,
+                    End::After => JigPhrase::ReadLater,
+                },
+                &[],
+                Act::More {
+                    window: skein_lib::Token::new(match parent {
+                        InboxReadGroup::Needs => jig_client::pages::conversations::INBOX_WINDOW,
+                        InboxReadGroup::Updates => jig_client::pages::conversations::INBOX_UPDATES_WINDOW,
+                    }),
+                    end,
+                },
+            );
+        } else {
+            words.text(
+                b,
+                match end {
+                    End::Before => JigPhrase::WindowStart,
+                    End::After => JigPhrase::WindowEnd,
+                },
+                &[],
+            );
+        }
+    }
 }
 fn filter(
     b: &mut Builder,

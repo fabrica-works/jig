@@ -733,8 +733,9 @@ impl Payload for Read {
                 sum(&[project.heap(bounds), kind.heap(bounds), goal.heap(bounds), after.heap(bounds)])
             }
             Self::Conversations { after } => sum(&[after.heap(bounds)]),
-            Self::Goals { project, after } => sum(&[project.heap(bounds), after.heap(bounds)]),
-            Self::Spend { project, after } => sum(&[project.heap(bounds), after.heap(bounds)]),
+            Self::Goals { project, after } | Self::Spend { project, after } => {
+                sum(&[project.heap(bounds), after.heap(bounds)])
+            }
             Self::Project { project } => sum(&[project.heap(bounds)]),
             Self::Notes { scope, description, after } => {
                 sum(&[scope.heap(bounds), description.heap(bounds), after.heap(bounds)])
