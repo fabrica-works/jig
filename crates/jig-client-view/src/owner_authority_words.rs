@@ -1,5 +1,5 @@
 //! Checked authority words and selected language (client/domain/view.md, 7).
-//! Phrase IDs 3000..3017 are separate from the legacy authority vocabulary.
+//! Phrase IDs 3000..3017 are reserved for the owner authority vocabulary.
 use crate::{
     Owner,
     phrases::{
