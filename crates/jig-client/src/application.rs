@@ -202,11 +202,8 @@ fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body
     if domain.objects.put(key, body) {
         for part in parts.values.into_boxed() {
             if let Some(project) = project {
-                out.push(Request::ShowPart {
-                    part,
-                    generation: domain.generation,
-                    scope: contract::PartScope::Project(project),
-                });
+                let scope = owner_scope(&part, contract::PartScope::Project(project));
+                out.push(Request::ShowPart { part, generation: domain.generation, scope });
             } else if let Some(scope) = scope(domain, &part) {
                 out.push(Request::ShowPart { part, generation: domain.generation, scope });
             }
@@ -312,9 +309,25 @@ fn append(parts: &mut Parts, values: &[Part]) {
 fn object_project(domain: &Domain, key: ObjectKey) -> Option<u32> {
     domain.objects.get(domain.objects.find(key)?)?.project
 }
+/// An outbox reference names its owner; other parts retain their enclosing document scope.
+pub(crate) fn owner_scope(part: &Part, enclosing: contract::PartScope) -> contract::PartScope {
+    match part {
+        Part::Outbox { scope, .. } => *scope,
+        Part::Connector { .. }
+        | Part::Resource { .. }
+        | Part::Kind { .. }
+        | Part::Panel { .. }
+        | Part::Result { .. }
+        | Part::Effect { .. }
+        | Part::Hold { .. }
+        | Part::Project { .. }
+        | Part::Deployment { .. } => enclosing,
+    }
+}
 #[expect(clippy::manual_map, reason = "step code matches optional values explicitly")]
 pub(crate) fn scope(domain: &Domain, part: &Part) -> Option<contract::PartScope> {
     match part {
+        Part::Outbox { scope, .. } => Some(*scope),
         Part::Project { project, .. } => Some(contract::PartScope::Project(*project)),
         Part::Deployment { .. } | Part::Connector { .. } | Part::Resource { .. } | Part::Kind { .. } => {
             Some(contract::PartScope::Deployment)

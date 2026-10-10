@@ -214,3 +214,23 @@ fn sparse_current_hold_facts_keep_only_supplied_categories_and_numeric_identitie
         assert!(contains(&tree, b"123"));
     }
 }
+
+#[test]
+fn outbox_hold_facts_show_the_actual_entry_scope_without_a_proposal_identity() {
+    for scope in [PartScope::Project(u32::MAX), PartScope::Deployment] {
+        let tree = render(Refusal::Moved {
+            now: Revision { value: 9 },
+            what: Moved::Hold {
+                reason: Some(CurrentHold::Document(Box::new(HoldReason::EffectUncertain {
+                    part: Part::Outbox { connector: 2, scope, entry: u64::MAX },
+                }))),
+            },
+        });
+        assert!(contains(&tree, b"Outbox entry 18446744073709551615"));
+        assert!(!contains(&tree, b"Proposal "));
+        match scope {
+            PartScope::Project(_) => assert!(contains(&tree, b"Project 4294967295")),
+            PartScope::Deployment => assert!(contains(&tree, b"Deployment")),
+        }
+    }
+}

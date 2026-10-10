@@ -83,6 +83,7 @@ pub fn part(b: &mut Builder, part: &Part, words: &Words, bindings: &mut JigBindi
         | Part::Panel { connector, .. }
         | Part::Result { connector, .. }
         | Part::Effect { connector, .. }
+        | Part::Outbox { connector, .. }
         | Part::Hold { connector, .. }
         | Part::Project { connector, .. }
         | Part::Deployment { connector } => *connector,

@@ -9,13 +9,13 @@ use jig_client::contract::{
     Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, FieldRule, Frame, GoalLine,
     GoalPage, Goals, Grant, HeldRole, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure,
     HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made,
-    Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Part, Party,
-    PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
-    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult, ReadValue,
-    Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField, ResultValue, Revision,
-    RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod, Steering,
-    Subject, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage,
-    VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Part,
+    PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool,
+    Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone,
+    ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField,
+    ResultValue, Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage,
+    SpendPeriod, Steering, Subject, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn,
+    TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
@@ -272,6 +272,14 @@ impl Payload for Phase {
         }
     }
 }
+impl Payload for PartScope {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Project(project) => project.heap(bounds),
+            Self::Deployment => Some(0),
+        }
+    }
+}
 impl Payload for Part {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -281,6 +289,9 @@ impl Payload for Part {
                 sum(&[connector.heap(bounds), task.heap(bounds)])
             }
             Self::Effect { connector, proposal } => sum(&[connector.heap(bounds), proposal.heap(bounds)]),
+            Self::Outbox { connector, scope, entry } => {
+                sum(&[connector.heap(bounds), scope.heap(bounds), entry.heap(bounds)])
+            }
             Self::Project { connector, project } => sum(&[connector.heap(bounds), project.heap(bounds)]),
             Self::Connector { connector } | Self::Deployment { connector } => sum(&[connector.heap(bounds)]),
         }

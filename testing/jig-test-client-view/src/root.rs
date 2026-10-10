@@ -137,6 +137,7 @@ fn second(b: &mut Builder, root: &Domain, part: &jig_client::contract::Part, wor
         Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::Outbox { .. }
         | Part::Hold { .. }
         | Part::Project { .. }
         | Part::Deployment { .. } => words.status(b, words::Word::Unshowable, &[]),

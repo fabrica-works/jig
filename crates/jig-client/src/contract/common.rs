@@ -153,6 +153,8 @@ pub enum Part {
     Result { connector: u16, task: u64 },
     /// A proposed effect.
     Effect { connector: u16, proposal: ProposalKey },
+    /// An actual outbox entry in its supplied owner scope, independent of an effect proposal.
+    Outbox { connector: u16, scope: PartScope, entry: u64 },
     /// The connector facts about a hold.
     Hold { connector: u16, task: u64 },
     /// A connector project summary.

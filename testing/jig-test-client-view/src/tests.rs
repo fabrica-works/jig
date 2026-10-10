@@ -463,3 +463,68 @@ fn a_family_entrance_refusal_shows_its_budget_and_keeps_the_object_present() {
     assert!(view.tree().len() <= view.limits().tree.nodes);
     assert!(patches(&mut view, &root).is_empty());
 }
+
+#[test]
+fn outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
+    let entry = u64::MAX;
+    let subjects = [
+        family::Subject { scope: family::Scope::Project(0), kind: family::Kind::Outbox(entry) },
+        family::Subject { scope: family::Scope::Project(3), kind: family::Kind::Outbox(entry) },
+        family::Subject { scope: family::Scope::Project(4), kind: family::Kind::Outbox(entry) },
+        family::Subject { scope: family::Scope::Deployment, kind: family::Kind::Outbox(entry) },
+        family::Subject {
+            scope: family::Scope::Project(3),
+            kind: family::Kind::Effect(ProposalKey { proposer: entry, number: entry }),
+        },
+    ];
+    let mut root = ready();
+    let opened =
+        drive(&mut root, Event::Went { place: Place::Address(Address::Jig(jig_client::address::Address::Deployment)) });
+    let watch = opened
+        .iter()
+        .find_map(|row| match row {
+            Request::Jig(JigOut::Open { watch, subject: Subject::Deployment }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let mut parts = List::with_capacity(3);
+    for scope in [PartScope::Project(3), PartScope::Project(4), PartScope::Deployment] {
+        parts.push(Part::Outbox { connector: jig_test_client_domain::FIRST, scope, entry }).unwrap();
+    }
+    drive(
+        &mut root,
+        Event::Jig(jig_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                hosts: list([]),
+                accounts: list([]),
+                capacity: list([]),
+                proposals: 0,
+                refusals: list([]),
+                parts,
+            }))),
+        }),
+    );
+    let mut view = view();
+    patches(&mut view, &root);
+    let shown = view
+        .tree()
+        .nodes()
+        .iter()
+        .flat_map(|node| node.text.iter())
+        .filter(|run| run.text.as_ref() == b"Outbox entry 18446744073709551615")
+        .count();
+    assert_eq!(shown, 3);
+    for subject in &subjects[1..4] {
+        assert!(view.tree().nodes().iter().any(|node| node.key == Some(crate::family_key(subject))));
+    }
+    for (index, subject) in subjects.iter().enumerate() {
+        let key = crate::family_key(subject);
+        for previous in &subjects[..index] {
+            assert_ne!(key, crate::family_key(previous));
+        }
+        if let family::Kind::Outbox(_) = subject.kind {
+            assert_eq!(key.b, entry);
+        }
+    }
+}

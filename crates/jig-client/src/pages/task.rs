@@ -315,11 +315,8 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
             break;
         }
         emitted = emitted.saturating_add(1);
-        out.push(Request::ShowPart {
-            part,
-            generation: domain.generation,
-            scope: contract::PartScope::Project(project),
-        });
+        let scope = crate::application::owner_scope(&part, contract::PartScope::Project(project));
+        out.push(Request::ShowPart { part, generation: domain.generation, scope });
     }
     if section == TaskSection::Plan {
         if crate::pages::conversations::live(phase) {

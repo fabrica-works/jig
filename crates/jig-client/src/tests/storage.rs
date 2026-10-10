@@ -268,3 +268,55 @@ fn every_concrete_window_slides_from_both_ends_and_gates_live_rows() {
     turn_window_slides_from_both_ends_and_gates_live_rows();
     history_window_slides_from_both_ends_and_gates_live_rows();
 }
+
+#[test]
+fn outbox_parts_keep_their_owner_scope_in_pages_and_retained_application_objects() {
+    for owner in [PartScope::Project(41), PartScope::Deployment] {
+        let mut domain = Domain::new(&LIMITS, 117);
+        let f = start(&mut domain, List::with_capacity(0));
+        delivered(&mut domain, Time::ZERO, f, frame(7));
+        let part = Part::Outbox { connector: 2, scope: owner, entry: u64::MAX };
+        let moved = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
+        let watch = open_token(&moved);
+        let deployment = Deployment {
+            hosts: List::with_capacity(0),
+            accounts: List::with_capacity(0),
+            capacity: List::with_capacity(0),
+            proposals: 0,
+            refusals: List::with_capacity(0),
+            parts: rows([part.clone()]),
+        };
+        let out = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(deployment))) },
+        );
+        assert_eq!(out.as_ref(), &[Request::ShowPart { part: part.clone(), generation: 1, scope: owner }]);
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Overview }) },
+        );
+        assert_eq!(crate::application::scope(&domain, &part), Some(owner));
+        let task = super::confirmation::task();
+        assert_eq!(crate::application::owner_scope(&part, PartScope::Project(task.project)), owner);
+        // The same supplied scope survives a jig object retained on an application page.
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+        let shown = drive(&mut domain, Time::ZERO, Event::ShowObjects { objects: rows([ObjectKey::Task(8)]) });
+        let mut task_read = None;
+        for request in &shown {
+            if let Request::Read { read, what: Read::Task { task: 8 } } = request {
+                task_read = Some(*read);
+            }
+        }
+        let read = task_read.unwrap();
+        let mut task = super::confirmation::task();
+        task.resources = rows([part.clone()]);
+        let shown = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(task))) },
+        );
+        assert!(shown.contains(&Request::ShowPart { part, generation: 3, scope: owner }));
+    }
+}

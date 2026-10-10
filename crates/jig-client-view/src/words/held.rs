@@ -106,6 +106,7 @@ impl Words {
             | Part::Panel { connector, .. }
             | Part::Result { connector, .. }
             | Part::Effect { connector, .. }
+            | Part::Outbox { connector, .. }
             | Part::Hold { connector, .. }
             | Part::Project { connector, .. }
             | Part::Deployment { connector } => *connector,
@@ -127,6 +128,15 @@ impl Words {
             Part::Hold { task, .. } => {
                 self.text(b, JigPhrase::HoldPart, &[]);
                 self.text(b, JigPhrase::PartTask, &[Hole::Number(*task)]);
+            }
+            Part::Outbox { scope, entry, .. } => {
+                match scope {
+                    jig_client::contract::PartScope::Project(project) => {
+                        self.text(b, JigPhrase::PartProject, &[Hole::Number(u64::from(*project))]);
+                    }
+                    jig_client::contract::PartScope::Deployment => self.text(b, JigPhrase::Deployment, &[]),
+                }
+                self.text(b, JigPhrase::OutboxEntry, &[Hole::Number(*entry)]);
             }
             Part::Project { project, .. } => self.text(b, JigPhrase::PartProject, &[Hole::Number(u64::from(*project))]),
             Part::Effect { proposal, .. } => {

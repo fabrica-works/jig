@@ -47,6 +47,7 @@ impl Side {
             | Part::Panel { .. }
             | Part::Result { .. }
             | Part::Effect { .. }
+            | Part::Outbox { .. }
             | Part::Hold { .. }
             | Part::Project { .. }
             | Part::Deployment { .. } => {}

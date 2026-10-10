@@ -213,6 +213,7 @@ pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, parts: List<Pa
                 contract::PartScope::Deployment
             }
         };
+        let scope = crate::application::owner_scope(&part, scope);
         out.push(Request::ShowPart { part, generation: domain.generation, scope });
         count = count.saturating_add(1);
     }

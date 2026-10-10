@@ -866,6 +866,7 @@ pub enum JigPhrase {
     PanelPart,
     ResultPart,
     HoldPart,
+    OutboxEntry,
 
     EngineLimitWords,
     EngineLimitIdentity,
@@ -1367,6 +1368,7 @@ impl JigPhrase {
             Self::PanelPart => 490,
             Self::ResultPart => 491,
             Self::HoldPart => 492,
+            Self::OutboxEntry => 508,
 
             Self::EngineLimitWords => 413,
             Self::EngineLimitIdentity => 414,
@@ -1842,6 +1844,7 @@ impl JigPhrase {
             | Self::GrantKindMissing
             | Self::DepthMaximum
             | Self::TasksLeft
+            | Self::OutboxEntry
             | Self::PartConnector
             | Self::PartKind
             | Self::PartTask
@@ -2011,7 +2014,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 508] = [
+pub const ALL: [JigPhrase; 509] = [
     JigPhrase::LoadingNavigation,
     JigPhrase::ByNamed,
     JigPhrase::Refused,
@@ -2428,6 +2431,7 @@ pub const ALL: [JigPhrase; 508] = [
     JigPhrase::PanelPart,
     JigPhrase::ResultPart,
     JigPhrase::HoldPart,
+    JigPhrase::OutboxEntry,
     JigPhrase::EngineLimitWords,
     JigPhrase::EngineLimitIdentity,
     JigPhrase::EngineLimitRoles,

@@ -14,7 +14,7 @@ use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =
     SlotRef { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, token: Token::new(0) };
 /// A fragment includes a document heading, drawing fallback, card status and form.
-pub const PART_NODES: u32 = 36;
+pub const PART_NODES: u32 = 37;
 pub const NAV_NODES: u32 = 2;
 pub fn navigation(b: &mut Builder, address: first::Address, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Link);
@@ -80,6 +80,7 @@ pub fn part(
         Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::Outbox { .. }
         | Part::Hold { .. }
         | Part::Project { .. }
         | Part::Deployment { .. } => {
@@ -108,6 +109,9 @@ fn object(
     };
     b.open(Role::Item);
     b.key(key(&object.subject));
+    if let Kind::Outbox(entry) = object.subject.kind {
+        words.text(b, Word::OutboxEntry, &[Hole::Number(entry)]);
+    }
     b.open(Role::Region);
     let title = match &object.value {
         Value::Known(Document::Item(item)) => words.say(Word::Item, &[Hole::Number(item.key)]),
@@ -235,6 +239,10 @@ pub fn key(subject: &Subject) -> Key {
         Kind::Panel(task) => Key { owner: NAV.owner, kind: 11, a: project, b: task },
         Kind::Result(task) => Key { owner: NAV.owner, kind: 12, a: project, b: task },
         Kind::Effect(proposal) => Key { owner: NAV.owner, kind: 13, a: proposal.proposer, b: proposal.number },
+        Kind::Outbox(entry) => match subject.scope {
+            Scope::Project(project) => Key { owner: NAV.owner, kind: 17, a: u64::from(project), b: entry },
+            Scope::Deployment => Key { owner: NAV.owner, kind: 18, a: 0, b: entry },
+        },
         Kind::Hold(task) => Key { owner: NAV.owner, kind: 14, a: project, b: task },
         Kind::Project(project) => Key { owner: NAV.owner, kind: 15, a: u64::from(project), b: 0 },
         Kind::Deployment => Key { owner: NAV.owner, kind: 16, a: 0, b: 0 },

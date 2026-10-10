@@ -791,3 +791,69 @@ fn a_raw_entrance_refusal_finishes_the_original_family_request_once_with_its_fac
         _ => true,
     }));
 }
+
+#[test]
+fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_proposals() {
+    use crate::family::{Kind, Scope, Subject};
+    let mut root = ready(121);
+    let opened = drive(
+        &mut root,
+        Event::Went { place: crate::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+    );
+    let watch = opened
+        .iter()
+        .find_map(|request| match request {
+            Request::Jig(JigOut::Open { watch, subject: contract::Subject::Deployment }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let entry = u64::MAX;
+    let proposal = contract::ProposalKey { proposer: entry, number: entry };
+    let parts = [
+        contract::Part::Outbox { connector: crate::FIRST, scope: contract::PartScope::Project(3), entry },
+        contract::Part::Outbox { connector: crate::FIRST, scope: contract::PartScope::Project(4), entry },
+        contract::Part::Outbox { connector: crate::FIRST, scope: contract::PartScope::Deployment, entry },
+        contract::Part::Effect { connector: crate::FIRST, proposal },
+    ];
+    let mut retained = List::with_capacity(4);
+    for part in &parts {
+        retained.push(part.clone()).unwrap();
+    }
+    let rows = drive(
+        &mut root,
+        Event::Jig(jig_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
+                hosts: List::with_capacity(0),
+                accounts: List::with_capacity(0),
+                capacity: List::with_capacity(0),
+                proposals: 0,
+                refusals: List::with_capacity(0),
+                parts: retained,
+            }))),
+        }),
+    );
+    let expected = [
+        Subject { scope: Scope::Project(3), kind: Kind::Outbox(entry) },
+        Subject { scope: Scope::Project(4), kind: Kind::Outbox(entry) },
+        Subject { scope: Scope::Deployment, kind: Kind::Outbox(entry) },
+        Subject { scope: Scope::Deployment, kind: Kind::Effect(proposal) },
+    ];
+    for (part, subject) in parts.iter().zip(expected) {
+        assert_eq!(root.first().part(part).unwrap().subject, subject);
+        assert!(rows.iter().any(
+            |row| matches!(row, Request::First(first::Out::Read { subject: requested, .. }) if *requested == subject)
+        ));
+        assert!(root.first().contains(part, root.jig().generation()));
+    }
+    let generation = root.jig().generation();
+    drive(
+        &mut root,
+        Event::Went {
+            place: crate::Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })),
+        },
+    );
+    for part in &parts {
+        assert!(!root.first().contains(part, generation));
+    }
+}
