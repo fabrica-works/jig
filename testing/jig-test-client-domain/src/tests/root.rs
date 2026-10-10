@@ -841,9 +841,10 @@ fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_propo
     ];
     for (part, subject) in parts.iter().zip(expected) {
         assert_eq!(root.first().part(part).unwrap().subject, subject);
-        assert!(rows.iter().any(
-            |row| matches!(row, Request::First(first::Out::Read { subject: requested, .. }) if *requested == subject)
-        ));
+        assert!(rows.iter().any(|row| match row {
+            Request::First(first::Out::Read { subject: requested, .. }) => *requested == subject,
+            _ => false,
+        }));
         assert!(root.first().contains(part, root.jig().generation()));
     }
     let generation = root.jig().generation();
