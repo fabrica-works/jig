@@ -41,15 +41,14 @@ fn task_pages_keep_owner_requesters_and_live_retained_stored_links_without_filli
             assert!(contains(&tree, caption));
             assert!(contains(&tree, b"Some task lists are incomplete"));
             assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
-            let mut routes = 0;
+            let mut routes = 0_u32;
             for node in tree.nodes() {
-                if let Some(binding) = node.binding {
-                    if let Some(Action::Go {
+                if let Some(binding) = node.binding
+                    && let Some(Action::Go {
                         address: Address::Task { task: u64::MAX, section: TaskSection::Overview },
                     }) = decode(&mut bindings, binding.token, Act::Press)
-                    {
-                        routes += 1;
-                    }
+                {
+                    routes += 1;
                 }
             }
             assert_eq!(routes, 3, "each supplied input, dependency and reference links by its number");
@@ -87,12 +86,11 @@ fn aggregate_task_loss_prevents_partial_dependency_replacement_and_complete_link
         assert_eq!(contains(&tree, b"Some task lists are incomplete"), cut);
         let mut selected = Vec::new();
         for node in tree.nodes() {
-            if let Some(binding) = node.binding {
-                if let Some(Action::Change { change }) = decode(&mut bindings, binding.token, Act::Press) {
-                    if let Some(dependencies) = change.dependencies {
-                        selected.push(dependencies);
-                    }
-                }
+            if let Some(binding) = node.binding
+                && let Some(Action::Change { change }) = decode(&mut bindings, binding.token, Act::Press)
+                && let Some(dependencies) = change.dependencies
+            {
+                selected.push(dependencies);
             }
         }
         if cut {

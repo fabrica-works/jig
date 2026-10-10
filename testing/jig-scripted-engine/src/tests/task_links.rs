@@ -29,7 +29,7 @@ fn task_link_payloads_price_whole_chips_and_every_reserved_reference_list() {
         assert_eq!(row.requester.heap(&bounds), Some(0));
         assert_eq!(row.references.get(0).unwrap().heap(&bounds), Some(0));
         assert_eq!(row, before);
-        for field in 0..3 {
+        for field in 0_u8..3 {
             let mut oversized = row.clone();
             match field {
                 0 => oversized.inputs = List::with_capacity(3),
