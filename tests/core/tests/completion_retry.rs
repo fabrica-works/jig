@@ -4,7 +4,7 @@ use jig_core_world::watches::{open, world};
 use jig_test_domain as root;
 use skein_lib::Token;
 
-fn report(world: &mut jig_core_world::World, task: u64, attempt: u64, retry: u32, text: &[u8]) {
+fn report(world: &mut jig_core_world::effects::World, task: u64, attempt: u64, retry: u32, text: &[u8]) {
     world.send(root::Event::Core(core::Event::RunText {
         run: Token::new(task),
         attempt: Token::new(attempt),
