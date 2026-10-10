@@ -13,8 +13,8 @@ fn shown(value: &PolicyEdit) -> crate::Tree {
     let words = words();
     let required = policy_edit::required(value, &words).unwrap();
     let mut b = Builder::new(&crate::Limits {
-        nodes: required.nodes + 1,
-        depth: required.depth + 1,
+        nodes: required.nodes.checked_add(1).unwrap(),
+        depth: required.depth.checked_add(1).unwrap(),
         text_per_node: required.text_per_node,
         text_bytes: required.text_bytes,
         drawing_bytes: 0,
@@ -28,7 +28,7 @@ fn shown(value: &PolicyEdit) -> crate::Tree {
     policy_edit::render(&mut b, value, &words);
     b.close();
     let tree = b.finish();
-    assert_eq!(tree.len(), required.nodes + 1);
+    assert_eq!(tree.len(), required.nodes.checked_add(1).unwrap());
     tree
 }
 #[test]

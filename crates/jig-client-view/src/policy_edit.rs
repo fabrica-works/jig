@@ -116,7 +116,7 @@ pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words) {
     b.open(Role::Region);
     match value {
         PolicyEdit::ProjectSpend { period_spend } => {
-            words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(*period_spend)])
+            words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(*period_spend)]);
         }
         PolicyEdit::Role(role) => {
             words.text(b, JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]);
@@ -142,7 +142,7 @@ pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words) {
                 match requirement.guard {
                     PolicyGuard::Guarded => words.text(b, JigPhrase::PolicyGuarded, &[]),
                     PolicyGuard::Observed { freshness } => {
-                        words.text(b, JigPhrase::PolicyObserved, &[Hole::Number(freshness.as_nanos())])
+                        words.text(b, JigPhrase::PolicyObserved, &[Hole::Number(freshness.as_nanos())]);
                     }
                 }
                 words.text(

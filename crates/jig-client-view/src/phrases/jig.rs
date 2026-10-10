@@ -1614,38 +1614,18 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "every phrase declares its holes in one exhaustive table")]
     pub fn shape(self, text: u32) -> PhraseShape {
         let holes: Box<[HoleShape]> = match self {
-            Self::PolicyPeriodSpend => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
-            Self::PolicyEditRole => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::PolicyRequests => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::PolicyDecides => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::PolicyRequirements => Box::new([]),
-            Self::PolicyProjections => Box::new([]),
-            Self::PolicyPermissions => Box::new([]),
-            Self::PolicyEffect => Box::new([
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-            ]),
-            Self::PolicyJudge => Box::new([
+            Self::PolicyJudge | Self::PolicyPermission | Self::SpecificationResource => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::PolicyGuarded => Box::new([]),
-            Self::PolicyObserved => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::PolicyMustGuard => Box::new([]),
-            Self::PolicyGuardNotRequired => Box::new([]),
-            Self::PolicyPermission => Box::new([
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-            ]),
-
-            Self::SpecificationResource => Box::new([
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-                HoleShape { kind: HoleKind::Number, bytes: 0 },
-            ]),
-            Self::RunIdle
+            Self::PolicyRequirements
+            | Self::PolicyProjections
+            | Self::PolicyPermissions
+            | Self::PolicyGuarded
+            | Self::PolicyMustGuard
+            | Self::PolicyGuardNotRequired
+            | Self::RunIdle
             | Self::RunDue
             | Self::RunPreparing
             | Self::RunUnobserved
@@ -2034,7 +2014,11 @@ impl JigPhrase {
             | Self::ApprovalState
             | Self::TakenBy
             | Self::StalledOn => Box::new([HoleShape { kind: HoleKind::Name, bytes: text }]),
-            Self::RunClaimed
+            Self::PolicyEditRole
+            | Self::PolicyRequests
+            | Self::PolicyDecides
+            | Self::PolicyObserved
+            | Self::RunClaimed
             | Self::RunOwnerActive
             | Self::RunRetryRefused
             | Self::ClosingRun
@@ -2137,7 +2121,8 @@ impl JigPhrase {
             | Self::Priority
             | Self::Closing
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
-            Self::RunRetryFailed
+            Self::PolicyEffect
+            | Self::RunRetryFailed
             | Self::SpecificationNumber
             | Self::GoalProcedure
             | Self::RequiredJudgeMissing
@@ -2185,7 +2170,8 @@ impl JigPhrase {
             Self::DeadlineMissing => {
                 Box::new([HoleShape { kind: HoleKind::Wall, bytes: 0 }, HoleShape { kind: HoleKind::Wall, bytes: 0 }])
             }
-            Self::Reserved
+            Self::PolicyPeriodSpend
+            | Self::Reserved
             | Self::Left
             | Self::TotalBudget
             | Self::OwnBudget
