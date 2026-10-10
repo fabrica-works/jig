@@ -29,7 +29,7 @@ fn whole_task_context_absence_and_supplied_empty_are_distinct_in_original_reads(
             panic!("whole task body");
         };
         assert_eq!(retained.context, context);
-        assert_eq!(retained.spec_revision.value, 6);
+        assert_eq!(retained.spec_revision.value, 9);
     }
     assert!(supplied.parts.is_empty());
     assert_eq!(supplied.closing, None);
