@@ -4,8 +4,8 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary tests inspect public trees and select supplied watch requests"
 )]
-use super::cards::{CLIENT, contains, text, words};
-use crate::{Builder, JigBindings, Role, Tree};
+use super::cards::{CLIENT, contains, shared_words as words, text};
+use crate::{Builder, JigBindings, Tree};
 use jig_client::{Domain, Request, address::Address, contract::*};
 use skein_lib::List;
 fn list<T>(items: impl IntoIterator<Item = T>) -> List<T> {
@@ -103,5 +103,6 @@ fn task_overview_expands_whole_metadata_but_nested_verdict_chips_stay_brief() {
     assert!(!contains(&tree, b"Ended at:"));
     assert_eq!(inner.phase, Phase::Ended);
     assert_eq!(inner.title.whole(), None);
-    assert!(tree.nodes().iter().all(|node| node.role != Role::Input));
+    let bound = crate::Limits::of_words(&CLIENT, words()).unwrap();
+    assert!(tree.nodes().iter().all(|node| node.text_bytes() <= bound.text_per_node));
 }
