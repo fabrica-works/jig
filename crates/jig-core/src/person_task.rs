@@ -53,7 +53,9 @@ fn person_result(result: people::PersonResult) -> tasks::TaskResult {
     match result {
         people::PersonResult::Approved { state, words } => tasks::TaskResult::Approved { state, words },
         people::PersonResult::Report { words } => tasks::TaskResult::Report { words },
-        people::PersonResult::Verdict { code, words } => tasks::TaskResult::Verdict { code, words },
+        people::PersonResult::Verdict { code, words } => {
+            tasks::TaskResult::Verdict { code, words, fields: Box::new([]) }
+        }
         people::PersonResult::Failure { reason } => tasks::TaskResult::Failure { reason },
     }
 }

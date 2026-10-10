@@ -181,7 +181,10 @@ fn priced_invalid_terminals_charge_but_live_delegate_refusals_do_not() {
             &mut w,
             1,
             1,
-            End::Finished { result: TaskResult::Verdict { code: 99, words: Box::new([1]) }, cancel_delegates: false },
+            End::Finished {
+                result: TaskResult::Verdict { fields: Box::new([]), code: 99, words: Box::new([1]) },
+                cancel_delegates: false
+            },
             20
         ),
         Reply::Acknowledged(Accepted::New)

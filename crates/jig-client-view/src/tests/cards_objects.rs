@@ -293,7 +293,15 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
 fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words: &crate::words::Words) {
     let part = Part::Result { connector: 2, task: 8 };
     for contract in [
-        PersonContract::Choice { options: list([OptionLine { number: 3, words: text(b"Third choice") }]) },
+        PersonContract::Choice {
+            options: list([OptionLine {
+                number: 3,
+                words: text(b"Third choice"),
+                words_max: 64,
+                followups: 0,
+                fields: list([]),
+            }]),
+        },
         PersonContract::Approval { state: text(b"Named state"), part: part.clone() },
         PersonContract::Words,
     ] {
@@ -357,12 +365,25 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
     assert!(tree.nodes().iter().any(|n| n.role == Role::Status && n.name.as_deref() == Some(b"Leaving")));
     assert!(contains(&tree, b"whole failure"));
     assert!(contains(&tree, b"whole report"));
+    result_value_payloads(words, &part);
+}
+
+fn result_value_payloads(words: &crate::words::Words, part: &Part) {
     let (d, _) = start();
     for (value, whole) in [
         (ResultValue::Report(text(b"full report")), b"full report".as_slice()),
         (ResultValue::Words(text(b"full words")), b"full words"),
         (
-            ResultValue::Verdict { verdict: 2, fields: list([text(b"full field")]), tasks: list([]), proposal: None },
+            ResultValue::Verdict {
+                verdict: 2,
+                words: text(b"explanation"),
+                fields: list([ResultField {
+                    name: b"field".as_slice().into(),
+                    value: b"full field".as_slice().into(),
+                }]),
+                tasks: list([]),
+                proposal: None,
+            },
             b"full field",
         ),
         (ResultValue::Connector { summary: text(b"full connector"), part: part.clone() }, b"full connector"),

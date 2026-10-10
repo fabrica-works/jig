@@ -289,7 +289,7 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
                         let option = choices.option?;
                         let mut present = false;
                         for row in options {
-                            if row.number == option {
+                            if row.number == option && row.fields.is_empty() {
                                 present = true;
                             }
                         }

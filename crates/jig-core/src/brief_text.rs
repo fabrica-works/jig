@@ -346,7 +346,7 @@ fn dependency_read(results: &[HistoricalResult], bytes: u32) -> BriefRead {
             .checked_add(3)
             .expect("result separators");
         match &result.kind {
-            tasks::ResultKind::Verdict { code } => {
+            tasks::ResultKind::Verdict { code, .. } => {
                 total = total
                     .checked_add(Decimal::of(u64::from(*code)).as_bytes().len())
                     .expect("bounded verdict code")
@@ -367,7 +367,7 @@ fn dependency_read(results: &[HistoricalResult], bytes: u32) -> BriefRead {
         writer.put(b": ").expect("measured result text");
         writer.put(result_label(&result.kind)).expect("measured result kind");
         match &result.kind {
-            tasks::ResultKind::Verdict { code } => {
+            tasks::ResultKind::Verdict { code, .. } => {
                 writer.put(b" ").expect("measured verdict space");
                 writer.put(Decimal::of(u64::from(*code)).as_bytes()).expect("measured verdict code");
             }

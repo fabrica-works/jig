@@ -990,8 +990,9 @@ fn documents_person_task_has_the_current_revision_holder_and_answer_form() {
     let (mut core, limits) = make_tree();
     let mut row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
     row.executor = tasks::Executor::Person(tasks::PersonAddress::Role(0));
-    row.contract =
-        tasks::Contract::Verdict { choices: Box::new([tasks::Verdict { code: 3, words: 32, followups: 0 }]) };
+    row.contract = tasks::Contract::Verdict {
+        choices: Box::new([tasks::Verdict { fields: Box::new([]), code: 3, words: 32, followups: 0 }]),
+    };
     send_task(
         &mut core,
         &limits,
@@ -1046,7 +1047,11 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
     assert_eq!(delegate.chip.number, 2);
     assert_eq!(delegate.at, row.ended_at);
     for ending in [
-        tasks::Ending::Done(tasks::TaskResult::Verdict { code: 3, words: Box::from(&b"Choice"[..]) }),
+        tasks::Ending::Done(tasks::TaskResult::Verdict {
+            fields: Box::new([]),
+            code: 3,
+            words: Box::from(&b"Choice"[..]),
+        }),
         tasks::Ending::Failed { reason: Box::from(&b"Failure"[..]) },
         tasks::Ending::Done(tasks::TaskResult::Change {
             connector: 2,
@@ -1065,7 +1070,11 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
             | Ending::Cancelled { .. } => panic!(),
         }
     }
-    row.phase = tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict { code: 3, words: Box::new([]) }));
+    row.phase = tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict {
+        fields: Box::new([]),
+        code: 3,
+        words: Box::new([]),
+    }));
     row.delegates = Box::new([1]);
     row.result_followups = Box::new([3, 99]);
     let result = result_from_row(&core, &limits, 1, &row).unwrap();
@@ -2723,3 +2732,46 @@ fn approval_documents_keep_opaque_state_whole_and_refuse_a_smaller_bound() {
 }
 
 mod chip_executor;
+
+#[test]
+fn verdict_documents_preserve_machine_field_rules_and_values_whole() {
+    let (mut core, limits) = make_tree();
+    let mut row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
+    let rule = tasks::FieldRule { name: b"state".as_slice().into(), max: 8 };
+    row.contract = tasks::Contract::Verdict {
+        choices: Box::new([tasks::Verdict { code: 2, words: 4, followups: 0, fields: Box::new([rule.clone()]) }]),
+    };
+    send_task(
+        &mut core,
+        &limits,
+        tasks::Event::Make {
+            reply_to: ReplyTo::new(Token::new(461)),
+            creator: tasks::Party::Person(1),
+            batch: Box::new([row]),
+        },
+    );
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 5 }, &window()).unwrap() else {
+        panic!("task document");
+    };
+    let ContractLine::Verdict { choices, cut } = task.contract else {
+        panic!("verdict contract");
+    };
+    assert!(!cut);
+    assert_eq!(choices.get(0).expect("one choice").fields.as_ref(), &[rule]);
+    let fields: Box<[tasks::ResultField]> =
+        Box::new([tasks::ResultField { name: b"state".as_slice().into(), value: b"\x00\xff".as_slice().into() }]);
+    let mut row = core.tasks.task(5).unwrap().clone();
+    row.phase = tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict {
+        code: 2,
+        words: Box::new([]),
+        fields: fields.clone(),
+    }));
+    assert_eq!(
+        result_from_row(&core, &limits, 1, &row).unwrap().ending,
+        Ending::Done(ResultValue::Verdict { code: 2, fields, words: Text { bytes: Box::new([]), cut: false } })
+    );
+    let mut smaller = limits;
+    smaller.documents.text_bytes = 3;
+    assert_eq!(make(&core, &smaller, 1, &Subject::Task { task: 5 }, &window()), Err(Missing::TooLarge));
+    assert_eq!(result_from_row(&core, &smaller, 1, &row), Err(Missing::TooLarge));
+}

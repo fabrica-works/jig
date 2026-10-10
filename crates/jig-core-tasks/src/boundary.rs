@@ -121,6 +121,7 @@ pub enum ResultKind {
     Report,
     Verdict {
         code: u32,
+        fields: Box<[ResultField]>,
     },
     Change {
         connector: u16,
@@ -162,12 +163,11 @@ impl Word {
                 }
                 state.len().checked_add(self.words.len())
             }
+            MessageKind::Result(ResultKind::Verdict { fields, .. }) => {
+                crate::verdict::fields_bytes(fields)?.checked_add(self.words.len())
+            }
             MessageKind::Result(
-                ResultKind::Report
-                | ResultKind::Verdict { .. }
-                | ResultKind::Change { .. }
-                | ResultKind::Failed
-                | ResultKind::Cancelled,
+                ResultKind::Report | ResultKind::Change { .. } | ResultKind::Failed | ResultKind::Cancelled,
             )
             | MessageKind::Escalation { .. }
             | MessageKind::Proposal { .. }
@@ -329,9 +329,23 @@ pub struct Spec {
     pub inputs: Box<[u64]>,
 }
 
+/// One required named machine field and its value byte cap.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct FieldRule {
+    pub name: Box<[u8]>,
+    pub max: u32,
+}
+
+/// A named opaque machine value retained with a verdict.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ResultField {
+    pub name: Box<[u8]>,
+    pub value: Box<[u8]>,
+}
+
 /// One admitted result choice with a unique code and a per-choice word-byte bound.
 /// (domain/tasks.md, sections 3 and 5.6).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Verdict {
     /// Distinct permitted choice code within its contract.
     pub code: u32,
@@ -339,6 +353,8 @@ pub struct Verdict {
     pub words: u32,
     /// Maximum whole-batch follow-up delegates this choice permits.
     pub followups: u32,
+    /// Required closed-list machine fields, whose values remain opaque.
+    pub fields: Box<[FieldRule]>,
 }
 
 /// Root-supplied bounded result shape; tasks validates returned results against it before terminal
@@ -382,6 +398,8 @@ pub enum TaskResult {
     /// Successful admitted verdict code with bounded explanation.
     Verdict {
         code: u32,
+        /// Each required field exactly once; values are never read by tasks.
+        fields: Box<[ResultField]>,
         /** Explanation bytes bounded by that choice's word cap and `Limits::result_bytes`. */
         words: Box<[u8]>,
     },

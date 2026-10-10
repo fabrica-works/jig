@@ -78,11 +78,13 @@ pub fn proposal_nodes(limits: &Limits) -> Option<u32> {
         .checked_add(8)
 }
 fn result_value(limits: &Limits) -> Option<u32> {
-    // Verdict may contain every field, follow-up chip and a retained proposal.
+    // Verdict contains explanation words, each named field, follow-up chips and a retained proposal.
     let verdict = markdown(limits)?
+        .checked_add(1)?
         .checked_add(chip_nodes(limits)?)?
         .checked_mul(limits.rows)?
         .checked_add(proposal_nodes(limits)?)?
+        .checked_add(markdown(limits)?)?
         .checked_add(1)?;
     Some(verdict.max(markdown(limits)?.checked_add(2)?))
 }

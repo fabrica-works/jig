@@ -451,8 +451,25 @@ pub enum PersonContract {
 /// One option in a person task choice.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OptionLine {
-    pub number: u16,
+    pub number: u32,
     pub words: Text,
+    pub words_max: u32,
+    pub followups: u32,
+    pub fields: List<FieldRule>,
+}
+
+/// An opaque named field admitted by a verdict choice.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FieldRule {
+    pub name: Box<[u8]>,
+    pub max: u32,
+}
+
+/// An opaque named value supplied with a verdict.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ResultField {
+    pub name: Box<[u8]>,
+    pub value: Box<[u8]>,
 }
 
 /// The kind of result a task owes.
@@ -478,11 +495,11 @@ pub enum ResultValue {
     /// A report.
     Report(Text),
     /// A verdict and follow ups.
-    Verdict { verdict: u16, fields: List<Text>, tasks: List<Chip>, proposal: Option<ProposalKey> },
+    Verdict { verdict: u32, words: Text, fields: List<ResultField>, tasks: List<Chip>, proposal: Option<ProposalKey> },
     /// A summary and connector result.
     Connector { summary: Text, part: Part },
     /// A party choice.
-    Choice { option: u16, by: Party, reason: Text },
+    Choice { option: u32, by: Party, reason: Text },
     /// Approval of a named state.
     Approval { state: Text, approved: bool, by: Party },
     /// An answer in words.

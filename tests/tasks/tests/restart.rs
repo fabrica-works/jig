@@ -123,11 +123,17 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
                 4 => record.result_followups = Box::new([3]),
                 5..=7 => {
                     record.contract = jig_core_tasks::Contract::Verdict {
-                        choices: Box::new([jig_core_tasks::Verdict { code: 7, words: 32, followups: 2 }]),
+                        choices: Box::new([jig_core_tasks::Verdict {
+                            fields: Box::new([]),
+                            code: 7,
+                            words: 32,
+                            followups: 2,
+                        }]),
                     };
                     record.phase = Phase::Closing(jig_core_tasks::Closing {
                         stage: jig_core_tasks::Stage::Delegates,
                         ending: jig_core_tasks::Ending::Done(jig_core_tasks::TaskResult::Verdict {
+                            fields: Box::new([]),
                             code: 7,
                             words: Box::new([]),
                         }),

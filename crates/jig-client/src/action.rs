@@ -19,7 +19,7 @@ pub enum Act {
     /// Open a confirmation for an object act.
     Intend { object: Token, act: ActKind },
     /// Choose an option in the confirmation.
-    Choose { option: u16 },
+    Choose { option: u32 },
     /// Answer that a person task cannot be done.
     CannotDo,
     /// Choose whether to repeat an uncertain effect on release.

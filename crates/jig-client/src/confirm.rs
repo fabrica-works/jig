@@ -25,7 +25,7 @@ use skein_lib::{Env, Id, List, Queue};
 /// The person choices, bounded independently of the incoming document.
 #[derive(Debug)]
 pub struct Choices {
-    pub option: Option<u16>,
+    pub option: Option<u32>,
     pub cannot: bool,
     pub again: Option<bool>,
     pub disposals: List<Disposal>,
@@ -260,7 +260,7 @@ fn answer_field(open: &Confirmation, object: &Object) -> Result<Option<Purpose>,
                     };
                     let mut offered = false;
                     for line in options {
-                        if line.number == option {
+                        if line.number == option && line.fields.is_empty() {
                             offered = true;
                         }
                     }
@@ -484,7 +484,7 @@ fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Miss
     None
 }
 /// Changes one choice; the form checks membership again before sending.
-pub(crate) fn choose(domain: &mut Domain, option: u16) {
+pub(crate) fn choose(domain: &mut Domain, option: u32) {
     if let Some(open) = &mut domain.confirming {
         open.choices.option = Some(option);
         open.choices.cannot = false;

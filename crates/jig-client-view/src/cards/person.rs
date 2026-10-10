@@ -104,7 +104,7 @@ fn options(
         b.open(Role::Choice);
         b.name(option.words.bytes());
         b.text(Run::Plain, option.words.bytes());
-        if answering {
+        if answering && option.fields.is_empty() {
             if let Some(open) = client.confirmation()
                 && open.choices.option == Some(option.number)
             {

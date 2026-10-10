@@ -27,7 +27,7 @@ pub struct WakePolicy {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PersonAnswer {
     /// An option and reason.
-    Choice { option: u16, reason: Text },
+    Choice { option: u32, reason: Text },
     /// An approval naming the state seen.
     Approval { state: Text, approved: bool, reason: Text },
     /// An answer in words.

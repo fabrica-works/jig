@@ -95,18 +95,19 @@ mod subscriptions;
 #[cfg(test)]
 mod tests;
 mod value;
+mod verdict;
 mod wake;
 mod writers;
 pub use activity::{ActivityLine, EndKind, Line, Why, line_bytes_limit, lines_per_decision};
 pub use batch::{bounded_batch, valid_authority, valid_contract, valid_spec};
 pub use boundary::{
-    Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor, Hold,
-    HoldKind, HoldSource, Holding, InvalidResult, Key, Kind, MessageKind, Name, New, NewsClass, NoticeState, Parameter,
-    Party, PersonAddress, PersonAnswer, PersonStallNotice, PersonWait, Phase, PoolSlots, Problem, ProcedureDecision,
-    QuestionCredit, RecurringOverlap, RecurringState, RecurringTemplate, Refusal, ReplyHint, Request, ResourceAccess,
-    ResultFollowups, ResultKind, ResultsWake, Revisions, RunContext, SavedResource, Spec, Stage, Status, Stored, Stub,
-    Subscription, SubscriptionKind, Taken, TaskRecord, TaskResult, Verdict, WakePolicy, WakeRule, Was, Word, Writer,
-    WriterSlot,
+    Accepted, Active, Cause, Closing, Contract, DelegateState, DelegationContext, End, Ending, Event, Executor,
+    FieldRule, Hold, HoldKind, HoldSource, Holding, InvalidResult, Key, Kind, MessageKind, Name, New, NewsClass,
+    NoticeState, Parameter, Party, PersonAddress, PersonAnswer, PersonStallNotice, PersonWait, Phase, PoolSlots,
+    Problem, ProcedureDecision, QuestionCredit, RecurringOverlap, RecurringState, RecurringTemplate, Refusal,
+    ReplyHint, Request, ResourceAccess, ResultField, ResultFollowups, ResultKind, ResultsWake, Revisions, RunContext,
+    SavedResource, Spec, Stage, Status, Stored, Stub, Subscription, SubscriptionKind, Taken, TaskRecord, TaskResult,
+    Verdict, WakePolicy, WakeRule, Was, Word, Writer, WriterSlot,
 };
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
 pub use chat::{Disposal, Grace, Keep};

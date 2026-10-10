@@ -17,8 +17,8 @@ use core::mem::{size_of, size_of_val};
 pub fn stored_bytes(record: &Stored) -> Option<u64> {
     match record {
         Stored::Activity(row) => match &row.line {
-            crate::Line::Words { words, .. } => bytes(words.len()),
-            crate::Line::Heard(word) | crate::Line::Notified { word, .. } => bytes(word.payload_bytes()?),
+            crate::Line::Words { words, kind, .. } => bytes(words.len())?.checked_add(kind_bytes(kind)?),
+            crate::Line::Heard(word) | crate::Line::Notified { word, .. } => word_bytes(word),
             crate::Line::Decided { .. }
             | crate::Line::Milestone { .. }
             | crate::Line::RunBegan { .. }
@@ -174,16 +174,81 @@ fn contract_bytes(contract: &Contract) -> Option<u64> {
             }
             Some(total)
         }
-        Contract::Verdict { choices } => bytes(size_of_val(&**choices)),
+        Contract::Verdict { choices } => {
+            let mut total = bytes(size_of_val(&**choices))?;
+            for choice in choices {
+                total = total.checked_add(bytes(size_of_val(&*choice.fields))?)?;
+                for field in &choice.fields {
+                    total = total.checked_add(bytes(field.name.len())?)?;
+                }
+            }
+            Some(total)
+        }
         Contract::Report { .. } | Contract::Change { .. } => Some(0),
+    }
+}
+
+fn kind_bytes(kind: &crate::MessageKind) -> Option<u64> {
+    match kind {
+        crate::MessageKind::Result(crate::ResultKind::Verdict { fields, .. }) => {
+            bytes(crate::verdict::fields_bytes(fields)?)?.checked_add(bytes(size_of_val(&**fields))?)
+        }
+        crate::MessageKind::Result(crate::ResultKind::Approved { state, .. }) => bytes(state.len()),
+        crate::MessageKind::Result(
+            crate::ResultKind::Report
+            | crate::ResultKind::Change { .. }
+            | crate::ResultKind::Failed
+            | crate::ResultKind::Cancelled,
+        )
+        | crate::MessageKind::Escalation { .. }
+        | crate::MessageKind::Proposal { .. }
+        | crate::MessageKind::PersonStalled { .. }
+        | crate::MessageKind::ProposalDecision { .. }
+        | crate::MessageKind::Words
+        | crate::MessageKind::EffectNotMade { .. }
+        | crate::MessageKind::Amendment { .. }
+        | crate::MessageKind::Question
+        | crate::MessageKind::Answer { .. }
+        | crate::MessageKind::Notice { .. }
+        | crate::MessageKind::Timer { .. }
+        | crate::MessageKind::News { .. } => Some(0),
+    }
+}
+
+fn word_bytes(word: &crate::Word) -> Option<u64> {
+    let payload = bytes(word.payload_bytes()?)?;
+    match &word.kind {
+        crate::MessageKind::Result(crate::ResultKind::Verdict { fields, .. }) => {
+            payload.checked_add(bytes(size_of_val(&**fields))?)
+        }
+        crate::MessageKind::Result(
+            crate::ResultKind::Approved { .. }
+            | crate::ResultKind::Report
+            | crate::ResultKind::Change { .. }
+            | crate::ResultKind::Failed
+            | crate::ResultKind::Cancelled,
+        )
+        | crate::MessageKind::Escalation { .. }
+        | crate::MessageKind::Proposal { .. }
+        | crate::MessageKind::PersonStalled { .. }
+        | crate::MessageKind::ProposalDecision { .. }
+        | crate::MessageKind::Words
+        | crate::MessageKind::EffectNotMade { .. }
+        | crate::MessageKind::Amendment { .. }
+        | crate::MessageKind::Question
+        | crate::MessageKind::Answer { .. }
+        | crate::MessageKind::Notice { .. }
+        | crate::MessageKind::Timer { .. }
+        | crate::MessageKind::News { .. } => Some(payload),
     }
 }
 
 fn result_bytes(result: &TaskResult) -> Option<u64> {
     match result {
-        TaskResult::Report { words } | TaskResult::Verdict { words, .. } | TaskResult::Change { words, .. } => {
-            bytes(words.len())
-        }
+        TaskResult::Report { words } | TaskResult::Change { words, .. } => bytes(words.len()),
+        TaskResult::Verdict { fields, words, .. } => bytes(words.len())?
+            .checked_add(bytes(crate::verdict::fields_bytes(fields)?)?)?
+            .checked_add(bytes(size_of_val(&**fields))?),
         TaskResult::Approved { state, words } => bytes(state.len())?.checked_add(match words {
             Some(words) => bytes(words.len())?,
             None => 0,
@@ -283,7 +348,7 @@ fn proposal_bytes(proposal: &Proposal) -> Option<u64> {
 pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
     let mut inbox_bytes = bytes(size_of_val(&*task.inbox))?;
     for word in &task.inbox {
-        inbox_bytes = inbox_bytes.checked_add(bytes(word.payload_bytes()?)?)?;
+        inbox_bytes = inbox_bytes.checked_add(word_bytes(word)?)?;
     }
     let mut saved_bytes = bytes(size_of_val(&*task.saved))?;
     for resource in &task.saved {

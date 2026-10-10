@@ -87,7 +87,11 @@ fn full_batch() -> ProposalAction {
 fn full_value() -> ResultValue {
     ResultValue::Verdict {
         verdict: 1,
-        fields: list([full_text(), full_text()]),
+        words: full_text(),
+        fields: list([
+            ResultField { name: full_text().bytes().into(), value: full_text().bytes().into() },
+            ResultField { name: full_text().bytes().into(), value: full_text().bytes().into() },
+        ]),
         tasks: list([full_chip(11), full_chip(12)]),
         proposal: Some(ProposalKey { proposer: 8, number: 1 }),
     }
@@ -183,7 +187,10 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     question_value.task = full_chip(8);
     let (d, id) = loaded(ObjectKey::Question { task: 8, message: 1 }, ReadValue::Question(Box::new(question_value)));
     card_tree(&d, id, words, sized, crate::question_nodes(&CLIENT).unwrap());
-    let options = list([OptionLine { number: 1, words: full_name() }, OptionLine { number: 2, words: full_name() }]);
+    let options = list([
+        OptionLine { number: 1, words: full_name(), words_max: 64, followups: 0, fields: list([]) },
+        OptionLine { number: 2, words: full_name(), words_max: 64, followups: 0, fields: list([]) },
+    ]);
     let mut person_value = person(PersonContract::Choice { options });
     person_value.task = full_chip(8);
     person_value.spec = full_text();

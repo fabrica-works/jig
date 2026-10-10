@@ -132,8 +132,8 @@ impl Peers {
                         member.authority = authority(0, false);
                         member.contract = tasks::Contract::Verdict {
                             choices: Box::new([
-                                tasks::Verdict { code: 1, words: 64, followups: 0 },
-                                tasks::Verdict { code: 2, words: 64, followups: 0 },
+                                tasks::Verdict { fields: Box::new([]), code: 1, words: 64, followups: 0 },
+                                tasks::Verdict { fields: Box::new([]), code: 2, words: 64, followups: 0 },
                             ]),
                         };
                         root::Event::Core(core::Event::DelegateValidated {

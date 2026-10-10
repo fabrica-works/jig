@@ -480,3 +480,39 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
         &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: None }
     );
 }
+
+#[test]
+fn person_verdict_choices_preserve_full_codes_and_refuse_missing_machine_fields() {
+    for required in [false, true] {
+        let (mut domain, _) = live();
+        let mut row = person();
+        let mut options = List::with_capacity(1);
+        let mut fields = List::with_capacity(1);
+        if required {
+            fields.push(FieldRule { name: b"state".as_slice().into(), max: 8 }).unwrap();
+        }
+        options
+            .push(OptionLine { number: u32::MAX, words: text(b"choice"), words_max: 32, followups: 0, fields })
+            .unwrap();
+        row.contract = PersonContract::Choice { options };
+        row.acts = offered(ActKind::Answer, Admission::Allowed);
+        let id = install(&mut domain, Body::PersonTask(Box::new(row)));
+        assert!(intend(&mut domain, id, ActKind::Answer).is_empty());
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Choose { option: u32::MAX } }).is_empty());
+        let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+        if required {
+            assert!(rows.is_empty(), "machine field choice cannot send an incomplete answer");
+            assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Choice));
+        } else {
+            assert_eq!(
+                sent(&rows),
+                &Ask::AnswerPerson {
+                    project: 1,
+                    task: 8,
+                    revision: Revision { value: 4 },
+                    answer: PersonAnswer::Choice { option: u32::MAX, reason: text(b"") },
+                }
+            );
+        }
+    }
+}

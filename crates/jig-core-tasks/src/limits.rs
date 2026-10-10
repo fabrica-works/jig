@@ -131,14 +131,25 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(2)?
         .checked_mul(u64::from(limits.authority_segments))?
         .checked_mul(u64::try_from(size_of::<Box<[u8]>>()).ok()?)?;
+    // Every admitted field has a nonempty name, so its array length is at
+    // most its semantic byte cap. Arrays are priced separately from bytes.
+    let field_size = u64::try_from(size_of::<crate::ResultField>()).ok()?;
+    let result_fields = u64::from(limits.result_bytes).checked_mul(field_size)?;
+    let contract_fields = u64::from(limits.contract_choices).checked_mul(
+        u64::from(limits.result_bytes)
+            .checked_mul(u64::try_from(size_of::<crate::FieldRule>()).ok()?.checked_add(1)?)?,
+    )?;
     let approval_contract = u64::from(limits.result_bytes)
         .checked_add(u64::from(limits.hold_bytes))?
         .checked_add(List::<Box<[u8]>>::worst_case(limits.hold_segments)?)?;
     let payload = u64::from(limits.spec_bytes)
         .checked_add(u64::from(limits.message_bytes))?
         .checked_add(u64::from(limits.inbox_bytes))?
+        .checked_add(u64::from(limits.inbox_bytes).checked_mul(field_size)?)?
         .checked_add(approval_contract)?
+        .checked_add(contract_fields)?
         .checked_add(u64::from(limits.message_bytes).checked_mul(2)?)?
+        .checked_add(u64::from(limits.message_bytes).checked_mul(field_size)?.checked_mul(3)?)?
         .checked_add(u64::try_from(size_of::<crate::Word>()).ok()?)?
         .checked_add(u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::Word>()).ok()?)?)?
         .checked_add(u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::ReplyHint>()).ok()?)?)?
@@ -156,7 +167,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(u64::from(limits.authority_bytes))?,
             )?,
         )?
-        .checked_add(u64::from(limits.result_bytes).checked_mul(3)?)?
+        .checked_add(u64::from(limits.result_bytes).checked_add(result_fields)?.checked_mul(3)?)?
         .checked_add(
             // Live phase, observed phase, and bounded transition scratch.
             3_u64.checked_mul(
@@ -213,6 +224,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             )?,
         )?
         .checked_add(approval_contract)?
+        .checked_add(contract_fields)?
         .checked_add(u64::from(limits.contract_choices).checked_mul(u64::try_from(size_of::<Verdict>()).ok()?)?)?;
     let proposal_payload = u64::try_from(size_of::<crate::Proposal>())
         .ok()?
@@ -230,7 +242,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<u64>::worst_case(limits.tasks)?)?
         .checked_add(List::<crate::moving::Plan>::worst_case(limits.delegates)?)?
         .checked_add(u64::from(limits.delegates).checked_mul(List::<u64>::worst_case(limits.tasks)?)?)?
-        .checked_add(u64::from(limits.tasks).checked_mul(u64::from(limits.result_bytes).checked_mul(2)?)?)?
+        .checked_add(
+            u64::from(limits.tasks)
+                .checked_mul(u64::from(limits.result_bytes).checked_add(result_fields)?.checked_mul(2)?)?,
+        )?
         .checked_add(Map::<crate::Funder, crate::FundingRecord>::worst_case(limits.funders)?)?
         .checked_add(Map::<u64, Id<Task>>::worst_case(limits.tasks)?)?
         .checked_add(Map::<u64, crate::Stub>::worst_case(stub_capacity(limits)?)?)?

@@ -26,8 +26,9 @@ fn result_followup_proposal(w: &World) -> Proposal {
 
 fn start_result_followup(w: &mut World) {
     let mut first = task(1, &[]);
-    first.contract =
-        Contract::Verdict { choices: Box::new([jig_core_tasks::Verdict { code: 7, words: 32, followups: 1 }]) };
+    first.contract = Contract::Verdict {
+        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 1 }]),
+    };
     assert_eq!(w.make(Party::Person(1), vec![first, task(3, &[1])]), Reply::Made(vec![1, 3]));
     w.claim_budget(1, 1, 10);
     let proposal = result_followup_proposal(w);
@@ -35,7 +36,7 @@ fn start_result_followup(w: &mut World) {
         w.terminal_cause(
             1,
             End::FinishedWithFollowups {
-                result: TaskResult::Verdict { code: 7, words: Box::new([1]) },
+                result: TaskResult::Verdict { fields: Box::new([]), code: 7, words: Box::new([1]) },
                 followups: ResultFollowups::Proposal(Box::new(proposal)),
             },
             Cause::Priced { cumulative: 0 },
@@ -138,8 +139,9 @@ fn cancelling_a_closing_result_withdraws_its_pending_followup_proposal() {
 fn an_authorized_verdict_makes_followups_in_its_result_commit_and_waits_for_them() {
     let mut w = World::new(203, LIMITS);
     let mut first = task(1, &[]);
-    first.contract =
-        Contract::Verdict { choices: Box::new([jig_core_tasks::Verdict { code: 7, words: 32, followups: 1 }]) };
+    first.contract = Contract::Verdict {
+        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 1 }]),
+    };
     assert_eq!(w.make(Party::Person(1), vec![first, task(3, &[1])]), Reply::Made(vec![1, 3]));
     w.claim(1, 1);
     let mut child = task(2, &[]);
@@ -150,7 +152,7 @@ fn an_authorized_verdict_makes_followups_in_its_result_commit_and_waits_for_them
         w.terminal_cause(
             1,
             End::FinishedWithFollowups {
-                result: TaskResult::Verdict { code: 7, words: Box::new([1]) },
+                result: TaskResult::Verdict { fields: Box::new([]), code: 7, words: Box::new([1]) },
                 followups: ResultFollowups::Delegates(Box::new([child])),
             },
             Cause::Priced { cumulative: 0 },
@@ -178,8 +180,9 @@ fn an_authorized_verdict_makes_followups_in_its_result_commit_and_waits_for_them
 fn a_verdict_cannot_make_followups_its_contract_did_not_allow() {
     let mut w = World::new(205, LIMITS);
     let mut first = task(1, &[]);
-    first.contract =
-        Contract::Verdict { choices: Box::new([jig_core_tasks::Verdict { code: 7, words: 32, followups: 0 }]) };
+    first.contract = Contract::Verdict {
+        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 0 }]),
+    };
     w.make(Party::Person(1), vec![first]);
     w.claim(1, 1);
     let mut child = task(2, &[]);
@@ -190,7 +193,7 @@ fn a_verdict_cannot_make_followups_its_contract_did_not_allow() {
         w.terminal_cause(
             1,
             End::FinishedWithFollowups {
-                result: TaskResult::Verdict { code: 7, words: Box::new([1]) },
+                result: TaskResult::Verdict { fields: Box::new([]), code: 7, words: Box::new([1]) },
                 followups: ResultFollowups::Delegates(Box::new([child])),
             },
             Cause::Priced { cumulative: 0 },
@@ -207,8 +210,9 @@ fn a_plan_of_reports_a_choice_and_procedure_tasks_runs_in_dependency_order() {
     let mut w = World::new(204, LIMITS);
     let first = task(1, &[]);
     let mut choice = task(2, &[1]);
-    choice.contract =
-        Contract::Verdict { choices: Box::new([jig_core_tasks::Verdict { code: 1, words: 32, followups: 0 }]) };
+    choice.contract = Contract::Verdict {
+        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 1, words: 32, followups: 0 }]),
+    };
     let mut procedure = task(3, &[2]);
     procedure.executor = jig_core_tasks::Executor::Procedure { connector: 1, code: 1 };
     let last = task(4, &[3]);
@@ -222,7 +226,10 @@ fn a_plan_of_reports_a_choice_and_procedure_tasks_runs_in_dependency_order() {
     w.claim(2, 2);
     w.terminal(
         2,
-        End::Finished { result: TaskResult::Verdict { code: 1, words: Box::new([9]) }, cancel_delegates: false },
+        End::Finished {
+            result: TaskResult::Verdict { fields: Box::new([]), code: 1, words: Box::new([9]) },
+            cancel_delegates: false,
+        },
     );
     w.settle(2);
     assert!(w.activations.contains(&3) && !w.activations.contains(&4));
@@ -358,15 +365,16 @@ fn dependency_order_negative_verdict_starts_but_failure_holds() {
     for fail in [false, true] {
         let mut w = World::new(3, LIMITS);
         let mut first = task(1, &[]);
-        first.contract =
-            Contract::Verdict { choices: Box::new([jig_core_tasks::Verdict { code: 0, words: 32, followups: 0 }]) };
+        first.contract = Contract::Verdict {
+            choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 0, words: 32, followups: 0 }]),
+        };
         w.make(Party::Person(1), vec![first, task(2, &[1])]);
         assert!(!w.activations.contains(&2));
         w.claim(1, 1);
         let result = if fail {
             TaskResult::Failure { reason: Box::new([1]) }
         } else {
-            TaskResult::Verdict { code: 0, words: Box::new([]) }
+            TaskResult::Verdict { fields: Box::new([]), code: 0, words: Box::new([]) }
         };
         w.terminal(1, End::Finished { result, cancel_delegates: false });
         assert!(!w.activations.contains(&2));
@@ -683,7 +691,10 @@ fn invalid_results_spend_invalid_tries_and_refused_held_closing_make_is_atomic()
     w.claim(1, 1);
     w.terminal(
         1,
-        End::Finished { result: TaskResult::Verdict { code: 0, words: Box::new([]) }, cancel_delegates: false },
+        End::Finished {
+            result: TaskResult::Verdict { fields: Box::new([]), code: 0, words: Box::new([]) },
+            cancel_delegates: false,
+        },
     );
     assert_eq!(w.record(1).tries.invalid, 1);
     assert_eq!(w.record(1).invalid_result, Some(jig_core_tasks::InvalidResult::Form));

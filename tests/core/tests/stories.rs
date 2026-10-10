@@ -119,8 +119,9 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
     finish(&mut world, second_run, b"alternative result");
     let mut choice = member(&world, tasks::Executor::Agent { charter: 1 }, b"choose between the reports");
     choice.authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
-    choice.contract =
-        tasks::Contract::Verdict { choices: Box::new([tasks::Verdict { code: 1, words: 128, followups: 0 }]) };
+    choice.contract = tasks::Contract::Verdict {
+        choices: Box::new([tasks::Verdict { fields: Box::new([]), code: 1, words: 128, followups: 0 }]),
+    };
     let choice = delegate(&mut world, parent, 4, choice);
     let choice_run = running(&world, choice);
     world.send(root::Event::Answer {
@@ -129,7 +130,11 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
         attempt: choice_run.1,
         cumulative: 0,
         end: tasks::End::Finished {
-            result: tasks::TaskResult::Verdict { code: 1, words: b"choose the revised report".as_slice().into() },
+            result: tasks::TaskResult::Verdict {
+                fields: Box::new([]),
+                code: 1,
+                words: b"choose the revised report".as_slice().into(),
+            },
             cancel_delegates: false,
         },
     });
@@ -1711,4 +1716,70 @@ fn approval_state_and_explanation_share_the_person_answer_byte_bound() {
         .find(|message| message.from == tasks::Party::Task(task))
         .expect("bounded result");
     assert_eq!(message.payload_bytes(), Some(bound));
+}
+
+#[test]
+fn a_verdicts_machine_fields_reach_its_requester_whole_after_commit_and_restart() {
+    let mut world = plan_world(461);
+    let parent = world.assignments[0];
+    let mut triage = member(&world, tasks::Executor::Agent { charter: 1 }, b"return named machine fields");
+    triage.contract = tasks::Contract::Verdict {
+        choices: Box::new([tasks::Verdict {
+            code: 2,
+            words: 4,
+            followups: 0,
+            fields: Box::new([tasks::FieldRule { name: b"state".as_slice().into(), max: 8 }]),
+        }]),
+    };
+    let child = delegate(&mut world, parent, 1, triage);
+    let run = running(&world, child);
+    let fields: Box<[tasks::ResultField]> =
+        Box::new([tasks::ResultField { name: b"state".as_slice().into(), value: b"\x00\xff".as_slice().into() }]);
+    let before = world.inbound.len();
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    world.send(root::Event::Answer {
+        channel: Token::new(7),
+        task: run.0,
+        attempt: run.1,
+        cumulative: 0,
+        end: tasks::End::Finished {
+            result: tasks::TaskResult::Verdict { code: 2, words: b"why".as_slice().into(), fields: fields.clone() },
+            cancel_delegates: false,
+        },
+    });
+    assert_eq!(world.inbound.len(), before, "result waits for its commit completion");
+    let number = world.store.release_held().expect("held verdict transaction");
+    world.send(root::Event::Committed { number });
+    let expected = tasks::MessageKind::Result(tasks::ResultKind::Verdict { code: 2, fields: fields.clone() });
+    assert!(world.inbound.iter().any(|message| message.from == tasks::Party::Task(child)
+        && message.kind == expected
+        && message.words.as_ref() == b"why"));
+    let message = live_row(&world, parent.0)
+        .inbox
+        .iter()
+        .find(|message| message.from == tasks::Party::Task(child))
+        .expect("durable delegate message");
+    assert_eq!(message.kind, expected);
+    assert_eq!(message.payload_bytes(), Some(10));
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(child)))]
+    else {
+        panic!("durable ended owner");
+    };
+    assert_eq!(
+        row.phase,
+        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict {
+            code: 2,
+            words: b"why".as_slice().into(),
+            fields
+        }))
+    );
+    world.restart_with(jig_core_world::faults::plan_fixture(461).0);
+    let message = live_row(&world, parent.0)
+        .inbox
+        .iter()
+        .find(|message| message.from == tasks::Party::Task(child))
+        .expect("restored delegate message");
+    assert_eq!(message.kind, expected);
+    assert_eq!(message.words.as_ref(), b"why");
 }

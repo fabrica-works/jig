@@ -193,14 +193,18 @@ pub(crate) fn invalid_result(contract: &Contract, result: &TaskResult, limits: &
             }
             Contract::Approval { .. } | Contract::Verdict { .. } | Contract::Change { .. } => Some(InvalidResult::Form),
         },
-        TaskResult::Verdict { code, words } => match contract {
+        TaskResult::Verdict { code, words, fields } => match contract {
             Contract::Verdict { choices } => {
                 for choice in choices {
                     if choice.code == *code {
-                        return if words.len() <= usize::try_from(choice.words).expect("u32 fits usize") {
-                            None
-                        } else {
+                        return if words.len() > usize::try_from(choice.words).expect("u32 fits usize")
+                            || result_bytes(result) > usize::try_from(limits.result_bytes).expect("u32 fits usize")
+                        {
                             Some(InvalidResult::Words)
+                        } else if !crate::verdict::fields_valid(&choice.fields, fields) {
+                            Some(InvalidResult::Form)
+                        } else {
+                            None
                         };
                     }
                 }
@@ -267,9 +271,11 @@ pub(crate) fn invalid_followups(
 
 pub(crate) fn result_bytes(result: &TaskResult) -> usize {
     match result {
-        TaskResult::Report { words } | TaskResult::Verdict { words, .. } | TaskResult::Change { words, .. } => {
-            words.len()
-        }
+        TaskResult::Report { words } | TaskResult::Change { words, .. } => words.len(),
+        TaskResult::Verdict { words, fields, .. } => match crate::verdict::fields_bytes(fields) {
+            Some(bytes) => bytes.saturating_add(words.len()),
+            None => usize::MAX,
+        },
         TaskResult::Approved { state, words } => state.len().saturating_add(match words {
             Some(words) => words.len(),
             None => 0,

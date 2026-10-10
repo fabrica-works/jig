@@ -195,7 +195,11 @@ fn saturated_payloads_graph_backoff_held_closing_retirement_and_restore_fit() {
                 task: number,
                 attempt: number + 10,
                 end: End::Finished {
-                    result: TaskResult::Verdict { code: 0, words: vec![1; l.result_bytes as usize].into_boxed_slice() },
+                    result: TaskResult::Verdict {
+                        fields: Box::new([]),
+                        code: 0,
+                        words: vec![1; l.result_bytes as usize].into_boxed_slice(),
+                    },
                     cancel_delegates: false,
                 },
                 cause: tasks::Cause::Priced { cumulative: 10 },
@@ -282,7 +286,7 @@ fn filled(limits: &Limits, number: u64) -> jig_core_tasks::New {
 
     new.contract = Contract::Verdict {
         choices: (0..limits.contract_choices)
-            .map(|code| Verdict { code, words: limits.result_bytes, followups: 0 })
+            .map(|code| Verdict { code, words: limits.result_bytes, followups: 0, fields: Box::new([]) })
             .collect::<Vec<_>>()
             .into_boxed_slice(),
     };
@@ -514,4 +518,43 @@ fn saturated_approval_states_parts_and_results_fit_the_owner_bound() {
         part: tasks::Part { connector: 1, kind: tasks::PartKind::Resource, key: tasks::PartKey::Number(1) },
     };
     assert!(!tasks::valid_contract(&l, &approval), "oversized whole state cannot be admitted");
+}
+
+#[test]
+fn saturated_verdict_machine_field_arrays_fit_their_declared_owner_bound() {
+    let l = LIMITS;
+    let mut measured = Measured::new(&l);
+    measured.bootstrap();
+    let rules: Box<[tasks::FieldRule]> = (0..l.result_bytes)
+        .map(|name| tasks::FieldRule { name: Box::new([u8::try_from(name).expect("small field count")]), max: 0 })
+        .collect();
+    let fields: Box<[tasks::ResultField]> =
+        rules.iter().map(|rule| tasks::ResultField { name: rule.name.clone(), value: Box::new([]) }).collect();
+    let choices: Box<[tasks::Verdict]> = (0..l.contract_choices)
+        .map(|code| tasks::Verdict { code, words: 0, followups: 0, fields: rules.clone() })
+        .collect();
+    let batch: Box<[tasks::New]> = (1..=u64::from(l.batch))
+        .map(|number| {
+            let mut new = filled(&l, number);
+            new.executor = tasks::Executor::Person(tasks::PersonAddress::Person(9));
+            new.funder = Funder::Pool { project: 1, person: 9, period: 7 };
+            new.contract = Contract::Verdict { choices: choices.clone() };
+            new
+        })
+        .collect();
+    let reply_to = measured.to();
+    measured.event(Event::Make { reply_to, creator: Party::Person(9), batch });
+    assert!(!measured.refused);
+    for task in 1..=u64::from(l.batch) {
+        let reply_to = measured.to();
+        measured.event(Event::AnswerPerson {
+            reply_to,
+            task,
+            person: 9,
+            result: TaskResult::Verdict { code: 0, words: Box::new([]), fields: fields.clone() },
+        });
+        assert!(!measured.refused);
+        measured.event(Event::EffectsSettled { task });
+        measured.event(Event::Settled { task });
+    }
 }

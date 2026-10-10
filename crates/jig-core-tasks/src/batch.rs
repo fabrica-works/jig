@@ -396,7 +396,7 @@ pub fn valid_contract(limits: &Limits, contract: &Contract) -> bool {
                 return false;
             }
             for (at, choice) in choices.iter().enumerate() {
-                if choice.words > limits.result_bytes || choice.followups > limits.batch {
+                if !crate::verdict::rules_valid(choice, limits.result_bytes) || choice.followups > limits.batch {
                     return false;
                 }
                 for earlier in choices.iter().take(at) {

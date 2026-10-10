@@ -1062,3 +1062,35 @@ fn moved_hold_refusal_prices_the_complete_reason_allocation_and_each_nested_fail
     bounds.text = 5;
     assert!(!crate::payload::fits(&answer, &bounds));
 }
+
+#[test]
+fn verdict_documents_price_whole_machine_field_arrays_and_bytes() {
+    let fields = list(vec![ResultField { name: b"state".as_slice().into(), value: Box::new([0, 255]) }]);
+    let value =
+        ResultValue::Verdict { verdict: u32::MAX, words: text(b"why"), fields, tasks: list(vec![]), proposal: None };
+    let mut bounds = Bounds { text: 8, rows: 1, ..Bounds::default() };
+    bounds.document_bytes = u64::try_from(core::mem::size_of::<ResultValue>()).unwrap()
+        + List::<ResultField>::worst_case(1).unwrap()
+        + List::<Chip>::worst_case(0).unwrap()
+        + 10;
+    assert!(crate::payload::fits(&value, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&value, &bounds));
+    bounds.document_bytes += 1;
+    bounds.text = 4;
+    assert!(!crate::payload::fits(&value, &bounds), "field name is whole or refused");
+    let mut names = List::with_capacity(2);
+    names.push(FieldRule { name: b"state".as_slice().into(), max: u32::MAX }).unwrap();
+    let option = OptionLine {
+        number: u32::MAX,
+        words: text(b"choice"),
+        words_max: u32::MAX,
+        followups: u32::MAX,
+        fields: names,
+    };
+    bounds.text = 8;
+    bounds.document_bytes = u64::MAX;
+    assert!(!crate::payload::fits(&option, &bounds), "allocated rule capacity also consumes rows");
+    bounds.rows = 2;
+    assert!(crate::payload::fits(&option, &bounds));
+}

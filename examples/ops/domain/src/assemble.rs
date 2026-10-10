@@ -133,11 +133,15 @@ fn contract(value: tasks::Contract) -> Option<charter::Contract> {
         tasks::Contract::Verdict { choices } => {
             let mut verdicts = List::with_capacity(u32::try_from(choices.len()).expect("verdict choices"));
             for choice in choices {
+                let mut fields = List::with_capacity(u32::try_from(choice.fields.len()).ok()?);
+                for field in choice.fields {
+                    fields.push(charter::FieldRule { name: field.name, max: field.max }).ok()?;
+                }
                 verdicts
                     .push(charter::VerdictRule {
                         name: Box::from(Decimal::of(u64::from(choice.code)).as_bytes()),
                         text_max: choice.words,
-                        fields: Box::new([]),
+                        fields: fields.into_boxed(),
                         items: charter::Items { min: 0, max: 0, kinds: Box::new([]) },
                     })
                     .expect("one verdict rule");
@@ -265,7 +269,17 @@ fn decode_result(bytes: &[u8]) -> Option<tasks::TaskResult> {
                 return None;
             }
             let code = crate::translate::decimal(value.label().as_deref()?)?;
-            Some(tasks::TaskResult::Verdict { code: u32::try_from(code).ok()?, words: Box::from(value.text()) })
+            let mut fields = List::with_capacity(value.fields().len());
+            for field in value.fields() {
+                fields
+                    .push(tasks::ResultField { name: Box::from(field.name()), value: Box::from(field.text()) })
+                    .ok()?;
+            }
+            Some(tasks::TaskResult::Verdict {
+                fields: fields.into_boxed(),
+                code: u32::try_from(code).ok()?,
+                words: Box::from(value.text()),
+            })
         }
         smith_charter::Form::Change => None,
     }

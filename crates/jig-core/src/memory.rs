@@ -59,6 +59,10 @@ fn task_carrier(limits: &Limits) -> Option<u64> {
         .checked_add(bytes(task.inputs, sizeof(size_of::<u64>())?)?)?
         .checked_add(bytes(task.dependencies, sizeof(size_of::<u64>())?)?)?
         .checked_add(bytes(task.contract_choices, sizeof(size_of::<tasks::Verdict>())?)?)?
+        .checked_add(bytes(
+            task.contract_choices,
+            u64::from(task.result_bytes).checked_mul(sizeof(size_of::<tasks::FieldRule>())?.checked_add(1)?)?,
+        )?)?
         .checked_add(u64::from(task.result_bytes))?
         .checked_add(List::<Box<[u8]>>::worst_case(task.hold_segments)?)?
         .checked_add(u64::from(task.hold_bytes))?
@@ -72,6 +76,7 @@ fn context_carrier(limits: &Limits) -> Option<u64> {
         .checked_add(sizeof(size_of::<tasks::RunContext>())?)?
         .checked_add(bytes(task.inbox_messages, sizeof(size_of::<tasks::Word>())?)?)?
         .checked_add(u64::from(task.inbox_bytes))?
+        .checked_add(u64::from(task.inbox_bytes).checked_mul(sizeof(size_of::<tasks::ResultField>())?)?)?
         .checked_add(bytes(task.delegates, sizeof(size_of::<tasks::DelegateState>())?)?)?
         .checked_add(bytes(task.saved_resources, sizeof(size_of::<tasks::SavedResource>())?)?)?
         .checked_add(u64::from(task.result_bytes))
@@ -209,7 +214,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let task = &limits.tasks;
     let new_task = task_carrier(limits)?;
     let context = context_carrier(limits)?;
-    let historical = sizeof(size_of::<HistoricalResult>())?.checked_add(u64::from(task.result_bytes))?;
+    let field_size = sizeof(size_of::<tasks::ResultField>())?;
+    let result_payload = u64::from(task.result_bytes).checked_mul(field_size.checked_add(1)?)?;
+    let historical = sizeof(size_of::<HistoricalResult>())?.checked_add(result_payload)?;
     let histories = task.dependencies.checked_add(task.inputs)?;
     total = total.checked_add(bytes(task.tasks, bytes(histories, historical)?)?)?;
     total = total.checked_add(bytes(task.tasks.checked_mul(2)?, context)?)?;
@@ -244,7 +251,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.notes.body_bytes))?
         .checked_add(List::<u64>::worst_case(limits.notes.references)?)?;
     total = total.checked_add(bytes(limits.call_records, bytes(limits.notes.recalled, note_entry)?)?)?;
-    total = total.checked_add(bytes(task.tasks, u64::from(task.result_bytes).checked_mul(3)?)?)?;
+    total = total.checked_add(bytes(task.tasks, result_payload.checked_mul(3)?)?)?;
     total = total.checked_add(u64::from(task.message_bytes))?;
     // Documents move from this bounded construction map into held outputs.
     // The application journal separately prices outputs retained across decisions.
@@ -260,7 +267,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_mul(u64::from(task.batch.max(1)).checked_add(2)?)?
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?
         .checked_add(context)?
-        .checked_add(u64::from(task.message_bytes.max(task.result_bytes)))?
+        .checked_add(u64::from(task.message_bytes.max(task.result_bytes)).checked_mul(field_size.checked_add(1)?)?)?
         .checked_add(limits.policy_bytes)?
         .checked_add(u64::from(limits.run_bytes))?
         .checked_add(u64::from(task.message_bytes))?

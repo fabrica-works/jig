@@ -181,7 +181,7 @@ fn a_person_chooses_between_two_reports_and_the_result_reaches_its_requester() {
     );
     assert!(world.store.rows.values().any(|row| matches!(row,
         root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(task))) if matches!(&task.phase,
-            tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict { code: 2, words })) if words.as_ref() == b"second report")
+            tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Verdict { code: 2, words, .. })) if words.as_ref() == b"second report")
     )), "{:?}", world.trace);
     let peers = world.peers.as_ref().expect("peers");
     assert!(peers.workers[0].messages.iter().any(|(_, _, _, words)| words.as_ref() == b"second report"));

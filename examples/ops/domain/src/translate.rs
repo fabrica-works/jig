@@ -619,6 +619,7 @@ pub(crate) mod nested {
                 let mut out = List::with_capacity(capacity);
                 for choice in choices {
                     let Ok(()) = out.push(tasks::Verdict {
+                        fields: Box::new([]),
                         code: choice.required(b"code")?.small()?,
                         words: choice.required(b"words")?.small()?,
                         followups: 0,

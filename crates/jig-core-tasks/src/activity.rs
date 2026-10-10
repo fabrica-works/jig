@@ -109,7 +109,10 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, out: &mut Queue<Reques
 /// Maximum complete bytes in an emitted line; referenced history/turn rows have their own bounds.
 #[must_use]
 pub fn line_bytes_limit(limits: &crate::Limits) -> Option<u64> {
-    u64::try_from(size_of::<ActivityLine>()).ok()?.checked_add(u64::from(limits.message_bytes.max(limits.result_bytes)))
+    u64::try_from(size_of::<ActivityLine>()).ok()?.checked_add(
+        u64::from(limits.message_bytes.max(limits.result_bytes))
+            .checked_mul(u64::try_from(size_of::<crate::ResultField>()).ok()?.checked_add(1)?)?,
+    )
 }
 
 /// Whole-decision line ceiling: admission, decisions and lifecycle cascades,

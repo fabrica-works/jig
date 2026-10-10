@@ -6,16 +6,16 @@ use jig_client::contract::{
     Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, AdmissionLimit, Amendment, Answer, Ask,
     AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing,
     ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider, Decision, Delivery,
-    Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, Frame, GoalLine, GoalPage, Goals,
-    Grant, HeldRole, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding,
-    Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs,
-    Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Part, Party, PartyKind, Passed,
-    PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project, ProjectRole,
-    Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult, ReadValue, Recipient,
-    Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultValue, Revision, RolePolicy, RunBeginning,
-    RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod, Steering, Subject, Task, TaskFilter,
-    TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy,
-    WatchEnd, WatchEvent, WriterSlot,
+    Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, FieldRule, Frame, GoalLine,
+    GoalPage, Goals, Grant, HeldRole, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure,
+    HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made,
+    Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Part, Party,
+    PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
+    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult, ReadValue,
+    Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField, ResultValue, Revision,
+    RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, SpendLine, SpendPage, SpendPeriod, Steering,
+    Subject, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage,
+    VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
@@ -36,6 +36,14 @@ plain!(bool, u16, u32, u64, Duration, Wall);
 impl Payload for Text {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         if self.fits(bounds.text) { u64::try_from(self.bytes().len()).ok() } else { None }
+    }
+}
+impl Payload for Box<[u8]> {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        if self.len() > bounds.text as usize {
+            return None;
+        }
+        u64::try_from(self.len()).ok()
     }
 }
 impl<T: Payload> Payload for List<T> {
@@ -533,7 +541,9 @@ impl Payload for PersonContract {
         }
     }
 }
-fields!(OptionLine { number, words });
+fields!(FieldRule { name, max });
+fields!(ResultField { name, value });
+fields!(OptionLine { number, words, words_max, followups, fields });
 impl Payload for ResultContract {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -548,9 +558,13 @@ impl Payload for ResultValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Report(value0) | Self::Words(value0) => sum(&[value0.heap(bounds)]),
-            Self::Verdict { verdict, fields, tasks, proposal } => {
-                sum(&[verdict.heap(bounds), fields.heap(bounds), tasks.heap(bounds), proposal.heap(bounds)])
-            }
+            Self::Verdict { verdict, words, fields, tasks, proposal } => sum(&[
+                verdict.heap(bounds),
+                words.heap(bounds),
+                fields.heap(bounds),
+                tasks.heap(bounds),
+                proposal.heap(bounds),
+            ]),
             Self::Connector { summary, part } => sum(&[summary.heap(bounds), part.heap(bounds)]),
             Self::Choice { option, by, reason } => sum(&[option.heap(bounds), by.heap(bounds), reason.heap(bounds)]),
             Self::Approval { state, approved, by } => {

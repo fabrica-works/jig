@@ -74,7 +74,7 @@ pub enum ResultValue {
     /// Successful report.
     Report(Text),
     /// A selected verdict code with its explanation.
-    Verdict { code: u32, words: Text },
+    Verdict { code: u32, fields: Box<[tasks::ResultField]>, words: Text },
     /// A connector value with summary words.
     Change { kind: u16, part: Part, words: Text },
     /// A task that could not complete its contract.
@@ -409,7 +409,17 @@ pub(super) fn contract(limits: &Limits, value: &tasks::Contract) -> Result<Contr
         tasks::Contract::Verdict { choices } => {
             let mut result = List::with_capacity(limits.documents.lines);
             for choice in choices.iter().take(bound(limits)) {
-                result.push(*choice).expect("bounded form choices");
+                if choice.fields.len() > bound(limits) {
+                    return Err(Missing::TooLarge);
+                }
+                let mut names = 0_usize;
+                for field in &choice.fields {
+                    names = names.checked_add(field.name.len()).ok_or(Missing::TooLarge)?;
+                }
+                if names > usize::try_from(limits.documents.text_bytes).expect("u32 fits usize") {
+                    return Err(Missing::TooLarge);
+                }
+                result.push(choice.clone()).expect("bounded form choices");
             }
             ContractLine::Verdict { cut: size(result.len()) < choices.len(), choices: result }
         }
@@ -433,8 +443,26 @@ pub(super) fn result_value(limits: &Limits, value: &tasks::TaskResult) -> Result
         tasks::TaskResult::Report { words } => {
             ResultValue::Report(super::small::text(words, limits.documents.text_bytes))
         }
-        tasks::TaskResult::Verdict { code, words } => {
-            ResultValue::Verdict { code: *code, words: super::small::text(words, limits.documents.text_bytes) }
+        tasks::TaskResult::Verdict { code, words, fields } => {
+            let mut total = 0_usize;
+            if fields.len() > bound(limits) {
+                return Err(Missing::TooLarge);
+            }
+            for field in fields {
+                total = total
+                    .checked_add(field.name.len())
+                    .ok_or(Missing::TooLarge)?
+                    .checked_add(field.value.len())
+                    .ok_or(Missing::TooLarge)?;
+            }
+            if total > usize::try_from(limits.documents.text_bytes).expect("u32 fits usize") {
+                return Err(Missing::TooLarge);
+            }
+            ResultValue::Verdict {
+                code: *code,
+                fields: fields.clone(),
+                words: super::small::text(words, limits.documents.text_bytes),
+            }
         }
         tasks::TaskResult::Change { connector, kind, resource, words } => ResultValue::Change {
             kind: *kind,
@@ -910,6 +938,12 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
         .checked_add(references.checked_mul(3)?)?
         .checked_add(List::<tasks::Subscription>::worst_case(limits.lines)?)?
         .checked_add(List::<tasks::Verdict>::worst_case(limits.lines)?)?
+        .checked_add(
+            lines.checked_mul(
+                lines.checked_mul(u64::try_from(size_of::<tasks::FieldRule>()).ok()?)?.checked_add(text)?,
+            )?,
+        )?
+        .checked_add(lines.checked_mul(u64::try_from(size_of::<tasks::ResultField>()).ok()?)?.checked_add(text)?)?
         .checked_add(List::<ProposalRef>::worst_case(limits.lines)?)?
         .checked_add(authority)?;
     let tree = chip

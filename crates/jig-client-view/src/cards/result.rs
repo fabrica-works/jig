@@ -53,10 +53,12 @@ pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &W
 pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words: &Words, bindings: &mut JigBindings) {
     match value {
         ResultValue::Report(text) | ResultValue::Words(text) => crate::markdown::read(text.bytes(), 2, b),
-        ResultValue::Verdict { verdict, fields, tasks, proposal } => {
+        ResultValue::Verdict { verdict, words: explanation, fields, tasks, proposal } => {
             words.text(b, JigPhrase::Verdict, &[Hole::Number(u64::from(*verdict))]);
+            crate::markdown::read(explanation.bytes(), 2, b);
             for field in fields {
-                crate::markdown::read(field.bytes(), 2, b);
+                b.text(Run::Plain, &field.name);
+                crate::markdown::read(&field.value, 2, b);
             }
             for task in tasks {
                 super::chip::chip(b, client, task, words, bindings);

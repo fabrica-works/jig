@@ -35,7 +35,10 @@ fn a_person_task_is_taken_handed_back_and_answered() {
     let mut new = task(1, &[]);
     new.executor = Executor::Person(PersonAddress::Role(7));
     new.contract = Contract::Verdict {
-        choices: Box::new([Verdict { code: 1, words: 8, followups: 0 }, Verdict { code: 2, words: 8, followups: 0 }]),
+        choices: Box::new([
+            Verdict { fields: Box::new([]), code: 1, words: 8, followups: 0 },
+            Verdict { fields: Box::new([]), code: 2, words: 8, followups: 0 },
+        ]),
     };
     assert_eq!(world.make(Party::Person(9), vec![new]), Reply::Made(vec![1]));
     assert_eq!(world.record(1).phase, Phase::Active(tasks::Active::Due));
@@ -57,7 +60,7 @@ fn a_person_task_is_taken_handed_back_and_answered() {
             reply_to,
             task: 1,
             person: 11,
-            result: TaskResult::Verdict { code: 3, words: Box::new([]) },
+            result: TaskResult::Verdict { fields: Box::new([]), code: 3, words: Box::new([]) },
         }),
         Reply::Refused(_)
     ));
@@ -66,7 +69,7 @@ fn a_person_task_is_taken_handed_back_and_answered() {
             reply_to,
             task: 1,
             person: 11,
-            result: TaskResult::Verdict { code: 2, words: Box::new([1]) },
+            result: TaskResult::Verdict { fields: Box::new([]), code: 2, words: Box::new([1]) },
         }),
         Reply::Done
     );
