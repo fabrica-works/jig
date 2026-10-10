@@ -65,7 +65,10 @@ impl Core {
     /// Begin once; a repeated start cannot repeat loads or open decisions.
     pub fn restart_begin(&mut self) -> RestartRequest {
         match self.restart {
-            Restart::Cold => self.restart_ask(RestartStep::LoadCore),
+            Restart::Cold => {
+                self.counters.begin_restore();
+                self.restart_ask(RestartStep::LoadCore)
+            }
             Restart::Waiting(_) | Restart::Open | Restart::Failed(_) => RestartRequest::Idle,
         }
     }
@@ -119,6 +122,7 @@ impl Core {
                 if !self.restoring_proofs.is_empty() {
                     return self.restart_refuse();
                 }
+                self.counters.finish_restore();
                 RestartStep::LoadInbox
             }
             RestartStep::LoadInbox => match self.connectors.first() {

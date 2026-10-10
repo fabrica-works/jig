@@ -66,7 +66,13 @@ pub(super) fn sign_in(
     identity: people::Identity,
 ) -> Requests {
     let mut out = Queue::with_capacity(2);
-    if core.counters.deployment().people == u64::MAX || core.counters.deployment().sign_ins == u64::MAX {
+    if !core.people.ready() {
+        out.push(Request::Held(Box::new(Held::PeopleReply {
+            to: reply_to,
+            sign_in: None,
+            reply: people::Reply::Again(people::Again::NotReady),
+        })));
+    } else if core.counters.deployment().people == u64::MAX || core.counters.deployment().sign_ins == u64::MAX {
         out.push(Request::Now(Box::new(Now::SignInRefused { to: reply_to })));
     } else {
         let person = crate::fresh(&mut core.counters, crate::Family::Person).expect("person counter available");

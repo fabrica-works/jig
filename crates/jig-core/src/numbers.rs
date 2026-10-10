@@ -60,7 +60,14 @@ pub enum Family {
 #[derive(Debug)]
 pub struct Counters {
     deployment: Deployment,
-    dirty: bool,
+    header: Header,
+}
+
+#[derive(Debug)]
+enum Header {
+    Clean,
+    Dirty,
+    Loading,
 }
 
 impl Counters {
@@ -81,7 +88,7 @@ impl Counters {
             applications: 0,
             commits: 0,
         };
-        Counters { deployment, dirty: true }
+        Counters { deployment, header: Header::Dirty }
     }
 
     /// A loaded header names the last fully applied commit. It is durable; outstanding answers from
@@ -89,7 +96,7 @@ impl Counters {
     /// validated startup bounds; construction emits no effect.
     #[must_use]
     pub const fn new(deployment: Deployment) -> Counters {
-        Counters { deployment, dirty: false }
+        Counters { deployment, header: Header::Clean }
     }
 
     /// Pure snapshot of allocated counters, which may run ahead of the durable store until its
@@ -102,28 +109,54 @@ impl Counters {
     /// Whether the next decision must save the deployment numbers.
     #[must_use]
     pub const fn dirty(&self) -> bool {
-        self.dirty
+        match self.header {
+            Header::Dirty => true,
+            Header::Clean | Header::Loading => false,
+        }
+    }
+
+    /// The bootstrap header cannot be written until the core's live load has
+    /// established whether a durable header already exists (domain/engine.md, 6).
+    pub(crate) fn begin_restore(&mut self) {
+        self.header = Header::Loading;
+    }
+
+    /// A supplied durable header replaces these counters with `new`. Only an
+    /// empty load still has its bootstrap identity waiting to be committed.
+    pub(crate) fn finish_restore(&mut self) {
+        match self.header {
+            Header::Loading => self.header = Header::Dirty,
+            Header::Clean | Header::Dirty => {}
+        }
     }
 
     /// Number the decision's one commit and return its header for the store.
     pub fn next_commit(&mut self) -> Deployment {
+        match self.header {
+            Header::Loading => unreachable!("no writing decision before the deployment header is known"),
+            Header::Clean | Header::Dirty => {}
+        }
         self.deployment.commits = self.deployment.commits.checked_add(1).expect("admitted commit number");
-        self.dirty = false;
+        self.header = Header::Clean;
         self.deployment
     }
 
     /// Pure idle query given the journal's own idle result.
     #[must_use]
     pub const fn quiescent(&self, journal_idle: bool) -> bool {
-        !self.dirty && journal_idle
+        !self.dirty() && journal_idle
     }
 }
 
 /// Root numbers are never reused. Allocation is part of the admitted decision, even if its
 /// candidate is unused; the next commit saves the gap. The root chooses the counter family after
-/// admission. Returns its next positive `u64`, or `None` when stopped/exhausted, with no effect on
+/// admission. Returns its next positive `u64`, or `None` while loading or exhausted, with no effect on
 /// refusal; emits no request itself.
 pub fn fresh(counters: &mut Counters, family: Family) -> Option<u64> {
+    match counters.header {
+        Header::Loading => return None,
+        Header::Clean | Header::Dirty => {}
+    }
     let counter = match family {
         Family::Task => &mut counters.deployment.tasks,
         Family::Person => &mut counters.deployment.people,
@@ -136,6 +169,6 @@ pub fn fresh(counters: &mut Counters, family: Family) -> Option<u64> {
     };
     let next = counter.checked_add(1)?;
     *counter = next;
-    counters.dirty = true;
+    counters.header = Header::Dirty;
     Some(next)
 }
