@@ -1,7 +1,6 @@
 #![expect(
     clippy::disallowed_methods,
     clippy::disallowed_types,
-    clippy::wildcard_enum_match_arm,
     reason = "ordinary tests inspect whole public resource slots and literal trees"
 )]
 use super::cards::{CLIENT, contains, shared_words};
@@ -63,7 +62,7 @@ fn segmented_names_and_exact_open_patterns_keep_raw_bindings_and_separate_litera
     let slots = b.slots(0);
     assert_eq!(slots.len(), 3, "only two supplied kinds and the actual resource get slots");
     assert_eq!(
-        bindings.part(slots.get(0).unwrap().reference.token),
+        bindings.part(slots.first().unwrap().reference.token),
         Some(&Part::Kind { connector: u16::MAX, kind: 1 })
     );
     assert_eq!(
