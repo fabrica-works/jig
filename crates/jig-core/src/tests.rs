@@ -2715,16 +2715,29 @@ fn goal_deadlines_are_checked_against_the_role_and_policy() {
     policy.roles[0].authority.budget.deadline = Some(deadline);
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy: policy.clone() }, &mut out);
-    let started = core.goal_start(1, 1, people::Role::Owner, 1, 10, Some(earlier), 2).expect("within role");
+    let started = core
+        .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(earlier), 2)
+        .expect("within role");
     assert!(started.direct);
     assert_eq!(started.authority.budget.deadline, Some(earlier));
-    assert!(!core.goal_start(1, 1, people::Role::Owner, 1, 10, Some(later), 2).expect("proposed deadline").direct);
-    assert!(!core.goal_start(1, 1, people::Role::Owner, 1, 10, None, 2).expect("unbounded deadline proposed").direct);
+    assert!(
+        !core
+            .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(later), 2)
+            .expect("proposed deadline")
+            .direct
+    );
+    assert!(
+        !core
+            .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, None, 2)
+            .expect("unbounded deadline proposed")
+            .direct
+    );
     policy.ceiling.budget.deadline = Some(deadline);
     while out.pop().is_some() {}
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(
-        core.goal_start(1, 1, people::Role::Owner, 1, 10, Some(later), 2).expect_err("beyond policy"),
+        core.goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(later), 2)
+            .expect_err("beyond policy"),
         people::Refusal::Authority { proposable: None, lacking: people::Lack::Deadline }
     );
 }

@@ -41,10 +41,44 @@ fn a_goal_within_its_offer_is_direct_and_a_supported_goal_beyond_it_is_proposed(
     assert_eq!((budget, pool_left), (500, 500));
     assert_eq!(charters.as_slice(), &[1]);
     assert_eq!(beyond, Beyond::Proposed { to: policy_holder(&[0]) });
-    assert!(core.goal_start(1, 1, people::Role::Owner, 1, budget, None, limits.tasks.tree_tasks).unwrap().direct);
-    assert!(!core.goal_start(1, 1, people::Role::Owner, 1, budget + 1, None, limits.tasks.tree_tasks).unwrap().direct);
+    assert!(
+        core.goal_start(
+            1,
+            1,
+            people::Role::Owner,
+            people::GoalExecutor::Charter(1),
+            budget,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .unwrap()
+        .direct
+    );
+    assert!(
+        !core
+            .goal_start(
+                1,
+                1,
+                people::Role::Owner,
+                people::GoalExecutor::Charter(1),
+                budget + 1,
+                None,
+                limits.tasks.tree_tasks
+            )
+            .unwrap()
+            .direct
+    );
     assert_eq!(
-        core.goal_start(1, 1, people::Role::Owner, 2, budget, None, limits.tasks.tree_tasks).unwrap_err(),
+        core.goal_start(
+            1,
+            1,
+            people::Role::Owner,
+            people::GoalExecutor::Charter(2),
+            budget,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .unwrap_err(),
         people::Refusal::NotOffered
     );
 }
@@ -59,8 +93,32 @@ fn a_goal_without_an_accepting_role_reports_the_same_refusal_in_its_bound_and_ad
         panic!("unproposable bound")
     };
     assert_eq!(why, people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(false) });
-    assert_eq!(core.goal_start(1, 1, people::Role::Owner, 1, 501, None, limits.tasks.tree_tasks).unwrap_err(), why);
-    assert!(core.goal_start(1, 1, people::Role::Owner, 1, 100, None, limits.tasks.tree_tasks).unwrap().direct);
+    assert_eq!(
+        core.goal_start(
+            1,
+            1,
+            people::Role::Owner,
+            people::GoalExecutor::Charter(1),
+            501,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .unwrap_err(),
+        why
+    );
+    assert!(
+        core.goal_start(
+            1,
+            1,
+            people::Role::Owner,
+            people::GoalExecutor::Charter(1),
+            100,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .unwrap()
+        .direct
+    );
 }
 
 #[test]
@@ -84,7 +142,12 @@ fn a_policy_proposal_names_every_eligible_role_without_choosing_one_holder() {
         panic!("bounded goal")
     };
     assert_eq!(beyond, Beyond::Proposed { to: policy_holder(&[0, 4]) });
-    assert!(!core.goal_start(1, 1, people::Role::Owner, 1, 501, None, limits.tasks.tree_tasks).unwrap().direct);
+    assert!(
+        !core
+            .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 501, None, limits.tasks.tree_tasks)
+            .unwrap()
+            .direct
+    );
 }
 
 #[test]
@@ -208,7 +271,7 @@ fn an_observers_core_role_refusals_match_their_offers() {
         people::Ask::SetGoal {
             project: 1,
             spec: b"goal".as_slice().into(),
-            charter: 1,
+            executor: jig_core_people::GoalExecutor::Charter(1),
             budget: 1,
             priority: 1,
             deadline: None,
@@ -635,5 +698,76 @@ fn a_takeover_offer_uses_the_childs_current_requester_and_changes_after_adoption
     assert_eq!(
         core.move_admit(1, Some(people::Role::Owner), 1, 5, limits.tasks.tree_tasks, limits.tasks.depth),
         Err(why)
+    );
+}
+
+#[test]
+fn procedure_goal_bounds_and_admission_keep_exact_executor_and_authority_facts() {
+    let (mut core, limits) = core();
+    let executor = people::GoalExecutor::Procedure { connector: 2, code: 1 };
+    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
+        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 })
+    else {
+        panic!("goal facts")
+    };
+    assert_eq!(
+        procedures.as_slice(),
+        &[offers::GoalProcedure { connector: 1, code: 1 }, offers::GoalProcedure { connector: 2, code: 1 },]
+    );
+    let admitted = core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap();
+    assert!(admitted.direct);
+    assert_eq!(admitted.authority.tools, authority::Tools(0));
+    assert_eq!(admitted.authority.grants, core.settings.chat_authority.grants);
+    assert_eq!(admitted.authority.delegation, core.settings.chat_authority.delegation);
+    assert!(!core.goal_start(1, 1, people::Role::Owner, executor, 501, None, limits.tasks.tree_tasks).unwrap().direct);
+    assert_eq!(
+        core.goal_start(
+            1,
+            1,
+            people::Role::Owner,
+            people::GoalExecutor::Procedure { connector: 3, code: 1 },
+            100,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .unwrap_err(),
+        people::Refusal::NotOffered
+    );
+    core.goal_start(
+        1,
+        1,
+        people::Role::Owner,
+        people::GoalExecutor::Procedure { connector: 1, code: u32::MAX },
+        100,
+        None,
+        limits.tasks.tree_tasks,
+    )
+    .unwrap_err();
+    let mut changed = core.authority.policy(1).unwrap().clone();
+    changed.roles[0].authority.delegation.kinds = Box::new([authority::Executor::Charter(1)]);
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy: changed }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+    core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap_err();
+    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
+        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 })
+    else {
+        panic!("changed goal facts")
+    };
+    assert!(procedures.is_empty(), "current authority removes every direct procedure choice");
+}
+
+#[test]
+fn procedure_goal_bounds_refuse_an_incomplete_executor_list() {
+    let (core, mut limits) = core();
+    limits.documents.lines = 1;
+    assert_eq!(
+        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 }),
+        Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
+    );
+    let executor = people::GoalExecutor::Procedure { connector: 2, code: 1 };
+    assert!(
+        core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap().direct,
+        "document receiving bound does not alter owner admission"
     );
 }

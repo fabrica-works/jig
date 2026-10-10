@@ -181,7 +181,7 @@ fn inbox_across_projects_stories() {
             people::Ask::SetGoal {
                 project,
                 spec: b"shared goal".as_slice().into(),
-                charter: 1,
+                executor: jig_core_people::GoalExecutor::Charter(1),
                 budget: 600,
                 priority: 0,
                 deadline: None,

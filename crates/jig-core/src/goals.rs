@@ -101,9 +101,10 @@ impl Core {
         tasks_left: u32,
     ) -> Result<tasks::Funder, people::Refusal> {
         let (source, numbers) = self.goal_pool(project, person);
-        let charter = match proposal.goal.executor {
-            tasks::Executor::Agent { charter } => charter,
-            tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => unreachable!("goal is agent"),
+        let executor = match proposal.goal.executor {
+            tasks::Executor::Agent { charter } => authority::Executor::Charter(charter),
+            tasks::Executor::Procedure { code, .. } => authority::Executor::Procedure(code),
+            tasks::Executor::Person(_) => return Err(people::Refusal::NotOffered),
         };
         let mut findings = Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority room"));
         let ask = authority::PersonAsk {
@@ -112,7 +113,7 @@ impl Core {
             pool: translate::authority_numbers(numbers),
             tasks_left,
             request: authority::PersonRequest::Accept(authority::Action::Batch(Box::new([authority::Delegate {
-                executor: authority::Executor::Charter(charter),
+                executor,
                 authority: translate::authority_value(&proposal.goal.authority),
                 symbolic: Box::new([]),
             }]))),
@@ -144,11 +145,11 @@ impl Core {
         project: u32,
         person: u64,
         role: people::Role,
-        charter: u32,
+        executor: people::GoalExecutor,
         budget: u64,
         deadline: Option<Wall>,
         tasks_left: u32,
     ) -> Result<GoalStart, people::Refusal> {
-        crate::acts::bounds::goal_start(self, project, person, role, charter, budget, deadline, tasks_left)
+        crate::acts::bounds::goal_start(self, project, person, role, executor, budget, deadline, tasks_left)
     }
 }

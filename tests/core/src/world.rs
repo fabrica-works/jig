@@ -587,7 +587,7 @@ impl World {
                     Scenario::Goal | Scenario::Batch => people::Ask::SetGoal {
                         project: 1,
                         spec: b"complete procedure".as_slice().into(),
-                        charter: 1,
+                        executor: jig_core_people::GoalExecutor::Charter(1),
                         budget: 100,
                         priority: 1,
                         deadline: None,

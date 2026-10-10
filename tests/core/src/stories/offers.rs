@@ -6,6 +6,17 @@ use jig_core_people as people;
 use jig_test_domain as root;
 use skein_lib::{Queue, ReplyTo, Token};
 
+/// The same fixed goal form and authority used by the offer world, for cold restoration.
+#[must_use]
+pub fn world_configuration(seed: u64) -> root::Config {
+    let (mut configuration, _) = fixture(seed, false);
+    configuration.core.settings.chat_authority.delegation.kinds =
+        Box::new([authority::Executor::Charter(1), authority::Executor::Procedure(1)]);
+    configuration.core.settings.chat_authority.delegation.tasks = 1;
+    configuration.core.settings.chat_authority.delegation.depth = 1;
+    configuration
+}
+
 #[must_use]
 pub fn world(seed: u64, role: Option<people::Role>) -> World {
     let (mut configuration, mut limits) = fixture(seed, false);
@@ -81,7 +92,7 @@ pub fn goal(budget: u64) -> people::Ask {
     people::Ask::SetGoal {
         project: 1,
         spec: b"offered goal".as_slice().into(),
-        charter: 1,
+        executor: jig_core_people::GoalExecutor::Charter(1),
         budget,
         priority: 1,
         deadline: None,

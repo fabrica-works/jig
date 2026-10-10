@@ -141,7 +141,7 @@ pub(super) fn begin_goal_creation(
     project: u32,
     role: people::Role,
     spec: Box<[u8]>,
-    charter: u32,
+    executor: people::GoalExecutor,
     budget: u64,
     priority: u32,
     deadline: Option<skein_lib::Wall>,
@@ -150,7 +150,7 @@ pub(super) fn begin_goal_creation(
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::LiveTasks });
         return;
     }
-    let admitted = match core.goal_start(project, person, role, charter, budget, deadline, env.limits.tasks.tree_tasks)
+    let admitted = match core.goal_start(project, person, role, executor, budget, deadline, env.limits.tasks.tree_tasks)
     {
         Ok(admitted) => admitted,
         Err(why) => {
@@ -165,7 +165,10 @@ pub(super) fn begin_goal_creation(
     let new = tasks::New {
         number,
         project,
-        executor: tasks::Executor::Agent { charter },
+        executor: match executor {
+            people::GoalExecutor::Charter(charter) => tasks::Executor::Agent { charter },
+            people::GoalExecutor::Procedure { connector, code } => tasks::Executor::Procedure { connector, code },
+        },
         spec: tasks::Spec { words: spec, parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: env.limits.tasks.result_bytes },
         authority: crate::translate::task_authority(&admitted.authority),

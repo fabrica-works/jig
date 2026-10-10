@@ -177,7 +177,10 @@ pub(crate) fn valid_person_proposal(proposal: &PersonProposal, limits: &Limits) 
     }
     let executor = match proposal.goal.executor {
         crate::Executor::Agent { charter } => charter != 0,
-        crate::Executor::Person(_) | crate::Executor::Procedure { .. } => false,
+        crate::Executor::Procedure { connector, code } => {
+            connector != 0 && code != 0 && proposal.goal.authority.tools == crate::Tools(0)
+        }
+        crate::Executor::Person(_) => false,
     };
     let funder = match proposal.goal.funder {
         crate::Funder::Pool { project, person, .. } => project == proposal.project && person == proposal.proposer,

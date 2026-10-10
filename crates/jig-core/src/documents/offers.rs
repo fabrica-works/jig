@@ -31,7 +31,9 @@ fn receiving(value: Admission, limits: &DocumentLimits) -> Result<Admission, Mis
         Admission::Proposed { to } => Admission::Proposed { to: receiving_recipient(to, limits)? },
         Admission::Bounded { within, beyond } => {
             let fits = match &within {
-                Bounds::Goal { charters, .. } => charters.len() <= limits.lines,
+                Bounds::Goal { charters, procedures, .. } => {
+                    charters.len() <= limits.lines && procedures.len() <= limits.lines
+                }
                 Bounds::Amend { authority, ceiling, grants, .. } => {
                     !authority.cut && !ceiling.cut && grants.len() <= limits.lines
                 }
@@ -51,7 +53,7 @@ fn list(core: &Core, limits: &Limits, party: u64, subject: &Subject, kinds: &[Ac
     let mut result = List::with_capacity(u32::try_from(kinds.len()).expect("closed act list"));
     for act in kinds {
         let value = acts::admit(core, limits, party, *act, subject);
-        if (*act == Act::Amend || *act == Act::AmendRelease)
+        if (*act == Act::SetGoal || *act == Act::Amend || *act == Act::AmendRelease)
             && value == Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
         {
             return Err(Missing::TooLarge);
@@ -222,7 +224,8 @@ pub(super) fn heap_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let recipient = List::<u32>::worst_case(limits.lines)?;
     // Only Amend and AmendRelease carry the full amendment facts on a task;
     // all other object kinds carry at most one bounded act.
-    List::<Offered>::worst_case(MAX_ACTS)?.checked_add(amended.checked_add(recipient)?.checked_mul(2)?)
+    let goal = List::<u32>::worst_case(1)?.checked_add(List::<acts::GoalProcedure>::worst_case(limits.lines)?)?;
+    List::<Offered>::worst_case(MAX_ACTS)?.checked_add(amended.max(goal).checked_add(recipient)?.checked_mul(2)?)
 }
 
 fn path_heap(value: &List<Box<[u8]>>, last: &super::PatternEnd) -> Option<u64> {
@@ -275,8 +278,10 @@ pub(super) fn heap_bytes(value: &List<Offered>) -> Option<u64> {
             Admission::Proposed { to } => recipient_heap(to)?,
             Admission::Bounded { within, beyond } => {
                 let inner = match within {
-                    Bounds::Goal { charters, .. } => {
-                        List::<u32>::worst_case(charters.len().checked_add(charters.room())?)?
+                    Bounds::Goal { charters, procedures, .. } => {
+                        List::<u32>::worst_case(charters.len().checked_add(charters.room())?)?.checked_add(
+                            List::<acts::GoalProcedure>::worst_case(procedures.len().checked_add(procedures.room())?)?,
+                        )?
                     }
                     Bounds::Amend { grants, authority, ceiling, .. } => grants_heap(grants)?
                         .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?.checked_mul(2)?)?

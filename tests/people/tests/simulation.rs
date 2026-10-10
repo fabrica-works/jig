@@ -91,7 +91,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
         Ask::SetGoal {
             project: 1,
             spec: b"goal".to_vec().into_boxed_slice(),
-            charter: 1,
+            executor: jig_core_people::GoalExecutor::Charter(1),
             budget: 1,
             priority: 1,
             deadline: None,
@@ -132,7 +132,7 @@ fn a_service_sets_a_goal_its_role_allows_and_is_refused_a_chat() {
         Ask::SetGoal {
             project: 1,
             spec: b"goal".to_vec().into_boxed_slice(),
-            charter: 1,
+            executor: jig_core_people::GoalExecutor::Charter(1),
             budget: 1,
             priority: 1,
             deadline: None,

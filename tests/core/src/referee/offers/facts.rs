@@ -66,11 +66,16 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
     };
     match (within, ask) {
         (
-            Bounds::Goal { pool_left, charters, latest, budget, maximum_budget, maximum_deadline },
-            people::Ask::SetGoal { charter, budget: amount, deadline: until, .. },
+            Bounds::Goal { pool_left, charters, procedures, latest, budget, maximum_budget, maximum_deadline },
+            people::Ask::SetGoal { executor, budget: amount, deadline: until, .. },
         ) => {
-            if !charters.as_slice().contains(charter) || amount > maximum_budget || !deadline(*maximum_deadline, *until)
-            {
+            let supported = match executor {
+                people::GoalExecutor::Charter(charter) => charters.as_slice().contains(charter),
+                people::GoalExecutor::Procedure { connector, code } => {
+                    procedures.iter().any(|value| value.connector == *connector && value.code == *code)
+                }
+            };
+            if !supported || amount > maximum_budget || !deadline(*maximum_deadline, *until) {
                 return None;
             }
             Some(if amount <= pool_left && amount <= budget && deadline(*latest, *until) {

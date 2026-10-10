@@ -1027,6 +1027,13 @@ fn valid_person_result(limits: &Limits, result: &crate::PersonResult) -> bool {
     }
 }
 
+fn goal_executor(value: crate::GoalExecutor) -> bool {
+    match value {
+        crate::GoalExecutor::Charter(charter) => charter != 0,
+        crate::GoalExecutor::Procedure { connector, code } => connector != 0 && code != 0,
+    }
+}
+
 fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
     match ask {
         Ask::Close { chat, disposals, .. } => valid_close(limits, *chat, disposals),
@@ -1059,8 +1066,10 @@ fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
             None => false,
         },
         Ask::SetPool { person, .. } => *person != 0,
-        Ask::SetGoal { spec, charter, .. } => {
-            *charter != 0 && !spec.is_empty() && spec.len() <= usize::try_from(limits.words).expect("u32 fits usize")
+        Ask::SetGoal { spec, executor, .. } => {
+            goal_executor(*executor)
+                && !spec.is_empty()
+                && spec.len() <= usize::try_from(limits.words).expect("u32 fits usize")
         }
         Ask::StartChat { words, .. } => words.len() <= usize::try_from(limits.words).expect("u32 fits usize"),
         Ask::Say { task, words, .. } => {
@@ -1158,8 +1167,8 @@ fn invalid_ask(ask: &Ask) -> Refusal {
         Ask::Adopt { .. } => LimitKind::Resource,
         Ask::SetRoles { .. } => LimitKind::Roles,
         Ask::ChangePolicy { .. } => LimitKind::Policy,
-        Ask::SetGoal { spec, charter, .. } => {
-            if *charter == 0 {
+        Ask::SetGoal { spec, executor, .. } => {
+            if !goal_executor(*executor) {
                 return Refusal::Unknown;
             }
             if spec.is_empty() { LimitKind::Empty } else { LimitKind::Words }

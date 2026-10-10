@@ -30,7 +30,7 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
     let goal = people::Ask::SetGoal {
         project: 1,
         spec: b"beyond my pool".as_slice().into(),
-        charter: 1,
+        executor: jig_core_people::GoalExecutor::Charter(1),
         budget: 600,
         priority: 1,
         deadline: None,

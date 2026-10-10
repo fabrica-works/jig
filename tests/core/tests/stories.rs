@@ -1325,7 +1325,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
         people::Ask::SetGoal {
             project: 1,
             spec: b"finish before the deadline".as_slice().into(),
-            charter: 1,
+            executor: jig_core_people::GoalExecutor::Charter(1),
             budget: 600,
             priority: 0,
             deadline: Some(deadline),
@@ -1878,3 +1878,6 @@ fn procedure_delegate_outcomes_without_a_live_procedure_owner_are_not_routed() {
         root::Write::Save(root::Record::Connector { record: connector::Record::ProcedureDelegateOutcome { .. }, .. })
     )));
 }
+
+#[path = "stories/procedure_goals.rs"]
+mod procedure_goals;

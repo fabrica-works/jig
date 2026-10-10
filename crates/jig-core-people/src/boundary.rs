@@ -269,8 +269,15 @@ pub enum Ask {
     MakeService { project: u32, name: Box<[u8]>, role: Role },
     /// Adopt a connector resource as a durable keyed owner request.
     Adopt { project: u32, adoption: Adoption },
-    /// Start a tracked goal at the requested charter, budget and priority.
-    SetGoal { project: u32, spec: Box<[u8]>, charter: u32, budget: u64, priority: u32, deadline: Option<Wall> },
+    /// Start a tracked goal at the requested charter or procedure, budget and priority.
+    SetGoal {
+        project: u32,
+        spec: Box<[u8]>,
+        executor: GoalExecutor,
+        budget: u64,
+        priority: u32,
+        deadline: Option<Wall>,
+    },
     /// Hold a live run for this person's decision, cancelling its current claim.
     Stop { project: u32, task: u64 },
     /// Cancel a task and its descendants with a bounded reason.
@@ -327,6 +334,13 @@ pub enum Ask {
         /** Opening words, bounded by `Limits::words` before any route or saved answer. */
         words: Box<[u8]>,
     },
+}
+
+/// Executors a person may request for a tracked goal (domain/people.md, section 5.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum GoalExecutor {
+    Charter(u32),
+    Procedure { connector: u16, code: u32 },
 }
 
 /// A person's answer to a report, choice or failure contract; root translates it for tasks.

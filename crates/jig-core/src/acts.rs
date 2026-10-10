@@ -84,6 +84,14 @@ pub enum Admission {
     Bounded { within: Bounds, beyond: Beyond },
 }
 
+/// Configured connector and permitted procedure code for the existing goal form.
+/// This is an authority fact, not a connector's procedure schema or display name.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct GoalProcedure {
+    pub connector: u16,
+    pub code: u32,
+}
+
 /// A draft's numerical and listed bounds, supplied by the engine.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Bounds {
@@ -91,6 +99,7 @@ pub enum Bounds {
     Goal {
         pool_left: u64,
         charters: List<u32>,
+        procedures: List<GoalProcedure>,
         latest: Option<Wall>,
         budget: u64,
         maximum_budget: u64,

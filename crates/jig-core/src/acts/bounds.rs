@@ -49,7 +49,7 @@ pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         project,
         party,
         held,
-        core.settings.charter,
+        people::GoalExecutor::Charter(core.settings.charter),
         0,
         canonical_deadline,
         limits.tasks.tree_tasks,
@@ -63,6 +63,31 @@ pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
     {
         charters.push(core.settings.charter).expect("one offered charter");
     }
+    let mut procedures = List::with_capacity(limits.documents.lines);
+    if core.projections.len() < limits.tasks.tasks {
+        for kind in &role.authority.delegation.kinds {
+            let authority::Executor::Procedure(procedure) = kind else { continue };
+            for &connector in &core.connectors {
+                let executor = people::GoalExecutor::Procedure { connector, code: *procedure };
+                let supported = match goal_start(
+                    core,
+                    project,
+                    party,
+                    held,
+                    executor,
+                    0,
+                    canonical_deadline,
+                    limits.tasks.tree_tasks,
+                ) {
+                    Ok(value) => value.direct,
+                    Err(_) => false,
+                };
+                if supported && procedures.push(super::GoalProcedure { connector, code: *procedure }).is_err() {
+                    return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
+                }
+            }
+        }
+    }
     let beyond = match recipient(core, project, authority::ProposalKind::Batch) {
         Some(to) => Beyond::Proposed { to },
         None => Beyond::Refused(unproposable()),
@@ -71,6 +96,7 @@ pub(super) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         within: Bounds::Goal {
             pool_left,
             charters,
+            procedures,
             latest: role.authority.budget.deadline,
             budget,
             maximum_budget,
@@ -171,7 +197,7 @@ pub(crate) fn goal_start(
     project: u32,
     person: u64,
     role: people::Role,
-    charter: u32,
+    executor: people::GoalExecutor,
     budget: u64,
     deadline: Option<Wall>,
     tasks_left: u32,
@@ -187,9 +213,21 @@ pub(crate) fn goal_start(
     let mut given = core.settings.chat_authority.clone();
     given.budget.spend = budget;
     given.budget.deadline = deadline;
-    if charter != core.settings.charter {
-        return Err(people::Refusal::NotOffered);
-    }
+    let executor = match executor {
+        people::GoalExecutor::Charter(charter) => {
+            if charter != core.settings.charter {
+                return Err(people::Refusal::NotOffered);
+            }
+            authority::Executor::Charter(charter)
+        }
+        people::GoalExecutor::Procedure { connector, code } => {
+            if code == 0 || !core.connectors.contains(&connector) {
+                return Err(people::Refusal::NotOffered);
+            }
+            given.tools = authority::Tools(0);
+            authority::Executor::Procedure(code)
+        }
+    };
     let period_cap = policy.period_spend.min(core.authority.rules().period_spend);
     if budget > period_cap {
         return Err(people::Refusal::Authority {
@@ -206,7 +244,7 @@ pub(crate) fn goal_start(
         pool: translate::authority_numbers(numbers),
         tasks_left,
         request: authority::PersonRequest::Create(Box::new([authority::Delegate {
-            executor: authority::Executor::Charter(charter),
+            executor,
             authority: given.clone(),
             symbolic: Box::new([]),
         }])),

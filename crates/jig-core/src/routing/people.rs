@@ -231,7 +231,7 @@ pub(super) fn tag_people(
                     people::Ask::DecideEscalation { task, revision, decision, .. } => escalation_request(
                         core, env, work, request, person, project, role, &mut out, task, revision, decision,
                     ),
-                    people::Ask::SetGoal { spec, charter, budget, priority, deadline, .. } => begin_goal_creation(
+                    people::Ask::SetGoal { spec, executor, budget, priority, deadline, .. } => begin_goal_creation(
                         core,
                         env,
                         &mut out,
@@ -241,7 +241,7 @@ pub(super) fn tag_people(
                         project,
                         role.expect("goal membership admitted"),
                         spec,
-                        charter,
+                        executor,
                         budget,
                         priority,
                         deadline,

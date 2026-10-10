@@ -186,9 +186,14 @@ impl Peers {
                         people::Ask::MarkSeen { seen: people::Seen::Chat { task: task_number(task), through } }
                     }
                     parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
-                    parties::Ask::Goal { words, budget, priority, deadline } => {
-                        people::Ask::SetGoal { project, spec: words, charter: 1, budget, priority, deadline }
-                    }
+                    parties::Ask::Goal { words, budget, priority, deadline } => people::Ask::SetGoal {
+                        project,
+                        spec: words,
+                        executor: jig_core_people::GoalExecutor::Charter(1),
+                        budget,
+                        priority,
+                        deadline,
+                    },
                     parties::Ask::Say { task, words, release, .. } => {
                         people::Ask::Say { project, task: task_number(task), words, release }
                     }

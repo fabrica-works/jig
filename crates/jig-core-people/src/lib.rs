@@ -70,10 +70,10 @@ pub use amendment::{
     ResourceScope, ResultsWake, Spec, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
-    Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity,
-    IdentityKey, InitialOwner, Keep, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole,
-    ProposalChoice, ProposalDecision, Reply, ReplyRef, Request, RequestKey, ResourceName, ResourceRole, ResultRef,
-    Role, Seed, Seen, Stored, Update, Whom,
+    Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, GoalExecutor,
+    Holding, Identity, IdentityKey, InitialOwner, Keep, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult,
+    ProjectRole, ProposalChoice, ProposalDecision, Reply, ReplyRef, Request, RequestKey, ResourceName, ResourceRole,
+    ResultRef, Role, Seed, Seen, Stored, Update, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{FailureClass, HoldReason, Moved};

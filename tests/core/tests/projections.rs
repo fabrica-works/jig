@@ -23,7 +23,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
         ask: people::Ask::SetGoal {
             project: 1,
             spec: Box::from(&b"Project this goal"[..]),
-            charter: 1,
+            executor: jig_core_people::GoalExecutor::Charter(1),
             budget: 20,
             priority: 1,
             deadline: None,
@@ -218,7 +218,7 @@ fn a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_f
         ask: people::Ask::SetGoal {
             project: 1,
             spec: Box::from(&b"Whole tree"[..]),
-            charter: 1,
+            executor: jig_core_people::GoalExecutor::Charter(1),
             budget: 300,
             priority: 1,
             deadline: None,
