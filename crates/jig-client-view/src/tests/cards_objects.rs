@@ -1851,3 +1851,6 @@ mod task_contract;
 
 #[path = "task_authority.rs"]
 mod task_authority;
+
+#[path = "task_budget.rs"]
+mod task_budget;

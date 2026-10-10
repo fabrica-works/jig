@@ -2377,3 +2377,46 @@ fn task_authority_watch_replacements_keep_bitmap_pattern_and_loss_facts_whole() 
         assert_eq!(actual.authority.authority.grants.get(0).unwrap().pattern.segments.get(0).unwrap().as_ref(), b"a/b");
     }
 }
+
+#[test]
+fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_deadlines() {
+    let mut domain = Domain::new(&LIMITS, 78);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    for funder in [
+        Funder::Task(u64::MAX),
+        Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX - 1 },
+        Funder::Recurring { project: u32::MAX, task: u64::MAX, period: u64::MAX - 2 },
+        Funder::Period { project: u32::MAX, period: u64::MAX },
+    ] {
+        for deadline in [None, Some(skein_lib::Wall::EPOCH), Some(skein_lib::Wall::from_nanos(u64::MAX))] {
+            let mut row = super::confirmation::task();
+            row.budget = OwnerBudget {
+                numbers: OwnerNumbers { budget: u64::MAX, spent: u64::MAX - 1, spent_below: 7, reserved: 11 },
+                left: 17,
+                funder,
+                deadline,
+            };
+            row.authority.authority.deadline = Some(skein_lib::Wall::from_nanos(123));
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row.clone()))) },
+            );
+            let id = domain.task_page().header.unwrap();
+            let Some(crate::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole watched task");
+            };
+            assert_eq!(**actual, row);
+            assert_eq!(actual.budget.left, 17, "availability is supplied independently of the numbers");
+            assert_eq!(actual.budget.deadline, deadline, "authority is a separate supplied fact");
+            assert!(crate::pages::task::offered(
+                &crate::pages::task::sections(actual),
+                crate::address::TaskSection::Budget
+            ));
+        }
+    }
+}

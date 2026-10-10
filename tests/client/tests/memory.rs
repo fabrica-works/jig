@@ -47,6 +47,17 @@ fn full_authority() -> jig_client::contract::OwnerAuthorityDocument {
 fn full_task() -> jig_client::contract::Task {
     let mut task = stories::task();
     task.goal = Some(u64::MAX);
+    task.budget = jig_client::contract::OwnerBudget {
+        numbers: jig_client::contract::OwnerNumbers {
+            budget: u64::MAX,
+            spent: u64::MAX,
+            spent_below: u64::MAX,
+            reserved: u64::MAX,
+        },
+        left: u64::MAX,
+        funder: jig_client::contract::Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX },
+        deadline: Some(skein_lib::Wall::from_nanos(u64::MAX)),
+    };
     task.result_contract = full_contract();
     task.authority = full_authority();
     task.chip.title = jig_client::contract::DocumentText::complete(stories::text(&[b't'; 32]));

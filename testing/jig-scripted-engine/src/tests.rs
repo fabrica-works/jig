@@ -2255,3 +2255,5 @@ mod task_contract;
 
 mod page_loss;
 mod task_authority;
+
+mod task_budget;
