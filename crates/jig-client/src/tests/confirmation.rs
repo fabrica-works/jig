@@ -162,6 +162,11 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
         );
         match case {
             1 => {
+                drive(
+                    &mut domain,
+                    Time::ZERO,
+                    Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } },
+                );
                 drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
             }
             2 => edit(&mut domain, Purpose::Answer, b"the answer"),
@@ -171,7 +176,14 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
         let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
         let expected = match case {
             0 => Ask::Release { project: 1, task: 8, revision: Revision { value: 3 }, again: None },
-            1 => Ask::Amend { project: 1, task: 8, revision: Revision { value: 9 }, change: change(), release: None },
+            1 => Ask::Amend {
+                reason: text(b""),
+                project: 1,
+                task: 8,
+                revision: Revision { value: 9 },
+                change: change(),
+                release: None,
+            },
             2 => Ask::AnswerPerson {
                 project: 1,
                 task: 8,
@@ -288,6 +300,7 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
     row.acts = offered(ActKind::Amend, Admission::Proposed { to: Recipient::Party(9) });
     let id = install(&mut domain, Body::Task(Box::new(row.clone())));
     intend(&mut domain, id, ActKind::Amend);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
     row.budget.numbers.spent = 5;
     reread(&mut domain, Body::Task(Box::new(row)), Read::Task { task: 8 });
@@ -297,7 +310,14 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
     assert!(open.missing.is_none());
     assert_eq!(
         sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
-        &Ask::Amend { project: 1, task: 8, revision: Revision { value: 9 }, change: change(), release: None }
+        &Ask::Amend {
+            reason: text(b""),
+            project: 1,
+            task: 8,
+            revision: Revision { value: 9 },
+            change: change(),
+            release: None
+        }
     );
 }
 
@@ -374,10 +394,12 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
         after.grants = List::with_capacity(1);
         after.grants.push(grant).unwrap();
         draft.authority = Some(after);
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
         assert!(domain.confirmation().unwrap().missing.is_none());
         assert_eq!(domain.confirmation().unwrap().proposed, None);
         draft.authority.as_mut().unwrap().spend = 16;
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
         assert_eq!(domain.confirmation().unwrap().proposed, Some(Recipient::Party(9)));
         row.acts = offered(
@@ -405,11 +427,13 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
         );
         assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
         draft.authority = None;
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
         assert_eq!(domain.confirmation().unwrap().proposed, None);
         assert_eq!(
             sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
             &Ask::Amend {
+                reason: text(b""),
                 project: 1,
                 task: 8,
                 revision: row.spec_revision,
@@ -523,12 +547,20 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
     let mut after = row.authority.whole().unwrap();
     after.spend = 16;
     draft.authority = Some(after);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
     assert_eq!(domain.confirmation().unwrap().proposed, Some(recipient));
     assert!(domain.confirmation().unwrap().missing.is_none());
     assert_eq!(
         sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
-        &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: None }
+        &Ask::Amend {
+            reason: text(b""),
+            project: 1,
+            task: 8,
+            revision: row.spec_revision,
+            change: draft,
+            release: None
+        }
     );
 }
 
@@ -656,6 +688,7 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
             after.spend = spend;
             let mut draft = change();
             draft.authority = Some(after);
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
             drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
             let refused = cuts & 1 != 0 || spend > 10 && cuts & 6 != 0;
             if refused {
@@ -667,7 +700,14 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
                 let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
                 assert_eq!(
                     sent(&out),
-                    &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: None }
+                    &Ask::Amend {
+                        reason: text(b""),
+                        project: 1,
+                        task: 8,
+                        revision: row.spec_revision,
+                        change: draft,
+                        release: None
+                    }
                 );
             }
             assert_eq!(row.authority.authority.grants.get(0), Some(&current));
@@ -720,6 +760,7 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
             intend(&mut domain, id, ActKind::Amend);
             let mut draft = change();
             draft.authority = Some(after);
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
             drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
             let confirmation = domain.confirmation().unwrap();
             assert!(confirmation.missing.is_none());
@@ -727,7 +768,14 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
             let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
             assert_eq!(
                 sent(&out),
-                &Ask::Amend { project: 1, task: 8, revision: row.spec_revision, change: draft, release: None }
+                &Ask::Amend {
+                    reason: text(b""),
+                    project: 1,
+                    task: 8,
+                    revision: row.spec_revision,
+                    change: draft,
+                    release: None
+                }
             );
             let Bounds::Amend { implications: retained, .. } = within else { panic!("whole amendment offer") };
             assert_eq!(retained, implications);
@@ -735,3 +783,5 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
         }
     }
 }
+
+mod amendment_reason;

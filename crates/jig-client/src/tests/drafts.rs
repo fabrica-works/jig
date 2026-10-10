@@ -93,8 +93,10 @@ fn prepare_steering(domain: &mut Domain, act: ActKind) -> Ask {
             }
         }
         ActKind::AmendRelease => {
+            drive(domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
             drive(domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
             Ask::Amend {
+                reason: text(b""),
                 project: 1,
                 task: 8,
                 revision: Revision { value: 9 },
@@ -303,6 +305,7 @@ fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_
         intend(&mut domain, id, ActKind::AmendRelease);
         assert_eq!(domain.confirmation().unwrap().revision, Some(Revision { value: 9 }));
         assert_eq!(domain.confirmation().unwrap().release_revision, Some(Revision { value: 3 }));
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
         match which {
             0 => document.hold.as_mut().unwrap().revision = Revision { value: 4 },
@@ -322,16 +325,19 @@ fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_
             }
         );
         // Further draft editing does not acknowledge a newly displayed hold.
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
         drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
         assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
         if which < 2 {
             drive(&mut domain, Time::ZERO, Event::Act { act: Act::Dismiss });
             intend(&mut domain, id, ActKind::AmendRelease);
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
             drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
             let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
             assert_eq!(
                 only_send(&rows).1,
                 &Ask::Amend {
+                    reason: text(b""),
                     project: 1,
                     task: 8,
                     revision: document.spec_revision,

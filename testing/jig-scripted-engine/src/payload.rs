@@ -162,12 +162,13 @@ impl Payload for Ask {
             Self::Release { project, task, revision, again } => {
                 sum(&[project.heap(bounds), task.heap(bounds), revision.heap(bounds), again.heap(bounds)])
             }
-            Self::Amend { project, task, revision, change, release } => sum(&[
+            Self::Amend { project, task, revision, change, release, reason } => sum(&[
                 project.heap(bounds),
                 task.heap(bounds),
                 revision.heap(bounds),
                 change.heap(bounds),
                 release.heap(bounds),
+                reason.heap(bounds),
             ]),
             Self::Cancel { project, task, reason } | Self::TakeOver { project, task, reason } => {
                 sum(&[project.heap(bounds), task.heap(bounds), reason.heap(bounds)])

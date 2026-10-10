@@ -161,17 +161,23 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         ActKind::Release => {
             Some(Ask::Release { project, task, revision: confirmation.revision?, again: choices.again })
         }
-        ActKind::Amend | ActKind::AmendRelease => Some(Ask::Amend {
-            project,
-            task,
-            revision: confirmation.revision?,
-            change: choices.change.clone()?,
-            release: if confirmation.act == ActKind::AmendRelease {
-                Some(confirmation.release_revision?)
-            } else {
-                None
-            },
-        }),
+        ActKind::Amend | ActKind::AmendRelease => {
+            if !confirmation.reason_supplied {
+                return None;
+            }
+            Some(Ask::Amend {
+                project,
+                task,
+                revision: confirmation.revision?,
+                change: choices.change.clone()?,
+                reason: words(fields, Purpose::Reason)?,
+                release: if confirmation.act == ActKind::AmendRelease {
+                    Some(confirmation.release_revision?)
+                } else {
+                    None
+                },
+            })
+        }
         ActKind::Answer => answer(object, confirmation, fields, project, task),
         ActKind::Take => Some(Ask::Take { project, task }),
         ActKind::HandBack => Some(Ask::HandBack { project, task }),

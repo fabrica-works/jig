@@ -83,6 +83,7 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         row.instructions = source.clone();
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, &words(), &mut bindings);
         facts(&tree, source.as_ref());
@@ -119,6 +120,7 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         row.steering.instructions = source.clone();
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, &words(), &mut bindings);
         facts(&tree, source.as_ref());

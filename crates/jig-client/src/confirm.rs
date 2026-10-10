@@ -70,6 +70,8 @@ pub struct Confirmation {
     pub release_revision: Option<Revision>,
     /// A moved hold stays invalid until the person reviews it again.
     pub release_changed: bool,
+    /// A person supplied the reason in this confirmation, including an empty value.
+    pub reason_supplied: bool,
     pub choices: Choices,
     pub missing: Option<Missing>,
     pub changed: bool,
@@ -201,6 +203,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         revision,
         release_revision: if act == ActKind::AmendRelease { acts::hold_revision(object) } else { None },
         release_changed: false,
+        reason_supplied: false,
         choices,
         missing: None,
         changed: false,
@@ -212,6 +215,15 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         Card::Deciding { request: None, progress: Progress::Confirming };
     sync(domain);
     domain.changed();
+}
+/// Receives a successful person edit without mistaking a domain-cleared blank for input.
+pub(crate) fn edited(domain: &mut Domain, field: Purpose) {
+    if field == Purpose::Reason
+        && let Some(open) = domain.confirming.as_mut()
+        && (open.act == ActKind::Amend || open.act == ActKind::AmendRelease)
+    {
+        open.reason_supplied = true;
+    }
 }
 /// Updates only the validity of the revision the act names and the engine's admission.
 pub(crate) fn sync(domain: &mut Domain) {
@@ -448,6 +460,9 @@ fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Miss
             }
             if open.act == ActKind::AmendRelease && open.release_revision.is_none() {
                 return Some(Missing::Refused { why: Refusal::NotOffered });
+            }
+            if !open.reason_supplied || domain.fields.get(Purpose::Reason).is_none() {
+                return Some(Missing::Words { field: Purpose::Reason });
             }
             None
         }

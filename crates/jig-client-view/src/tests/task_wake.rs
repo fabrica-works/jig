@@ -24,6 +24,7 @@ fn whole_wake_channel_edits_preserve_batched_rules_flags_and_separate_subscripti
             let initial = row.clone();
             let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
             drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+            drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
             let words = words();
             let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
             let tree = dialog(&domain, &words, &mut bindings);

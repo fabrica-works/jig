@@ -188,7 +188,7 @@ pub fn frame_nodes(limits: &Limits) -> Option<u32> {
 /// One object or goal dialog, with every delegate and amendment field.
 #[must_use]
 pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
-    let form = amendment(limits)?.checked_mul(2)?.checked_add(limits.rows.checked_mul(3)?)?.checked_add(14)?;
+    let form = amendment(limits)?.checked_mul(2)?.checked_add(limits.rows.checked_mul(3)?)?.checked_add(15)?;
     let delegates = chip_nodes(limits)?.checked_add(4)?.checked_mul(limits.delegates.max(limits.rows))?;
     // The closed act table takes one alternative; using their sum also covers
     // live context, missing/changed statuses, impact, reason and review buttons.

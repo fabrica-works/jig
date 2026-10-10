@@ -19,6 +19,7 @@ fn sent(out: &[Request]) -> &Amendment {
 fn open(row: Task) -> (Domain, Id<Object>) {
     let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
     drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     (domain, id)
 }
 
@@ -155,6 +156,7 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
     let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
     let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
     drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let words = words();
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
     for (label, value) in [
@@ -203,6 +205,7 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
         let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, &words, &mut bindings);
@@ -258,6 +261,7 @@ fn address_controls_require_actual_person_revision_and_keep_task_recipients_outs
         row.steering.addressed = recipient;
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row)));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let tree = dialog(&domain, &words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));
         assert!(

@@ -37,6 +37,7 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
         let before = row.clone();
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, &words, &mut bindings);

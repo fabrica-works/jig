@@ -1203,6 +1203,7 @@ fn escalation_row_scenario(
         let initial_writes = d.confirmation().unwrap().writes;
         drive(&mut d, Event::Act { act: Action::Dismiss });
         drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut d, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         assert!(d.confirmation().unwrap().writes > initial_writes);
         let tree = dialog(&d, words, bindings);
         let value = tree
@@ -1401,6 +1402,7 @@ fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
     let expected = row.spec.whole().unwrap();
     let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
     drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let words = words();
     let mut bindings = JigBindings::new(256, CLIENT.text);
     let tree = dialog(&domain, &words, &mut bindings);
@@ -1448,6 +1450,7 @@ fn cut_specification_is_shown_and_cannot_be_reconstructed_by_the_words_editor() 
     builder.close();
     assert!(contains(&builder.finish(), b"The specification is incomplete"));
     drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let mut bindings = JigBindings::new(256, CLIENT.text);
     let tree = dialog(&domain, &words, &mut bindings);
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
@@ -1517,6 +1520,7 @@ fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_e
         assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(256, CLIENT.text);
         let tree = dialog(&domain, &words, &mut bindings);
         if mask != 0 {
@@ -1860,3 +1864,4 @@ mod task_budget;
 
 #[path = "task_ending.rs"]
 mod task_ending;
+mod amendment_reason;

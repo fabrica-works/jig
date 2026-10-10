@@ -156,6 +156,7 @@ fn action(
                 &[],
             );
             amendment::form(b, client, object, open, words, bindings);
+            common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
             if let Some(revision) = open.release_revision {
                 words.text(b, JigPhrase::HoldRevision, &[Hole::Number(revision.value)]);
             }

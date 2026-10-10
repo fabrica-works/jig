@@ -952,6 +952,7 @@ fn bounded_offer_payloads_and_predictions() {
         let mut after = owner_authority().whole().unwrap();
         after.spend = budget;
         let ask = Ask::Amend {
+            reason: text(b""),
             project: 1,
             task: 8,
             revision: Revision { value: 1 },
@@ -1158,6 +1159,7 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
             1,
             1,
             Ask::Amend {
+                reason: text(b""),
                 project: 1,
                 task: 8,
                 revision: Revision { value: if stale_hold { 1 } else { 2 } },
@@ -2274,3 +2276,4 @@ mod history_pages;
 
 mod question_sender;
 mod task_ending;
+mod amendment_reason;

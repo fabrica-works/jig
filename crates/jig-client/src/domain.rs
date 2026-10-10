@@ -649,7 +649,10 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
             }
         }
         Act::Edit { field, text } => match domain.fields.edit(field, text) {
-            Ok(()) => domain.changed(),
+            Ok(()) => {
+                crate::confirm::edited(domain, field);
+                domain.changed();
+            }
             Err(which) => {
                 crate::pages::routing::refuse(domain, which);
                 out.push(Request::Fact { fact: Fact::Refused { which } });

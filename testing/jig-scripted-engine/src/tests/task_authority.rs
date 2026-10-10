@@ -36,6 +36,7 @@ fn task_authority_receiving_prices_whole_documents_replacements_and_reserved_nes
         assert_eq!(row, before);
         bounds.document_bytes = u64::MAX;
         let ask = Ask::Amend {
+            reason: text(b""),
             project: 1,
             task: 8,
             revision: Revision { value: 1 },
