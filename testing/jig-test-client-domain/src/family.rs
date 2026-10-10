@@ -73,6 +73,7 @@ impl Document {
         }
     }
     #[must_use]
+    #[expect(clippy::manual_map, reason = "step code matches optional values explicitly")]
     pub fn revision(&self) -> Option<Revision> {
         match self {
             Self::Item(item) => Some(item.revision),
