@@ -14,7 +14,7 @@ fn rows(values: &[ConversationLine]) -> List<ConversationLine> {
     }
     result
 }
-fn watch_rows(domain: &mut Domain, watch: Token, values: &[ConversationLine]) {
+fn watch_rows(domain: &mut Domain, watch: Token, values: &[ConversationLine]) -> Box<[Request]> {
     drive(
         domain,
         Time::ZERO,
@@ -25,7 +25,7 @@ fn watch_rows(domain: &mut Domain, watch: Token, values: &[ConversationLine]) {
                 more: true,
             }))),
         },
-    );
+    )
 }
 fn read_rows(
     domain: &mut Domain,
@@ -59,7 +59,7 @@ fn reply(domain: &Domain, task: u64) -> &crate::objects::result::Reply {
 fn a_stale_read_preserves_one_current_conversation_and_its_reply() {
     let (mut domain, watch, first) = live_conversation_page(7101);
     let old = list_entry(8, Phase::Idle, 99);
-    watch_rows(&mut domain, watch, &[old.clone()]);
+    watch_rows(&mut domain, watch, core::slice::from_ref(&old));
     let mut current = old.clone();
     current.first_words = DocumentText { bytes: text(b"\xff\x00whole"), cut: true };
     current.seen = 0;
@@ -69,7 +69,7 @@ fn a_stale_read_preserves_one_current_conversation_and_its_reply() {
     current.unread = None;
     current.cached_replies = u32::MAX;
     current.budget.left = u64::MAX;
-    watch_rows(&mut domain, watch, &[current.clone()]);
+    watch_rows(&mut domain, watch, core::slice::from_ref(&current));
     assert_eq!(reply(&domain, 8).first_words.bytes(), b"\xff\x00whole");
     let opaque = cursor(b"\xff\x00opaque-row");
     read_rows(&mut domain, first, &[old], None, Some(opaque.clone()), true);
@@ -132,7 +132,7 @@ fn opposite_edge_reads_keep_their_opaque_cursor_and_drop_the_other_end() {
     let eight = list_entry(8, Phase::Idle, 10);
     let nine = list_entry(9, Phase::Done, 9);
     let ten = list_entry(10, Phase::Done, 8);
-    watch_rows(&mut domain, watch, &[eight.clone()]);
+    watch_rows(&mut domain, watch, core::slice::from_ref(&eight));
     let older = cursor(b"\xff\x00older");
     read_rows(&mut domain, first, &[eight.clone(), nine.clone()], None, Some(older.clone()), true);
     let read = more(&mut domain, End::After, &older);
@@ -153,9 +153,9 @@ fn opposite_edge_reads_keep_their_opaque_cursor_and_drop_the_other_end() {
     assert_eq!(reply(&domain, 9).first_unread, 3);
     let object = domain.objects().get(domain.objects().find(ObjectKey::Task(9)).unwrap()).unwrap();
     assert_eq!(object.project, Some(1));
-    assert!(matches!(object.card, crate::objects::Card::Open));
+    assert_eq!(object.card, crate::objects::Card::Open);
     let object = domain.objects().get(domain.objects().find(ObjectKey::Task(10)).unwrap()).unwrap();
-    assert!(matches!(object.card, crate::objects::Card::Open));
+    assert_eq!(object.card, crate::objects::Card::Open);
     let read = more(&mut domain, End::Before, &back);
     let forward = cursor(b"\xffforward");
     read_rows(&mut domain, read, &[eight.clone(), nine.clone()], None, Some(forward.clone()), false);
@@ -171,13 +171,15 @@ fn a_live_replacement_keeps_read_rows_and_clears_its_own_unread_receipt() {
     let (mut domain, watch, first) = live_conversation_page(7103);
     let eight = list_entry(8, Phase::Idle, 10);
     let ended = list_entry(9, Phase::Done, 9);
-    watch_rows(&mut domain, watch, &[eight.clone()]);
+    let observed = watch_rows(&mut domain, watch, core::slice::from_ref(&eight));
+    let task_read = read_named(&observed, &Read::Task { task: 8 });
+    assert_ne!(task_read, first, "the object document has an independent terminal obligation");
     let after = cursor(b"past");
     read_rows(&mut domain, first, &[eight.clone(), ended.clone()], None, Some(after.clone()), true);
     let mut seen = eight;
     seen.seen = seen.last_reply;
     seen.unread = Some(Count { value: 0, limited: false });
-    watch_rows(&mut domain, watch, &[seen.clone()]);
+    watch_rows(&mut domain, watch, core::slice::from_ref(&seen));
     assert_eq!(domain.conversation_rows().rows.as_slice(), &[seen, ended.clone()]);
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
     assert!(domain.objects().get(id).unwrap().reply.is_none());
@@ -188,7 +190,13 @@ fn a_live_replacement_keeps_read_rows_and_clears_its_own_unread_receipt() {
     assert_eq!(domain.conversation_rows().edges.after, Edge::More(after));
     let removed = domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap();
     assert!(removed.sources.is_empty());
-    assert!(matches!(removed.card, crate::objects::Card::Leaving { how: crate::objects::Left::Looking, .. }));
+    assert_eq!(
+        removed.card,
+        crate::objects::Card::Leaving {
+            how: crate::objects::Left::Looking,
+            until: Time::ZERO.saturating_add(LIMITS.linger)
+        }
+    );
     assert_eq!(reply(&domain, 9).first_unread, 3);
 }
 #[test]
@@ -196,8 +204,8 @@ fn old_page_terminals_and_sibling_clients_cannot_replace_current_conversations()
     let (mut domain, old_watch, old_read) = live_conversation_page(7104);
     let (mut sibling, sibling_watch, sibling_read) = live_conversation_page(7104);
     let sibling_row = list_entry(80, Phase::Idle, 8);
-    watch_rows(&mut sibling, sibling_watch, &[sibling_row.clone()]);
-    read_rows(&mut sibling, sibling_read, &[sibling_row.clone()], None, None, false);
+    watch_rows(&mut sibling, sibling_watch, core::slice::from_ref(&sibling_row));
+    read_rows(&mut sibling, sibling_read, core::slice::from_ref(&sibling_row), None, None, false);
     drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
     domain.reclaim();
     let entered =
@@ -207,7 +215,7 @@ fn old_page_terminals_and_sibling_clients_cannot_replace_current_conversations()
     let mut current = list_entry(8, Phase::Idle, 1);
     current.project = 2;
     current.first_words = DocumentText { bytes: text(b"\xffcurrent"), cut: true };
-    watch_rows(&mut domain, watch, &[current.clone()]);
+    watch_rows(&mut domain, watch, core::slice::from_ref(&current));
     watch_rows(&mut domain, old_watch, &[list_entry(90, Phase::Idle, 99)]);
     read_rows(&mut domain, old_read, &[list_entry(91, Phase::Idle, 99)], None, Some(cursor(b"stale")), true);
     read_rows(&mut domain, read, &[list_entry(8, Phase::Idle, 99)], None, None, false);
