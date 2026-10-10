@@ -77,7 +77,7 @@ pub(super) fn task() -> Task {
             deadline: None,
         },
         authority: owner_authority(),
-        hold: Some(escalation().hold),
+        hold: Some(TaskHold::Document(Box::new(escalation().hold))),
         escalation: None,
         proposals: List::with_capacity(0),
         activity: 0,
@@ -438,7 +438,7 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
                 task: 8,
                 revision: row.spec_revision,
                 change: draft,
-                release: if act == ActKind::AmendRelease { Some(row.hold.as_ref().unwrap().revision) } else { None }
+                release: if act == ActKind::AmendRelease { Some(row.hold.as_ref().unwrap().revision()) } else { None }
             }
         );
     }

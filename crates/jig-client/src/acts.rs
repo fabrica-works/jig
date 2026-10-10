@@ -42,7 +42,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
     match act {
         ActKind::Release | ActKind::LeaveHeld | ActKind::PassUp => match &object.body {
             Some(Body::Escalation(document)) => Some(document.hold.revision),
-            Some(Body::Task(document)) => Some(document.hold.as_ref()?.revision),
+            Some(Body::Task(document)) => Some(document.hold.as_ref()?.revision()),
             Some(
                 Body::Chip(_)
                 | Body::Proposal(_)
@@ -119,7 +119,7 @@ pub fn hold_revision(object: &Object) -> Option<Revision> {
             let Some(hold) = &document.hold else {
                 return None;
             };
-            Some(hold.revision)
+            Some(hold.revision())
         }
         Some(Body::Escalation(document)) => Some(document.hold.revision),
         Some(

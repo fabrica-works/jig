@@ -10,7 +10,7 @@ use jig_client::{
     Domain,
     action::Act,
     confirm::{Confirmation, Missing},
-    contract::{ActKind, Hold, HoldReason, Impact, ObjectKey},
+    contract::{ActKind, Hold, HoldReason, Impact, ObjectKey, OwnerChipHold, TaskHold},
     fields::Purpose,
     objects::{Body, Object},
 };
@@ -142,9 +142,7 @@ fn action(
             }
         }
         ActKind::Release => {
-            if let Some(hold) = held(object) {
-                release(b, client, hold, words, bindings);
-            }
+            release_object(b, client, object, words, bindings);
             if let Some(again) = open.choices.again {
                 words.text(b, if again { JigPhrase::RepeatEffect } else { JigPhrase::SkipEffect }, &[]);
             }
@@ -160,10 +158,8 @@ fn action(
             if let Some(revision) = open.release_revision {
                 words.text(b, JigPhrase::HoldRevision, &[Hole::Number(revision.value)]);
             }
-            if open.act == ActKind::AmendRelease
-                && let Some(hold) = held(object)
-            {
-                release(b, client, hold, words, bindings);
+            if open.act == ActKind::AmendRelease {
+                release_object(b, client, object, words, bindings);
             }
         }
         ActKind::Answer => {
@@ -219,7 +215,7 @@ fn action(
                 | ObjectKey::Result(_)
                 | ObjectKey::Note { .. } => {}
             }
-            if held(object).is_some() {
+            if held(object) {
                 crate::frame::control(
                     b,
                     words,
@@ -292,10 +288,10 @@ fn action(
         | ActKind::SetPool => words.refusal(b, &jig_client::contract::Refusal::NotOffered),
     }
 }
-fn held(object: &Object) -> Option<&Hold> {
+fn held(object: &Object) -> bool {
     match &object.body {
-        Some(Body::Task(doc)) => doc.hold.as_ref(),
-        Some(Body::Escalation(doc)) => Some(&doc.hold),
+        Some(Body::Task(doc)) => doc.hold.is_some(),
+        Some(Body::Escalation(_)) => true,
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
@@ -304,7 +300,53 @@ fn held(object: &Object) -> Option<&Hold> {
             | Body::Result(_)
             | Body::Note { .. },
         )
-        | None => None,
+        | None => false,
+    }
+}
+fn release_object(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bindings: &mut JigBindings) {
+    match &object.body {
+        Some(Body::Task(doc)) => match &doc.hold {
+            Some(TaskHold::Document(hold)) => release(b, client, hold, words, bindings),
+            Some(TaskHold::Owner(hold)) => release_owner(b, hold, words, bindings),
+            None => {}
+        },
+        Some(Body::Escalation(doc)) => release(b, client, &doc.hold, words, bindings),
+        Some(
+            Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => {}
+    }
+}
+/// Release follows the supplied prior lifecycle and resets all failure counts
+/// (tasks.md, 9); only an uncertain entry needs the person's repeat choice.
+fn release_owner(b: &mut Builder, facts: &OwnerChipHold, words: &Words, bindings: &mut JigBindings) {
+    crate::owner_chip::hold(b, facts, words, bindings);
+    words.text(b, JigPhrase::OwnerHoldRelease, &[]);
+    if let jig_client::contract::HoldCategory::Uncertain { .. } = facts.reason {
+        words.text(b, JigPhrase::EngineFollowsChoice, &[]);
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::RepeatEffect,
+            &[],
+            Act::Again { again: true },
+        );
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::SkipEffect,
+            &[],
+            Act::Again { again: false },
+        );
     }
 }
 fn impact(object: &Object) -> Option<&Impact> {

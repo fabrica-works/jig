@@ -6,6 +6,7 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    OwnerHoldRelease,
     QuestionFromTask,
     QuestionFromPerson,
     QuestionFromDeployment,
@@ -1076,6 +1077,7 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::OwnerHoldRelease => 673,
             Self::QuestionFromTask => 670,
             Self::QuestionFromPerson => 671,
             Self::QuestionFromDeployment => 672,
@@ -1708,7 +1710,8 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::PageCut
+            Self::OwnerHoldRelease
+            | Self::PageCut
             | Self::NoteChangedNotSupplied
             | Self::TaskListsCut
             | Self::FramePerson
@@ -2347,7 +2350,8 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 609] = [
+pub const ALL: [JigPhrase; 610] = [
+    JigPhrase::OwnerHoldRelease,
     JigPhrase::QuestionFromTask,
     JigPhrase::QuestionFromPerson,
     JigPhrase::QuestionFromDeployment,

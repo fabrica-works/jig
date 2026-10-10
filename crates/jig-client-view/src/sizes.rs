@@ -195,6 +195,7 @@ pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
     chip_nodes(limits)?
         .checked_add(form.max(proposal_action(limits)?).max(person_contract(limits)?).max(markdown(limits)?))?
         .checked_add(delegates)?
+        .checked_add(crate::owner_chip::max_nodes(limits)?)?
         .checked_add(limits.rows)?
         .checked_add(66)
 }

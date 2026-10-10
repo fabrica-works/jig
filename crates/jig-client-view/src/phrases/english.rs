@@ -13,6 +13,9 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::OwnerHoldRelease => {
+                Box::new([Segment::Text(copy_of(b"Release continues from the shown lifecycle; failure counts reset"))])
+            }
             JigPhrase::QuestionFromTask => Box::new([
                 Segment::Text(copy_of(b"Question from task ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

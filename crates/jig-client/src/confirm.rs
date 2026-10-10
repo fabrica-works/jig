@@ -345,9 +345,22 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
 }
 
 fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
-    let hold = match &object.body {
-        Some(Body::Task(document)) => document.hold.as_ref(),
-        Some(Body::Escalation(document)) => Some(&document.hold),
+    let uncertain = match &object.body {
+        Some(Body::Task(document)) => document.hold.as_ref().map(crate::contract::TaskHold::uncertain),
+        Some(Body::Escalation(document)) => Some(match &document.hold.reason {
+            HoldReason::EffectUncertain { .. } => true,
+            HoldReason::Tries { .. }
+            | HoldReason::Stalled { .. }
+            | HoldReason::Dependency { .. }
+            | HoldReason::Drift { .. }
+            | HoldReason::EffectFailed { .. }
+            | HoldReason::Budget { .. }
+            | HoldReason::Deadline { .. }
+            | HoldReason::Stopped { .. }
+            | HoldReason::Resource { .. }
+            | HoldReason::Pool { .. }
+            | HoldReason::Procedure { .. } => false,
+        }),
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
@@ -358,26 +371,11 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
         )
         | None => None,
     };
-    let Some(hold) = hold else {
+    let Some(uncertain) = uncertain else {
         return Some(Missing::Refused { why: Refusal::NotOffered });
     };
-    match hold.reason {
-        HoldReason::EffectUncertain { .. } => {
-            if open.choices.again.is_none() {
-                return Some(Missing::Again);
-            }
-        }
-        HoldReason::Tries { .. }
-        | HoldReason::Stalled { .. }
-        | HoldReason::Dependency { .. }
-        | HoldReason::Drift { .. }
-        | HoldReason::EffectFailed { .. }
-        | HoldReason::Budget { .. }
-        | HoldReason::Deadline { .. }
-        | HoldReason::Stopped { .. }
-        | HoldReason::Resource { .. }
-        | HoldReason::Pool { .. }
-        | HoldReason::Procedure { .. } => {}
+    if uncertain && open.choices.again.is_none() {
+        return Some(Missing::Again);
     }
     None
 }

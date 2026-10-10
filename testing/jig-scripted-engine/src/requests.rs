@@ -3,7 +3,7 @@
 use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
 use jig_client::contract::{
     ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
-    Outcome, OwnerRequester, Phase, ReadValue, Recipient, Refusal, Revision, Runtime,
+    Outcome, OwnerRequester, Phase, ReadValue, Recipient, Refusal, Revision, Runtime, TaskHold,
 };
 use skein_lib::{List, Time, Token, Wall};
 
@@ -109,7 +109,7 @@ impl<A: crate::Application> Engine<A> {
             if let Some((seen, what)) = revision {
                 let current = match (value, &what) {
                     (ReadValue::Task(value), Moved::Spec) => Some(value.spec_revision),
-                    (ReadValue::Task(value), Moved::Hold { .. }) => value.hold.as_ref().map(|hold| hold.revision),
+                    (ReadValue::Task(value), Moved::Hold { .. }) => value.hold.as_ref().map(TaskHold::revision),
                     (ReadValue::Escalation(value), Moved::Hold { .. }) => Some(value.hold.revision),
                     (ReadValue::PersonTask(value), Moved::PersonTask) => Some(value.revision),
                     (

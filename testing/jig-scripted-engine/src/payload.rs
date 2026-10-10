@@ -1283,3 +1283,12 @@ fields!(jig_client::contract::OwnerPhaseCounts {
 
 #[cfg(test)]
 mod question;
+
+impl Payload for TaskHold {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Document(value) => value.heap(bounds),
+            Self::Owner(value) => value.heap(bounds),
+        }
+    }
+}

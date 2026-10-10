@@ -582,14 +582,14 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
     let mut world = world(seed);
     let mut held = task();
     let reason = HoldReason::Stopped { by: party(7), at: Wall::EPOCH };
-    held.hold = Some(Hold {
+    held.hold = Some(TaskHold::Document(Box::new(Hold {
         revision: Revision { value: 4 },
         reason: reason.clone(),
         before: Phase::Running,
         since: Wall::EPOCH,
         result: None,
         spend: list([]),
-    });
+    })));
     held.chip.phase = Phase::Held;
     held.chip.details =
         Box::new(ChipPhase::Held { reason, since: Wall::EPOCH, revision: Revision { value: 4 }, was: None });

@@ -178,7 +178,7 @@ pub struct Task {
     pub resources: List<super::TaskResource>,
     pub budget: super::OwnerBudget,
     pub authority: super::OwnerAuthorityDocument,
-    pub hold: Option<Hold>,
+    pub hold: Option<super::TaskHold>,
     pub escalation: Option<Escalation>,
     pub proposals: List<ProposalKey>,
     pub activity: u64,

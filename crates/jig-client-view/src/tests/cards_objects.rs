@@ -802,7 +802,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
             deadline: None,
         },
         authority: owner_authority(),
-        hold: Some(escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[]).hold),
+        hold: Some(TaskHold::Document(Box::new(escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[]).hold))),
         escalation: None,
         proposals: list([]),
         activity: 0,
@@ -1495,7 +1495,7 @@ fn retained_task_facts_keep_person_revision_taker_and_full_executor_identity_ind
         assert_eq!(retained.person_revision, person_revision);
         assert_eq!(retained.taken_by, taken_by);
         assert_eq!(retained.spec_revision, Revision { value: 6 });
-        assert_eq!(retained.hold.as_ref().unwrap().revision, Revision { value: 4 });
+        assert_eq!(retained.hold.as_ref().unwrap().revision(), Revision { value: 4 });
     }
 }
 
