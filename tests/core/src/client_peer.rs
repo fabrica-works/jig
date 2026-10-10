@@ -48,6 +48,10 @@ impl ClientPeer {
     ///
     /// # Errors
     /// Returns the same delivery when its external consumer is another peer.
+    #[expect(
+        clippy::result_large_err,
+        reason = "return the whole owned envelope without allocating or changing its boundary"
+    )]
     pub fn capture(&mut self, commit: u64, delivery: root::Delivery) -> Result<(), root::Delivery> {
         let delivery = if let Some(replies) = &self.replies {
             if let root::Delivery::Core(core::Held::PeopleReply { to, sign_in, reply }) = delivery {

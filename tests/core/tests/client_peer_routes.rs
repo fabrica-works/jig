@@ -158,6 +158,10 @@ fn interleaved_destinations_route_by_registration_even_for_the_same_person() {
     let party = &world.peers.as_ref().expect("peers").parties[0];
     assert!(party.quiescent());
     assert_eq!(party.replies.len(), 2);
+    let scripted_session = party.sign_in.expect("independent session");
+    assert_ne!(scripted_session, first_session);
+    assert_ne!(scripted_session, second_session);
+    assert_eq!(party.replies[0], (SCRIPTED, parties::Reply::SignedIn { person, sign_in: scripted_session }));
     assert_eq!(party.replies[1], (SCRIPTED + 1, parties::Reply::Done));
     assert_eq!(world.people_answers.len(), 2);
 }
@@ -248,6 +252,19 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
     assert_eq!(replay.len(), 1);
     assert_eq!((replay[0].1, replay[0].2, replay[0].3), (CLIENT, None, first[0].3));
     assert!(replay[0].0 <= world.store.applied);
+    assert_eq!(
+        world
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(
+                row,
+                root::Record::Core(core::Record::Tasks(tasks::Stored::Live(_) | tasks::Stored::Ended(_)))
+            ))
+            .count(),
+        1,
+        "replay creates no second task"
+    );
     assert_eq!(
         world
             .store
