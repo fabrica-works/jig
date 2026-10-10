@@ -346,7 +346,10 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
 
 fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
     let uncertain = match &object.body {
-        Some(Body::Task(document)) => document.hold.as_ref().map(crate::contract::TaskHold::uncertain),
+        Some(Body::Task(document)) => match &document.hold {
+            Some(hold) => Some(hold.uncertain()),
+            None => None,
+        },
         Some(Body::Escalation(document)) => Some(match &document.hold.reason {
             HoldReason::EffectUncertain { .. } => true,
             HoldReason::Tries { .. }

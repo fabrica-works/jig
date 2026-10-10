@@ -11,7 +11,7 @@ fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at
     let mut path = List::with_capacity(2);
     path.push(Box::<[u8]>::from([255_u8; 32])).unwrap();
     let held = OwnerChipHold {
-        source: Some(OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Hold, key: OwnerPartKey::Path(path) }),
+        source: Some(OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path) }),
         reason: HoldCategory::Uncertain { entry: u64::MAX },
         revision: u64::MAX,
         before: OwnerPriorPhase::Closing(ClosingStage::Effects),

@@ -5,7 +5,11 @@ fn owner(reason: HoldCategory) -> OwnerChipHold {
     segments.push(Box::<[u8]>::from(*b"a/b")).unwrap();
     segments.push(Box::<[u8]>::from([255_u8, 0])).unwrap();
     OwnerChipHold {
-        source: Some(OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Hold, key: OwnerPartKey::Path(segments) }),
+        source: Some(OwnerPart {
+            connector: u16::MAX,
+            kind: OwnerPartKind::Resource,
+            key: OwnerPartKey::Path(segments),
+        }),
         reason,
         revision: u64::MAX,
         before: OwnerPriorPhase::Closing(ClosingStage::Effects),

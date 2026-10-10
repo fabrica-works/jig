@@ -6,7 +6,7 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
     for _ in 0..CLIENT.rows {
         segments.push(Box::<[u8]>::from([255_u8; 32])).unwrap();
     }
-    let reference = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Hold, key: OwnerPartKey::Path(segments) };
+    let reference = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(segments) };
     for uncertain in [false, true] {
         for wait in [None, Some(Wall::from_nanos(u64::MAX))] {
             for prior in [
