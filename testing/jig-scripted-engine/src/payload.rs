@@ -774,7 +774,7 @@ fields!(ConversationLine {
     last_reply,
     changed
 });
-fields!(Conversations { rows, more });
+fields!(Conversations { rows, more, after });
 fields!(GoalLine { changed, chip, priority, progress, budget, held_below });
 fields!(Goals { project, rows, more });
 fields!(Project {

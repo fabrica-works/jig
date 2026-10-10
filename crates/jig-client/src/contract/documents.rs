@@ -738,7 +738,10 @@ pub struct ConversationLine {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Conversations {
     pub rows: List<ConversationLine>,
+    /// Whether another live slice follows; independent from retained past.
     pub more: bool,
+    /// Complete opaque read-owner continuation after this live snapshot.
+    pub after: Cursor,
 }
 
 /// A goal on the project board.
