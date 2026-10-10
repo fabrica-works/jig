@@ -381,7 +381,7 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
     let words = Words { book, language: 1, offset_minutes: 1 };
     let fragment = view::required(&words).unwrap();
     assert!(fragment.text_per_node >= 2048);
-    assert!(crate::Limits::of_words(&super::cards::CLIENT, &words).unwrap().text_per_node >= 2048);
+    assert!(Limits::of_words(&super::cards::CLIENT, &words).unwrap().text_per_node >= 2048);
     let value = OwnerOutcome::ProposalDecided {
         proposal: ProposalKey { proposer: Proposer::Party(u64::MAX), number: 17 },
         by: 23,
