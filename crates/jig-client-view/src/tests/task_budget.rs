@@ -40,9 +40,9 @@ fn task_budget_page_renders_all_owner_funders_numbers_and_deadline_presence_with
             let tree = budget_page(row);
             for number in [
                 b"Budget: 18446744073709551615".as_slice(),
-                b"Spent: 4",
-                b"Spent below: 7",
-                b"Reserved: 11",
+                b"Spent directly: 4",
+                b"Settled spend below: 7",
+                b"Reserved for funded work: 11",
                 b"Left: 17",
             ] {
                 assert!(contains(&tree, number));
