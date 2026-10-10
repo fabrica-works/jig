@@ -60,3 +60,4 @@ mod task_resources;
 
 mod owner_proposal;
 mod task_context;
+mod owner_person_task;

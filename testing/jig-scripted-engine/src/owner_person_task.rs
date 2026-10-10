@@ -34,4 +34,4 @@ pub fn worst_case(bounds: &Bounds) -> Option<u64> {
     }
 }
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
