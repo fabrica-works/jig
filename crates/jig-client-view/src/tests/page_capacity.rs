@@ -7,7 +7,7 @@
 use super::{
     cards::{CLIENT, document, drive, start, words},
     pages::deliver,
-    work_pages::{chip, list, part, project_doc, recurring_task},
+    work_pages::{chip, list, part, project_doc},
 };
 use crate::{Builder, JigBindings, Owner, Role, SlotRef, Tree, words::Words};
 use jig_client::{
@@ -211,7 +211,7 @@ fn project_pages(words: &Words) {
         let recurring = Recurring {
             chip: full_chip(7),
             key: u32::MAX,
-            batch: list([recurring_task(1, full().bytes()), recurring_task(2, full().bytes())]),
+            batch: list([super::proposed_task::full_template(1), super::proposed_task::full_template(2)]),
             budget: u64::MAX,
             overlap: RecurringOverlap::Wait,
             last_period: u64::MAX,
