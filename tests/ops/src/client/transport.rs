@@ -9,7 +9,7 @@ use jig_scripted_engine::{self as engine, ApplicationScope, Envelope, Up};
 use sha2::{Digest, Sha256};
 use skein_lib::{RequestEnvelope, Time, Token, Wall};
 use skein_world::domain::Ledger;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Channel {
@@ -28,6 +28,7 @@ pub struct Scripted {
     pub engine: engine::Engine<OpsScript>,
     routes: BTreeMap<Token, Route>,
     parties: BTreeMap<ClientId, u64>,
+    hellos: BTreeSet<ClientId>,
     ledger: Ledger<Token, ()>,
     serial: u64,
     committed: usize,
@@ -51,6 +52,7 @@ impl Scripted {
             engine: engine::Engine::with_application(script, seed, ops).expect("Ops fixture admitted"),
             routes: BTreeMap::new(),
             parties: BTreeMap::new(),
+            hellos: BTreeSet::new(),
             ledger: Ledger::new("Ops shell operation"),
             serial: 0,
             committed: 0,
@@ -182,6 +184,7 @@ fn end(channel: Channel, local: Token, why: WatchEnd) -> Event {
 impl Front<Ops> for Scripted {
     fn bind(&mut self, client: ClientId, party: u64) {
         self.parties.insert(client, party);
+        self.hellos.insert(client);
     }
     #[expect(
         clippy::too_many_lines,
@@ -351,7 +354,10 @@ impl Front<Ops> for Scripted {
     }
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
         self.recover(now, wall);
-        let mut delivered = vec![];
+        let mut delivered: Vec<_> = std::mem::take(&mut self.hellos)
+            .into_iter()
+            .map(|client| (client, Event::Jig(jig_client::Event::Hello { versions: self.engine.versions() })))
+            .collect();
         for up in self.engine.poll(now) {
             let token = match &up {
                 Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => *attempt,
@@ -448,6 +454,9 @@ impl Front<Ops> for Scripted {
         delivered
     }
     fn next_due(&self) -> Option<Time> {
+        if !self.hellos.is_empty() {
+            return Some(Time::ZERO);
+        }
         match (self.recovery, self.engine.next_due()) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, None) | (None, a) => a,
@@ -491,7 +500,10 @@ impl Front<Ops> for Scripted {
             FrontFault::SignedOut => {
                 engine::Fault::SignOut { sign_in: *self.parties.values().next().expect("bound client") }
             }
-            FrontFault::Versions => engine::Fault::Versions(VersionRange { first: 2, last: 2 }),
+            FrontFault::Versions => {
+                self.hellos.extend(self.parties.keys().copied());
+                engine::Fault::Versions(VersionRange { first: 2, last: 2 })
+            }
             FrontFault::ObjectGone => {
                 if let Some(key) = self.last_object {
                     if self.recovery.is_some_and(|at| now < at) {
@@ -506,6 +518,7 @@ impl Front<Ops> for Scripted {
         self.engine.fault(now, fault);
     }
     fn reload(&mut self, client: ClientId, now: Time) {
+        self.hellos.insert(client);
         let abandoned: Vec<_> =
             self.routes.iter().filter_map(|(token, route)| (route.client == client).then_some(*token)).collect();
         for token in abandoned {
