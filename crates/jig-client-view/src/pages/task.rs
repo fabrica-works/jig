@@ -111,7 +111,7 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
 }
 fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
     crate::specification::document(b, &doc.spec, words);
-    crate::instructions::document(b, &doc.instructions, words);
+    crate::instructions::document(b, doc.instructions.as_ref(), words);
     result_contract(b, &doc.result_contract, words, bindings);
     words.actor(b, doc.requester);
     cards::chip::wake(b, &doc.wake, words, bindings);

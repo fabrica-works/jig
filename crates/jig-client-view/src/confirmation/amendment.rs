@@ -196,8 +196,8 @@ pub fn form(
 }
 fn loss(b: &mut Builder, object: &Object, words: &Words) {
     match &object.body {
-        Some(Body::Task(doc)) => crate::instructions::before(b, &doc.instructions, words),
-        Some(Body::Escalation(doc)) => crate::instructions::before(b, &doc.steering.instructions, words),
+        Some(Body::Task(doc)) => crate::instructions::before(b, doc.instructions.as_ref(), words),
+        Some(Body::Escalation(doc)) => crate::instructions::before(b, doc.steering.instructions.as_ref(), words),
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
@@ -314,7 +314,7 @@ fn before(object: &Object) -> Option<Amendment> {
                 | jig_client::contract::ChipPhase::Ended { .. } => None,
             },
             spec: doc.spec.whole(),
-            instructions: crate::instructions::whole(&doc.instructions),
+            instructions: crate::instructions::whole(doc.instructions.as_ref()),
             wake: Some(doc.wake.clone()),
             dependencies: Some(numbers(&doc.dependencies)),
             authority: Some(doc.authority.clone()),
@@ -322,7 +322,7 @@ fn before(object: &Object) -> Option<Amendment> {
         Some(Body::Escalation(doc)) => Amendment {
             addressed: doc.steering.addressed.clone(),
             spec: doc.steering.spec.whole(),
-            instructions: crate::instructions::whole(&doc.steering.instructions),
+            instructions: crate::instructions::whole(doc.steering.instructions.as_ref()),
             wake: Some(doc.steering.wake.clone()),
             dependencies: Some(doc.steering.dependencies.clone()),
             authority: Some(doc.steering.authority.clone()),

@@ -1642,7 +1642,7 @@ fn optional_instruction_sources_price_whole_task_and_steering_at_byte_and_text_b
             wake: row.wake.clone(),
             dependencies: List::with_capacity(0),
             authority: row.authority.clone(),
-            budget: row.budget.clone(),
+            budget: budget(),
         };
         let mut absent = row.clone();
         absent.instructions = None;

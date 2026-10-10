@@ -6,7 +6,7 @@ use jig_client::{
 };
 
 /// Show the supplied text, its own loss, known empty text or absence.
-pub(crate) fn document(b: &mut Builder, value: &Option<DocumentText>, words: &Words) {
+pub(crate) fn document(b: &mut Builder, value: Option<&DocumentText>, words: &Words) {
     if let Some(value) = value {
         supplied(b, value, words);
     } else {
@@ -14,7 +14,7 @@ pub(crate) fn document(b: &mut Builder, value: &Option<DocumentText>, words: &Wo
     }
 }
 /// The amendment already shows complete text; retain its other supplied facts beside it.
-pub(crate) fn before(b: &mut Builder, value: &Option<DocumentText>, words: &Words) {
+pub(crate) fn before(b: &mut Builder, value: Option<&DocumentText>, words: &Words) {
     let Some(value) = value else {
         words.text(b, JigPhrase::InstructionNotSupplied, &[]);
         return;
@@ -30,7 +30,7 @@ fn supplied(b: &mut Builder, value: &DocumentText, words: &Words) {
     crate::document_text::markdown(b, value, words);
 }
 /// A whole replacement baseline is available only from complete supplied text.
-pub(crate) fn whole(value: &Option<DocumentText>) -> Option<Text> {
+pub(crate) fn whole(value: Option<&DocumentText>) -> Option<Text> {
     match value {
         Some(value) => value.whole(),
         None => None,

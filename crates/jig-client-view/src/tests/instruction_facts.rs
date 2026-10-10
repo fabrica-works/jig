@@ -26,13 +26,13 @@ fn sent(out: &[Request]) -> &Amendment {
         })
         .unwrap()
 }
-fn facts(tree: &Tree, source: &Option<DocumentText>) {
+fn facts(tree: &Tree, source: Option<&DocumentText>) {
     assert_eq!(contains(tree, b"Instructions were not supplied"), source.is_none());
     assert_eq!(
         contains(tree, b"Instructions are empty"),
-        source.as_ref().is_some_and(|value| value.bytes().is_empty() && !value.cut)
+        source.is_some_and(|value| value.bytes().is_empty() && !value.cut)
     );
-    assert_eq!(contains(tree, b"Only part of this text was supplied"), source.as_ref().is_some_and(|value| value.cut));
+    assert_eq!(contains(tree, b"Only part of this text was supplied"), source.is_some_and(|value| value.cut));
     let Some(value) = source else {
         return;
     };
@@ -40,9 +40,9 @@ fn facts(tree: &Tree, source: &Option<DocumentText>) {
         assert!(contains(tree, value.bytes()));
     }
 }
-fn baseline(tree: &Tree, source: &Option<DocumentText>) {
+fn baseline(tree: &Tree, source: Option<&DocumentText>) {
     let node = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"New instructions")).unwrap();
-    let expected = source.as_ref().filter(|value| !value.cut).map_or(b"".as_slice(), DocumentText::bytes);
+    let expected = source.filter(|value| !value.cut).map_or(b"".as_slice(), DocumentText::bytes);
     assert_eq!(node.value.as_ref().map_or(b"".as_slice(), |value| &*value.text), expected);
 }
 
@@ -63,7 +63,7 @@ fn task_instruction_updates_distinguish_supplied_effective_empty_unknown_and_par
         row.instructions = source.clone();
         super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row)));
         let tree = super::super::pages::build(&domain, 3, &words()).0;
-        facts(&tree, &source);
+        facts(&tree, source.as_ref());
         if source.is_none() {
             assert!(!contains(&tree, b"supplied local effective text"));
             assert!(!contains(&tree, b"supplied charter effective text"));
@@ -85,8 +85,8 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, &words(), &mut bindings);
-        facts(&tree, &source);
-        baseline(&tree, &source);
+        facts(&tree, source.as_ref());
+        baseline(&tree, source.as_ref());
         assert!(domain.confirmation().unwrap().choices.change.is_none());
         drive(&mut domain, Event::Act { act: input(&tree, b"New budget", b"25", &mut bindings) });
         let mut expected = Amendment {
@@ -100,7 +100,7 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         expected.authority.as_mut().unwrap().budget = 25;
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
         let tree = dialog(&domain, &words(), &mut bindings);
-        baseline(&tree, &source);
+        baseline(&tree, source.as_ref());
         drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
         expected.instructions = Some(text(b""));
         let out = drive(&mut domain, Event::Act { act: Action::Confirm });
@@ -121,8 +121,8 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, &words(), &mut bindings);
-        facts(&tree, &source);
-        baseline(&tree, &source);
+        facts(&tree, source.as_ref());
+        baseline(&tree, source.as_ref());
         assert!(domain.confirmation().unwrap().choices.change.is_none());
         drive(&mut domain, Event::Act { act: input(&tree, b"New budget", b"25", &mut bindings) });
         let mut authority = row.steering.authority.clone();
