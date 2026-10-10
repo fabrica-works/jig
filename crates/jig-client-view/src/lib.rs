@@ -64,3 +64,6 @@ pub mod owner_budget_words;
 pub mod owner_result;
 pub mod owner_result_words;
 pub mod policy_edit;
+
+pub mod owner_outcome;
+pub mod owner_outcome_words;

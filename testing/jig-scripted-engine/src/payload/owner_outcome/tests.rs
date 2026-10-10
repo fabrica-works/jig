@@ -1,0 +1,106 @@
+use super::{admit_owner_outcome, owner_outcome_bytes};
+use crate::{Bounds, Invalid};
+use jig_client::contract::{
+    OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
+};
+use skein_lib::Wall;
+use std::mem::size_of;
+
+fn maximum_outcomes() -> [OwnerOutcome; 26] {
+    [
+        OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: u32::MAX },
+        OwnerOutcome::MarkedSeen { seen: Seen::Results { through: u64::MAX } },
+        OwnerOutcome::MarkedSeen { seen: Seen::Replies { chat: u64::MAX, through: u64::MAX } },
+        OwnerOutcome::NoteEdited { name: u64::MAX },
+        OwnerOutcome::ServiceMade { person: u64::MAX },
+        OwnerOutcome::Adopted { project: u32::MAX },
+        OwnerOutcome::GoalStarted { task: u64::MAX },
+        OwnerOutcome::GoalProposed { proposal: u64::MAX },
+        OwnerOutcome::Stopped { task: u64::MAX },
+        OwnerOutcome::Cancelled { task: u64::MAX },
+        OwnerOutcome::Released { task: u64::MAX },
+        OwnerOutcome::PersonTaken { task: u64::MAX },
+        OwnerOutcome::PersonHandedBack { task: u64::MAX },
+        OwnerOutcome::PersonAnswered { task: u64::MAX },
+        OwnerOutcome::Moved { task: u64::MAX },
+        OwnerOutcome::ProposalDecided {
+            proposal: ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX },
+            by: u64::MAX,
+            at: Wall::from_nanos(u64::MAX),
+            choice: OwnerProposalChoice::Accepted,
+        },
+        OwnerOutcome::Said { task: u64::MAX, message: u64::MAX, released: true },
+        OwnerOutcome::QuestionAnswered { task: u64::MAX, question: u64::MAX, message: u64::MAX },
+        OwnerOutcome::Prioritised { project: u32::MAX },
+        OwnerOutcome::Amended { task: u64::MAX, released: true },
+        OwnerOutcome::AmendProposed { task: u64::MAX, proposal: u64::MAX, released: true },
+        OwnerOutcome::RolesSet { project: u32::MAX },
+        OwnerOutcome::PolicyChanged { project: u32::MAX },
+        OwnerOutcome::PoolSet { project: u32::MAX, person: u64::MAX },
+        OwnerOutcome::EscalationDecided {
+            task: u64::MAX,
+            revision: Revision { value: u64::MAX },
+            by: u64::MAX,
+            at: Wall::from_nanos(u64::MAX),
+            choice: OwnerEscalationChoice::Released,
+        },
+        OwnerOutcome::Started { task: u64::MAX },
+    ]
+}
+
+#[test]
+fn every_committed_owner_outcome_is_admitted_only_at_its_whole_inline_bound() {
+    let bytes = u64::try_from(size_of::<OwnerOutcome>()).expect("inline size fits");
+    let exact = Bounds { text: 0, rows: 0, document_bytes: bytes, ..Bounds::default() };
+    let short = Bounds { document_bytes: bytes.checked_sub(1).expect("outcome holds facts"), ..exact };
+    for value in maximum_outcomes() {
+        assert_eq!(owner_outcome_bytes(&value, &exact), Some(bytes));
+        assert_eq!(admit_owner_outcome(&value, &exact), Ok(()));
+        assert_eq!(admit_owner_outcome(&value, &short), Err(Invalid::Payload));
+    }
+}
+
+#[test]
+fn closed_decision_choices_and_release_flags_need_no_explanation_payload() {
+    let bytes = u64::try_from(size_of::<OwnerOutcome>()).expect("inline size fits");
+    let bounds = Bounds { text: 0, rows: 0, document_bytes: bytes, ..Bounds::default() };
+    for proposer in [Proposer::Task(u64::MAX), Proposer::Party(u64::MAX)] {
+        for choice in [
+            OwnerProposalChoice::Accepted,
+            OwnerProposalChoice::Rejected,
+            OwnerProposalChoice::Passed,
+            OwnerProposalChoice::Withdrawn,
+            OwnerProposalChoice::Stale,
+        ] {
+            let value = OwnerOutcome::ProposalDecided {
+                proposal: ProposalKey { proposer, number: u64::MAX },
+                by: 23,
+                at: Wall::from_nanos(31),
+                choice,
+            };
+            assert_eq!(owner_outcome_bytes(&value, &bounds), Some(bytes));
+            assert_eq!(admit_owner_outcome(&value, &bounds), Ok(()));
+        }
+    }
+    for choice in [OwnerEscalationChoice::Released, OwnerEscalationChoice::Rejected, OwnerEscalationChoice::Passed] {
+        let value = OwnerOutcome::EscalationDecided {
+            task: 7,
+            revision: Revision { value: 13 },
+            by: 19,
+            at: Wall::from_nanos(29),
+            choice,
+        };
+        assert_eq!(owner_outcome_bytes(&value, &bounds), Some(bytes));
+        assert_eq!(admit_owner_outcome(&value, &bounds), Ok(()));
+    }
+    for released in [false, true] {
+        for value in [
+            OwnerOutcome::Said { task: 7, message: 11, released },
+            OwnerOutcome::Amended { task: 13, released },
+            OwnerOutcome::AmendProposed { task: 17, proposal: 23, released },
+        ] {
+            assert_eq!(owner_outcome_bytes(&value, &bounds), Some(bytes));
+            assert_eq!(admit_owner_outcome(&value, &bounds), Ok(()));
+        }
+    }
+}

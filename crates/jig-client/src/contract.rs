@@ -46,3 +46,6 @@ pub mod result_details;
 pub use result_details::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, ResultDetails};
 pub mod owner_budget;
 pub use owner_budget::*;
+
+pub mod owner_outcome;
+pub use owner_outcome::*;
