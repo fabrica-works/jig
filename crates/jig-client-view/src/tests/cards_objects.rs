@@ -282,7 +282,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
             Event::Answered {
                 request,
                 answer: Answer::Done(Outcome::DecidedFirst {
-                    by: document().party,
+                    by: super::cards::party(),
                     how: Decision::Accepted,
                     at: Wall::EPOCH,
                 }),
@@ -395,7 +395,7 @@ fn result_value_payloads(words: &crate::words::Words, part: &Part) {
         (
             ResultValue::Choice {
                 option: 3,
-                by: document().party,
+                by: super::cards::party(),
                 reason: DocumentText::complete(text(b"full reason")),
             },
             b"full reason",
@@ -524,7 +524,7 @@ fn all_chip_phases(words: &crate::words::Words) {
         ),
         (
             ChipPhase::Held {
-                reason: HoldReason::Stopped { by: document().party, at: Wall::EPOCH },
+                reason: HoldReason::Stopped { by: super::cards::party(), at: Wall::EPOCH },
                 since: Wall::EPOCH,
                 revision: Revision { value: 7 },
                 was: None,
@@ -813,7 +813,7 @@ fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_se
         (HoldReason::Budget { spent: 10, limit: 10 }, vec![AmendRelease, Cancel], b"spent 10".as_slice()),
         (HoldReason::Deadline { at: Wall::EPOCH }, vec![AmendRelease, Cancel], b"past deadline".as_slice()),
         (
-            HoldReason::Stopped { by: document().party, at: Wall::EPOCH },
+            HoldReason::Stopped { by: super::cards::party(), at: Wall::EPOCH },
             vec![Release, AmendRelease, Cancel],
             b"stopped by Pat".as_slice(),
         ),
@@ -1695,7 +1695,7 @@ fn result_documents_keep_each_words_loss_fact_and_the_exact_change_kind_and_owne
                 proposal: None,
             },
             ResultValue::Connector { summary: explanation.clone(), part: part.clone() },
-            ResultValue::Choice { option: u32::MAX, by: document().party, reason: explanation.clone() },
+            ResultValue::Choice { option: u32::MAX, by: super::cards::party(), reason: explanation.clone() },
             ResultValue::Approved { state: Box::new([0, 255, 1]), words: Some(explanation.clone()) },
             ResultValue::Change { kind: u16::MAX, part: raw.clone(), words: explanation },
         ];

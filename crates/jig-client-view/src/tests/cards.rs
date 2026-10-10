@@ -446,3 +446,7 @@ fn jig_card_frames_bindings_and_phrase_contracts() {
     every_binding_kind_decodes_and_old_tokens_are_retired();
     jig_phrasebook_requires_every_sentence_and_says_wall_times_in_person_offset();
 }
+
+pub(super) fn party() -> Party {
+    Party { number: 1, kind: PartyKind::Person, name: text(b"Pat") }
+}

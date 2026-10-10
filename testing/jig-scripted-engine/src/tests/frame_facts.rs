@@ -60,7 +60,7 @@ fn builtin_roles_remain_memberships_without_becoming_numeric_policy_recipients()
             role == HeldRole::Policy { role: u32::MAX }
         );
         assert!(!crate::requests::recipient(&truth, 1, &Recipient::Role { project: 1, role: 1 }));
-        let request = Ask::SetRoles { project: u32::MAX, roles: list(vec![Holding { party: u64::MAX, role }]) };
+        let request = Ask::SetRoles { project: u32::MAX, holdings: list(vec![Holding { party: u64::MAX, role }]) };
         assert!(fits(&request, &Bounds::default()));
         let service = Ask::MakeService { project: u32::MAX, name: text(b"actual-service"), role };
         assert!(fits(&service, &Bounds::default()));

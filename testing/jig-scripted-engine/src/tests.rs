@@ -1000,7 +1000,7 @@ fn recurring_optional_boundaries_keep_whole_value_and_allocated_list_limits() {
 fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list() {
     let recipient = Recipient::Roles { project: 1, roles: list(vec![7, 1]) };
     let mut setup = script();
-    setup.truth.frames.get_mut(&2).unwrap().projects.get_mut(0).unwrap().roles = list(vec![99]);
+    setup.truth.frames.get_mut(&2).unwrap().projects.get_mut(0).unwrap().role = HeldRole::Policy { role: 99 };
     assert!(crate::requests::recipient(&setup.truth, 1, &recipient));
     assert!(!crate::requests::recipient(&setup.truth, 2, &recipient));
     let mut row = proposal();
