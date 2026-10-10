@@ -25,7 +25,24 @@ pub fn head(b: &mut Builder, chip: &Chip, words: &Words, bindings: &mut JigBindi
         &[Hole::Number(chip.task), name(chip.title.bytes())],
         Act::Go { address: Address::task(chip.task) },
     );
-    words.executor(b, chip.executor);
+    if chip.title.cut {
+        words.text(b, JigPhrase::ChipTitleCut, &[]);
+    }
+    match chip.details.as_ref() {
+        ChipPhase::Owner { details, .. } => crate::proposed_task::executor(b, details.executor, words),
+        ChipPhase::Active(_)
+        | ChipPhase::Waiting { .. }
+        | ChipPhase::Idle { .. }
+        | ChipPhase::Starting
+        | ChipPhase::Running { .. }
+        | ChipPhase::WaitingForWords { .. }
+        | ChipPhase::BackingOff { .. }
+        | ChipPhase::Procedure { .. }
+        | ChipPhase::Person { .. }
+        | ChipPhase::Closing(_)
+        | ChipPhase::Held { .. }
+        | ChipPhase::Ended { .. } => words.executor(b, chip.executor),
+    }
 }
 /// Build all kept dependency chips with a bounded work list, never recursive traversal.
 pub fn chip(b: &mut Builder, client: &Domain, chip: &Chip, words: &Words, bindings: &mut JigBindings) {
@@ -96,28 +113,16 @@ pub fn details(
     seen: &mut skein_lib::Set<u64>,
 ) {
     match phase {
+        ChipPhase::Owner { phase, details: _ } => {
+            crate::chip_phase::brief(b, phase, words);
+            if let jig_client::contract::OwnerChipPhase::Waiting { dependencies, .. } = phase {
+                dependencies_list(b, client, dependencies, words, bindings, pending, seen);
+            }
+        }
         ChipPhase::Active(value) => crate::runtime::active(b, value, words),
         ChipPhase::Waiting { dependencies, hold } => {
             words.text(b, JigPhrase::Waiting, &[]);
-            for dependency in dependencies {
-                crate::frame::control(
-                    b,
-                    words,
-                    bindings,
-                    Role::Link,
-                    JigPhrase::TaskPage,
-                    &[Hole::Number(*dependency)],
-                    Act::Go { address: Address::task(*dependency) },
-                );
-                if seen.contains(dependency) {
-                    // The named chip has already been shown or queued.
-                } else if kept(client, *dependency).is_some() {
-                    seen.insert(*dependency).expect("only kept objects are added");
-                    pending.push(*dependency);
-                } else {
-                    words.status(b, JigPhrase::LoadingDependency, &[Hole::Number(*dependency)]);
-                }
-            }
+            dependencies_list(b, client, dependencies, words, bindings, pending, seen);
             if let Some(hold) = hold {
                 super::common::part(b, hold, words, bindings);
             }
@@ -200,5 +205,35 @@ pub fn wake(b: &mut Builder, wake: &jig_client::contract::WakePolicy, words: &Wo
     }
     for part in &wake.subscriptions {
         super::common::part(b, part, words, bindings);
+    }
+}
+
+fn dependencies_list(
+    b: &mut Builder,
+    client: &Domain,
+    dependencies: &skein_lib::List<u64>,
+    words: &Words,
+    bindings: &mut JigBindings,
+    pending: &mut skein_lib::Queue<u64>,
+    seen: &mut skein_lib::Set<u64>,
+) {
+    for dependency in dependencies {
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Link,
+            JigPhrase::TaskPage,
+            &[Hole::Number(*dependency)],
+            Act::Go { address: Address::task(*dependency) },
+        );
+        if seen.contains(dependency) {
+            // The named chip has already been shown or queued.
+        } else if kept(client, *dependency).is_some() {
+            seen.insert(*dependency).expect("only kept objects are added");
+            pending.push(*dependency);
+        } else {
+            words.status(b, JigPhrase::LoadingDependency, &[Hole::Number(*dependency)]);
+        }
     }
 }

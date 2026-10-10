@@ -223,7 +223,7 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
     ConversationLine {
         chip: Chip {
             task,
-            title: text(b"held checkout"),
+            title: crate::contract::DocumentText::complete(text(b"held checkout")),
             executor: Executor::Agent { charter: 1 },
             phase,
             details: Box::new(super::objects::phase_details(phase)),
@@ -685,7 +685,7 @@ fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
 }
 
 fn empty_phase_counts() -> PhaseCounts {
-    PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+    PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
 }
 
 fn project_document() -> Project {
@@ -1270,7 +1270,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
 
     let mut task = super::confirmation::task();
     task.chip.task = 8;
-    task.chip.title = text(b"current task title");
+    task.chip.title = crate::contract::DocumentText::complete(text(b"current task title"));
     task.spec = specification(text(b"whole task specification"));
     drive(
         &mut domain,

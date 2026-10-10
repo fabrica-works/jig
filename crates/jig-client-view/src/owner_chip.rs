@@ -28,6 +28,15 @@ pub struct ChipFragment {
     pub bindings: u32,
     pub slots: u32,
 }
+/// Whole bounded metadata, including one terminal result with brief follow-up chips.
+#[must_use]
+pub fn max_nodes(limits: &Limits) -> Option<u32> {
+    120_u32
+        .checked_add(limits.rows.checked_add(20)?.checked_mul(limits.rows)?)?
+        .checked_add(limits.rows.checked_add(6)?.checked_mul(2)?)?
+        .checked_add(limits.rows)?
+        .checked_add(crate::result_nodes(limits)?)
+}
 fn part_fits(part: &OwnerPart, limits: &Limits) -> Option<()> {
     match &part.key {
         OwnerPartKey::Number(_) => Some(()),
@@ -62,7 +71,7 @@ fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> {
                 }
             }
             for task in tasks {
-                if !task.title.fits(limits.text) {
+                if !task.title.bytes.fits(limits.text) {
                     return None;
                 }
             }
@@ -241,7 +250,7 @@ fn hold_failure(b: &mut Builder, value: HoldFailure, words: &Words) {
     };
     text(b, words, phrase, &[]);
 }
-fn reason(b: &mut Builder, value: HoldCategory, words: &Words) {
+pub(crate) fn reason(b: &mut Builder, value: HoldCategory, words: &Words) {
     match value {
         HoldCategory::Failures { class } => {
             text(b, words, P::Failures, &[]);

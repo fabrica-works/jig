@@ -46,3 +46,5 @@ mod policy;
 
 mod frame_facts;
 mod hello;
+
+mod chip_facts;

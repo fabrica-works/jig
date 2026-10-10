@@ -28,7 +28,7 @@ pub(super) fn part() -> Part {
     Part::Panel { connector: 2, task: 8 }
 }
 fn counts() -> PhaseCounts {
-    PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+    PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
 }
 pub(super) fn chip(task: u64) -> Chip {
     let mut chip = super::cards_objects::task_doc(&[]).chip;

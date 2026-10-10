@@ -38,7 +38,7 @@ pub(super) fn change() -> Amendment {
     }
 }
 fn counts() -> PhaseCounts {
-    PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+    PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
 }
 pub(super) fn task() -> Task {
     Task {

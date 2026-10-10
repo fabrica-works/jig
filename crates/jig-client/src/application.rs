@@ -272,7 +272,8 @@ fn chip_parts(parts: &mut Parts, chip: &contract::Chip) {
             }
         }
         contract::ChipPhase::Closing(closing) => closing_parts(parts, closing),
-        contract::ChipPhase::Active(_)
+        contract::ChipPhase::Owner { .. }
+        | contract::ChipPhase::Active(_)
         | contract::ChipPhase::Idle { .. }
         | contract::ChipPhase::Starting
         | contract::ChipPhase::Running { .. }

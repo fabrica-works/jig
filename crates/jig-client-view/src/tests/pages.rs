@@ -351,7 +351,7 @@ fn conversation_states(words: &crate::words::Words) {
                 budget: Budget { total: 20, own: 5, ended: 1, reserved: 2, left: 12, funder: Actor::Party(1) },
                 chip: Chip {
                     task,
-                    title: text(b"Help"),
+                    title: jig_client::contract::DocumentText::complete(text(b"Help")),
                     executor: Executor::Agent { charter: 2 },
                     phase: if task == 1 { Phase::Done } else { Phase::Idle },
                     details: Box::new(ChipPhase::Starting),

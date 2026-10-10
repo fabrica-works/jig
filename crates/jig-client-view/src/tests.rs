@@ -33,3 +33,5 @@ mod policy_edit;
 mod runtime_facts;
 
 mod owner_chip;
+
+mod chip_facts;

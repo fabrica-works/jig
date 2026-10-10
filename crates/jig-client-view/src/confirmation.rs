@@ -327,6 +327,9 @@ pub fn impact_words(b: &mut Builder, impact: &Impact, words: &Words) {
     words.text(b, JigPhrase::TasksRunning, &[Hole::Number(u64::from(impact.tasks.running))]);
     words.text(b, JigPhrase::TasksHeld, &[Hole::Number(u64::from(impact.tasks.held))]);
     words.text(b, JigPhrase::TasksClosing, &[Hole::Number(u64::from(impact.tasks.closing))]);
+    if impact.tasks.ended > 0 {
+        words.text(b, JigPhrase::TasksEnded, &[Hole::Number(u64::from(impact.tasks.ended))]);
+    }
     words.text(b, JigPhrase::TasksDone, &[Hole::Number(u64::from(impact.tasks.done))]);
     words.text(b, JigPhrase::TasksFailed, &[Hole::Number(u64::from(impact.tasks.failed))]);
     words.text(b, JigPhrase::TasksCancelled, &[Hole::Number(u64::from(impact.tasks.cancelled))]);

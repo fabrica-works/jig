@@ -21,7 +21,7 @@ fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
 fn chip() -> Chip {
     Chip {
         task: 8,
-        title: text(b"Review"),
+        title: jig_client::contract::DocumentText::complete(text(b"Review")),
         executor: Executor::Party { party: 1 },
         phase: Phase::Held,
         details: Box::new(ChipPhase::Held {
@@ -541,6 +541,7 @@ fn all_chip_phases(words: &crate::words::Words) {
     ] {
         let mut value = chip();
         value.phase = match &details {
+            ChipPhase::Owner { phase, .. } => phase.compact(),
             ChipPhase::Waiting { .. } => Phase::Waiting,
             ChipPhase::Idle { .. } => Phase::Idle,
             ChipPhase::Starting => Phase::Due,
@@ -593,7 +594,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
         .unwrap();
     let mut dependency = chip();
     dependency.task = 9;
-    dependency.title = text(b"Live dependency");
+    dependency.title = jig_client::contract::DocumentText::complete(text(b"Live dependency"));
     dependency.phase = Phase::Running;
     *dependency.details = ChipPhase::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) };
     let conversation = ConversationLine {
@@ -670,7 +671,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
 
 fn impact() -> Impact {
     Impact {
-        tasks: PhaseCounts { waiting: 1, running: 2, held: 3, closing: 4, done: 5, failed: 6, cancelled: 7 },
+        tasks: PhaseCounts { ended: 0, waiting: 1, running: 2, held: 3, closing: 4, done: 5, failed: 6, cancelled: 7 },
         live_runs: 8,
         proposals: 9,
         effects_pending: 10,

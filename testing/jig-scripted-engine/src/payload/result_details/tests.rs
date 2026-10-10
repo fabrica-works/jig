@@ -12,7 +12,7 @@ fn chip() -> Chip {
     dependencies.push(u64::MAX).unwrap();
     Chip {
         task: u64::MAX,
-        title: Text::new(copy_of(b"raw"), 3).unwrap(),
+        title: jig_client::contract::DocumentText::complete(Text::new(copy_of(b"raw"), 3).unwrap()),
         executor: Executor::Agent { charter: u32::MAX },
         phase: Phase::Waiting,
         details: Box::new(ChipPhase::Waiting { dependencies, hold: None }),

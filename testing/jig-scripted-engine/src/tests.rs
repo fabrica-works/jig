@@ -199,7 +199,7 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     let mut setup = script();
     let chip = Chip {
         task: 8,
-        title: text(b"held"),
+        title: jig_client::contract::DocumentText::complete(text(b"held")),
         executor: Executor::Agent { charter: 1 },
         phase: Phase::Held,
         details: Box::new(ChipPhase::Held {
@@ -239,7 +239,16 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
             budget: Budget { total: 100, own: 100, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
         }),
         impact: Impact {
-            tasks: PhaseCounts { waiting: 0, running: 0, held: 1, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            tasks: PhaseCounts {
+                ended: 0,
+                waiting: 0,
+                running: 0,
+                held: 1,
+                closing: 0,
+                done: 0,
+                failed: 0,
+                cancelled: 0,
+            },
             live_runs: 0,
             proposals: 0,
             effects_pending: 0,
@@ -305,13 +314,13 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     assert!(engine.commits().is_empty());
 }
 fn counts() -> PhaseCounts {
-    PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+    PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
 }
 fn task() -> Task {
     Task {
         chip: Chip {
             task: 8,
-            title: text(b"chat"),
+            title: jig_client::contract::DocumentText::complete(text(b"chat")),
             executor: Executor::Agent { charter: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Running { attempt: 1, since: Wall::EPOCH, tool: None }),
@@ -396,7 +405,7 @@ fn scenario_pages_and_read_barriers() {
     });
     let mut engine = Engine::new(setup, 4).expect("source rows span pages");
     let mut changed = task();
-    changed.chip.title = text(b"latest");
+    changed.chip.title = jig_client::contract::DocumentText::complete(text(b"latest"));
     engine
         .act(
             Time::ZERO,
@@ -486,7 +495,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
         "idle run has no fabricated turn"
     );
     let mut changed = task();
-    changed.chip.title = text(b"one");
+    changed.chip.title = jig_client::contract::DocumentText::complete(text(b"one"));
     engine
         .act(
             Time::ZERO,
@@ -494,7 +503,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
             Change::Object { project: 1, key: ObjectKey::Task(8), value: ReadValue::Task(Box::new(changed.clone())) },
         )
         .expect("one");
-    changed.chip.title = text(b"two");
+    changed.chip.title = jig_client::contract::DocumentText::complete(text(b"two"));
     engine
         .act(
             at(1),
@@ -966,7 +975,7 @@ fn recurring_optional_boundaries_keep_whole_value_and_allocated_list_limits() {
     let mut bounds = Bounds { rows: 2, ..Bounds::default() };
     for next in [None, Some(Wall::from_nanos(u64::MAX))] {
         let mut chip = task().chip;
-        chip.title = text(b"job");
+        chip.title = jig_client::contract::DocumentText::complete(text(b"job"));
         chip.details = Box::new(ChipPhase::Starting);
         let mut row = Recurring {
             chip,
@@ -1386,7 +1395,16 @@ fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
         GoalLine {
             chip,
             priority: 1,
-            progress: PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            progress: PhaseCounts {
+                ended: 0,
+                waiting: 0,
+                running: 0,
+                held: 0,
+                closing: 0,
+                done: 0,
+                failed: 0,
+                cancelled: 0,
+            },
             budget: budget(),
             deadline: None,
             held_below: 0,
@@ -1987,3 +2005,5 @@ fn whole_run_state_prices_independent_call_and_writing_and_preserves_refused_sna
         "a postcommit call is deliverable without a text turn or continuation cursor"
     );
 }
+
+mod chip_facts;

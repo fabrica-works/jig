@@ -6,7 +6,7 @@ use skein_world::domain::heap::Counting;
 static HEAP: Counting = Counting;
 fn full_task() -> jig_client::contract::Task {
     let mut task = stories::task();
-    task.chip.title = stories::text(&[b't'; 32]);
+    task.chip.title = jig_client::contract::DocumentText::complete(stories::text(&[b't'; 32]));
     task.lineage = jig_client_world::test::list([8, 7]);
     task.wake.topics = jig_client_world::test::list([1, 2]);
     task.parts = jig_client_world::test::list(

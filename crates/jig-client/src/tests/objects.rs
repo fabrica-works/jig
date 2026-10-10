@@ -12,7 +12,7 @@ pub(super) fn text(bytes: &[u8]) -> Text {
 pub(super) fn chip(task: u64) -> Chip {
     Chip {
         task,
-        title: text(b"title"),
+        title: crate::contract::DocumentText::complete(text(b"title")),
         executor: Executor::Party { party: 7 },
         phase: Phase::Held,
         details: Box::new(phase_details(Phase::Held)),
@@ -51,6 +51,9 @@ pub(super) fn phase_details(phase: Phase) -> ChipPhase {
             revision: Revision { value: 3 },
             was: None,
         },
+        Phase::Ended => {
+            ChipPhase::Owner { phase: OwnerChipPhase::Ended, details: Box::new(super::chip_facts::details()) }
+        }
         Phase::Done => ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH },
         Phase::Failed => ChipPhase::Ended { how: Ending::Failed { reason: Some(text(b"failure")) }, at: Wall::EPOCH },
         Phase::Cancelled => ChipPhase::Ended {
@@ -126,7 +129,16 @@ pub(super) fn escalation() -> Escalation {
             budget: Budget { total: 100, own: 100, ended: 0, reserved: 0, left: 0, funder: Actor::Party(1) },
         }),
         impact: Impact {
-            tasks: PhaseCounts { waiting: 0, running: 0, held: 1, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            tasks: PhaseCounts {
+                ended: 0,
+                waiting: 0,
+                running: 0,
+                held: 1,
+                closing: 0,
+                done: 0,
+                failed: 0,
+                cancelled: 0,
+            },
             live_runs: 0,
             proposals: 0,
             effects_pending: 0,

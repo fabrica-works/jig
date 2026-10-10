@@ -97,19 +97,54 @@ pub struct Chip {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ChipPhase {
     /// Exact producer phase with its mandatory whole owner metadata.
-    Owner { phase: super::OwnerChipPhase, details: Box<super::OwnerChipDetails> },
+    Owner {
+        phase: super::OwnerChipPhase,
+        details: Box<super::OwnerChipDetails>,
+    },
     Active(super::ActiveRun),
-    Waiting { dependencies: List<u64>, hold: Option<Part> },
-    Idle { wake: WakePolicy },
+    Waiting {
+        dependencies: List<u64>,
+        hold: Option<Part>,
+    },
+    Idle {
+        wake: WakePolicy,
+    },
     Starting,
-    Running { attempt: u64, since: Wall, tool: Option<Text> },
-    WaitingForWords { attempt: u64, since: Wall },
-    BackingOff { at: Wall, attempt: u64, tries: u32, class: FailureClass, reason: Text },
-    Procedure { panel: Part },
-    Person { addressed: Recipient, taken: Option<TakenBy>, since: Option<Wall> },
+    Running {
+        attempt: u64,
+        since: Wall,
+        tool: Option<Text>,
+    },
+    WaitingForWords {
+        attempt: u64,
+        since: Wall,
+    },
+    BackingOff {
+        at: Wall,
+        attempt: u64,
+        tries: u32,
+        class: FailureClass,
+        reason: Text,
+    },
+    Procedure {
+        panel: Part,
+    },
+    Person {
+        addressed: Recipient,
+        taken: Option<TakenBy>,
+        since: Option<Wall>,
+    },
     Closing(Closing),
-    Held { reason: HoldReason, since: Wall, revision: Revision, was: Option<super::HeldRuntime> },
-    Ended { how: Ending, at: Wall },
+    Held {
+        reason: HoldReason,
+        since: Wall,
+        revision: Revision,
+        was: Option<super::HeldRuntime>,
+    },
+    Ended {
+        how: Ending,
+        at: Wall,
+    },
 }
 
 /// A complete task document with independently moving revisions.

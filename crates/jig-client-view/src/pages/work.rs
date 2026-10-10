@@ -53,6 +53,7 @@ pub(super) fn counts(b: &mut Builder, counts: PhaseCounts, words: &Words) {
         (JigPhrase::TasksRunning, counts.running),
         (JigPhrase::TasksHeld, counts.held),
         (JigPhrase::TasksClosing, counts.closing),
+        (JigPhrase::TasksEnded, counts.ended),
         (JigPhrase::TasksDone, counts.done),
         (JigPhrase::TasksFailed, counts.failed),
         (JigPhrase::TasksCancelled, counts.cancelled),

@@ -25,7 +25,7 @@ fn full() -> Text {
 }
 fn full_chip(number: u64) -> Chip {
     let mut value = chip(number);
-    value.title = full();
+    value.title = jig_client::contract::DocumentText::complete(full());
     value
 }
 fn parts() -> List<Part> {
@@ -49,7 +49,7 @@ fn authority() -> Authority {
         ]),
     }
 }
-fn entered(address: Address) -> (Domain, Vec<Request>) {
+pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     let (mut d, watch) = start();
     let mut frame = document();
     let mut project = frame.projects.get(0).unwrap().clone();
@@ -80,7 +80,7 @@ fn entered(address: Address) -> (Domain, Vec<Request>) {
     let out = drive(&mut d, Event::Went { place: Place::Jig(address) });
     (d, out)
 }
-fn render(d: &Domain, words: &Words) -> Tree {
+pub(super) fn render(d: &Domain, words: &Words) -> Tree {
     let limits = crate::Limits::of_words(&CLIENT, words).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
@@ -545,7 +545,7 @@ fn fill_tree(d: &mut Domain, watch: Token) {
             ProposalKey { proposer: Proposer::Task(8), number: 2 },
         ]),
         spend: u64::MAX,
-        folded: PhaseCounts { waiting: 2, running: 2, held: 2, closing: 2, done: 2, failed: 2, cancelled: 2 },
+        folded: PhaseCounts { ended: 2, waiting: 2, running: 2, held: 2, closing: 2, done: 2, failed: 2, cancelled: 2 },
         held_below: 2,
     };
     deliver(
@@ -554,7 +554,16 @@ fn fill_tree(d: &mut Domain, watch: Token) {
         Delivery::Tree(Box::new(jig_client::contract::Tree {
             task: 8,
             nodes: list([node(9, None), node(10, Some(9))]),
-            folded: PhaseCounts { waiting: 2, running: 2, held: 2, closing: 2, done: 2, failed: 2, cancelled: 2 },
+            folded: PhaseCounts {
+                ended: 2,
+                waiting: 2,
+                running: 2,
+                held: 2,
+                closing: 2,
+                done: 2,
+                failed: 2,
+                cancelled: 2,
+            },
             held_below: 2,
         })),
     );
@@ -622,7 +631,16 @@ fn fill_goals(d: &mut Domain, watch: Token, doc: &Project) {
         changed: Wall::EPOCH,
         chip: full_chip(number),
         priority: u32::MAX,
-        progress: PhaseCounts { waiting: 2, running: 2, held: 2, closing: 2, done: 2, failed: 2, cancelled: 2 },
+        progress: PhaseCounts {
+            ended: 2,
+            waiting: 2,
+            running: 2,
+            held: 2,
+            closing: 2,
+            done: 2,
+            failed: 2,
+            cancelled: 2,
+        },
         budget: doc.spend,
         deadline: Some(Wall::from_nanos(u64::MAX)),
         held_below: 2,
@@ -634,7 +652,16 @@ fn fill_ended_goals(d: &mut Domain, read: Token, doc: &Project) {
         changed: Wall::EPOCH,
         chip: full_chip(number),
         priority: u32::MAX,
-        progress: PhaseCounts { waiting: 2, running: 2, held: 2, closing: 2, done: 2, failed: 2, cancelled: 2 },
+        progress: PhaseCounts {
+            ended: 2,
+            waiting: 2,
+            running: 2,
+            held: 2,
+            closing: 2,
+            done: 2,
+            failed: 2,
+            cancelled: 2,
+        },
         budget: doc.spend,
         deadline: Some(Wall::from_nanos(u64::MAX)),
         held_below: 2,

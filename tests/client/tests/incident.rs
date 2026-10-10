@@ -28,7 +28,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
     item.revision.value += 1;
     let mut delegate = stories::task();
     delegate.chip.task = 10;
-    delegate.chip.title = stories::text(b"Delegate ten");
+    delegate.chip.title = jig_client::contract::DocumentText::complete(stories::text(b"Delegate ten"));
     let lead = stories::reported(stories::task(), b"Incident resolved");
     let delegate = stories::reported(delegate, if withdrawn { b"Already healthy by hand" } else { b"Service healthy" });
     let mut proposal = stories::proposal();

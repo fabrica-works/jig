@@ -109,6 +109,7 @@ const fn phrase(phase: Phase) -> JigPhrase {
         Phase::Active => JigPhrase::ActivePhase,
         Phase::Closing => JigPhrase::ClosingPhase,
         Phase::Held => JigPhrase::Held,
+        Phase::Ended => JigPhrase::Ended,
         Phase::Done => JigPhrase::Done,
         Phase::Failed => JigPhrase::FailedPhase,
         Phase::Cancelled => JigPhrase::CancelledPhase,

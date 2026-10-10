@@ -91,7 +91,7 @@ impl TaskPage {
     }
 }
 fn counts() -> PhaseCounts {
-    PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+    PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
 }
 /// Whether a section has content for this executor and its current facts.
 #[must_use]
@@ -103,7 +103,8 @@ pub fn sections(task: &Task) -> Sections {
         || task.impact.tasks.closing > 0
         || task.impact.tasks.done > 0
         || task.impact.tasks.failed > 0
-        || task.impact.tasks.cancelled > 0;
+        || task.impact.tasks.cancelled > 0
+        || task.impact.tasks.ended > 0;
     let panels = !task.parts.is_empty()
         || !task.resources.is_empty()
         || match task.chip.executor {
@@ -116,7 +117,21 @@ pub fn sections(task: &Task) -> Sections {
             task.budget.total > 0 || task.budget.own > 0 || task.budget.ended > 0 || task.budget.reserved > 0
         }
     };
-    let overview = !task.spec.specification.words.bytes().is_empty()
+    let overview = match task.chip.details.as_ref() {
+        contract::ChipPhase::Owner { .. } => true,
+        contract::ChipPhase::Active(_)
+        | contract::ChipPhase::Waiting { .. }
+        | contract::ChipPhase::Idle { .. }
+        | contract::ChipPhase::Starting
+        | contract::ChipPhase::Running { .. }
+        | contract::ChipPhase::WaitingForWords { .. }
+        | contract::ChipPhase::BackingOff { .. }
+        | contract::ChipPhase::Procedure { .. }
+        | contract::ChipPhase::Person { .. }
+        | contract::ChipPhase::Closing(_)
+        | contract::ChipPhase::Held { .. }
+        | contract::ChipPhase::Ended { .. } => false,
+    } || !task.spec.specification.words.bytes().is_empty()
         || !task.spec.specification.parameters.is_empty()
         || !task.spec.specification.inputs.is_empty()
         || task.spec.has_loss()
@@ -190,6 +205,7 @@ fn add(counts: &mut PhaseCounts, phase: Phase) {
         }
         Phase::Held => &mut counts.held,
         Phase::Closing => &mut counts.closing,
+        Phase::Ended => &mut counts.ended,
         Phase::Done => &mut counts.done,
         Phase::Failed => &mut counts.failed,
         Phase::Cancelled => &mut counts.cancelled,

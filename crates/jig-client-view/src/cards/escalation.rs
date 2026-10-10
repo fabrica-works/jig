@@ -74,6 +74,7 @@ pub fn phase(b: &mut Builder, phase: Phase, words: &Words) {
         Phase::BackingOff => JigPhrase::Retrying,
         Phase::Closing => JigPhrase::ClosingPhase,
         Phase::Held => JigPhrase::Held,
+        Phase::Ended => JigPhrase::Ended,
         Phase::Done => JigPhrase::Done,
         Phase::Failed => JigPhrase::FailedPhase,
         Phase::Cancelled => JigPhrase::CancelledPhase,

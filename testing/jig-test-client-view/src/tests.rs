@@ -207,7 +207,7 @@ fn task() -> Task {
     Task {
         chip: Chip {
             task: 9,
-            title: text(&[b't'; 32]),
+            title: jig_client::contract::DocumentText::complete(text(&[b't'; 32])),
             executor: Executor::Procedure { connector: jig_test_client_domain::FIRST, kind: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Procedure {
@@ -250,7 +250,16 @@ fn task() -> Task {
         result: None,
         runtime: Runtime::Procedure { panel: Part::Panel { connector: jig_test_client_domain::FIRST, task: 9 } },
         impact: Impact {
-            tasks: PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            tasks: PhaseCounts {
+                ended: 0,
+                waiting: 0,
+                running: 0,
+                held: 0,
+                closing: 0,
+                done: 0,
+                failed: 0,
+                cancelled: 0,
+            },
             live_runs: 0,
             proposals: 0,
             effects_pending: 0,

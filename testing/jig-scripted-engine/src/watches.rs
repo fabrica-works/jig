@@ -472,7 +472,7 @@ impl<A: crate::Application> Engine<A> {
     }
 }
 fn ended(phase: Phase) -> bool {
-    matches!(phase, Phase::Done | Phase::Failed | Phase::Cancelled)
+    matches!(phase, Phase::Ended | Phase::Done | Phase::Failed | Phase::Cancelled)
 }
 
 fn shorten<T: Clone>(rows: &mut skein_lib::List<T>) -> bool {
@@ -491,6 +491,7 @@ fn fold(counts: &mut jig_client::contract::PhaseCounts, phase: Phase) {
         Phase::Running | Phase::Active => &mut counts.running,
         Phase::Held => &mut counts.held,
         Phase::Closing => &mut counts.closing,
+        Phase::Ended => &mut counts.ended,
         Phase::Done => &mut counts.done,
         Phase::Failed => &mut counts.failed,
         Phase::Cancelled => &mut counts.cancelled,

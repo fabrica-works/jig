@@ -148,7 +148,7 @@ pub fn task() -> Task {
     Task {
         chip: Chip {
             task: 9,
-            title: text(b"Chat nine"),
+            title: jig_client::contract::DocumentText::complete(text(b"Chat nine")),
             executor: Executor::Agent { charter: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Procedure {
@@ -187,7 +187,16 @@ pub fn task() -> Task {
         result: None,
         runtime: Runtime::Idle,
         impact: Impact {
-            tasks: PhaseCounts { waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 },
+            tasks: PhaseCounts {
+                ended: 0,
+                waiting: 0,
+                running: 0,
+                held: 0,
+                closing: 0,
+                done: 0,
+                failed: 0,
+                cancelled: 0,
+            },
             live_runs: 0,
             proposals: 0,
             effects_pending: 0,
@@ -712,7 +721,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
 fn incident_delegate() -> Task {
     let mut delegate = task();
     delegate.chip.task = 10;
-    delegate.chip.title = text(b"Delegate ten");
+    delegate.chip.title = jig_client::contract::DocumentText::complete(text(b"Delegate ten"));
     delegate.chip.details =
         Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 } });
     delegate.requester = Actor::Task(9);
@@ -729,7 +738,8 @@ pub fn incident_world(seed: u64) -> World<Test, Scripted> {
     let mut lead = task();
     lead.delegates = list([LiveDelegate { chip: delegate.chip.clone(), takeover_budget: 1 }]);
     lead.impact.tasks.running = 1;
-    let counts = PhaseCounts { waiting: 0, running: 2, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
+    let counts =
+        PhaseCounts { ended: 0, waiting: 0, running: 2, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 };
     for change in [
         jig_scripted_engine::Change::Object {
             project: 1,

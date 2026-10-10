@@ -6,6 +6,10 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    ChipTitleCut,
+    ChipDependenciesCut,
+    ChipWaitingHolds,
+    TasksEnded,
     FrameProjectNumber,
     FrameLogin,
     FramePerson,
@@ -1048,6 +1052,10 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::ChipTitleCut => 620,
+            Self::ChipDependenciesCut => 621,
+            Self::ChipWaitingHolds => 622,
+            Self::TasksEnded => 623,
             Self::FrameProjectNumber => 610,
             Self::FrameLogin => 611,
             Self::FramePerson => 612,
@@ -1917,6 +1925,9 @@ impl JigPhrase {
             | Self::Permanent
             | Self::Stall
             | Self::Held
+            | Self::ChipTitleCut
+            | Self::ChipDependenciesCut
+            | Self::ChipWaitingHolds
             | Self::Ended
             | Self::Pool
             | Self::ProposalWhy
@@ -2160,6 +2171,7 @@ impl JigPhrase {
             | Self::TasksRunning
             | Self::TasksHeld
             | Self::TasksClosing
+            | Self::TasksEnded
             | Self::TasksDone
             | Self::TasksFailed
             | Self::TasksCancelled
@@ -2276,7 +2288,11 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 588] = [
+pub const ALL: [JigPhrase; 592] = [
+    JigPhrase::ChipTitleCut,
+    JigPhrase::ChipDependenciesCut,
+    JigPhrase::ChipWaitingHolds,
+    JigPhrase::TasksEnded,
     JigPhrase::FrameProjectNumber,
     JigPhrase::FrameLogin,
     JigPhrase::FramePerson,

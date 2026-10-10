@@ -16,7 +16,7 @@ fn part() -> OwnerPart {
     path.push(copy_of(&[255, 0])).unwrap();
     OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path) }
 }
-fn details() -> OwnerChipDetails {
+pub(super) fn details() -> OwnerChipDetails {
     OwnerChipDetails {
         project: u32::MAX,
         executor: OwnerExecutor::Agent { charter: u32::MAX },

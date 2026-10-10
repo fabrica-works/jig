@@ -110,6 +110,9 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
     }
 }
 fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+    if let jig_client::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {
+        crate::owner_chip::render(b, details, client, words, bindings);
+    }
     crate::specification::document(b, &doc.spec, words);
     crate::instructions::document(b, doc.instructions.as_ref(), words);
     result_contract(b, &doc.result_contract, words, bindings);

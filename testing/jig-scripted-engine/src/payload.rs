@@ -299,7 +299,8 @@ impl Payload for Phase {
             | Self::Held
             | Self::Done
             | Self::Failed
-            | Self::Cancelled | Self::Ended => Some(0),
+            | Self::Cancelled
+            | Self::Ended => Some(0),
         }
     }
 }

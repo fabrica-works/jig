@@ -28,6 +28,7 @@ pub mod specification;
 pub mod styles;
 pub mod turns;
 pub use styles::JigStyle;
+mod chip_phase;
 mod diff;
 pub mod frame;
 mod frame_facts;

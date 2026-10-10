@@ -952,6 +952,12 @@ pub fn language() -> Language {
             JigPhrase::NobodyMayAccept => Box::new([Segment::Text(copy_of(b"Nobody in this project may accept it"))]),
             JigPhrase::ClosingEffects => Box::new([Segment::Text(copy_of(b"'s effects settling"))]),
             JigPhrase::Held => Box::new([Segment::Text(copy_of(b"Held"))]),
+            JigPhrase::ChipTitleCut => Box::new([Segment::Text(copy_of(b"Title is incomplete"))]),
+            JigPhrase::ChipDependenciesCut => Box::new([Segment::Text(copy_of(b"More dependencies are not shown"))]),
+            JigPhrase::ChipWaitingHolds => Box::new([Segment::Text(copy_of(b"Waiting for resource holds"))]),
+            JigPhrase::TasksEnded => {
+                Box::new([Segment::Text(copy_of(b"Ended tasks with outcome not supplied: ")), Segment::Hole(0)])
+            }
             JigPhrase::Ended => Box::new([Segment::Text(copy_of(b"Ended"))]),
             JigPhrase::WaitingParty => Box::new([
                 Segment::Text(copy_of(b"Waiting for party ")),

@@ -406,7 +406,7 @@ pub(crate) fn order(rows: &mut List<ConversationLine>) {
 #[must_use]
 pub const fn live(phase: contract::Phase) -> bool {
     match phase {
-        contract::Phase::Done | contract::Phase::Failed | contract::Phase::Cancelled => false,
+        contract::Phase::Ended | contract::Phase::Done | contract::Phase::Failed | contract::Phase::Cancelled => false,
         contract::Phase::Waiting
         | contract::Phase::Idle
         | contract::Phase::Due
