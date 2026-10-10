@@ -240,7 +240,14 @@ fn retained_runs_past_the_limit_start_when_a_place_frees() {
     let Request::Stream { watcher, from, to, cut, .. } = &out[0] else { panic!("late retained stream") };
     assert_eq!((*watcher, *from, *to, *cut), (Token::new(3), 3, 6, true));
     assert_eq!(domain.runs(), 2);
-    assert_eq!(follow(&mut domain, 4, 7, None, 0).len(), 2);
+    assert_eq!(
+        follow(&mut domain, 4, 7, None, 0).as_ref(),
+        &[
+            Request::Watching { watcher: Token::new(4) },
+            Request::Make { watcher: Token::new(4), subject: Token::new(7), window: Window { rows: 10, after: None } },
+            stream(4, 1, 0, 3, b"one", false),
+        ]
+    );
 }
 #[test]
 fn ending_a_run_discards_text_and_a_new_attempt_can_write() {
