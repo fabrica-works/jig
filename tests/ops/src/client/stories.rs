@@ -10,7 +10,7 @@ use jig_client_world::{
     Settings, World,
     harness::{CardKey, CardSeen, Seen},
     observe,
-    stories::{frame, proposal, task, text},
+    stories::{frame, party, proposal, task, text},
 };
 use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_ops_client_domain::{Address, infrastructure as infra, observability as obs};
@@ -280,7 +280,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
     );
     let mut decided = p.clone();
     decided.ending =
-        Some(Ending::Decided { by: 7, party: Some(frame(7).party), how: Some(Decision::Accepted), at: Wall::EPOCH });
+        Some(Ending::Decided { by: 7, party: Some(party(7)), how: Some(Decision::Accepted), at: Wall::EPOCH });
     let rule = jig_scripted_engine::Rule {
         party: Some(7),
         ask: Ask::DecideProposal { project: 1, proposal: p.key, decision: Decision::Accepted },
@@ -351,7 +351,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     let mut truth = Truth::default();
     for party in [7, 8] {
         let mut row = frame(party);
-        row.party.name = text(if party == 7 { b"Q" } else { b"Other" });
+        row.party.name = DocumentText::complete(text(if party == 7 { b"Q" } else { b"Other" }));
         truth.frames.insert(party, row);
         truth.sign_ins.insert(party, party);
     }
@@ -367,7 +367,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     let ask = Ask::StartChat { project: 1, words: text(b"staging for one week") };
     let mut accepted = p.clone();
     accepted.ending =
-        Some(Ending::Decided { by: 7, party: Some(frame(7).party), how: Some(Decision::Accepted), at: Wall::EPOCH });
+        Some(Ending::Decided { by: 7, party: Some(party(7)), how: Some(Decision::Accepted), at: Wall::EPOCH });
     let rule = jig_scripted_engine::Rule {
         party: Some(7),
         ask,
