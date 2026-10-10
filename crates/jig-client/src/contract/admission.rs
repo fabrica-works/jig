@@ -113,7 +113,7 @@ fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority) -> bool {
         && draft.notes & !facts.notes == 0
         && deadline(draft.deadline, facts.deadline);
     for grant in &draft.grants {
-        fits &= facts.grant_covered(grants.as_slice(), grant);
+        fits &= grant_covered(facts.grants.as_slice(), grant);
     }
     for kind in &draft.delegation.kinds {
         fits &= facts.delegation.kinds.as_slice().contains(kind);
