@@ -31,7 +31,8 @@ fn full_task() -> jig_client::contract::Task {
                 connector: jig_test_client_domain::FIRST,
                 path: {
                     let mut rows = skein_lib::List::with_capacity(1);
-                    rows.push(stories::text(&[b'r'; 32]).into_bytes()).unwrap();
+                    rows.push(stories::text(&[b'r'; 32]).into_bytes())
+                        .expect("one supplied segment fits its reserved slot");
                     rows
                 },
             },
@@ -43,7 +44,8 @@ fn full_task() -> jig_client::contract::Task {
                 connector: jig_test_client_domain::FIRST,
                 path: {
                     let mut rows = skein_lib::List::with_capacity(1);
-                    rows.push(stories::text(&[b'r'; 32]).into_bytes()).unwrap();
+                    rows.push(stories::text(&[b'r'; 32]).into_bytes())
+                        .expect("one supplied segment fits its reserved slot");
                     rows
                 },
             },
