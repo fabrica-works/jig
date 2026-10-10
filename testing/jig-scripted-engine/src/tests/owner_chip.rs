@@ -5,7 +5,7 @@ fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(bytes.into(), 4096).unwrap(), cut }
 }
 fn part() -> OwnerPart {
-    let mut path = List::with_capacity(3);
+    let mut path: List<Box<[u8]>> = List::with_capacity(3);
     path.push(b"a/b".as_slice().into()).unwrap();
     path.push(Box::new([255, 0])).unwrap();
     OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path) }
@@ -152,8 +152,8 @@ fn chip_admission_refuses_oversized_terminal_bytes_nested_raw_parts_and_unused_l
         connector: 1,
         kind: OwnerPartKind::Procedure,
         key: OwnerPartKey::Path({
-            let mut path = List::with_capacity(1);
-            path.push(Box::new([255; 7]) as Box<[u8]>).unwrap();
+            let mut path: List<Box<[u8]>> = List::with_capacity(1);
+            path.push(Box::new([255_u8; 7])).unwrap();
             path
         }),
     });

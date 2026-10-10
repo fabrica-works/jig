@@ -79,11 +79,7 @@ fn phrase_limits() -> PhraseLimits {
 }
 fn words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
-    WORDS.get_or_init(|| crate::words::Words {
-        book: crate::phrases::english::english(256).unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    })
+    WORDS.get_or_init(|| Words { book: crate::phrases::english::english(256).unwrap(), language: 0, offset_minutes: 0 })
 }
 fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::ChipFragment) {
     let client = Domain::new(&client_limits(), 1);
