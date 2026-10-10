@@ -49,14 +49,15 @@ pub fn task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     };
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(doc.project))]);
     if let Some(goal) = doc.goal {
-        words.text(b, JigPhrase::Goal, &[]);
-        if goal != doc.chip.task {
+        if goal == doc.chip.task {
+            words.text(b, JigPhrase::Goal, &[]);
+        } else {
             crate::frame::control(
                 b,
                 words,
                 bindings,
                 Role::Link,
-                JigPhrase::ContextTask,
+                JigPhrase::ServedGoal,
                 &[Hole::Number(goal)],
                 Act::Go { address: Address::task(goal) },
             );

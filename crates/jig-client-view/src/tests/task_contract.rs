@@ -57,7 +57,7 @@ fn task_contract_overview_preserves_opaque_approval_and_named_verdict_caps_witho
                 assert_eq!(contains(&tree, b"Some contract choices were omitted"), cut);
             }
             TaskContractDocument::Change { .. } => {
-                assert!(contains(&tree, b"Change contract 65535, kind 65535, word byte limit 4294967295"))
+                assert!(contains(&tree, b"Change contract 65535, kind 65535, word byte limit 4294967295"));
             }
         }
     }
@@ -80,7 +80,8 @@ fn task_header_links_the_supplied_served_goal_without_turning_ancestor_identity_
             }
         }
         assert_eq!(goals, goal.filter(|number| *number != 8).into_iter().collect::<Vec<_>>());
-        assert_eq!(contains(&tree, b"Goal"), goal.is_some());
+        assert_eq!(contains(&tree, b"Goal"), goal == Some(8));
+        assert_eq!(contains(&tree, b"Serves goal"), goal.is_some_and(|number| number != 8));
         assert!(contains(&tree, b"Priority 1"));
     }
 }

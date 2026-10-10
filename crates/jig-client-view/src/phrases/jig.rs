@@ -14,6 +14,8 @@ pub enum JigPhrase {
     NoteChangedNotSupplied,
     /// Some owner task lists were omitted.
     TaskListsCut,
+    /// The actual other goal this task serves: (0).
+    ServedGoal,
     ResourceSegments,
     LiteralGrant,
     LiteralGrantMissing,
@@ -1068,6 +1070,7 @@ impl JigPhrase {
             Self::NoteWriterTask => 635,
             Self::NoteChangedNotSupplied => 636,
             Self::TaskListsCut => 637,
+            Self::ServedGoal => 638,
             Self::ResourceSegments => 630,
             Self::LiteralGrant => 631,
             Self::LiteralGrantMissing => 632,
@@ -2162,6 +2165,7 @@ impl JigPhrase {
             | Self::MoreUpdates
             | Self::TaskPage
             | Self::NoteWriterParty
+            | Self::ServedGoal
             | Self::ByParty
             | Self::ByTask
             | Self::MadeChat
@@ -2316,11 +2320,12 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 600] = [
+pub const ALL: [JigPhrase; 601] = [
     JigPhrase::NoteWriterParty,
     JigPhrase::NoteWriterTask,
     JigPhrase::NoteChangedNotSupplied,
     JigPhrase::TaskListsCut,
+    JigPhrase::ServedGoal,
     JigPhrase::ResourceSegments,
     JigPhrase::LiteralGrant,
     JigPhrase::LiteralGrantMissing,
