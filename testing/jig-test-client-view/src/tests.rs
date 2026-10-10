@@ -134,7 +134,7 @@ fn family_words() -> words::Words {
 fn view() -> View {
     let jig = words();
     let first = family_words();
-    let bounds = Limits::of(&limits(), &jig, &first).unwrap();
+    let bounds = Limits::for_world(&limits(), &jig, &first, 1024, 256).unwrap();
     View::new(&bounds, &limits(), jig, first, first::Address { project: 3, item: 5 })
 }
 fn patches(view: &mut View, root: &Domain) -> Vec<Patch> {

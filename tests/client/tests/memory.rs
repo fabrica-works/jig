@@ -185,6 +185,7 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
         w.event(counted, jig_test_client_domain::Event::Jig(jig_client::Event::Kept { scope, requests: 1 }));
     }
     let result = w.run(Until::Steps(2));
+    eprintln!("full client fixture: heap peak {} bytes, bound {} bytes", result.heap_peak, result.heap_bound);
     assert!(result.heap_peak > 0, "counted every iteration");
     assert!(result.heap_peak <= result.heap_bound, "composed root, view and shell model envelope");
 }
@@ -192,7 +193,7 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
 /// A real client allocation crosses a deliberately small declared budget.
 /// The same callback guard used by the full fixture must catch it.
 #[test]
-#[should_panic(expected = "client world iteration")]
+#[should_panic(expected = "more than the worst case of 1024")]
 fn a_client_that_exceeds_its_declared_heap_budget_is_caught() {
     let mut world = stories::configured(Settings { memory: true, heap_bytes_per_client: 1024, ..Settings::default() });
     world.client(7, stories::inbox());

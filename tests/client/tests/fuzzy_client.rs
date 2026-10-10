@@ -1,8 +1,6 @@
 //! Replayable random people over every story start and seeded random documents.
 use jig_client_world::random::{self, Start};
-use skein_world::domain::{Verdict, heap::Counting};
-#[global_allocator]
-static HEAP: Counting = Counting;
+use skein_world::domain::Verdict;
 fn sweep(start: Start) {
     let mut faults = 0;
     for seed in 100..116 {
