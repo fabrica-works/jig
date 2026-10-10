@@ -1,6 +1,7 @@
 //! Whole allocation envelopes (programming-model.md, 6.3; root.md, 6–7).
 use crate::connector_values::ConnectorLimits as Bounds;
 use crate::connector_values::{ConnectorAnswer, ConnectorDocument};
+use alloc::boxed::Box;
 use core::mem::size_of;
 use jig_test_connector::{ClientDocument, ClientResource, OutboxEntry, Path};
 use skein_lib::List;
