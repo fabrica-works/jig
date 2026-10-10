@@ -128,7 +128,7 @@ fn contains(tree: &Tree, bytes: &[u8]) -> bool {
 fn retained_chip_preserves_concrete_executor_project_and_full_width_owner_scalars() {
     let mut value = details();
     for (executor, label) in [
-        (OwnerExecutor::Agent { charter: u32::MAX }, b"Charter 4294967295".as_slice()),
+        (OwnerExecutor::Agent { charter: u32::MAX }, b"Agent charter 4294967295".as_slice()),
         (
             OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
             b"Procedure connector 65535, code 4294967295",

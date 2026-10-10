@@ -305,7 +305,7 @@ fn observation(b: &mut Builder, value: &OwnerChipObservation, words: &Words) {
         None => text(b, words, P::StartUnknown, &[]),
     }
 }
-fn result(b: &mut Builder, value: &ResultValue, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn result_value(b: &mut Builder, value: &ResultValue, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     match value {
         ResultValue::Approved { state, words: explanation } => {
             words.text(b, crate::phrases::jig::JigPhrase::ApprovalExpected, &[]);
@@ -327,7 +327,7 @@ fn ending(b: &mut Builder, value: &OwnerChipEnding, client: &Domain, words: &Wor
     match value {
         OwnerChipEnding::Done(result) => {
             text(b, words, P::Done, &[]);
-            self::result(b, result, client, words, bindings);
+            result_value(b, result, client, words, bindings);
         }
         OwnerChipEnding::Failed(reason) => {
             text(b, words, P::Failed, &[]);
@@ -343,7 +343,7 @@ fn ending(b: &mut Builder, value: &OwnerChipEnding, client: &Domain, words: &Wor
             }
             wall(b, words, P::CancelledAt, *at);
             if let Some(result) = result {
-                self::result(b, result, client, words, bindings);
+                result_value(b, result, client, words, bindings);
             }
         }
     }
