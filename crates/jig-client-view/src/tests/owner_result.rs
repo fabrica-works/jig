@@ -1,6 +1,5 @@
 #![expect(
     clippy::disallowed_methods,
-    clippy::disallowed_types,
     reason = "ordinary tests inspect standalone trees and mutate checked language data"
 )]
 use crate::{
