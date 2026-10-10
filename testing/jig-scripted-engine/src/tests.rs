@@ -854,6 +854,17 @@ fn restart_faults_and_application_hooks_keep_one_durable_truth() {
     application::run();
 }
 
+fn overlong_resource_grant() -> Grant {
+    Grant {
+        connector: 1,
+        kind: 1,
+        pattern: OwnerPattern {
+            segments: List::with_capacity(0),
+            last: OwnerPatternEnd::Exact(vec![0; 4097].into_boxed_slice()),
+        },
+    }
+}
+
 fn bounded_offer_payloads_and_predictions() {
     use jig_client::contract::Bounds as DraftBounds;
     closing_connector_payload_bounds();
@@ -937,14 +948,7 @@ fn bounded_offer_payloads_and_predictions() {
                 direct.tools = List::with_capacity(33);
             }
             if variant == 3 {
-                ceiling.grants = list(vec![Grant {
-                    connector: 1,
-                    kind: 1,
-                    pattern: OwnerPattern {
-                        segments: List::with_capacity(0),
-                        last: OwnerPatternEnd::Exact(vec![0; 4097].into_boxed_slice()),
-                    },
-                }]);
+                ceiling.grants = list(vec![overlong_resource_grant()]);
             }
             if variant == 4 {
                 ceiling.note_scopes = List::with_capacity(33);
