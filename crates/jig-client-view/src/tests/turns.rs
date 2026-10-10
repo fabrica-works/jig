@@ -97,7 +97,7 @@ fn live(d: &mut Domain, run: Token, number: u32) {
         Delivery::Run(Box::new(RunText {
             attempt: 2,
             began: Some(Wall::EPOCH),
-            turn: TurnName { attempt: 2, number },
+            turn: ProvisionalTurnName { retry: 0, attempt: 2, number },
             from: 0,
             through: length,
             text: value,
@@ -332,7 +332,7 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
             Delivery::Run(Box::new(RunText {
                 attempt,
                 began: Some(Wall::EPOCH),
-                turn: TurnName { attempt, number: u32::MAX },
+                turn: ProvisionalTurnName { retry: 0, attempt, number: u32::MAX },
                 from: 0,
                 through: 4,
                 text: text(b"live"),
@@ -410,7 +410,7 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
         Delivery::Run(Box::new(RunText {
             attempt: u64::MAX,
             began: Some(Wall::EPOCH),
-            turn: TurnName { attempt: u64::MAX, number: 1 },
+            turn: ProvisionalTurnName { retry: 0, attempt: u64::MAX, number: 1 },
             from: 0,
             through: 4,
             text: text(b"live"),
@@ -459,7 +459,7 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
 fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_loss_and_folds() {
     let words = words();
     let (mut d, _, run, _) = ready();
-    let name = TurnName { attempt: u64::MAX, number: u32::MAX };
+    let name = ProvisionalTurnName { retry: 0, attempt: u64::MAX, number: u32::MAX };
     let raw = CurrentCall {
         identity: current_identity(b"id/\xff"),
         began: None,
@@ -536,7 +536,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     let tool = full_raw_byte(0xff);
     let input = full_raw_byte(0xfe);
     for number in 1..=CLIENT.rows {
-        let name = TurnName { attempt: u64::MAX, number };
+        let name = ProvisionalTurnName { retry: 0, attempt: u64::MAX, number };
         let call = CurrentCall {
             identity: CallIdentity { sequence: number, id: full_raw_byte(0xfd), ..current_identity(b"id/\xff") },
             began: Some(Wall::EPOCH),
@@ -598,7 +598,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
         Delivery::Run(Box::new(RunText {
             attempt: u64::MAX,
             began: None,
-            turn: TurnName { attempt: u64::MAX, number: 1 },
+            turn: ProvisionalTurnName { retry: 0, attempt: u64::MAX, number: 1 },
             from: 0,
             through: 0,
             text: text(b""),
@@ -658,7 +658,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         Delivery::Run(Box::new(RunText {
             attempt: 2,
             began: None,
-            turn: TurnName { attempt: 2, number: 1 },
+            turn: ProvisionalTurnName { retry: 0, attempt: 2, number: 1 },
             from: 0,
             through: 0,
             text: text(b""),
@@ -738,7 +738,7 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
     state.writing = Some(RunText {
         attempt: 2,
         began: None,
-        turn: TurnName { attempt: 2, number: 1 },
+        turn: ProvisionalTurnName { retry: 0, attempt: 2, number: 1 },
         from: 0,
         through: 4,
         text: text(b"live"),

@@ -565,14 +565,14 @@ fn scenario_run_offsets_cut_names_and_activity() {
     assert_eq!(run.text.bytes(), b"abcdefghijklmnopqrst");
     engine.write(at(1), 8, name, Wall::EPOCH, &text(b"uvwxyz0123456789ABCD"), None).expect("second chunk");
     assert!(engine.poll(at(1)).is_empty());
-    engine.continue_run(Token::new(1), Some(name), 20).expect("same watch cursor");
+    engine.continue_run(Token::new(1), Some(provisional(name)), 20).expect("same watch cursor");
     let up = engine.poll(at(1));
     let Up::Watch { event: WatchEvent::Delivered(Delivery::Run(run)), .. } = &up[0] else {
         panic!("run text");
     };
     assert_eq!((run.from, run.through, run.cut), (20, 40, true));
     assert_eq!(run.text.bytes(), b"uvwxyz0123456789ABCD");
-    engine.continue_run(Token::new(1), Some(name), 0).expect("lagging offset");
+    engine.continue_run(Token::new(1), Some(provisional(name)), 0).expect("lagging offset");
     let up = engine.poll(at(1));
     let Up::Watch { event: WatchEvent::Delivered(Delivery::Run(run)), .. } = &up[0] else {
         panic!("cut text");
@@ -580,12 +580,12 @@ fn scenario_run_offsets_cut_names_and_activity() {
     assert_eq!((run.from, run.through), (8, 40));
     let second = TurnName { attempt: 1, number: 1 };
     engine.write(at(2), 8, second, Wall::EPOCH, &text(b"second"), None).expect("new turn");
-    engine.continue_run(Token::new(1), Some(name), 40).expect("old turn position");
+    engine.continue_run(Token::new(1), Some(provisional(name)), 40).expect("old turn position");
     let up = engine.poll(at(2));
     let Up::Watch { event: WatchEvent::Delivered(Delivery::Run(run)), .. } = &up[0] else {
         panic!("new turn text");
     };
-    assert_eq!((run.turn, run.from, run.through), (second, 0, 6));
+    assert_eq!((run.turn, run.from, run.through), (provisional(second), 0, 6));
     engine
         .act(
             at(2),
@@ -1825,7 +1825,7 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     let run = RunText {
         attempt: name.attempt,
         began: None,
-        turn: name,
+        turn: provisional(name),
         from: 0,
         through: 4,
         text: text(b"live"),
@@ -1884,13 +1884,13 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
         engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(&vec![b'!'; excess]), held.call.clone()),
         Err(Invalid::Payload)
     );
-    engine.continue_run(token, Some(name), 0).unwrap();
+    engine.continue_run(token, Some(provisional(name)), 0).unwrap();
     assert!(
         engine.poll(Time::ZERO).contains(&Up::Watch { token, event: WatchEvent::Delivered(delivery) }),
         "refusal preserved the whole previously delivered value"
     );
     engine.write_live(Time::ZERO, 8, name, Some(Wall::EPOCH), &text(b""), held.call.clone()).unwrap();
-    engine.continue_run(token, Some(name), 0).unwrap();
+    engine.continue_run(token, Some(provisional(name)), 0).unwrap();
     let supplied = RunText { began: Some(Wall::EPOCH), ..held };
     assert!(
         engine
@@ -1956,7 +1956,7 @@ fn whole_run_state_prices_independent_call_and_writing_and_preserves_refused_sna
     let writing = RunText {
         attempt: u64::MAX,
         began: None,
-        turn: TurnName { attempt: u64::MAX, number: u32::MAX },
+        turn: ProvisionalTurnName { retry: 0, attempt: u64::MAX, number: u32::MAX },
         from: 9,
         through: 13,
         text: text(b"tail"),
@@ -2007,3 +2007,7 @@ fn whole_run_state_prices_independent_call_and_writing_and_preserves_refused_sna
 }
 
 mod chip_facts;
+
+fn provisional(name: TurnName) -> ProvisionalTurnName {
+    ProvisionalTurnName { attempt: name.attempt, number: name.number, retry: 0 }
+}

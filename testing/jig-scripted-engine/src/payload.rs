@@ -13,7 +13,7 @@ use jig_client::contract::{
     LiveDelegate, Made, Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered,
     OfferedCharters, OptionLine, Outcome, OwnerChipPhase, Parameter, ParameterDocument, Part, PartScope, Party,
     PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
-    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, Question, Read, ReadNone, ReadResult,
+    ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question, Read, ReadNone, ReadResult,
     ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField, ResultValue,
     RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunState, RunText, RunWork,
     Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject,
@@ -1048,6 +1048,7 @@ impl Payload for LiveCall {
         }
     }
 }
+fields!(ProvisionalTurnName { attempt, number, retry });
 fields!(RunText { attempt, began, turn, from, through, text, cut, call });
 fields!(RunState { task, attempt, committed_turn, writing, call });
 impl Payload for WatchEvent {

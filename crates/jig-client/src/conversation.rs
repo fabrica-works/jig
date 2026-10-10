@@ -16,8 +16,8 @@
 use crate::{
     action::End,
     contract::{
-        Activity, ActivityLine, ActivityPage, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part, Read, RunState,
-        RunText, Text, TurnName,
+        Activity, ActivityLine, ActivityPage, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part,
+        ProvisionalTurnName, Read, RunState, RunText, Text, TurnName,
     },
     objects::{Objects, Source},
     windows::{Edge, Edges, TurnWindow},
@@ -58,7 +58,7 @@ pub enum Reading {
 /// One turn's text is provisional until its committed turn is read.
 #[derive(Debug)]
 pub struct LiveTurn {
-    pub name: TurnName,
+    pub name: ProvisionalTurnName,
     pub began: Option<Wall>,
     pub text: Text,
     pub offset: u32,
@@ -86,7 +86,7 @@ pub struct Conversation {
     /// Earlier provisional turns survive deliveries of a later turn.
     pub live: List<LiveTurn>,
     /// The name and offset to request on the run watch.
-    pub current: Option<TurnName>,
+    pub current: Option<ProvisionalTurnName>,
     /// The current watch cursor survives replacement by a committed turn.
     pub stream_offset: u32,
     /// The latest committed turn read, fencing stale stream deliveries.
@@ -302,7 +302,7 @@ impl Conversation {
             return false;
         }
         if let Some(committed) = self.committed_turn
-            && !later(value.turn, committed)
+            && !later(value.turn.turn(), committed)
         {
             return true;
         }
@@ -314,7 +314,11 @@ impl Conversation {
         }
         let mut index = None;
         for at in 0..self.live.len() {
-            if self.live.get(at).expect("live row exists").name == value.turn {
+            let held = self.live.get(at).expect("live row exists").name;
+            if held.turn() == value.turn.turn() {
+                if value.turn.retry < held.retry {
+                    return true;
+                }
                 index = Some(at);
                 break;
             }
@@ -322,30 +326,47 @@ impl Conversation {
         match index {
             Some(at) => {
                 let live = self.live.get_mut(at).expect("live row exists");
-                if value.through <= live.offset {
-                    if value.through == live.offset {
-                        live.began = value.began;
-                        live.call = value.call;
+                if value.turn.retry > live.name.retry {
+                    *live = LiveTurn {
+                        name: value.turn,
+                        began: value.began,
+                        text: tail(&[], value.text.bytes(), text_limit),
+                        offset: value.through,
+                        cut: value.cut || value.from > 0 || !value.text.fits(text_limit),
+                        call: value.call,
+                    };
+                } else if value.cut && value.through >= live.offset {
+                    live.text = tail(&[], value.text.bytes(), text_limit);
+                    live.offset = value.through;
+                    live.began = value.began;
+                    live.call = value.call;
+                    live.cut = true;
+                } else {
+                    if value.through <= live.offset {
+                        if value.through == live.offset {
+                            live.began = value.began;
+                            live.call = value.call;
+                        }
+                        self.prune_folds();
+                        return true;
                     }
-                    self.prune_folds();
-                    return true;
+                    if value.from > live.offset && !value.cut {
+                        return false;
+                    }
+                    let skip = live.offset.saturating_sub(value.from);
+                    let skip = usize::try_from(skip).expect("offset fits usize");
+                    let Some(text) = value.text.bytes().get(skip..) else {
+                        return false;
+                    };
+                    let old = if value.from > live.offset { &[] } else { live.text.bytes() };
+                    let combined = old.len().saturating_add(text.len());
+                    live.text = tail(old, text, text_limit);
+                    live.offset = value.through;
+                    live.cut =
+                        live.cut || value.cut || combined > usize::try_from(text_limit).expect("text bound fits usize");
+                    live.began = value.began;
+                    live.call = value.call;
                 }
-                if value.from > live.offset && !value.cut {
-                    return false;
-                }
-                let skip = live.offset.saturating_sub(value.from);
-                let skip = usize::try_from(skip).expect("offset fits usize");
-                let Some(text) = value.text.bytes().get(skip..) else {
-                    return false;
-                };
-                let old = if value.from > live.offset { &[] } else { live.text.bytes() };
-                let combined = old.len().saturating_add(text.len());
-                live.text = tail(old, text, text_limit);
-                live.offset = value.through;
-                live.cut =
-                    live.cut || value.cut || combined > usize::try_from(text_limit).expect("text bound fits usize");
-                live.began = value.began;
-                live.call = value.call;
             }
             None => {
                 if self.live.len() == self.live.capacity() {
@@ -366,7 +387,7 @@ impl Conversation {
         }
         match self.current {
             Some(current) => {
-                if later(value.turn, current) || value.turn == current {
+                if value.turn >= current {
                     self.current = Some(value.turn);
                     self.stream_offset = value.through;
                 }
@@ -409,7 +430,7 @@ impl Conversation {
         let mut kept = List::with_capacity(self.live.capacity());
         let live = core::mem::replace(&mut self.live, List::with_capacity(0));
         for turn in live.into_boxed() {
-            if turn.name != name {
+            if turn.name.turn() != name {
                 kept.push(turn).expect("removal keeps bounded live turns");
             }
         }

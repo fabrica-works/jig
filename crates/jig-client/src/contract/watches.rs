@@ -24,7 +24,7 @@ pub enum Subject {
     /// Party live chats.
     Conversations,
     /// A task run text from the client offset.
-    Run { task: u64, turn: Option<TurnName>, offset: u32 },
+    Run { task: u64, turn: Option<ProvisionalTurnName>, offset: u32 },
     /// Deployment capacity.
     Deployment,
 }
@@ -67,12 +67,28 @@ pub struct RunState {
     pub call: Option<CurrentCall>,
 }
 
-/// Provisional text named by turn, with explicit offset and truncation.
+/// A provisional retry's actual attempt and activation turn, independent of a committed turn name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ProvisionalTurnName {
+    pub attempt: u64,
+    pub number: u32,
+    pub retry: u32,
+}
+impl ProvisionalTurnName {
+    /// The attempt/turn projection used by activity fences; it does not attest a commit.
+    #[must_use]
+    pub const fn turn(self) -> TurnName {
+        TurnName { attempt: self.attempt, number: self.number }
+    }
+}
+
+/// Provisional text named by retry, with explicit offset and truncation.
+/// A cut delivery replaces retained text from its supplied origin.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RunText {
     pub attempt: u64,
     pub began: Option<Wall>,
-    pub turn: TurnName,
+    pub turn: ProvisionalTurnName,
     pub from: u32,
     pub through: u32,
     pub text: Text,

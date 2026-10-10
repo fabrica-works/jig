@@ -1,7 +1,7 @@
 use crate::{
     contract::{
-        Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, Read, RunBeginning, RunText,
-        Speaker, Text, Turn, TurnName, Usage,
+        Activity, ActivityLine, ActivityPage, Block, Call, Cursor, Message, ObjectKey, ProvisionalTurnName, Read,
+        RunBeginning, RunText, Speaker, Text, Turn, TurnName, Usage,
     },
     conversation::{CallName, Conversation, Fold},
     objects::{Objects, Source},
@@ -157,7 +157,7 @@ fn stream(number: u32, from: u32, through: u32, bytes: &[u8], cut: bool) -> RunT
     RunText {
         attempt: 1,
         began: Some(Wall::EPOCH),
-        turn: TurnName { attempt: 1, number },
+        turn: ProvisionalTurnName { retry: 0, attempt: 1, number },
         from,
         through,
         text: text(bytes),
@@ -211,7 +211,7 @@ fn provisional_text_keeps_its_cut_mark_and_recovery_replaces_uncommitted_text() 
     assert_eq!(c.live.len(), 2);
     c.end_run();
     assert!(c.stream(stream(3, 0, 1, b"y", false), 4));
-    assert_eq!(c.current, Some(TurnName { attempt: 1, number: 3 }));
+    assert_eq!(c.current, Some(ProvisionalTurnName { retry: 0, attempt: 1, number: 3 }));
 }
 
 fn activity_read(requests: &[crate::Request]) -> skein_lib::Token {
@@ -269,7 +269,12 @@ fn routed_conversation() {
     for request in &requests {
         if let Request::Continue {
             watch,
-            subject: crate::contract::Subject::Run { turn: Some(TurnName { attempt: 1, number: 1 }), offset: 3, .. },
+            subject:
+                crate::contract::Subject::Run {
+                    turn: Some(ProvisionalTurnName { retry: 0, attempt: 1, number: 1 }),
+                    offset: 3,
+                    ..
+                },
         } = request
         {
             continued = *watch == run_watch;
@@ -774,7 +779,7 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
 fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made_values() {
     use crate::contract::{CurrentCall, LiveCall};
     let mut c = Conversation::new(9, 4);
-    let name = TurnName { attempt: u64::MAX, number: u32::MAX - 1 };
+    let name = ProvisionalTurnName { attempt: u64::MAX, number: u32::MAX - 1, retry: 0 };
     let mut value = stream(name.number, 0, 3, b"one", false);
     value.attempt = name.attempt;
     value.turn = name;
@@ -819,7 +824,7 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     assert_eq!(c.live.get(0).unwrap().text.bytes(), b"one++");
     assert_eq!(c.live.get(0).unwrap().began, None);
     assert_eq!(c.live.get(0).unwrap().call, value.call);
-    let later = TurnName { number: u32::MAX, ..name };
+    let later = ProvisionalTurnName { number: u32::MAX, ..name };
     value.turn = later;
     value.from = 0;
     value.through = 4;
@@ -830,7 +835,7 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     assert!(c.moved(1).is_some());
     let mut committed = calls(1, name.number);
     if let Activity::Turn { name: committed_name, .. } = &mut committed.event {
-        *committed_name = name;
+        *committed_name = name.turn();
     }
     let mut rows = List::with_capacity(1);
     rows.push(committed).unwrap();

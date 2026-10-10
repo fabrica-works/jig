@@ -342,7 +342,7 @@ impl<A: Application> Engine<A> {
                     rows: Rows::Activity(rows),
                     ..
                 }) = change
-                    && self.runs.get(task).is_some_and(|run| match run { watches::Run::Text(run) => rows.iter().any(|line| matches!(line.event, jig_client::contract::Activity::Turn { name, .. } if name == run.turn)), watches::Run::State(_) => false }) { self.runs.remove(task); }
+                    && self.runs.get(task).is_some_and(|run| match run { watches::Run::Text(run) => rows.iter().any(|line| matches!(line.event, jig_client::contract::Activity::Turn { name, .. } if name == run.turn.turn())), watches::Run::State(_) => false }) { self.runs.remove(task); }
             }
             if let (Some(party), Some(key)) = (pending.commit.party, pending.commit.key) {
                 let retention = self.durable_truth.frames.get(&party).expect("keyed party has a frame").retention;

@@ -1,8 +1,8 @@
 //! One in-flight document and a dirty mark per watch; contract.md, 7.
 use crate::{Engine, Invalid, Rows, Up, payload, reads::list};
 use jig_client::contract::{
-    Actor, Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, Phase, Read, ReadValue, RunState, RunText,
-    Subject, TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
+    Actor, Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, Phase, ProvisionalTurnName, Read,
+    ReadValue, RunState, RunText, Subject, TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
 };
 use skein_lib::{Time, Token, Wall};
 
@@ -81,7 +81,12 @@ impl<A: crate::Application> Engine<A> {
         }
     }
     /// Advances the same run watch with the client's turn name and absolute offset.
-    pub fn continue_run(&mut self, token: Token, turn: Option<TurnName>, offset: u32) -> Result<(), Invalid> {
+    pub fn continue_run(
+        &mut self,
+        token: Token,
+        turn: Option<ProvisionalTurnName>,
+        offset: u32,
+    ) -> Result<(), Invalid> {
         let watch = self.watches.get_mut(&token).ok_or(Invalid::Identity)?;
         let Subject::Run { turn: current, offset: through, .. } = &mut watch.subject else {
             return Err(Invalid::Identity);
@@ -317,10 +322,13 @@ impl<A: crate::Application> Engine<A> {
                     Run::State(value) => return Ok(Some(Delivery::RunState(Box::new(value.clone())))),
                     Run::Text(value) => value,
                 };
-                let from = if *turn == Some(run.turn) { (*offset).max(run.from).min(run.through) } else { run.from };
+                let acknowledged =
+                    if *turn == Some(run.turn) && (run.from..=run.through).contains(offset) { *offset } else { 0 };
+                let from = acknowledged.max(run.from);
                 let start = (from - run.from) as usize;
                 let mut value = run.clone();
                 value.from = from;
+                value.cut = from > acknowledged;
                 value.text = Text::new(run.text.bytes()[start..].to_vec().into_boxed_slice(), self.bounds.text)
                     .expect("retained run fits");
                 Delivery::Run(Box::new(value))
@@ -388,12 +396,31 @@ impl<A: crate::Application> Engine<A> {
     ) -> Result<(), Invalid> {
         self.write_live(now, task, turn, Some(began), bytes, call.map(LiveCall::Decoded))
     }
-    /// Supplies exactly the available wall and raw or decoded provisional call.
+    /// Legacy scripted first-retry adapter; real retry sources use write_provisional.
     pub fn write_live(
         &mut self,
         now: Time,
         task: u64,
         turn: TurnName,
+        began: Option<Wall>,
+        bytes: &Text,
+        call: Option<LiveCall>,
+    ) -> Result<(), Invalid> {
+        self.write_provisional(
+            now,
+            task,
+            ProvisionalTurnName { attempt: turn.attempt, number: turn.number, retry: 0 },
+            began,
+            bytes,
+            call,
+        )
+    }
+    /// Supplies the actual provisional name, available wall and whole call.
+    pub fn write_provisional(
+        &mut self,
+        now: Time,
+        task: u64,
+        turn: ProvisionalTurnName,
         began: Option<Wall>,
         bytes: &Text,
         call: Option<LiveCall>,
@@ -406,6 +433,11 @@ impl<A: crate::Application> Engine<A> {
         }
         if !self.truth.objects.contains_key(&ObjectKey::Task(task)) {
             return Err(Invalid::Identity);
+        }
+        if let Some(Run::Text(held)) = self.runs.get(&task)
+            && turn < held.turn
+        {
+            return Ok(());
         }
         let old = self.runs.get(&task).and_then(|run| match run {
             Run::Text(value) if value.turn == turn => Some(value),

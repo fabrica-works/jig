@@ -54,7 +54,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     pending(b, state, words);
     for live in &state.live {
         b.open(Role::Item);
-        b.key(turn_key(live.name));
+        b.key(turn_key(live.name.turn()));
         b.open(Role::Region);
         b.name(&words.say(JigPhrase::Provisional, &[]));
         words.status(b, JigPhrase::Provisional, &[]);
@@ -67,10 +67,10 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         }
         if let Some(value) = &live.call {
             match value {
-                LiveCall::Decoded(_) => call::live(b, client, live.name, value, words, bindings),
+                LiveCall::Decoded(_) => call::live(b, client, live.name.turn(), value, words, bindings),
                 LiveCall::Raw(_) => {
                     if state.current_run.is_none() {
-                        call::live(b, client, live.name, value, words, bindings);
+                        call::live(b, client, live.name.turn(), value, words, bindings);
                     }
                 }
             }
