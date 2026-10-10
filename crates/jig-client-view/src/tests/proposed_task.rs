@@ -145,3 +145,19 @@ fn exact_contracts_keep_approval_state_verdict_fields_and_each_result_bound() {
     assert!(contains(&tree, b"Some contract choices were omitted"));
     assert!(contains(&tree, b"Change contract 65535, kind 65535, word byte limit 4294967295"));
 }
+
+#[test]
+fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
+    let mut words = words();
+    for offset in [i32::MAX, i32::MIN] {
+        words.offset_minutes = offset;
+        for instant in [skein_lib::Wall::EPOCH, skein_lib::Wall::from_nanos(u64::MAX)] {
+            let expected = if offset > 0 { u64::MAX } else { 0 };
+            assert_eq!(words.adjusted_wall(instant).as_nanos(), expected);
+        }
+    }
+    words.offset_minutes = 60;
+    assert_eq!(words.adjusted_wall(skein_lib::Wall::EPOCH).as_nanos(), 3_600_000_000_000);
+    words.offset_minutes = -60;
+    assert_eq!(words.adjusted_wall(skein_lib::Wall::from_nanos(7_200_000_000_000)).as_nanos(), 3_600_000_000_000);
+}

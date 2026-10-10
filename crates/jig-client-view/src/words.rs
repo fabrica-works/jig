@@ -110,9 +110,7 @@ impl Words {
     /// A wall instant shifted to the person's UTC offset for a phrase hole.
     #[must_use]
     pub fn adjusted_wall(&self, at: Wall) -> Wall {
-        let nanos = u64::from(self.offset_minutes.unsigned_abs())
-            .checked_mul(60_000_000_000)
-            .expect("i32 minutes fit u64 nanos");
+        let nanos = u64::from(self.offset_minutes.unsigned_abs()).saturating_mul(60_000_000_000);
         let adjusted = if self.offset_minutes < 0_i32 {
             at.as_nanos().saturating_sub(nanos)
         } else {
