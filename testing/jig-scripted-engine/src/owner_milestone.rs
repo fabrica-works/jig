@@ -1,6 +1,6 @@
 //! Whole milestone admission (client/domain/contract.md, 5.3).
 //! Nested results retain all allocated capacity; the receiving byte bound
-//! supplies the finite ceiling for legacy recursively nested result values.
+//! supplies the finite ceiling for recursively nested result values.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
 use jig_client::contract::{OwnerMilestoneLine, OwnerMilestonePhase};
@@ -28,7 +28,7 @@ pub fn bytes(value: &OwnerMilestoneLine, bounds: &Bounds) -> Option<u64> {
 pub fn fits(value: &OwnerMilestoneLine, bounds: &Bounds) -> bool {
     crate::payload::fits(value, bounds)
 }
-/// Finite ceiling for admitted whole values, including recursive legacy results.
+/// Finite ceiling for admitted whole values, including recursive result values.
 /// Rows/text alone do not supply a recursive depth bound.
 #[must_use]
 pub fn worst_case(bounds: &Bounds) -> Option<u64> {

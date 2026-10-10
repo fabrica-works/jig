@@ -101,7 +101,7 @@ fn owner_milestone_reserved_empty_lists_optional_approval_and_every_nested_capac
     assert!(bytes(&reserved, &base).is_none());
 }
 #[test]
-fn owner_milestone_legacy_followup_allocations_remain_whole_and_no_terminal_clock_or_result_is_fabricated() {
+fn owner_milestone_verdict_followup_allocations_remain_whole_and_no_terminal_clock_or_result_is_fabricated() {
     let base = bounds();
     let empty = line(OwnerMilestonePhase::Ended(OwnerChipEnding::Cancelled {
         reason: doc(b"", false),

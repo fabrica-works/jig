@@ -110,6 +110,8 @@ fn closing(b: &mut Builder, stage: ClosingStage, words: &Words) {
 /// Render only supplied milestone facts, borrowing existing result follow-ups.
 pub fn render(b: &mut Builder, value: &OwnerMilestoneLine, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Region);
+    let caption = words.book.say(words.language, P::Milestone.id(), &[]).expect("checked milestone region name");
+    b.name(&caption.text);
     text(b, words, P::Milestone, &[]);
     text(b, words, P::Task, &[Hole::Number(value.task)]);
     text(b, words, P::Position, &[Hole::Number(value.position)]);

@@ -82,6 +82,12 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     let client = Domain::new(&limits(), 1);
     view::render(&mut b, value, &client, words, &mut bindings);
     let tree = b.finish();
+    let region = tree.nodes().first().expect("standalone milestone region");
+    assert_eq!(region.role, crate::Role::Region);
+    assert_eq!(
+        region.name.as_deref(),
+        Some(if words.language == 0 { b"Lifecycle milestone".as_slice() } else { b"second ".as_slice() })
+    );
     assert!(tree.len() <= f.nodes);
     let mut total = 0_u64;
     for node in tree.nodes() {
@@ -288,7 +294,7 @@ fn owner_milestone_task_and_position_are_full_width_and_optional_time_is_separat
     }
 }
 #[test]
-fn owner_milestone_whole_results_keep_all_nine_branches_and_independent_approval_presence_loss_and_raw_bytes() {
+fn owner_milestone_whole_results_keep_all_nine_variants_and_independent_approval_presence_loss_and_raw_bytes() {
     let w = words(false);
     let mut fields = List::with_capacity(3);
     fields.push(ResultField { name: copy_of(b"name"), value: copy_of(b"value") }).unwrap();
@@ -297,7 +303,7 @@ fn owner_milestone_whole_results_keep_all_nine_branches_and_independent_approval
         ResultValue::OwnerVerdict { verdict: u32::MAX, words: doc(b"verdict", false), fields: fields.clone() },
         ResultValue::Verdict {
             verdict: u32::MAX,
-            words: doc(b"legacy", true),
+            words: doc(b"followup", true),
             fields,
             tasks: List::with_capacity(3),
             proposal: None,
@@ -317,7 +323,7 @@ fn owner_milestone_whole_results_keep_all_nine_branches_and_independent_approval
         let label: &[u8] = match &value {
             ResultValue::Report(_) => b"report",
             ResultValue::OwnerVerdict { .. } => b"verdict",
-            ResultValue::Verdict { .. } => b"legacy",
+            ResultValue::Verdict { .. } => b"followup",
             ResultValue::Connector { .. } => b"summary",
             ResultValue::Change { .. } => b"change",
             ResultValue::Choice { .. } => b"choice",
