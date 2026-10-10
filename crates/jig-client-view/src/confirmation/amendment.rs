@@ -305,7 +305,7 @@ fn before(object: &Object) -> Option<Amendment> {
             authority: Some(doc.authority.clone()),
         },
         Some(Body::Escalation(doc)) => Amendment {
-            addressed: recipient_address(doc.steering.person_revision, &doc.steering.addressed, object.project),
+            addressed: recipient_address(doc.steering.person_revision, doc.steering.addressed.as_ref(), object.project),
             spec: doc.steering.spec.whole(),
             instructions: crate::instructions::whole(doc.steering.instructions.as_ref()),
             wake: Some(doc.steering.wake.clone()),
@@ -336,11 +336,11 @@ fn task_address(doc: &Task) -> Option<AddressChange> {
 }
 fn recipient_address(
     revision: Option<Revision>,
-    to: &Option<Recipient>,
+    to: Option<&Recipient>,
     project: Option<u32>,
 ) -> Option<AddressChange> {
     let revision = revision?;
-    let address = match to.as_ref()? {
+    let address = match to? {
         Recipient::Party(party) => PersonAddress::Party(*party),
         Recipient::Role { project: scope, role } if Some(*scope) == project => PersonAddress::Role(*role),
         Recipient::Role { .. } | Recipient::Task(_) | Recipient::Roles { .. } => return None,
