@@ -172,6 +172,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
             Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
@@ -302,6 +303,7 @@ fn answer_field(open: &Confirmation, object: &Object) -> Result<Option<Purpose>,
                 Body::Chip(_)
                 | Body::Task(_)
                 | Body::Proposal(_)
+                | Body::OwnerProposal(_)
                 | Body::Escalation(_)
                 | Body::Result(_)
                 | Body::Note { .. },
@@ -318,6 +320,7 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
         Body::Task(task) => task,
         Body::Chip(_)
         | Body::Proposal(_)
+        | Body::OwnerProposal(_)
         | Body::Escalation(_)
         | Body::Question(_)
         | Body::PersonTask(_)
@@ -369,6 +372,7 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -398,6 +402,7 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
                 Some(
                     Body::Chip(_)
                     | Body::Proposal(_)
+                    | Body::OwnerProposal(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
                     | Body::Result(_)

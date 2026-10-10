@@ -249,6 +249,7 @@ impl Payload for ObjectKey {
                 sum(&[value0.heap(bounds)])
             }
             Self::Proposal(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerProposal(value0) => sum(&[value0.heap(bounds)]),
             Self::Question { task, message } => sum(&[task.heap(bounds), message.heap(bounds)]),
             Self::Note { project, note } => sum(&[project.heap(bounds), note.heap(bounds)]),
         }
@@ -942,6 +943,7 @@ impl Payload for ReadValue {
             Self::Frame(value0) => sum(&[value0.heap(bounds)]),
             Self::Task(value0) => sum(&[value0.heap(bounds)]),
             Self::Proposal(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerProposal(value0) => sum(&[value0.heap(bounds)]),
             Self::Escalation(value0) => sum(&[value0.heap(bounds)]),
             Self::Question(value0) => sum(&[value0.heap(bounds)]),
             Self::PersonTask(value0) => sum(&[value0.heap(bounds)]),
@@ -1082,6 +1084,7 @@ impl Payload for Delivery {
         match self {
             Self::Frame(value0) => sum(&[value0.heap(bounds)]),
             Self::Task(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerProposal(value0) => sum(&[value0.heap(bounds)]),
             Self::Tree(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerTree(value0) => sum(&[value0.heap(bounds)]),
             Self::Chips(value0) => sum(&[value0.heap(bounds)]),

@@ -248,6 +248,7 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
     match value {
         ReadValue::Task(v) => Some(ObjectKey::Task(v.chip.task)),
         ReadValue::Proposal(v) => Some(ObjectKey::Proposal(v.key)),
+        ReadValue::OwnerProposal(v) => Some(ObjectKey::Proposal(v.key)),
         ReadValue::Escalation(v) => Some(ObjectKey::Escalation(v.task.task)),
         ReadValue::Question(v) => Some(ObjectKey::Question { task: v.task.task, message: v.message }),
         ReadValue::PersonTask(v) => Some(ObjectKey::PersonTask(v.task.task)),
@@ -271,6 +272,7 @@ fn document_project(value: &ReadValue) -> Option<u32> {
     match value {
         ReadValue::Task(v) => Some(v.project),
         ReadValue::Proposal(v) => Some(v.project),
+        ReadValue::OwnerProposal(v) => Some(v.project),
         ReadValue::Frame(_)
         | ReadValue::Escalation(_)
         | ReadValue::Question(_)

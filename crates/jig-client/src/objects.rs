@@ -224,6 +224,7 @@ impl Objects {
         match &body {
             Body::Task(task) => object.project = Some(task.project),
             Body::Proposal(proposal) => object.project = Some(proposal.project),
+            Body::OwnerProposal(proposal) => object.project = Some(proposal.project),
             Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {}
             Body::Note { project, .. } => object.project = Some(*project),
         }
@@ -233,6 +234,7 @@ impl Objects {
                 Some(
                     Body::Chip(_)
                     | Body::Proposal(_)
+                    | Body::OwnerProposal(_)
                     | Body::Escalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
@@ -243,6 +245,7 @@ impl Objects {
             },
             Body::Task(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
@@ -436,6 +439,7 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
             Some(false)
         }
         Delivery::Task(task) => Some(key == ObjectKey::Task(task.chip.task)),
+        Delivery::OwnerProposal(proposal) => Some(key == ObjectKey::Proposal(proposal.key)),
         Delivery::OwnerInbox(inbox) => {
             for entries in [&inbox.needs, &inbox.updates] {
                 for entry in entries {
@@ -728,6 +732,7 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
     match value {
         ReadValue::Task(task) => Some(Body::Task(task)),
         ReadValue::Proposal(proposal) => Some(Body::Proposal(proposal)),
+        ReadValue::OwnerProposal(proposal) => Some(Body::OwnerProposal(proposal)),
         ReadValue::Escalation(escalation) => Some(Body::Escalation(escalation)),
         ReadValue::Question(question) => Some(Body::Question(question)),
         ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
@@ -771,6 +776,7 @@ impl Body {
             Self::Chip(chip) => ObjectKey::Task(chip.task),
             Self::Task(task) => ObjectKey::Task(task.chip.task),
             Self::Proposal(proposal) => ObjectKey::Proposal(proposal.key),
+            Self::OwnerProposal(proposal) => ObjectKey::Proposal(proposal.key),
             Self::Escalation(escalation) => ObjectKey::Escalation(escalation.task.task),
             Self::Question(question) => ObjectKey::Question { task: question.task.task, message: question.message },
             Self::PersonTask(task) => ObjectKey::PersonTask(task.task.task),
@@ -789,6 +795,7 @@ impl Body {
             },
             Self::Chip(_)
             | Self::Proposal(_)
+            | Self::OwnerProposal(_)
             | Self::Escalation(_)
             | Self::Question(_)
             | Self::PersonTask(_)
@@ -812,7 +819,7 @@ impl Body {
             Self::PersonTask(task) => task.ending.as_ref(),
             Self::Result(result) => Some(&result.ending),
             Self::Escalation(escalation) => escalation.ending.as_ref(),
-            Self::Chip(_) | Self::Note { .. } => None,
+            Self::Chip(_) | Self::OwnerProposal(_) | Self::Note { .. } => None,
         }
     }
 }
@@ -854,6 +861,7 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
         }
         crate::contract::Delivery::Frame(_)
         | crate::contract::Delivery::Task(_)
+        | crate::contract::Delivery::OwnerProposal(_)
         | crate::contract::Delivery::Tree(_)
         | crate::contract::Delivery::OwnerTree(_)
         | crate::contract::Delivery::Chips(_)

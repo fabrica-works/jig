@@ -613,6 +613,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
         engine::Change::Object { key, value, .. } => {
             let terminal = match value {
                 ReadValue::Proposal(p) => p.ending.is_some(),
+                ReadValue::OwnerProposal(_) => false,
                 ReadValue::Escalation(e) => e.ending.is_some(),
                 ReadValue::Question(q) => q.ending.is_some(),
                 ReadValue::PersonTask(p) => p.ending.is_some(),
@@ -640,6 +641,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 ReadValue::Task(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Proposal(_)
+                | ReadValue::OwnerProposal(_)
                 | ReadValue::Escalation(_)
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)

@@ -193,6 +193,7 @@ pub fn form(
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -208,6 +209,7 @@ fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -228,6 +230,7 @@ fn task_loss(b: &mut Builder, object: &Object, words: &Words) {
             Body::Task(_)
             | Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
@@ -244,6 +247,7 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -257,6 +261,7 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -360,6 +365,7 @@ fn before(object: &Object) -> Option<Amendment> {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)

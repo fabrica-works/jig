@@ -377,6 +377,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)

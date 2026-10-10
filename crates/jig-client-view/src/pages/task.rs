@@ -39,6 +39,7 @@ pub fn task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)

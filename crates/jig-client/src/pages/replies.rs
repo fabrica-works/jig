@@ -102,6 +102,7 @@ fn attach(domain: &mut Domain, source: Source, line: ConversationLine) {
         Some(
             Body::Task(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)

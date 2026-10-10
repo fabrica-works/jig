@@ -28,6 +28,7 @@ pub fn escalation(
             Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)

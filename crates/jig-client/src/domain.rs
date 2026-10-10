@@ -198,6 +198,7 @@ impl Domain {
                         Some(
                             crate::objects::Body::Chip(_)
                             | crate::objects::Body::Proposal(_)
+                            | crate::objects::Body::OwnerProposal(_)
                             | crate::objects::Body::Escalation(_)
                             | crate::objects::Body::Question(_)
                             | crate::objects::Body::PersonTask(_)
@@ -810,6 +811,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 },
                 Delivery::Frame(_)
                 | Delivery::Task(_)
+                | Delivery::OwnerProposal(_)
                 | Delivery::Tree(_)
                 | Delivery::Chips(_)
                 | Delivery::Inbox(_)
@@ -832,6 +834,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 Owner::Frame => match delivery {
                     Delivery::Frame(frame) => frame_delivery(domain, env, *frame, out),
                     Delivery::Task(_)
+                    | Delivery::OwnerProposal(_)
                     | Delivery::Tree(_)
                     | Delivery::OwnerTree(_)
                     | Delivery::Chips(_)

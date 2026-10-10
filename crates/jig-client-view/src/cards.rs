@@ -140,6 +140,9 @@ pub fn card(
         return result::reply(b, client, object, place, words, bindings);
     }
     match &facts.body {
+        Some(jig_client::objects::Body::OwnerProposal(_)) => {
+            proposal::owner_proposal(b, client, object, place, words, bindings);
+        }
         Some(jig_client::objects::Body::Proposal(_)) => {
             proposal::proposal(b, client, object, place, words, bindings);
         }

@@ -278,6 +278,10 @@ pub(crate) fn delivery(
         Delivery::Frame(_) => {}
         Delivery::Run(value) => crate::conversation::routing::stream(domain, env, watch, *value, out),
         Delivery::RunState(value) => crate::conversation::routing::run_state(domain, env, watch, *value, out),
+        Delivery::OwnerProposal(proposal) => {
+            let key = ObjectKey::Proposal(proposal.key);
+            one(domain, source, key, Body::OwnerProposal(proposal));
+        }
         Delivery::Task(task) => {
             crate::conversation::routing::document(domain, &task, out);
             let key = ObjectKey::Task(task.chip.task);
@@ -470,6 +474,10 @@ fn read_value(
         ReadValue::Notes(page) => crate::pages::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
+        ReadValue::OwnerProposal(proposal) => {
+            let key = ObjectKey::Proposal(proposal.key);
+            read_body(domain, key, Body::OwnerProposal(proposal));
+        }
         ReadValue::Proposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::Proposal(proposal));
@@ -570,6 +578,7 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
             ReadValue::Frame(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
+            | ReadValue::OwnerProposal(_)
             | ReadValue::Escalation(_)
             | ReadValue::Question(_)
             | ReadValue::PersonTask(_)
@@ -672,6 +681,7 @@ fn received_value(
         ReadValue::Frame(_)
         | ReadValue::Task(_)
         | ReadValue::Proposal(_)
+        | ReadValue::OwnerProposal(_)
         | ReadValue::Escalation(_)
         | ReadValue::Question(_)
         | ReadValue::PersonTask(_)
@@ -743,6 +753,7 @@ fn owner_tree_delivery(
             Body::Task(_) => put_root = false,
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)

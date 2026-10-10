@@ -67,6 +67,7 @@ fn kept(client: &Domain, task: u64) -> Option<&Chip> {
         Some(Body::Task(task)) => Some(&task.chip),
         Some(
             Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)

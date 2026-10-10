@@ -92,6 +92,12 @@ fn read(domain: &mut Domain, key: ObjectKey, out: &mut Queue<Request>) {
 }
 pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: Delivery, out: &mut Queue<Request>) {
     match delivery {
+        Delivery::OwnerProposal(proposal) => {
+            let key = ObjectKey::Proposal(proposal.key);
+            if domain.objects.named(key, source(domain)) {
+                put(domain, env, key, Body::OwnerProposal(proposal), out);
+            }
+        }
         Delivery::Chips(chips) => {
             for chip in chips.into_boxed() {
                 let key = ObjectKey::Task(chip.task);
@@ -148,6 +154,7 @@ pub(crate) fn read_result(
         ReadResult::Value(value) => match value {
             ReadValue::Task(document) => put(domain, env, key, Body::Task(document), out),
             ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out),
+            ReadValue::OwnerProposal(document) => put(domain, env, key, Body::OwnerProposal(document), out),
             ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out),
             ReadValue::Question(document) => put(domain, env, key, Body::Question(document), out),
             ReadValue::PersonTask(document) => put(domain, env, key, Body::PersonTask(document), out),
@@ -196,6 +203,7 @@ fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body
     let project = match &body {
         Body::Task(task) => Some(task.project),
         Body::Proposal(proposal) => Some(proposal.project),
+        Body::OwnerProposal(proposal) => Some(proposal.project),
         Body::Note { project, .. } => Some(*project),
         Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {
             object_project(domain, key)
@@ -262,7 +270,7 @@ fn parts(body: &Body, limit: u32) -> Parts {
                 | None => {}
             }
         }
-        Body::Note { .. } => {}
+        Body::OwnerProposal(_) | Body::Note { .. } => {}
     }
     parts
 }

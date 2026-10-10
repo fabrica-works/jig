@@ -19,6 +19,7 @@ pub fn offered(object: &Object, act: ActKind) -> Admission {
     let rows = match &object.body {
         Some(Body::Task(document)) => &document.acts,
         Some(Body::Proposal(document)) => &document.acts,
+        Some(Body::OwnerProposal(document)) => &document.acts,
         Some(Body::Escalation(document)) => &document.acts,
         Some(Body::Question(document)) => &document.acts,
         Some(Body::PersonTask(document)) => &document.acts,
@@ -46,6 +47,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
             Some(
                 Body::Chip(_)
                 | Body::Proposal(_)
+                | Body::OwnerProposal(_)
                 | Body::Question(_)
                 | Body::PersonTask(_)
                 | Body::Result(_)
@@ -59,6 +61,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
             Some(
                 Body::Chip(_)
                 | Body::Proposal(_)
+                | Body::OwnerProposal(_)
                 | Body::Question(_)
                 | Body::PersonTask(_)
                 | Body::Result(_)
@@ -72,6 +75,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
                 Body::Chip(_)
                 | Body::Task(_)
                 | Body::Proposal(_)
+                | Body::OwnerProposal(_)
                 | Body::Escalation(_)
                 | Body::Question(_)
                 | Body::Result(_)
@@ -85,6 +89,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
                 Body::Chip(_)
                 | Body::Task(_)
                 | Body::Proposal(_)
+                | Body::OwnerProposal(_)
                 | Body::Escalation(_)
                 | Body::Question(_)
                 | Body::PersonTask(_)
@@ -125,6 +130,7 @@ pub fn hold_revision(object: &Object) -> Option<Revision> {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -330,6 +336,7 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
             Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Result(_)
             | Body::Note { .. },

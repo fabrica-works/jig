@@ -116,6 +116,7 @@ impl<A: crate::Application> Engine<A> {
                         ReadValue::Frame(_)
                         | ReadValue::Task(_)
                         | ReadValue::Proposal(_)
+                        | ReadValue::OwnerProposal(_)
                         | ReadValue::Escalation(_)
                         | ReadValue::Question(_)
                         | ReadValue::PersonTask(_)
@@ -145,6 +146,7 @@ impl<A: crate::Application> Engine<A> {
                                     }
                                     ReadValue::Frame(_)
                                     | ReadValue::Proposal(_)
+                                    | ReadValue::OwnerProposal(_)
                                     | ReadValue::Question(_)
                                     | ReadValue::PersonTask(_)
                                     | ReadValue::Result(_)
@@ -431,6 +433,7 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
     match value {
         ReadValue::Task(v) => Some(&v.acts),
         ReadValue::Proposal(v) => Some(&v.acts),
+        ReadValue::OwnerProposal(v) => Some(&v.acts),
         ReadValue::Escalation(v) => Some(&v.acts),
         ReadValue::Question(v) => Some(&v.acts),
         ReadValue::PersonTask(v) => Some(&v.acts),
@@ -462,6 +465,7 @@ fn ending(value: &ReadValue) -> Option<Ending> {
             jig_client::contract::TaskResult::Ending(ending) => Some(Ending::Task(ending.clone())),
         },
         ReadValue::Proposal(v) => v.ending.clone(),
+        ReadValue::OwnerProposal(_) => None,
         ReadValue::Escalation(v) => v.ending.clone(),
         ReadValue::Question(v) => v.ending.clone(),
         ReadValue::PersonTask(v) => v.ending.clone(),

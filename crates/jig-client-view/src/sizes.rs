@@ -74,14 +74,15 @@ fn proposal_action(limits: &Limits) -> Option<u32> {
 /// Whole proposal, including the shared card and inbox context.
 #[must_use]
 pub fn proposal_nodes(limits: &Limits) -> Option<u32> {
-    frame_of_card(limits)?
+    let existing = frame_of_card(limits)?
         .checked_add(markdown(limits)?)?
         .checked_add(proposal_action(limits)?)?
         .checked_add(authority(limits)?)?
         .checked_add(trail(limits)?)?
         .checked_add(outcome(limits)?)?
         .checked_add(limits.rows)?
-        .checked_add(8)
+        .checked_add(8)?;
+    Some(existing.max(frame_of_card(limits)?.checked_add(crate::owner_proposal::max_nodes(limits)?)?))
 }
 fn result_value(limits: &Limits) -> Option<u32> {
     // Verdict contains explanation words, each named field, follow-up chips and a retained proposal.
@@ -193,7 +194,12 @@ pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
     // The closed act table takes one alternative; using their sum also covers
     // live context, missing/changed statuses, impact, reason and review buttons.
     chip_nodes(limits)?
-        .checked_add(form.max(proposal_action(limits)?).max(person_contract(limits)?).max(markdown(limits)?))?
+        .checked_add(
+            form.max(proposal_action(limits)?)
+                .max(crate::owner_proposal::max_nodes(limits)?)
+                .max(person_contract(limits)?)
+                .max(markdown(limits)?),
+        )?
         .checked_add(delegates)?
         .checked_add(crate::owner_chip::max_nodes(limits)?)?
         .checked_add(limits.rows)?

@@ -106,6 +106,7 @@ fn context(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bin
         Some(Body::PersonTask(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::Result(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::Proposal(doc)) => words.proposer(b, doc.proposer),
+        Some(Body::OwnerProposal(doc)) => words.proposer(b, doc.key.proposer),
         Some(Body::Note { document, .. }) => b.text(Run::Plain, document.description.bytes()),
         None => words.status(b, JigPhrase::LoadingObject, &[]),
     }
@@ -124,6 +125,7 @@ fn action(
         ActKind::Accept => {
             words.text(b, JigPhrase::WillAccept, &[]);
             match &object.body {
+                Some(Body::OwnerProposal(doc)) => crate::owner_proposal::render(b, client, doc, words, bindings),
                 Some(Body::Proposal(doc)) => {
                     proposal::action(b, &doc.action, words, bindings);
                     common::authority(b, &doc.needs, words, bindings);
@@ -174,6 +176,7 @@ fn action(
                     Body::Task(_)
                     | Body::Chip(_)
                     | Body::Proposal(_)
+                    | Body::OwnerProposal(_)
                     | Body::Escalation(_)
                     | Body::Result(_)
                     | Body::Note { .. },
@@ -295,6 +298,7 @@ fn held(object: &Object) -> bool {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -359,6 +363,7 @@ fn impact(object: &Object) -> Option<&Impact> {
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
@@ -457,6 +462,7 @@ fn delegates(
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)

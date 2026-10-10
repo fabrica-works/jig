@@ -64,7 +64,7 @@ fn contract_fits(value: &TaskContractDocument, limits: &Limits) -> Option<()> {
     }
     Some(())
 }
-fn proposed_fits(value: &ProposedTask, limits: &Limits) -> Option<()> {
+pub(crate) fn proposed_fits(value: &ProposedTask, limits: &Limits) -> Option<()> {
     spec_fits(&value.spec, limits)?;
     contract_fits(&value.contract, limits)?;
     crate::owner_amendment::authority_fits(&value.authority, limits)?;
@@ -185,7 +185,7 @@ fn change(b: &mut Builder, value: OwnerHistoryChange, words: &Words) {
     };
     saying(b, words, phrase, &[]);
 }
-fn holder(b: &mut Builder, value: OwnerHistoryHolder, words: &Words) {
+pub(crate) fn holder(b: &mut Builder, value: OwnerHistoryHolder, words: &Words) {
     match value {
         OwnerHistoryHolder::Task(number) => saying(b, words, P::HolderTask, &[Hole::Number(number)]),
         OwnerHistoryHolder::Person(number) => saying(b, words, P::HolderPerson, &[Hole::Number(number)]),

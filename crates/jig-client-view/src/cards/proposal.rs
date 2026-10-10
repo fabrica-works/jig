@@ -135,3 +135,40 @@ pub(crate) fn address_change(b: &mut Builder, change: &jig_client::contract::Add
     words.text(b, JigPhrase::PersonAddressRevision, &[Hole::Number(change.revision.value)]);
     crate::proposed_task::executor(b, jig_client::contract::OwnerExecutor::Person(change.address), words);
 }
+
+/// The same keyed card for the independently supplied pending owner document.
+pub fn owner_proposal(
+    b: &mut Builder,
+    client: &Domain,
+    object: Id<Object>,
+    place: &super::Place,
+    words: &Words,
+    bindings: &mut JigBindings,
+) -> bool {
+    let Some(facts) = client.objects().get(object) else {
+        return false;
+    };
+    let document = match &facts.body {
+        Some(jig_client::objects::Body::OwnerProposal(document)) => document,
+        Some(
+            jig_client::objects::Body::Chip(_)
+            | jig_client::objects::Body::Task(_)
+            | jig_client::objects::Body::Proposal(_)
+            | jig_client::objects::Body::Escalation(_)
+            | jig_client::objects::Body::Question(_)
+            | jig_client::objects::Body::PersonTask(_)
+            | jig_client::objects::Body::Result(_)
+            | jig_client::objects::Body::Note { .. },
+        )
+        | None => return false,
+    };
+    let title = words.say(JigPhrase::Proposal, &[]);
+    if !super::open(b, client, object, place, &title, words, bindings) {
+        return false;
+    }
+    crate::owner_proposal::render(b, client, document, words, bindings);
+    common::answer(b, facts, words);
+    common::acts(b, &facts.card, &document.acts, object, words, bindings);
+    super::close(b);
+    true
+}

@@ -10,6 +10,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Question> {
             Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::PersonTask(_)
             | Body::Result(_)

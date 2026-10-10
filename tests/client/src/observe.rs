@@ -117,6 +117,7 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
             })
             .collect(),
         ReadValue::Proposal(_)
+        | ReadValue::OwnerProposal(_)
         | ReadValue::Question(_)
         | ReadValue::Result(_)
         | ReadValue::Ended(_)

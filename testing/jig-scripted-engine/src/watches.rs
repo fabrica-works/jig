@@ -370,6 +370,7 @@ impl<A: crate::Application> Engine<A> {
                 Delivery::Frame(_)
                 | Delivery::OwnerTree(_)
                 | Delivery::Task(_)
+                | Delivery::OwnerProposal(_)
                 | Delivery::Chips(_)
                 | Delivery::Run(_)
                 | Delivery::RunState(_)

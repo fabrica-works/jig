@@ -7,8 +7,27 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Proposal> {
     match &object.body {
         Some(Body::Proposal(document)) => Some(document),
         Some(
+            Body::OwnerProposal(_)
+            | Body::Chip(_)
+            | Body::Task(_)
+            | Body::Escalation(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => None,
+    }
+}
+/// Pending owner facts share the original typed proposal identity.
+#[must_use]
+pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerProposal> {
+    match &object.body {
+        Some(Body::OwnerProposal(document)) => Some(document),
+        Some(
             Body::Chip(_)
             | Body::Task(_)
+            | Body::Proposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
