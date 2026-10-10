@@ -618,14 +618,15 @@ fn retry_activation_tree(retry: Option<RetryNotice>, words: &Words) -> Tree {
 
 #[test]
 fn owner_retry_keeps_all_six_classes_and_independent_zero_max_counts_in_chip_and_activation() {
-    for (class, label) in [
+    let classes = [
         (HoldFailure::Transient, b"Transient failure".as_slice()),
         (HoldFailure::Permanent, b"Permanent failure"),
         (HoldFailure::Run, b"Run failure"),
         (HoldFailure::Agent, b"Agent failure"),
         (HoldFailure::Lost, b"Lost failure"),
         (HoldFailure::Invalid, b"Invalid failure"),
-    ] {
+    ];
+    for (class, label) in classes {
         for (count, allowance, caption) in [
             (0, 0, b"Failure count 0 of allowance 0".as_slice()),
             (0, u32::MAX, b"Failure count 0 of allowance 4294967295"),
@@ -638,11 +639,13 @@ fn owner_retry_keeps_all_six_classes_and_independent_zero_max_counts_in_chip_and
             assert_eq!(value.clone().retry, retry);
             let tree = build(&value, words()).0;
             assert!(has(&tree, label));
+            assert_eq!(classes.iter().filter(|(_, other)| has(&tree, other)).count(), 1);
             assert!(has(&tree, caption));
             assert!(has(&tree, b"Run work unobserved"));
             assert!(!contains(&tree, b"Actual run start:"));
             let tree = retry_activation_tree(retry, words());
             assert!(has(&tree, label));
+            assert_eq!(classes.iter().filter(|(_, other)| has(&tree, other)).count(), 1);
             assert!(has(&tree, caption));
             assert!(contains(&tree, b"Run observation not supplied"));
             assert!(!contains(&tree, b"Start observed at"));
