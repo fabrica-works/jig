@@ -761,12 +761,9 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
 }
 
 fn specification(words: jig_client::contract::Text) -> jig_client::contract::SpecificationDocument {
-    jig_client::contract::SpecificationDocument {
-        specification: jig_client::contract::Specification {
-            words,
-            parameters: skein_lib::List::with_capacity(0),
-            inputs: skein_lib::List::with_capacity(0),
-        },
-        cut: false,
-    }
+    jig_client::contract::SpecificationDocument::complete(jig_client::contract::Specification {
+        words,
+        parameters: skein_lib::List::with_capacity(0),
+        inputs: skein_lib::List::with_capacity(0),
+    })
 }

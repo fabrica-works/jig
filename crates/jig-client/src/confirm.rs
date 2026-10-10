@@ -149,7 +149,14 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
     };
     let note_fields = match &object.body {
         Some(Body::Note { document, .. }) => {
-            Some(NoteFields { description: document.description.clone(), body: document.body.clone() })
+            if document.cut {
+                None
+            } else {
+                match (document.description.whole(), document.body.whole()) {
+                    (Some(description), Some(body)) => Some(NoteFields { description, body }),
+                    (None | Some(_), None) | (None, Some(_)) => None,
+                }
+            }
         }
         Some(
             Body::Chip(_)
@@ -460,6 +467,11 @@ fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Miss
             None
         }
         ActKind::EditNote => {
+            if let Some(Body::Note { document, .. }) = &object.body
+                && (document.cut || document.description.cut || document.body.cut)
+            {
+                return Some(Missing::Change);
+            }
             if domain.fields.get(Purpose::NoteDescription).is_none() {
                 return Some(Missing::Words { field: Purpose::NoteDescription });
             }

@@ -257,8 +257,17 @@ fn action(
         }
         ActKind::EditNote => {
             words.text(b, JigPhrase::WillEditNote, &[]);
-            common::field(b, client, Purpose::NoteDescription, JigPhrase::NoteDescription, words, bindings);
-            common::field(b, client, Purpose::NoteBody, JigPhrase::NoteBody, words, bindings);
+            if let Some(Body::Note { document, .. }) = &object.body {
+                crate::document_text::loss(b, &document.description, words);
+                crate::document_text::loss(b, &document.body, words);
+                if document.cut {
+                    words.text(b, JigPhrase::NoteReferencesCut, &[]);
+                }
+                if !(document.cut || document.description.cut || document.body.cut) {
+                    common::field(b, client, Purpose::NoteDescription, JigPhrase::NoteDescription, words, bindings);
+                    common::field(b, client, Purpose::NoteBody, JigPhrase::NoteBody, words, bindings);
+                }
+            }
         }
         ActKind::Reject | ActKind::LeaveHeld => {
             words.text(

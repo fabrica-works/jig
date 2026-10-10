@@ -994,12 +994,13 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         number: 3,
         revision: Revision { value: 1 },
         scope: NoteScope::Project(1),
-        description: text(b"description"),
-        body: text(b"body"),
+        description: DocumentText::complete(text(b"description")),
+        body: DocumentText::complete(text(b"body")),
         by: Actor::Party(7),
         tasks: List::with_capacity(0),
         changed: skein_lib::Wall::EPOCH,
         acts,
+        cut: false,
     };
     let mut rows = List::with_capacity(1);
     rows.push(note.clone()).unwrap();
@@ -1028,7 +1029,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
     let Request::Read { read, .. } = refresh[0] else { panic!("moved note read") };
     let mut newer = note;
     newer.revision = Revision { value: 2 };
-    newer.body = text(b"new body");
+    newer.body = DocumentText::complete(text(b"new body"));
     let mut rows = List::with_capacity(1);
     rows.push(newer).unwrap();
     drive(
@@ -1041,7 +1042,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
     );
     let Some(Body::Note { document, .. }) = &domain.objects().get(id).unwrap().body else { panic!("updated note") };
     assert_eq!(document.revision, Revision { value: 2 });
-    assert_eq!(document.body, text(b"new body"));
+    assert_eq!(document.body, DocumentText::complete(text(b"new body")));
     assert_eq!(domain.project_page().notes.as_slice()[0], id);
     domain.reclaim();
     let moved = drive(
@@ -1483,10 +1484,11 @@ fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
 }
 
 fn specification(words: Text) -> SpecificationDocument {
-    SpecificationDocument {
-        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
-        cut: false,
-    }
+    SpecificationDocument::complete(Specification {
+        words,
+        parameters: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+    })
 }
 
 fn bounded_goal_nobody_accepts(domain: &mut Domain, latest: skein_lib::Wall, out: &mut skein_lib::Queue<Request>) {

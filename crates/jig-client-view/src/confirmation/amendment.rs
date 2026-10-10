@@ -92,8 +92,10 @@ pub fn form(
 ) {
     let Some(before) = before(object) else {
         match &object.body {
-            Some(Body::Task(doc)) if doc.spec.cut => words.text(b, JigPhrase::SpecificationCut, &[]),
-            Some(Body::Escalation(doc)) if doc.steering.spec.cut => words.text(b, JigPhrase::SpecificationCut, &[]),
+            Some(Body::Task(doc)) if doc.spec.has_loss() => words.text(b, JigPhrase::SpecificationCut, &[]),
+            Some(Body::Escalation(doc)) if doc.steering.spec.has_loss() => {
+                words.text(b, JigPhrase::SpecificationCut, &[]);
+            }
             _ => {}
         }
         return;
@@ -223,8 +225,8 @@ fn input(
 
 fn before(object: &Object) -> Option<Amendment> {
     match &object.body {
-        Some(Body::Task(doc)) if doc.spec.cut => return None,
-        Some(Body::Escalation(doc)) if doc.steering.spec.cut => return None,
+        Some(Body::Task(doc)) if doc.spec.has_loss() => return None,
+        Some(Body::Escalation(doc)) if doc.steering.spec.has_loss() => return None,
         _ => {}
     }
     Some(match &object.body {
@@ -242,7 +244,7 @@ fn before(object: &Object) -> Option<Amendment> {
                 | jig_client::contract::ChipPhase::Held { .. }
                 | jig_client::contract::ChipPhase::Ended { .. } => None,
             },
-            spec: Some(doc.spec.specification.clone()),
+            spec: Some(doc.spec.whole()?),
             instructions: Some(doc.instructions.clone()),
             wake: Some(doc.wake.clone()),
             dependencies: Some(numbers(&doc.dependencies)),
@@ -250,7 +252,7 @@ fn before(object: &Object) -> Option<Amendment> {
         },
         Some(Body::Escalation(doc)) => Amendment {
             addressed: doc.steering.addressed.clone(),
-            spec: Some(doc.steering.spec.specification.clone()),
+            spec: Some(doc.steering.spec.whole()?),
             instructions: Some(doc.steering.instructions.clone()),
             wake: Some(doc.steering.wake.clone()),
             dependencies: Some(doc.steering.dependencies.clone()),

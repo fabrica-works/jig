@@ -51,7 +51,7 @@ fn full_trail() -> List<Passed> {
 fn full_amendment() -> Amendment {
     Amendment {
         addressed: Some(Recipient::Role { project: 4, role: 2 }),
-        spec: Some(specification(full_text()).specification),
+        spec: Some(specification(full_text()).whole().unwrap()),
         instructions: Some(full_text()),
         wake: Some(full_wake()),
         dependencies: Some(list([9, 10])),
@@ -227,12 +227,13 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
         number: 1,
         revision: Revision { value: 2 },
         scope: NoteScope::Project(4),
-        description: full_name(),
-        body: full_text(),
+        description: DocumentText::complete(full_name()),
+        body: DocumentText::complete(full_text()),
         by: Actor::Party(1),
         tasks: list([8, 9]),
         changed: Wall::EPOCH,
         acts: offered(ActKind::EditNote),
+        cut: false,
     };
     let (d, id) = note_loaded(note);
     card_tree(&d, id, words, sized, crate::card_nodes(&CLIENT).unwrap());
@@ -414,15 +415,12 @@ pub(super) fn scenario(words: &crate::words::Words) {
 }
 
 fn specification(words: Text) -> SpecificationDocument {
-    SpecificationDocument {
-        specification: Specification {
-            words,
-            parameters: list([
-                Parameter::Bytes { name: u32::MAX, value: full_text() },
-                Parameter::Bytes { name: 0, value: full_text() },
-            ]),
-            inputs: list([u64::MAX, 0]),
-        },
-        cut: false,
-    }
+    SpecificationDocument::complete(Specification {
+        words,
+        parameters: list([
+            Parameter::Bytes { name: u32::MAX, value: full_text() },
+            Parameter::Bytes { name: 0, value: full_text() },
+        ]),
+        inputs: list([u64::MAX, 0]),
+    })
 }

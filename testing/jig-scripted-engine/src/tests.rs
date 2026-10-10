@@ -1037,7 +1037,7 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
                 release: Some(Revision { value: if stale_hold { 6 } else { 7 } }),
                 change: Amendment {
                     addressed: None,
-                    spec: Some(specification(text(b"new spec")).specification),
+                    spec: Some(specification(text(b"new spec")).whole().unwrap()),
                     wake: None,
                     dependencies: None,
                     authority: None,
@@ -1156,14 +1156,11 @@ fn approved_documents_preserve_opaque_state_optional_words_and_exact_byte_bounds
 }
 
 fn specification(words: jig_client::contract::Text) -> jig_client::contract::SpecificationDocument {
-    jig_client::contract::SpecificationDocument {
-        specification: jig_client::contract::Specification {
-            words,
-            parameters: List::with_capacity(0),
-            inputs: List::with_capacity(0),
-        },
-        cut: false,
-    }
+    jig_client::contract::SpecificationDocument::complete(jig_client::contract::Specification {
+        words,
+        parameters: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+    })
 }
 
 #[test]
@@ -1174,10 +1171,13 @@ fn whole_specification_prices_parameter_and_input_capacity_and_refuses_partial_v
     parameters.push(Parameter::Resource { name: 8, connector: u16::MAX, resource: u64::MAX }).unwrap();
     let mut inputs = List::with_capacity(3);
     inputs.push(u64::MAX).unwrap();
-    let value =
-        SpecificationDocument { specification: Specification { words: text(b"whole"), parameters, inputs }, cut: true };
+    let value = {
+        let mut document = SpecificationDocument::complete(Specification { words: text(b"whole"), parameters, inputs });
+        document.cut = true;
+        document
+    };
     let allocated = u64::try_from(core::mem::size_of::<SpecificationDocument>() + 5 + 3).unwrap()
-        + List::<Parameter>::worst_case(4).unwrap()
+        + List::<ParameterDocument>::worst_case(4).unwrap()
         + List::<u64>::worst_case(3).unwrap();
     let mut bounds = Bounds { text: 5, rows: 4, document_bytes: allocated, ..Bounds::default() };
     assert!(crate::payload::fits(&value, &bounds));
@@ -1197,7 +1197,7 @@ fn whole_specification_prices_parameter_and_input_capacity_and_refuses_partial_v
         .parameters
         .get_mut(1)
         .unwrap()
-        .clone_from(&Parameter::Bytes { name: 7, value: text(b"longer") });
+        .clone_from(&ParameterDocument::Bytes { name: 7, value: DocumentText::complete(text(b"longer")) });
     bounds.document_bytes = u64::MAX;
     assert!(!crate::payload::fits(&too_long, &bounds), "whole opaque bytes parameter is never clipped");
 }
@@ -1437,4 +1437,44 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
         assert_eq!(final_answer(&engine.poll(at(10_000_000))[0]), &answer);
         assert_eq!(engine.commits()[0].ask, Some(ask));
     }
+}
+
+#[test]
+fn document_text_loss_is_preserved_and_priced_with_whole_document_parameter_capacity() {
+    for cut in [false, true] {
+        let value = DocumentText { bytes: text(&[0, 255, 1]), cut };
+        let mut bounds = Bounds {
+            text: 3,
+            document_bytes: u64::try_from(core::mem::size_of::<DocumentText>() + 3).unwrap(),
+            ..Bounds::default()
+        };
+        assert!(crate::payload::fits(&value, &bounds));
+        assert_eq!(value.whole().is_some(), !cut);
+        assert_eq!(value.bytes(), [0, 255, 1]);
+        bounds.document_bytes -= 1;
+        assert!(!crate::payload::fits(&value, &bounds));
+        bounds.document_bytes = u64::MAX;
+        bounds.text = 2;
+        assert!(!crate::payload::fits(&value, &bounds));
+    }
+    let mut parameters = List::with_capacity(4);
+    parameters.push(Parameter::Bytes { name: u32::MAX, value: text(&[0, 255, 1]) }).unwrap();
+    let value = SpecificationDocument::complete(Specification {
+        words: text(b"w"),
+        parameters,
+        inputs: List::with_capacity(2),
+    });
+    let whole = value.whole().unwrap();
+    assert_eq!(whole.parameters.capacity(), 4);
+    assert_eq!(whole.inputs.capacity(), 2);
+    let size = u64::try_from(core::mem::size_of::<SpecificationDocument>() + 1 + 3).unwrap()
+        + List::<ParameterDocument>::worst_case(4).unwrap()
+        + List::<u64>::worst_case(2).unwrap();
+    let mut bounds = Bounds { text: 3, rows: 4, document_bytes: size, ..Bounds::default() };
+    assert!(crate::payload::fits(&value, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&value, &bounds));
+    bounds.document_bytes = size;
+    bounds.rows = 3;
+    assert!(!crate::payload::fits(&value, &bounds));
 }

@@ -23,6 +23,8 @@ pub use owner_wake::*;
 pub use reads::*;
 pub use refusals::*;
 pub use specification::*;
+mod document_text;
+pub use document_text::*;
 pub use turn::*;
 pub use versions::*;
 pub use watches::*;

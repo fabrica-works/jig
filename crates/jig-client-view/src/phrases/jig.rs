@@ -585,6 +585,10 @@ pub enum JigPhrase {
     NoteDescription,
     /// Note body.
     NoteBody,
+    /// This text value is incomplete.
+    DocumentTextCut,
+    /// This note reference list is incomplete.
+    NoteReferencesCut,
     /// Charter (0).
     Charter,
     /// Connector (0), procedure code (1), supplied by the goal bounds.
@@ -1244,6 +1248,8 @@ impl JigPhrase {
             Self::PriorityField => 267,
             Self::NoteDescription => 268,
             Self::NoteBody => 269,
+            Self::DocumentTextCut => 3500,
+            Self::NoteReferencesCut => 3300,
             Self::Charter => 270,
             Self::GoalProcedure => 510,
             Self::Priority => 271,
@@ -1826,6 +1832,8 @@ impl JigPhrase {
             | Self::PriorityField
             | Self::NoteDescription
             | Self::NoteBody
+            | Self::DocumentTextCut
+            | Self::NoteReferencesCut
             | Self::Notice
             | Self::UnknownAction
             | Self::FailedPhase
@@ -2045,7 +2053,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 516] = [
+pub const ALL: [JigPhrase; 518] = [
     JigPhrase::SpecificationNumber,
     JigPhrase::SpecificationBytes,
     JigPhrase::SpecificationResource,
@@ -2325,6 +2333,8 @@ pub const ALL: [JigPhrase; 516] = [
     JigPhrase::PriorityField,
     JigPhrase::NoteDescription,
     JigPhrase::NoteBody,
+    JigPhrase::DocumentTextCut,
+    JigPhrase::NoteReferencesCut,
     JigPhrase::Charter,
     JigPhrase::GoalProcedure,
     JigPhrase::Priority,

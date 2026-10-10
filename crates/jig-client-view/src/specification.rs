@@ -6,7 +6,7 @@ use crate::{
 };
 use jig_client::{
     Limits,
-    contract::{Parameter, Specification, SpecificationDocument},
+    contract::{Parameter, ParameterDocument, Specification, SpecificationDocument},
 };
 
 /// Show every supplied parameter and input without interpreting opaque values.
@@ -34,7 +34,26 @@ pub fn specification(b: &mut Builder, value: &Specification, words: &Words) {
 }
 /// Retain the owner's loss marker separately from the supplied values.
 pub fn document(b: &mut Builder, value: &SpecificationDocument, words: &Words) {
-    specification(b, &value.specification, words);
+    crate::document_text::markdown(b, &value.specification.words, words);
+    for parameter in &value.specification.parameters {
+        match parameter {
+            ParameterDocument::Number { name, value } => {
+                words.text(b, JigPhrase::SpecificationNumber, &[Hole::Number(u64::from(*name)), Hole::Number(*value)]);
+            }
+            ParameterDocument::Bytes { name, value } => {
+                words.text(b, JigPhrase::SpecificationBytes, &[Hole::Number(u64::from(*name))]);
+                crate::document_text::plain(b, value, words);
+            }
+            ParameterDocument::Resource { name, connector, resource } => words.text(
+                b,
+                JigPhrase::SpecificationResource,
+                &[Hole::Number(u64::from(*name)), Hole::Number(u64::from(*connector)), Hole::Number(*resource)],
+            ),
+        }
+    }
+    for task in &value.specification.inputs {
+        words.text(b, JigPhrase::SpecificationInput, &[Hole::Number(*task)]);
+    }
     if value.cut {
         words.text(b, JigPhrase::SpecificationCut, &[]);
     }
@@ -42,5 +61,5 @@ pub fn document(b: &mut Builder, value: &SpecificationDocument, words: &Words) {
 /// Maximum nodes for whole words, all parameter variants, input rows and loss marker.
 #[must_use]
 pub fn nodes(limits: &Limits) -> Option<u32> {
-    crate::markdown::max_nodes(limits.text)?.checked_add(limits.rows.checked_mul(3)?)?.checked_add(1)
+    crate::markdown::max_nodes(limits.text)?.checked_add(limits.rows.checked_mul(4)?)?.checked_add(2)
 }

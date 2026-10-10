@@ -13,6 +13,7 @@ mod binding;
 mod builder;
 pub mod cards;
 pub mod confirmation;
+pub mod document_text;
 pub mod notices;
 pub mod owner_wake;
 pub mod owner_wake_words;

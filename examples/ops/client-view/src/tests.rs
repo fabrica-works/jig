@@ -257,10 +257,11 @@ fn task() -> Task {
         project: 1,
         requester: Actor::Party(7),
         lineage: list([]),
-        spec: SpecificationDocument {
-            specification: Specification { words: text(b"spec"), parameters: list([]), inputs: list([]) },
-            cut: false,
-        },
+        spec: SpecificationDocument::complete(Specification {
+            words: text(b"spec"),
+            parameters: list([]),
+            inputs: list([]),
+        }),
         spec_revision: Revision { value: 1 },
         person_revision: None,
         taken_by: None,

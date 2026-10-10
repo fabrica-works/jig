@@ -429,7 +429,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
                 before: text(b"full before"),
                 change: Amendment {
                     addressed: None,
-                    spec: Some(specification(text(b"full after")).specification),
+                    spec: Some(specification(text(b"full after")).whole().unwrap()),
                     instructions: None,
                     wake: None,
                     dependencies: None,
@@ -890,12 +890,13 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
             number: 1,
             revision: Revision { value: 2 },
             scope: NoteScope::Project(4),
-            description: text(b"note title"),
-            body: text(b"note body"),
+            description: DocumentText::complete(text(b"note title")),
+            body: DocumentText::complete(text(b"note body")),
             by: Actor::Party(1),
             tasks: list([]),
             changed: Wall::EPOCH,
             acts: offered(act),
+            cut: false,
         };
         let (mut d, id) = note_loaded(note);
         drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act } });
@@ -1013,6 +1014,7 @@ fn notice_scenarios(words: &crate::words::Words) {
 
 fn note_loaded(note: Note) -> (Domain, Id<Object>) {
     use jig_client::address::{Address, Place, ProjectSection};
+    let number = note.number;
     let (mut d, frame) = start();
     drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
     let out = drive(
@@ -1037,7 +1039,7 @@ fn note_loaded(note: Note) -> (Domain, Id<Object>) {
             }))),
         },
     );
-    let id = d.objects().find(ObjectKey::Note { project: 4, note: 1 }).unwrap();
+    let id = d.objects().find(ObjectKey::Note { project: 4, note: number }).unwrap();
     (d, id)
 }
 
@@ -1296,22 +1298,23 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
 }
 
 fn specification(words: Text) -> SpecificationDocument {
-    SpecificationDocument {
-        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
-        cut: false,
-    }
+    SpecificationDocument::complete(Specification {
+        words,
+        parameters: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+    })
 }
 
 #[test]
 fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
     let mut row = task_doc(&[ActKind::Amend]);
     row.spec.specification.parameters = list([
-        Parameter::Number { name: u32::MAX, value: u64::MAX },
-        Parameter::Bytes { name: 8, value: text(&[0, 255, 1]) },
-        Parameter::Resource { name: 9, connector: u16::MAX, resource: u64::MAX },
+        ParameterDocument::Number { name: u32::MAX, value: u64::MAX },
+        ParameterDocument::Bytes { name: 8, value: DocumentText::complete(text(&[0, 255, 1])) },
+        ParameterDocument::Resource { name: 9, connector: u16::MAX, resource: u64::MAX },
     ]);
     row.spec.specification.inputs = list([u64::MAX, 0]);
-    let expected = row.spec.specification.clone();
+    let expected = row.spec.whole().unwrap();
     let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
     drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
     let words = words();
@@ -1347,9 +1350,14 @@ fn cut_specification_is_shown_and_cannot_be_reconstructed_by_the_words_editor() 
     builder.open(Role::Page);
     crate::specification::document(
         &mut builder,
-        &SpecificationDocument {
-            specification: Specification { words: text(b"partial"), parameters: list([]), inputs: list([]) },
-            cut: true,
+        &{
+            let mut document = SpecificationDocument::complete(Specification {
+                words: text(b"partial"),
+                parameters: list([]),
+                inputs: list([]),
+            });
+            document.cut = true;
+            document
         },
         &words,
     );
@@ -1401,5 +1409,92 @@ fn retained_task_facts_keep_person_revision_taker_and_full_executor_identity_ind
         assert_eq!(retained.taken_by, taken_by);
         assert_eq!(retained.spec_revision, Revision { value: 6 });
         assert_eq!(retained.hold.as_ref().unwrap().revision, Revision { value: 4 });
+    }
+}
+
+#[test]
+fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_edits() {
+    for mask in 0_u8..8 {
+        let mut row = task_doc(&[ActKind::Amend]);
+        row.spec.specification.parameters = list([ParameterDocument::Bytes {
+            name: 8,
+            value: DocumentText { bytes: text(&[0, 255, 1]), cut: mask & 2 != 0 },
+        }]);
+        row.spec.specification.words.cut = mask & 1 != 0;
+        row.spec.cut = mask & 4 != 0;
+        row.spec.specification.inputs = list([u64::MAX]);
+        assert_eq!(row.spec.has_loss(), mask != 0);
+        assert_eq!(row.spec.whole().is_some(), mask == 0);
+        let words = words();
+        let mut builder = Builder::new(&limits());
+        crate::specification::document(&mut builder, &row.spec, &words);
+        let tree = builder.finish();
+        assert!(contains(&tree, &[0, 255, 1]));
+        assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
+        let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
+        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        let mut bindings = JigBindings::new(256, CLIENT.text);
+        let tree = dialog(&domain, &words, &mut bindings);
+        if mask != 0 {
+            assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
+            assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
+        } else {
+            drive(&mut domain, Event::Act { act: input(&tree, b"New specification", b"replacement", &mut bindings) });
+            let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+            assert!(out.iter().any(|request| match request {
+                Request::Send { ask, .. } => match &**ask {
+                    Ask::Amend { change, .. } =>
+                        change.spec.as_ref().is_some_and(|spec| spec.words.bytes() == b"replacement"
+                            && spec.inputs == list([u64::MAX])
+                            && spec.parameters == list([Parameter::Bytes { name: 8, value: text(&[0, 255, 1]) }])),
+                    _ => false,
+                },
+                _ => false,
+            }));
+        }
+    }
+}
+
+#[test]
+#[expect(clippy::match_like_matches_macro, reason = "scenario matching stays explicit; matches is disallowed")]
+fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_corrections() {
+    for mask in 0_u8..8 {
+        for act in [ActKind::EditNote, ActKind::DeleteNote] {
+            let note = Note {
+                number: 77,
+                revision: Revision { value: 123 },
+                scope: NoteScope::Goal(900),
+                description: DocumentText { bytes: text(b"note title"), cut: mask & 1 != 0 },
+                body: DocumentText { bytes: text(b"note body"), cut: mask & 2 != 0 },
+                by: Actor::Party(1),
+                tasks: list([91]),
+                changed: Wall::EPOCH,
+                acts: offered(act),
+                cut: mask & 4 != 0,
+            };
+            let (mut domain, id) = note_loaded(note);
+            let words = words();
+            let mut bindings = JigBindings::new(256, CLIENT.text);
+            let mut builder = Builder::new(&limits());
+            cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words, &mut bindings);
+            let tree = builder.finish();
+            assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
+            assert_eq!(contains(&tree, b"This note has more references"), mask & 4 != 0);
+            drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act } });
+            let tree = dialog(&domain, &words, &mut bindings);
+            let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+            if act == ActKind::EditNote && mask != 0 {
+                assert!(tree.nodes().iter().all(|node| node.value.is_none()));
+                assert!(out.iter().all(|request| match request {
+                    Request::Send { .. } => false,
+                    _ => true,
+                }));
+            } else {
+                assert!(out.iter().any(|request| match request {
+                    Request::Send { .. } => true,
+                    _ => false,
+                }));
+            }
+        }
     }
 }

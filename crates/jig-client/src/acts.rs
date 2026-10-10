@@ -203,6 +203,11 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
             if confirmation.act == ActKind::DeleteNote {
                 Some(Ask::DeleteNote { project, note, revision: confirmation.revision? })
             } else {
+                if let Some(Body::Note { document, .. }) = &object.body
+                    && (document.cut || document.description.cut || document.body.cut)
+                {
+                    return None;
+                }
                 Some(Ask::EditNote {
                     project,
                     note,
@@ -333,6 +338,9 @@ pub fn note_ask(project: u32, note: &Note, act: ActKind, description: Text, body
     }
     match act {
         ActKind::EditNote => {
+            if note.cut || note.description.cut || note.body.cut {
+                return None;
+            }
             Some(Ask::EditNote { project, note: note.number, revision: note.revision, description, body })
         }
         ActKind::DeleteNote => Some(Ask::DeleteNote { project, note: note.number, revision: note.revision }),

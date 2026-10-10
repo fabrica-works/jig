@@ -15,7 +15,7 @@ fn full_task() -> jig_client::contract::Task {
     task.resources = jig_client_world::test::list(
         (1..=8).map(|n| jig_client::contract::Part::Panel { connector: jig_test_client_domain::SECOND, task: n }),
     );
-    task.spec.specification.words = stories::text(&[b's'; 32]);
+    task.spec.specification.words.bytes = stories::text(&[b's'; 32]);
     task.instructions = stories::text(&[b'i'; 32]);
     task.dependencies = jig_client_world::test::list([task.chip.clone(), task.chip.clone()]);
     task.references = task.dependencies.clone();

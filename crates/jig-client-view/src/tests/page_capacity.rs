@@ -671,8 +671,8 @@ fn fill_notes(d: &mut Domain, read: Token) {
         number,
         revision: Revision { value: 7 },
         scope: NoteScope::Resource { project: 4, connector: 2, pattern: full() },
-        description: full(),
-        body: full(),
+        description: DocumentText::complete(full()),
+        body: DocumentText::complete(full()),
         by: Actor::Party(1),
         tasks: list([8, 9]),
         changed: Wall::EPOCH,
@@ -680,6 +680,7 @@ fn fill_notes(d: &mut Domain, read: Token) {
             Offered { act: ActKind::EditNote, admission: Admission::Allowed },
             Offered { act: ActKind::DeleteNote, admission: Admission::Allowed },
         ]),
+        cut: false,
     };
     drive(
         d,
@@ -710,8 +711,9 @@ fn fill_spend(d: &mut Domain, read: Token, doc: &Project) {
 }
 
 fn specification(words: Text) -> SpecificationDocument {
-    SpecificationDocument {
-        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
-        cut: false,
-    }
+    SpecificationDocument::complete(Specification {
+        words,
+        parameters: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+    })
 }

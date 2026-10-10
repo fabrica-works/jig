@@ -186,7 +186,11 @@ pub fn card(
         }
         Some(jig_client::objects::Body::Note { document, .. }) => {
             if open(b, client, object, place, document.description.bytes(), words, bindings) {
-                crate::markdown::read(document.body.bytes(), 2, b);
+                crate::document_text::loss(b, &document.description, words);
+                crate::document_text::markdown(b, &document.body, words);
+                if document.cut {
+                    words.text(b, JigPhrase::NoteReferencesCut, &[]);
+                }
                 words.actor(b, document.by);
                 words.wall(b, document.changed);
                 for task in &document.tasks {

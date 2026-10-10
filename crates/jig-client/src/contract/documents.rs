@@ -3,8 +3,9 @@
 //! List capacities and Text byte bounds are validated by the protocol before entry;
 //! the working set keeps only what its own configured limits admit.
 use super::{
-    Actor, Amendment, Authority, Count, Decision, Ending, Executor, Holding, Lacking, NoteScope, ObjectKey, Part,
-    Party, Phase, Policy, ProposalKey, Refusal, Revision, Text, Turn, TurnName, VersionRange, WakePolicy,
+    Actor, Amendment, Authority, Count, Decision, DocumentText, Ending, Executor, Holding, Lacking, NoteScope,
+    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Refusal, Revision, Text, Turn, TurnName, VersionRange,
+    WakePolicy,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
@@ -715,12 +716,14 @@ pub struct Note {
     pub number: u64,
     pub revision: Revision,
     pub scope: NoteScope,
-    pub description: Text,
-    pub body: Text,
+    pub description: DocumentText,
+    pub body: DocumentText,
     pub by: Actor,
     pub tasks: List<u64>,
     pub changed: Wall,
     pub acts: List<Offered>,
+    /// The supplied reference list is incomplete.
+    pub cut: bool,
 }
 
 /// Hosts, accounts and deployment capacity.

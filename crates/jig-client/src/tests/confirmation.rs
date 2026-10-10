@@ -30,7 +30,7 @@ fn intend(domain: &mut Domain, id: Id<Object>, act: ActKind) -> Box<[Request]> {
 pub(super) fn change() -> Amendment {
     Amendment {
         addressed: None,
-        spec: Some(specification(text(b"amended")).specification),
+        spec: specification(text(b"amended")).whole(),
         wake: None,
         dependencies: None,
         authority: None,
@@ -189,12 +189,13 @@ fn note_decisions_name_the_revision() {
         number: 6,
         revision: Revision { value: 11 },
         scope: NoteScope::Project(1),
-        description: text(b"before"),
-        body: text(b"body"),
+        description: DocumentText::complete(text(b"before")),
+        body: DocumentText::complete(text(b"body")),
         by: Actor::Party(7),
         tasks: List::with_capacity(0),
         changed: Wall::EPOCH,
         acts: List::with_capacity(2),
+        cut: false,
     };
     note.acts.push(Offered { act: ActKind::EditNote, admission: Admission::Allowed }).unwrap();
     note.acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
@@ -551,8 +552,9 @@ fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation()
 }
 
 fn specification(words: Text) -> SpecificationDocument {
-    SpecificationDocument {
-        specification: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
-        cut: false,
-    }
+    SpecificationDocument::complete(Specification {
+        words,
+        parameters: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+    })
 }

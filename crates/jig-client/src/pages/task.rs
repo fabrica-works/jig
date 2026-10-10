@@ -119,7 +119,7 @@ pub fn sections(task: &Task) -> Sections {
     let overview = !task.spec.specification.words.bytes().is_empty()
         || !task.spec.specification.parameters.is_empty()
         || !task.spec.specification.inputs.is_empty()
-        || task.spec.cut
+        || task.spec.has_loss()
         || task.result.is_some()
         || !task.resources.is_empty()
         || !task.inputs.is_empty()

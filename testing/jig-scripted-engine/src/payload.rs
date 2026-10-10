@@ -6,17 +6,18 @@ use jig_client::contract::{
     Account, ActKind, Activity, ActivityLine, ActivityPage, Actor, Admission, AdmissionLimit, Amendment, Answer, Ask,
     AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase, Closing,
     ConversationLine, ConversationPage, Conversations, Count, CurrentHold, Cursor, Decider, Decision, Delivery,
-    Deployment, Disposal, DisposalIssue, Ending, Escalation, Executor, FailureClass, FieldRule, Frame, GoalExecutor,
-    GoalLine, GoalPage, GoalProcedure, Goals, Grant, HeldRole, HistoryChange, HistoryLine, HistoryPage, Hold,
-    HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking,
-    Limit, LiveDelegate, Made, Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered,
-    OptionLine, Outcome, Parameter, Part, PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract,
-    PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project, ProjectRole, Proposal, ProposalAction,
-    ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal,
-    ReplyPosition, Result, ResultContract, ResultField, ResultValue, Revision, RolePolicy, RunBeginning, RunEnding,
-    RunText, Runtime, Seen, Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering,
-    Subject, TakenBy, Task, TaskFilter, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName,
-    Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, Ending, Escalation, Executor,
+    FailureClass, FieldRule, Frame, GoalExecutor, GoalLine, GoalPage, GoalProcedure, Goals, Grant, HeldRole,
+    HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox,
+    InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveDelegate, Made, Message, Moved, Needs, Note, NotePage,
+    NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, Parameter, ParameterDocument, Part, PartScope,
+    Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority,
+    Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Question, Read, ReadNone, ReadResult,
+    ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result, ResultContract, ResultField, ResultValue,
+    Revision, RolePolicy, RunBeginning, RunEnding, RunText, Runtime, Seen, Speaker, Specification,
+    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskFilter, TaskLine,
+    TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd,
+    WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Wall};
 
@@ -644,7 +645,7 @@ fields!(Project {
 });
 fields!(Pool { party, period, budget });
 fields!(Recurring { number, spec, period, budget, last, current_period, began, next });
-fields!(Note { number, revision, scope, description, body, by, tasks, changed, acts });
+fields!(Note { number, revision, scope, description, body, by, tasks, changed, acts, cut });
 fields!(Deployment { hosts, accounts, capacity, proposals, refusals, parts });
 fields!(Host { number, connected, grace, used, free, runs, refused });
 fields!(Account { number, usable, reason, runs, waiting });
@@ -1042,6 +1043,20 @@ impl Payload for HoldFailure {
 fields!(Specification { words, parameters, inputs });
 fields!(SpecificationDocument { specification, cut });
 impl Payload for Parameter {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Number { name, value } => sum(&[name.heap(bounds), value.heap(bounds)]),
+            Self::Bytes { name, value } => sum(&[name.heap(bounds), value.heap(bounds)]),
+            Self::Resource { name, connector, resource } => {
+                sum(&[name.heap(bounds), connector.heap(bounds), resource.heap(bounds)])
+            }
+        }
+    }
+}
+
+fields!(DocumentText { bytes, cut });
+fields!(DocumentSpecification { words, parameters, inputs });
+impl Payload for ParameterDocument {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Number { name, value } => sum(&[name.heap(bounds), value.heap(bounds)]),
