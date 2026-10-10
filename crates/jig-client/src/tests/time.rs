@@ -17,7 +17,24 @@ fn limits() -> Limits {
 }
 fn drive(domain: &mut Domain, limits: &Limits, now: Time, event: Event) -> Box<[Request]> {
     let mut out = Queue::with_capacity(crate::max_out(limits));
-    let starting = matches!(event, Event::Start { .. });
+    let starting = match &event {
+        Event::Start { .. } => true,
+        Event::Hello { .. }
+        | Event::Kept { .. }
+        | Event::KeptGone { .. }
+        | Event::Went { .. }
+        | Event::Act { .. }
+        | Event::Ask { .. }
+        | Event::Progress { .. }
+        | Event::Answered { .. }
+        | Event::Read { .. }
+        | Event::Watch { .. }
+        | Event::Ended { .. }
+        | Event::ShowObjects { .. }
+        | Event::ObjectsLeft
+        | Event::SignedOut
+        | Event::Frame { .. } => false,
+    };
     crate::step(domain, &Env { now, wall: Wall::EPOCH, limits: *limits }, event, &mut out);
     if starting {
         crate::step(

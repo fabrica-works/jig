@@ -51,7 +51,24 @@ pub(super) fn drain(mut out: Queue<Request>) -> Box<[Request]> {
 }
 pub(super) fn drive(domain: &mut Domain, now: Time, event: Event) -> Box<[Request]> {
     let mut out = Queue::with_capacity(max_out(&LIMITS));
-    let starting = matches!(event, Event::Start { .. });
+    let starting = match &event {
+        Event::Start { .. } => true,
+        Event::Hello { .. }
+        | Event::Kept { .. }
+        | Event::KeptGone { .. }
+        | Event::Went { .. }
+        | Event::Act { .. }
+        | Event::Ask { .. }
+        | Event::Progress { .. }
+        | Event::Answered { .. }
+        | Event::Read { .. }
+        | Event::Watch { .. }
+        | Event::Ended { .. }
+        | Event::ShowObjects { .. }
+        | Event::ObjectsLeft
+        | Event::SignedOut
+        | Event::Frame { .. } => false,
+    };
     step(domain, &env(now), event, &mut out);
     if starting {
         step(domain, &env(now), Event::Hello { versions: VersionRange { first: 1, last: 1 } }, &mut out);

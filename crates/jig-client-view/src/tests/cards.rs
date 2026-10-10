@@ -76,7 +76,24 @@ pub(super) fn text(bytes: &[u8]) -> Text {
 }
 pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
     let mut q = Queue::with_capacity(jig_client::max_out(&CLIENT));
-    let starting = matches!(event, Event::Start { .. });
+    let starting = match &event {
+        Event::Start { .. } => true,
+        Event::Hello { .. }
+        | Event::Kept { .. }
+        | Event::KeptGone { .. }
+        | Event::Went { .. }
+        | Event::Act { .. }
+        | Event::Ask { .. }
+        | Event::Progress { .. }
+        | Event::Answered { .. }
+        | Event::Read { .. }
+        | Event::Watch { .. }
+        | Event::Ended { .. }
+        | Event::ShowObjects { .. }
+        | Event::ObjectsLeft
+        | Event::SignedOut
+        | Event::Frame { .. } => false,
+    };
     jig_client::step(d, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT }, event, &mut q);
     if starting {
         jig_client::step(
