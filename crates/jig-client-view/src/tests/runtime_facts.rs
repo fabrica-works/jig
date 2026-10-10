@@ -83,8 +83,8 @@ fn observed_work_preserves_actual_optional_start_and_whole_tool_call_identity() 
         (RunWork::Waiting, b"Observed work: waiting"),
         (RunWork::Ending, b"Observed work: ending"),
         (
-            RunWork::Tool { call: text(b"actual-call/23"), tool: text(b"actual-tool") },
-            b"Observed tool actual-tool, call actual-call/23",
+            RunWork::Tool { call: current_identity(b"actual-call/23"), tool: text(b"actual-tool") },
+            b"Observed current tool call",
         ),
     ] {
         for started in [None, Some(Wall::EPOCH)] {
@@ -98,6 +98,10 @@ fn observed_work_preserves_actual_optional_start_and_whole_tool_call_identity() 
             });
             let tree = shown(value);
             assert!(contains(&tree, expected));
+            if let RunWork::Tool { .. } = &work {
+                assert!(contains(&tree, b"actual-tool"));
+                assert!(contains(&tree, b"actual-call/23"));
+            }
             assert!(contains(&tree, b"Observed work since"));
             assert!(contains(&tree, b"Observation received at"));
             assert_eq!(contains(&tree, b"Start observed at"), started.is_some());
@@ -178,7 +182,10 @@ fn full_runtime_tools_and_held_closing_fit_the_declared_tree_envelope() {
         Some(RetryNotice::Failed { class: FailureClass::Temporary, count: u32::MAX - 1, allowance: u32::MAX - 1 });
     run.observation = Some(RunObservation {
         channel: Token::new(u64::MAX),
-        work: RunWork::Tool { call: full.clone(), tool: full.clone() },
+        work: RunWork::Tool {
+            call: CallIdentity { id: full.clone(), ..current_identity(b"call") },
+            tool: full.clone(),
+        },
         since: Wall::from_nanos(u64::MAX),
         reported_at: Wall::from_nanos(u64::MAX),
         started: Some(Wall::from_nanos(u64::MAX)),
@@ -227,5 +234,14 @@ fn full_runtime_tools_and_held_closing_fit_the_declared_tree_envelope() {
         let tree = b.finish();
         assert!(tree.len() <= crate::chip_nodes(&CLIENT).unwrap() + 1);
         super::cards_access::check(&tree);
+    }
+}
+
+fn current_identity(id: &[u8]) -> jig_client::contract::CallIdentity {
+    jig_client::contract::CallIdentity {
+        owner: skein_lib::Token::new(u64::MAX),
+        sequence: u32::MAX,
+        retry: u32::MAX,
+        id: text(id),
     }
 }

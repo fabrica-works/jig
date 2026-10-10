@@ -780,7 +780,8 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     value.turn = name;
     value.began = None;
     value.call = Some(LiveCall::Raw(CurrentCall {
-        number: u64::MAX,
+        identity: current_identity(b"id/\xff"),
+        began: None,
         tool: text(b"raw/tool\xff"),
         input: text(b"a/b\x00\xfe"),
         cut: true,
@@ -791,12 +792,17 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     assert_eq!(held.call, value.call);
     assert!(c.names(4).is_empty());
     assert!(c.parts(4).is_empty());
-    let call = CallName { attempt: name.attempt, turn: name.number, call: u64::MAX };
-    assert!(c.set_fold(call, Fold::Open));
-    assert!(!c.set_fold(CallName { attempt: 1, ..call }, Fold::Open));
+    let call = current_identity(b"id/\xff");
+    assert!(c.set_current_fold(call.clone(), Fold::Open));
+    assert!(!c.set_current_fold(
+        crate::contract::CallIdentity { owner: skein_lib::Token::new(1), ..call.clone() },
+        Fold::Open
+    ));
+    assert!(!c.set_fold(CallName { attempt: name.attempt, turn: name.number, call: u64::MAX }, Fold::Open));
     value.began = Some(Wall::EPOCH);
     value.call = Some(LiveCall::Raw(CurrentCall {
-        number: u64::MAX,
+        identity: current_identity(b"id/\xff"),
+        began: None,
         tool: text(b"raw/tool\xff"),
         input: text(b"new literal"),
         cut: false,
@@ -836,4 +842,66 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     assert!(c.live.is_empty());
     let reloaded = Conversation::new(9, 4);
     assert!(reloaded.live.is_empty(), "provisional facts are read again after reload");
+}
+
+fn current_identity(id: &[u8]) -> crate::contract::CallIdentity {
+    crate::contract::CallIdentity {
+        owner: skein_lib::Token::new(u64::MAX),
+        sequence: u32::MAX,
+        retry: u32::MAX,
+        id: text(id),
+    }
+}
+
+#[test]
+fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_matching() {
+    use crate::contract::{CallIdentity, CurrentCall, LiveCall};
+    let mut c = Conversation::new(9, 4);
+    let identity = current_identity(b"same/id\xff\x00");
+    let mut value = stream(1, 0, 3, b"one", false);
+    value.began = None;
+    let raw = CurrentCall {
+        identity: identity.clone(),
+        tool: text(b"tool/\xfe"),
+        input: text(b"first"),
+        cut: false,
+        began: Some(Wall::EPOCH),
+    };
+    value.call = Some(LiveCall::Raw(raw.clone()));
+    assert!(c.stream(value.clone(), 100));
+    assert!(c.set_current_fold(identity.clone(), Fold::Open));
+    assert_eq!(c.current_fold(&identity), Fold::Open);
+    value.call = Some(LiveCall::Raw(CurrentCall { input: text(b"replacement"), cut: true, ..raw.clone() }));
+    assert!(c.stream(value.clone(), 100));
+    assert_eq!(c.live.len(), 1);
+    assert_eq!(c.live.get(0).unwrap().call, value.call);
+    assert_eq!(c.current_fold(&identity), Fold::Open);
+    assert_eq!(c.live.get(0).unwrap().began, None, "call first-seen is independent of turn wall");
+    for different in [
+        CallIdentity { owner: skein_lib::Token::new(1), ..identity.clone() },
+        CallIdentity { sequence: 1, ..identity.clone() },
+        CallIdentity { retry: 1, ..identity.clone() },
+        CallIdentity { id: text(b"same/id\xff\x01"), ..identity.clone() },
+    ] {
+        value.call = Some(LiveCall::Raw(CurrentCall { identity: different.clone(), began: None, ..raw.clone() }));
+        assert!(c.stream(value.clone(), 100));
+        assert_eq!(c.live.get(0).unwrap().call, value.call);
+        assert_eq!(c.current_fold(&identity), Fold::Folded);
+        assert_eq!(c.current_fold(&different), Fold::Folded);
+        assert!(!c.set_current_fold(identity.clone(), Fold::Open));
+        assert!(c.set_current_fold(different.clone(), Fold::Open));
+        assert_eq!(c.current_opened.len(), 1);
+        assert!(c.set_current_fold(different, Fold::Folded));
+        assert!(c.current_opened.is_empty());
+    }
+    assert!(c.names(4).is_empty());
+    assert!(c.parts(4).is_empty());
+    assert!(!c.set_fold(CallName { attempt: 1, turn: 1, call: 7 }, Fold::Open));
+    assert!(c.moved(1).is_some());
+    let mut rows = List::with_capacity(1);
+    rows.push(calls(1, 1)).unwrap();
+    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert!(c.live.is_empty());
+    assert!(c.current_opened.is_empty());
+    assert!(c.set_fold(CallName { attempt: 1, turn: 1, call: 7 }, Fold::Open));
 }

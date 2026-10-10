@@ -1551,7 +1551,7 @@ fn activation_observations_and_prior_closing_are_admitted_whole_with_their_alloc
         retry: Some(RetryNotice::Refused { count: u32::MAX }),
         observation: Some(RunObservation {
             channel: Token::new(u64::MAX),
-            work: RunWork::Tool { call: text(b"call"), tool: text(b"tool") },
+            work: RunWork::Tool { call: current_identity(b"call"), tool: text(b"tool") },
             since: Wall::EPOCH,
             reported_at: Wall::EPOCH,
             started: None,
@@ -1562,7 +1562,11 @@ fn activation_observations_and_prior_closing_are_admitted_whole_with_their_alloc
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
     assert!(Engine::new(setup.clone(), 1).is_ok());
     active.observation.as_mut().unwrap().work = RunWork::Tool {
-        call: Text::new(vec![b'x'; setup.bounds.text as usize + 1].into_boxed_slice(), setup.bounds.text + 1).unwrap(),
+        call: CallIdentity {
+            id: Text::new(vec![b'x'; setup.bounds.text as usize + 1].into_boxed_slice(), setup.bounds.text + 1)
+                .unwrap(),
+            ..current_identity(b"call")
+        },
         tool: text(b"tool"),
     };
     row.runtime = Runtime::Active(active);
@@ -1793,7 +1797,13 @@ mod owner_chip;
 fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_run() {
     use crate::payload::Payload;
     let name = TurnName { attempt: u64::MAX, number: u32::MAX };
-    let raw = CurrentCall { number: u64::MAX, tool: text(b"raw/tool\xff"), input: text(b"a/b\x00\xfe"), cut: true };
+    let raw = CurrentCall {
+        identity: current_identity(b"id/\xff"),
+        began: None,
+        tool: text(b"raw/tool\xff"),
+        input: text(b"a/b\x00\xfe"),
+        cut: true,
+    };
     let run = RunText {
         attempt: name.attempt,
         began: None,
@@ -1807,7 +1817,7 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     let setup = live_script();
     let original_bounds = setup.bounds;
     let heap = run.heap(&original_bounds).unwrap();
-    assert_eq!(heap, 18, "four streamed bytes plus nine tool and five input bytes");
+    assert_eq!(heap, 22, "four streamed bytes plus four identity, nine tool and five input bytes");
     let exact = u64::try_from(core::mem::size_of::<RunText>()).unwrap() + heap;
     let mut bounds = original_bounds;
     bounds.document_bytes = exact;
@@ -1817,8 +1827,29 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     bounds.document_bytes = exact;
     bounds.text = 8;
     assert!(!crate::payload::fits(&run, &bounds), "the whole raw tool must fit its own bound");
-    let large =
-        CurrentCall { number: u64::MAX, tool: text(&vec![0xff; 4096]), input: text(&vec![0xfe; 4096]), cut: true };
+    let whole_identity = LiveCall::Raw(CurrentCall {
+        identity: CallIdentity { id: text(b"opaque/provider/id\xff"), ..raw.identity.clone() },
+        tool: text(b"t"),
+        input: text(b"i"),
+        ..raw.clone()
+    });
+    bounds = original_bounds;
+    let identity_heap = whole_identity.heap(&bounds).unwrap();
+    assert_eq!(identity_heap, 21);
+    bounds.document_bytes = u64::try_from(core::mem::size_of::<LiveCall>()).unwrap() + identity_heap;
+    assert!(crate::payload::fits(&whole_identity, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!crate::payload::fits(&whole_identity, &bounds), "whole opaque id is priced with tool/input");
+    bounds.document_bytes += 1;
+    bounds.text = 18;
+    assert!(!crate::payload::fits(&whole_identity, &bounds), "id admission never cuts or parses provider bytes");
+    let large = CurrentCall {
+        identity: current_identity(b"id/\xff"),
+        began: None,
+        tool: text(&vec![0xff; 4096]),
+        input: text(&vec![0xfe; 4096]),
+        cut: true,
+    };
     let held = RunText { call: Some(LiveCall::Raw(large)), ..run.clone() };
     let delivery = Delivery::Run(Box::new(held.clone()));
     let whole = u64::try_from(core::mem::size_of::<Delivery>()).unwrap() + delivery.heap(&original_bounds).unwrap();
@@ -1864,4 +1895,13 @@ fn live_raw_calls_price_both_texts_whole_and_refuse_without_replacing_retained_r
     assert!(crate::payload::fits(&rich, &bounds));
     bounds.document_bytes -= 1;
     assert!(!crate::payload::fits(&rich, &bounds));
+}
+
+fn current_identity(id: &[u8]) -> jig_client::contract::CallIdentity {
+    jig_client::contract::CallIdentity {
+        owner: skein_lib::Token::new(u64::MAX),
+        sequence: u32::MAX,
+        retry: u32::MAX,
+        id: text(id),
+    }
 }

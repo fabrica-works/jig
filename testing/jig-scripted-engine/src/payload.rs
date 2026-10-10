@@ -1027,7 +1027,8 @@ impl Payload for Delivery {
         }
     }
 }
-fields!(CurrentCall { number, tool, input, cut });
+fields!(jig_client::contract::CallIdentity { owner, sequence, retry, id });
+fields!(CurrentCall { identity, tool, input, cut, began });
 impl Payload for LiveCall {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {

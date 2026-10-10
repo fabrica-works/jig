@@ -176,6 +176,7 @@ impl JigBindings {
                         | jig_client::action::Act::Dismiss
                         | jig_client::action::Act::Fold { .. }
                         | jig_client::action::Act::FoldCall { .. }
+                        | jig_client::action::Act::FoldCurrentCall { .. }
                         | jig_client::action::Act::Filter { .. }
                         | jig_client::action::Act::More { .. }
                         | jig_client::action::Act::FilterInbox { .. }

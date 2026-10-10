@@ -460,7 +460,13 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     let words = words();
     let (mut d, _, run, _) = ready();
     let name = TurnName { attempt: u64::MAX, number: u32::MAX };
-    let raw = CurrentCall { number: u64::MAX, tool: text(b"raw/tool\xff"), input: text(b"a/b\x00\xfe"), cut: true };
+    let raw = CurrentCall {
+        identity: current_identity(b"id/\xff"),
+        began: None,
+        tool: text(b"raw/tool\xff"),
+        input: text(b"a/b\x00\xfe"),
+        cut: true,
+    };
     let mut value = RunText {
         attempt: name.attempt,
         began: None,
@@ -478,6 +484,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     access(&folded);
     assert!(contains(&folded, b"\\x72\\x61\\x77\\x2F\\x74\\x6F\\x6F\\x6C\\xFF"));
     assert!(!contains(&folded, b"\\x61\\x2F\\x62\\x00\\xFE"));
+    assert!(contains(&folded, b"\\x69\\x64\\x2F\\xFF"));
     let missing_nodes = folded.nodes().len();
     drop(bindings);
     value.began = Some(Wall::EPOCH);
@@ -485,15 +492,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     let supplied = build(&d, 3, &words).0;
     assert_eq!(supplied.nodes().len(), missing_nodes + 2, "an actual epoch gets its own time and text nodes");
     assert_eq!(d.conversation().live.get(0).unwrap().began, Some(Wall::EPOCH));
-    drive(
-        &mut d,
-        Event::Act {
-            act: Act::FoldCall {
-                name: jig_client::conversation::CallName { attempt: name.attempt, turn: name.number, call: raw.number },
-                open: true,
-            },
-        },
-    );
+    drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
     let expanded = build(&d, 3, &words).0;
     access(&expanded);
     assert!(contains(&expanded, b"\\x61\\x2F\\x62\\x00\\xFE"));
@@ -508,6 +507,25 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     let uncut = build(&d, 3, &words).0;
     assert_eq!(uncut.nodes().len() + 4, expanded.nodes().len(), "wall and raw-call loss are independent leaves");
     assert!(contains(&uncut, b"\\x61\\x2F\\x62\\x00\\xFE"));
+    let mut first_seen = RunText {
+        attempt: name.attempt,
+        began: None,
+        turn: name,
+        from: 0,
+        through: 4,
+        text: text(b"live"),
+        cut: false,
+        call: Some(LiveCall::Raw(CurrentCall { began: Some(Wall::EPOCH), cut: false, ..raw })),
+    };
+    deliver(&mut d, run, Delivery::Run(Box::new(first_seen.clone())));
+    let observed = build(&d, 3, &words).0;
+    assert_eq!(observed.nodes().len(), uncut.nodes().len() + 2);
+    assert_eq!(d.conversation().live.get(0).unwrap().began, None);
+    if let Some(LiveCall::Raw(call)) = &mut first_seen.call {
+        call.began = None;
+    }
+    deliver(&mut d, run, Delivery::Run(Box::new(first_seen)));
+    assert_eq!(build(&d, 3, &words).0.nodes().len(), uncut.nodes().len());
 }
 
 #[test]
@@ -519,7 +537,13 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     let input = full_raw_byte(0xfe);
     for number in 1..=CLIENT.rows {
         let name = TurnName { attempt: u64::MAX, number };
-        let call = CurrentCall { number: u64::MAX, tool: tool.clone(), input: input.clone(), cut: true };
+        let call = CurrentCall {
+            identity: CallIdentity { sequence: number, id: full_raw_byte(0xfd), ..current_identity(b"id/\xff") },
+            began: Some(Wall::EPOCH),
+            tool: tool.clone(),
+            input: input.clone(),
+            cut: true,
+        };
         deliver(
             &mut d,
             run,
@@ -531,21 +555,13 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
                 through: CLIENT.text,
                 text: full_raw_byte(b'x'),
                 cut: true,
-                call: Some(LiveCall::Raw(call)),
+                call: Some(LiveCall::Raw(call.clone())),
             })),
         );
-        drive(
-            &mut d,
-            Event::Act {
-                act: Act::FoldCall {
-                    name: jig_client::conversation::CallName { attempt: name.attempt, turn: number, call: u64::MAX },
-                    open: true,
-                },
-            },
-        );
+        drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity.clone(), open: true } });
     }
     assert_eq!(d.conversation().live.len(), CLIENT.rows);
-    assert_eq!(d.conversation().opened.len(), CLIENT.rows);
+    assert_eq!(d.conversation().current_opened.len(), CLIENT.rows);
     let limits = crate::Limits::of_words(&CLIENT, &words).unwrap();
     let mut b = crate::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
@@ -566,7 +582,9 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
         escaped.extend_from_slice(b"\\xFE");
     }
     assert!(contains(&tree, &escaped));
-    assert_eq!(d.conversation().live.get(0).unwrap().call.as_ref().unwrap().number(), u64::MAX);
+    assert!(
+        matches!(d.conversation().live.get(0).unwrap().call.as_ref().unwrap(), LiveCall::Raw(call) if call.identity.owner == Token::new(u64::MAX) && call.identity.id == full_raw_byte(0xfd))
+    );
     assert!(limits.text_per_node >= CLIENT.text * 4);
     let (mut reloaded, _, run, _) = ready();
     assert!(reloaded.conversation().live.is_empty());
@@ -581,7 +599,13 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
             through: 0,
             text: text(b""),
             cut: false,
-            call: Some(LiveCall::Raw(CurrentCall { number: u64::MAX, tool, input, cut: false })),
+            call: Some(LiveCall::Raw(CurrentCall {
+                identity: current_identity(b"id/\xff"),
+                began: None,
+                tool,
+                input,
+                cut: false,
+            })),
         })),
     );
     assert_eq!(reloaded.conversation().live.get(0).unwrap().began, None);
@@ -636,7 +660,8 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
             text: text(b""),
             cut: false,
             call: Some(LiveCall::Raw(CurrentCall {
-                number: u64::MAX,
+                identity: current_identity(b"id/\xff"),
+                began: None,
                 tool: text(b"literal/tool"),
                 input: text(b"input"),
                 cut: false,
@@ -664,4 +689,13 @@ fn full_raw_byte(byte: u8) -> Text {
     let mut bytes = Vec::new();
     bytes.resize(usize::try_from(super::cards::CLIENT.text).unwrap(), byte);
     Text::new(bytes.into_boxed_slice(), super::cards::CLIENT.text).unwrap()
+}
+
+fn current_identity(id: &[u8]) -> jig_client::contract::CallIdentity {
+    jig_client::contract::CallIdentity {
+        owner: skein_lib::Token::new(u64::MAX),
+        sequence: u32::MAX,
+        retry: u32::MAX,
+        id: text(id),
+    }
 }

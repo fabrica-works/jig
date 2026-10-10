@@ -667,6 +667,7 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
             out,
         ),
         Act::FoldCall { name, open } => crate::conversation::routing::fold(domain, name, open),
+        Act::FoldCurrentCall { identity, open } => crate::conversation::routing::fold_current(domain, identity, open),
         Act::More { window, end } => {
             crate::conversation::routing::more(domain, window, end, out);
             crate::pages::conversations::more(domain, window, end, out);

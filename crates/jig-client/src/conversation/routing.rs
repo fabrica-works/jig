@@ -188,3 +188,11 @@ pub(crate) fn fold(domain: &mut Domain, name: super::CallName, open: bool) {
         domain.changed();
     }
 }
+
+/// Raw provider identities never match a committed transcript call number.
+pub(crate) fn fold_current(domain: &mut Domain, identity: crate::contract::CallIdentity, open: bool) {
+    let fold = if open { super::Fold::Open } else { super::Fold::Folded };
+    if domain.conversation.set_current_fold(identity, fold) {
+        domain.changed();
+    }
+}

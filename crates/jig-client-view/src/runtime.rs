@@ -1,9 +1,9 @@
 //! Exact owner lifecycle beside separately supplied host observations.
 //! See client/domain/objects.md, 3, and view.md, 7 and 10.
 use crate::{
-    Builder, JigBindings,
+    Builder, JigBindings, Run,
     phrases::{Hole, jig::JigPhrase},
-    words::{Words, name},
+    words::Words,
 };
 use jig_client::contract::{ActiveRun, HeldRuntime, RetryNotice, RunStage, RunWork};
 
@@ -48,7 +48,13 @@ pub(crate) fn active(b: &mut Builder, value: &ActiveRun, words: &Words) {
         RunWork::Starting => words.text(b, JigPhrase::WorkStarting, &[]),
         RunWork::Active => words.text(b, JigPhrase::WorkActive, &[]),
         RunWork::Writing => words.text(b, JigPhrase::WorkWriting, &[]),
-        RunWork::Tool { call, tool } => words.text(b, JigPhrase::WorkTool, &[name(tool.bytes()), name(call.bytes())]),
+        RunWork::Tool { call, tool } => {
+            let phrase = crate::live_call_words::LiveCallPhrase::ObservedCurrentCall;
+            let label = words.book.say(words.language, phrase.id(), &[]).expect("checked observed call label").text;
+            b.text(Run::Plain, &label);
+            crate::literal_segment::render(b, tool.bytes());
+            crate::literal_segment::render(b, call.id.bytes());
+        }
         RunWork::Waiting => words.text(b, JigPhrase::WorkWaiting, &[]),
         RunWork::Ending => words.text(b, JigPhrase::WorkEnding, &[]),
     }

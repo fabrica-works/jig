@@ -1,5 +1,5 @@
 //! Neutral controls for provisional raw input; client/domain/view.md, 7 and 9.
-//! IDs 6800–6801 keep raw byte display outside bounded name holes.
+//! IDs 6800–6802 keep raw byte display outside bounded name holes.
 use crate::{
     Owner,
     phrases::{Form, Language, Phrase, PhraseId, PhraseShape, PluralClass, PluralRule, Segment, SpanUnit, WallFormat},
@@ -10,35 +10,39 @@ use skein_lib::{List, bytes::copy_of};
 pub enum LiveCallPhrase {
     OpenCurrentCallInput,
     FoldCurrentCallInput,
+    ObservedCurrentCall,
 }
-pub const ALL: [LiveCallPhrase; 2] = [LiveCallPhrase::OpenCurrentCallInput, LiveCallPhrase::FoldCurrentCallInput];
+pub const ALL: [LiveCallPhrase; 3] =
+    [LiveCallPhrase::OpenCurrentCallInput, LiveCallPhrase::FoldCurrentCallInput, LiveCallPhrase::ObservedCurrentCall];
 impl LiveCallPhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         let number = match self {
             Self::OpenCurrentCallInput => 6800,
             Self::FoldCurrentCallInput => 6801,
+            Self::ObservedCurrentCall => 6802,
         };
         PhraseId { owner: Owner::Jig, number }
     }
 }
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut rows = List::with_capacity(2);
+    let mut rows = List::with_capacity(3);
     for phrase in ALL {
         rows.push(PhraseShape { id: phrase.id(), holes: Box::new([]), plural: None })
-            .expect("two live call shapes fit");
+            .expect("three live call shapes fit");
     }
     rows.into_boxed()
 }
 /// English data for the caller's normal composition, never constructed by renderers.
 #[must_use]
 pub fn language() -> Language {
-    let mut phrases = List::with_capacity(2);
+    let mut phrases = List::with_capacity(3);
     for phrase in ALL {
         let bytes: &[u8] = match phrase {
             LiveCallPhrase::OpenCurrentCallInput => b"Open current call input",
             LiveCallPhrase::FoldCurrentCallInput => b"Fold current call input",
+            LiveCallPhrase::ObservedCurrentCall => b"Observed current tool call",
         };
         phrases
             .push(Phrase {
@@ -48,7 +52,7 @@ pub fn language() -> Language {
                     segments: Box::new([Segment::Text(copy_of(bytes))]),
                 }]),
             })
-            .expect("two live call sayings fit");
+            .expect("three live call sayings fit");
     }
     Language {
         plural: PluralRule::English,

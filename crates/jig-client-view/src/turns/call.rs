@@ -77,22 +77,22 @@ pub(super) fn live(
 ) {
     match value {
         LiveCall::Decoded(value) => call(b, client, turn, value, words, bindings),
-        LiveCall::Raw(value) => raw(b, client, turn, value, words, bindings),
+        LiveCall::Raw(value) => raw(b, client, value, words, bindings),
     }
 }
-fn raw(
-    b: &mut Builder,
-    client: &Domain,
-    turn: TurnName,
-    call: &CurrentCall,
-    words: &Words,
-    bindings: &mut JigBindings,
-) {
-    let name = CallName { attempt: turn.attempt, turn: turn.number, call: call.number };
-    let open = client.conversation().fold(name) == Fold::Open;
+fn raw(b: &mut Builder, client: &Domain, call: &CurrentCall, words: &Words, bindings: &mut JigBindings) {
+    let open = client.conversation().current_fold(&call.identity) == Fold::Open;
     b.open(Role::Region);
-    b.name(&words.say(JigPhrase::CallNumber, &[Hole::Number(call.number)]));
-    words.text(b, JigPhrase::CallNumber, &[Hole::Number(call.number)]);
+    let region = words
+        .book
+        .say(words.language, crate::live_call_words::LiveCallPhrase::ObservedCurrentCall.id(), &[])
+        .expect("checked observed call label")
+        .text;
+    b.name(&region);
+    crate::literal_segment::render(b, call.identity.id.bytes());
+    if let Some(began) = call.began {
+        words.wall(b, began);
+    }
     crate::literal_segment::render(b, call.tool.bytes());
     let phrase = if open {
         crate::live_call_words::LiveCallPhrase::FoldCurrentCallInput
@@ -106,7 +106,10 @@ fn raw(
     if open {
         b.state(State::Expanded);
     }
-    b.bind(bindings.insert(crate::JigMeaning::Action(Act::FoldCall { name, open: !open })));
+    b.bind(
+        bindings
+            .insert(crate::JigMeaning::Action(Act::FoldCurrentCall { identity: call.identity.clone(), open: !open })),
+    );
     b.close();
     if open {
         crate::literal_segment::render(b, call.input.bytes());

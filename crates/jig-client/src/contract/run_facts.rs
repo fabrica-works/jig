@@ -1,6 +1,6 @@
 //! Owned activation facts, distinct from best-effort run observations.
 //! See client/domain/objects.md, 3, and domain/tasks.md, 5.1–5.2.
-use super::{Closing, FailureClass, Text};
+use super::{CallIdentity, Closing, FailureClass, Text};
 use skein_lib::{Token, Wall};
 
 /// Exact current owner activation stage; an attempt does not imply observed work.
@@ -51,7 +51,7 @@ pub enum RunWork {
     Starting,
     Active,
     Writing,
-    Tool { call: Text, tool: Text },
+    Tool { call: CallIdentity, tool: Text },
     Waiting,
     Ending,
 }

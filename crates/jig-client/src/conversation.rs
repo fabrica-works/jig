@@ -16,7 +16,8 @@
 use crate::{
     action::End,
     contract::{
-        Activity, ActivityLine, ActivityPage, Block, Cursor, LiveCall, ObjectKey, Part, Read, RunText, Text, TurnName,
+        Activity, ActivityLine, ActivityPage, Block, CallIdentity, Cursor, LiveCall, ObjectKey, Part, Read, RunText,
+        Text, TurnName,
     },
     objects::{Objects, Source},
     windows::{Edge, Edges, TurnWindow},
@@ -78,6 +79,8 @@ pub struct Conversation {
     pub fresh: TurnWindow,
     /// The displayed calls whose details the person opened.
     pub opened: Map<CallName, ()>,
+    /// Opaque current-call folds are equality-only and independent of transcript numbers.
+    pub current_opened: List<CallIdentity>,
     /// Earlier provisional turns survive deliveries of a later turn.
     pub live: List<LiveTurn>,
     /// The name and offset to request on the run watch.
@@ -111,6 +114,7 @@ impl Conversation {
             reading: None,
             fresh: TurnWindow::new(rows),
             opened: Map::with_capacity(rows),
+            current_opened: List::with_capacity(rows),
             live: List::with_capacity(rows),
             current: None,
             stream_offset: 0,
@@ -289,6 +293,7 @@ impl Conversation {
                         live.began = value.began;
                         live.call = value.call;
                     }
+                    self.prune_folds();
                     return true;
                 }
                 if value.from > live.offset && !value.cut {
@@ -337,6 +342,7 @@ impl Conversation {
                 self.stream_offset = value.through;
             }
         }
+        self.prune_folds();
         true
     }
     /// Keeps text during a brief offline interval, replacing it on the next delivery.
@@ -349,6 +355,7 @@ impl Conversation {
         self.current = None;
         self.stream_offset = 0;
         self.replacing = false;
+        self.prune_folds();
     }
     /// The stream cursor follows the current name, never another turn's offset.
     #[must_use]
@@ -444,8 +451,8 @@ impl Conversation {
         for live in &self.live {
             if live.name.attempt == name.attempt
                 && live.name.number == name.turn
-                && let Some(call) = &live.call
-                && call.number() == name.call
+                && let Some(LiveCall::Decoded(call)) = &live.call
+                && call.number == name.call
             {
                 return true;
             }
@@ -462,7 +469,66 @@ impl Conversation {
                 self.opened.remove(&name);
                 true
             }
-            Fold::Open => self.opened.insert(name, ()).is_ok(),
+            Fold::Open => {
+                if !self.opened.contains_key(&name)
+                    && self
+                        .opened
+                        .len()
+                        .checked_add(self.current_opened.len())
+                        .is_none_or(|n| n >= self.opened.capacity())
+                {
+                    return false;
+                }
+                self.opened.insert(name, ()).is_ok()
+            }
+        }
+    }
+    /// Presentation state for a raw call is keyed by its supplied opaque triple.
+    #[must_use]
+    pub fn current_fold(&self, identity: &CallIdentity) -> Fold {
+        if self.current_opened.as_slice().contains(identity) { Fold::Open } else { Fold::Folded }
+    }
+    fn displayed_current_call(&self, identity: &CallIdentity) -> bool {
+        for live in &self.live {
+            if let Some(LiveCall::Raw(call)) = &live.call
+                && &call.identity == identity
+            {
+                return true;
+            }
+        }
+        false
+    }
+    /// Opening an unknown identity or exceeding the bounded fold table is refused.
+    pub fn set_current_fold(&mut self, identity: CallIdentity, fold: Fold) -> bool {
+        if !self.displayed_current_call(&identity) {
+            return false;
+        }
+        self.prune_folds();
+        match fold {
+            Fold::Open => {
+                if self.current_opened.as_slice().contains(&identity) {
+                    return true;
+                }
+                if self
+                    .opened
+                    .len()
+                    .checked_add(self.current_opened.len())
+                    .is_none_or(|n| n >= self.current_opened.capacity())
+                {
+                    return false;
+                }
+                self.current_opened.push(identity).is_ok()
+            }
+            Fold::Folded => {
+                let mut kept = List::with_capacity(self.current_opened.capacity());
+                for name in &self.current_opened {
+                    if name != &identity {
+                        kept.push(name.clone()).expect("folds remain bounded");
+                    }
+                }
+                self.current_opened = kept;
+                true
+            }
         }
     }
     fn prune_folds(&mut self) {
@@ -475,6 +541,13 @@ impl Conversation {
         for name in gone.into_boxed() {
             self.opened.remove(&name);
         }
+        let mut kept = List::with_capacity(self.current_opened.capacity());
+        for identity in &self.current_opened {
+            if self.displayed_current_call(identity) {
+                kept.push(identity.clone()).expect("remaining current folds fit");
+            }
+        }
+        self.current_opened = kept;
     }
     /// Names cards produced by calls and heard results, deduplicated by object key.
     #[must_use]
@@ -599,6 +672,8 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(u64::from(limits.text).checked_mul(2)?)?
         .checked_add(Map::<CallName, ()>::worst_case(limits.rows)?)?
         .checked_add(List::<CallName>::worst_case(limits.rows)?)?
+        .checked_add(List::<CallIdentity>::worst_case(limits.rows)?.checked_mul(2)?)?
+        .checked_add(u64::from(limits.rows).checked_mul(u64::from(limits.text))?.checked_mul(2)?)?
         .checked_add(List::<u64>::worst_case(limits.rows)?.checked_mul(2)?)?
         .checked_add(List::<ActivityLine>::worst_case(limits.rows)?.checked_mul(3)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(4)?)

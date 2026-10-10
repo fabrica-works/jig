@@ -1,27 +1,28 @@
 //! A supplied current call is provisional, not a committed transcript call.
-//! See client/domain/contract.md, 7.3, and client.md, 10.
+//! See client/domain/contract.md, 7.3, client.md, 10, and QUESTIONS.md, 42.
 use super::{Call, Text};
-/// The owner's raw call snapshot, with its aggregate loss fact.
+use skein_lib::{Token, Wall};
+/// The provider's id within its actual owner and issued completion.
+/// Equality alone names a call; no field is a routing or transcript number.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CallIdentity {
+    pub owner: Token,
+    pub sequence: u32,
+    pub retry: u32,
+    pub id: Text,
+}
+/// The owner's raw call snapshot, with aggregate loss and supplied first-seen clock.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct CurrentCall {
-    pub number: u64,
+    pub identity: CallIdentity,
     pub tool: Text,
     pub input: Text,
     pub cut: bool,
+    pub began: Option<Wall>,
 }
 /// Preserve rich decoded sources alongside the owner's raw provisional call.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LiveCall {
     Decoded(Call),
     Raw(CurrentCall),
-}
-impl LiveCall {
-    /// The supplied call identity, without interpreting tool or input bytes.
-    #[must_use]
-    pub const fn number(&self) -> u64 {
-        match self {
-            Self::Decoded(call) => call.number,
-            Self::Raw(call) => call.number,
-        }
-    }
 }
