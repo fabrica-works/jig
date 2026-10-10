@@ -85,8 +85,9 @@ pub fn limits() -> domain::Limits {
     }
 }
 type Books = (jig_client_view::words::Words, view::words::Words, view::words::Words);
+type BookCache = Mutex<BTreeMap<(u32, u32, u32), Books>>;
 fn phrasebooks(limits: &domain::Limits) -> Books {
-    static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32, u32), Books>>> = OnceLock::new();
+    static BOOKS: OnceLock<BookCache> = OnceLock::new();
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
     books
         .entry((limits.jig.text, limits.observability.text, limits.infrastructure.text))

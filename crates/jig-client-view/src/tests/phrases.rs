@@ -143,6 +143,11 @@ fn plural_selection_hole_values_and_longest_language_capacity_are_checked() {
 }
 
 #[test]
+#[expect(
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    reason = "ordinary fixture checks a finite shuffled language table through the public API"
+)]
 fn shuffled_languages_keep_owner_scoped_ids_capacities_and_whole_load_refusals() {
     let rows = [
         (PhraseId { owner: Owner::Other { child: u16::MAX }, number: 0 }, b"other maximum".as_slice()),
@@ -169,7 +174,7 @@ fn shuffled_languages_keep_owner_scoped_ids_capacities_and_whole_load_refusals()
                 forms: Box::new([Form {
                     class: PluralClass::Other,
                     segments: if long {
-                        Box::new([Segment::Text(bytes.to_vec().repeat(2).into_boxed_slice())])
+                        Box::new([Segment::Text(bytes.repeat(2).into_boxed_slice())])
                     } else {
                         Box::new([Segment::Text((*bytes).into())])
                     },
@@ -182,7 +187,7 @@ fn shuffled_languages_keep_owner_scoped_ids_capacities_and_whole_load_refusals()
     let book = Phrasebook::load(shapes.clone(), Box::new([language(false), language(true)]), &limits).unwrap();
     for (id, bytes) in rows {
         assert_eq!(book.say(0, id, &[]).unwrap().text.as_ref(), bytes);
-        assert_eq!(book.say(1, id, &[]).unwrap().text.as_ref(), bytes.to_vec().repeat(2));
+        assert_eq!(book.say(1, id, &[]).unwrap().text.as_ref(), bytes.repeat(2));
         assert_eq!(book.capacity(id), Some(u32::try_from(bytes.len().checked_mul(2).unwrap()).unwrap()));
         assert_eq!(book.clone().say(1, id, &[]), book.say(1, id, &[]));
     }
