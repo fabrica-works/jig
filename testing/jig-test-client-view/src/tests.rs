@@ -722,7 +722,10 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
             .iter()
             .any(|node| node.role == Role::Status && node.name.as_deref() == Some(b"Application outcome".as_slice()))
     );
-    assert!(contains(&view, b"Changed"));
+    assert!(contains(&view, b"Object changed"));
+    assert!(contains(&view, b"Object: 5"));
+    assert!(contains(&view, b"Object revision: 18"));
+    assert!(contains(&view, b"Value: 0"));
     assert_eq!(root.first().object(id).unwrap().card, first::Card::Done { answer });
     assert!(view.tree().len() <= view.limits().tree.nodes);
     assert!(patches(&mut view, &root).is_empty());
