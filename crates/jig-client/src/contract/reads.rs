@@ -81,6 +81,8 @@ pub enum Read {
 /// A bounded page with opaque cursors at both ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ObjectPage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<Result>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -89,6 +91,8 @@ pub struct ObjectPage {
 /// A bounded page with opaque cursors at both ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ConversationPage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<ConversationLine>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -97,6 +101,8 @@ pub struct ConversationPage {
 /// A bounded page with opaque cursors at both ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ActivityPage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<ActivityLine>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -105,6 +111,8 @@ pub struct ActivityPage {
 /// A bounded page with opaque cursors at both ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct HistoryPage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<HistoryLine>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -113,6 +121,8 @@ pub struct HistoryPage {
 /// A bounded page with opaque cursors at both ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InboxPage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<InboxEntry>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -121,6 +131,8 @@ pub struct InboxPage {
 /// A bounded page with opaque cursors at both ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GoalPage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<GoalLine>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -129,6 +141,8 @@ pub struct GoalPage {
 /// A bounded page with opaque cursors at both ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NotePage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<Note>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -202,6 +216,8 @@ pub enum ReadResult {
 /// Bounded past spend periods with opaque page ends.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SpendPage {
+    /// The source page is incomplete, independent of row loss and continuations.
+    pub cut: bool,
     pub rows: List<super::SpendPeriod>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,

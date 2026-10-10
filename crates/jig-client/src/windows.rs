@@ -131,6 +131,8 @@ fn move_objectwindow(rows: List<ObjectKey>, start: u32, count: u32, out: &mut Li
 /// Conversations in the party list.
 #[derive(Debug)]
 pub struct ConversationWindow {
+    /// A retained read reported page loss; independent from its row edges.
+    pub cut: bool,
     pub rows: List<ConversationLine>,
     pub edges: Edges,
 }
@@ -138,7 +140,7 @@ impl ConversationWindow {
     /// Allocates a fixed row capacity and starts at both list ends.
     #[must_use]
     pub fn new(capacity: u32) -> Self {
-        Self { rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
+        Self { cut: false, rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
     }
     /// Slides from one end, returning the number dropped from the other.
     pub fn slide(&mut self, incoming: List<ConversationLine>, incoming_edges: Edges, end: End) -> u32 {
@@ -243,6 +245,8 @@ fn move_turnwindow(rows: List<ActivityLine>, start: u32, count: u32, out: &mut L
 /// Task or subtree history lines.
 #[derive(Debug)]
 pub struct HistoryWindow {
+    /// A retained read reported page loss; independent from its row edges.
+    pub cut: bool,
     pub rows: List<HistoryLine>,
     pub edges: Edges,
 }
@@ -250,7 +254,7 @@ impl HistoryWindow {
     /// Allocates a fixed row capacity and starts at both list ends.
     #[must_use]
     pub fn new(capacity: u32) -> Self {
-        Self { rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
+        Self { cut: false, rows: List::with_capacity(capacity), edges: Edges { before: Edge::End, after: Edge::End } }
     }
     /// Slides from one end, returning the number dropped from the other.
     pub fn slide(&mut self, incoming: List<HistoryLine>, incoming_edges: Edges, end: End) -> u32 {

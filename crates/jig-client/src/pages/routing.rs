@@ -89,12 +89,14 @@ pub(crate) fn navigate(
     domain.object_rows.rows.clear();
     domain.object_rows.edges = blank_edges();
     domain.conversation_rows.rows.clear();
+    domain.conversation_rows.cut = false;
     domain.conversation_rows.edges = blank_edges();
     let rows = domain.conversation.lines.rows.capacity();
     let words = domain.conversation.words.rows.capacity();
     domain.conversation = crate::conversation::Conversation::new(0, rows);
     domain.conversation.words = crate::conversation::KeptWords::new(words);
     domain.history_rows.rows.clear();
+    domain.history_rows.cut = false;
     domain.history_rows.edges = blank_edges();
     domain.generation = generation;
     match place {
@@ -487,6 +489,7 @@ fn read_value(
         }
         ReadValue::Activity(page) => crate::conversation::routing::page(domain, env, *page, out),
         ReadValue::History(page) => {
+            domain.history_rows.cut |= page.cut;
             let edges = page_edges(page.before, page.after);
             let dropped = domain.history_rows.slide(page.rows, edges, End::After);
             if dropped > 0 {
@@ -495,6 +498,7 @@ fn read_value(
             domain.changed();
         }
         ReadValue::Conversations(page) => {
+            domain.conversation_rows.cut |= page.cut;
             let edges = page_edges(page.before, page.after);
             let mut rows = page.rows;
             crate::pages::conversations::order(&mut rows);
@@ -520,6 +524,7 @@ fn read_value(
         }
         ReadValue::Ended(page) => {
             crate::pages::task::ended(domain, page.before, page.after);
+            domain.task_page.ended_cut = page.cut;
             let mut keys = List::with_capacity(env.limits.rows);
             for result in &page.rows {
                 match keys.push(ObjectKey::Result(result.task.task)) {

@@ -76,6 +76,7 @@ fn start(domain: &mut Domain, limits: &Limits, kept: List<Record>) -> (Token, To
                 Event::Read {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        cut: false,
                         rows: List::with_capacity(0),
                         before: None,
                         after: None,

@@ -50,6 +50,8 @@ pub struct TaskPage {
     pub header: Option<Id<Object>>,
     pub plan: Plan,
     pub subtree_history: bool,
+    /// Loss reported by the current ended-delegate read window.
+    pub ended_cut: bool,
     pub ended_after: Option<contract::Cursor>,
     pub ended_before: Option<contract::Cursor>,
     pub ended_task: Option<u64>,
@@ -66,6 +68,7 @@ impl TaskPage {
                 folds: Map::with_capacity(rows),
             },
             subtree_history: false,
+            ended_cut: false,
             ended_after: None,
             ended_before: None,
             ended_task: None,
@@ -85,6 +88,7 @@ impl TaskPage {
             let _open = self.plan.folds.remove(task).expect("collected fold exists");
         }
         self.subtree_history = false;
+        self.ended_cut = false;
         self.ended_after = None;
         self.ended_before = None;
         self.ended_task = None;
@@ -429,6 +433,7 @@ pub(crate) fn history(domain: &mut Domain, subtree: bool, out: &mut Queue<Reques
     };
     domain.task_page.subtree_history = subtree;
     domain.history_rows.rows.clear();
+    domain.history_rows.cut = false;
     read(domain, 2, Read::History { task, subtree, after: None }, out);
     domain.changed();
 }
@@ -452,6 +457,7 @@ pub(crate) fn open_ended(domain: &mut Domain, task: u64, out: &mut Queue<Request
         return;
     }
     domain.task_page.ended_task = Some(task);
+    domain.task_page.ended_cut = false;
     domain.task_page.ended_after = None;
     domain.task_page.ended_before = None;
     read(domain, 16, Read::Ended { task, after: None }, out);

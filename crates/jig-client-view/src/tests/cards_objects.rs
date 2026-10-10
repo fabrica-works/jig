@@ -1082,6 +1082,7 @@ fn note_loaded(note: Note) -> (Domain, Id<Object>) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                cut: false,
                 rows: list([note]),
                 before: None,
                 after: None,

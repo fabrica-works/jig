@@ -56,6 +56,7 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
         b.close();
     }
     b.close();
+    super::cut(b, words, client.conversation_rows().cut);
     super::edges(
         b,
         words,

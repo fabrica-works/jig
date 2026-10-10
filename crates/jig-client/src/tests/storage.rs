@@ -100,7 +100,7 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
     assert_eq!(gone.len(), 3);
     assert_eq!(gone[2], Request::PartsLeft { generation: 1 });
     let shown = domain.shown();
-    let page = ActivityPage { rows: rows([activity(9)]), before: None, after: None };
+    let page = ActivityPage { cut: false, rows: rows([activity(9)]), before: None, after: None };
     assert!(
         drive(
             &mut domain,

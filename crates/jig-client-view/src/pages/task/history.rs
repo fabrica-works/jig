@@ -56,5 +56,6 @@ pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings:
         b.close();
     }
     b.close();
+    super::super::cut(b, words, client.history_rows().cut);
     super::super::edges(b, words, bindings, &client.history_rows().edges, jig_client::pages::task::HISTORY_WINDOW);
 }

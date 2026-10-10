@@ -892,13 +892,13 @@ impl Payload for Read {
         }
     }
 }
-fields!(ObjectPage { rows, before, after });
-fields!(ConversationPage { rows, before, after });
-fields!(ActivityPage { rows, before, after });
-fields!(HistoryPage { rows, before, after });
-fields!(InboxPage { rows, before, after });
-fields!(GoalPage { rows, before, after });
-fields!(NotePage { rows, before, after });
+fields!(ObjectPage { cut, rows, before, after });
+fields!(ConversationPage { cut, rows, before, after });
+fields!(ActivityPage { cut, rows, before, after });
+fields!(HistoryPage { cut, rows, before, after });
+fields!(InboxPage { cut, rows, before, after });
+fields!(GoalPage { cut, rows, before, after });
+fields!(NotePage { cut, rows, before, after });
 impl Payload for ReadValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -937,7 +937,7 @@ impl Payload for ReadResult {
         }
     }
 }
-fields!(SpendPage { rows, before, after });
+fields!(SpendPage { cut, rows, before, after });
 impl Payload for Lacking {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {

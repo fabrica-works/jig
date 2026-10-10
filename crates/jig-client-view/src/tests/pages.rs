@@ -144,6 +144,7 @@ fn inbox_edges(words: &crate::words::Words) {
                 Event::Read {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        cut: false,
                         rows: List::with_capacity(0),
                         before: None,
                         after: Some(Cursor { value: text(b"next") }),
@@ -230,6 +231,7 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                cut: false,
                 rows,
                 before: Some(Cursor { value: text(b"earlier") }),
                 after: Some(Cursor { value: text(b"later") }),
@@ -370,6 +372,7 @@ fn conversation_states(words: &crate::words::Words) {
             Event::Read {
                 read: token,
                 result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                    cut: false,
                     rows,
                     before: Some(Cursor { value: text(b"before") }),
                     after: Some(Cursor { value: text(b"after") }),
@@ -412,6 +415,7 @@ fn inbox_group_controls_decode_independent_windows() {
                 Event::Read {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        cut: false,
                         rows: List::with_capacity(0),
                         before: None,
                         after: Some(Cursor {

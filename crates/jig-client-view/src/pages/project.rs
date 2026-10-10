@@ -183,6 +183,7 @@ fn settings(
                 period(b, past.period, &past.budget, &past.pools, words);
                 task_spend(b, client, &past.tasks, words, bindings);
             }
+            super::cut(b, words, client.project_page().spend_cut);
             super::work::cursors(
                 b,
                 words,

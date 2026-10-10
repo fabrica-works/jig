@@ -6,6 +6,8 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    /// A source page is incomplete; no particular row or continuation is inferred.
+    PageCut,
     /// The stored party writer of a note.
     NoteWriterParty,
     /// The stored task and attempt writer of a note.
@@ -1071,6 +1073,7 @@ impl JigPhrase {
             Self::NoteChangedNotSupplied => 636,
             Self::TaskListsCut => 637,
             Self::ServedGoal => 638,
+            Self::PageCut => 639,
             Self::ResourceSegments => 630,
             Self::LiteralGrant => 631,
             Self::LiteralGrantMissing => 632,
@@ -1689,7 +1692,8 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::NoteChangedNotSupplied
+            Self::PageCut
+            | Self::NoteChangedNotSupplied
             | Self::TaskListsCut
             | Self::FramePerson
             | Self::FrameService
@@ -2320,7 +2324,8 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 601] = [
+pub const ALL: [JigPhrase; 602] = [
+    JigPhrase::PageCut,
     JigPhrase::NoteWriterParty,
     JigPhrase::NoteWriterTask,
     JigPhrase::NoteChangedNotSupplied,

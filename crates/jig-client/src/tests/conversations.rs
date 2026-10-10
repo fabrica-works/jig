@@ -27,6 +27,7 @@ fn page(positions: &[u64], older: Option<&[u8]>, newer: Option<&[u8]>) -> Activi
         rows.push(row(*position)).unwrap();
     }
     ActivityPage {
+        cut: false,
         rows,
         before: match older {
             Some(bytes) => {
@@ -135,7 +136,7 @@ fn calls_fold_on_the_page_and_engine_objects_share_one_live_card() {
     let mut rows = List::with_capacity(2);
     rows.push(calls(2, 2)).unwrap();
     rows.push(calls(1, 1)).unwrap();
-    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
     let call = CallName { attempt: 1, turn: 2, call: 7 };
     assert_eq!(c.fold(call), Fold::Folded);
     assert!(c.set_fold(call, Fold::Open));
@@ -181,7 +182,7 @@ fn provisional_turns_append_by_offset_and_commit_only_replaces_the_same_name() {
     assert!(c.moved(1).is_some());
     let mut rows = List::with_capacity(1);
     rows.push(calls(1, 1)).unwrap();
-    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
     assert_eq!(c.live.len(), 1);
     assert_eq!(c.live.get(0).unwrap().name.number, 2);
     assert!(c.stream(stream(1, 0, 3, b"old", false), 10));
@@ -311,6 +312,7 @@ fn routed_conversation() {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
                 rows,
                 before: Some(cursor(b"older")),
                 after: None,
@@ -411,7 +413,7 @@ fn words_keep_the_submitted_snapshot_and_restore_sent_messages_until_read() {
     }
     let mut rows = List::with_capacity(1);
     rows.push(committed).unwrap();
-    assert_eq!(reload.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(reload.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
     assert_eq!(reload.words.rows.get(0).unwrap().state, Words::Read { message: 2 });
     assert_eq!(reload.words.rows.get(1).unwrap().state, Words::Read { message: 1 });
     assert_eq!(reload.words.rows.get(1).unwrap().words, text(b"first"));
@@ -426,7 +428,7 @@ fn words_page() -> ActivityPage {
         })
         .unwrap();
     }
-    ActivityPage { rows, before: None, after: None }
+    ActivityPage { cut: false, rows, before: None, after: None }
 }
 
 #[test]
@@ -593,7 +595,7 @@ fn calls_share_a_chip_watch_and_deliveries_keep_the_same_task_card_live() {
     let mut rows = List::with_capacity(2);
     rows.push(calls(2, 2)).unwrap();
     rows.push(calls(1, 1)).unwrap();
-    let page = ActivityPage { rows, before: None, after: None };
+    let page = ActivityPage { cut: false, rows, before: None, after: None };
     let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
     let read = domain
         .reads
@@ -684,7 +686,12 @@ fn changed_chip_membership(domain: &mut crate::Domain, old: skein_lib::Token) ->
         Time::ZERO,
         Event::Read {
             read,
-            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage { rows, before: None, after: None }))),
+            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
         },
     );
     let mut closed = false;
@@ -839,7 +846,7 @@ fn raw_live_calls_keep_optional_wall_literals_cut_and_full_identity_without_made
     }
     let mut rows = List::with_capacity(1);
     rows.push(committed).unwrap();
-    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
     assert_eq!(c.live.len(), 1);
     assert_eq!(c.live.get(0).unwrap().name, later);
     assert_eq!(c.live.get(0).unwrap().text.bytes(), b"next");
@@ -905,7 +912,7 @@ fn opaque_current_calls_replace_by_full_owner_completion_and_id_without_numeric_
     assert!(c.moved(1).is_some());
     let mut rows = List::with_capacity(1);
     rows.push(calls(1, 1)).unwrap();
-    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
     assert!(c.live.is_empty());
     assert!(c.current_opened.is_empty());
     assert!(c.set_fold(CallName { attempt: 1, turn: 1, call: 7 }, Fold::Open));
@@ -943,7 +950,7 @@ fn whole_run_state_keeps_call_only_and_postcommit_facts_without_a_synthetic_turn
     assert!(c.moved(1).is_some());
     let mut rows = List::with_capacity(1);
     rows.push(calls(1, 1)).unwrap();
-    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
     assert!(c.live.is_empty(), "actual activity replaces only matching provisional text");
     assert_eq!(c.current_run, Some(state.clone()), "a committed turn is not a tool-end report");
     assert_eq!(c.current_fold(&identity), Fold::Open);
@@ -1041,7 +1048,7 @@ fn mandatory_empty_retry_replaces_same_turn_and_stale_retries_cannot_restore_old
     assert!(c.moved(1).is_some());
     let mut rows = List::with_capacity(1);
     rows.push(calls(1, 2)).unwrap();
-    assert_eq!(c.accept(ActivityPage { rows, before: None, after: None }), None);
+    assert_eq!(c.accept(ActivityPage { cut: false, rows, before: None, after: None }), None);
     assert_eq!(c.live.len(), 1, "committed attempt/turn replaces all provisional retries of that turn");
     assert_eq!(c.live.get(0).unwrap().name.number, 1);
     assert!(c.stream(retry, 100));

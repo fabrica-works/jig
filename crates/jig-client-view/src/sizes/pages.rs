@@ -13,7 +13,7 @@ pub fn inbox_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
         .checked_add(14)?
         .checked_mul(l.rows.checked_mul(3)?)?
         .checked_add(l.projects.checked_mul(3)?)?
-        .checked_add(80)?
+        .checked_add(84)?
         .checked_add(slot_nodes)
 }
 /// Chat rows, every runtime alternative and all offered project forms.
@@ -22,7 +22,7 @@ pub fn conversations_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     let row =
         card_nodes(l)?.checked_add(chip_nodes(l)?)?.checked_add(runtime(l)?)?.checked_add(20)?.checked_mul(l.rows)?;
     let forms = l.charters.max(l.rows).checked_mul(3)?.checked_add(9)?.checked_mul(l.projects.max(l.rows))?;
-    row.checked_add(forms)?.checked_add(64)?.checked_add(slot_nodes)
+    row.checked_add(forms)?.checked_add(66)?.checked_add(slot_nodes)
 }
 fn call(l: &Limits) -> Option<u32> {
     card_nodes(l)?.checked_mul(l.rows)?.checked_add(l.rows.checked_mul(5)?)?.checked_add(16)
@@ -42,7 +42,7 @@ fn turn(l: &Limits) -> Option<u32> {
 pub fn conversation_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     let rows = turn(l)?.checked_add(card_nodes(l)?.checked_mul(2)?)?.checked_add(16)?.checked_mul(l.rows)?;
     let live = call(l)?.max(10).checked_add(markdown(l)?)?.checked_add(8)?.checked_mul(l.rows)?;
-    rows.checked_add(live)?.checked_add(l.conversation_words.checked_mul(9)?)?.checked_add(32)?.checked_add(slot_nodes)
+    rows.checked_add(live)?.checked_add(l.conversation_words.checked_mul(9)?)?.checked_add(34)?.checked_add(slot_nodes)
 }
 fn plan(l: &Limits) -> Option<u32> {
     card_nodes(l)?
@@ -51,7 +51,7 @@ fn plan(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(2)?)?
         .checked_add(18)?
         .checked_mul(l.rows)?
-        .checked_add(24)
+        .checked_add(26)
 }
 fn overview(l: &Limits) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?
@@ -66,7 +66,7 @@ fn overview(l: &Limits) -> Option<u32> {
         .checked_add(24)
 }
 fn history(l: &Limits) -> Option<u32> {
-    markdown(l)?.checked_mul(2)?.checked_add(authority(l)?)?.checked_add(24)?.checked_mul(l.rows)?.checked_add(16)
+    markdown(l)?.checked_mul(2)?.checked_add(authority(l)?)?.checked_add(24)?.checked_mul(l.rows)?.checked_add(18)
 }
 /// Task header, lineage and the largest available executor section.
 #[must_use]
@@ -90,7 +90,7 @@ fn goals(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(3)?)?
         .checked_add(32)?
         .checked_mul(l.projects.max(l.rows))?;
-    board.checked_add(form)?.checked_add(32)
+    board.checked_add(form)?.checked_add(34)
 }
 fn tasks(l: &Limits) -> Option<u32> {
     card_nodes(l)?
@@ -101,7 +101,7 @@ fn tasks(l: &Limits) -> Option<u32> {
         .checked_add(40)
 }
 fn notes(l: &Limits) -> Option<u32> {
-    card_nodes(l)?.checked_add(l.rows.checked_add(8)?)?.checked_mul(l.rows)?.checked_add(24)
+    card_nodes(l)?.checked_add(l.rows.checked_add(8)?)?.checked_mul(l.rows)?.checked_add(26)
 }
 fn spend(l: &Limits) -> Option<u32> {
     // Each past period has pools and task lines, each at the row bound.
@@ -111,7 +111,7 @@ fn spend(l: &Limits) -> Option<u32> {
         .checked_mul(l.rows)?
         .checked_add(8)?
         .checked_mul(l.rows.checked_add(1)?)?
-        .checked_add(8)
+        .checked_add(10)
 }
 fn settings(l: &Limits) -> Option<u32> {
     let policy = authority(l)?

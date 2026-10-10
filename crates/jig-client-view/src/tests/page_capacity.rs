@@ -427,6 +427,7 @@ fn inbox(words: &Words) {
                 Event::Read {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        cut: false,
                         rows: list([first, second]),
                         before: Some(Cursor { value: full() }),
                         after: Some(Cursor { value: full() }),
@@ -576,6 +577,7 @@ fn fill_activity(d: &mut Domain, read: Token) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
                 rows: list([
                     row(2, Activity::Turn { name: TurnName { attempt: 1, number: 2 }, turn: full_turn() }),
                     row(1, Activity::Turn { name: TurnName { attempt: 1, number: 1 }, turn: full_turn() }),
@@ -605,6 +607,7 @@ fn fill_history(d: &mut Domain, read: Token) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::History(Box::new(HistoryPage {
+                cut: false,
                 rows: list([
                     HistoryLine {
                         position: 2,
@@ -673,6 +676,7 @@ fn fill_ended_goals(d: &mut Domain, read: Token, doc: &Project) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                cut: false,
                 rows: list([goal(10), goal(11)]),
                 before: Some(Cursor { value: full() }),
                 after: Some(Cursor { value: full() }),
@@ -741,6 +745,7 @@ fn fill_notes(d: &mut Domain, read: Token) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                cut: false,
                 rows: list([note(1), note(2)]),
                 before: Some(Cursor { value: full() }),
                 after: Some(Cursor { value: full() }),
@@ -756,6 +761,7 @@ fn fill_spend(d: &mut Domain, read: Token, doc: &Project) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Spend(Box::new(SpendPage {
+                cut: false,
                 rows: list([period.clone(), period]),
                 before: Some(Cursor { value: full() }),
                 after: Some(Cursor { value: full() }),

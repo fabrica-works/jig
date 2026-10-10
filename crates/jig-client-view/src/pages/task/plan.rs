@@ -76,6 +76,7 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
     b.close();
     super::super::work::counts(b, plan.folded, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(plan.held_below))]);
+    super::super::cut(b, words, client.task_page().ended_cut);
     super::super::work::cursors(
         b,
         words,

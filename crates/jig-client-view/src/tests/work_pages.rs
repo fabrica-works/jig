@@ -49,6 +49,7 @@ pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
                 Event::Read {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        cut: false,
                         rows: List::with_capacity(0),
                         before: None,
                         after: None,
@@ -287,6 +288,7 @@ fn history(words: &Words) {
             Event::Read {
                 read,
                 result: ReadResult::Value(ReadValue::History(Box::new(HistoryPage {
+                    cut: false,
                     rows: list(changes.iter().enumerate().map(|(index, change)| HistoryLine {
                         position: u64::try_from(page.checked_mul(2).unwrap().checked_add(index).unwrap()).unwrap(),
                         task: 8,
@@ -375,6 +377,7 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                     Event::Read {
                         read: *read,
                         result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                            cut: false,
                             rows: list([Note {
                                 number: 1,
                                 revision: Revision { value: 7 },

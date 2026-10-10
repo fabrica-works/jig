@@ -30,6 +30,10 @@ pub struct NoteFilter {
 }
 /// Only current project context; pending goal requests survive leaving the page.
 #[derive(Debug)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent source loss flags for three read windows and live continuation flags"
+)]
 pub struct ProjectPage {
     pub document: Option<Box<Project>>,
     pub goals: List<GoalLine>,
@@ -38,6 +42,7 @@ pub struct ProjectPage {
     /// Keyed display merge; the board's current row wins over a read row.
     pub listed_goals: List<GoalLine>,
     pub goals_more: bool,
+    pub ended_cut: bool,
     pub ended_before: Option<Cursor>,
     pub ended_after: Option<Cursor>,
     pub tasks: List<TaskLine>,
@@ -47,9 +52,11 @@ pub struct ProjectPage {
     pub note_filter: Option<NoteFilter>,
     /// Domain writes of the selected note scope and description.
     pub note_writes: u64,
+    pub notes_cut: bool,
     pub notes_before: Option<Cursor>,
     pub notes_after: Option<Cursor>,
     pub spend: List<contract::SpendPeriod>,
+    pub spend_cut: bool,
     pub spend_before: Option<Cursor>,
     pub spend_after: Option<Cursor>,
     pub form: goals::FormState,
@@ -62,6 +69,7 @@ impl ProjectPage {
             ended: List::with_capacity(rows),
             listed_goals: List::with_capacity(rows.checked_mul(2).expect("goal source rows fit")),
             goals_more: false,
+            ended_cut: false,
             ended_before: None,
             ended_after: None,
             tasks: List::with_capacity(rows),
@@ -70,9 +78,11 @@ impl ProjectPage {
             notes: List::with_capacity(rows),
             note_filter: None,
             note_writes: 0,
+            notes_cut: false,
             notes_before: None,
             notes_after: None,
             spend: List::with_capacity(rows),
+            spend_cut: false,
             spend_before: None,
             spend_after: None,
             form: goals::FormState::new(),
@@ -84,6 +94,7 @@ impl ProjectPage {
         self.ended.clear();
         self.listed_goals.clear();
         self.goals_more = false;
+        self.ended_cut = false;
         self.ended_before = None;
         self.ended_after = None;
         self.tasks.clear();
@@ -92,9 +103,11 @@ impl ProjectPage {
         self.notes.clear();
         self.note_filter = None;
         self.note_writes = self.note_writes.checked_add(1).expect("note writes remain");
+        self.notes_cut = false;
         self.notes_before = None;
         self.notes_after = None;
         self.spend.clear();
+        self.spend_cut = false;
         self.spend_before = None;
         self.spend_after = None;
         self.form.confirmation = None;
@@ -357,6 +370,7 @@ pub(crate) fn ended(
     page: contract::GoalPage,
     out: &mut Queue<Request>,
 ) {
+    domain.project_page.ended_cut = page.cut;
     domain.project_page.ended_before = page.before;
     domain.project_page.ended_after = page.after;
     domain.project_page.ended.clear();
@@ -455,6 +469,7 @@ fn order_tasks(rows: &mut List<TaskLine>) {
     }
 }
 pub(crate) fn spend(domain: &mut Domain, page: contract::SpendPage) {
+    domain.project_page.spend_cut = page.cut;
     domain.project_page.spend_before = page.before;
     domain.project_page.spend_after = page.after;
     domain.project_page.spend.clear();

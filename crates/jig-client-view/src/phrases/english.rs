@@ -13,6 +13,7 @@ pub fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            JigPhrase::PageCut => Box::new([Segment::Text(copy_of(b"This page is incomplete"))]),
             JigPhrase::NoteWriterParty => Box::new([
                 Segment::Text(copy_of(b"Written by party ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

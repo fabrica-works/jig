@@ -194,6 +194,7 @@ pub(super) fn finish_initial_inbox_reads(domain: &mut Domain, out: &[Request]) {
                 Event::Read {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        cut: false,
                         rows: List::with_capacity(0),
                         before: None,
                         after: None,
@@ -330,6 +331,7 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
         Event::Read {
             read: read.unwrap(),
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
                 rows,
                 before: None,
                 after: Some(cursor.clone()),
@@ -583,6 +585,7 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Ended(Box::new(ObjectPage {
+                cut: false,
                 rows: List::with_capacity(0),
                 before: None,
                 after: Some(cursor.clone()),
@@ -636,7 +639,7 @@ fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
         change: HistoryChange::Released,
     })
     .unwrap();
-    let page = HistoryPage { rows, before: None, after: Some(cursor.clone()) };
+    let page = HistoryPage { cut: false, rows, before: None, after: Some(cursor.clone()) };
     drive(
         &mut domain,
         Time::ZERO,
@@ -836,6 +839,7 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                cut: false,
                 rows,
                 before: None,
                 after: Some(cursor.clone()),
@@ -1005,6 +1009,10 @@ fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_
     bounded_goal_nobody_accepts(&mut domain, latest, &mut out);
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "whole existing story preserves every assertion and explicit page-loss fields"
+)]
 fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
     use crate::{action::Act, objects::Body};
     let (mut domain, opened) = project_open(ProjectSection::Notes);
@@ -1031,7 +1039,12 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         Time::ZERO,
         Event::Read {
             read,
-            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage { rows, before: None, after: None }))),
+            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
         },
     );
     let id = domain.project_page().notes.as_slice()[0];
@@ -1059,7 +1072,12 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         Time::ZERO,
         Event::Read {
             read,
-            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage { rows, before: None, after: None }))),
+            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
         },
     );
     let Some(Body::Note { document, .. }) = &domain.objects().get(id).unwrap().body else { panic!("updated note") };
@@ -1184,6 +1202,7 @@ fn project_task_filters_and_spend_pages() {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Spend(Box::new(SpendPage {
+                cut: false,
                 rows,
                 before: None,
                 after: Some(cursor.clone()),
@@ -1250,6 +1269,10 @@ fn reply_entry(task: u64, seen: u64, last: u64) -> InboxEntry {
     row
 }
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "whole existing story preserves every assertion and explicit page-loss fields"
+)]
 fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_requests() {
     use crate::{action::Act, objects::Body, pages::inbox::Filter};
     let (mut domain, page) = live_inbox(45);
@@ -1298,6 +1321,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
         Event::Read {
             read: read_named(&out, &what),
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                cut: false,
                 rows,
                 before: Some(Cursor { value: text(b"back") }),
                 after: None,
@@ -1320,6 +1344,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
         Event::Read {
             read: read_named(&out, &what),
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                cut: false,
                 rows,
                 before: Some(Cursor { value: text(b"back") }),
                 after: None,
@@ -1411,6 +1436,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
         Event::Read {
             read: first_read,
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
                 rows,
                 before: None,
                 after: Some(cursor.clone()),
@@ -1437,6 +1463,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
         Event::Read {
             read: read_named(&out, &Read::Conversations { after: Some(cursor) }),
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
                 rows,
                 before: Some(Cursor { value: text(b"back") }),
                 after: None,
@@ -1567,7 +1594,12 @@ fn goal_read_from_start_merges_live_watch_by_key() {
         Time::ZERO,
         Event::Read {
             read: read_named(&opened, &query),
-            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage { rows, before: None, after: None }))),
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
         },
     );
     assert_eq!(domain.project_page().listed_goals.len(), 2);
@@ -1656,6 +1688,7 @@ fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
             Event::Read {
                 read: read_named(&entered, query),
                 result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                    cut: false,
                     rows,
                     before: None,
                     after: Some(cursor.clone()),
@@ -1689,6 +1722,7 @@ fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
         Event::Read {
             read: read_named(&out, &needs_query),
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                cut: false,
                 rows: List::with_capacity(0),
                 before: Some(Cursor { value: text(b"needs-back") }),
                 after: None,
@@ -1747,6 +1781,7 @@ fn conversations_address_project_preselects_form_without_filtering_rows() {
         Event::Read {
             read: read_named(&entered, &query),
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
                 rows,
                 before: None,
                 after: None,
@@ -2107,7 +2142,12 @@ fn note_reads_keep_full_writer_identity_and_optional_time_without_changing_the_n
                 Time::ZERO,
                 Event::Read {
                     read,
-                    result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage { rows, before: None, after: None }))),
+                    result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                        cut: false,
+                        rows,
+                        before: None,
+                        after: None,
+                    }))),
                 },
             );
             let id = domain.project_page().notes.as_slice()[0];

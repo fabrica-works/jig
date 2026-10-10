@@ -138,6 +138,7 @@ fn replacement(words: &Words) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
                 rows: list([
                     ActivityLine {
                         position: 2,
@@ -209,6 +210,7 @@ fn words_states(words: &Words) {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
                 rows: list([]),
                 before: None,
                 after: None,
@@ -275,6 +277,7 @@ fn activities(words: &Words) {
             Event::Read {
                 read: token,
                 result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                    cut: false,
                     rows: list(rows.iter().enumerate().map(|(offset, event)| {
                         ActivityLine {
                             position: u64::try_from(
@@ -355,6 +358,7 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
                 rows: list([
                     ActivityLine {
                         position: 2,
@@ -390,6 +394,7 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
         Event::Read {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
                 rows: list([ActivityLine {
                     position: 2,
                     at: Wall::EPOCH,

@@ -18,6 +18,7 @@ pub struct Filter {
 /// One read group's bounded window and independent continuation.
 #[derive(Debug)]
 pub struct InboxWindow {
+    pub cut: bool,
     pub rows: List<InboxEntry>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
@@ -26,7 +27,7 @@ pub struct InboxWindow {
 }
 impl InboxWindow {
     fn new(rows: u32) -> Self {
-        Self { rows: List::with_capacity(rows), before: None, after: None, more: false, reading: None }
+        Self { cut: false, rows: List::with_capacity(rows), before: None, after: None, more: false, reading: None }
     }
     // Read rows past the watch remain; duplicate snapshots never resurrect a removed live key.
     fn past(&mut self, live: &List<InboxEntry>) {
@@ -50,6 +51,7 @@ impl InboxWindow {
     }
     fn clear(&mut self) {
         self.rows.clear();
+        self.cut = false;
         self.before = None;
         self.after = None;
         self.more = false;
@@ -141,6 +143,7 @@ impl Inbox {
     /// A read terminal moves only its group's rows and cursor.
     pub(crate) fn page(&mut self, group: InboxReadGroup, page: InboxPage) {
         let window = self.window_mut(group);
+        window.cut = page.cut;
         window.rows = page.rows;
         window.before = page.before;
         window.after = page.after;

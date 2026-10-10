@@ -104,21 +104,32 @@ impl Rows {
     fn page(&self, start: usize, end: usize, before: Option<Cursor>, after: Option<Cursor>) -> ReadValue {
         match self {
             Self::Ended(rows) => {
-                ReadValue::Ended(Box::new(ObjectPage { rows: list(&rows[start..end]), before, after }))
+                ReadValue::Ended(Box::new(ObjectPage { cut: false, rows: list(&rows[start..end]), before, after }))
             }
             Self::History(rows) => {
-                ReadValue::History(Box::new(HistoryPage { rows: list(&rows[start..end]), before, after }))
+                ReadValue::History(Box::new(HistoryPage { cut: false, rows: list(&rows[start..end]), before, after }))
             }
             Self::Activity(rows) => {
-                ReadValue::Activity(Box::new(ActivityPage { rows: list(&rows[start..end]), before, after }))
+                ReadValue::Activity(Box::new(ActivityPage { cut: false, rows: list(&rows[start..end]), before, after }))
             }
-            Self::Inbox(rows) => ReadValue::Inbox(Box::new(InboxPage { rows: list(&rows[start..end]), before, after })),
-            Self::Conversations(rows) => {
-                ReadValue::Conversations(Box::new(ConversationPage { rows: list(&rows[start..end]), before, after }))
+            Self::Inbox(rows) => {
+                ReadValue::Inbox(Box::new(InboxPage { cut: false, rows: list(&rows[start..end]), before, after }))
             }
-            Self::Goals(rows) => ReadValue::Goals(Box::new(GoalPage { rows: list(&rows[start..end]), before, after })),
-            Self::Spend(rows) => ReadValue::Spend(Box::new(SpendPage { rows: list(&rows[start..end]), before, after })),
-            Self::Notes(rows) => ReadValue::Notes(Box::new(NotePage { rows: list(&rows[start..end]), before, after })),
+            Self::Conversations(rows) => ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
+                rows: list(&rows[start..end]),
+                before,
+                after,
+            })),
+            Self::Goals(rows) => {
+                ReadValue::Goals(Box::new(GoalPage { cut: false, rows: list(&rows[start..end]), before, after }))
+            }
+            Self::Spend(rows) => {
+                ReadValue::Spend(Box::new(SpendPage { cut: false, rows: list(&rows[start..end]), before, after }))
+            }
+            Self::Notes(rows) => {
+                ReadValue::Notes(Box::new(NotePage { cut: false, rows: list(&rows[start..end]), before, after }))
+            }
         }
     }
 }
@@ -368,3 +379,6 @@ fn empty(read: &Read) -> Rows {
         | Read::Deployment => unreachable!("documents do not request a row source"),
     }
 }
+
+#[cfg(test)]
+mod page_loss;

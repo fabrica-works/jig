@@ -63,6 +63,7 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
         cards::card(b, client, *note, &cards::Place::Elsewhere, words, bindings);
     }
     b.close();
+    super::super::cut(b, words, client.project_page().notes_cut);
     super::super::work::cursors(
         b,
         words,

@@ -29,6 +29,12 @@ pub(super) fn heading(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: 
     b.text(Run::Plain, &title);
     b.close();
 }
+pub(crate) fn cut(b: &mut Builder, words: &Words, cut: bool) {
+    if cut {
+        words.status(b, JigPhrase::PageCut, &[]);
+    }
+}
+
 pub(super) fn edges(b: &mut Builder, words: &Words, bindings: &mut JigBindings, edges: &Edges, window: u64) {
     edge(b, words, bindings, &edges.before, window, End::Before);
     edge(b, words, bindings, &edges.after, window, End::After);

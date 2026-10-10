@@ -67,7 +67,10 @@ pub struct LiveTurn {
 }
 /// Committed lines and page state for one task conversation.
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools, reason = "independent retained page-loss and existing run/watch flags")]
 pub struct Conversation {
+    /// Loss reported by retained activity pages, independent of turn and text loss.
+    pub page_cut: bool,
     pub task: u64,
     pub lines: TurnWindow,
     /// The newest position announced by the task document.
@@ -109,6 +112,7 @@ impl Conversation {
     #[must_use]
     pub fn new(task: u64, rows: u32) -> Self {
         Self {
+            page_cut: false,
             task,
             lines: TurnWindow::new(rows),
             committed: 0,
@@ -169,6 +173,7 @@ impl Conversation {
     /// The owner has validated its row and payload bounds before this call.
     pub fn accept(&mut self, page: ActivityPage) -> Option<Read> {
         let reading = self.reading.take()?;
+        self.page_cut |= page.cut;
         self.words.observe(&page);
         for row in &page.rows {
             match &row.event {

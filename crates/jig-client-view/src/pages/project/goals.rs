@@ -44,6 +44,7 @@ pub(super) fn goals(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
     if client.project_page().goals_more {
         words.status(b, JigPhrase::MoreRows, &[]);
     }
+    super::super::cut(b, words, client.project_page().ended_cut);
     super::super::work::cursors(
         b,
         words,

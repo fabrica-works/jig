@@ -87,6 +87,7 @@ fn window(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBin
         return;
     }
     let window = page.window(parent);
+    super::cut(b, words, window.cut);
     if window.reading.is_some() {
         words.status(b, JigPhrase::Looking, &[]);
     }

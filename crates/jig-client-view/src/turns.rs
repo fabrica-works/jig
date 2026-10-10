@@ -92,6 +92,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     b.close();
     b.close();
     b.close();
+    crate::pages::cut(b, words, state.page_cut);
     edges(b, state, words, bindings);
 }
 fn pending(b: &mut Builder, state: &Conversation, words: &Words) {

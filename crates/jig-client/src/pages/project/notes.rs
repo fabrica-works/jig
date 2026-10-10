@@ -14,6 +14,7 @@ pub(crate) fn filter(domain: &mut Domain, filter: super::NoteFilter, out: &mut Q
     domain.project_page.note_writes = domain.project_page.note_writes.checked_add(1).expect("note writes remain");
     domain.project_page.note_filter = Some(filter.clone());
     domain.project_page.notes.clear();
+    domain.project_page.notes_cut = false;
     domain.project_page.notes_before = None;
     domain.project_page.notes_after = None;
     super::ask(domain, 3, Read::Notes { scope: filter.scope, description: filter.description, after: None }, out);
@@ -23,6 +24,7 @@ pub(crate) fn page(domain: &mut Domain, source: Source, page: crate::contract::N
     let Some(project) = super::number(domain) else {
         return;
     };
+    domain.project_page.notes_cut = page.cut;
     domain.project_page.notes_before = page.before;
     domain.project_page.notes_after = page.after;
     let mut keys = List::with_capacity(domain.project_page.notes.capacity());
