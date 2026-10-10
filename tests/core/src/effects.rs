@@ -65,6 +65,8 @@ pub struct World {
     pub peers: Option<crate::peers::Peers>,
     /// Client-facing outputs; their protocol adapter runs in the joint world.
     pub client_peer: Option<crate::client_peer::ClientPeer>,
+    /// Whole applied store snapshots, enabled only for external durable observers.
+    pub store_peer: Option<crate::store_peer::StorePeer>,
     /// Independent document consumers, enabled only in watch stories.
     pub watches: Option<crate::peers::WatchParties>,
     /// Independent offer observer, enabled for immediately acting scripted parties.
@@ -263,6 +265,7 @@ impl World {
             stopped: false,
             peers: None,
             client_peer: None,
+            store_peer: None,
             watches: None,
             offers: None,
             reads: None,
@@ -494,6 +497,9 @@ impl World {
                     Err(number) => self.events.push_front(root::Event::Failed { number }),
                 }
                 self.observer.durable(self.wall, &self.store);
+                if let Some(peer) = &mut self.store_peer {
+                    peer.capture(Time::from_nanos(self.wall), &self.store);
+                }
                 if self.cut == Some(Cut::Durable(self.store.applied)) {
                     self.reached_cut = self.cut.take();
                     return;

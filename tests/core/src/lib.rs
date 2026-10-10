@@ -8,6 +8,7 @@ mod application_observations;
 pub mod client_peer;
 pub mod effects;
 pub mod peers;
+pub mod store_peer;
 
 /// The testing application's store, with the fake's opaque row parameters.
 pub type Store = jig_fake_store::Store<jig_test_domain::Key, jig_test_domain::Record>;
