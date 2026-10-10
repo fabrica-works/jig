@@ -318,6 +318,7 @@ fn release_object(b: &mut Builder, client: &Domain, object: &Object, words: &Wor
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::Result(_)
