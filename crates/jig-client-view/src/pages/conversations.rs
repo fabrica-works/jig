@@ -21,6 +21,7 @@ pub fn conversations(b: &mut Builder, client: &Domain, words: &Words, bindings: 
             &[Hole::Number(row.chip.task), crate::words::name(row.chip.title.bytes())],
             Act::OpenChat { task: row.chip.task },
         );
+        title_loss(b, &row.chip.title, &row.runtime, words);
         words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(row.project))]);
         b.text(Run::Plain, row.first_words.bytes());
         runtime(b, client, &row.runtime, words, bindings);
@@ -171,5 +172,27 @@ pub(super) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words
             }
         }
         Runtime::Ended => words.text(b, JigPhrase::Ended, &[]),
+    }
+}
+
+// Ended rows already render the complete chip, including its title-loss caption.
+fn title_loss(b: &mut Builder, title: &jig_client::contract::DocumentText, runtime: &Runtime, words: &Words) {
+    match runtime {
+        Runtime::Ended => {}
+        Runtime::Active(_)
+        | Runtime::Waiting { .. }
+        | Runtime::Idle
+        | Runtime::Starting
+        | Runtime::Running { .. }
+        | Runtime::WaitingForWords { .. }
+        | Runtime::BackingOff { .. }
+        | Runtime::Procedure { .. }
+        | Runtime::Person { .. }
+        | Runtime::Closing(_)
+        | Runtime::Held { .. } => {
+            if title.cut {
+                words.text(b, JigPhrase::ChipTitleCut, &[]);
+            }
+        }
     }
 }

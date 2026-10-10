@@ -20,7 +20,7 @@ pub fn inbox_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
 #[must_use]
 pub fn conversations_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     let row =
-        card_nodes(l)?.checked_add(chip_nodes(l)?)?.checked_add(runtime(l)?)?.checked_add(20)?.checked_mul(l.rows)?;
+        card_nodes(l)?.checked_add(chip_nodes(l)?)?.checked_add(runtime(l)?)?.checked_add(21)?.checked_mul(l.rows)?;
     let forms = l.charters.max(l.rows).checked_mul(3)?.checked_add(9)?.checked_mul(l.projects.max(l.rows))?;
     row.checked_add(forms)?.checked_add(66)?.checked_add(slot_nodes)
 }
