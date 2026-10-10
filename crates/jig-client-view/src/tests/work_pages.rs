@@ -174,10 +174,11 @@ fn plan_folds(words: &Words) {
 pub(super) fn recurring_task(number: u64, words: &[u8]) -> ProposedTask {
     ProposedTask {
         number,
-        spec: SpecificationDocument {
-            specification: Specification { words: text(words), parameters: list([]), inputs: list([]) },
-            cut: false,
-        },
+        spec: SpecificationDocument::complete(Specification {
+            words: text(words),
+            parameters: list([]),
+            inputs: list([]),
+        }),
         executor: OwnerExecutor::Agent { charter: 2 },
         budget: 5,
         contract: TaskContractDocument::Report { words: 32 },

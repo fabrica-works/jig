@@ -74,7 +74,7 @@ fn full_proposal(action: ProposalAction) -> Proposal {
 }
 fn full_batch() -> ProposalAction {
     let mut row = super::super::proposed_task::full_template(1);
-    row.spec.specification.words = full_text();
+    row.spec.specification.words.bytes = full_text();
     row.executor = OwnerExecutor::Person(PersonAddress::Party(1));
     row.dependencies = list([1, 2]);
     ProposalAction::Batch { tasks: list([row.clone(), row]), own: true }
