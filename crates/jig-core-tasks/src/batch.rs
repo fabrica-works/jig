@@ -1,5 +1,9 @@
 //! Whole-batch structural and financial admission (domain/tasks.md, sections 4 and 10). Bounded immutable dependencies and delegation waits are checked
 //! together before mutation; tasks does not judge root-authorized authority.
+#![expect(
+    clippy::result_large_err,
+    reason = "bounded owner refusal keeps exact revision and capacity facts inline instead of allocating on refusal"
+)]
 use crate::domain::{Domain, record};
 use crate::{Authority, Contract, Executor, Last, Limits, New, Parameter, Party, Phase, Problem, Refusal, Spec, Was};
 use skein_lib::List;

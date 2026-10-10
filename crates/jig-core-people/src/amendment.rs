@@ -1,4 +1,4 @@
-//! Person amendment payloads (domain/people.md, 5.1; domain/tasks.md, 6).
+//! Person amendment payloads (domain/people.md, 5.1; domain/tasks.md, 7).
 //! People retains these only with keyed requests. The root translates them to
 //! tasks and checks current policy; this child never sees task records.
 use alloc::boxed::Box;

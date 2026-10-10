@@ -1,6 +1,10 @@
 //! Connector-configured, whole-set hold admission and bounded waiting
 //! (domain/tasks.md, 6.1–6.2). Names are opaque; the hub orders tasks and
 //! never interprets a connector's path.
+#![expect(
+    clippy::result_large_err,
+    reason = "bounded owner refusal keeps exact revision and capacity facts inline instead of allocating on refusal"
+)]
 use crate::domain::{Domain, publish, record, task_mut};
 use crate::{
     HoldKind, Holding, Kind, Limits, Name, New, Party, Phase, PoolSlots, Problem, Refusal, Request, Stored, Taken,
