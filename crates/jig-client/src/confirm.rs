@@ -346,10 +346,12 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
 
 fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
     let uncertain = match &object.body {
-        Some(Body::Task(document)) => match &document.hold {
-            Some(hold) => Some(hold.uncertain()),
-            None => None,
-        },
+        Some(Body::Task(document)) => {
+            let Some(hold) = &document.hold else {
+                return Some(Missing::Refused { why: Refusal::NotOffered });
+            };
+            Some(hold.uncertain())
+        }
         Some(Body::Escalation(document)) => Some(match &document.hold.reason {
             HoldReason::EffectUncertain { .. } => true,
             HoldReason::Tries { .. }
