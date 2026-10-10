@@ -6,6 +6,12 @@ use skein_lib::List;
 /// Each sentence jig says, independent of language word order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JigPhrase {
+    /// The stored party writer of a note.
+    NoteWriterParty,
+    /// The stored task and attempt writer of a note.
+    NoteWriterTask,
+    /// No changed time was supplied for this note.
+    NoteChangedNotSupplied,
     ResourceSegments,
     LiteralGrant,
     LiteralGrantMissing,
@@ -1056,6 +1062,9 @@ impl JigPhrase {
     #[expect(clippy::too_many_lines, reason = "closed phrase-number data is kept in one exhaustive table")]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::NoteWriterParty => 634,
+            Self::NoteWriterTask => 635,
+            Self::NoteChangedNotSupplied => 636,
             Self::ResourceSegments => 630,
             Self::LiteralGrant => 631,
             Self::LiteralGrantMissing => 632,
@@ -1674,7 +1683,8 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::FramePerson
+            Self::NoteChangedNotSupplied
+            | Self::FramePerson
             | Self::FrameService
             | Self::FrameProjectsCut
             | Self::FramePoolUnopened
@@ -2147,6 +2157,7 @@ impl JigPhrase {
             | Self::Updates
             | Self::MoreUpdates
             | Self::TaskPage
+            | Self::NoteWriterParty
             | Self::ByParty
             | Self::ByTask
             | Self::MadeChat
@@ -2216,6 +2227,7 @@ impl JigPhrase {
             | Self::RepliesThrough
             | Self::LiteralGrant
             | Self::LiteralGrantMissing
+            | Self::NoteWriterTask
             | Self::ScopedResourceNotes => Box::new([
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
@@ -2300,7 +2312,10 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 596] = [
+pub const ALL: [JigPhrase; 599] = [
+    JigPhrase::NoteWriterParty,
+    JigPhrase::NoteWriterTask,
+    JigPhrase::NoteChangedNotSupplied,
     JigPhrase::ResourceSegments,
     JigPhrase::LiteralGrant,
     JigPhrase::LiteralGrantMissing,

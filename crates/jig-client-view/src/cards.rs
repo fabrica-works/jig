@@ -183,8 +183,19 @@ pub fn card(
                 if document.cut {
                     words.text(b, JigPhrase::NoteReferencesCut, &[]);
                 }
-                words.actor(b, document.by);
-                words.wall(b, document.changed);
+                match document.writer {
+                    jig_client::contract::NoteAuthor::Party { party } => {
+                        words.text(b, JigPhrase::NoteWriterParty, &[Hole::Number(party)]);
+                    }
+                    jig_client::contract::NoteAuthor::Task { task, attempt } => {
+                        words.text(b, JigPhrase::NoteWriterTask, &[Hole::Number(task), Hole::Number(attempt)]);
+                    }
+                }
+                if let Some(changed) = document.changed {
+                    words.wall(b, changed);
+                } else {
+                    words.text(b, JigPhrase::NoteChangedNotSupplied, &[]);
+                }
                 for task in &document.tasks {
                     crate::frame::control(
                         b,

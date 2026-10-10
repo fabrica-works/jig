@@ -798,6 +798,15 @@ pub struct Recurring {
     pub cut: bool,
 }
 
+/// The stored writer of a note, without inferred identity or run facts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NoteAuthor {
+    /// A party made or corrected the note.
+    Party { party: u64 },
+    /// An identified task attempt wrote the note.
+    Task { task: u64, attempt: u64 },
+}
+
 /// A note with its independently moving revision.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Note {
@@ -806,9 +815,9 @@ pub struct Note {
     pub scope: NoteScope,
     pub description: DocumentText,
     pub body: DocumentText,
-    pub by: Actor,
+    pub writer: NoteAuthor,
     pub tasks: List<u64>,
-    pub changed: Wall,
+    pub changed: Option<Wall>,
     pub acts: List<Offered>,
     /// The supplied reference list is incomplete.
     pub cut: bool,

@@ -10,7 +10,7 @@ use jig_client::contract::{
     Escalation, Executor, FailureClass, FieldRule, Frame, FrameParty, GoalExecutor, GoalLine, GoalPage, GoalProcedure,
     Goals, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory, HoldFailure,
     HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveCall,
-    LiveDelegate, Made, Message, Moved, Needs, Note, NotePage, NoteScope, ObjectKey, ObjectPage, Offered,
+    LiveDelegate, Made, Message, Moved, Needs, Note, NoteAuthor, NotePage, NoteScope, ObjectKey, ObjectPage, Offered,
     OfferedCharters, OptionLine, Outcome, OwnerChipPhase, Parameter, ParameterDocument, Part, PartScope, Party,
     PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project,
     ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question, Read,
@@ -772,7 +772,14 @@ fields!(Recurring {
     last_batch,
     cut
 });
-fields!(Note { number, revision, scope, description, body, by, tasks, changed, acts, cut });
+impl Payload for NoteAuthor {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Party { .. } | Self::Task { .. } => Some(0),
+        }
+    }
+}
+fields!(Note { number, revision, scope, description, body, writer, tasks, changed, acts, cut });
 fields!(Deployment { hosts, accounts, capacity, proposals, refusals, parts });
 fields!(Host { number, connected, grace, used, free, runs, refused });
 fields!(Account { number, usable, reason, runs, waiting });

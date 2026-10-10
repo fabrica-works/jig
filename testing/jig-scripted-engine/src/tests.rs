@@ -2130,3 +2130,5 @@ fn scripted_provisional_retry_reopens_exact_positions_and_replaces_on_empty_star
 }
 
 mod resource_facts;
+
+mod note_facts;

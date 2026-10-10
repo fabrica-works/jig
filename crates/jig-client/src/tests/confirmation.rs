@@ -191,14 +191,14 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
         scope: NoteScope::Goal { project: 1, goal: 900 },
         description: DocumentText::complete(text(b"before")),
         body: DocumentText::complete(text(b"body")),
-        by: Actor::Party(7),
+        writer: NoteAuthor::Party { party: 7 },
         tasks: {
             let mut rows = List::with_capacity(2);
             rows.push(91).unwrap();
             rows.push(u64::MAX).unwrap();
             rows
         },
-        changed: Wall::EPOCH,
+        changed: Some(Wall::EPOCH),
         acts: List::with_capacity(2),
         cut: false,
     };

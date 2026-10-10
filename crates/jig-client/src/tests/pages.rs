@@ -1018,9 +1018,9 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         scope: NoteScope::Project(1),
         description: DocumentText::complete(text(b"description")),
         body: DocumentText::complete(text(b"body")),
-        by: Actor::Party(7),
+        writer: NoteAuthor::Party { party: 7 },
         tasks: List::with_capacity(0),
-        changed: skein_lib::Wall::EPOCH,
+        changed: Some(skein_lib::Wall::EPOCH),
         acts,
         cut: false,
     };
@@ -2078,4 +2078,60 @@ fn goal_note_scope_keeps_its_supplied_project_instead_of_the_parent_page() {
     }
     assert_eq!(reads.as_slice(), &[(scope.clone(), Some(text(b"supplied")), None)]);
     assert_eq!(domain.project_page().note_filter.as_ref().unwrap().scope, scope);
+}
+
+#[test]
+fn note_reads_keep_full_writer_identity_and_optional_time_without_changing_the_named_revision() {
+    for writer in [NoteAuthor::Party { party: u64::MAX }, NoteAuthor::Task { task: u64::MAX, attempt: u64::MAX }] {
+        for changed in [None, Some(skein_lib::Wall::EPOCH)] {
+            let (mut domain, opened) = project_open(ProjectSection::Notes);
+            let Request::Read { read, .. } = opened[2] else { panic!("notes read") };
+            let mut acts = List::with_capacity(1);
+            acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
+            let note = Note {
+                number: 3,
+                revision: Revision { value: u64::MAX },
+                scope: NoteScope::Project(1),
+                description: DocumentText::complete(text(b"description")),
+                body: DocumentText { bytes: text(b"body"), cut: true },
+                writer,
+                tasks: List::with_capacity(0),
+                changed,
+                acts,
+                cut: true,
+            };
+            let mut rows = List::with_capacity(1);
+            rows.push(note.clone()).unwrap();
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Read {
+                    read,
+                    result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage { rows, before: None, after: None }))),
+                },
+            );
+            let id = domain.project_page().notes.as_slice()[0];
+            let Some(crate::objects::Body::Note { document, .. }) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole supplied note");
+            };
+            assert_eq!(**document, note);
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::DeleteNote } },
+            );
+            assert_eq!(domain.confirmation().unwrap().revision, Some(note.revision));
+            let output = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm });
+            let mut requests = List::with_capacity(1);
+            for request in &output {
+                if let Request::Send { ask, .. } = request {
+                    requests.push(ask.clone()).unwrap();
+                }
+            }
+            assert_eq!(
+                requests.as_slice(),
+                &[Ask::DeleteNote { project: 1, note: 3, scope: note.scope, revision: note.revision }]
+            );
+        }
+    }
 }

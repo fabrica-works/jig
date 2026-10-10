@@ -922,9 +922,9 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
             scope: NoteScope::Project(4),
             description: DocumentText::complete(text(b"note title")),
             body: DocumentText::complete(text(b"note body")),
-            by: Actor::Party(1),
+            writer: NoteAuthor::Party { party: 1 },
             tasks: list([]),
-            changed: Wall::EPOCH,
+            changed: Some(Wall::EPOCH),
             acts: offered(act),
             cut: false,
         };
@@ -1505,9 +1505,9 @@ fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_
                 scope: NoteScope::Goal { project: 1, goal: 900 },
                 description: DocumentText { bytes: text(b"note title"), cut: mask & 1 != 0 },
                 body: DocumentText { bytes: text(b"note body"), cut: mask & 2 != 0 },
-                by: Actor::Party(1),
+                writer: NoteAuthor::Party { party: 1 },
                 tasks: list([91]),
-                changed: Wall::EPOCH,
+                changed: Some(Wall::EPOCH),
                 acts: offered(act),
                 cut: mask & 4 != 0,
             };
@@ -1635,9 +1635,9 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
             scope: NoteScope::Goal { project: 1, goal: 900 },
             description: DocumentText::complete(text(b"note title")),
             body: DocumentText::complete(text(b"note body")),
-            by: Actor::Party(1),
+            writer: NoteAuthor::Party { party: 1 },
             tasks: list([91, u64::MAX]),
-            changed: Wall::EPOCH,
+            changed: Some(Wall::EPOCH),
             acts: offered(act),
             cut: true,
         };
@@ -1794,3 +1794,6 @@ fn exact_owner_verdict_renders_payload_and_stored_followups_without_inventing_ch
         assert_eq!(value, before);
     }
 }
+
+#[path = "note_facts.rs"]
+mod note_facts;
