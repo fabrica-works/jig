@@ -15,7 +15,6 @@ use crate::{
 };
 use skein_lib::{Duration, Time, Wall};
 
-#[expect(clippy::too_many_lines, reason = "seven independent durable timer fixtures enter through restore")]
 fn deadlines(first: usize) -> Harness {
     let mut h = Harness::new();
     h.make((1..=7).map(|n| task(n, &[])).collect());
@@ -27,7 +26,7 @@ fn deadlines(first: usize) -> Harness {
     h.env.limits.hold_wait = spans[6];
     let name = Name { connector: 7, path: Box::new([Box::from(&b"wait"[..])]) };
     for (i, span) in spans.into_iter().enumerate() {
-        let number = u64::try_from(i).unwrap() + 1;
+        let number = u64::try_from(i).unwrap().checked_add(1).unwrap();
         let mut row = h.domain.task(number).unwrap().clone();
         let at = Wall::from_nanos(h.env.wall.as_nanos().checked_add(span.as_nanos()).unwrap());
         match i {
@@ -40,7 +39,7 @@ fn deadlines(first: usize) -> Harness {
             1 => row.chat_close = Some(Grace { by: 9, until: at }),
             2 => {
                 row.subscriptions =
-                    Box::new([Subscription { number: 1, kind: SubscriptionKind::Timer { at, period: None } }])
+                    Box::new([Subscription { number: 1, kind: SubscriptionKind::Timer { at, period: None } }]);
             }
             3 => {
                 row.phase = Phase::Active(Active::Idle);
@@ -88,18 +87,34 @@ fn deadlines(first: usize) -> Harness {
         }
         h.stored.insert(Key::Live(number), Stored::Live(Box::new(row)));
     }
-    let rows: Vec<_> =
-        h.stored.values().filter(|r| matches!(r, Stored::Live(_) | Stored::Ledger(_))).cloned().collect();
+    let rows: Vec<_> = h
+        .stored
+        .values()
+        .filter(|r| match r {
+            Stored::Live(_) | Stored::Ledger(_) => true,
+            _ => false,
+        })
+        .cloned()
+        .collect();
     h.domain = Domain::new(&LIMITS, 91, Box::new([1]));
     h.send(Event::Kinds {
         connector: 7,
         kinds: Box::new([Kind { connector: 7, kind: 1, hold: HoldKind::Exclusive { taken: Taken::Waits } }]),
     });
     for row in rows {
-        assert!(!h.send(Event::Restore { record: row }).iter().any(|r| matches!(r, Request::RestoreRefused { .. })));
+        assert!(!h.send(Event::Restore { record: row }).iter().any(|r| match r {
+            Request::RestoreRefused { .. } => true,
+            _ => false,
+        }));
     }
     let out = h.send(Event::Restored);
-    assert!(!out.iter().any(|r| matches!(r, Request::RestoreRefused { .. })), "{out:?}");
+    assert!(
+        !out.iter().any(|r| match r {
+            Request::RestoreRefused { .. } => true,
+            _ => false,
+        }),
+        "{out:?}"
+    );
     assert!(h.domain.ready());
     h
 }
@@ -118,7 +133,7 @@ fn each_of_seven_task_timer_owners_can_supply_the_pure_earliest_deadline() {
         let before: Vec<_> = (1..=7).map(|n| h.domain.task(n).unwrap().clone()).collect();
         assert_eq!(h.domain.next_deadline(), Some(Time::from_nanos(110)), "timer set {first}");
         h.env.now = Time::from_nanos(110);
-        for _ in 0..3 {
+        for _ in 0_u32..3 {
             assert_eq!(h.domain.next_deadline(), Some(h.env.now), "observing a due timer does not expire it");
         }
         assert_eq!((1..=7).map(|n| h.domain.task(n).unwrap().clone()).collect::<Vec<_>>(), before);

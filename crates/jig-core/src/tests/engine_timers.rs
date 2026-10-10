@@ -48,12 +48,12 @@ fn timer_core(answers: bool) -> (Core, Env<Limits>) {
 fn accept(journal: &mut Journal<Write, Box<Held>>, requests: Requests) -> u32 {
     let Requests::Out(mut out) = requests;
     let mut decision = journal.decision(&JournalRoom { writes: 1, held: 1 }).unwrap();
-    let mut writes = 0;
+    let mut writes = 0_u32;
     while let Some(request) = out.pop() {
         match request {
             Request::Write(write) => {
                 decision.write(write).unwrap();
-                writes += 1;
+                writes = writes.checked_add(1).unwrap();
             }
             Request::Held(held) => decision.hold(held).unwrap(),
             Request::Decided => {}
@@ -74,7 +74,7 @@ fn people_timer_expires_signins_durably_and_later_replies_wait_for_that_commit()
     let due = Time::ZERO.saturating_add(env.limits.people.sign_in_lifetime);
     assert_eq!(core.people.next_deadline(), Some(due));
     let Requests::Out(mut future) = fire(&mut core, &env, Timer::People);
-    assert!(matches!(future.pop(), Some(Request::Decided)));
+    let Some(Request::Decided) = future.pop() else { panic!("future timer decides without writes") };
     assert!(future.is_empty());
     assert_eq!(core.people.next_deadline(), Some(due));
     env.now = due;
@@ -83,7 +83,9 @@ fn people_timer_expires_signins_durably_and_later_replies_wait_for_that_commit()
     assert_eq!(accept(&mut journal, fire(&mut core, &env, Timer::People)), 1);
     let mut commit = journal.commit().unwrap();
     assert_eq!(commit.writes.len(), 1);
-    assert!(matches!(commit.writes.pop(), Some(Write::Erase(Key::People(people::Key::SignIn(10))))));
+    let Some(Write::Erase(Key::People(people::Key::SignIn(10)))) = commit.writes.pop() else {
+        panic!("expired signin erase")
+    };
     assert!(core.people.is_due(env.now), "the second expiration remains for a later bounded fire");
     let reply = step(
         &mut core,
@@ -103,7 +105,9 @@ fn people_timer_expires_signins_durably_and_later_replies_wait_for_that_commit()
     assert_eq!(journal.release(&mut released), Released::Some);
     assert_eq!(released.len(), 1);
     let held = released.pop().unwrap();
-    assert!(matches!(held.as_ref(), Held::PeopleReply { reply: people::Reply::SignedOut, .. }));
+    let Held::PeopleReply { reply: people::Reply::SignedOut, .. } = held.as_ref() else {
+        panic!("expired session reply")
+    };
 }
 
 #[test]
@@ -136,7 +140,7 @@ fn people_timer_erases_retained_answers_then_signins_one_decision_at_a_time() {
     assert_eq!(core.people.next_deadline(), None);
     for timer in [Timer::People, Timer::Tasks, Timer::Fleet, Timer::Brief, Timer::Account, Timer::View] {
         let Requests::Out(mut out) = fire(&mut core, &env, timer);
-        assert!(matches!(out.pop(), Some(Request::Decided)));
+        let Some(Request::Decided) = out.pop() else { panic!("empty timer decides without writes") };
         assert!(out.is_empty(), "empty owners remain separately dispatchable: {timer:?}");
     }
 }
