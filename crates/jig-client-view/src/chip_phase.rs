@@ -25,7 +25,7 @@ pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
             RunStage::Claimed { attempt } => words.text(b, JigPhrase::RunClaimed, &[Hole::Number(*attempt)]),
             RunStage::Running { attempt } => words.text(b, JigPhrase::RunOwnerActive, &[Hole::Number(*attempt)]),
             RunStage::BackingOff { until } => {
-                words.text(b, JigPhrase::RunBackingOff, &[Hole::Wall(words.adjusted_wall(*until))])
+                words.text(b, JigPhrase::RunBackingOff, &[Hole::Wall(words.adjusted_wall(*until))]);
             }
         },
         OwnerChipPhase::Person { address, taken_by, since } => {
