@@ -851,7 +851,7 @@ fn a_task_and_a_party_with_identical_proposal_numbers_are_decided_separately() {
         let task = Proposer::Task(1);
         let party = Proposer::Party(1);
         let order = if party_first { [party, task] } else { [task, party] };
-        let mut archives = std::collections::BTreeMap::new();
+        let mut archives = alloc::collections::BTreeMap::new();
         for (position, proposer) in order.into_iter().enumerate() {
             let out = keyed_proposal(&mut core, &limits, u8::try_from(position + 1).unwrap(), proposer);
             assert_eq!(
@@ -872,14 +872,14 @@ fn a_task_and_a_party_with_identical_proposal_numbers_are_decided_separately() {
             }
             if position == 0 {
                 match proposer {
-                    Proposer::Task(_) => assert!(matches!(
+                    Proposer::Task(_) => assert_eq!(
                         core.tasks.person_proposal(1, 10).unwrap().state,
-                        tasks::PersonProposalState::Pending { .. }
-                    )),
-                    Proposer::Party(_) => assert!(matches!(
+                        tasks::PersonProposalState::Pending { since: Wall::EPOCH }
+                    ),
+                    Proposer::Party(_) => assert_eq!(
                         core.tasks.proposal(1, 10).unwrap().state,
-                        tasks::ProposalState::Pending { .. }
-                    )),
+                        tasks::ProposalState::Pending { holder: tasks::ProposalHolder::Person(1), since: Wall::EPOCH }
+                    ),
                 }
             }
         }
@@ -903,23 +903,20 @@ fn a_historical_proposal_decision_requires_the_exact_typed_maker() {
             sign_in(&mut core, &limits);
             // Allocate the archived decider and proposal through their real deployment families.
             assert_eq!(fresh(&mut core.counters, Family::Person), Some(1));
-            for _ in 0..10 {
+            for _ in 0_u8..10 {
                 fresh(&mut core.counters, Family::Message).unwrap();
             }
             let out = keyed_proposal(&mut core, &limits, 1, proposer);
-            let request = out
-                .iter()
-                .find_map(|request| {
-                    if let Request::Now(now) = request
-                        && let Now::HistoricalProposal { request, person, project, proposer: named, proposal } = &**now
-                    {
-                        assert_eq!((*person, *project, *named, *proposal), (1, 1, proposer, 10));
-                        Some(*request)
-                    } else {
-                        None
-                    }
-                })
-                .expect("only the named absent store falls back to history");
+            let mut named_request = None;
+            for output in &out {
+                if let Request::Now(now) = output
+                    && let Now::HistoricalProposal { request, person, project, proposer: named, proposal } = &**now
+                {
+                    assert_eq!((*person, *project, *named, *proposal), (1, 1, proposer, 10));
+                    assert!(named_request.replace(*request).is_none(), "one exact historical load");
+                }
+            }
+            let request = named_request.expect("only the named absent store falls back to history");
             let maker = match proposer {
                 Proposer::Task(number) => {
                     if other_store {
