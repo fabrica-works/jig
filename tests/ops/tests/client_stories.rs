@@ -52,7 +52,15 @@ fn p_accepts_a_restart_from_the_incidents_page() {
                 see(b"Waiting for condition"),
             ],
         );
-        world.person(inbox, vec![see(b"Restart checkout in production"), see(b"Accepted")]);
+        world.person(
+            inbox,
+            vec![
+                see(b"Restart checkout in production"),
+                see(b"Accepted"),
+                Step::Pause { span: Duration::from_secs(6) },
+                Step::Gone { find: Find::text(b"Restart checkout in production"), within: WITHIN },
+            ],
+        );
         let outcome = world.run(Until::Done);
         assert_eq!(outcome.verdict, Verdict::Passed);
         assert!(outcome.judged.0 > 0);
