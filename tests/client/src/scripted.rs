@@ -616,10 +616,10 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 ReadValue::Escalation(e) => e.ending.is_some(),
                 ReadValue::Question(q) => q.ending.is_some(),
                 ReadValue::PersonTask(p) => p.ending.is_some(),
-                ReadValue::OwnerPersonTask(_) => false,
                 ReadValue::Task(t) => t.result.is_some(),
                 ReadValue::Result(_) => true,
-                ReadValue::OwnerProposal(_)
+                ReadValue::OwnerPersonTask(_)
+                | ReadValue::OwnerProposal(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)
