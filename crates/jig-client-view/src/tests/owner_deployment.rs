@@ -1,5 +1,7 @@
 #![expect(
     clippy::disallowed_methods,
+    clippy::disallowed_macros,
+    clippy::too_many_lines,
     clippy::disallowed_types,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs inspect complete trees and select public requests"
@@ -48,15 +50,6 @@ fn empty() -> OwnerDeployment {
         cut: true,
         connectors: List::with_capacity(2),
         connectors_cut: false,
-    }
-}
-fn chip(number: u64) -> Chip {
-    Chip {
-        task: number,
-        title: DocumentText::complete(super::cards::text(b"task")),
-        executor: Executor::Agent { charter: 1 },
-        phase: Phase::Waiting,
-        details: Box::new(ChipPhase::Waiting { dependencies: List::with_capacity(2), hold: None }),
     }
 }
 fn run(task: OwnerTaskLink, state: OwnerAttemptState, location: OwnerRunLocation) -> OwnerHostRun {
@@ -403,8 +396,8 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
     let exact = crate::Limits {
         nodes: tree.len(),
         depth,
-        text_per_node: tree.nodes().iter().map(|n| n.text_bytes()).max().unwrap(),
-        text_bytes: tree.nodes().iter().map(|n| n.text_bytes()).sum(),
+        text_per_node: tree.nodes().iter().map(crate::tree::Node::text_bytes).max().unwrap(),
+        text_bytes: tree.nodes().iter().map(crate::tree::Node::text_bytes).sum(),
         ..maximum
     };
     assert_eq!(build(&client, w, exact).len(), tree.len());
@@ -496,6 +489,7 @@ fn genuine_owner_chip_fixture(number: u64) -> Chip {
 
 #[test]
 fn deployment_view_person_actions_four_causes_all_structural_limits_and_opaque_request_keys_survive() {
+    use AdmissionLimit as L;
     use OwnerPersonCapacityAction as A;
     let actions = [
         A::Close,
@@ -533,7 +527,6 @@ fn deployment_view_person_actions_four_causes_all_structural_limits_and_opaque_r
             .unwrap();
         round_trip(value);
     }
-    use AdmissionLimit as L;
     let limits = [
         L::Words,
         L::Identity,

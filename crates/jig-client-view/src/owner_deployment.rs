@@ -457,9 +457,7 @@ fn admission(b: &mut Builder, words: &Words, value: AdmissionLimit) {
     };
     text(b, words, phrase, &[]);
 }
-/// Render every supplied deployment scalar and ordered row without decoding keys or deriving authority.
-pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
-    region(b, words, P::Deployment, &[], None);
+fn render_hosts(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
     region(b, words, P::Hosts, &[], None);
     for host in &value.hosts {
         region(
@@ -490,11 +488,14 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     }
     b.close();
     field_number(b, words, P::HostsForgotten, value.hosts_forgotten);
-    region(b, words, P::Attempts, &[], None);
-    for value in &value.attempts {
-        run(b, client, words, value, bindings);
-    }
-    b.close();
+}
+fn render_accounts(
+    b: &mut Builder,
+    client: &Domain,
+    value: &OwnerDeployment,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     region(b, words, P::Accounts, &[], None);
     for account in &value.accounts {
         region(
@@ -527,6 +528,17 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
         b.close();
     }
     b.close();
+}
+/// Render every supplied deployment scalar and ordered row without decoding keys or deriving authority.
+pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
+    region(b, words, P::Deployment, &[], None);
+    render_hosts(b, client, value, words, bindings);
+    region(b, words, P::Attempts, &[], None);
+    for value in &value.attempts {
+        run(b, client, words, value, bindings);
+    }
+    b.close();
+    render_accounts(b, client, value, words, bindings);
     region(b, words, P::Capacity, &[], None);
     capacity(b, words, P::TasksCapacity, &value.tasks);
     capacity(b, words, P::WorkersCapacity, &value.workers);
@@ -673,10 +685,10 @@ fn chip_fits(value: &Chip, l: &Limits, words: &Words) -> Option<()> {
             }
         }
         ChipPhase::Closing(value) => {
-            if let Some(connectors) = &value.connectors {
-                if connectors.capacity() > l.rows {
-                    return None;
-                }
+            if let Some(connectors) = &value.connectors
+                && connectors.capacity() > l.rows
+            {
+                return None;
             }
         }
         ChipPhase::Active(_)

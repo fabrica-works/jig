@@ -1,4 +1,10 @@
-#![expect(clippy::wildcard_enum_match_arm, reason = "ordinary entry-point proofs select requests")]
+#![expect(
+    clippy::wildcard_enum_match_arm,
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    reason = "ordinary entry-point proofs select requests and inspect complete output"
+)]
 //! Native fixtures cover received authority; source 02 separately proves its producer.
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::{

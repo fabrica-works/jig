@@ -413,6 +413,7 @@ pub const ALL: [DeploymentPhrase; 199] = [
 ];
 impl DeploymentPhrase {
     #[must_use]
+    #[expect(clippy::too_many_lines, reason = "the closed deployment vocabulary has one exhaustive mapping table")]
     pub const fn id(self) -> PhraseId {
         PhraseId {
             owner: Owner::Jig,
@@ -619,209 +620,207 @@ impl DeploymentPhrase {
             },
         }
     }
+    #[expect(clippy::too_many_lines, reason = "the closed deployment vocabulary has one exhaustive mapping table")]
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Deployment => None,
-            Self::Hosts => None,
-            Self::Attempts => None,
-            Self::Accounts => None,
-            Self::Capacity => None,
-            Self::Projects => None,
-            Self::HelloRefusals => None,
-            Self::PersonRefusals => None,
-            Self::TaskRefusals => None,
-            Self::Runs => None,
-            Self::WaitingRuns => None,
-            Self::PersonRefusal => None,
-            Self::TaskRefusal => None,
-            Self::UnknownClock => None,
-            Self::UnknownDuration => None,
-            Self::UnknownChannel => None,
-            Self::UnknownProject => None,
-            Self::UnknownFirst => None,
-            Self::RequestKey => None,
-            Self::Cut => None,
-            Self::Listed => None,
-            Self::NotListed => None,
-            Self::Connected => None,
-            Self::Disconnected => None,
-            Self::Draining => None,
-            Self::NotDraining => None,
-            Self::Usable => None,
-            Self::Unusable => None,
-            Self::Unsaved => None,
-            Self::Saved => None,
-            Self::Attention => None,
-            Self::NoAttention => None,
-            Self::TaskProposer => Some(HoleKind::Number),
-            Self::PartyProposer => Some(HoleKind::Number),
-            Self::Host => Some(HoleKind::Number),
-            Self::Account => Some(HoleKind::Number),
-            Self::Attempt => Some(HoleKind::Number),
-            Self::Task => Some(HoleKind::Number),
-            Self::Channel => Some(HoleKind::Number),
-            Self::Slots => Some(HoleKind::Number),
-            Self::Used => Some(HoleKind::Number),
-            Self::Free => Some(HoleKind::Number),
-            Self::Limit => Some(HoleKind::Number),
-            Self::Kept => Some(HoleKind::Number),
-            Self::Generation => Some(HoleKind::Number),
-            Self::WaitingAttempts => Some(HoleKind::Number),
-            Self::Proposals => Some(HoleKind::Number),
-            Self::Project => Some(HoleKind::Number),
-            Self::HostsForgotten => Some(HoleKind::Number),
-            Self::HelloForgotten => Some(HoleKind::Number),
-            Self::PersonForgotten => Some(HoleKind::Number),
-            Self::TaskForgotten => Some(HoleKind::Number),
-            Self::Person => Some(HoleKind::Number),
-            Self::Connector => Some(HoleKind::Number),
-            Self::Name => Some(HoleKind::Number),
-            Self::Number => Some(HoleKind::Number),
-            Self::Question => Some(HoleKind::Number),
-            Self::Members => Some(HoleKind::Number),
-            Self::First => Some(HoleKind::Number),
-            Self::Message => Some(HoleKind::Number),
-            Self::Left => Some(HoleKind::Number),
-            Self::Right => Some(HoleKind::Number),
-            Self::Entry => Some(HoleKind::Number),
-            Self::Period => Some(HoleKind::Number),
-            Self::Through => Some(HoleKind::Number),
-            Self::Chat => Some(HoleKind::Number),
-            Self::Messages => Some(HoleKind::Number),
-            Self::Bytes => Some(HoleKind::Number),
-            Self::At => Some(HoleKind::Wall),
-            Self::GraceUntil => Some(HoleKind::Wall),
-            Self::SpentUntil => Some(HoleKind::Wall),
-            Self::GraceRemaining => Some(HoleKind::Span),
-            Self::GraceBound => Some(HoleKind::Span),
-            Self::StopBound => Some(HoleKind::Span),
-            Self::AllowedGrace => Some(HoleKind::Span),
-            Self::Retention => Some(HoleKind::Span),
-            Self::TasksCapacity => None,
-            Self::WorkersCapacity => None,
-            Self::AttemptsCapacity => None,
-            Self::ProposalsCapacity => None,
-            Self::ProjectTasksCapacity => None,
-            Self::HostKindWorker => None,
-            Self::HostKindEngine => None,
-            Self::AttemptStateWaiting => None,
-            Self::AttemptStateAdopted => None,
-            Self::AttemptStateClaimed => None,
-            Self::AttemptStateCancelled => None,
-            Self::AttemptStateHanded => None,
-            Self::AttemptStateAcknowledged => None,
-            Self::AttemptStateStray => None,
-            Self::AttemptStateKept => None,
-            Self::AttemptStateFenced => None,
-            Self::AttemptStateClosed => None,
-            Self::RunLocationNone => None,
-            Self::RunLocationConnected => None,
-            Self::RunLocationAdrift => None,
-            Self::AccountStateFresh => None,
-            Self::AccountStateRefreshing => None,
-            Self::AccountStateRetrying => None,
-            Self::AccountStateRevoked => None,
-            Self::AccountStateClosing => None,
-            Self::HelloRefusalReservedChannel => None,
-            Self::HelloRefusalWorkers => None,
-            Self::HelloRefusalStopBound => None,
-            Self::PersonCapacityActionClose => None,
-            Self::PersonCapacityActionApplication => None,
-            Self::PersonCapacityActionNote => None,
-            Self::PersonCapacityActionService => None,
-            Self::PersonCapacityActionAdoption => None,
-            Self::PersonCapacityActionRoles => None,
-            Self::PersonCapacityActionPolicy => None,
-            Self::PersonCapacityActionPool => None,
-            Self::PersonCapacityActionChat => None,
-            Self::PersonCapacityActionGoal => None,
-            Self::PersonCapacityActionEscalation => None,
-            Self::PersonCapacityActionProposal => None,
-            Self::PersonCapacityActionWords => None,
-            Self::PersonCapacityActionQuestion => None,
-            Self::PersonCapacityActionPriority => None,
-            Self::PersonCapacityActionAmend => None,
-            Self::PersonCapacityActionMove => None,
-            Self::PersonCapacityActionTakePerson => None,
-            Self::PersonCapacityActionHandBackPerson => None,
-            Self::PersonCapacityActionAnswerPerson => None,
-            Self::PersonCapacityActionStop => None,
-            Self::PersonCapacityActionCancel => None,
-            Self::PersonCapacityActionRelease => None,
-            Self::PersonCapacityActionMarkSeen => None,
-            Self::PersonCapacityCauseRequests => None,
-            Self::PersonCapacityCausePending => None,
-            Self::PersonCapacityCauseWaiters => None,
-            Self::PersonCapacityCauseLimit => None,
-            Self::TaskCapacityActionBatch => None,
-            Self::TaskCapacityActionProposal => None,
-            Self::TaskCapacityActionPersonProposal => None,
-            Self::TaskCapacityActionMessage => None,
-            Self::TaskCapacityActionSource => None,
-            Self::TaskCapacityActionIntroduce => None,
-            Self::TaskCapacityActionSubscription => None,
-            Self::TaskCapacityActionEffect => None,
-            Self::TaskCapacityActionClaim => None,
-            Self::TaskCapacityActionRelease => None,
-            Self::TaskCapacityActionMove => None,
-            Self::TaskCapacityCauseTasks => None,
-            Self::TaskCapacityCauseCreationFlights => None,
-            Self::TaskCapacityCauseResourceReports => None,
-            Self::TaskCapacityCauseProjectTasks => None,
-            Self::TaskCapacityCauseTree => None,
-            Self::TaskCapacityCauseDelegates => None,
-            Self::TaskCapacityCauseInbox => None,
-            Self::TaskCapacityCauseHoldings => None,
-            Self::TaskCapacityCauseHoldWaiters => None,
-            Self::TaskCapacityCauseProposals => None,
-            Self::TaskCapacityCauseReferences => None,
-            Self::TaskCapacityCauseSubscriptions => None,
-            Self::TaskCapacityCauseFunders => None,
-            Self::TaskCapacityCauseWriters => None,
-            Self::FunderPool => None,
-            Self::FunderRecurring => None,
-            Self::FunderPeriod => None,
-            Self::FunderTask => None,
-            Self::AdmissionWords => None,
-            Self::AdmissionIdentity => None,
-            Self::AdmissionRoles => None,
-            Self::AdmissionArithmetic => None,
-            Self::AdmissionDuplicate => None,
-            Self::AdmissionEmpty => None,
-            Self::AdmissionBatch => None,
-            Self::AdmissionProjectLiveTasks => None,
-            Self::AdmissionLiveTasks => None,
-            Self::AdmissionTree => None,
-            Self::AdmissionDepth => None,
-            Self::AdmissionDelegates => None,
-            Self::AdmissionSubscription => None,
-            Self::AdmissionDependencies => None,
-            Self::AdmissionCycle => None,
-            Self::AdmissionSpec => None,
-            Self::AdmissionContract => None,
-            Self::AdmissionAuthority => None,
-            Self::AdmissionInputs => None,
-            Self::AdmissionAttempts => None,
-            Self::AdmissionLiveDelegates => None,
-            Self::AdmissionRestore => None,
-            Self::AdmissionRead => None,
-            Self::AdmissionTurn => None,
-            Self::AdmissionHoldKind => None,
-            Self::AdmissionHoldTaken => None,
-            Self::AdmissionHolds => None,
-            Self::AdmissionInboxFull => None,
-            Self::AdmissionNotes => None,
-            Self::AdmissionRevision => None,
-            Self::AdmissionQuestion => None,
-            Self::AdmissionPriority => None,
-            Self::AdmissionPolicy => None,
-            Self::AdmissionResource => None,
-            Self::AdmissionService => None,
-            Self::Connectors => None,
-            Self::ConnectorsCut => None,
-            Self::ConnectorsEmpty => None,
+            Self::Deployment
+            | Self::Hosts
+            | Self::Attempts
+            | Self::Accounts
+            | Self::Capacity
+            | Self::Projects
+            | Self::HelloRefusals
+            | Self::PersonRefusals
+            | Self::TaskRefusals
+            | Self::Runs
+            | Self::WaitingRuns
+            | Self::PersonRefusal
+            | Self::TaskRefusal
+            | Self::UnknownClock
+            | Self::UnknownDuration
+            | Self::UnknownChannel
+            | Self::UnknownProject
+            | Self::UnknownFirst
+            | Self::RequestKey
+            | Self::Cut
+            | Self::Listed
+            | Self::NotListed
+            | Self::Connected
+            | Self::Disconnected
+            | Self::Draining
+            | Self::NotDraining
+            | Self::Usable
+            | Self::Unusable
+            | Self::Unsaved
+            | Self::Saved
+            | Self::Attention
+            | Self::NoAttention
+            | Self::TasksCapacity
+            | Self::WorkersCapacity
+            | Self::AttemptsCapacity
+            | Self::ProposalsCapacity
+            | Self::ProjectTasksCapacity
+            | Self::HostKindWorker
+            | Self::HostKindEngine
+            | Self::AttemptStateWaiting
+            | Self::AttemptStateAdopted
+            | Self::AttemptStateClaimed
+            | Self::AttemptStateCancelled
+            | Self::AttemptStateHanded
+            | Self::AttemptStateAcknowledged
+            | Self::AttemptStateStray
+            | Self::AttemptStateKept
+            | Self::AttemptStateFenced
+            | Self::AttemptStateClosed
+            | Self::RunLocationNone
+            | Self::RunLocationConnected
+            | Self::RunLocationAdrift
+            | Self::AccountStateFresh
+            | Self::AccountStateRefreshing
+            | Self::AccountStateRetrying
+            | Self::AccountStateRevoked
+            | Self::AccountStateClosing
+            | Self::HelloRefusalReservedChannel
+            | Self::HelloRefusalWorkers
+            | Self::HelloRefusalStopBound
+            | Self::PersonCapacityActionClose
+            | Self::PersonCapacityActionApplication
+            | Self::PersonCapacityActionNote
+            | Self::PersonCapacityActionService
+            | Self::PersonCapacityActionAdoption
+            | Self::PersonCapacityActionRoles
+            | Self::PersonCapacityActionPolicy
+            | Self::PersonCapacityActionPool
+            | Self::PersonCapacityActionChat
+            | Self::PersonCapacityActionGoal
+            | Self::PersonCapacityActionEscalation
+            | Self::PersonCapacityActionProposal
+            | Self::PersonCapacityActionWords
+            | Self::PersonCapacityActionQuestion
+            | Self::PersonCapacityActionPriority
+            | Self::PersonCapacityActionAmend
+            | Self::PersonCapacityActionMove
+            | Self::PersonCapacityActionTakePerson
+            | Self::PersonCapacityActionHandBackPerson
+            | Self::PersonCapacityActionAnswerPerson
+            | Self::PersonCapacityActionStop
+            | Self::PersonCapacityActionCancel
+            | Self::PersonCapacityActionRelease
+            | Self::PersonCapacityActionMarkSeen
+            | Self::PersonCapacityCauseRequests
+            | Self::PersonCapacityCausePending
+            | Self::PersonCapacityCauseWaiters
+            | Self::PersonCapacityCauseLimit
+            | Self::TaskCapacityActionBatch
+            | Self::TaskCapacityActionProposal
+            | Self::TaskCapacityActionPersonProposal
+            | Self::TaskCapacityActionMessage
+            | Self::TaskCapacityActionSource
+            | Self::TaskCapacityActionIntroduce
+            | Self::TaskCapacityActionSubscription
+            | Self::TaskCapacityActionEffect
+            | Self::TaskCapacityActionClaim
+            | Self::TaskCapacityActionRelease
+            | Self::TaskCapacityActionMove
+            | Self::TaskCapacityCauseTasks
+            | Self::TaskCapacityCauseCreationFlights
+            | Self::TaskCapacityCauseResourceReports
+            | Self::TaskCapacityCauseProjectTasks
+            | Self::TaskCapacityCauseTree
+            | Self::TaskCapacityCauseDelegates
+            | Self::TaskCapacityCauseInbox
+            | Self::TaskCapacityCauseHoldings
+            | Self::TaskCapacityCauseHoldWaiters
+            | Self::TaskCapacityCauseProposals
+            | Self::TaskCapacityCauseReferences
+            | Self::TaskCapacityCauseSubscriptions
+            | Self::TaskCapacityCauseFunders
+            | Self::TaskCapacityCauseWriters
+            | Self::FunderPool
+            | Self::FunderRecurring
+            | Self::FunderPeriod
+            | Self::FunderTask
+            | Self::AdmissionWords
+            | Self::AdmissionIdentity
+            | Self::AdmissionRoles
+            | Self::AdmissionArithmetic
+            | Self::AdmissionDuplicate
+            | Self::AdmissionEmpty
+            | Self::AdmissionBatch
+            | Self::AdmissionProjectLiveTasks
+            | Self::AdmissionLiveTasks
+            | Self::AdmissionTree
+            | Self::AdmissionDepth
+            | Self::AdmissionDelegates
+            | Self::AdmissionSubscription
+            | Self::AdmissionDependencies
+            | Self::AdmissionCycle
+            | Self::AdmissionSpec
+            | Self::AdmissionContract
+            | Self::AdmissionAuthority
+            | Self::AdmissionInputs
+            | Self::AdmissionAttempts
+            | Self::AdmissionLiveDelegates
+            | Self::AdmissionRestore
+            | Self::AdmissionRead
+            | Self::AdmissionTurn
+            | Self::AdmissionHoldKind
+            | Self::AdmissionHoldTaken
+            | Self::AdmissionHolds
+            | Self::AdmissionInboxFull
+            | Self::AdmissionNotes
+            | Self::AdmissionRevision
+            | Self::AdmissionQuestion
+            | Self::AdmissionPriority
+            | Self::AdmissionPolicy
+            | Self::AdmissionResource
+            | Self::AdmissionService
+            | Self::Connectors
+            | Self::ConnectorsCut
+            | Self::ConnectorsEmpty => None,
+            Self::TaskProposer
+            | Self::PartyProposer
+            | Self::Host
+            | Self::Account
+            | Self::Attempt
+            | Self::Task
+            | Self::Channel
+            | Self::Slots
+            | Self::Used
+            | Self::Free
+            | Self::Limit
+            | Self::Kept
+            | Self::Generation
+            | Self::WaitingAttempts
+            | Self::Proposals
+            | Self::Project
+            | Self::HostsForgotten
+            | Self::HelloForgotten
+            | Self::PersonForgotten
+            | Self::TaskForgotten
+            | Self::Person
+            | Self::Connector
+            | Self::Name
+            | Self::Number
+            | Self::Question
+            | Self::Members
+            | Self::First
+            | Self::Message
+            | Self::Left
+            | Self::Right
+            | Self::Entry
+            | Self::Period
+            | Self::Through
+            | Self::Chat
+            | Self::Messages
+            | Self::Bytes => Some(HoleKind::Number),
+            Self::At | Self::GraceUntil | Self::SpentUntil => Some(HoleKind::Wall),
+            Self::GraceRemaining | Self::GraceBound | Self::StopBound | Self::AllowedGrace | Self::Retention => {
+                Some(HoleKind::Span)
+            }
         }
     }
+    #[expect(clippy::too_many_lines, reason = "the closed deployment vocabulary has one exhaustive mapping table")]
     fn label(self) -> &'static [u8] {
         match self {
             Self::Deployment => b"Deployment owner facts",
