@@ -1,6 +1,8 @@
 //! The connector's documents and one revision-naming keyed request. Application
 //! values and forms stay here, never in jig's requests (root.md, sections 6–7).
-use jig_client::contract::{EntranceRefusal, ObjectKey, Part, ProposalKey, Revision};
+use jig_client::contract::{
+    EntranceRefusal, ObjectKey, OwnerPart, OwnerPartKey, OwnerPartKind, Part, ProposalKey, Revision,
+};
 use skein_lib::List;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Scope {
@@ -197,4 +199,21 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
         Part::Connector { .. } | Part::Resource { .. } | Part::Kind { .. } => return None,
     };
     Some(Subject { scope, kind })
+}
+
+/// The explicit held-task account only (root.md, section 6; QUESTIONS.md, 47).
+/// A resource origin is a distinct reference and cannot supply this identity.
+pub fn owner_hold(part: &OwnerPart) -> Option<Part> {
+    match part.kind {
+        OwnerPartKind::Hold => match part.key {
+            OwnerPartKey::Number(task) => Some(Part::Hold { connector: part.connector, task }),
+            OwnerPartKey::Path(_) => None,
+        },
+        OwnerPartKind::Resource
+        | OwnerPartKind::Pool
+        | OwnerPartKind::Result
+        | OwnerPartKind::Procedure
+        | OwnerPartKind::Effect
+        | OwnerPartKind::Outbox => None,
+    }
 }
