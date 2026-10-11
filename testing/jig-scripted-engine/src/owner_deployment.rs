@@ -77,130 +77,118 @@ impl Payload for OwnerTaskCapacityRequest {
 impl Payload for OwnerHostKind {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Worker => Some(0),
-            Self::Engine => Some(0),
+            Self::Worker | Self::Engine => Some(0),
         }
     }
 }
 impl Payload for OwnerAttemptState {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Waiting => Some(0),
-            Self::Adopted => Some(0),
-            Self::Claimed => Some(0),
-            Self::Cancelled => Some(0),
-            Self::Handed => Some(0),
-            Self::Acknowledged => Some(0),
-            Self::Stray => Some(0),
-            Self::Kept => Some(0),
-            Self::Fenced => Some(0),
-            Self::Closed => Some(0),
+            Self::Waiting
+            | Self::Adopted
+            | Self::Claimed
+            | Self::Cancelled
+            | Self::Handed
+            | Self::Acknowledged
+            | Self::Stray
+            | Self::Kept
+            | Self::Fenced
+            | Self::Closed => Some(0),
         }
     }
 }
 impl Payload for OwnerRunLocation {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::None => Some(0),
-            Self::Connected { .. } => Some(0),
-            Self::Adrift { .. } => Some(0),
+            Self::None | Self::Connected { .. } | Self::Adrift { .. } => Some(0),
         }
     }
 }
 impl Payload for OwnerAccountState {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Fresh => Some(0),
-            Self::Refreshing => Some(0),
-            Self::Retrying => Some(0),
-            Self::Revoked => Some(0),
-            Self::Closing => Some(0),
+            Self::Fresh | Self::Refreshing | Self::Retrying | Self::Revoked | Self::Closing => Some(0),
         }
     }
 }
 impl Payload for OwnerHelloRefusal {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::ReservedChannel => Some(0),
-            Self::Workers { .. } => Some(0),
-            Self::StopBound { .. } => Some(0),
+            Self::ReservedChannel | Self::Workers { .. } | Self::StopBound { .. } => Some(0),
         }
     }
 }
 impl Payload for OwnerPersonCapacityAction {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Close => Some(0),
-            Self::Application { .. } => Some(0),
-            Self::Note { .. } => Some(0),
-            Self::Service => Some(0),
-            Self::Adoption => Some(0),
-            Self::Roles => Some(0),
-            Self::Policy => Some(0),
-            Self::Pool { .. } => Some(0),
-            Self::Chat => Some(0),
-            Self::Goal => Some(0),
-            Self::Escalation { .. } => Some(0),
-            Self::Proposal { .. } => Some(0),
-            Self::Words { .. } => Some(0),
-            Self::Question { .. } => Some(0),
-            Self::Priority => Some(0),
-            Self::Amend { .. } => Some(0),
-            Self::Move { .. } => Some(0),
-            Self::TakePerson { .. } => Some(0),
-            Self::HandBackPerson { .. } => Some(0),
-            Self::AnswerPerson { .. } => Some(0),
-            Self::Stop { .. } => Some(0),
-            Self::Cancel { .. } => Some(0),
-            Self::Release { .. } => Some(0),
-            Self::MarkSeen { .. } => Some(0),
+            Self::Close
+            | Self::Application { .. }
+            | Self::Note { .. }
+            | Self::Service
+            | Self::Adoption
+            | Self::Roles
+            | Self::Policy
+            | Self::Pool { .. }
+            | Self::Chat
+            | Self::Goal
+            | Self::Escalation { .. }
+            | Self::Proposal { .. }
+            | Self::Words { .. }
+            | Self::Question { .. }
+            | Self::Priority
+            | Self::Amend { .. }
+            | Self::Move { .. }
+            | Self::TakePerson { .. }
+            | Self::HandBackPerson { .. }
+            | Self::AnswerPerson { .. }
+            | Self::Stop { .. }
+            | Self::Cancel { .. }
+            | Self::Release { .. }
+            | Self::MarkSeen { .. } => Some(0),
         }
     }
 }
 impl Payload for OwnerPersonCapacityCause {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Requests { .. } => Some(0),
-            Self::Pending { .. } => Some(0),
-            Self::Waiters { .. } => Some(0),
-            Self::Limit { .. } => Some(0),
+            Self::Requests { .. } | Self::Pending { .. } | Self::Waiters { .. } | Self::Limit { .. } => Some(0),
         }
     }
 }
 impl Payload for OwnerTaskCapacityAction {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Batch { .. } => Some(0),
-            Self::Proposal { .. } => Some(0),
-            Self::PersonProposal { .. } => Some(0),
-            Self::Message { .. } => Some(0),
-            Self::Source { .. } => Some(0),
-            Self::Introduce { .. } => Some(0),
-            Self::Subscription { .. } => Some(0),
-            Self::Effect { .. } => Some(0),
-            Self::Claim { .. } => Some(0),
-            Self::Release => Some(0),
-            Self::Move => Some(0),
+            Self::Batch { .. }
+            | Self::Proposal { .. }
+            | Self::PersonProposal { .. }
+            | Self::Message { .. }
+            | Self::Source { .. }
+            | Self::Introduce { .. }
+            | Self::Subscription { .. }
+            | Self::Effect { .. }
+            | Self::Claim { .. }
+            | Self::Release
+            | Self::Move => Some(0),
         }
     }
 }
 impl Payload for OwnerTaskCapacityCause {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Tasks { .. } => Some(0),
-            Self::CreationFlights { .. } => Some(0),
-            Self::ResourceReports { .. } => Some(0),
-            Self::ProjectTasks { .. } => Some(0),
-            Self::Tree { .. } => Some(0),
-            Self::Delegates { .. } => Some(0),
-            Self::Inbox { .. } => Some(0),
-            Self::Holdings { .. } => Some(0),
-            Self::HoldWaiters { .. } => Some(0),
-            Self::Proposals { .. } => Some(0),
-            Self::References { .. } => Some(0),
-            Self::Subscriptions { .. } => Some(0),
-            Self::Funders { .. } => Some(0),
-            Self::Writers { .. } => Some(0),
+            Self::Tasks { .. }
+            | Self::CreationFlights { .. }
+            | Self::ResourceReports { .. }
+            | Self::ProjectTasks { .. }
+            | Self::Tree { .. }
+            | Self::Delegates { .. }
+            | Self::Inbox { .. }
+            | Self::Holdings { .. }
+            | Self::HoldWaiters { .. }
+            | Self::Proposals { .. }
+            | Self::References { .. }
+            | Self::Subscriptions { .. }
+            | Self::Funders { .. }
+            | Self::Writers { .. } => Some(0),
         }
     }
 }

@@ -298,7 +298,7 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
     let mut value = empty();
     for n in [0, u64::MAX] {
         let attempt = run(
-            OwnerTaskLink::Retained { chip: owner_chip_fixture(n), at: Some(Wall::EPOCH) },
+            OwnerTaskLink::Retained { chip: genuine_owner_chip_fixture(n), at: Some(Wall::EPOCH) },
             OwnerAttemptState::Acknowledged,
             OwnerRunLocation::Adrift { channel: Some(n), until: Some(Wall::EPOCH), remaining: Some(Duration::ZERO) },
         );
@@ -317,7 +317,7 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
                 runs: list(vec![
                     attempt.clone(),
                     run(
-                        OwnerTaskLink::Live(owner_chip_fixture(n.wrapping_add(1))),
+                        OwnerTaskLink::Live(genuine_owner_chip_fixture(n.wrapping_add(1))),
                         OwnerAttemptState::Closed,
                         OwnerRunLocation::Connected { channel: n, kind: OwnerHostKind::Engine },
                     ),
@@ -336,8 +336,8 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
                 unsaved: true,
                 attention: true,
                 spent_until: Some(Wall::EPOCH),
-                runs: list(vec![owner_chip_fixture(n), owner_chip_fixture(n.wrapping_add(1))]),
-                waiting: list(vec![owner_chip_fixture(n), owner_chip_fixture(n.wrapping_add(1))]),
+                runs: list(vec![genuine_owner_chip_fixture(n), genuine_owner_chip_fixture(n.wrapping_add(1))]),
+                waiting: list(vec![genuine_owner_chip_fixture(n), genuine_owner_chip_fixture(n.wrapping_add(1))]),
                 cut: true,
             })
             .unwrap();

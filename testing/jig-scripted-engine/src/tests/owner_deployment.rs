@@ -54,11 +54,9 @@ fn round_trip(value: OwnerDeployment) {
     );
     engine.open(Time::ZERO, 11, Token::new(2), Subject::Deployment).unwrap();
     let events = engine.poll(Time::ZERO);
-    assert!(events.iter().any(|event| *event
-        == Up::Watch {
-            token: Token::new(2),
-            event: WatchEvent::Delivered(Delivery::OwnerDeployment(Box::new(value.clone())))
-        }));
+    let expected =
+        Up::Watch { token: Token::new(2), event: WatchEvent::Delivered(Delivery::OwnerDeployment(Box::new(value))) };
+    assert!(events.contains(&expected));
     assert!(engine.commits().is_empty());
 }
 #[test]
@@ -209,6 +207,7 @@ fn task(action: OwnerTaskCapacityAction, cause: OwnerTaskCapacityCause) -> Owner
 }
 #[test]
 fn deployment_person_actions_four_causes_all_structural_limits_and_opaque_request_keys_survive() {
+    use AdmissionLimit as L;
     use OwnerPersonCapacityAction as A;
     let actions = [
         A::Close,
@@ -246,7 +245,6 @@ fn deployment_person_actions_four_causes_all_structural_limits_and_opaque_reques
             .unwrap();
         round_trip(value);
     }
-    use AdmissionLimit as L;
     let limits = [
         L::Words,
         L::Identity,

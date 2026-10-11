@@ -18,7 +18,7 @@ fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     let saying = words.book.say(words.language, phrase.id(), holes).expect("deployment sayings checked");
     b.text(Run::Plain, &saying.text);
 }
-fn number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
+fn field_number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
     text(b, words, phrase, &[Hole::Number(value)]);
 }
 fn region(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole], key: Option<Key>) {
@@ -46,7 +46,7 @@ fn optional_duration(b: &mut Builder, words: &Words, phrase: P, value: Option<Du
 }
 fn project(b: &mut Builder, words: &Words, value: Option<u32>) {
     match value {
-        Some(value) => number(b, words, P::Project, u64::from(value)),
+        Some(value) => field_number(b, words, P::Project, u64::from(value)),
         None => text(b, words, P::UnknownProject, &[]),
     }
 }
@@ -87,13 +87,13 @@ fn placement(b: &mut Builder, words: &Words, value: OwnerRunLocation) {
         OwnerRunLocation::None => text(b, words, P::RunLocationNone, &[]),
         OwnerRunLocation::Connected { channel, kind } => {
             text(b, words, P::RunLocationConnected, &[]);
-            number(b, words, P::Channel, channel);
+            field_number(b, words, P::Channel, channel);
             host_kind(b, words, kind);
         }
         OwnerRunLocation::Adrift { channel, until, remaining } => {
             text(b, words, P::RunLocationAdrift, &[]);
             match channel {
-                Some(channel) => number(b, words, P::Channel, channel),
+                Some(channel) => field_number(b, words, P::Channel, channel),
                 None => text(b, words, P::UnknownChannel, &[]),
             }
             wall(b, words, P::GraceUntil, P::UnknownClock, until);
@@ -109,9 +109,9 @@ fn run(b: &mut Builder, client: &Domain, words: &Words, value: &OwnerHostRun, bi
         &[Hole::Number(value.attempt)],
         Some(Key { owner: Owner::Jig, kind: 96, a: value.task.number(), b: value.attempt }),
     );
-    number(b, words, P::Attempt, value.attempt);
+    field_number(b, words, P::Attempt, value.attempt);
     crate::owner_result::link(b, client, &value.task, words, bindings);
-    number(b, words, P::Kept, u64::from(value.kept));
+    field_number(b, words, P::Kept, u64::from(value.kept));
     text(b, words, if value.listed { P::Listed } else { P::NotListed }, &[]);
     attempt_state(b, words, value.state);
     placement(b, words, value.location);
@@ -120,8 +120,8 @@ fn run(b: &mut Builder, client: &Domain, words: &Words, value: &OwnerHostRun, bi
 }
 fn capacity(b: &mut Builder, words: &Words, phrase: P, value: &OwnerCapacity) {
     region(b, words, phrase, &[], None);
-    number(b, words, P::Used, u64::from(value.used));
-    number(b, words, P::Limit, u64::from(value.limit));
+    field_number(b, words, P::Used, u64::from(value.used));
+    field_number(b, words, P::Limit, u64::from(value.limit));
     b.close();
 }
 fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLine, position: u64) {
@@ -132,15 +132,15 @@ fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLine, position
         &[Hole::Number(value.channel)],
         Some(Key { owner: Owner::Jig, kind: 97, a: position, b: value.channel }),
     );
-    number(b, words, P::Host, value.channel);
-    number(b, words, P::Slots, u64::from(value.slots));
+    field_number(b, words, P::Host, value.channel);
+    field_number(b, words, P::Slots, u64::from(value.slots));
     text(b, words, P::At, &[Hole::Wall(words.adjusted_wall(value.at))]);
     duration(b, words, P::StopBound, value.stop_bound);
     match value.why {
         OwnerHelloRefusal::ReservedChannel => text(b, words, P::HelloRefusalReservedChannel, &[]),
         OwnerHelloRefusal::Workers { limit } => {
             text(b, words, P::HelloRefusalWorkers, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerHelloRefusal::StopBound { grace } => {
             text(b, words, P::HelloRefusalStopBound, &[]);
@@ -151,16 +151,16 @@ fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLine, position
 }
 fn show_proposer(b: &mut Builder, words: &Words, value: Proposer) {
     match value {
-        Proposer::Task(value) => number(b, words, P::TaskProposer, value),
-        Proposer::Party(value) => number(b, words, P::PartyProposer, value),
+        Proposer::Task(value) => field_number(b, words, P::TaskProposer, value),
+        Proposer::Party(value) => field_number(b, words, P::PartyProposer, value),
     }
 }
 fn show_seen(b: &mut Builder, words: &Words, value: Seen) {
     match value {
-        Seen::Results { through } => number(b, words, P::Through, through),
+        Seen::Results { through } => field_number(b, words, P::Through, through),
         Seen::Replies { chat, through } => {
-            number(b, words, P::Chat, chat);
-            number(b, words, P::Through, through);
+            field_number(b, words, P::Chat, chat);
+            field_number(b, words, P::Through, through);
         }
     }
 }
@@ -168,24 +168,24 @@ fn show_funder(b: &mut Builder, words: &Words, value: Funder) {
     match value {
         Funder::Task(task) => {
             text(b, words, P::FunderTask, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         Funder::Pool { project, person, period } => {
             text(b, words, P::FunderPool, &[]);
-            number(b, words, P::Project, u64::from(project));
-            number(b, words, P::Person, person);
-            number(b, words, P::Period, period);
+            field_number(b, words, P::Project, u64::from(project));
+            field_number(b, words, P::Person, person);
+            field_number(b, words, P::Period, period);
         }
         Funder::Recurring { project, task, period } => {
             text(b, words, P::FunderRecurring, &[]);
-            number(b, words, P::Project, u64::from(project));
-            number(b, words, P::Task, task);
-            number(b, words, P::Period, period);
+            field_number(b, words, P::Project, u64::from(project));
+            field_number(b, words, P::Task, task);
+            field_number(b, words, P::Period, period);
         }
         Funder::Period { project, period } => {
             text(b, words, P::FunderPeriod, &[]);
-            number(b, words, P::Project, u64::from(project));
-            number(b, words, P::Period, period);
+            field_number(b, words, P::Project, u64::from(project));
+            field_number(b, words, P::Period, period);
         }
     }
 }
@@ -196,11 +196,11 @@ fn person_action(b: &mut Builder, words: &Words, value: OwnerPersonCapacityActio
         }
         OwnerPersonCapacityAction::Application { connector } => {
             text(b, words, P::PersonCapacityActionApplication, &[]);
-            number(b, words, P::Connector, u64::from(connector));
+            field_number(b, words, P::Connector, u64::from(connector));
         }
         OwnerPersonCapacityAction::Note { name } => {
             text(b, words, P::PersonCapacityActionNote, &[]);
-            number(b, words, P::Name, name);
+            field_number(b, words, P::Name, name);
         }
         OwnerPersonCapacityAction::Service => {
             text(b, words, P::PersonCapacityActionService, &[]);
@@ -216,7 +216,7 @@ fn person_action(b: &mut Builder, words: &Words, value: OwnerPersonCapacityActio
         }
         OwnerPersonCapacityAction::Pool { person } => {
             text(b, words, P::PersonCapacityActionPool, &[]);
-            number(b, words, P::Person, person);
+            field_number(b, words, P::Person, person);
         }
         OwnerPersonCapacityAction::Chat => {
             text(b, words, P::PersonCapacityActionChat, &[]);
@@ -226,56 +226,56 @@ fn person_action(b: &mut Builder, words: &Words, value: OwnerPersonCapacityActio
         }
         OwnerPersonCapacityAction::Escalation { task } => {
             text(b, words, P::PersonCapacityActionEscalation, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::Proposal { proposer, number } => {
             text(b, words, P::PersonCapacityActionProposal, &[]);
             show_proposer(b, words, proposer);
-            number(b, words, P::Number, number);
+            field_number(b, words, P::Number, number);
         }
         OwnerPersonCapacityAction::Words { task } => {
             text(b, words, P::PersonCapacityActionWords, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::Question { task, question } => {
             text(b, words, P::PersonCapacityActionQuestion, &[]);
-            number(b, words, P::Task, task);
-            number(b, words, P::Question, question);
+            field_number(b, words, P::Task, task);
+            field_number(b, words, P::Question, question);
         }
         OwnerPersonCapacityAction::Priority => {
             text(b, words, P::PersonCapacityActionPriority, &[]);
         }
         OwnerPersonCapacityAction::Amend { task } => {
             text(b, words, P::PersonCapacityActionAmend, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::Move { task } => {
             text(b, words, P::PersonCapacityActionMove, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::TakePerson { task } => {
             text(b, words, P::PersonCapacityActionTakePerson, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::HandBackPerson { task } => {
             text(b, words, P::PersonCapacityActionHandBackPerson, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::AnswerPerson { task } => {
             text(b, words, P::PersonCapacityActionAnswerPerson, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::Stop { task } => {
             text(b, words, P::PersonCapacityActionStop, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::Cancel { task } => {
             text(b, words, P::PersonCapacityActionCancel, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::Release { task } => {
             text(b, words, P::PersonCapacityActionRelease, &[]);
-            number(b, words, P::Task, task);
+            field_number(b, words, P::Task, task);
         }
         OwnerPersonCapacityAction::MarkSeen { seen } => {
             text(b, words, P::PersonCapacityActionMarkSeen, &[]);
@@ -287,15 +287,15 @@ fn person_cause(b: &mut Builder, words: &Words, value: OwnerPersonCapacityCause)
     match value {
         OwnerPersonCapacityCause::Requests { limit } => {
             text(b, words, P::PersonCapacityCauseRequests, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerPersonCapacityCause::Pending { limit } => {
             text(b, words, P::PersonCapacityCausePending, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerPersonCapacityCause::Waiters { limit } => {
             text(b, words, P::PersonCapacityCauseWaiters, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerPersonCapacityCause::Limit { which } => {
             text(b, words, P::PersonCapacityCauseLimit, &[]);
@@ -308,23 +308,23 @@ fn task_action(b: &mut Builder, words: &Words, value: OwnerTaskCapacityAction) {
         OwnerTaskCapacityAction::Batch { first, members } => {
             text(b, words, P::TaskCapacityActionBatch, &[]);
             match first {
-                Some(value) => number(b, words, P::First, value),
+                Some(value) => field_number(b, words, P::First, value),
                 None => text(b, words, P::UnknownFirst, &[]),
             }
-            number(b, words, P::Members, u64::from(members));
+            field_number(b, words, P::Members, u64::from(members));
         }
         OwnerTaskCapacityAction::Proposal { number } => {
             text(b, words, P::TaskCapacityActionProposal, &[]);
-            number(b, words, P::Number, number);
+            field_number(b, words, P::Number, number);
         }
         OwnerTaskCapacityAction::PersonProposal { number } => {
             text(b, words, P::TaskCapacityActionPersonProposal, &[]);
-            number(b, words, P::Number, number);
+            field_number(b, words, P::Number, number);
         }
         OwnerTaskCapacityAction::Message { task, number } => {
             text(b, words, P::TaskCapacityActionMessage, &[]);
-            number(b, words, P::Task, task);
-            number(b, words, P::Number, number);
+            field_number(b, words, P::Task, task);
+            field_number(b, words, P::Number, number);
         }
         OwnerTaskCapacityAction::Source { funder } => {
             text(b, words, P::TaskCapacityActionSource, &[]);
@@ -332,20 +332,20 @@ fn task_action(b: &mut Builder, words: &Words, value: OwnerTaskCapacityAction) {
         }
         OwnerTaskCapacityAction::Introduce { left, right } => {
             text(b, words, P::TaskCapacityActionIntroduce, &[]);
-            number(b, words, P::Left, left);
-            number(b, words, P::Right, right);
+            field_number(b, words, P::Left, left);
+            field_number(b, words, P::Right, right);
         }
         OwnerTaskCapacityAction::Subscription { number } => {
             text(b, words, P::TaskCapacityActionSubscription, &[]);
-            number(b, words, P::Number, number);
+            field_number(b, words, P::Number, number);
         }
         OwnerTaskCapacityAction::Effect { entry } => {
             text(b, words, P::TaskCapacityActionEffect, &[]);
-            number(b, words, P::Entry, entry);
+            field_number(b, words, P::Entry, entry);
         }
         OwnerTaskCapacityAction::Claim { attempt } => {
             text(b, words, P::TaskCapacityActionClaim, &[]);
-            number(b, words, P::Attempt, attempt);
+            field_number(b, words, P::Attempt, attempt);
         }
         OwnerTaskCapacityAction::Release => {
             text(b, words, P::TaskCapacityActionRelease, &[]);
@@ -359,61 +359,61 @@ fn task_cause(b: &mut Builder, words: &Words, value: OwnerTaskCapacityCause) {
     match value {
         OwnerTaskCapacityCause::Tasks { limit } => {
             text(b, words, P::TaskCapacityCauseTasks, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::CreationFlights { limit } => {
             text(b, words, P::TaskCapacityCauseCreationFlights, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::ResourceReports { limit } => {
             text(b, words, P::TaskCapacityCauseResourceReports, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::ProjectTasks { limit } => {
             text(b, words, P::TaskCapacityCauseProjectTasks, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::Tree { limit } => {
             text(b, words, P::TaskCapacityCauseTree, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::Delegates { limit } => {
             text(b, words, P::TaskCapacityCauseDelegates, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::Inbox { task, messages, bytes } => {
             text(b, words, P::TaskCapacityCauseInbox, &[]);
-            number(b, words, P::Task, task);
-            number(b, words, P::Messages, u64::from(messages));
-            number(b, words, P::Bytes, u64::from(bytes));
+            field_number(b, words, P::Task, task);
+            field_number(b, words, P::Messages, u64::from(messages));
+            field_number(b, words, P::Bytes, u64::from(bytes));
         }
         OwnerTaskCapacityCause::Holdings { limit } => {
             text(b, words, P::TaskCapacityCauseHoldings, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::HoldWaiters { limit } => {
             text(b, words, P::TaskCapacityCauseHoldWaiters, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::Proposals { limit } => {
             text(b, words, P::TaskCapacityCauseProposals, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::References { limit } => {
             text(b, words, P::TaskCapacityCauseReferences, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::Subscriptions { limit } => {
             text(b, words, P::TaskCapacityCauseSubscriptions, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::Funders { limit } => {
             text(b, words, P::TaskCapacityCauseFunders, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
         OwnerTaskCapacityCause::Writers { limit } => {
             text(b, words, P::TaskCapacityCauseWriters, &[]);
-            number(b, words, P::Limit, u64::from(limit));
+            field_number(b, words, P::Limit, u64::from(limit));
         }
     }
 }
@@ -469,11 +469,11 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
             &[Hole::Number(host.channel)],
             Some(Key { owner: Owner::Jig, kind: 94, a: host.channel, b: 0 }),
         );
-        number(b, words, P::Host, host.channel);
+        field_number(b, words, P::Host, host.channel);
         host_kind(b, words, host.kind);
-        number(b, words, P::Slots, u64::from(host.slots));
-        number(b, words, P::Used, u64::from(host.used));
-        number(b, words, P::Free, u64::from(host.free));
+        field_number(b, words, P::Slots, u64::from(host.slots));
+        field_number(b, words, P::Used, u64::from(host.used));
+        field_number(b, words, P::Free, u64::from(host.free));
         text(b, words, if host.draining { P::Draining } else { P::NotDraining }, &[]);
         text(b, words, if host.connected { P::Connected } else { P::Disconnected }, &[]);
         wall(b, words, P::GraceUntil, P::UnknownClock, host.grace_until);
@@ -489,7 +489,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
         b.close();
     }
     b.close();
-    number(b, words, P::HostsForgotten, value.hosts_forgotten);
+    field_number(b, words, P::HostsForgotten, value.hosts_forgotten);
     region(b, words, P::Attempts, &[], None);
     for value in &value.attempts {
         run(b, client, words, value, bindings);
@@ -504,8 +504,8 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
             &[Hole::Number(u64::from(account.number))],
             Some(Key { owner: Owner::Jig, kind: 95, a: u64::from(account.number), b: account.generation }),
         );
-        number(b, words, P::Account, u64::from(account.number));
-        number(b, words, P::Generation, account.generation);
+        field_number(b, words, P::Account, u64::from(account.number));
+        field_number(b, words, P::Generation, account.generation);
         account_state(b, words, account.state);
         text(b, words, if account.usable { P::Usable } else { P::Unusable }, &[]);
         text(b, words, if account.unsaved { P::Unsaved } else { P::Saved }, &[]);
@@ -532,7 +532,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     capacity(b, words, P::WorkersCapacity, &value.workers);
     capacity(b, words, P::AttemptsCapacity, &value.attempts_capacity);
     capacity(b, words, P::ProposalsCapacity, &value.proposals);
-    number(b, words, P::WaitingAttempts, u64::from(value.waiting_attempts));
+    field_number(b, words, P::WaitingAttempts, u64::from(value.waiting_attempts));
     duration(b, words, P::GraceBound, value.grace_bound);
     b.close();
     region(b, words, P::Projects, &[], None);
@@ -544,9 +544,9 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
             &[Hole::Number(u64::from(project.project))],
             Some(Key { owner: Owner::Jig, kind: 98, a: u64::from(project.project), b: 0 }),
         );
-        number(b, words, P::Project, u64::from(project.project));
+        field_number(b, words, P::Project, u64::from(project.project));
         capacity(b, words, P::ProjectTasksCapacity, &project.tasks);
-        number(b, words, P::Proposals, u64::from(project.proposals));
+        field_number(b, words, P::Proposals, u64::from(project.proposals));
         b.close();
     }
     b.close();
@@ -557,12 +557,12 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
         position = position.checked_add(1).expect("bounded hello history");
     }
     b.close();
-    number(b, words, P::HelloForgotten, value.hello_refusals_forgotten);
+    field_number(b, words, P::HelloForgotten, value.hello_refusals_forgotten);
     region(b, words, P::PersonRefusals, &[], None);
     let mut position = 0_u64;
     for value in &value.person_room_refusals {
         region(b, words, P::PersonRefusal, &[], Some(Key { owner: Owner::Jig, kind: 99, a: position, b: 0 }));
-        number(b, words, P::Person, value.key.person);
+        field_number(b, words, P::Person, value.key.person);
         text(b, words, P::RequestKey, &[]);
         crate::literal_segment::render(b, &value.key.key);
         project(b, words, value.project);
@@ -573,7 +573,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
         position = position.checked_add(1).expect("bounded person history");
     }
     b.close();
-    number(b, words, P::PersonForgotten, value.person_room_refusals_forgotten);
+    field_number(b, words, P::PersonForgotten, value.person_room_refusals_forgotten);
     duration(b, words, P::Retention, value.person_answer_retention);
     region(b, words, P::TaskRefusals, &[], None);
     let mut position = 0_u64;
@@ -588,7 +588,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
         position = position.checked_add(1).expect("bounded task history");
     }
     b.close();
-    number(b, words, P::TaskForgotten, value.task_room_refusals_forgotten);
+    field_number(b, words, P::TaskForgotten, value.task_room_refusals_forgotten);
     region(b, words, P::Connectors, &[], None);
     for connector in &value.connectors {
         crate::cards::common::part(
