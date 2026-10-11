@@ -75,8 +75,8 @@ fn ended_read() -> (Domain, Token) {
     );
     let mut watch = None;
     for request in &out {
-        if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
-            watch = Some(*watch);
+        if let Request::Open { watch: value, subject: Subject::Task { task: 8 } } = request {
+            watch = Some(*value);
             break;
         }
     }
