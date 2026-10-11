@@ -105,3 +105,5 @@ mod owner_project;
 pub use owner_project::*;
 pub mod owner_deployment;
 pub use owner_deployment::*;
+pub mod owner_historical;
+pub use owner_historical::*;
