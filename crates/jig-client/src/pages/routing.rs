@@ -781,6 +781,22 @@ fn owner_tree_delivery(
     domain.changed();
 }
 
+fn historical_funders_fit(page: &contract::OwnerSpendPage, project: u32) -> bool {
+    for row in &page.rows {
+        match row.funder {
+            contract::Funder::Period { project: owner, .. } => {
+                if owner != project {
+                    return false;
+                }
+            }
+            contract::Funder::Pool { .. } | contract::Funder::Task(_) | contract::Funder::Recurring { .. } => {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 /// Validate the retained original request before consuming its terminal.
 fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
     let value = match result {
@@ -854,19 +870,7 @@ fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token
             {
                 return false;
             }
-            for row in &page.rows {
-                match row.funder {
-                    contract::Funder::Period { project: owner, .. } => {
-                        if owner != project {
-                            return false;
-                        }
-                    }
-                    contract::Funder::Pool { .. } | contract::Funder::Task(_) | contract::Funder::Recurring { .. } => {
-                        return false;
-                    }
-                }
-            }
-            true
+            historical_funders_fit(page, project)
         }
         ReadValue::Frame(_)
         | ReadValue::Task(_)

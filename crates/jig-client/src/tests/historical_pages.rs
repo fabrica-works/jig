@@ -1,5 +1,4 @@
 #![expect(
-    clippy::disallowed_types,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary public-boundary proofs collect emitted requests and select their original identities"
 )]
@@ -18,7 +17,6 @@ fn cursor(bytes: &[u8]) -> Cursor {
     Cursor { value: objects::text(bytes) }
 }
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {
-    let values: Vec<_> = values.into_iter().collect();
     let mut rows = List::with_capacity(2);
     for value in values {
         rows.push(value).ok().unwrap();
@@ -75,26 +73,28 @@ fn ended_read() -> (Domain, Token) {
         Time::ZERO,
         Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) },
     );
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { task: 8 } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let mut watch = None;
+    for request in &out {
+        if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+            watch = Some(*watch);
+            break;
+        }
+    }
+    let watch = watch.unwrap();
     let mut task = super::confirmation::task();
     task.chip.phase = Phase::Done;
     task.delegates = rows([LiveDelegate { chip: objects::chip(9), takeover_budget: 0 }]);
     task.chip.details = Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH });
     let out =
         drive(&mut d, Time::ZERO, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) });
-    let token = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Read { read, what: Read::Ended { task: 8, after: None } } => Some(*read),
-            _ => None,
-        })
-        .unwrap();
+    let mut token = None;
+    for request in &out {
+        if let Request::Read { read, what: Read::Ended { task: 8, after: None } } = request {
+            token = Some(*read);
+            break;
+        }
+    }
+    let token = token.unwrap();
     (d, token)
 }
 fn spend_read() -> (Domain, Token, Token) {
@@ -104,20 +104,22 @@ fn spend_read() -> (Domain, Token, Token) {
         Time::ZERO,
         Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Spend }) },
     );
-    let spend = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Read { read, what: Read::Spend { project: 1, after: None } } => Some(*read),
-            _ => None,
-        })
-        .unwrap();
-    let project = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Read { read, what: Read::Project { project: 1 } } => Some(*read),
-            _ => None,
-        })
-        .unwrap();
+    let mut spend = None;
+    for request in &out {
+        if let Request::Read { read, what: Read::Spend { project: 1, after: None } } = request {
+            spend = Some(*read);
+            break;
+        }
+    }
+    let spend = spend.unwrap();
+    let mut project = None;
+    for request in &out {
+        if let Request::Read { read, what: Read::Project { project: 1 } } = request {
+            project = Some(*read);
+            break;
+        }
+    }
+    let project = project.unwrap();
     (d, spend, project)
 }
 #[test]
@@ -207,10 +209,16 @@ fn historical_owner_more_keeps_original_window_tokens_and_each_supplied_opaque_c
             Event::Act { act: Act::More { window: Token::new(crate::pages::task::ENDED_WINDOW), end } },
         );
         let expected = Read::Ended { task: 8, after: edge };
-        assert!(out.iter().any(|r| match r {
-            Request::Read { what, .. } => *what == expected,
-            _ => false,
-        }));
+        let mut found = false;
+        for request in &out {
+            if let Request::Read { what, .. } = request
+                && *what == expected
+            {
+                found = true;
+                break;
+            }
+        }
+        assert!(found);
     }
     let (mut d, token, _) = spend_read();
     let page = funding(1);
@@ -226,10 +234,16 @@ fn historical_owner_more_keeps_original_window_tokens_and_each_supplied_opaque_c
             Event::Act { act: Act::More { window: Token::new(crate::pages::project::SPEND_WINDOW), end } },
         );
         let expected = Read::Spend { project: 1, after: edge };
-        assert!(out.iter().any(|r| match r {
-            Request::Read { what, .. } => *what == expected,
-            _ => false,
-        }));
+        let mut found = false;
+        for request in &out {
+            if let Request::Read { what, .. } = request
+                && *what == expected
+            {
+                found = true;
+                break;
+            }
+        }
+        assert!(found);
     }
 }
 #[test]
@@ -246,13 +260,14 @@ fn historical_owner_fresh_whole_page_clears_obsolete_page_loss_without_changing_
         Time::ZERO,
         Event::Act { act: Act::More { window: Token::new(crate::pages::task::ENDED_WINDOW), end: End::After } },
     );
-    let token = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Read { read, what: Read::Ended { .. } } => Some(*read),
-            _ => None,
-        })
-        .unwrap();
+    let mut token = None;
+    for request in &out {
+        if let Request::Read { read, what: Read::Ended { .. } } = request {
+            token = Some(*read);
+            break;
+        }
+    }
+    let token = token.unwrap();
     let mut fresh = page.clone();
     fresh.cut = false;
     fresh.before = None;
@@ -356,13 +371,14 @@ fn historical_owner_fresh_funding_page_resets_loss_and_navigation_clears_only_it
         Time::ZERO,
         Event::Act { act: Act::More { window: Token::new(crate::pages::project::SPEND_WINDOW), end: End::After } },
     );
-    let token = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Read { read, what: Read::Spend { .. } } => Some(*read),
-            _ => None,
-        })
-        .unwrap();
+    let mut token = None;
+    for request in &out {
+        if let Request::Read { read, what: Read::Spend { .. } } = request {
+            token = Some(*read);
+            break;
+        }
+    }
+    let token = token.unwrap();
     let mut fresh = page.clone();
     fresh.cut = false;
     fresh.before = None;

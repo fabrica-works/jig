@@ -531,8 +531,8 @@ pub(crate) fn live(
 /// Install the complete historical source page in supplied order.
 pub(crate) fn owner_spend(domain: &mut Domain, page: Box<contract::OwnerSpendPage>) {
     domain.project_page.spend_cut = page.cut;
-    domain.project_page.spend_before = page.before.clone();
-    domain.project_page.spend_after = page.after.clone();
+    domain.project_page.spend_before.clone_from(&page.before);
+    domain.project_page.spend_after.clone_from(&page.after);
     domain.project_page.owner_spend = Some(page);
     domain.changed();
 }
