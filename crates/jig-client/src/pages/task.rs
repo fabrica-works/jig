@@ -285,6 +285,10 @@ impl Plan {
 #[must_use]
 pub fn parts(task: &Task, section: TaskSection, limit: u32) -> List<Part> {
     let mut parts = List::with_capacity(limit);
+    // The shared chip is shown in every task section.
+    if let Some(part) = crate::application::owner_hold(&task.chip) {
+        push(&mut parts, part);
+    }
     match section {
         TaskSection::Overview => {
             for resource in &task.resources {

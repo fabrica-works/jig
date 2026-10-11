@@ -216,12 +216,24 @@ fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body
         Body::OwnerProposal(proposal) => Some(proposal.project),
         Body::OwnerPersonTask(person) => person.project(),
         Body::Note { project, .. } => Some(*project),
-        Body::Historical(_)
-        | Body::Chip(_)
-        | Body::Escalation(_)
-        | Body::Question(_)
-        | Body::PersonTask(_)
-        | Body::Result(_) => object_project(domain, key),
+        Body::Chip(chip) => match chip.details.as_ref() {
+            contract::ChipPhase::Owner { details, .. } => Some(details.project),
+            contract::ChipPhase::Waiting { .. }
+            | contract::ChipPhase::Procedure { .. }
+            | contract::ChipPhase::Held { .. }
+            | contract::ChipPhase::Closing(_)
+            | contract::ChipPhase::Active(_)
+            | contract::ChipPhase::Idle { .. }
+            | contract::ChipPhase::Starting
+            | contract::ChipPhase::Running { .. }
+            | contract::ChipPhase::WaitingForWords { .. }
+            | contract::ChipPhase::BackingOff { .. }
+            | contract::ChipPhase::Person { .. }
+            | contract::ChipPhase::Ended { .. } => object_project(domain, key),
+        },
+        Body::Historical(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {
+            object_project(domain, key)
+        }
     };
     if domain.objects.put(key, body) {
         for part in parts.values.into_boxed() {
@@ -256,10 +268,14 @@ fn parts(body: &Body, limit: u32) -> Parts {
             }
         }
         Body::OwnerEscalation(value) => {
-            chip_parts(&mut parts, &value.task.chip);
+            // Native accounts already belong to the shared task parts list.
+            if owner_hold(&value.task.chip).is_none() {
+                chip_parts(&mut parts, &value.task.chip);
+            }
             append(
                 &mut parts,
-                crate::pages::task::parts(&value.task, crate::address::TaskSection::Overview, limit).as_slice(),
+                crate::pages::task::parts(&value.task, crate::address::TaskSection::Overview, limit.saturating_add(1))
+                    .as_slice(),
             );
         }
         Body::Proposal(proposal) => match &proposal.action {
@@ -311,8 +327,12 @@ fn chip_parts(parts: &mut Parts, chip: &contract::Chip) {
             }
         }
         contract::ChipPhase::Closing(closing) => closing_parts(parts, closing),
-        contract::ChipPhase::Owner { .. }
-        | contract::ChipPhase::Active(_)
+        contract::ChipPhase::Owner { .. } => {
+            if let Some(part) = owner_hold(chip) {
+                push(parts, part);
+            }
+        }
+        contract::ChipPhase::Active(_)
         | contract::ChipPhase::Idle { .. }
         | contract::ChipPhase::Starting
         | contract::ChipPhase::Running { .. }
@@ -320,6 +340,26 @@ fn chip_parts(parts: &mut Parts, chip: &contract::Chip) {
         | contract::ChipPhase::BackingOff { .. }
         | contract::ChipPhase::Person { .. }
         | contract::ChipPhase::Ended { .. } => {}
+    }
+}
+// The account is an explicit owner reference, independent of the hold's origin
+// (client/domain/contract.md, 5.1; objects.md, 3).
+pub(crate) fn owner_hold(chip: &contract::Chip) -> Option<Part> {
+    let contract::ChipPhase::Owner { details, .. } = chip.details.as_ref() else {
+        return None;
+    };
+    let account = details.hold.as_ref()?.account.as_ref()?;
+    match account.kind {
+        contract::OwnerPartKind::Hold => match &account.key {
+            contract::OwnerPartKey::Number(task) => Some(Part::Hold { connector: account.connector, task: *task }),
+            contract::OwnerPartKey::Path(_) => None,
+        },
+        contract::OwnerPartKind::Resource
+        | contract::OwnerPartKind::Pool
+        | contract::OwnerPartKind::Result
+        | contract::OwnerPartKind::Procedure
+        | contract::OwnerPartKind::Effect
+        | contract::OwnerPartKind::Outbox => None,
     }
 }
 fn closing_parts(parts: &mut Parts, closing: &contract::Closing) {
