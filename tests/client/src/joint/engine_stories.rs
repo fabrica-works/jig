@@ -2,7 +2,7 @@
 //! (domain/engine.md, 15; client/domain/testing.md, 5).
 use super::*;
 
-fn action(
+pub(super) fn action(
     world: &mut World<Test, Joint>,
     assignment: &jig_fake_workers::Assignment,
     completion: u32,

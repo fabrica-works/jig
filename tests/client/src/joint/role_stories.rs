@@ -415,3 +415,6 @@ mod engine_stories;
 
 #[path = "role_stories/proposed_story.rs"]
 mod proposed_story;
+
+#[path = "role_stories/card_stories.rs"]
+mod card_stories;
