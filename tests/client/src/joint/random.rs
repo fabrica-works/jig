@@ -5,7 +5,7 @@ use super::{Joint, fixture};
 use crate::{Fault, FrontFault, Outcome, Test, Until, World};
 use jig_client_view::Role;
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
-use skein_lib::{Duration, Rng, Time};
+use skein_lib::{Duration, Rng};
 use skein_world::domain::Verdict;
 
 /// The real engine transaction fault reached in this seed.
@@ -80,6 +80,7 @@ fn ready(seed: u64) -> (World<Test, Joint>, crate::ClientId) {
         |front| front.restart_configuration(configuration),
         |limits| limits.core.views.watchers = 12,
     );
+    world.randomness(8, 0, 0);
     let client = world.client(1, crate::stories::conversation());
     let within = Duration::from_secs(1);
     world.person(
@@ -175,7 +176,6 @@ pub fn world(seed: u64) -> (Outcome, Reach) {
     if client_fault == ClientFault::Slow {
         world.fault(FrontFault::Slow { span: Duration::from_millis(rng.between(10, 35)) });
     }
-    world.randomness(8, 0, 0);
     world.random_person(client);
     let outcome = world.run(Until::Done);
     world.front().session.driver.referee.check().expect("every actual taken normal delivery reaches the engine");

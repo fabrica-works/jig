@@ -8,7 +8,7 @@ use jig_core_people as people;
 use jig_core_world::peers::Peers;
 use jig_fake_person::{Find, Step};
 use jig_fake_workers::{Script, Worker};
-use skein_lib::{Duration, Time, Token, Wall};
+use skein_lib::{Duration, Time, Token};
 use std::collections::BTreeMap;
 
 use super::fixture::{bounded_world, clock, configured_world, turn, world};

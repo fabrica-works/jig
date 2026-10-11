@@ -39,14 +39,17 @@ pub(super) fn turn() -> Box<[u8]> {
     writer.finish()
 }
 
+#[cfg(test)]
 pub(super) fn world(body: Box<[u8]>) -> World<Test, Joint> {
     configured_world(body, |_| {})
 }
 
+#[cfg(test)]
 pub(super) fn configured_world(body: Box<[u8]>, configure: fn(&mut Joint)) -> World<Test, Joint> {
     bounded_world(body, configure, |_| {})
 }
 
+#[cfg(test)]
 pub(super) fn bounded_world(
     body: Box<[u8]>,
     configure: fn(&mut Joint),
