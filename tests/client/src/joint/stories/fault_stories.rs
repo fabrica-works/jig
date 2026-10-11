@@ -128,3 +128,42 @@ fn a_held_actual_commit_keeps_the_stop_answer_pending_until_its_completion() {
     assert_eq!(answers(&mut world), 2);
     assert!(world.front().session.driver.world.cancellations.iter().any(|(task, _)| *task == 1));
 }
+
+#[test]
+fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_recovery() {
+    fn configuration() -> jig_test_domain::Config {
+        jig_core_world::world::config(8510)
+    }
+    let (mut world, client) = stop_ready();
+    world.front().restart_configuration(configuration);
+    let (applied, rows) = {
+        let owner = &world.front().session.driver.world;
+        (owner.store.applied, owner.store.rows.clone())
+    };
+    world.front().session.driver.world.store.fail_at = Some(applied.checked_add(1).expect("next actual transaction"));
+    world.person(
+        client,
+        vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Offline"), within: Duration::from_secs(1) },
+        ],
+    );
+    let boundary = world.now().saturating_add(Duration::from_millis(250));
+    let outcome = world.run(Until::Time(boundary));
+    assert!(matches!(outcome.verdict, skein_world::domain::Verdict::Open { .. }));
+    assert!(outcome.judged.0 > 0);
+    assert!(shown(&world, client, b"Offline"));
+    assert!(!shown(&world, client, b"Held stopped"));
+    let owner = &world.front().session.driver.world;
+    assert!(owner.stopped);
+    assert_eq!(owner.store.applied, applied);
+    assert_eq!(owner.store.rows, rows);
+    assert_eq!(answers(&mut world), 1);
+    world.fault(crate::FrontFault::Restart { offline: Duration::from_millis(150) });
+    world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    assert!(!world.front().session.driver.world.stopped);
+    assert_eq!(answers(&mut world), 2, "the original keyed stop is made once after real recovery");
+}
