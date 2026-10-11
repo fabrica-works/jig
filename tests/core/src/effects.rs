@@ -725,6 +725,7 @@ impl World {
             }
             root::Delivery::Procedure { task, step, connector: number, code, context } => {
                 self.procedure = Some(task);
+                let project = context.project;
                 self.procedure_inputs.push((step, number, code, context));
                 if self.hold_procedures {
                     return;
@@ -732,6 +733,7 @@ impl World {
                 self.events.push_back(root::Event::Connector {
                     number,
                     event: connector::Event::Procedure {
+                        project,
                         task,
                         number: code,
                         resource: jig_test_connector_world::path(1, 1),

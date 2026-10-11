@@ -162,6 +162,7 @@ fn every_part_is_owned_scoped_and_read_without_mutating_its_records() {
     }
     world.event(Event::Names { task: 4, project: 1, resources: Box::new([path(84, 1)]) });
     let procedure = connector::ProcedureState {
+        project: 1,
         task: 4,
         number: kind(84, 1),
         resource: path(84, 1),
@@ -292,3 +293,94 @@ fn an_outbox_part_uses_the_retained_entry_and_marks_its_removal() {
 
 #[path = "application_documents/deployment_diagnostics.rs"]
 mod deployment_diagnostics;
+
+#[test]
+fn a_resource_less_procedure_panel_keeps_its_actual_project_across_restart() {
+    let mut world = World::new(88);
+    let panel = prepare(&mut world, 90, ClientSubject::Panel { project: 7, task: 9 });
+    let made = world.event(Event::Procedure {
+        project: 7,
+        task: 9,
+        number: kind(88, 1),
+        resource: path(88, 1),
+        signal: connector::ProcedureSignal::Activate,
+    });
+    assert!(marked(&made, panel));
+    assert!(!world.records.contains_key(&connector::RecordKey::Task(9)));
+    let Some(connector::Record::Procedure(procedure)) = world.records.get(&connector::RecordKey::Procedure(9)) else {
+        panic!("authentic procedure record")
+    };
+    let procedure = procedure.clone();
+    assert_eq!(procedure.project, 7);
+    assert_eq!(procedure.task, 9);
+    assert_eq!(procedure.number, kind(88, 1));
+    assert_eq!(procedure.resource, path(88, 1));
+    assert_eq!(procedure.steps, 1);
+    for restart in [false, true] {
+        if restart {
+            world.cold_restart();
+        }
+        let records = world.records.clone();
+        let panel = prepare(&mut world, 90, ClientSubject::Panel { project: 7, task: 9 });
+        let requests = world.event(Event::ReadDocument { scope: ClientScope::Project(7), read: panel, party: 1 });
+        let [
+            Request::ReadAnswered {
+                read,
+                answer: Ok(ClientDocument::Panel { task, procedure: now, result, resources, effects }),
+            },
+        ] = requests.as_slice()
+        else {
+            panic!("whole resource-less panel: {requests:?}")
+        };
+        assert_eq!(*read, panel);
+        assert_eq!(*task, 9);
+        assert_eq!(now.as_ref(), Some(&procedure));
+        assert_eq!(*result, None);
+        assert!(resources.is_empty());
+        assert!(effects.is_empty());
+        assert_eq!(world.records, records, "reads create no synthetic names or records");
+    }
+}
+
+#[test]
+fn a_resource_less_procedure_panel_refuses_an_inferred_or_changed_project() {
+    let mut world = World::new(89);
+    world.event(Event::Procedure {
+        project: 7,
+        task: 9,
+        number: kind(89, 1),
+        resource: path(89, 1),
+        signal: connector::ProcedureSignal::Activate,
+    });
+    let records = world.records.clone();
+    for (project, scope, task) in [
+        (8, ClientScope::Project(8), 9),
+        (7, ClientScope::Project(8), 9),
+        (7, ClientScope::Deployment, 9),
+        (7, ClientScope::Project(7), 10),
+    ] {
+        let panel = prepare(&mut world, 90, ClientSubject::Panel { project, task });
+        assert!(matches!(
+            world.event(Event::ReadDocument { scope, read: panel, party: 1 }).as_slice(),
+            [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
+        ));
+    }
+    let rejected = world.event(Event::Procedure {
+        project: 8,
+        task: 9,
+        number: kind(89, 1),
+        resource: path(89, 1),
+        signal: connector::ProcedureSignal::Activate,
+    });
+    assert!(matches!(
+        rejected.as_slice(),
+        [Request::Step { task: 9, decision: connector::StepDecision::Hold { reason: 0 } }]
+    ));
+    assert_eq!(world.records, records, "reactivation cannot rename the actual owner");
+    world.event(Event::Unnamed { task: 9 });
+    let panel = prepare(&mut world, 90, ClientSubject::Panel { project: 7, task: 9 });
+    assert!(matches!(
+        world.event(Event::ReadDocument { scope: ClientScope::Project(7), read: panel, party: 1 }).as_slice(),
+        [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
+    ));
+}

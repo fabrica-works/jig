@@ -143,7 +143,7 @@ fn procedures_require_answers_and_current_facts_and_replay_the_same_decision() {
     let mut world = World::new(19);
     let task = 7;
     let step = |world: &mut World, signal| {
-        world.event(Event::Procedure { task, number: kind(19, 1), resource: path(19, 1), signal })
+        world.event(Event::Procedure { project: 1, task, number: kind(19, 1), resource: path(19, 1), signal })
     };
     let first = step(&mut world, ProcedureSignal::Activate);
     assert!(matches!(first.last(), Some(Request::Step { decision: StepDecision::Effect(..), .. })));

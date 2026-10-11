@@ -684,11 +684,12 @@ impl World {
                     }
                 }
             }
-            root::Delivery::Procedure { task, connector, code, .. } => {
+            root::Delivery::Procedure { task, connector, code, context, .. } => {
                 self.procedure = Some(task);
                 self.events.push_back(root::Event::Connector {
                     number: connector,
                     event: jig_test_connector::Event::Procedure {
+                        project: context.project,
                         task,
                         number: code,
                         resource: jig_test_connector_world::path(1, 1),

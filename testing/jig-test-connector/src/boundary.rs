@@ -359,6 +359,8 @@ pub struct ProcedureSpec {
 /// Durable procedure parameters and progress.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ProcedureState {
+    /// Actual project supplied by the procedure context, independent of resource holdings.
+    pub project: u32,
     /// Task executing this procedure.
     pub task: u64,
     /// Configured procedure program.
@@ -520,7 +522,7 @@ pub enum Event {
     /// Ask the connector to judge the named state on its facts.
     Judge { token: Token, requirement: u16, resources: Box<[Path]>, state: u64 },
     /// Create, wake or answer a connector-owned procedure task.
-    Procedure { task: u64, number: u16, resource: Path, signal: ProcedureSignal },
+    Procedure { project: u32, task: u64, number: u16, resource: Path, signal: ProcedureSignal },
     /// The core's first delegated child, returned in the creating decision.
     ProcedureDelegateOutcome { task: u64, step: u64, child: Option<u64> },
     /// Serve an ephemeral read.

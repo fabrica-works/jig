@@ -19,9 +19,14 @@ fn program(domain: &Domain, number: u16) -> Option<ProcedureSpec> {
 
 /// One incoming event merely gives a durable state machine another chance to
 /// decide from its state and current facts. The event is never its input data.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the procedure input carries its authentic project alongside its task and program"
+)]
 pub(crate) fn step(
     domain: &mut Domain,
     env: &Env<Limits>,
+    project: u32,
     task: u64,
     number: u16,
     resource: crate::Path,
@@ -34,7 +39,7 @@ pub(crate) fn step(
     };
     let new_state = !domain.procedures.contains_key(&task);
     let mut state = if let Some(existing) = domain.procedures.get(&task) {
-        if existing.number != number || existing.resource != resource {
+        if existing.project != project || existing.number != number || existing.resource != resource {
             out.push(Request::Step { task, decision: StepDecision::Hold { reason: 0 } });
             return;
         }
@@ -43,7 +48,7 @@ pub(crate) fn step(
         if signal != ProcedureSignal::Activate || domain.procedures.len() >= env.limits.procedures {
             return;
         }
-        ProcedureState { task, number, resource, index: 0, steps: 0, awaiting: false, deadline: None }
+        ProcedureState { project, task, number, resource, index: 0, steps: 0, awaiting: false, deadline: None }
     };
     let original = state.clone();
     if usize::from(state.index) >= spec.actions.len() {

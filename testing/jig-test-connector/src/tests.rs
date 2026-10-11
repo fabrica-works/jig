@@ -112,7 +112,7 @@ fn run_at(domain: &mut Domain, wall: u64, event: Event) -> Box<[Request]> {
 }
 
 fn procedure_event(signal: crate::ProcedureSignal) -> Event {
-    Event::Procedure { task: 9, number: 3, resource: service(), signal }
+    Event::Procedure { project: 1, task: 9, number: 3, resource: service(), signal }
 }
 
 #[test]

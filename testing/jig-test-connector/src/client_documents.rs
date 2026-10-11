@@ -116,8 +116,11 @@ fn task(domain: &Domain, project: u32, number: u64) -> Result<&[crate::Path], Do
             | crate::Record::Pool { .. }
             | crate::Record::Outbox(_)
             | crate::Record::Made { .. },
-        )
-        | None => Err(DocumentMissing::Unknown),
+        ) => Err(DocumentMissing::Unknown),
+        None => match domain.procedures.get(&number) {
+            Some(procedure) if procedure.project == project => Ok(&[]),
+            Some(_) | None => Err(DocumentMissing::Unknown),
+        },
     }
 }
 

@@ -539,10 +539,11 @@ impl Application for Testing {
                 resource,
                 event: systems[usize::from(connector - 1)].answer(call, jig_test_system::Fault::None),
             })],
-            root::Delivery::Procedure { task, connector: number, code, .. } => {
+            root::Delivery::Procedure { task, connector: number, code, context, .. } => {
                 vec![Input::Event(root::Event::Connector {
                     number,
                     event: connector::Event::Procedure {
+                        project: context.project,
                         task,
                         number: code,
                         resource: jig_test_connector_world::path(1, 1),

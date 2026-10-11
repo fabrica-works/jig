@@ -183,8 +183,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Judge { token, requirement, resources, state } => {
             crate::requirements::judge(domain, env, token, requirement, &resources, state, out);
         }
-        Event::Procedure { task, number, resource, signal } => {
-            crate::procedures::step(domain, env, task, number, resource, signal, out);
+        Event::Procedure { project, task, number, resource, signal } => {
+            crate::procedures::step(domain, env, project, task, number, resource, signal, out);
         }
         Event::ProcedureDelegateOutcome { task, step, child } => {
             if domain.delegate_outcomes.contains_key(&task) || domain.delegate_outcomes.len() < env.limits.tasks {

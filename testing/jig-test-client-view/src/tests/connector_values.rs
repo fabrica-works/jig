@@ -74,6 +74,7 @@ fn resource() -> ClientResource {
 }
 fn procedure() -> ProcedureState {
     ProcedureState {
+        project: u32::MAX,
         task: u64::MAX,
         number: u16::MAX,
         resource: path(),
