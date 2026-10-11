@@ -29,7 +29,9 @@ pub struct PersonFragment {
 /// Every shown link and optional whole result, specification and contract.
 #[must_use]
 pub fn max_nodes(l: &Limits) -> Option<u32> {
-    let chip = crate::chip_nodes(l)?.max(crate::owner_chip::max_nodes(l)?);
+    // The reused card/link chip renderer shows the brief phase, not the
+    // standalone full metadata/result renderer. All metadata remains stored.
+    let chip = crate::chip_nodes(l)?;
     crate::sizes::result_facts(l)?
         .checked_add(chip)?
         .checked_add(5)?
