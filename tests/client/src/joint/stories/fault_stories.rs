@@ -58,7 +58,7 @@ fn a_draft_kept_across_a_reload_stays_unsent_on_the_actual_engine() {
     assert!(owner.peers.as_ref().expect("actual worker").workers[0].messages.is_empty());
 }
 
-fn stop_ready() -> (World<Test, Joint>, crate::ClientId) {
+pub(super) fn stop_ready() -> (World<Test, Joint>, crate::ClientId) {
     stop_ready_in(super::world(super::turn()))
 }
 
@@ -76,7 +76,7 @@ fn stop_ready_in(mut world: World<Test, Joint>) -> (World<Test, Joint>, crate::C
     assert!(outcome.judged.0 > 0);
     (world, client)
 }
-fn answers(world: &mut World<Test, Joint>) -> usize {
+pub(super) fn answers(world: &mut World<Test, Joint>) -> usize {
     world
         .front()
         .session

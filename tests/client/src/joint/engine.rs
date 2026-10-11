@@ -19,6 +19,7 @@ pub enum Packet {
 pub struct Driver {
     pub world: World,
     pub transport: Transport,
+    pub referee: super::referee::Referee,
 }
 
 impl Driver {
@@ -28,11 +29,18 @@ impl Driver {
         let mut world = World::scripted_clock(configuration, limits, peers, now, wall);
         world.client_peer = Some(ClientPeer::routed());
         world.store_peer = Some(jig_core_world::store_peer::StorePeer::after(world.store.applied));
-        Self { world, transport: Transport::new(VersionRange { first: configured.minimum, last: configured.maximum }) }
+        Self {
+            world,
+            transport: Transport::new(VersionRange { first: configured.minimum, last: configured.maximum }),
+            referee: super::referee::Referee::default(),
+        }
     }
 
     pub fn send(&mut self, now: Time, wall: Wall, event: root::Event) {
         self.register_replies();
+        if let root::Event::Core(core::Event::Delivered { watcher }) = &event {
+            self.referee.acknowledged(*watcher);
+        }
         self.world.set_clock(now, wall);
         self.world.send(event);
     }

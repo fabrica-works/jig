@@ -868,17 +868,23 @@ impl Session {
         self.stopping().expect("whole original stopped routes");
         if let Event::Jig(jig_client::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) = event
             && !matches!(value, client::Delivery::Run(_))
-            && let Some(event) = self.driver.transport.taken(client, *watch)
+            && let Some(watcher) = self.driver.transport.watch_token(client, *watch)
         {
-            self.driver.send(now, wall, root::Event::Core(event));
+            self.driver.referee.consumed(watcher);
+            if let Some(event) = self.driver.transport.taken(client, *watch) {
+                self.driver.send(now, wall, root::Event::Core(event));
+            }
         }
         if let Event::First(jig_test_client_domain::first::Event::Watch {
             watch,
             event: jig_test_client_domain::family::WatchEvent::Delivered(_),
         }) = event
-            && let Some(event) = self.driver.transport.application_taken(client, *watch)
+            && let Some(watcher) = self.driver.transport.application_watch_token(client, *watch)
         {
-            self.driver.send(now, wall, root::Event::Core(event));
+            self.driver.referee.consumed(watcher);
+            if let Some(event) = self.driver.transport.application_taken(client, *watch) {
+                self.driver.send(now, wall, root::Event::Core(event));
+            }
         }
     }
 
@@ -936,6 +942,32 @@ mod tests {
     }
     fn frame(watch: Token) -> Request {
         Request::Jig(jig_test_client_domain::JigOut::Open { watch, subject: client::Subject::Frame })
+    }
+
+    #[test]
+    fn the_joint_referee_catches_a_peer_dropping_an_actual_normal_delivery_acknowledgement() {
+        let (mut session, now, wall) = session();
+        let client = ClientId(0);
+        let native = Token::new(19);
+        session.bind(client, 1, identity(), now, wall);
+        session.poll(now, wall).expect("actual sign-in");
+        session.send(client, now, wall, frame(native)).expect("actual frame watch");
+        let callbacks = session.poll(now, wall).expect("actual root delivery");
+        assert!(callbacks.iter().any(|(owner, event)| *owner == client && matches!(event,
+            Event::Jig(jig_client::Event::Watch { watch, event: client::WatchEvent::Delivered(_) }) if *watch == native)));
+        let watcher = session.driver.transport.watch_token(client, native).expect("original owner route");
+        session.driver.referee.consumed(watcher);
+        let acknowledgement = session.driver.transport.taken(client, native).expect("shell actually took the frame");
+        assert!(matches!(&acknowledgement, core::Event::Delivered { watcher: actual } if *actual == watcher));
+        assert_eq!(
+            session.driver.referee.check(),
+            Err(super::super::referee::MissingAcknowledgement(watcher)),
+            "taking locally cannot stand in for the dropped root input"
+        );
+        assert_eq!(session.driver.referee.acknowledgements(), 0);
+        session.driver.send(now, wall, root::Event::Core(acknowledgement));
+        assert_eq!(session.driver.referee.check(), Ok(()));
+        assert_eq!(session.driver.referee.acknowledgements(), 1);
     }
 
     #[test]

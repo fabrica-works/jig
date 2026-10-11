@@ -131,24 +131,19 @@ fn facts(rows: &BTreeMap<root::Key, root::Record>) -> (BTreeSet<CardKey>, WordIm
             }
         }
     }
-    // Connector proposal identities are independent of core makers. Join only
-    // its actual retained task/project rows, as the connector's Effect producer does.
+    // The connector owns its raw proposal identity and its authentic project.
+    // Resource-less agent proposals do not require a synthetic Task record.
     for record in rows.values() {
         if let root::Record::Connector {
-            number,
-            record: jig_test_connector::Record::Proposal { number: proposal, task, .. },
+            record: jig_test_connector::Record::Proposal { number: proposal, project, .. },
+            ..
         } = record
         {
-            let key = root::Key::Connector { number: *number, key: jig_test_connector::RecordKey::Task(*task) };
-            if let Some(root::Record::Connector { record: jig_test_connector::Record::Task { project, .. }, .. }) =
-                rows.get(&key)
-            {
-                let subject = jig_test_client_domain::family::Subject {
-                    scope: jig_test_client_domain::family::Scope::Project(*project),
-                    kind: jig_test_client_domain::family::Kind::OwnerEffect(*proposal),
-                };
-                waiting.insert(CardKey::of(jig_test_client_view::family_key(&subject)));
-            }
+            let subject = jig_test_client_domain::family::Subject {
+                scope: jig_test_client_domain::family::Scope::Project(*project),
+                kind: jig_test_client_domain::family::Kind::OwnerEffect(*proposal),
+            };
+            waiting.insert(CardKey::of(jig_test_client_view::family_key(&subject)));
         }
     }
     (waiting, words, ended)
@@ -293,10 +288,10 @@ mod tests {
             truth.applied(image(1, vec![task])),
             vec![
                 Observed::Durable { commit: 1, at: Time::from_nanos(17) },
-                Observed::Stopped { card: expected, commit: 1 },
+                Observed::Stopped { card: expected.clone(), commit: 1 },
             ]
         );
         let no_task = Truth::after(image(0, vec![proposal]).rows);
-        assert!(no_task.waiting.is_empty(), "an absent owner project cannot be inferred");
+        assert_eq!(no_task.waiting, BTreeSet::from([expected]), "the proposal itself supplies the actual project");
     }
 }
