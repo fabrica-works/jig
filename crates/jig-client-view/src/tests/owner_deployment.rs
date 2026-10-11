@@ -284,7 +284,10 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     );
     let mut missing = crate::phrases::english::language();
     missing.phrases = missing.phrases.into_vec().into_iter().filter(|p| p.id != P::Hosts.id()).collect();
-    assert!(Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([missing]), &phrase_limits).is_err());
+    assert_eq!(
+        Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([missing]), &phrase_limits).unwrap_err(),
+        Invalid::Missing { id: P::Hosts.id() }
+    );
 }
 #[test]
 fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_under_storage() {
