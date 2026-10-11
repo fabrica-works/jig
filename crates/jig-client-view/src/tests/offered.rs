@@ -1,6 +1,6 @@
 #![expect(
     clippy::disallowed_methods,
-    clippy::wildcard_enum_match_arm,
+    clippy::disallowed_types,
     reason = "ordinary public tree proofs inspect nodes and decoded meanings"
 )]
 use super::cards::{CLIENT, contains, words};
@@ -87,11 +87,10 @@ fn every_closed_offer_control_and_whole_refusal_fits_the_public_card_tree_with_t
             total += u64::from(node.text_bytes());
             if node.role == Role::Button
                 && let Some(binding) = node.binding
+                && let Some(Action::Intend { object, act }) = decode(&mut bindings, binding.token, Act::Press)
             {
-                if let Some(Action::Intend { object, act }) = decode(&mut bindings, binding.token, Act::Press) {
-                    assert_eq!(object, id.token());
-                    decoded.push(act);
-                }
+                assert_eq!(object, id.token());
+                decoded.push(act);
             }
         }
         assert!(total <= u64::from(limits.text_bytes));

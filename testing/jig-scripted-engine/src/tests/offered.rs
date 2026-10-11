@@ -71,7 +71,13 @@ fn seven_offers_cross_normal_task_read_and_delivery_whole_with_two_paged_rows() 
             Up::Read { token, terminal: ReadResult::Value(ReadValue::Task(document)) } if *token == Token::new(1) => {
                 Some(document)
             }
-            _ => None,
+            Up::Answer { .. }
+            | Up::Read { .. }
+            | Up::Watch { .. }
+            | Up::ApplicationAnswer { .. }
+            | Up::ApplicationRead { .. }
+            | Up::App { .. }
+            | Up::Ended { .. } => None,
         })
         .unwrap();
     let delivery = outputs
@@ -80,7 +86,13 @@ fn seven_offers_cross_normal_task_read_and_delivery_whole_with_two_paged_rows() 
             Up::Watch { token, event: WatchEvent::Delivered(Delivery::Task(document)) } if *token == Token::new(2) => {
                 Some(document)
             }
-            _ => None,
+            Up::Answer { .. }
+            | Up::Read { .. }
+            | Up::Watch { .. }
+            | Up::ApplicationAnswer { .. }
+            | Up::ApplicationRead { .. }
+            | Up::App { .. }
+            | Up::Ended { .. } => None,
         })
         .unwrap();
     assert_eq!(read.acts.capacity(), 7);
