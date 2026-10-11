@@ -324,3 +324,45 @@ fn signing_in_and_starting_a_chat_on_the_engine() {
     );
     assert!(!world.tree(client).nodes().iter().any(|node| node.name.as_deref() == Some(b"Provisional".as_slice())));
 }
+
+#[test]
+fn a_person_reads_actual_project_settings_and_returns_to_its_overview() {
+    let mut world = world(turn());
+    let client = world.client(1, crate::stories::conversation());
+    let within = Duration::from_secs(1);
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::named(Role::Button, b"Project 1"), within },
+            Step::Press { find: Find::named(Role::Button, b"Project 1") },
+            Step::See { find: Find::named(Role::Button, b"Settings"), within },
+            Step::Press { find: Find::named(Role::Button, b"Settings") },
+            Step::See { find: Find::text(b"Period spend: 1000"), within },
+            Step::See { find: Find::text(b"Period spend: 500"), within },
+            Step::See { find: Find::text(b"Escalation role: 0"), within },
+            Step::See { find: Find::text(b"Configured pool period: 1"), within },
+            Step::See { find: Find::named(Role::Button, b"Overview"), within },
+            Step::Press { find: Find::named(Role::Button, b"Overview") },
+            Step::See { find: Find::named(Role::Button, b"Settings"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let rows = &world.front().session.driver.world.store.rows;
+    assert_eq!(
+        rows.values()
+            .filter(|value| matches!(
+                value,
+                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+            ))
+            .count(),
+        1
+    );
+    assert!(!rows.values().any(|value| matches!(
+        value,
+        jig_test_domain::Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(_)))
+    )));
+}
