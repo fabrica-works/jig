@@ -418,12 +418,12 @@ fn check_presence_envelopes(result: bool, part: u32) {
                 if case / 2 == part {
                     check_presence_case([result, person, proposal], loaded, false);
                 }
-                case += 1;
+                case = case.checked_add(1).expect("twelve presence cases");
                 if person {
                     if case / 2 == part {
                         check_presence_case([result, person, proposal], loaded, true);
                     }
-                    case += 1;
+                    case = case.checked_add(1).expect("twelve presence cases");
                 }
             }
         }
