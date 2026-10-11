@@ -232,8 +232,8 @@ fn fragment(value: &OwnerChipObservation, capacity: &crate::Limits) -> Tree {
 fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_storage() {
     let value = report(
         OwnerChipWork::Tool {
-            call: std::iter::repeat_n(255, usize::try_from(CLIENT.text).unwrap()).collect(),
-            tool: std::iter::repeat_n(254, usize::try_from(CLIENT.text).unwrap()).collect(),
+            call: core::iter::repeat_n(255, usize::try_from(CLIENT.text).unwrap()).collect(),
+            tool: core::iter::repeat_n(254, usize::try_from(CLIENT.text).unwrap()).collect(),
         },
         Some(Wall::from_nanos(u64::MAX)),
     );
