@@ -1,7 +1,3 @@
-#![expect(
-    clippy::wildcard_enum_match_arm,
-    reason = "ordinary public-boundary proofs collect emitted requests and select their original identities"
-)]
 use super::{
     objects,
     spine::{LIMITS, delivered, drive, frame, start},
