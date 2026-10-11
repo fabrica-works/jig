@@ -323,6 +323,12 @@ pub(crate) fn answered(domain: &mut Domain, request: Token, answer: crate::contr
         domain.changed();
     }
 }
+/// Retire only the matching pending settings request after retention becomes unknown.
+pub(crate) fn unknown(domain: &mut Domain, request: Token) {
+    if domain.project_page.settings.pending == Some(request) {
+        domain.project_page.settings.pending = None;
+    }
+}
 /// Typed settings values are supplied by the view, never parsed by the domain.
 #[must_use]
 pub fn action(ask: Ask) -> Act {

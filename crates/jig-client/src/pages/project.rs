@@ -23,6 +23,7 @@ use skein_lib::{Env, Id, List, Queue, Token};
 pub mod goals;
 pub mod notes;
 pub mod owner_form;
+mod owner_goals;
 /// Selected scope and description search, passed to the notes owner unchanged.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NoteFilter {

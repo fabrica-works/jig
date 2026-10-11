@@ -664,15 +664,15 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     assert_eq!(value.resources.capacity(), 4);
 }
 fn native_owner(value: OwnerProject) -> Domain {
-    use jig_client::{
-        Event, Request,
-        address::{Address, ProjectSection},
-    };
+    native_owner_at(value, jig_client::address::ProjectSection::Settings)
+}
+fn native_owner_at(value: OwnerProject, section: jig_client::address::ProjectSection) -> Domain {
+    use jig_client::{Event, Request, address::Address};
     let mut domain = Domain::new(&limits(), 9177);
     let out = native_drive(
         &mut domain,
         Event::Start {
-            address: Address::Project { project: value.number, section: ProjectSection::Settings },
+            address: Address::Project { project: value.number, section },
             kept: List::with_capacity(0),
             offset: jig_client::boundary::Offset { minutes: 0 },
         },
@@ -809,4 +809,110 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
     assert_eq!(holdings.get(0).unwrap().party, u64::MAX);
     assert_eq!(holdings.get(1).unwrap().party, 0);
     assert_eq!(holdings.get(1).unwrap().role, HeldRole::Owner);
+}
+
+#[test]
+fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_proposed_review_before_one_keyed_request() {
+    use jig_client::{Event, Request, action::Act, address::ProjectSection, fields::Purpose};
+    let mut value = source();
+    value.number = 4;
+    let executor = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let recipient = Recipient::Roles { project: 4, roles: list(4, [u32::MAX, 0, u32::MAX]) };
+    value.acts = list(
+        4,
+        [Offered {
+            act: ActKind::SetGoal,
+            admission: Admission::Bounded {
+                within: Bounds::Goal {
+                    pool_left: 17,
+                    charters: list(4, [u32::MAX, 0, u32::MAX]),
+                    procedures: list(4, [GoalProcedure { connector: u16::MAX, code: u32::MAX }]),
+                    latest: None,
+                    budget: 17,
+                    maximum_budget: 23,
+                    maximum_deadline: None,
+                },
+                beyond: Beyond::Proposed { to: recipient.clone() },
+            },
+        }],
+    );
+    let mut domain = native_owner_at(value.clone(), ProjectSection::Goals);
+    assert!(domain.project_page().document.is_none());
+    let (tree, mut bindings) = owner_page(&domain);
+    let choice = tree
+        .nodes()
+        .iter()
+        .filter_map(|node| {
+            let act = crate::decode(&mut bindings, node.binding?.token, crate::Act::Press)?;
+            match act {
+                Act::GoalForm { form } if form.executor == executor => Some(form),
+                _ => None,
+            }
+        })
+        .next()
+        .expect("supplied procedure choice");
+    assert_eq!(choice.project, 4);
+    assert_eq!(choice.budget, 17);
+    assert!(native_drive(&mut domain, Event::Act { act: Act::GoalForm { form: choice } }).is_empty());
+    let (tree, mut bindings) = owner_page(&domain);
+    let words_field = tree.nodes().iter().find(|node| node.role == Role::TextArea).unwrap().binding.unwrap().token;
+    let act =
+        crate::decode(&mut bindings, words_field, crate::Act::Input { value: copy_of(&[255, 0, b'/', 254]) }).unwrap();
+    assert!(matches!(&act, Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == [255, 0, b'/', 254]));
+    native_drive(&mut domain, Event::Act { act });
+    for (field, amount) in [
+        (crate::pages::project::goals::Field::Budget, b"23".as_slice()),
+        (crate::pages::project::goals::Field::Priority, b"4294967295".as_slice()),
+    ] {
+        let (tree, mut bindings) = owner_page(&domain);
+        let form = domain.project_page().form.form.unwrap();
+        let edited = crate::pages::project::goals::edit(form, field, amount).unwrap();
+        let decoded = tree
+            .nodes()
+            .iter()
+            .filter_map(|node| {
+                crate::decode(&mut bindings, node.binding?.token, crate::Act::Input { value: copy_of(amount) })
+            })
+            .find(|act| act == &edited)
+            .unwrap();
+        assert!(native_drive(&mut domain, Event::Act { act: decoded }).is_empty());
+    }
+    let (tree, mut bindings) = owner_page(&domain);
+    let submit = tree
+        .nodes()
+        .iter()
+        .filter_map(|node| crate::decode(&mut bindings, node.binding?.token, crate::Act::Press))
+        .find(|act| matches!(act, Act::Submit { field: Purpose::NewGoal }))
+        .unwrap();
+    assert!(native_drive(&mut domain, Event::Act { act: submit }).is_empty());
+    let review = domain.project_page().form.confirmation.as_ref().unwrap();
+    assert_eq!(review.form.executor, executor);
+    assert_eq!(review.form.budget, 23);
+    assert_eq!(review.form.priority, u32::MAX);
+    assert_eq!(review.form.deadline, None);
+    assert_eq!(review.words.bytes(), &[255, 0, b'/', 254]);
+    assert_eq!(review.pool_left, 17);
+    assert!(review.proposed);
+    assert_eq!(review.to.as_ref(), Some(&recipient));
+    let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
+    let asks: Vec<_> = sent
+        .iter()
+        .filter_map(|row| match row {
+            Request::Send { ask, .. } => Some(ask.as_ref()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        asks,
+        [&Ask::SetGoal {
+            project: 4,
+            spec: Text::new(copy_of(&[255, 0, b'/', 254]), limits().text).unwrap(),
+            executor,
+            budget: 23,
+            priority: u32::MAX,
+            deadline: None
+        }]
+    );
+    assert!(native_drive(&mut domain, Event::Act { act: Act::Confirm }).is_empty());
+    assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
 }

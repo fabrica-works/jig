@@ -13,6 +13,7 @@ use jig_client::{
 pub mod goals;
 mod notes;
 pub mod owner;
+mod owner_goals;
 mod recurring;
 mod tasks;
 /// Show the project document and its selected bounded section.

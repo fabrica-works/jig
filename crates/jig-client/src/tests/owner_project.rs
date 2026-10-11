@@ -11,6 +11,7 @@ use crate::{
     contract::*,
     pages::project::owner_form,
 };
+use alloc::vec::Vec;
 use skein_lib::{List, Time, Token, bytes::copy_of};
 fn list<T>(cap: u32, rows: impl IntoIterator<Item = T>) -> List<T> {
     let mut out = List::with_capacity(cap);
@@ -311,4 +312,39 @@ fn owner_project_service_requires_explicit_role_before_name_without_emitting_an_
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) }).is_empty());
     let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
     assert!(matches!(&sent[..], [Request::Send { ask, .. }] if ask.as_ref()==&chosen));
+}
+
+#[test]
+fn owner_project_settings_unknown_retires_only_matching_pending_and_late_answer_never_reopens_or_resends() {
+    let (mut domain, token) = live(0);
+    let value = source(0);
+    install(&mut domain, token, value.clone());
+    let ask = Ask::ChangePolicy { project: 0, edit: PolicyEdit::ProjectSpend(19) };
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(ask) }).is_empty());
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let request = out
+        .iter()
+        .find_map(|row| match row {
+            Request::Send { request, .. } => Some(*request),
+            _ => None,
+        })
+        .unwrap();
+    owner_form::unknown(&mut domain, Token::new(u64::MAX));
+    assert_eq!(domain.project_page().settings.pending, Some(request));
+    assert!(drive(&mut domain, Time::ZERO, Event::Progress { request, progress: Progress::Unknown }).is_empty());
+    assert!(domain.project_page().settings.pending.is_none());
+    let notices: Vec<_> =
+        domain.notices().ids().into_iter().map(|(id, ())| domain.notices().get(*id).unwrap().kind.clone()).collect();
+    assert!(
+        notices.contains(&crate::notices::Kind::PageUnknown { purpose: crate::pages::IntentPurpose::ProjectSettings })
+    );
+    assert!(drive(&mut domain, Time::ZERO, Event::Progress { request, progress: Progress::Unknown }).is_empty());
+    assert!(
+        drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Done(Outcome::Changed) }).is_empty()
+    );
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    let after: Vec<_> =
+        domain.notices().ids().into_iter().map(|(id, ())| domain.notices().get(*id).unwrap().kind.clone()).collect();
+    assert_eq!(after, notices);
+    assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
 }

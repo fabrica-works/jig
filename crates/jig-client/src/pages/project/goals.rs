@@ -122,6 +122,9 @@ pub(crate) fn open(domain: &mut Domain) {
     domain.changed();
 }
 fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission, u64)> {
+    if domain.project_page.owner.is_some() {
+        return super::owner_goals::prediction(domain, form, scope);
+    }
     let mut offered = false;
     let mut pool = None;
     if let Some(frame) = &domain.frame.document {

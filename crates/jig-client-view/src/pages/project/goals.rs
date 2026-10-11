@@ -174,7 +174,7 @@ fn choices(
         }
     }
 }
-fn choice(
+pub(super) fn choice(
     b: &mut Builder,
     client: &Domain,
     words: &Words,
@@ -310,7 +310,7 @@ pub(super) fn line(b: &mut Builder, client: &Domain, goal: &GoalLine, words: &Wo
     b.close();
 }
 
-fn date(at: skein_lib::Wall) -> [u8; 16] {
+pub(super) fn date(at: skein_lib::Wall) -> [u8; 16] {
     let seconds = at.as_secs();
     let mut days = seconds / 86400;
     let mut year = 1970_u64;

@@ -112,6 +112,10 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_add(4)?.checked_mul(l.rows.checked_add(1)?)?.checked_mul(2)?)?
         .checked_add(l.rows.checked_mul(10)?)?
         .checked_add(l.rows.checked_mul(3)?)?
+        .checked_add(l.rows.checked_mul(l.rows)?.checked_mul(4)?)?
+        .checked_add(l.rows.checked_mul(6)?)?
+        .checked_add(crate::sizes::refusal_nodes(l)?.checked_mul(3)?)?
+        .checked_add(20)?
         .checked_add(113)
 }
 /// Every loaded saying and escaped source segment contributes to the envelope.
@@ -157,9 +161,7 @@ pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<Proje
     for row in &value.policy.roles {
         crate::owner_amendment::authority_fits(&row.authority, l)?;
     }
-    b.open(Role::List);
     for resource in &value.resources {
-        b.open(Role::Item);
         crate::owner_chip::part_fits(&resource.part, l)?;
     }
     for grant in &value.policy.projections {
@@ -184,6 +186,9 @@ pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<Proje
         for task in &row.batch {
             crate::owner_history::proposed_fits(task, l)?;
         }
+    }
+    for row in &value.acts {
+        super::owner_goals::offer_fits(&row.admission, l)?;
     }
     worst_case(l, words)
 }
@@ -328,7 +333,9 @@ fn configured_ledgers(b: &mut Builder, value: &OwnerProject, words: &Words) {
     b.close();
 }
 fn resources(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::List);
     for resource in &value.resources {
+        b.open(Role::Item);
         text(b, words, P::Resource, &[]);
         text(
             b,
@@ -498,11 +505,15 @@ pub(super) fn section(
             ledgers(b, value, client, words, bindings);
         }
         ProjectSection::Goals => {
+            words.text(b, JigPhrase::PriorityMeaning, &[]);
             b.open(Role::List);
             for goal in &client.project_page().listed_goals {
                 super::goals::line(b, client, goal, words, bindings);
             }
             b.close();
+            if client.project_page().goals_more {
+                words.status(b, JigPhrase::MoreRows, &[]);
+            }
             super::super::cut(b, words, client.project_page().ended_cut);
             super::super::work::cursors(
                 b,
@@ -512,6 +523,7 @@ pub(super) fn section(
                 client.project_page().ended_after.as_ref(),
                 jig_client::pages::project::GOALS_WINDOW,
             );
+            super::owner_goals::form(b, client, value, words, bindings);
         }
         ProjectSection::Tasks => {
             b.open(Role::List);
