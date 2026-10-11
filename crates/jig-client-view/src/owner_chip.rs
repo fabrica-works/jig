@@ -357,7 +357,62 @@ pub(crate) fn hold(b: &mut Builder, value: &OwnerChipHold, words: &Words, bindin
         wall(b, words, P::HoldWaitSince, at);
     }
 }
-fn observation(b: &mut Builder, value: &OwnerChipObservation, words: &Words) {
+/// Maximum leaves for the supplied work report: three tool leaves and three
+/// independent clock leaves. No other metadata or inferred work is included.
+#[must_use]
+pub const fn observation_nodes() -> u32 {
+    6
+}
+
+/// Validate the independent work report and its selected checked sayings.
+/// The byte envelope also permits a name and text on each leaf; the current
+/// renderer emits only text. It carries no bindings, slots or nested cards.
+#[must_use]
+pub fn observation_required(value: &OwnerChipObservation, limits: &Limits, words: &Words) -> Option<ChipFragment> {
+    match &value.work {
+        OwnerChipWork::Tool { call, tool } => {
+            if u32::try_from(call.len()).ok()? > limits.text || u32::try_from(tool.len()).ok()? > limits.text {
+                return None;
+            }
+        }
+        OwnerChipWork::Preparing
+        | OwnerChipWork::Starting
+        | OwnerChipWork::Active
+        | OwnerChipWork::Writing
+        | OwnerChipWork::Waiting
+        | OwnerChipWork::Ending => {}
+    }
+    let mut phrase_bytes = 0;
+    for phrase in [
+        P::Preparing,
+        P::Starting,
+        P::Active,
+        P::Writing,
+        P::Tool,
+        P::Waiting,
+        P::Ending,
+        P::ObservedSince,
+        P::ReportedAt,
+        P::Started,
+        P::StartUnknown,
+    ] {
+        phrase_bytes = phrase_bytes.max(words.book.capacity(phrase.id())?);
+    }
+    let nodes = observation_nodes();
+    let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase_bytes).checked_mul(2)?;
+    Some(ChipFragment {
+        nodes,
+        text_bytes: nodes.checked_mul(text_per_node)?,
+        text_per_node,
+        depth: 1,
+        bindings: 0,
+        slots: 0,
+    })
+}
+
+/// Show only the supplied observation, preserving all seven work kinds and
+/// each independent clock. Channel identity remains an opaque contract fact.
+pub fn observation(b: &mut Builder, value: &OwnerChipObservation, words: &Words) {
     match &value.work {
         OwnerChipWork::Preparing => text(b, words, P::Preparing, &[]),
         OwnerChipWork::Starting => text(b, words, P::Starting, &[]),

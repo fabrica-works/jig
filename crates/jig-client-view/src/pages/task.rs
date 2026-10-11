@@ -8,7 +8,7 @@ use jig_client::{
     Domain,
     action::Act,
     address::{Address, TaskSection},
-    contract::{Executor, ObjectKey, Task},
+    contract::{ChipPhase, Executor, ObjectKey, Task},
     objects::Body,
 };
 mod history;
@@ -221,6 +221,25 @@ fn task_link(
 fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
     match doc.chip.executor {
         Executor::Agent { .. } => {
+            match doc.chip.details.as_ref() {
+                ChipPhase::Owner { details, .. } => {
+                    if let Some(observation) = &details.observation {
+                        crate::owner_chip::observation(b, observation, words);
+                    }
+                }
+                ChipPhase::Active(_)
+                | ChipPhase::Waiting { .. }
+                | ChipPhase::Idle { .. }
+                | ChipPhase::Starting
+                | ChipPhase::Running { .. }
+                | ChipPhase::WaitingForWords { .. }
+                | ChipPhase::BackingOff { .. }
+                | ChipPhase::Procedure { .. }
+                | ChipPhase::Person { .. }
+                | ChipPhase::Held { .. }
+                | ChipPhase::Closing(_)
+                | ChipPhase::Ended { .. } => {}
+            }
             if let Some(context) = &doc.context {
                 super::conversations::runtime(b, client, &context.runtime, words, bindings);
             }
