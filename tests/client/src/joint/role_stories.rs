@@ -21,6 +21,14 @@ fn client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::V
 }
 
 fn world(seed: u64, scripts: Vec<Box<[Script]>>) -> World<Test, Joint> {
+    configured(seed, scripts, |_, _| {})
+}
+
+fn configured(
+    seed: u64,
+    scripts: Vec<Box<[Script]>>,
+    configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
+) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
     // Four adoption identities and their four later public client sign-ins.
     owner.core.people.sign_ins = 8;
@@ -49,6 +57,7 @@ fn world(seed: u64, scripts: Vec<Box<[Script]>>) -> World<Test, Joint> {
         &mut out,
     );
     assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
+    configure(&mut configuration, &owner);
     let roles = [PartyRole::Owner, PartyRole::Maintainer, PartyRole::Member, PartyRole::Observer];
     let parties = roles
         .iter()
@@ -347,3 +356,6 @@ fn an_observer_is_refused_a_request_and_told_why() {
         1
     );
 }
+
+#[path = "engine_stories.rs"]
+mod engine_stories;
