@@ -165,7 +165,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         jig_core::CallPart::Delegated(numbers) => numbers[0],
         other => panic!("delegation must be admitted: {other:?}"),
     };
-    world.person(member, vec![Step::Pause { for_: Duration::from_millis(2100) }]);
+    world.person(member, vec![Step::Pause { span: Duration::from_millis(2100) }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
@@ -208,7 +208,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
             Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
             Step::See { find: Find::text(b"Released"), within },
-            Step::Pause { for_: Duration::from_secs(1) },
+            Step::Pause { span: Duration::from_secs(1) },
         ],
     );
     let outcome = world.run(Until::Done);
