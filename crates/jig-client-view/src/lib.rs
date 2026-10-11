@@ -92,7 +92,7 @@ pub mod owner_inbox_words;
 pub mod owner_tree;
 pub mod owner_tree_words;
 
-pub mod owner_proposal;
-pub mod owner_proposal_words;
 pub mod owner_person_task;
 pub mod owner_person_task_words;
+pub mod owner_proposal;
+pub mod owner_proposal_words;

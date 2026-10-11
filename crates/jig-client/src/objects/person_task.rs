@@ -41,6 +41,7 @@ pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerPersonTask>
             | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
+            | Body::OwnerProposal(_)
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::Result(_)
