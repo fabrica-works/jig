@@ -688,3 +688,5 @@ fn owner_history_composed_normal_book_prices_every_entry_segment_literal_and_che
     };
     let _above_book = Phrasebook::load(shapes, Box::new([language]), &above).unwrap();
 }
+
+mod proposal_fragment;

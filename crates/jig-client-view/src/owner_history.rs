@@ -5,8 +5,8 @@ use jig_client::{
     Limits,
     contract::{
         DocumentText, OwnerHistoryChange, OwnerHistoryHolder, OwnerHistoryLine, OwnerMessageProposalKind,
-        OwnerProposalHistoryState, OwnerRetainedAction, OwnerRetainedAmendment, ParameterDocument, PersonAddress,
-        ProposedTask, SpecificationDocument, TaskContractDocument,
+        OwnerProposalHistory, OwnerProposalHistoryState, OwnerRetainedAction, OwnerRetainedAmendment,
+        ParameterDocument, PersonAddress, ProposedTask, SpecificationDocument, TaskContractDocument,
     },
 };
 
@@ -93,6 +93,32 @@ fn amendment_fits(value: &OwnerRetainedAmendment, limits: &Limits) -> Option<()>
     }
     text_fits(&value.reason, limits)
 }
+fn proposal_fits(proposal: &OwnerProposalHistory, limits: &Limits) -> Option<()> {
+    match &proposal.state {
+        OwnerProposalHistoryState::Rejected { reason, .. } => text_fits(reason, limits)?,
+        OwnerProposalHistoryState::Pending { .. }
+        | OwnerProposalHistoryState::Accepted { .. }
+        | OwnerProposalHistoryState::Withdrawn => {}
+    }
+    match &proposal.action {
+        OwnerRetainedAction::Batch(tasks) => {
+            if tasks.capacity() > limits.rows {
+                return None;
+            }
+            for task in tasks {
+                proposed_fits(task, limits)?;
+            }
+        }
+        OwnerRetainedAction::Effect { part, authority, .. } => {
+            crate::owner_chip::part_fits(part, limits)?;
+            crate::owner_amendment::authority_fits(authority, limits)?;
+        }
+        OwnerRetainedAction::Amend { change, .. } => amendment_fits(change, limits)?,
+        OwnerRetainedAction::Widen { authority, .. } => crate::owner_amendment::authority_fits(authority, limits)?,
+        OwnerRetainedAction::Release { .. } => {}
+    }
+    Some(())
+}
 /// Validate every supplied nested text and allocated capacity before rendering.
 #[must_use]
 pub fn required(value: &OwnerHistoryLine, limits: &Limits, words: &Words) -> Option<HistoryFragment> {
@@ -102,30 +128,24 @@ pub fn required(value: &OwnerHistoryLine, limits: &Limits, words: &Words) -> Opt
         crate::owner_amendment::required(after, limits, words)?;
     }
     if let Some(proposal) = &value.proposal {
-        match &proposal.state {
-            OwnerProposalHistoryState::Rejected { reason, .. } => text_fits(reason, limits)?,
-            OwnerProposalHistoryState::Pending { .. }
-            | OwnerProposalHistoryState::Accepted { .. }
-            | OwnerProposalHistoryState::Withdrawn => {}
-        }
-        match &proposal.action {
-            OwnerRetainedAction::Batch(tasks) => {
-                if tasks.capacity() > limits.rows {
-                    return None;
-                }
-                for task in tasks {
-                    proposed_fits(task, limits)?;
-                }
-            }
-            OwnerRetainedAction::Effect { part, authority, .. } => {
-                crate::owner_chip::part_fits(part, limits)?;
-                crate::owner_amendment::authority_fits(authority, limits)?;
-            }
-            OwnerRetainedAction::Amend { change, .. } => amendment_fits(change, limits)?,
-            OwnerRetainedAction::Widen { authority, .. } => crate::owner_amendment::authority_fits(authority, limits)?,
-            OwnerRetainedAction::Release { .. } => {}
-        }
+        proposal_fits(proposal, limits)?;
     }
+    worst_case(limits, words)
+}
+/// Validate a retained proposal without requiring a surrounding history line.
+#[must_use]
+pub fn proposal_required(proposal: &OwnerProposalHistory, limits: &Limits, words: &Words) -> Option<HistoryFragment> {
+    proposal_fits(proposal, limits)?;
+    proposal_worst_case(limits, words)
+}
+/// Conservative retained-proposal bound, including the whole history envelope's spare allowance.
+#[must_use]
+pub fn proposal_max_nodes(limits: &Limits) -> Option<u32> {
+    max_nodes(limits)
+}
+/// Conservative whole-history storage envelope for the passive proposal subset.
+#[must_use]
+pub fn proposal_worst_case(limits: &Limits, words: &Words) -> Option<HistoryFragment> {
     worst_case(limits, words)
 }
 /// Finite whole-node envelope reused by bounded history pages.
@@ -323,27 +343,32 @@ pub fn render(b: &mut Builder, value: &OwnerHistoryLine, words: &Words, bindings
         None => saying(b, words, P::SnapshotsAbsent, &[]),
     }
     if let Some(proposal) = &value.proposal {
-        saying(b, words, P::Proposal, &[Hole::Number(proposal.number)]);
-        saying(b, words, P::Proposer, &[Hole::Number(proposal.proposer)]);
-        saying(b, words, if proposal.as_holder { P::AsHolder } else { P::NotAsHolder }, &[]);
-        action(b, &proposal.action, words, bindings);
-        match &proposal.state {
-            OwnerProposalHistoryState::Pending { holder: value, since } => {
-                saying(b, words, P::Pending, &[]);
-                holder(b, *value, words);
-                saying(b, words, P::Since, &[Hole::Wall(words.adjusted_wall(*since))]);
-            }
-            OwnerProposalHistoryState::Accepted { by } => {
-                saying(b, words, P::Accepted, &[]);
-                crate::owner_result::requester(b, *by, words);
-            }
-            OwnerProposalHistoryState::Rejected { by, reason } => {
-                saying(b, words, P::Rejected, &[]);
-                crate::owner_result::requester(b, *by, words);
-                crate::document_text::markdown(b, reason, words);
-            }
-            OwnerProposalHistoryState::Withdrawn => saying(b, words, P::Withdrawn, &[]),
-        }
+        self::proposal(b, proposal, words, bindings);
     }
     b.close();
+}
+
+/// Render supplied retained proposal facts inline, without current controls or outer history metadata.
+pub fn proposal(b: &mut Builder, proposal: &OwnerProposalHistory, words: &Words, bindings: &mut JigBindings) {
+    saying(b, words, P::Proposal, &[Hole::Number(proposal.number)]);
+    saying(b, words, P::Proposer, &[Hole::Number(proposal.proposer)]);
+    saying(b, words, if proposal.as_holder { P::AsHolder } else { P::NotAsHolder }, &[]);
+    action(b, &proposal.action, words, bindings);
+    match &proposal.state {
+        OwnerProposalHistoryState::Pending { holder: value, since } => {
+            saying(b, words, P::Pending, &[]);
+            holder(b, *value, words);
+            saying(b, words, P::Since, &[Hole::Wall(words.adjusted_wall(*since))]);
+        }
+        OwnerProposalHistoryState::Accepted { by } => {
+            saying(b, words, P::Accepted, &[]);
+            crate::owner_result::requester(b, *by, words);
+        }
+        OwnerProposalHistoryState::Rejected { by, reason } => {
+            saying(b, words, P::Rejected, &[]);
+            crate::owner_result::requester(b, *by, words);
+            crate::document_text::markdown(b, reason, words);
+        }
+        OwnerProposalHistoryState::Withdrawn => saying(b, words, P::Withdrawn, &[]),
+    }
 }
