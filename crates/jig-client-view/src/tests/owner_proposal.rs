@@ -278,44 +278,53 @@ fn owner_proposal_five_whole_actions_keep_effect_coordinates_release_hold_links_
 }
 #[test]
 fn owner_proposal_amendment_contexts_address_and_release_presence_never_join_a_current_task() {
+    amendment_contexts(None);
+}
+
+#[test]
+fn owner_proposal_addressed_amendment_contexts_and_release_presence_never_join_a_current_task() {
+    amendment_contexts(Some(AddressChange {
+        revision: Revision { value: u64::MAX },
+        address: PersonAddress::Party(u64::MAX),
+    }));
+}
+
+fn amendment_contexts(addressed: Option<AddressChange>) {
     let w = words(false);
-    for addressed in
-        [None, Some(AddressChange { revision: Revision { value: u64::MAX }, address: PersonAddress::Party(u64::MAX) })]
-    {
-        for release in [None, Some(0), Some(u64::MAX)] {
-            for after in [None, Some(doc(b"", false)), Some(doc(b"exact effective after", true))] {
-                let mut a = state(b"before supplied context", false);
-                a.instructions = after.clone();
-                let v = source(OwnerProposalAction::Amend {
-                    task: OwnerTaskLink::Stored { number: 8, status: None },
-                    addressed,
-                    before: Box::new(state(b"before supplied context", false)),
-                    after: Box::new(a),
-                    reason: doc(b"own action reason", true),
-                    release,
-                });
-                let tree = build(&v, &w).0;
-                assert!(has(&tree, b"Before proposed change"));
-                assert!(has(&tree, b"After proposed change"));
-                assert!(has(&tree, b"before supplied context"));
-                assert!(has(&tree, b"own action reason"));
-                assert_eq!(has(&tree, b"Address change not supplied"), addressed.is_none());
-                assert_eq!(has(&tree, b"Proposed release not supplied"), release.is_none());
-                if release == Some(0) {
-                    assert!(has(&tree, b"Proposed release revision: 0"));
-                }
-                if addressed.is_some() {
-                    assert!(has(&tree, b"Person-task revision 18446744073709551615"));
-                }
-                if after.as_ref().is_some_and(|v| v.cut) {
-                    assert!(has(&tree, b"exact effective after"));
-                }
-                assert!(!has(&tree, b"whole task instructions"));
-                assert!(has(&tree, b"Stored status unavailable"));
+    for release in [None, Some(0), Some(u64::MAX)] {
+        for after in [None, Some(doc(b"", false)), Some(doc(b"exact effective after", true))] {
+            let mut a = state(b"before supplied context", false);
+            a.instructions = after.clone();
+            let v = source(OwnerProposalAction::Amend {
+                task: OwnerTaskLink::Stored { number: 8, status: None },
+                addressed,
+                before: Box::new(state(b"before supplied context", false)),
+                after: Box::new(a),
+                reason: doc(b"own action reason", true),
+                release,
+            });
+            let tree = build(&v, &w).0;
+            assert!(has(&tree, b"Before proposed change"));
+            assert!(has(&tree, b"After proposed change"));
+            assert!(has(&tree, b"before supplied context"));
+            assert!(has(&tree, b"own action reason"));
+            assert_eq!(has(&tree, b"Address change not supplied"), addressed.is_none());
+            assert_eq!(has(&tree, b"Proposed release not supplied"), release.is_none());
+            if release == Some(0) {
+                assert!(has(&tree, b"Proposed release revision: 0"));
             }
+            if addressed.is_some() {
+                assert!(has(&tree, b"Person-task revision 18446744073709551615"));
+            }
+            if after.as_ref().is_some_and(|v| v.cut) {
+                assert!(has(&tree, b"exact effective after"));
+            }
+            assert!(!has(&tree, b"whole task instructions"));
+            assert!(has(&tree, b"Stored status unavailable"));
         }
     }
 }
+
 #[test]
 fn owner_proposal_all_funders_independent_optional_amounts_and_holder_variants_preserve_supplied_identity() {
     let w = words(false);
