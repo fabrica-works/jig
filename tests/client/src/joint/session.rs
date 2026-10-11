@@ -870,6 +870,9 @@ impl Session {
 
     /// A normal callback taken by the shell releases only its normal flight.
     pub fn received(&mut self, client: ClientId, now: Time, wall: Wall, event: &Event) {
+        if let Event::Jig(jig_client::Event::Ended { .. }) = event {
+            eprintln!("FAILED_COMMIT_RECEIVED {now:?} {event:?}");
+        }
         self.stopping().expect("whole original stopped routes");
         if let Event::Jig(jig_client::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) = event
             && !matches!(value, client::Delivery::Run(_))
