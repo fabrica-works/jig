@@ -18,8 +18,8 @@ fn receiving_limits() -> jig_test_client_domain::Limits {
 
 fn choice_limits() -> jig_test_client_domain::Limits {
     let mut limits = receiving_limits();
-    limits.jig.text = 32;
-    limits.first.text = 32;
+    limits.jig.text = 128;
+    limits.first.text = 128;
     limits
 }
 fn choice_client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
@@ -238,6 +238,17 @@ fn a_person_answers_a_choice_between_two_reports() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
+    // The initiating member leaves the live chat while its maintainer answers.
+    // Its original start/referee assertions remain; it need not retain a run watch.
+    world.person(
+        member,
+        vec![Step::Go {
+            address: jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
+                project: 1,
+                section: jig_client::address::ProjectSection::Overview,
+            }),
+        }],
+    );
     let maintainer = world.client_with(2, crate::stories::inbox(), choice_limits(), choice_client);
     let within = Duration::from_secs(1);
     world.person(
