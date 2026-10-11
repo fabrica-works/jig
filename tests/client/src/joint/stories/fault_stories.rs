@@ -194,6 +194,11 @@ fn a_reload_with_a_stop_pending_recovers_its_lost_committed_answer_by_the_origin
     world.fault(crate::FrontFault::NoAnswer);
     world.front().session.driver.release_commits();
     world.fault(crate::Fault::Reload { client });
+    let diagnostic_boundary = world.now().saturating_add(Duration::from_millis(250));
+    let diagnostic = world.run(Until::Time(diagnostic_boundary));
+    eprintln!("PENDING_RELOAD_OUTCOME {diagnostic:?}");
+    eprintln!("PENDING_RELOAD_CORE {:?}", world.front().session.driver.world.trace);
+    eprintln!("PENDING_RELOAD_TREE {:?}", world.tree(client).nodes());
     world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
