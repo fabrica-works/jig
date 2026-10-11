@@ -215,6 +215,11 @@ impl Front<Test> for Joint {
         self.session.reload(client, now, self.wall);
     }
     fn received(&mut self, client: ClientId, event: &Event) {
+        if std::env::var_os("JIG_PROJECT_NAV_TRACE").is_some()
+            && matches!(event, Event::Went { .. } | Event::Jig(jig_client::Event::Read { .. }))
+        {
+            eprintln!("actual Project callback at {:?} client {client:?}: {event:?}", self.now);
+        }
         self.session.received(client, self.now, self.wall, event);
     }
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
