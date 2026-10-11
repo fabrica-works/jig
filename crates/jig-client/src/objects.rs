@@ -540,7 +540,7 @@ pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &cra
         | crate::contract::Delivery::Run(_)
         | crate::contract::Delivery::RunState(_)
         | crate::contract::Delivery::Deployment(_)
-        | Delivery::OwnerDeployment(_)
+        | crate::contract::Delivery::OwnerDeployment(_)
         | crate::contract::Delivery::Task(_)
         | crate::contract::Delivery::Tree(_)
         | crate::contract::Delivery::OwnerTree(_)
@@ -903,7 +903,7 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
         | crate::contract::Delivery::Run(_)
         | crate::contract::Delivery::RunState(_)
         | crate::contract::Delivery::Deployment(_)
-        | Delivery::OwnerDeployment(_) => {}
+        | crate::contract::Delivery::OwnerDeployment(_) => {}
     }
     rows
 }
