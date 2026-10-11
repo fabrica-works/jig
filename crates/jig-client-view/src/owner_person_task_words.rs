@@ -78,24 +78,19 @@ impl PersonPhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::PersonTask => None,
-            Self::Party => Some(HoleKind::Number),
-            Self::Role => Some(HoleKind::Number),
-            Self::Taker => Some(HoleKind::Number),
-            Self::TakerAbsent => None,
-            Self::Since => Some(HoleKind::Wall),
-            Self::SinceAbsent => None,
+            Self::Party | Self::Role | Self::Taker | Self::Choice | Self::Revision => Some(HoleKind::Number),
+            Self::Since | Self::Deadline => Some(HoleKind::Wall),
             Self::Stall => Some(HoleKind::Span),
-            Self::StallAbsent => None,
-            Self::Deadline => Some(HoleKind::Wall),
-            Self::DeadlineAbsent => None,
-            Self::Results => None,
-            Self::MissingResult => None,
-            Self::Cut => None,
-            Self::Choice => Some(HoleKind::Number),
-            Self::FieldsUnavailable => None,
-            Self::ChangeUnavailable => None,
-            Self::Revision => Some(HoleKind::Number),
+            Self::PersonTask
+            | Self::TakerAbsent
+            | Self::SinceAbsent
+            | Self::StallAbsent
+            | Self::DeadlineAbsent
+            | Self::Results
+            | Self::MissingResult
+            | Self::Cut
+            | Self::FieldsUnavailable
+            | Self::ChangeUnavailable => None,
         }
     }
     fn label(self) -> &'static [u8] {

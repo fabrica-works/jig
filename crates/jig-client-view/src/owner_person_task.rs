@@ -65,8 +65,22 @@ fn chip_fits(chip: &Chip, l: &Limits, words: &Words) -> Option<()> {
     if !chip.title.bytes.fits(l.text) {
         return None;
     }
-    if let ChipPhase::Owner { details, .. } = chip.details.as_ref() {
-        crate::owner_chip::required(details, l, words)?;
+    match chip.details.as_ref() {
+        ChipPhase::Owner { details, .. } => {
+            crate::owner_chip::required(details, l, words)?;
+        }
+        ChipPhase::Active(_)
+        | ChipPhase::Waiting { .. }
+        | ChipPhase::Idle { .. }
+        | ChipPhase::Starting
+        | ChipPhase::Running { .. }
+        | ChipPhase::WaitingForWords { .. }
+        | ChipPhase::BackingOff { .. }
+        | ChipPhase::Procedure { .. }
+        | ChipPhase::Person { .. }
+        | ChipPhase::Closing(_)
+        | ChipPhase::Held { .. }
+        | ChipPhase::Ended { .. } => {}
     }
     Some(())
 }

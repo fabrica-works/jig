@@ -175,7 +175,7 @@ fn action(
                 }
                 Some(Body::PersonTask(doc)) => person::contract(b, client, open.object, &doc.contract, words, bindings),
                 Some(Body::OwnerPersonTask(doc)) => {
-                    crate::owner_person_task::form(b, client, open.object, &doc.contract, words, bindings)
+                    crate::owner_person_task::form(b, client, open.object, &doc.contract, words, bindings);
                 }
                 Some(
                     Body::Task(_)

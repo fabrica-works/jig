@@ -1,7 +1,6 @@
 #![expect(
     clippy::disallowed_methods,
     clippy::disallowed_types,
-    clippy::disallowed_macros,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs inspect public trees, source data and checked language selection"
 )]
@@ -266,35 +265,8 @@ fn person_owner_approval_renders_opaque_parts_without_inventing_application_scop
         }
     );
 }
-#[test]
-fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_whole_requirements() {
-    let phrase_limits = PhraseLimits {
-        languages: 2,
-        phrases: crate::owner_words::phrase_count(),
-        holes: 4,
-        segments: 4096,
-        text_bytes: 100_000,
-        hole_bytes: 128,
-    };
-    let normal = crate::phrases::english::language();
-    let mut selected = crate::phrases::english::language();
-    for phrase in &mut selected.phrases {
-        for form in &mut phrase.forms {
-            for segment in &mut form.segments {
-                if let Segment::Text(bytes) = segment {
-                    *bytes = copy_of(b"selected ");
-                }
-            }
-        }
-    }
-    let w = Words {
-        book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([normal, selected]), &phrase_limits)
-            .unwrap(),
-        language: 1,
-        offset_minutes: 0,
-    };
+fn full_value(l: &jig_client::Limits) -> OwnerPersonTask {
     let mut value = value();
-    let l = client_limits();
     value.task.title = doc(&[255; 128]);
     value.spec.specification.words = doc(&[b'q'; 128]);
     value.spec.specification.parameters =
@@ -330,6 +302,37 @@ fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_
         }
     }));
     value.acts = List::with_capacity(l.rows);
+    value
+}
+#[test]
+fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_whole_requirements() {
+    let phrase_limits = PhraseLimits {
+        languages: 2,
+        phrases: crate::owner_words::phrase_count(),
+        holes: 4,
+        segments: 4096,
+        text_bytes: 100_000,
+        hole_bytes: 128,
+    };
+    let normal = crate::phrases::english::language();
+    let mut selected = crate::phrases::english::language();
+    for phrase in &mut selected.phrases {
+        for form in &mut phrase.forms {
+            for segment in &mut form.segments {
+                if let Segment::Text(bytes) = segment {
+                    *bytes = copy_of(b"selected ");
+                }
+            }
+        }
+    }
+    let w = Words {
+        book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([normal, selected]), &phrase_limits)
+            .unwrap(),
+        language: 1,
+        offset_minutes: 0,
+    };
+    let l = client_limits();
+    let value = full_value(&l);
     let untouched = value.clone();
     assert!(view::required(&value, &l, &w).is_some());
     let maximum = limits(&w);
@@ -379,7 +382,8 @@ fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_
         Limits { text_per_node: exact.text_per_node - 1, ..exact },
         Limits { text_bytes: exact.text_bytes - 1, ..exact },
     ] {
-        assert!(std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&value, &w, below))).is_err());
+        std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&value, &w, below)))
+            .expect_err("one-under storage rejects the whole view");
     }
     assert_eq!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..client_limits() }), None);
     let mut over = value.clone();
