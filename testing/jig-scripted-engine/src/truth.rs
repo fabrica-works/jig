@@ -13,7 +13,7 @@ pub struct Truth {
     /// Project context for object documents whose client carrier names only a task.
     pub object_projects: BTreeMap<ObjectKey, u32>,
     pub projects: BTreeMap<u32, Project>,
-    /// Whole authentic projects, independent of legacy fixtures.
+    /// Whole authentic projects, independent of ordinary fixtures.
     pub owner_projects: BTreeMap<u32, jig_client::contract::OwnerProject>,
     pub deployment: Option<Deployment>,
     pub notes: BTreeMap<u64, Note>,
