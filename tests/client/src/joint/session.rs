@@ -92,6 +92,12 @@ impl Session {
         }
     }
 
+    /// Capture only card offers when a story asserts no whole Task offer packet.
+    pub fn capture_card_offers(&mut self) {
+        self.task_offers = None;
+        self.card_offers = Some(BTreeMap::new());
+    }
+
     /// Enable latest whole Task packet evidence for a public journey. Ordinary
     /// worlds keep this off and allocate no copies of the offered lists.
     pub fn capture_task_offers(&mut self) {

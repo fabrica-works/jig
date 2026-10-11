@@ -16,6 +16,16 @@ fn receiving_limits() -> jig_test_client_domain::Limits {
     limits
 }
 
+fn choice_limits() -> jig_test_client_domain::Limits {
+    let mut limits = receiving_limits();
+    limits.jig.text = 32;
+    limits.first.text = 32;
+    limits
+}
+fn choice_client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+    crate::test::new(&choice_limits(), seed)
+}
+
 fn client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
     crate::test::new(&receiving_limits(), seed)
 }
@@ -207,7 +217,7 @@ fn a_chat_proposing_a_goal_its_member_cannot_fund_is_accepted_by_a_maintainer() 
 
 #[test]
 fn a_person_answers_a_choice_between_two_reports() {
-    let mut world = world(
+    let mut world = configured_with_bounds(
         8514,
         vec![Box::new([
             Script::Call(Call::Choose {
@@ -218,13 +228,17 @@ fn a_person_answers_a_choice_between_two_reports() {
             Script::Wait,
             Script::Finish { report: b"choice received".as_slice().into() },
         ])],
+        1,
+        |_, _| {},
+        choice_limits(),
     );
-    let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
+    world.front().session.capture_card_offers();
+    let member = world.client_with(3, crate::stories::conversation(), choice_limits(), choice_client);
     world.person(member, start(b"ask a maintainer"));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
-    let maintainer = world.client_with(2, crate::stories::inbox(), receiving_limits(), client);
+    let maintainer = world.client_with(2, crate::stories::inbox(), choice_limits(), choice_client);
     let within = Duration::from_secs(1);
     world.person(
         maintainer,
