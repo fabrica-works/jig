@@ -182,13 +182,13 @@ pub fn project_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
 /// Hosts, accounts, project capacity, refusals and deployment parts.
 #[must_use]
 pub fn deployment_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
-    let legacy = chip_nodes(l)?
+    let synthetic = chip_nodes(l)?
         .checked_mul(l.rows)?
         .checked_mul(l.rows)?
         .checked_mul(3)?
         .checked_add(l.rows.checked_mul(40)?)?
         .checked_add(64)?;
-    legacy.max(crate::owner_deployment::max_nodes(l)?).checked_add(slot_nodes)
+    synthetic.max(crate::owner_deployment::max_nodes(l)?).checked_add(slot_nodes)
 }
 /// Starting, providers, missing, out of date and someone else's work.
 #[must_use]

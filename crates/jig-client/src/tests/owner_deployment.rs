@@ -129,7 +129,7 @@ fn native_deployment_wrong_subject_wrong_read_left_generation_and_ended_watch_ne
     assert!(domain.deployment_page().owner.is_none());
 }
 #[test]
-fn native_deployment_genuine_and_legacy_documents_replace_each_other_without_inventing_connector_parts() {
+fn native_deployment_genuine_and_synthetic_documents_replace_each_other_without_inventing_connector_parts() {
     let mut domain = Domain::new(&LIMITS, 1);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, frame_watch, frame(7));

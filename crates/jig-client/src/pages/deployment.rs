@@ -11,7 +11,7 @@ use skein_lib::{Env, List, Queue};
 #[derive(Debug)]
 pub struct DeploymentPage {
     pub document: Option<Box<Deployment>>,
-    /// The latest deployment owner facts, independent of the legacy parts path.
+    /// The latest deployment owner facts, independent of the synthetic parts path.
     pub owner: Option<Box<OwnerDeployment>>,
 }
 impl DeploymentPage {
