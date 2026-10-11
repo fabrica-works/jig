@@ -1104,10 +1104,10 @@ fn deployment_read(root: &mut Domain, connector: u16) -> Request {
         }),
     );
     rows.into_iter()
-        .find(|request| match request {
+        .find_map(|request| match request {
             Request::Infrastructure(infrastructure::Out::Read { .. })
-            | Request::Observability(observability::Out::Read { .. }) => true,
-            _ => false,
+            | Request::Observability(observability::Out::Read { .. }) => Some(request),
+            _ => None,
         })
         .unwrap()
 }
@@ -1326,7 +1326,9 @@ fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_h
         }
         let mut short = bounds;
         short.text_bytes -= 1;
-        assert!(Phrasebook::load(shapes.clone().into_boxed_slice(), languages.clone(), &short).is_err());
+        let Err(_) = Phrasebook::load(shapes.clone().into_boxed_slice(), languages.clone(), &short) else {
+            panic!("one-under phrase byte capacity must be refused");
+        };
         for omitted in 0..2 {
             let mut missing = languages.clone();
             missing[1].phrases = missing[1]
@@ -1336,7 +1338,9 @@ fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_h
                 .filter(|(index, _)| *index != omitted)
                 .map(|(_, phrase)| phrase.clone())
                 .collect();
-            assert!(Phrasebook::load(shapes.clone().into_boxed_slice(), missing, &bounds).is_err());
+            let Err(_) = Phrasebook::load(shapes.clone().into_boxed_slice(), missing, &bounds) else {
+                panic!("each omitted checked caption must be refused");
+            };
         }
     }
 }
