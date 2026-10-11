@@ -251,7 +251,14 @@ pub(crate) fn parts(domain: &mut Domain, env: &Env<crate::Limits>, values: &[Par
     }
 }
 
-fn one(domain: &mut Domain, source: Source, key: ObjectKey, body: Body) {
+fn one(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    source: Source,
+    key: ObjectKey,
+    body: Body,
+    out: &mut Queue<Request>,
+) {
     let missed = domain.objects.replace(source, &[key]);
     if missed > 0 {
         refuse(domain, Limit::Objects);
@@ -259,7 +266,7 @@ fn one(domain: &mut Domain, source: Source, key: ObjectKey, body: Body) {
     }
     match domain.objects.find(key) {
         Some(_) => {
-            let stored = domain.objects.put(key, body);
+            let stored = crate::application::put(domain, env, key, body, out);
             assert!(stored, "named object receives its facts");
         }
         None => refuse(domain, Limit::Objects),
@@ -281,7 +288,7 @@ pub(crate) fn delivery(
         Delivery::RunState(value) => crate::conversation::routing::run_state(domain, env, watch, *value, out),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
-            one(domain, source, key, Body::OwnerProposal(proposal));
+            one(domain, env, source, key, Body::OwnerProposal(proposal), out);
         }
         Delivery::Task(task) => {
             crate::conversation::routing::document(domain, &task, out);
@@ -483,7 +490,9 @@ fn read_value(
         ReadValue::Historical(value) => read_body(domain, value.key, Body::Historical(value)),
         ReadValue::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
-            read_body(domain, key, Body::OwnerProposal(proposal));
+            if crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out) {
+                domain.changed();
+            }
         }
         ReadValue::Proposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
