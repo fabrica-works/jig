@@ -295,7 +295,8 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
             | ReadValue::Goals(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
-            | ReadValue::Deployment(_) => unreachable!(),
+            | ReadValue::Deployment(_)
+            | ReadValue::OwnerDeployment(_) => unreachable!(),
         }
     }
     let line = ConversationLine {
