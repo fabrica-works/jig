@@ -76,7 +76,9 @@ fn question_sender_malformed_nested_capacity_and_words_are_refused_whole_without
     assert!(!fits(&ReadValue::Question(Box::new(value.clone())), &bounds));
     assert_eq!(value, before);
     let mut empty_offers = value.clone();
-    empty_offers.acts = List::with_capacity(4);
+    // Offers use the closed vocabulary ceiling, independently of rows=3.
+    // Keep the original unused reserved-capacity refusal at its actual bound.
+    empty_offers.acts = List::with_capacity(MAX_OFFERED_ACTS.checked_add(1).unwrap());
     bounds.text = 3;
     assert!(!fits(&ReadValue::Question(Box::new(empty_offers)), &bounds), "reserved empty offer capacity is checked");
     let mut malformed = value;

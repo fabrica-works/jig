@@ -2286,4 +2286,5 @@ mod task_context;
 mod task_hold;
 mod task_resources;
 
+mod offered;
 mod owner_person_task;

@@ -51,3 +51,5 @@ mod question_sender;
 
 mod owner_person_task;
 mod owner_proposal;
+
+mod offered;

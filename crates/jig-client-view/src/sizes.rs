@@ -1,6 +1,7 @@
 //! Renderer envelopes (client/domain/view.md, section 10).
-//! Incoming lists, including nested lists, fit `rows` (contract.md, 5.3),
-//! and all text fits `text`. The protocol also checks whole document bytes.
+//! Ordinary incoming lists, including nested lists, fit `rows` (contract.md, 5.3),
+//! offered acts fit their closed vocabulary ceiling, and all text fits `text`.
+//! The protocol also checks whole document bytes.
 //! These counts deliberately do not spend that independent byte budget: full
 //! lists and full texts together form an envelope even when admission would
 //! reject their combination. Counts include loading slot fallbacks, but not
@@ -24,9 +25,11 @@ fn outcome(limits: &Limits) -> Option<u32> {
     // connector part identity; endings retain only supplied actor/decision facts.
     limits.rows.checked_mul(limits.rows.checked_add(9)?)?.checked_add(12)
 }
-fn acts(limits: &Limits) -> Option<u32> {
-    // Offered control (two nodes) or refused ending (up to eight leaves).
-    limits.rows.checked_mul(8)
+/// Whole closed offer controls or refusals, independent of paged rows.
+#[must_use]
+pub fn offered_nodes(limits: &Limits) -> Option<u32> {
+    // Each offer is a two-node control or its label plus a whole refusal.
+    jig_client::contract::MAX_OFFERED_ACTS.checked_mul(outcome(limits)?.checked_add(1)?.max(2))
 }
 /// One chip, including each retained dependency at most once for this call.
 #[must_use]
@@ -43,7 +46,7 @@ fn frame_of_card(limits: &Limits) -> Option<u32> {
         .checked_mul(limits.rows)?
         .checked_add(markdown(limits)?.checked_add(6)?)?
         .checked_add(outcome(limits)?.checked_mul(2)?)?
-        .checked_add(acts(limits)?)?
+        .checked_add(offered_nodes(limits)?)?
         .checked_add(12)
 }
 fn amendment(limits: &Limits) -> Option<u32> {
@@ -111,7 +114,7 @@ pub(crate) fn result_facts(limits: &Limits) -> Option<u32> {
 /// Whole result, including follow-up chips and a kept verdict proposal.
 #[must_use]
 pub fn result_nodes(limits: &Limits) -> Option<u32> {
-    frame_of_card(limits)?.checked_add(result_facts(limits)?)
+    frame_of_card(limits)?.checked_add(result_foffered_nodes(limits)?)
 }
 fn person_contract(limits: &Limits) -> Option<u32> {
     // Choice group, full named choices, cannot-do button and reason field;
@@ -121,7 +124,7 @@ fn person_contract(limits: &Limits) -> Option<u32> {
 /// Whole person task with every passive input result and active contract.
 #[must_use]
 pub fn person_task_nodes(limits: &Limits) -> Option<u32> {
-    result_facts(limits)?
+    result_foffered_nodes(limits)?
         .checked_add(1)?
         .checked_mul(limits.rows)?
         .checked_add(frame_of_card(limits)?)?

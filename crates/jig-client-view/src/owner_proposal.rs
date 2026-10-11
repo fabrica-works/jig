@@ -60,7 +60,7 @@ fn hold_fits(value: &OwnerChipHold, limits: &Limits) -> Option<()> {
 #[must_use]
 pub fn required(value: &OwnerProposal, limits: &Limits, words: &Words) -> Option<ProposalFragment> {
     text_fits(&value.reason, limits)?;
-    if value.funding.capacity() > limits.rows || value.acts.capacity() > limits.rows {
+    if value.funding.capacity() > limits.rows || value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS {
         return None;
     }
     match &value.action {

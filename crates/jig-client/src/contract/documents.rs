@@ -221,6 +221,10 @@ pub struct SpendLine {
     pub spent: u64,
 }
 
+/// Allocated offer slots for the closed act vocabulary (contract.md, 5.3).
+/// Offers are independent of paged rows; their nested values keep their own bounds.
+pub const MAX_OFFERED_ACTS: u32 = 25;
+
 /// An engine offered act kind, without view words.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ActKind {

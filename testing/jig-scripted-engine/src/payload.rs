@@ -93,6 +93,16 @@ impl<T: Payload> Payload for Box<T> {
     }
 }
 macro_rules! fields {
+    ($name:ty { $($field:ident),* ; acts }) => {
+        impl Payload for $name {
+            fn heap(&self, bounds: &Bounds) -> Option<u64> {
+                let Self { $($field),*, acts } = self;
+                let total = crate::offered::heap(acts, bounds)?;
+                $(let total = total.checked_add($field.heap(bounds)?)?;)*
+                Some(total)
+            }
+        }
+    };
     ($name:ty { $($field:ident),* }) => {
         impl Payload for $name {
             fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -478,11 +488,10 @@ fields!(Task {
     proposals,
     activity,
     changed,
-    acts,
     result,
     delegates,
     context,
-    cut
+    cut; acts
 });
 fields!(TaskContext { escalation, parts, closing, spend, runtime, impact, writer_slots });
 fields!(Closing { delegates, connectors, stage, ending });
@@ -595,7 +604,7 @@ impl Payload for FailureClass {
         }
     }
 }
-fields!(Escalation { ending, task, hold, steering, impact, waiting, trail, acts });
+fields!(Escalation { ending, task, hold, steering, impact, waiting, trail; acts });
 fields!(Steering {
     addressed,
     person_revision,
@@ -609,7 +618,7 @@ fields!(Steering {
     budget
 });
 fields!(Passed { by, at, reason, lacking });
-fields!(Proposal { key, project, proposer, why, action, needs, funding, waiting, trail, since, acts, ending });
+fields!(Proposal { key, project, proposer, why, action, needs, funding, waiting, trail, since, ending; acts });
 impl Payload for ProposalAction {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -662,7 +671,7 @@ impl Payload for jig_client::contract::TaskContractDocument {
         }
     }
 }
-fields!(Question { task, from, message, words, since, acts, ending });
+fields!(Question { task, from, message, words, since, ending; acts });
 fields!(PersonTask {
     task,
     revision,
@@ -675,8 +684,7 @@ fields!(PersonTask {
     since,
     stall,
     deadline,
-    acts,
-    ending
+    ending; acts
 });
 impl Payload for PersonContract {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -737,7 +745,7 @@ impl Payload for ResultValue {
         }
     }
 }
-fields!(Result { task, ending, value, at, details, acts });
+fields!(Result { task, ending, value, at, details; acts });
 fields!(PhaseCounts { ended, waiting, running, held, closing, done, failed, cancelled });
 fields!(TreeNode { chip, parent, dependencies, proposals, spend, folded, held_below });
 fields!(Tree { task, nodes, folded, held_below });
@@ -784,8 +792,7 @@ fields!(Project {
     resources,
     services,
     recurring,
-    parts,
-    acts
+    parts; acts
 });
 fields!(Pool { party, period, budget });
 fields!(Recurring {
@@ -809,7 +816,7 @@ impl Payload for NoteAuthor {
         }
     }
 }
-fields!(Note { number, revision, scope, description, body, writer, tasks, changed, acts, cut });
+fields!(Note { number, revision, scope, description, body, writer, tasks, changed, cut; acts });
 fields!(Deployment { hosts, accounts, capacity, proposals, refusals, parts });
 fields!(Host { number, connected, grace, used, free, runs, refused });
 fields!(Account { number, usable, reason, runs, waiting });

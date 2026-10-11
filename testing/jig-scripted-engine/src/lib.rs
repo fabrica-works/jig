@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 mod application;
 mod faults;
+pub mod offered;
 pub mod owner_wake;
 mod payload;
 pub mod policy_edit;

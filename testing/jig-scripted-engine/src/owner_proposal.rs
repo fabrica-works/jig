@@ -43,7 +43,7 @@ impl Payload for OwnerProposal {
             .checked_add(self.action.heap(bounds)?)?
             .checked_add(self.waiting.heap(bounds)?)?
             .checked_add(self.funding.heap(bounds)?)?
-            .checked_add(self.acts.heap(bounds)?)
+            .checked_add(crate::offered::heap(&self.acts, bounds)?)
     }
 }
 /// Inline carrier plus all nested allocated capacity and supplied text bytes.
