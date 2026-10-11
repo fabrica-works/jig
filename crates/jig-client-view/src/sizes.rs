@@ -114,7 +114,7 @@ pub(crate) fn result_facts(limits: &Limits) -> Option<u32> {
 /// Whole result, including follow-up chips and a kept verdict proposal.
 #[must_use]
 pub fn result_nodes(limits: &Limits) -> Option<u32> {
-    frame_of_card(limits)?.checked_add(result_foffered_nodes(limits)?)
+    frame_of_card(limits)?.checked_add(result_facts(limits)?)
 }
 fn person_contract(limits: &Limits) -> Option<u32> {
     // Choice group, full named choices, cannot-do button and reason field;
@@ -124,7 +124,7 @@ fn person_contract(limits: &Limits) -> Option<u32> {
 /// Whole person task with every passive input result and active contract.
 #[must_use]
 pub fn person_task_nodes(limits: &Limits) -> Option<u32> {
-    result_foffered_nodes(limits)?
+    result_facts(limits)?
         .checked_add(1)?
         .checked_mul(limits.rows)?
         .checked_add(frame_of_card(limits)?)?
