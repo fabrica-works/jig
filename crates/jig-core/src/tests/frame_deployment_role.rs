@@ -73,9 +73,9 @@ fn frame_deployment_role_preserves_every_builtin_and_admitted_policy_and_full_wi
             held += List::<u32>::worst_case(charters.goals.capacity()).unwrap();
         }
         assert!(document_worst_case(&limits.documents).unwrap() >= held);
-        let deployment_admitted =
-            matches!(make(&core, &limits, 1, &Subject::Deployment, &window()), Ok(Document::Deployment(_)));
-        assert!(deployment_admitted);
+        let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window()) else {
+            panic!("deployment document admitted");
+        };
     }
 }
 
@@ -94,9 +94,9 @@ fn frame_deployment_role_is_independent_of_clipped_project_rows_and_never_inferr
             Some(role) => {
                 assert_eq!(value.projects.get(0).unwrap().project, 0);
                 assert_eq!(value.projects.get(0).unwrap().role, role);
-                let clipped_deployment_admitted =
-                    matches!(make(&core, &limits, 1, &Subject::Deployment, &window()), Ok(Document::Deployment(_)));
-                assert!(clipped_deployment_admitted);
+                let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window()) else {
+                    panic!("clipped deployment document admitted");
+                };
             }
             None => {
                 assert_eq!(value.projects.get(0).unwrap().project, 1);
@@ -122,9 +122,9 @@ fn frame_deployment_role_changes_only_when_its_own_retained_membership_changes()
         },
         &mut out,
     );
-    let project_roles_saved =
-        matches!(out.pop(), Some(people::Request::Save { record: people::Stored::Roles { project: 1, .. } }));
-    assert!(project_roles_saved);
+    let Some(people::Request::Save { record: people::Stored::Roles { project: 1, .. } }) = out.pop() else {
+        panic!("project roles saved");
+    };
     assert_eq!(out.pop(), None);
     assert_eq!(frame(&core, &limits).deployment_role, None);
     people::step(
@@ -136,15 +136,15 @@ fn frame_deployment_role_changes_only_when_its_own_retained_membership_changes()
         },
         &mut out,
     );
-    let deployment_roles_saved =
-        matches!(out.pop(), Some(people::Request::Save { record: people::Stored::Roles { project: 0, .. } }));
-    assert!(deployment_roles_saved);
+    let Some(people::Request::Save { record: people::Stored::Roles { project: 0, .. } }) = out.pop() else {
+        panic!("deployment roles saved");
+    };
     assert_eq!(out.pop(), None);
     assert_eq!(frame(&core, &limits).deployment_role, Some(people::Role::Observer));
     people::step(&mut core.people, &env, people::Event::Roles { project: 0, holdings: Box::new([]) }, &mut out);
-    let deployment_roles_released =
-        matches!(out.pop(), Some(people::Request::Save { record: people::Stored::Roles { project: 0, .. } }));
-    assert!(deployment_roles_released);
+    let Some(people::Request::Save { record: people::Stored::Roles { project: 0, .. } }) = out.pop() else {
+        panic!("deployment roles released");
+    };
     assert_eq!(out.pop(), None);
     assert_eq!(frame(&core, &limits).deployment_role, None);
     assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
@@ -164,8 +164,9 @@ fn frame_deployment_role_does_not_invent_a_reserved_policy_number_refused_by_its
         },
         &mut out,
     );
-    let reserved_policy_refused = matches!(out.pop(), Some(people::Request::RolesRefused { project: 0, .. }));
-    assert!(reserved_policy_refused);
+    let Some(people::Request::RolesRefused { project: 0, .. }) = out.pop() else {
+        panic!("reserved policy refused");
+    };
     assert_eq!(out.pop(), None);
     assert_eq!(core.people.role(1, 0), None);
     assert_eq!(frame(&core, &limits).deployment_role, None);

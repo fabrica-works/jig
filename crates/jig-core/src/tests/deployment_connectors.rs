@@ -1,9 +1,5 @@
 //! Configured deployment connector references are supplied independently of their
 //! owners' values (`client/domain/pages.md`, 7; `client/domain/root.md`, 6).
-#![expect(
-    clippy::disallowed_macros,
-    reason = "producer proofs are ordinary Rust under programming-model.md section 10.2"
-)]
 use super::*;
 use crate::documents::Deployment;
 
@@ -139,9 +135,10 @@ fn deployment_complete_connector_registry_does_not_hide_original_refusal_history
             },
             &mut out,
         );
-        let hello_refused =
-            matches!(out.pop(), Some(fleet::Request::Refuse { channel: refused }) if refused == Token::new(channel));
-        assert!(hello_refused);
+        let Some(fleet::Request::Refuse { channel: refused }) = out.pop() else {
+            panic!("hello refused");
+        };
+        assert!(refused == Token::new(channel));
         assert_eq!(out.pop(), None);
     }
     let value = deployment(&core, &limits);
