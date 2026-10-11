@@ -409,27 +409,86 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     assert_eq!(domain.objects().get(id).unwrap().body, Some(jig_client::objects::Body::OwnerEscalation(Box::new(row))));
 }
 
-fn check_presence_envelopes(result: bool) {
+fn check_presence_envelopes(result: bool, part: u32) {
+    assert!(part < 6);
+    let mut case = 0_u32;
     for person in [false, true] {
         for proposal in [false, true] {
             for loaded in [false, true] {
-                check_presence_case([result, person, proposal], loaded, false);
+                if case / 2 == part {
+                    check_presence_case([result, person, proposal], loaded, false);
+                }
+                case += 1;
                 if person {
-                    check_presence_case([result, person, proposal], loaded, true);
+                    if case / 2 == part {
+                        check_presence_case([result, person, proposal], loaded, true);
+                    }
+                    case += 1;
                 }
             }
         }
     }
+    assert_eq!(case, 12);
 }
 
 #[test]
 fn owner_escalation_without_result_key_keeps_whole_person_inputs_loading_and_repeated_proposals_in_finite_view() {
-    check_presence_envelopes(false);
+    check_presence_envelopes(false, 0);
+}
+
+#[test]
+fn owner_escalation_without_result_key_presence_part_2_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(false, 1);
+}
+
+#[test]
+fn owner_escalation_without_result_key_presence_part_3_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(false, 2);
+}
+
+#[test]
+fn owner_escalation_without_result_key_presence_part_4_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(false, 3);
+}
+
+#[test]
+fn owner_escalation_without_result_key_presence_part_5_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(false, 4);
+}
+
+#[test]
+fn owner_escalation_without_result_key_presence_part_6_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(false, 5);
 }
 
 #[test]
 fn owner_escalation_with_repeated_result_key_keeps_whole_person_inputs_loading_and_repeated_proposals_in_finite_view() {
-    check_presence_envelopes(true);
+    check_presence_envelopes(true, 0);
+}
+
+#[test]
+fn owner_escalation_with_repeated_result_key_presence_part_2_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(true, 1);
+}
+
+#[test]
+fn owner_escalation_with_repeated_result_key_presence_part_3_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(true, 2);
+}
+
+#[test]
+fn owner_escalation_with_repeated_result_key_presence_part_4_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(true, 3);
+}
+
+#[test]
+fn owner_escalation_with_repeated_result_key_presence_part_5_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(true, 4);
+}
+
+#[test]
+fn owner_escalation_with_repeated_result_key_presence_part_6_keeps_whole_inputs_and_loading() {
+    check_presence_envelopes(true, 5);
 }
 
 #[test]
