@@ -67,5 +67,6 @@ mod owner_deployment;
 mod owner_project;
 
 mod historical_objects;
+mod owner_effect_parts;
 mod owner_hold_parts;
 mod task_revisit;

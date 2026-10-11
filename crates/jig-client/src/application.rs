@@ -204,7 +204,7 @@ fn key(what: &Read) -> Option<ObjectKey> {
         | Read::Deployment => None,
     }
 }
-fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body, out: &mut Queue<Request>) {
+pub(crate) fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body, out: &mut Queue<Request>) {
     let parts = parts(&body, env.limits.parts);
     if parts.full {
         crate::pages::routing::refuse(domain, contract::Limit::Objects);
@@ -284,6 +284,17 @@ fn parts(body: &Body, limit: u32) -> Parts {
             | contract::ProposalAction::Widen { .. }
             | contract::ProposalAction::Amend { .. } => {}
         },
+        Body::OwnerProposal(proposal) => match &proposal.action {
+            contract::OwnerProposalAction::Effect { part, .. } => {
+                if let Some(part) = owner_effect(part) {
+                    push(&mut parts, part);
+                }
+            }
+            contract::OwnerProposalAction::Batch(_)
+            | contract::OwnerProposalAction::Amend { .. }
+            | contract::OwnerProposalAction::Widen { .. }
+            | contract::OwnerProposalAction::Release { .. } => {}
+        },
         Body::Escalation(escalation) => {
             chip_parts(&mut parts, &escalation.task);
             hold_parts(&mut parts, &escalation.hold.reason);
@@ -308,7 +319,7 @@ fn parts(body: &Body, limit: u32) -> Parts {
                 | None => {}
             }
         }
-        Body::Historical(_) | Body::OwnerProposal(_) | Body::Note { .. } => {}
+        Body::Historical(_) | Body::Note { .. } => {}
     }
     parts
 }
@@ -374,6 +385,24 @@ pub(crate) fn owner_hold(chip: &contract::Chip) -> Option<Part> {
         | contract::OwnerPartKind::Outbox => None,
     }
 }
+// The connector's effect number is independent of the jig proposal maker
+// (client/domain/root.md, 6; objects.md, 4).
+fn owner_effect(part: &contract::OwnerPart) -> Option<Part> {
+    match part.kind {
+        contract::OwnerPartKind::Effect => match &part.key {
+            contract::OwnerPartKey::Number(proposal) => {
+                Some(Part::OwnerEffect { connector: part.connector, proposal: *proposal })
+            }
+            contract::OwnerPartKey::Path(_) => None,
+        },
+        contract::OwnerPartKind::Resource
+        | contract::OwnerPartKind::Pool
+        | contract::OwnerPartKind::Result
+        | contract::OwnerPartKind::Procedure
+        | contract::OwnerPartKind::Outbox
+        | contract::OwnerPartKind::Hold => None,
+    }
+}
 fn closing_parts(parts: &mut Parts, closing: &contract::Closing) {
     if let Some(connectors) = &closing.connectors {
         for connector in connectors {
@@ -421,6 +450,7 @@ pub(crate) fn owner_scope(part: &Part, enclosing: contract::PartScope) -> contra
         | Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::OwnerEffect { .. }
         | Part::Hold { .. }
         | Part::Project { .. }
         | Part::Deployment { .. } => enclosing,
@@ -454,6 +484,10 @@ pub(crate) fn scope(domain: &Domain, part: &Part) -> Option<contract::PartScope>
                 None => None,
             }
         }
+        Part::OwnerEffect { .. } => match current_project(domain) {
+            Some(project) => Some(contract::PartScope::Project(project)),
+            None => None,
+        },
     }
 }
 fn current_project(domain: &Domain) -> Option<u32> {
