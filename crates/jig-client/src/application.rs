@@ -95,14 +95,14 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             if domain.objects.named(key, source(domain)) {
-                put(domain, env, key, Body::OwnerProposal(proposal), out);
+                let _ = put(domain, env, key, Body::OwnerProposal(proposal), out);
             }
         }
         Delivery::Chips(chips) => {
             for chip in chips.into_boxed() {
                 let key = ObjectKey::Task(chip.task);
                 if domain.objects.named(key, source(domain)) {
-                    put(domain, env, key, Body::Chip(chip), out);
+                    let _ = put(domain, env, key, Body::Chip(chip), out);
                 }
             }
         }
@@ -153,34 +153,36 @@ pub(crate) fn read_result(
             | contract::ReadNone::Busy
             | contract::ReadNone::Unreachable => crate::pages::routing::refuse(domain, contract::Limit::Reads),
         },
-        ReadResult::Value(value) => match value {
-            ReadValue::Task(document) => put(domain, env, key, Body::Task(document), out),
-            ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out),
-            ReadValue::Historical(document) => put(domain, env, key, Body::Historical(document), out),
-            ReadValue::OwnerProposal(document) => put(domain, env, key, Body::OwnerProposal(document), out),
-            ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out),
-            ReadValue::OwnerEscalation(document) => put(domain, env, key, Body::OwnerEscalation(document), out),
-            ReadValue::Question(document) => put(domain, env, key, Body::Question(document), out),
-            ReadValue::PersonTask(document) => put(domain, env, key, Body::PersonTask(document), out),
-            ReadValue::OwnerPersonTask(document) => put(domain, env, key, Body::OwnerPersonTask(document), out),
-            ReadValue::Result(document) => put(domain, env, key, Body::Result(document), out),
-            ReadValue::Frame(_)
-            | ReadValue::Ended(_)
-            | ReadValue::History(_)
-            | ReadValue::Activity(_)
-            | ReadValue::Inbox(_)
-            | ReadValue::OwnerInbox(_)
-            | ReadValue::Conversations(_)
-            | ReadValue::Goals(_)
-            | ReadValue::Spend(_)
-            | ReadValue::OwnerEnded(_)
-            | ReadValue::OwnerSpend(_)
-            | ReadValue::OwnerProject(_)
-            | ReadValue::Project(_)
-            | ReadValue::Notes(_)
-            | ReadValue::Deployment(_)
-            | ReadValue::OwnerDeployment(_) => {}
-        },
+        ReadResult::Value(value) => {
+            let _ = match value {
+                ReadValue::Task(document) => put(domain, env, key, Body::Task(document), out),
+                ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out),
+                ReadValue::Historical(document) => put(domain, env, key, Body::Historical(document), out),
+                ReadValue::OwnerProposal(document) => put(domain, env, key, Body::OwnerProposal(document), out),
+                ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out),
+                ReadValue::OwnerEscalation(document) => put(domain, env, key, Body::OwnerEscalation(document), out),
+                ReadValue::Question(document) => put(domain, env, key, Body::Question(document), out),
+                ReadValue::PersonTask(document) => put(domain, env, key, Body::PersonTask(document), out),
+                ReadValue::OwnerPersonTask(document) => put(domain, env, key, Body::OwnerPersonTask(document), out),
+                ReadValue::Result(document) => put(domain, env, key, Body::Result(document), out),
+                ReadValue::Frame(_)
+                | ReadValue::Ended(_)
+                | ReadValue::History(_)
+                | ReadValue::Activity(_)
+                | ReadValue::Inbox(_)
+                | ReadValue::OwnerInbox(_)
+                | ReadValue::Conversations(_)
+                | ReadValue::Goals(_)
+                | ReadValue::Spend(_)
+                | ReadValue::OwnerEnded(_)
+                | ReadValue::OwnerSpend(_)
+                | ReadValue::OwnerProject(_)
+                | ReadValue::Project(_)
+                | ReadValue::Notes(_)
+                | ReadValue::Deployment(_)
+                | ReadValue::OwnerDeployment(_) => false,
+            };
+        }
     }
 }
 fn key(what: &Read) -> Option<ObjectKey> {
@@ -204,7 +206,15 @@ fn key(what: &Read) -> Option<ObjectKey> {
         | Read::Deployment => None,
     }
 }
-pub(crate) fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body, out: &mut Queue<Request>) {
+/// Stores the whole source and registers its bounded supplied parts only if accepted.
+#[must_use]
+pub(crate) fn put(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    key: ObjectKey,
+    body: Body,
+    out: &mut Queue<Request>,
+) -> bool {
     let parts = parts(&body, env.limits.parts);
     if parts.full {
         crate::pages::routing::refuse(domain, contract::Limit::Objects);
@@ -246,6 +256,9 @@ pub(crate) fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey,
         }
 
         domain.changed();
+        true
+    } else {
+        false
     }
 }
 struct Parts {

@@ -704,6 +704,7 @@ pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
 /// Applies a card's terminal read without replacing the whole page on failure.
 pub(crate) fn read_card(
     domain: &mut crate::Domain,
+    env: &skein_lib::Env<crate::Limits>,
     token: Token,
     result: crate::contract::ReadResult,
     out: &mut skein_lib::Queue<crate::Request>,
@@ -742,6 +743,7 @@ pub(crate) fn read_card(
         return;
     };
     let key = object.key;
+    let shown = object.shown;
     let leaving = match &object.card {
         Card::Leaving { how: Left::Looking, .. } => true,
         Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Deciding { request: None, .. } => false,
@@ -768,7 +770,26 @@ pub(crate) fn read_card(
     };
     let refreshed = body.is_some();
     if let Some(body) = body {
-        let stored = domain.objects.put(key, body);
+        let stored = match body {
+            Body::OwnerProposal(proposal) => {
+                if shown {
+                    crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out)
+                } else {
+                    domain.objects.put(key, Body::OwnerProposal(proposal))
+                }
+            }
+            body @ (Body::Task(_)
+            | Body::Chip(_)
+            | Body::Proposal(_)
+            | Body::Historical(_)
+            | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
+            | Body::Result(_)
+            | Body::Note { .. }) => domain.objects.put(key, body),
+        };
         if !stored {
             return;
         }

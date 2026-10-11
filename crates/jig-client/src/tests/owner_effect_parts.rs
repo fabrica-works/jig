@@ -201,3 +201,81 @@ fn native_effect_parts_refuse_full_capacity_while_retaining_the_whole_pending_do
     let (notice, ()) = domain.notices().ids().iter().next().unwrap();
     assert_eq!(domain.notices().get(*notice).unwrap().kind, crate::notices::Kind::Refused(Limit::Objects));
 }
+
+#[test]
+fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity_and_never_resends() {
+    for (shown_card, part_capacity) in [(true, LIMITS.parts), (true, 0), (false, LIMITS.parts)] {
+        let (mut domain, _) = objects::live();
+        let mut value = source(Proposer::Party(8), native(11));
+        value.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+        let (read, _) = shown(&mut domain, value.key);
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(value.clone()))) },
+        );
+        let id = domain.objects().find(ObjectKey::Proposal(value.key)).unwrap();
+        let mut output = Queue::with_capacity(crate::max_out(&LIMITS));
+        let request = crate::intents::send_card(
+            &mut domain,
+            ObjectKey::Proposal(value.key),
+            ActKind::Accept,
+            Box::new(Ask::DecideProposal { project: value.project, proposal: value.key, decision: Decision::Accepted }),
+            &mut output,
+        )
+        .unwrap();
+        assert_eq!(output.len(), 1);
+        assert!(
+            drive(&mut domain, Time::ZERO, Event::Progress { request, progress: crate::intents::Progress::Unknown })
+                .is_empty()
+        );
+        let output =
+            drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::LookAgain { object: id.token() } });
+        let mut current_read = None;
+        for request in &output {
+            if let Request::Read { read, what: Read::Proposal { proposal } } = request {
+                assert_eq!(*proposal, value.key);
+                assert!(current_read.replace(*read).is_none());
+            } else {
+                panic!("inspection only reads, never resends the decision");
+            }
+        }
+        domain.objects.get_mut(id).unwrap().shown = shown_card;
+        value.action = OwnerProposalAction::Effect {
+            part: native(17),
+            authority: objects::owner_authority(),
+            attempt: 1,
+            completion: 2,
+            position: 3,
+            purpose: 19,
+        };
+        let limits = crate::Limits { parts: part_capacity, ..LIMITS };
+        let mut output = Queue::with_capacity(crate::max_out(&limits));
+        let event = Event::Read {
+            read: current_read.unwrap(),
+            result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(value.clone()))),
+        };
+        crate::step(&mut domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event.clone(), &mut output);
+        let output = super::spine::drain(output);
+        if shown_card && part_capacity > 0 {
+            assert_eq!(
+                parts(&output).as_ref(),
+                &[Request::ShowPart {
+                    part: Part::OwnerEffect { connector: u16::MAX, proposal: 17 },
+                    generation: 1,
+                    scope: PartScope::Project(41)
+                }]
+            );
+        } else {
+            assert!(parts(&output).is_empty());
+        }
+        if shown_card && part_capacity == 0 {
+            let (notice, ()) = domain.notices().ids().iter().next().unwrap();
+            assert_eq!(domain.notices().get(*notice).unwrap().kind, crate::notices::Kind::Refused(Limit::Objects));
+        }
+        exact(&domain, &value);
+        assert_eq!(domain.objects().get(id).unwrap().card, crate::objects::Card::Open);
+        assert!(drive(&mut domain, Time::ZERO, event).is_empty());
+        exact(&domain, &value);
+    }
+}
