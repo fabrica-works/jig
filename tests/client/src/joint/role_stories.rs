@@ -412,3 +412,6 @@ fn an_observer_is_refused_a_request_and_told_why() {
 
 #[path = "engine_stories.rs"]
 mod engine_stories;
+
+#[path = "role_stories/proposed_story.rs"]
+mod proposed_story;
