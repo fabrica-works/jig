@@ -342,7 +342,7 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     row.task.references = row.task.inputs.clone();
     row.task.result = Some(TaskResult::Document(Box::new(result.clone())));
     let ChipPhase::Owner { details, .. } = row.task.chip.details.as_mut() else { panic!("owned held metadata") };
-    details.ending = Some(OwnerChipEnding::Done(Box::new(result.value.clone().unwrap())));
+    details.ending = Some(OwnerChipEnding::Done(result.value.clone().unwrap()));
     let mut documents = vec![(ObjectKey::Escalation(8), Some(ReadValue::OwnerEscalation(Box::new(row.clone()))))];
     for (yes, key, value) in [
         (present[0], ObjectKey::Result(42), ReadValue::Result(Box::new(result))),
