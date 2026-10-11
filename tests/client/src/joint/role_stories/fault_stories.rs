@@ -112,3 +112,81 @@ fn two_tabs_decide_one_proposal_and_both_receive_the_original_once_only_decision
     assert_eq!(parent_attempts.len(), 2, "the original chat parks and then resumes");
     assert_eq!(assignments.iter().filter(|row| row.task != parent).count(), 1, "one goal assignment");
 }
+
+#[test]
+fn an_inbox_acceptance_updates_the_same_proposal_still_shown_in_the_chat() {
+    let mut world = world(
+        8525,
+        vec![
+            Box::new([
+                Script::Call(Call::ProposeGoal {
+                    words: b"decide this goal".as_slice().into(),
+                    budget: 150,
+                    priority: 7,
+                }),
+                Script::Park,
+            ]),
+            Box::new([Script::Finish { report: b"one accepted goal".as_slice().into() }]),
+        ],
+    );
+    let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
+    world.person(member, start(b"propose once"));
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let within = Duration::from_secs(1);
+    world.person(
+        member,
+        vec![
+            Step::See { find: Find::text(b"decide this goal"), within },
+            Step::See { find: Find::text(b"Proposal"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let owner = world.client_with(1, crate::stories::inbox(), receiving_limits(), client);
+    world.person(
+        owner,
+        vec![
+            Step::See { find: Find::exactly_named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::text(b"decide this goal"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Accept") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Accepted"), within },
+        ],
+    );
+    world.person(
+        member,
+        vec![
+            Step::See { find: Find::text(b"decide this goal"), within },
+            Step::See { find: Find::text(b"Accepted"), within },
+            Step::See { find: Find::exactly_named(Role::Button, b"Write"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let engine = &world.front().session.driver.world;
+    let person = engine.peers.as_ref().expect("actual parties").parties[0].person.expect("actual owner");
+    assert_eq!(engine.store.rows.values().filter(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        if matches!(outcome, people::Outcome::ProposalDecided { by, choice: people::ProposalChoice::Accepted, .. } if *by == person))).count(), 1);
+    assert_eq!(
+        engine
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
+        if task.tracked == Some(7) && task.numbers.budget == 150))
+            .count(),
+        1
+    );
+    let assignments = &engine.peers.as_ref().expect("actual worker").workers[0].seen;
+    assert_eq!(assignments.len(), 3);
+    let tasks: std::collections::BTreeSet<_> = assignments.iter().map(|row| row.task).collect();
+    assert_eq!(tasks.len(), 2);
+    assert_eq!(assignments.iter().filter(|row| row.task != assignments[0].task).count(), 1);
+}
