@@ -5,7 +5,7 @@
 )]
 use super::cards::CLIENT;
 use crate::{
-    Builder, JigBindings, Limits, Role, Tree, historical_pages as view,
+    Builder, JigBindings, Limits, Tree, historical_pages as view,
     historical_pages_words::{self as sayings, HistoricalPhrase as P},
     phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment},
     words::Words,
@@ -423,10 +423,10 @@ fn historical_public_plan_keeps_owner_tree_early_return_and_companion_ended_read
     let page = ended(OwnerChipEnding::Failed(doc(b"companion actual cause", true)), None);
     drive(&mut client, Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) });
     let w = words();
-    let cap = crate::Limits::of_words(&CLIENT, &w).unwrap();
+    let cap = Limits::of_words(&CLIENT, &w).unwrap();
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    crate::pages::task::task(&mut b, &client, &w, &mut bindings);
+    crate::pages::task(&mut b, &client, &w, &mut bindings);
     let rendered = b.finish();
     assert!(has(&rendered, b"companion actual cause"));
     caption(&rendered, &w, P::EndedDelegates, &[]);
