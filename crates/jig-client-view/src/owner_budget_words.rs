@@ -125,8 +125,17 @@ pub fn language() -> Language {
     }
 }
 
+/// Exact closed size of the budget and shared proposed-task vocabulary.
+#[must_use]
+pub fn standalone_phrase_count() -> u32 {
+    u32::try_from(ALL.len())
+        .expect("budget phrase count fits")
+        .checked_add(u32::try_from(proposed_task_words::ALL.len()).expect("part phrase count fits"))
+        .expect("combined phrase count fits")
+}
+
 fn standalone_shapes() -> Box<[PhraseShape]> {
-    let mut combined = List::with_capacity(37);
+    let mut combined = List::with_capacity(standalone_phrase_count());
     for shape in shapes() {
         combined.push(shape).expect("budget shape count is closed");
     }
@@ -141,7 +150,7 @@ fn standalone_shapes() -> Box<[PhraseShape]> {
 #[must_use]
 pub fn standalone_language() -> Language {
     let mut result = language();
-    let mut combined = List::with_capacity(37);
+    let mut combined = List::with_capacity(standalone_phrase_count());
     for phrase in result.phrases {
         combined.push(phrase).expect("budget phrase count is closed");
     }

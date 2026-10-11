@@ -74,8 +74,14 @@ fn maximal_budget_and_ledger_fragments_fit_tree_and_checked_words_heap_bounds() 
         owner_budget_words::{self as data, OwnerBudgetWords},
         phrases::PhraseLimits,
     };
-    let language_limits =
-        PhraseLimits { languages: 1, phrases: 37, holes: 4, segments: 200, text_bytes: 8192, hole_bytes: 256 };
+    let language_limits = PhraseLimits {
+        languages: 1,
+        phrases: data::standalone_phrase_count(),
+        holes: 4,
+        segments: 200,
+        text_bytes: 8192,
+        hole_bytes: 256,
+    };
     let word_meter = Meter::new();
     let words = OwnerBudgetWords::load(Box::new([data::standalone_language()]), &language_limits, 0, 0)
         .expect("whole checked budget and shared Funder sayings");

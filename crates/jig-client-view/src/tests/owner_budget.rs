@@ -31,7 +31,14 @@ fn ledger() -> PoolLedger {
     }
 }
 fn phrase_limits() -> PhraseLimits {
-    PhraseLimits { languages: 2, phrases: 37, holes: 4, segments: 200, text_bytes: 8192, hole_bytes: 256 }
+    PhraseLimits {
+        languages: 2,
+        phrases: data::standalone_phrase_count(),
+        holes: 4,
+        segments: 200,
+        text_bytes: 8192,
+        hole_bytes: 256,
+    }
 }
 fn words() -> OwnerBudgetWords {
     OwnerBudgetWords::load(Box::new([data::standalone_language()]), &phrase_limits(), 0, 0)
