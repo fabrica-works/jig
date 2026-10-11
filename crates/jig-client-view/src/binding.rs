@@ -186,6 +186,7 @@ impl JigBindings {
                         | jig_client::action::Act::FilterInbox { .. }
                         | jig_client::action::Act::OpenUpdates
                         | jig_client::action::Act::StartChat { .. }
+                        | jig_client::action::Act::ProjectSettings { .. }
                         | jig_client::action::Act::GoalForm { .. }
                         | jig_client::action::Act::FilterTasks { .. }
                         | jig_client::action::Act::FilterNotes { .. }

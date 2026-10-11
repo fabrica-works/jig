@@ -118,6 +118,7 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
             }
         }
         Delivery::Frame(_)
+        | Delivery::OwnerProject(_)
         | Delivery::Task(_)
         | Delivery::Tree(_)
         | Delivery::OwnerTree(_)

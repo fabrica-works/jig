@@ -375,6 +375,7 @@ pub(crate) fn read_result(
     out: &mut Queue<Request>,
 ) {
     if !owner_escalation_read_valid(domain, token, &result)
+        || !owner_project_read_valid(domain, token, &result)
         || !owner_inbox_read_valid(domain, env, token, &result)
         || !historical_read_valid(domain, env, token, &result)
     {
@@ -580,6 +581,38 @@ fn task_read(domain: &mut Domain, env: &Env<crate::Limits>, task: Box<contract::
     let key = ObjectKey::Task(task.chip.task);
     read_body(domain, key, Body::Task(task));
     crate::pages::task::document(domain, env, out);
+}
+
+// The new carrier must match its original read before retiring the obligation.
+fn owner_project_read_valid(domain: &Domain, token: Token, result: &ReadResult) -> bool {
+    let ReadResult::Value(ReadValue::OwnerProject(value)) = result else {
+        return true;
+    };
+    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+        return true;
+    };
+    if read.abandoned || read.terminal || read.generation != domain.generation {
+        return true;
+    }
+    match &read.what {
+        Read::Project { project } => *project == value.number,
+        Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Ended { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::Inbox { .. }
+        | Read::Conversations { .. }
+        | Read::Goals { .. }
+        | Read::Spend { .. }
+        | Read::Notes { .. }
+        | Read::Deployment => false,
+    }
 }
 
 // Validate the original query and entire group before consuming its terminal.

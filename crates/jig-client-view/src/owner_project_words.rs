@@ -37,8 +37,9 @@ pub enum ProjectPhrase {
     Confirm,
     Review,
     Dismiss,
+    Remove,
 }
-pub const ALL: [ProjectPhrase; 27] = [
+pub const ALL: [ProjectPhrase; 28] = [
     ProjectPhrase::Project,
     ProjectPhrase::Resource,
     ProjectPhrase::Owned,
@@ -66,6 +67,7 @@ pub const ALL: [ProjectPhrase; 27] = [
     ProjectPhrase::Confirm,
     ProjectPhrase::Review,
     ProjectPhrase::Dismiss,
+    ProjectPhrase::Remove,
 ];
 impl ProjectPhrase {
     #[must_use]
@@ -100,6 +102,7 @@ impl ProjectPhrase {
                 Self::Confirm => 9024,
                 Self::Review => 9025,
                 Self::Dismiss => 9026,
+                Self::Remove => 9027,
             },
         }
     }
@@ -132,6 +135,7 @@ impl ProjectPhrase {
             Self::Confirm => None,
             Self::Review => None,
             Self::Dismiss => None,
+            Self::Remove => Some(HoleKind::Number),
         }
     }
     fn label(self) -> &'static [u8] {
@@ -163,6 +167,7 @@ impl ProjectPhrase {
             Self::Confirm => b"Confirm settings change",
             Self::Review => b"Before and after this settings change",
             Self::Dismiss => b"Dismiss settings change",
+            Self::Remove => b"Remove row: ",
         }
     }
 }
@@ -197,4 +202,4 @@ pub fn language() -> Language {
         phrases: values.into_boxed(),
     }
 }
-const COUNT: u32 = 27;
+const COUNT: u32 = 28;

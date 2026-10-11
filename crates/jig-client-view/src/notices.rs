@@ -44,6 +44,7 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words) {
         }
         Kind::PageUnknown { purpose } => {
             match purpose {
+                IntentPurpose::ProjectSettings => words.text(b, JigPhrase::Settings, &[]),
                 IntentPurpose::StartChat => words.text(b, JigPhrase::Conversations, &[]),
                 IntentPurpose::SetGoal => words.text(b, JigPhrase::ActSetGoal, &[]),
                 IntentPurpose::Seen(seen) => match seen {

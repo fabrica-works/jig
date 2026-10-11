@@ -263,6 +263,7 @@ impl<A: crate::Application> Engine<A> {
             object
                 .and_then(|key| self.truth.objects.get(&key))
                 .and_then(offers)
+                .or_else(|| project.and_then(|p| self.truth.owner_projects.get(&p).map(|p| &p.acts)))
                 .or_else(|| project.and_then(|p| self.truth.projects.get(&p).map(|p| &p.acts)))
         });
         let admission =

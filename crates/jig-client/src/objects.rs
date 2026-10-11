@@ -439,7 +439,11 @@ pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
 fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<bool> {
     use crate::contract::Delivery;
     match value {
-        Delivery::Frame(_) | Delivery::Run(_) | Delivery::RunState(_) | Delivery::Deployment(_) => None,
+        Delivery::OwnerProject(_)
+        | Delivery::Frame(_)
+        | Delivery::Run(_)
+        | Delivery::RunState(_)
+        | Delivery::Deployment(_) => None,
         Delivery::Conversations(chats) => {
             for row in &chats.rows {
                 if key == ObjectKey::Task(row.chip.task) {
@@ -538,6 +542,7 @@ pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &cra
         | crate::contract::Delivery::Task(_)
         | crate::contract::Delivery::Tree(_)
         | crate::contract::Delivery::OwnerTree(_)
+        | crate::contract::Delivery::OwnerProject(_)
         | crate::contract::Delivery::OwnerProposal(_)
         | crate::contract::Delivery::Chips(_)
         | crate::contract::Delivery::Inbox(_)
@@ -885,6 +890,7 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
         }
         crate::contract::Delivery::Frame(_)
         | crate::contract::Delivery::Task(_)
+        | crate::contract::Delivery::OwnerProject(_)
         | crate::contract::Delivery::OwnerProposal(_)
         | crate::contract::Delivery::Tree(_)
         | crate::contract::Delivery::OwnerTree(_)

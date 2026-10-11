@@ -24,20 +24,8 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         Ask::ChangePolicy { project, edit } => (*project, ActKind::ChangePolicy, policy_complete(doc, edit)),
         Ask::SetRoles { project, .. } => (*project, ActKind::SetRoles, !doc.cut),
         Ask::MakeService { project, .. } => (*project, ActKind::MakeService, true),
-        Ask::SetPool { project, party, .. } => {
-            let mut supplied = false;
-            for pool in &doc.pools {
-                match pool.source {
-                    crate::contract::Funder::Pool { project: source, person: owner, .. } => {
-                        supplied |= source == *project && owner == *party
-                    }
-                    crate::contract::Funder::Period { .. }
-                    | crate::contract::Funder::Task(_)
-                    | crate::contract::Funder::Recurring { .. } => {}
-                }
-            }
-            (*project, ActKind::SetPool, supplied)
-        }
+        // Observed ledgers do not identify core.settings.period, the request target.
+        Ask::SetPool { project, .. } => (*project, ActKind::SetPool, false),
         Ask::StartChat { .. }
         | Ask::Write { .. }
         | Ask::AnswerQuestion { .. }
@@ -131,16 +119,7 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
             }
             Some(Ask::SetRoles { project: doc.number, holdings })
         }
-        Ask::SetPool { party, .. } => {
-            for pool in &doc.pools {
-                if let crate::contract::Funder::Pool { project, person, .. } = pool.source {
-                    if project == doc.number && person == *party {
-                        return Some(Ask::SetPool { project, party: person, budget: pool.numbers.budget });
-                    }
-                }
-            }
-            None
-        }
+        Ask::SetPool { .. } => None,
         Ask::MakeService { .. } => None,
         Ask::StartChat { .. }
         | Ask::Write { .. }
@@ -162,6 +141,16 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => None,
     }
+}
+/// Keep previously edited channels when the rendered baseline is unchanged.
+#[must_use]
+pub fn draft(state: &Form, before: &Ask) -> Ask {
+    if state.before.as_deref() == Some(before) {
+        if let Some(review) = &state.review {
+            return review.as_ref().clone();
+        }
+    }
+    before.clone()
 }
 pub(crate) fn review(domain: &mut Domain, ask: Box<Ask>) {
     if domain.blocked || domain.project_page.settings.pending.is_some() {
