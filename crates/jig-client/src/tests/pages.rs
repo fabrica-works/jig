@@ -1,5 +1,6 @@
 //! Page policies exercised through the client boundary.
 mod conversation_merge;
+mod task_proposals;
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
 use crate::{
     Domain, Event, Request,

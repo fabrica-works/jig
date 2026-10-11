@@ -14,7 +14,7 @@
 use crate::{
     Domain, Request,
     address::{Address, TaskSection},
-    contract::{self, Executor, Limit, ObjectKey, Part, Phase, PhaseCounts, Read, Task, Tree, TreeNode},
+    contract::{self, Executor, Limit, ObjectKey, Part, Phase, PhaseCounts, ProposalKey, Read, Task, Tree, TreeNode},
     objects::{Body, Object, Source},
     watches::Owner,
 };
@@ -49,8 +49,12 @@ pub struct Plan {
 }
 /// The page's header handle and section-specific read choices.
 #[derive(Debug)]
+#[expect(clippy::partial_pub_fields, reason = "proposal refresh positions change only through admitted Task facts")]
 pub struct TaskPage {
     pub header: Option<Id<Object>>,
+    /// Supplied proposal cards, including their departing shared objects.
+    pub proposals: List<ProposalKey>,
+    proposal_activity: Option<u64>,
     /// Whole owner ended page under the selected original read.
     pub owner_ended: Option<Box<contract::OwnerEndedPage>>,
     pub plan: Plan,
@@ -62,9 +66,11 @@ pub struct TaskPage {
     pub ended_task: Option<u64>,
 }
 impl TaskPage {
-    pub(crate) fn new(rows: u32) -> Self {
+    pub(crate) fn new(rows: u32, objects: u32) -> Self {
         Self {
             header: None,
+            proposals: List::with_capacity(objects),
+            proposal_activity: None,
             owner_ended: None,
             plan: Plan {
                 owner: None,
@@ -83,6 +89,8 @@ impl TaskPage {
     }
     pub(crate) fn clear(&mut self) {
         self.header = None;
+        self.proposals.clear();
+        self.proposal_activity = None;
         self.owner_ended = None;
         self.plan.owner = None;
         self.plan.nodes.clear();
@@ -370,6 +378,87 @@ fn result(out: &mut List<Part>, task: &Task) {
         }
     }
 }
+/// A Task watch names its header and the exact proposal references together.
+pub(crate) fn delivered(domain: &mut Domain, source: Source, task: Box<Task>) {
+    let key = ObjectKey::Task(task.chip.task);
+    let keys = task_names(task.chip.task, &task.proposals);
+    let missed = domain.objects.replace(source, keys.as_slice());
+    crate::pages::routing::excess(domain, missed);
+    if domain.objects.find(key).is_some() {
+        let stored = domain.objects.put(key, Body::Task(task));
+        assert!(stored, "named task receives its whole facts");
+    } else {
+        crate::pages::routing::refuse(domain, Limit::Objects);
+    }
+    domain.changed();
+}
+fn task_names(number: u64, proposals: &List<ProposalKey>) -> List<ObjectKey> {
+    let mut keys = List::with_capacity(proposals.len().checked_add(1).expect("bounded header and proposal keys"));
+    keys.push(ObjectKey::Task(number)).expect("header fits");
+    for proposal in proposals {
+        let key = ObjectKey::Proposal(*proposal);
+        if !keys.as_slice().contains(&key) {
+            keys.push(key).expect("supplied proposal keys fit");
+        }
+    }
+    keys
+}
+fn proposal_cards(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    number: u64,
+    proposals: List<ProposalKey>,
+    activity: u64,
+    out: &mut Queue<Request>,
+) {
+    let mut source = None;
+    for (id, ()) in &domain.watch_ids {
+        let watch = domain.watches.get(*id).expect("registered watch exists");
+        if watch.owner == (Owner::Page { generation: domain.generation })
+            && watch.subject == (contract::Subject::Task { task: number })
+        {
+            source = Some(Source::Watch(*id));
+            break;
+        }
+    }
+    let Some(source) = source else {
+        return;
+    };
+    let keys = task_names(number, &proposals);
+    let missed = domain.objects.replace(source, keys.as_slice());
+    crate::pages::routing::excess(domain, missed);
+    if missed > 0 {
+        crate::pages::routing::refuse(domain, Limit::Objects);
+    }
+    let moved = domain.task_page.proposal_activity != Some(activity);
+    domain.task_page.proposal_activity = Some(activity);
+    let mut shown = List::with_capacity(env.limits.objects);
+    for key in &domain.task_page.proposals {
+        if domain.objects.find(ObjectKey::Proposal(*key)).is_some() {
+            shown.push(*key).expect("retained proposal names fit the working set");
+        }
+    }
+    for proposal in &proposals {
+        let key = ObjectKey::Proposal(*proposal);
+        if !domain.objects.named(key, source) {
+            continue;
+        }
+        if !shown.as_slice().contains(proposal) {
+            shown.push(*proposal).expect("unique proposal names fit the working set");
+        }
+        let id = domain.objects.find(key).expect("admitted proposal exists");
+        let object = domain.objects.get(id).expect("named proposal exists");
+        if moved || object.body.is_none() {
+            let what = Read::Proposal { proposal: *proposal };
+            if !domain.reads.pending(&what)
+                && domain.reads.ask(domain.generation, Source::Card(id), what, out).is_none()
+            {
+                crate::pages::routing::refuse(domain, Limit::Reads);
+            }
+        }
+    }
+    domain.task_page.proposals = shown;
+}
 /// After the task document reveals its executor, opens only that activity owner.
 pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
     let (number, section) = match domain.address {
@@ -400,7 +489,10 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
     let project = task.project;
     let executor = task.chip.executor;
     let phase = task.chip.phase;
+    let proposals = task.proposals.clone();
+    let activity = task.activity;
     let values = parts(task, section, env.limits.parts.saturating_add(1));
+    proposal_cards(domain, env, number, proposals, activity, out);
     let mut emitted = 0_u32;
     for part in values.into_boxed() {
         if emitted == env.limits.parts {
@@ -611,6 +703,9 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, 
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     List::<TreeNode>::worst_case(limits.rows)?
+        .checked_add(List::<ProposalKey>::worst_case(limits.objects)?.checked_mul(2)?)?
+        .checked_add(List::<ProposalKey>::worst_case(limits.rows)?)?
+        .checked_add(List::<ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)?
         .checked_add(Map::<u64, bool>::worst_case(limits.rows.checked_add(1)?)?)?
         .checked_add(List::<u64>::worst_case(limits.rows.checked_add(1)?)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(2)?)?

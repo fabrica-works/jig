@@ -37,7 +37,7 @@ pub(crate) fn refuse(domain: &mut Domain, which: Limit) {
     }
     domain.changed();
 }
-fn excess(domain: &mut Domain, count: u32) {
+pub(crate) fn excess(domain: &mut Domain, count: u32) {
     match &mut domain.page {
         Page::Work { excess, .. } => *excess = count,
         Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {}
@@ -285,8 +285,7 @@ pub(crate) fn delivery(
         }
         Delivery::Task(task) => {
             crate::conversation::routing::document(domain, &task, out);
-            let key = ObjectKey::Task(task.chip.task);
-            one(domain, source, key, Body::Task(task));
+            crate::pages::task::delivered(domain, source, task);
             crate::pages::task::document(domain, env, out);
         }
         Delivery::OwnerTree(tree) => owner_tree_delivery(domain, env, watch, source, tree, out),

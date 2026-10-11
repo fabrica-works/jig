@@ -119,7 +119,7 @@ impl Domain {
             inbox: crate::pages::inbox::Inbox::new(limits.rows),
             project_page: crate::pages::project::ProjectPage::new(limits.rows),
             deployment_page: crate::pages::deployment::DeploymentPage::new(),
-            task_page: crate::pages::task::TaskPage::new(limits.rows),
+            task_page: crate::pages::task::TaskPage::new(limits.rows, limits.objects),
             chats: crate::pages::conversations::State::new(),
             navigation: crate::pages::navigation::Navigation::new(limits.navigation_entries),
             updates_count: limits.updates_count,
