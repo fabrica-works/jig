@@ -21,6 +21,14 @@ fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
                 name: b"A Person".as_slice().into(),
             },
         },
+        people::Stored::Person {
+            number: 2,
+            identity: people::Identity {
+                key: people::IdentityKey { provider: 0, subject: Box::new([2]) },
+                login: b"outsider".as_slice().into(),
+                name: b"Another Person".as_slice().into(),
+            },
+        },
         people::Stored::Roles {
             project: 0,
             holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
@@ -77,7 +85,11 @@ fn deployment_connector_references_keep_full_width_identifiers_and_configured_or
     assert_eq!(value.tasks.used, 0);
     let (empty, empty_limits) = source(&[], 5);
     assert_original_facts(&deployment(&empty, &empty_limits), &value);
+    assert!(core.people.identity(2).is_some());
+    assert_eq!(core.people.role(2, 0), None);
+    assert_eq!(core.people.identity(3), None);
     assert_eq!(make(&core, &limits, 2, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 3, &Subject::Deployment, &window()), Err(Missing::Unknown));
 }
 
 #[test]
