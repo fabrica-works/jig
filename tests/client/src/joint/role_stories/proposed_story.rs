@@ -26,7 +26,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
             },
             Step::Press { find: Find::exactly_named(Role::Button, b"Charter 1") },
             Step::Type { find: Find::exactly_named(Role::TextField, b"Goal budget"), words: b"150".as_slice().into() },
-            Step::See { find: Find::text(b"Beyond your pool, this will be proposed"), within },
+            Step::See { find: Find::text(b"This will be proposed to its holder"), within },
             Step::Press { find: Find::exactly_named(Role::Button, b"Set goal") },
             Step::See { find: Find::text(b"This will be proposed"), within },
         ],
