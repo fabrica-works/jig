@@ -48,6 +48,7 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
                 | Part::Panel { .. }
                 | Part::Result { .. }
                 | Part::Effect { .. }
+                | Part::OwnerEffect { .. }
                 | Part::Outbox { .. }
                 | Part::Hold { .. }
                 | Part::Project { .. }
