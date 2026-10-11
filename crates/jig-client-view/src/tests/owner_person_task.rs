@@ -145,7 +145,7 @@ fn person_owner_view_retains_ordered_missing_links_full_results_and_independent_
         b"Some result metadata was omitted",
         b"result explanation",
         b"field/a",
-        b"\\xFF\\x00\\x2F",
+        &[255, 0, 47],
     ] {
         assert!(contains(&tree, text), "missing {text:?}");
     }
