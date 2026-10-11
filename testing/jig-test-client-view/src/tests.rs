@@ -795,7 +795,7 @@ fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_
     assert_eq!(root.first().object(root.first().find(subject).unwrap()).unwrap().value, first::Value::Unsupported);
     let jig = words();
     let family_words = words::Words::english(limits().first.text).unwrap();
-    let bounds = Limits::of(&limits(), &jig, &family_words).unwrap();
+    let bounds = Limits::for_world(&limits(), &jig, &family_words, 1024, 256).unwrap();
     let mut builder = jig_client_view::Builder::new(&bounds.tree);
     let mut bindings = crate::bindings::Bindings::new(bounds.tree.bindings, limits().first.text);
     builder.open(Role::Page);
