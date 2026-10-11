@@ -22,11 +22,19 @@ fn field_number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
     text(b, words, phrase, &[Hole::Number(value)]);
 }
 fn region(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole], key: Option<Key>) {
-    b.open(Role::Region);
-    if let Some(key) = key {
-        b.key(key);
+    match key {
+        Some(key) => {
+            b.open(Role::Item);
+            b.key(key);
+        }
+        None => b.open(Role::Region),
     }
     let saying = words.book.say(words.language, phrase.id(), holes).expect("deployment region name checked");
+    b.name(&saying.text);
+}
+fn list(b: &mut Builder, words: &Words, phrase: P) {
+    b.open(Role::List);
+    let saying = words.book.say(words.language, phrase.id(), &[]).expect("deployment list name checked");
     b.name(&saying.text);
 }
 fn wall(b: &mut Builder, words: &Words, phrase: P, absent: P, value: Option<Wall>) {
@@ -458,7 +466,7 @@ fn admission(b: &mut Builder, words: &Words, value: AdmissionLimit) {
     text(b, words, phrase, &[]);
 }
 fn render_hosts(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
-    region(b, words, P::Hosts, &[], None);
+    list(b, words, P::Hosts);
     for host in &value.hosts {
         region(
             b,
@@ -476,7 +484,7 @@ fn render_hosts(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words
         text(b, words, if host.connected { P::Connected } else { P::Disconnected }, &[]);
         wall(b, words, P::GraceUntil, P::UnknownClock, host.grace_until);
         optional_duration(b, words, P::GraceRemaining, host.grace_remaining);
-        region(b, words, P::Runs, &[], None);
+        list(b, words, P::Runs);
         for value in &host.runs {
             run(b, client, words, value, bindings);
         }
@@ -496,7 +504,7 @@ fn render_accounts(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
-    region(b, words, P::Accounts, &[], None);
+    list(b, words, P::Accounts);
     for account in &value.accounts {
         region(
             b,
@@ -533,7 +541,7 @@ fn render_accounts(
 pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
     region(b, words, P::Deployment, &[], None);
     render_hosts(b, client, value, words, bindings);
-    region(b, words, P::Attempts, &[], None);
+    list(b, words, P::Attempts);
     for value in &value.attempts {
         run(b, client, words, value, bindings);
     }
@@ -547,7 +555,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     field_number(b, words, P::WaitingAttempts, u64::from(value.waiting_attempts));
     duration(b, words, P::GraceBound, value.grace_bound);
     b.close();
-    region(b, words, P::Projects, &[], None);
+    list(b, words, P::Projects);
     for project in &value.projects {
         region(
             b,
@@ -562,7 +570,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
         b.close();
     }
     b.close();
-    region(b, words, P::HelloRefusals, &[], None);
+    list(b, words, P::HelloRefusals);
     let mut position = 0_u64;
     for value in &value.hello_refusals {
         hello(b, words, value, position);
@@ -570,7 +578,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     }
     b.close();
     field_number(b, words, P::HelloForgotten, value.hello_refusals_forgotten);
-    region(b, words, P::PersonRefusals, &[], None);
+    list(b, words, P::PersonRefusals);
     let mut position = 0_u64;
     for value in &value.person_room_refusals {
         region(b, words, P::PersonRefusal, &[], Some(Key { owner: Owner::Jig, kind: 99, a: position, b: 0 }));
@@ -587,7 +595,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     b.close();
     field_number(b, words, P::PersonForgotten, value.person_room_refusals_forgotten);
     duration(b, words, P::Retention, value.person_answer_retention);
-    region(b, words, P::TaskRefusals, &[], None);
+    list(b, words, P::TaskRefusals);
     let mut position = 0_u64;
     for value in &value.task_room_refusals {
         region(b, words, P::TaskRefusal, &[], Some(Key { owner: Owner::Jig, kind: 100, a: position, b: 0 }));
