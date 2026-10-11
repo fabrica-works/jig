@@ -721,6 +721,7 @@ fn owner_page(domain: &Domain) -> (Tree, JigBindings) {
     (tree, bindings)
 }
 #[test]
+#[expect(clippy::too_many_lines, reason = "complete explicit public service, pool and membership journey proof")]
 fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_preserve_complete_membership_choices() {
     use jig_client::{Event, Request, action::Act};
     let mut value = source();
