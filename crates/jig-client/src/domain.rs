@@ -1056,7 +1056,9 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
             _,
         ) => None,
     };
-    if end == WatchEnd::SubjectEnded
+    // A live watch cannot distinguish an ended task from an absent one. The
+    // retained read supplies that distinction (client/domain/client.md, 7).
+    if (end == WatchEnd::SubjectEnded || end == WatchEnd::Unknown)
         && let Some((task, generation)) = final_task
         && generation == domain.generation
     {
@@ -1070,11 +1072,12 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
             if generation == domain.generation && task_subject {
                 match domain.address {
                     Address::Task { .. } => match end {
-                        WatchEnd::Unknown | WatchEnd::NotAllowed => {
+                        WatchEnd::NotAllowed => {
                             domain.page = Page::Missing;
                             domain.changed();
                         }
-                        WatchEnd::SubjectEnded
+                        WatchEnd::Unknown
+                        | WatchEnd::SubjectEnded
                         | WatchEnd::Closed
                         | WatchEnd::Dropped
                         | WatchEnd::Busy
@@ -1099,9 +1102,14 @@ fn read_final_task(domain: &mut Domain, watch: Id<Watch>, task: u64, generation:
     if let Some(id) = domain.objects.find(key) {
         domain.objects.get_mut(id).expect("named task exists").sources.remove(&crate::objects::Source::Watch(watch));
     }
-    if domain.objects.name(key, source).is_none() {
+    let Some(id) = domain.objects.name(key, source) else {
         crate::pages::routing::refuse(domain, Limit::Objects);
-    } else if !domain.reads.pending(&what) && domain.reads.ask(generation, source, what, out).is_none() {
+        return;
+    };
+    // A fresh address has no live delivery to attach its page header.
+    domain.task_page.header = Some(id);
+    domain.changed();
+    if !domain.reads.pending(&what) && domain.reads.ask(generation, source, what, out).is_none() {
         crate::pages::routing::refuse(domain, Limit::Reads);
     }
 }

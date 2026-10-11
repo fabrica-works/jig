@@ -95,3 +95,62 @@ fn a_person_reads_the_whole_historical_task_and_result_after_the_engine_finishes
         1
     );
 }
+
+#[test]
+fn a_person_revisits_the_whole_historical_task_and_result_by_its_fresh_public_address() {
+    let mut world = world();
+    let client = world.client(1, crate::stories::conversation());
+    let within = Duration::from_secs(1);
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::named(Role::TextArea, b"First words"), within },
+            Step::Type { find: Find::named(Role::TextArea, b"First words"), words: b"Hello".as_slice().into() },
+            Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+            Step::See { find: Find::text(b"Hello"), within },
+            Step::Pause { span: Duration::from_millis(200) },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let task = world.front().session.driver.world.peers.as_ref().expect("actual worker peer").workers[0]
+        .seen
+        .first()
+        .expect("actual assigned chat")
+        .task;
+    assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(value)))
+        if value.number==task && matches!(value.phase,jig_core_tasks::Phase::Ended(_))
+    )));
+    world.person(
+        client,
+        vec![
+            Step::Go { address: jig_test_client_domain::Address::Jig(jig_client::address::Address::task(task)) },
+            Step::See { find: Find::named(Role::Region, b"Historical object"), within },
+            Step::See { find: Find::text(b"finished"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    assert!(
+        !world
+            .tree(client)
+            .nodes()
+            .iter()
+            .any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Cancel"))
+    );
+    let rows = &world.front().session.driver.world.store.rows;
+    assert_eq!(
+        rows.values()
+            .filter(|row| matches!(
+                row,
+                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+            ))
+            .count(),
+        1
+    );
+}

@@ -125,7 +125,27 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
         let f = start(&mut domain, List::with_capacity(0));
         delivered(&mut domain, Time::ZERO, f, frame(7));
         let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(42)) });
-        drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end });
+        let output = drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end });
+        if end == WatchEnd::Unknown {
+            let mut read = None;
+            for request in &output {
+                if let Request::Read { read: token, what: Read::Task { task: 42 } } = request {
+                    assert!(read.replace(*token).is_none());
+                }
+            }
+            let read = read.expect("an absent live task is checked in retained work");
+            let Page::Work { address, .. } = domain.page() else {
+                panic!("task page awaits its retained read");
+            };
+            assert_eq!(*address, Address::task(42));
+            drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::None(ReadNone::Unknown) });
+        } else {
+            for request in &output {
+                if let Request::Read { .. } = request {
+                    panic!("a forbidden task must not probe retained work");
+                }
+            }
+        }
         assert_eq!(domain.page(), &Page::Missing);
     }
     let mut old = Domain::new(&LIMITS, 6);
