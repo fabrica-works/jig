@@ -622,6 +622,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::Project(_)
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Notes(_)
+                | ReadValue::OwnerDeployment(_)
                 | ReadValue::Deployment(_) => false,
             };
             if terminal {
@@ -654,6 +655,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::Project(_)
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Notes(_)
+                | ReadValue::OwnerDeployment(_)
                 | ReadValue::Deployment(_) => {}
             }
         }
@@ -664,6 +666,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
         | engine::Change::Project(_)
         | engine::Change::Note(_)
         | engine::Change::DeleteNote { .. }
+        | engine::Change::OwnerDeployment(_)
         | engine::Change::Deployment(_)
         | engine::Change::Tree(_)
         | engine::Change::Seen { .. } => {}
