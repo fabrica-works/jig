@@ -374,6 +374,17 @@ fn read_body(domain: &mut Domain, key: ObjectKey, body: Body) {
         domain.changed();
     }
 }
+fn owner_proposal_read(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    proposal: Box<contract::OwnerProposal>,
+    out: &mut Queue<Request>,
+) {
+    let key = ObjectKey::Proposal(proposal.key);
+    if crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out) {
+        domain.changed();
+    }
+}
 /// Consumes one read terminal and drops old-generation values before applying them.
 pub(crate) fn read_result(
     domain: &mut Domain,
@@ -488,12 +499,7 @@ fn read_value(
         ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
         ReadValue::Historical(value) => read_body(domain, value.key, Body::Historical(value)),
-        ReadValue::OwnerProposal(proposal) => {
-            let key = ObjectKey::Proposal(proposal.key);
-            if crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out) {
-                domain.changed();
-            }
-        }
+        ReadValue::OwnerProposal(proposal) => owner_proposal_read(domain, env, proposal, out),
         ReadValue::Proposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::Proposal(proposal));
