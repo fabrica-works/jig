@@ -163,6 +163,33 @@ fn historical_raw_person_goal_displays_all_four_numbers_and_distinct_unjoined_op
     }
     assert!(!contains(&tree, b"a/b/"));
     assert!(contains(&tree, b"Decision not supplied"));
+    let selected = words();
+    for (choice, caption) in [
+        (OwnerProposalChoice::Accepted, b"Accept decision".as_slice()),
+        (OwnerProposalChoice::Rejected, b"Reject decision"),
+        (OwnerProposalChoice::Passed, b"Passed"),
+        (OwnerProposalChoice::Withdrawn, b"Withdrawn decision"),
+        (OwnerProposalChoice::Stale, b"Stale decision"),
+    ] {
+        let mut decided = value.clone();
+        let OwnerHistoricalValue::PersonProposal { decision, .. } = &mut decided.value else {
+            panic!("supplied raw person proposal")
+        };
+        *decision = Some(OwnerProposalDecision {
+            project: u32::MAX,
+            proposer: Proposer::Party(u64::MAX),
+            proposal: u64::MAX,
+            kind: OwnerMessageProposalKind::Batch,
+            by: u64::MAX,
+            at: Wall::EPOCH,
+            choice,
+            created: None,
+        });
+        let (tree, _) = build(&decided, &selected);
+        assert!(contains(&tree, caption));
+        assert!(contains(&tree, b"Created task pair not supplied"));
+        assert!(tree.nodes().iter().all(|node| node.role != Role::Button));
+    }
 }
 #[test]
 fn historical_retained_proposal_uses_bare_whole_fragment_and_keeps_pending_state_without_fake_history_row() {
