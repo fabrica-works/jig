@@ -18,6 +18,8 @@ pub enum PartKind {
     Effect,
     /// An existing connector-owned outbox entry.
     Outbox,
+    /// The connector's account of drift or a failed effect for the numbered held task.
+    Hold,
 }
 
 /// The core's key for a connector-owned part; keys are never shortened.

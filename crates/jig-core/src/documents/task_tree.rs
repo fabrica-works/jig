@@ -124,6 +124,8 @@ pub enum EscalationState {
 /// A hold's reason, revision and prior lifecycle, with its escalation.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct HoldLine {
+    /// The connector's account, independently of the resource or outbox origin.
+    pub account: Option<Part>,
     pub source: Option<Part>,
     pub reason: tasks::Hold,
     pub revision: u64,
@@ -509,9 +511,36 @@ pub(super) fn hold_source(limits: &Limits, source: Option<&tasks::HoldSource>) -
     }
 }
 
+// client/domain/root.md, section 6: the core names the hold account from retained origin facts.
+fn hold_account(task: u64, reason: tasks::Hold, source: Option<&tasks::HoldSource>) -> Option<Part> {
+    match reason {
+        tasks::Hold::Drift | tasks::Hold::Effects | tasks::Hold::EffectFailed => {
+            let connector = match source {
+                Some(tasks::HoldSource::Resource(name)) => name.connector,
+                Some(tasks::HoldSource::Effect { connector, .. }) => *connector,
+                None => return None,
+            };
+            Some(Part { connector, kind: PartKind::Hold, key: PartKey::Number(task) })
+        }
+        tasks::Hold::Failures(_)
+        | tasks::Hold::Stalled
+        | tasks::Hold::Dependency(_)
+        | tasks::Hold::Stopped
+        | tasks::Hold::StoppedBy { .. }
+        | tasks::Hold::Uncertain { .. }
+        | tasks::Hold::Budget
+        | tasks::Hold::Deadline
+        | tasks::Hold::HoldsWaited
+        | tasks::Hold::ResourceUnavailable
+        | tasks::Hold::ResourceAccess
+        | tasks::Hold::PoolLost { .. }
+        | tasks::Hold::Procedure => None,
+    }
+}
 pub(super) fn hold(limits: &Limits, row: &tasks::TaskRecord) -> Result<Option<HoldLine>, Missing> {
     match &row.phase {
         tasks::Phase::Held { was, why, source } => Ok(Some(HoldLine {
+            account: hold_account(row.number, *why, source.as_deref()),
             source: hold_source(limits, source.as_deref())?,
             reason: *why,
             revision: row.revisions.hold,
