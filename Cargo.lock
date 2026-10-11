@@ -136,6 +136,7 @@ dependencies = [
  "jig-client-transcript",
  "jig-client-view",
  "jig-core",
+ "jig-core-authority",
  "jig-core-fleet",
  "jig-core-notes",
  "jig-core-people",

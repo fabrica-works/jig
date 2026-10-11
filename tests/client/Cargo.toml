@@ -16,6 +16,7 @@ jig-test-client-view.workspace = true
 jig-fake-person.workspace = true
 jig-scripted-engine.workspace = true
 jig-core.workspace = true
+jig-core-authority.workspace = true
 jig-core-people.workspace = true
 jig-core-fleet.workspace = true
 jig-core-tasks.workspace = true
