@@ -104,8 +104,12 @@ fn a_held_actual_commit_keeps_the_stop_answer_pending_until_its_completion() {
             Step::Pause { span: Duration::from_millis(30) },
         ],
     );
-    let outcome = world.run(Until::Done);
-    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    let cut_boundary = world.now().saturating_add(Duration::from_millis(50));
+    let outcome = world.run(Until::Time(cut_boundary));
+    assert!(
+        matches!(outcome.verdict, skein_world::domain::Verdict::Open { .. }),
+        "the held request remains a real liveness obligation"
+    );
     assert!(outcome.judged.0 > 0);
     assert_eq!(
         world.front().session.driver.world.reached_cut,
