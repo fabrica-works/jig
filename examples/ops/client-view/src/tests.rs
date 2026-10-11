@@ -1347,7 +1347,7 @@ fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_h
 }
 
 #[test]
-fn native_effect_slots_say_unshowable_without_loading_a_typed_maker_effect() {
+fn native_effect_slots_say_unshowable_without_loading_a_maker_effect() {
     let domain_limits = limits();
     let (jig_words, obs_words, infra_words) = phrasebooks();
     let mut tree_limits = Limits::of(&domain_limits, &jig_words, &obs_words, &infra_words).unwrap().tree;

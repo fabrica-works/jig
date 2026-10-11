@@ -1146,7 +1146,7 @@ fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_conne
 }
 
 #[test]
-fn native_effect_parts_keep_their_connector_without_inventing_typed_maker_subjects() {
+fn native_effect_parts_keep_connector_numbers_separate_from_maker_subjects() {
     use crate::observability as obs;
     let limits = limits();
     for connector in [1, 2, u16::MAX] {
@@ -1155,8 +1155,8 @@ fn native_effect_parts_keep_their_connector_without_inventing_typed_maker_subjec
             assert_eq!(crate::parts::connector(&native), connector);
             for proposer in [contract::Proposer::Task(number), contract::Proposer::Party(number)] {
                 let key = contract::ProposalKey { proposer, number };
-                let legacy = contract::Part::Effect { connector, proposal: key };
-                assert_ne!(native, legacy);
+                let maker_effect = contract::Part::Effect { connector, proposal: key };
+                assert_ne!(native, maker_effect);
                 for project in [0, u32::MAX] {
                     assert_eq!(
                         infrastructure::documents::subject(&native, infrastructure::Scope::Project(project)),
@@ -1164,14 +1164,14 @@ fn native_effect_parts_keep_their_connector_without_inventing_typed_maker_subjec
                     );
                     assert_eq!(obs::documents::subject(&native, obs::Scope::Project(project)), None);
                     assert_eq!(
-                        infrastructure::documents::subject(&legacy, infrastructure::Scope::Project(project)),
+                        infrastructure::documents::subject(&maker_effect, infrastructure::Scope::Project(project)),
                         Some(infrastructure::Subject {
                             scope: infrastructure::Scope::Project(project),
                             kind: infrastructure::Kind::Effect(key)
                         })
                     );
                     assert_eq!(
-                        obs::documents::subject(&legacy, obs::Scope::Project(project)),
+                        obs::documents::subject(&maker_effect, obs::Scope::Project(project)),
                         Some(obs::Subject { scope: obs::Scope::Project(project), kind: obs::Kind::Effect(key) })
                     );
                 }
