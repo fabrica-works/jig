@@ -523,7 +523,12 @@ impl Session {
             &self.limits.first.connector,
         )
         .map_err(Invalid::Packet)?;
-        self.incoming(value, now, wall)
+        if self.driver.transport.is_closing(watcher) {
+            self.finish_closed_packet(watcher, now, wall);
+            Ok(())
+        } else {
+            self.incoming(value, now, wall)
+        }
     }
 
     fn application_read(
@@ -590,14 +595,21 @@ impl Session {
                 let value = packets::document(&mut self.driver.transport, watcher, &document, &self.limits.jig)
                     .map_err(Invalid::Packet)?;
                 self.capture_task_packet(&document, &value);
-                self.incoming(value, now, wall)?;
+                if self.driver.transport.is_closing(watcher) {
+                    self.finish_closed_packet(watcher, now, wall);
+                } else {
+                    self.incoming(value, now, wall)?;
+                }
             }
             root::Delivery::Core(core::Held::WatchEnded { watcher, why }) => {
                 if self.driver.transport.watch(watcher).is_none() {
                     return Ok(());
                 }
+                let closing = self.driver.transport.is_closing(watcher);
                 let value = packets::ended(&mut self.driver.transport, watcher, why).map_err(Invalid::Packet)?;
-                self.incoming(value, now, wall)?;
+                if !closing {
+                    self.incoming(value, now, wall)?;
+                }
             }
             root::Delivery::Application { to, number, outcome } => {
                 let to = to.into_token();
@@ -664,6 +676,12 @@ impl Session {
         Ok(())
     }
 
+    fn finish_closed_packet(&mut self, watcher: skein_lib::Token, now: Time, wall: Wall) {
+        for event in self.driver.transport.closed_flights(watcher) {
+            self.driver.send(now, wall, root::Event::Core(event));
+        }
+    }
+
     fn immediate(&mut self, value: core::Now, now: Time, wall: Wall) -> Result<(), Invalid> {
         match value {
             core::Now::RunText { watcher, turn, from, to, text, cut, call } => {
@@ -673,7 +691,11 @@ impl Session {
                 let source = jig_core_views::Writing { turn, from, to, text, cut, call };
                 let value = packets::stream(&mut self.driver.transport, watcher, &source, &self.limits.jig)
                     .map_err(Invalid::Packet)?;
-                self.incoming(value, now, wall)?;
+                if self.driver.transport.is_closing(watcher) {
+                    self.finish_closed_packet(watcher, now, wall);
+                } else {
+                    self.incoming(value, now, wall)?;
+                }
             }
             core::Now::WatchRefused { watcher, why } => {
                 if self.driver.transport.watch(watcher).is_none() {
@@ -759,14 +781,6 @@ impl Session {
         }
         loop {
             let packets = self.driver.poll(now, wall);
-            if self.task_offers.is_some() {
-                eprintln!("joint diagnostic now={now:?} packets={packets:?}");
-                eprintln!(
-                    "joint diagnostic upstream={:?}",
-                    self.driver.world.peers.as_ref().map(|peers| &peers.upstream)
-                );
-                eprintln!("joint diagnostic trace={:?}", self.driver.world.trace);
-            }
             self.stopping()?;
             if self.driver.world.stopped {
                 break;

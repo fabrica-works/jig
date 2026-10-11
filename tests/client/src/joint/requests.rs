@@ -69,8 +69,12 @@ pub fn send(
             }
             JigOut::Close { watch } => {
                 let Some(watcher) = driver.transport.watch_token(client, *watch) else { return Ok(()) };
-                driver.transport.end_watch(watcher);
-                root::Event::Core(core::Event::Unwatch { watcher })
+                let terminals = driver.transport.close_watch(watcher);
+                driver.send(now, wall, root::Event::Core(core::Event::Unwatch { watcher }));
+                for event in terminals {
+                    driver.send(now, wall, root::Event::Core(event));
+                }
+                return Ok(());
             }
             JigOut::Answered { .. } | JigOut::Unknown { .. } => return Err(Invalid::Shell),
         },
@@ -104,8 +108,12 @@ pub fn send(
             }
             first::Out::Close { watch } => {
                 let Some(watcher) = driver.transport.watch_token(client, *watch) else { return Ok(()) };
-                driver.transport.end_watch(watcher);
-                root::Event::Core(core::Event::Unwatch { watcher })
+                let terminals = driver.transport.close_watch(watcher);
+                driver.send(now, wall, root::Event::Core(core::Event::Unwatch { watcher }));
+                for event in terminals {
+                    driver.send(now, wall, root::Event::Core(event));
+                }
+                return Ok(());
             }
             first::Out::Fact { .. } => return Err(Invalid::Shell),
         },

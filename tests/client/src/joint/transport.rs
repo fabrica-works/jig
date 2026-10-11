@@ -61,6 +61,7 @@ pub struct Transport {
     clients: BTreeMap<ClientId, Client>,
     replies: BTreeMap<Token, Reply>,
     watches: BTreeMap<Token, Watch>,
+    closing: BTreeSet<Token>,
     documents: BTreeSet<Token>,
     streams: BTreeSet<Token>,
 }
@@ -75,6 +76,7 @@ impl Transport {
             clients: BTreeMap::new(),
             replies: BTreeMap::new(),
             watches: BTreeMap::new(),
+            closing: BTreeSet::new(),
             documents: BTreeSet::new(),
             streams: BTreeSet::new(),
         }
@@ -192,11 +194,13 @@ impl Transport {
 
     #[must_use]
     pub fn watch_token(&self, client: ClientId, native: Token) -> Option<Token> {
-        self.watches.iter().find_map(
-            |(token, watch)| {
-                if watch.client == client && watch.native == native { Some(*token) } else { None }
-            },
-        )
+        self.watches.iter().find_map(|(token, watch)| {
+            if watch.client == client && watch.native == native && !self.closing.contains(token) {
+                Some(*token)
+            } else {
+                None
+            }
+        })
     }
 
     #[must_use]
@@ -204,7 +208,36 @@ impl Transport {
         self.watches.get(&token)
     }
 
+    /// Retain the original route until its owning terminal. Closing cancels
+    /// only flights actually admitted by this transport, independently at each pace.
+    pub fn close_watch(&mut self, token: Token) -> Vec<Event> {
+        assert!(self.watches.contains_key(&token), "original live route");
+        self.closing.insert(token);
+        self.closed_flights(token)
+    }
+
+    #[must_use]
+    pub fn is_closing(&self, token: Token) -> bool {
+        self.closing.contains(&token)
+    }
+
+    /// After whole admission, a packet for a closed route is discarded here.
+    /// Its real flight ends without creating a callback for another route.
+    pub fn closed_flights(&mut self, token: Token) -> Vec<Event> {
+        let mut events = Vec::new();
+        if self.closing.contains(&token) {
+            if self.documents.remove(&token) {
+                events.push(Event::Delivered { watcher: token });
+            }
+            if self.streams.remove(&token) {
+                events.push(Event::StreamDelivered { watcher: token });
+            }
+        }
+        events
+    }
+
     pub fn end_watch(&mut self, token: Token) -> Option<Watch> {
+        self.closing.remove(&token);
         self.documents.remove(&token);
         self.streams.remove(&token);
         self.watches.remove(&token)
@@ -259,7 +292,7 @@ impl Transport {
     /// Original owner tokens of every open protocol watch, including siblings.
     #[must_use]
     pub fn watches(&self) -> Vec<Token> {
-        self.watches.keys().copied().collect()
+        self.watches.keys().filter(|token| !self.closing.contains(token)).copied().collect()
     }
 
     /// Old tab callbacks lose their route. The Front sends these actual owner
@@ -295,6 +328,35 @@ mod tests {
             login: Box::from([255, 0]),
             name: Box::new([]),
         }
+    }
+
+    #[test]
+    fn closing_keeps_original_correlation_until_real_terminals_and_finishes_only_admitted_flights() {
+        let mut front = Transport::new(VersionRange { first: 1, last: 1 });
+        front.bind(ClientId(0), 7, identity(b"same"));
+        front.bind(ClientId(1), 7, identity(b"same"));
+        let native = Token::new(9);
+        let subject = Subject::Run { task: 1, turn: None, offset: 0 };
+        let owner = front.open(ClientId(0), native, Watched::Jig(subject.clone()));
+        let other = front.open(ClientId(1), native, Watched::Jig(subject.clone()));
+        assert!(front.close_watch(owner).is_empty(), "closing does not invent any flight");
+        assert!(front.watch_token(ClientId(0), native).is_none());
+        assert_eq!(front.watch_token(ClientId(1), native), Some(other));
+        assert_eq!(front.watches(), vec![other]);
+        assert_eq!(front.watch(owner).unwrap().subject, Watched::Jig(subject.clone()));
+        assert!(front.delivered(owner, Pace::Document));
+        assert!(front.delivered(owner, Pace::Stream));
+        assert!(front.delivered(other, Pace::Document));
+        assert!(matches!(front.closed_flights(owner).as_slice(), [
+            Event::Delivered { watcher: a }, Event::StreamDelivered { watcher: b }
+        ] if *a == owner && *b == owner));
+        assert!(front.closed_flights(owner).is_empty(), "each real terminal occurs once");
+        assert!(matches!(front.taken(ClientId(1), native), Some(Event::Delivered { watcher }) if watcher == other));
+        assert!(front.continued(ClientId(0), native, subject).unwrap().is_none());
+        assert_eq!(front.end_watch(owner).unwrap().native, native);
+        assert!(front.watch(owner).is_none());
+        assert!(!front.delivered(owner, Pace::Document));
+        assert!(!front.is_closing(owner));
     }
 
     #[test]
