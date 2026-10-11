@@ -76,6 +76,15 @@ impl Reads {
             }
         }
     }
+    /// Discards pre-change facts while retaining each read until its terminal arrives.
+    pub(crate) fn abandon_matching(&mut self, generation: u32, what: &Read) {
+        for (id, ()) in &self.ids {
+            let reading = self.slab.get_mut(*id).expect("registered read exists");
+            if reading.generation == generation && reading.what == *what {
+                reading.abandoned = true;
+            }
+        }
+    }
     /// Takes one routing receipt and retires its obligation, ignoring duplicates.
     pub fn terminal(&mut self, token: Token) -> Option<Receipt> {
         let id = Id::from_token(token);

@@ -12,6 +12,7 @@ use crate::{
     objects::{Body, Card, Left, Object, Source, answer::recovery},
 };
 use skein_lib::{Id, Queue, Time, Token, Wall};
+mod person_refresh;
 fn install(domain: &mut Domain, body: Body) -> Id<Object> {
     let key = body.key();
     let id = domain.objects.name(key, Source::Window { generation: 0, number: 4 }).unwrap();

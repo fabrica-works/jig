@@ -6,6 +6,7 @@
 //! | Card event | State | Effect |
 //! |---|---|---|
 //! | done, still waiting | open with answer | none |
+//! | take or hand back, shown | open with answer | fresh whole object read |
 //! | done, stopped waiting | leaving with outcome | linger |
 //! | refused moved | refused with facts | fresh read |
 //! | refused otherwise | refused with facts | none |
@@ -84,11 +85,26 @@ pub(crate) fn answered(domain: &mut Domain, key: ObjectKey, act: ActKind, answer
                 assert!(left, "answered card exists");
             } else {
                 domain.objects.get_mut(id).expect("named card exists").card = Card::Open;
+                if act == ActKind::Take || act == ActKind::HandBack {
+                    current_facts(domain, id, out);
+                }
             }
         }
     }
     domain.objects.prune();
     domain.changed();
+}
+fn current_facts(domain: &mut Domain, id: Id<Object>, out: &mut Queue<Request>) {
+    let object = domain.objects.get(id).expect("answered card exists");
+    if !object.shown {
+        return;
+    }
+    let what = super::document_read(object.key);
+    // A read started before the durable answer may still describe the old offers.
+    domain.reads.abandon_matching(domain.generation, &what);
+    if domain.reads.ask(domain.generation, Source::Card(id), what, out).is_none() {
+        crate::notices::show(domain, crate::notices::Kind::Refused(Limit::Reads));
+    }
 }
 fn stops_waiting(key: ObjectKey, act: ActKind, outcome: &crate::contract::Outcome) -> bool {
     if act == ActKind::Take || act == ActKind::HandBack {
