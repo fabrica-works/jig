@@ -32,6 +32,7 @@ pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerProposal> {
             | Body::Escalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
+            | Body::OwnerPersonTask(_)
             | Body::Result(_)
             | Body::Note { .. },
         )
