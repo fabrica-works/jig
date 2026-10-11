@@ -359,6 +359,15 @@ fn a_person_reads_actual_project_settings_and_returns_to_its_overview() {
                 jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
+        0
+    );
+    assert_eq!(
+        rows.values()
+            .filter(|value| matches!(
+                value,
+                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::SignIn { .. }))
+            ))
+            .count(),
         1
     );
     assert!(!rows.values().any(|value| matches!(
