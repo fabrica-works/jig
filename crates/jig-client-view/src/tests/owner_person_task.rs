@@ -329,6 +329,16 @@ fn person_owner_selected_words_and_total_text_refuse_one_under_whole_requirement
     person_storage_dimension(Some(3));
 }
 
+#[test]
+fn person_owner_selected_words_and_exact_storage_envelope_fit_whole_requirements() {
+    person_storage_dimension(Some(4));
+}
+
+#[test]
+fn person_owner_selected_words_reject_overflow_and_invalid_phrase_holes() {
+    person_storage_dimension(Some(5));
+}
+
 #[expect(
     clippy::arithmetic_side_effects,
     clippy::too_many_lines,
@@ -363,6 +373,20 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
     let l = client_limits();
     let value = full_value(&l);
     let untouched = value.clone();
+    if selected_dimension == Some(5) {
+        assert_eq!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..client_limits() }), None);
+        let mut over = value.clone();
+        over.results = List::with_capacity(9);
+        assert!(view::required(&over, &client_limits(), &w).is_none());
+        assert_eq!(value, untouched);
+        let mut bad = owner_person_task_words::language();
+        bad.phrases[1].forms[0].segments = Box::new([Segment::Text(copy_of(b"missing number"))]);
+        assert_eq!(
+            Phrasebook::load(owner_person_task_words::shapes(), Box::new([bad]), &phrase_limits).err(),
+            Some(Invalid::Holes { id: PersonPhrase::Party.id() })
+        );
+        return;
+    }
     if selected_dimension.is_none() {
         assert!(view::required(&value, &l, &w).is_some());
     }
@@ -371,6 +395,8 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
     if selected_dimension.is_none() {
         assert!(contains(&tree, b"selected 4294967295"));
         assert!(!contains(&tree, b"Taker not supplied"));
+        assert_eq!(value, untouched);
+        return;
     }
     let nodes = tree.len();
     // A preorder node's size gives the end of its subtree. Keep only the
@@ -407,8 +433,10 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
         text_bytes: u32::try_from(total).unwrap(),
         ..maximum
     };
-    if selected_dimension.is_none() {
+    if selected_dimension == Some(4) {
         assert_eq!(build(&value, &w, exact).len(), nodes);
+        assert_eq!(value, untouched);
+        return;
     }
     for (index, below) in [
         Limits { nodes: nodes - 1, ..exact },
@@ -425,21 +453,7 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&value, &w, below)))
             .expect_err("one-under storage rejects the whole view");
     }
-    if selected_dimension.is_none() {
-        assert_eq!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..client_limits() }), None);
-        let mut over = value.clone();
-        over.results = List::with_capacity(9);
-        assert!(view::required(&over, &client_limits(), &w).is_none());
-        assert_eq!(value, untouched);
-        let mut bad = owner_person_task_words::language();
-        bad.phrases[1].forms[0].segments = Box::new([Segment::Text(copy_of(b"missing number"))]);
-        assert_eq!(
-            Phrasebook::load(owner_person_task_words::shapes(), Box::new([bad]), &phrase_limits).err(),
-            Some(Invalid::Holes { id: PersonPhrase::Party.id() })
-        );
-    } else {
-        assert_eq!(value, untouched);
-    }
+    assert_eq!(value, untouched);
 }
 
 #[test]

@@ -75,51 +75,59 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
 }
 #[test]
 fn an_incident_delegates_accepts_on_the_leads_plan_and_resolves_with_its_report() {
-    for seed in [51, 52] {
-        let mut w = stories::incident_world(seed);
-        let c = w.client(7, stories::incident());
-        let inbox = w.client(7, stories::inbox());
-        w.person(
-            c,
-            vec![
-                see(b"Item 1"),
-                see(b"Chat nine"),
-                Step::Go { address: stories::chat() },
-                see(b"delegate"),
-                Step::See { find: Find::named(Role::Link, b"Delegate ten"), within: WITHIN },
-                Step::Go { address: RootAddress::Jig(Address::Task { task: 9, section: TaskSection::Plan }) },
-                see(b"Delegate ten"),
-                see(b"Resolve the incident"),
-                press(b"Accept"),
-                press(b"Confirm"),
-                see(b"Accepted"),
-                Step::Go { address: RootAddress::Jig(Address::Task { task: 10, section: TaskSection::Panels }) },
-                see(b"Value: 31"),
-            ],
-        );
-        w.person(inbox, vec![see(b"Resolve the incident"), see(b"Accepted")]);
-        w.run(Until::Done);
-        let now = w.now();
-        let mut state = w.front().engine.application().clone();
-        let panel = family::Subject { scope: family::Scope::Project(1), kind: family::Kind::Panel(10) };
-        let family::Document::Part(part) = state.documents.get_mut(&panel).expect("incident fixture fits and exists")
-        else {
-            unreachable!()
-        };
-        part.revision.value += 1;
-        part.value = 32;
-        w.front()
-            .engine
-            .act_application(now, Wall::EPOCH, jig_test_client_domain::FIRST, 1, state, vec![])
-            .expect("incident fixture fits and exists");
-        w.person(c, vec![see(b"Value: 32")]);
-        w.run(Until::Done);
-        finish(&mut w, false);
-        w.person(c, vec![Step::Go { address: stories::incident() }, see(b"Ended"), see(b"Incident resolved")]);
-        w.run(Until::Done);
-        assert_eq!(w.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 1);
-    }
+    resolved_incident(51);
 }
+
+#[test]
+fn an_incident_delegates_accepts_on_the_leads_plan_and_resolves_with_its_report_with_a_second_seed() {
+    resolved_incident(52);
+}
+
+fn resolved_incident(seed: u64) {
+    let mut w = stories::incident_world(seed);
+    let c = w.client(7, stories::incident());
+    let inbox = w.client(7, stories::inbox());
+    w.person(
+        c,
+        vec![
+            see(b"Item 1"),
+            see(b"Chat nine"),
+            Step::Go { address: stories::chat() },
+            see(b"delegate"),
+            Step::See { find: Find::named(Role::Link, b"Delegate ten"), within: WITHIN },
+            Step::Go { address: RootAddress::Jig(Address::Task { task: 9, section: TaskSection::Plan }) },
+            see(b"Delegate ten"),
+            see(b"Resolve the incident"),
+            press(b"Accept"),
+            press(b"Confirm"),
+            see(b"Accepted"),
+            Step::Go { address: RootAddress::Jig(Address::Task { task: 10, section: TaskSection::Panels }) },
+            see(b"Value: 31"),
+        ],
+    );
+    w.person(inbox, vec![see(b"Resolve the incident"), see(b"Accepted")]);
+    w.run(Until::Done);
+    let now = w.now();
+    let mut state = w.front().engine.application().clone();
+    let panel = family::Subject { scope: family::Scope::Project(1), kind: family::Kind::Panel(10) };
+    let family::Document::Part(part) = state.documents.get_mut(&panel).expect("incident fixture fits and exists")
+    else {
+        unreachable!()
+    };
+    part.revision.value += 1;
+    part.value = 32;
+    w.front()
+        .engine
+        .act_application(now, Wall::EPOCH, jig_test_client_domain::FIRST, 1, state, vec![])
+        .expect("incident fixture fits and exists");
+    w.person(c, vec![see(b"Value: 32")]);
+    w.run(Until::Done);
+    finish(&mut w, false);
+    w.person(c, vec![Step::Go { address: stories::incident() }, see(b"Ended"), see(b"Incident resolved")]);
+    w.run(Until::Done);
+    assert_eq!(w.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 1);
+}
+
 #[test]
 fn an_incident_proposal_withdrawn_while_waiting_leaves_with_its_delegates_reason() {
     for seed in [53, 54] {
