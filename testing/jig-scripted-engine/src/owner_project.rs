@@ -28,7 +28,8 @@ impl Payload for OwnerProjectPolicy {
             .heap(bounds)?
             .checked_add(self.projections.heap(bounds)?)?
             .checked_add(self.roles.heap(bounds)?)?
-            .checked_add(self.requirements.heap(bounds)?)
+            .checked_add(self.requirements.heap(bounds)?)?
+            .checked_add(self.permissions.heap(bounds)?)
     }
 }
 impl Payload for OwnerProjectMember {
@@ -50,6 +51,7 @@ impl Payload for OwnerProject {
             .checked_add(self.members.heap(bounds)?)?
             .checked_add(self.current_period.heap(bounds)?)?
             .checked_add(self.pools.heap(bounds)?)?
+            .checked_add(self.configured_pools.heap(bounds)?)?
             .checked_add(self.spend.heap(bounds)?)?
             .checked_add(self.recurring.heap(bounds)?)
     }

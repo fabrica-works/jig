@@ -12,6 +12,9 @@ fn source() -> OwnerProject {
                 tools: u64::MAX,
                 grants: List::with_capacity(0),
                 delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: u32::MAX, depth: u32::MAX },
+                configured_period: 0,
+                configured_pools: List::with_capacity(2),
+                configured_pools_cut: false,
                 spend: u64::MAX,
                 deadline: None,
                 notes: u8::MAX,
@@ -22,6 +25,8 @@ fn source() -> OwnerProject {
             projections: List::with_capacity(2),
             roles: List::with_capacity(2),
             requirements: List::with_capacity(2),
+            permissions: None,
+            permissions_cut: false,
             cut: true,
         },
         members: List::with_capacity(2),
@@ -42,6 +47,7 @@ fn owner_project_kit_prices_every_empty_reserved_list_at_exact_bytes_and_refuses
         + List::<OwnerProjectPolicyRole>::worst_case(2).unwrap()
         + List::<PolicyRequirement>::worst_case(2).unwrap()
         + List::<OwnerProjectMember>::worst_case(2).unwrap()
+        + List::<PoolLedger>::worst_case(2).unwrap()
         + List::<PoolLedger>::worst_case(2).unwrap()
         + List::<OwnerProjectSpend>::worst_case(2).unwrap()
         + List::<Recurring>::worst_case(2).unwrap();

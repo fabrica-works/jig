@@ -3,7 +3,7 @@
 //! a period nor permission mappings are inferred from these values.
 use super::{
     Chip, DocumentText, Funder, HeldRole, Offered, OwnerAuthorityDocument, OwnerGrant, OwnerNumbers, OwnerPart,
-    PartyKind, PolicyRequirement, PoolLedger, Recurring,
+    PartyKind, PolicyPermission, PolicyRequirement, PoolLedger, Recurring,
 };
 use skein_lib::List;
 
@@ -17,6 +17,9 @@ pub struct OwnerProject {
     pub members: List<OwnerProjectMember>,
     pub current_period: Option<PoolLedger>,
     pub pools: List<PoolLedger>,
+    pub configured_period: u64,
+    pub configured_pools: List<PoolLedger>,
+    pub configured_pools_cut: bool,
     pub spend: List<OwnerProjectSpend>,
     pub recurring: List<Recurring>,
     pub cut: bool,
@@ -36,7 +39,7 @@ pub enum OwnerProjectResourceRole {
     Context,
 }
 /// Policy facts, with a loss flag independent of each authority document.
-/// Permissions mappings are absent from the producer and have no baseline here.
+/// Missing mappings remain absent; reserved lists and loss remain independent.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerProjectPolicy {
     pub ceiling: OwnerAuthorityDocument,
@@ -45,6 +48,8 @@ pub struct OwnerProjectPolicy {
     pub projections: List<OwnerGrant>,
     pub roles: List<OwnerProjectPolicyRole>,
     pub requirements: List<PolicyRequirement>,
+    pub permissions: Option<List<PolicyPermission>>,
+    pub permissions_cut: bool,
     pub cut: bool,
 }
 /// A role's whole authority, allotment and full raw request/decision bits.

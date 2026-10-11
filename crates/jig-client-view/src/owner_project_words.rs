@@ -38,8 +38,10 @@ pub enum ProjectPhrase {
     Review,
     Dismiss,
     Remove,
+    ConfiguredPeriod,
+    PoolAbsent,
 }
-pub const ALL: [ProjectPhrase; 28] = [
+pub const ALL: [ProjectPhrase; 30] = [
     ProjectPhrase::Project,
     ProjectPhrase::Resource,
     ProjectPhrase::Owned,
@@ -68,6 +70,8 @@ pub const ALL: [ProjectPhrase; 28] = [
     ProjectPhrase::Review,
     ProjectPhrase::Dismiss,
     ProjectPhrase::Remove,
+    ProjectPhrase::ConfiguredPeriod,
+    ProjectPhrase::PoolAbsent,
 ];
 impl ProjectPhrase {
     #[must_use]
@@ -103,6 +107,8 @@ impl ProjectPhrase {
                 Self::Review => 9025,
                 Self::Dismiss => 9026,
                 Self::Remove => 9027,
+                Self::ConfiguredPeriod => 9028,
+                Self::PoolAbsent => 9029,
             },
         }
     }
@@ -136,6 +142,8 @@ impl ProjectPhrase {
             Self::Review => None,
             Self::Dismiss => None,
             Self::Remove => Some(HoleKind::Number),
+            Self::ConfiguredPeriod => Some(HoleKind::Number),
+            Self::PoolAbsent => None,
         }
     }
     fn label(self) -> &'static [u8] {
@@ -168,6 +176,8 @@ impl ProjectPhrase {
             Self::Review => b"Before and after this settings change",
             Self::Dismiss => b"Dismiss settings change",
             Self::Remove => b"Remove row: ",
+            Self::ConfiguredPeriod => b"Configured pool period: ",
+            Self::PoolAbsent => b"No pool exists for this configured target",
         }
     }
 }
@@ -202,4 +212,4 @@ pub fn language() -> Language {
         phrases: values.into_boxed(),
     }
 }
-const COUNT: u32 = 28;
+const COUNT: u32 = 30;

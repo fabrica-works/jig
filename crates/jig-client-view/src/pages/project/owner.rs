@@ -105,7 +105,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(3)?
         .checked_mul(l.rows)?
         .checked_add(policy.checked_mul(3)?)?
-        .checked_add(l.rows.checked_mul(18)?)?
+        .checked_add(l.rows.checked_mul(34)?)?
         .checked_add(chip.checked_add(10)?.checked_mul(l.rows)?)?
         .checked_add(recurring)?
         .checked_add(l.rows.checked_mul(16)?)?
@@ -138,6 +138,7 @@ pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<Proje
         || value.resources.capacity() > l.rows
         || value.members.capacity() > l.rows
         || value.pools.capacity() > l.rows
+        || value.configured_pools.capacity() > l.rows
         || value.spend.capacity() > l.rows
         || value.recurring.capacity() > l.rows
         || value.policy.roles.capacity() > l.rows
@@ -145,6 +146,11 @@ pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<Proje
         || value.policy.projections.capacity() > l.rows
     {
         return None;
+    }
+    if let Some(permissions) = &value.policy.permissions {
+        if permissions.capacity() > l.rows {
+            return None;
+        }
     }
     crate::owner_amendment::authority_fits(&value.policy.ceiling, l)?;
     for row in &value.policy.roles {
@@ -277,7 +283,13 @@ fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words) {
             &[],
         );
     }
-    text(b, words, P::PermissionsAbsent, &[]);
+    match &value.permissions {
+        None => text(b, words, P::PermissionsAbsent, &[]),
+        Some(mappings) => crate::policy_edit::render(b, &PolicyEdit::Permissions { mappings: mappings.clone() }, words),
+    }
+    if value.permissions_cut {
+        text(b, words, P::PolicyCut, &[]);
+    }
     if value.cut {
         text(b, words, P::PolicyCut, &[]);
     }
@@ -293,9 +305,21 @@ pub fn render(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Wo
     policy_section(b, value, client, words, bindings);
     members(b, value, client, words, bindings);
     ledgers(b, value, client, words, bindings);
+    configured_ledgers(b, value, words);
     spend(b, value, client, words, bindings);
     recurring(b, value, client, words, bindings);
     if value.cut {
+        text(b, words, P::ProjectCut, &[]);
+    }
+    b.close();
+}
+fn configured_ledgers(b: &mut Builder, value: &OwnerProject, words: &Words) {
+    region(b, words, P::ConfiguredPeriod, &[Hole::Number(value.configured_period)]);
+    text(b, words, P::ConfiguredPeriod, &[Hole::Number(value.configured_period)]);
+    for pool in &value.configured_pools {
+        crate::owner_budget::ledger(b, pool, words);
+    }
+    if value.configured_pools_cut {
         text(b, words, P::ProjectCut, &[]);
     }
     b.close();
@@ -469,7 +493,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         edit: PolicyEdit::ProjectSpend { period_spend: value.policy.period_spend },
     };
     if owner_form::supported(value, &spend) {
-        named_region(b, words, JigPhrase::PolicyProjectSpend, &[]);
+        named_region(b, words, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(value.policy.period_spend)]);
         let spend = owner_form::draft(state, &spend);
         if let Ask::ChangePolicy { edit: PolicyEdit::ProjectSpend { period_spend }, .. } = &spend {
             request_field(b, &spend, Field::Spend, *period_spend, words, bindings);

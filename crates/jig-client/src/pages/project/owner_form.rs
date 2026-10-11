@@ -14,6 +14,7 @@ use skein_lib::{Queue, Token};
 pub struct Form {
     pub review: Option<Box<Ask>>,
     pub service_role: Option<crate::contract::HeldRole>,
+    pub pool_period: Option<u64>,
     pub before: Option<Box<Ask>>,
     pub pending: Option<Token>,
     pub refused: Option<Refusal>,
@@ -25,8 +26,8 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         Ask::ChangePolicy { project, edit } => (*project, ActKind::ChangePolicy, policy_complete(doc, edit)),
         Ask::SetRoles { project, .. } => (*project, ActKind::SetRoles, !doc.cut),
         Ask::MakeService { project, .. } => (*project, ActKind::MakeService, true),
-        // Observed ledgers do not identify core.settings.period, the request target.
-        Ask::SetPool { project, .. } => (*project, ActKind::SetPool, false),
+        // Only the separately supplied configured target establishes this baseline.
+        Ask::SetPool { project, .. } => (*project, ActKind::SetPool, !doc.configured_pools_cut),
         Ask::StartChat { .. }
         | Ask::Write { .. }
         | Ask::AnswerQuestion { .. }
@@ -123,7 +124,9 @@ fn policy_complete(doc: &OwnerProject, edit: &PolicyEdit) -> bool {
             false
         }
         PolicyEdit::Requirements { .. } | PolicyEdit::Projections { .. } => !doc.cut && !doc.policy.cut,
-        PolicyEdit::Permissions { .. } => false,
+        PolicyEdit::Permissions { .. } => {
+            !doc.cut && !doc.policy.cut && !doc.policy.permissions_cut && doc.policy.permissions.is_some()
+        }
     }
 }
 /// The unchanged source fields shown before a supported replacement.
@@ -157,7 +160,9 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
                     PolicyEdit::Requirements { requirements: doc.policy.requirements.clone() }
                 }
                 PolicyEdit::Projections { .. } => PolicyEdit::Projections { grants: doc.policy.projections.clone() },
-                PolicyEdit::Permissions { .. } => return None,
+                PolicyEdit::Permissions { .. } => {
+                    PolicyEdit::Permissions { mappings: doc.policy.permissions.as_ref()?.clone() }
+                }
             };
             Some(Ask::ChangePolicy { project: doc.number, edit })
         }
@@ -168,7 +173,22 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
             }
             Some(Ask::SetRoles { project: doc.number, holdings })
         }
-        Ask::SetPool { .. } => None,
+        Ask::SetPool { party, .. } => {
+            for pool in &doc.configured_pools {
+                match pool.source {
+                    crate::contract::Funder::Pool { project, person, period }
+                        if project == doc.number && person == *party && period == doc.configured_period =>
+                    {
+                        return Some(Ask::SetPool { project: doc.number, party: *party, budget: pool.numbers.budget });
+                    }
+                    crate::contract::Funder::Pool { .. }
+                    | crate::contract::Funder::Task(_)
+                    | crate::contract::Funder::Period { .. }
+                    | crate::contract::Funder::Recurring { .. } => {}
+                }
+            }
+            None
+        }
         Ask::MakeService { .. } => None,
         Ask::StartChat { .. }
         | Ask::Write { .. }
@@ -212,6 +232,31 @@ pub(crate) fn review(domain: &mut Domain, ask: Box<Ask>) {
         domain.project_page.settings.review = None;
         domain.project_page.settings.refused = Some(Refusal::NotOffered);
     } else {
+        domain.project_page.settings.pool_period = match ask.as_ref() {
+            Ask::SetPool { .. } => Some(doc.configured_period),
+            Ask::MakeService { .. }
+            | Ask::ChangePolicy { .. }
+            | Ask::SetRoles { .. }
+            | Ask::StartChat { .. }
+            | Ask::Write { .. }
+            | Ask::AnswerQuestion { .. }
+            | Ask::AnswerPerson { .. }
+            | Ask::Take { .. }
+            | Ask::HandBack { .. }
+            | Ask::DecideProposal { .. }
+            | Ask::DecideEscalation { .. }
+            | Ask::Release { .. }
+            | Ask::Amend { .. }
+            | Ask::Stop { .. }
+            | Ask::Cancel { .. }
+            | Ask::Close { .. }
+            | Ask::TakeOver { .. }
+            | Ask::SetGoal { .. }
+            | Ask::Prioritise { .. }
+            | Ask::MarkSeen { .. }
+            | Ask::EditNote { .. }
+            | Ask::DeleteNote { .. } => None,
+        };
         domain.project_page.settings.before = baseline(doc, &ask).map(Box::new);
         domain.project_page.settings.review = Some(ask);
         domain.project_page.settings.refused = None;
@@ -231,7 +276,35 @@ pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
     let Some(ask) = domain.project_page.settings.review.take() else {
         return;
     };
-    if !supported(doc, &ask) || baseline(doc, &ask).as_ref() != domain.project_page.settings.before.as_deref() {
+    let changed_period = match ask.as_ref() {
+        Ask::SetPool { .. } => domain.project_page.settings.pool_period != Some(doc.configured_period),
+        Ask::MakeService { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetRoles { .. }
+        | Ask::StartChat { .. }
+        | Ask::Write { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Take { .. }
+        | Ask::HandBack { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::Release { .. }
+        | Ask::Amend { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Close { .. }
+        | Ask::TakeOver { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Prioritise { .. }
+        | Ask::MarkSeen { .. }
+        | Ask::EditNote { .. }
+        | Ask::DeleteNote { .. } => false,
+    };
+    if changed_period
+        || !supported(doc, &ask)
+        || baseline(doc, &ask).as_ref() != domain.project_page.settings.before.as_deref()
+    {
         domain.project_page.settings.refused = Some(Refusal::NotOffered);
         domain.changed();
         return;
@@ -258,6 +331,6 @@ pub fn action(ask: Ask) -> Act {
 
 impl Form {
     pub(crate) const fn new() -> Self {
-        Self { review: None, service_role: None, before: None, pending: None, refused: None }
+        Self { review: None, service_role: None, pool_period: None, before: None, pending: None, refused: None }
     }
 }

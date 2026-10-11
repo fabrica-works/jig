@@ -179,6 +179,8 @@ fn source() -> OwnerProject {
                     },
                 ],
             ),
+            permissions: None,
+            permissions_cut: false,
             cut: true,
         },
         members: list(
@@ -202,6 +204,9 @@ fn source() -> OwnerProject {
         ),
         current_period: None,
         pools: list(4, funders.map(ledger)),
+        configured_period: 0,
+        configured_pools: List::with_capacity(4),
+        configured_pools_cut: false,
         spend: list(
             4,
             funders.into_iter().enumerate().map(|(index, funder)| OwnerProjectSpend {
