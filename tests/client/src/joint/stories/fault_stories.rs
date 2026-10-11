@@ -165,6 +165,12 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
     assert_eq!(owner.store.rows, rows);
     assert_eq!(answers(&mut world), 1);
     world.fault(crate::FrontFault::Restart { offline: Duration::from_millis(150) });
+    world.person(client, vec![Step::Pause { span: Duration::from_millis(200) }]);
+    let diagnostic_boundary = world.now().saturating_add(Duration::from_millis(180));
+    let diagnostic = world.run(Until::Time(diagnostic_boundary));
+    eprintln!("FAILED_COMMIT_RECOVERY_OUTCOME {diagnostic:?}");
+    eprintln!("FAILED_COMMIT_RECOVERY_CORE {:?}", world.front().session.driver.world.trace);
+    eprintln!("FAILED_COMMIT_RECOVERY_TREE {:?}", world.tree(client).nodes());
     world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
