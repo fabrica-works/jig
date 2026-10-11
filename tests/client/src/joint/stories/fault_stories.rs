@@ -167,3 +167,53 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
     assert!(!world.front().session.driver.world.stopped);
     assert_eq!(answers(&mut world), 2, "the original keyed stop is made once after real recovery");
 }
+
+#[test]
+fn a_reload_with_a_stop_pending_recovers_its_lost_committed_answer_by_the_original_key() {
+    let (mut world, client) = stop_ready();
+    let submitted = world.front().session.driver.world.store.applied.checked_add(1).expect("next transaction");
+    world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
+    world.person(
+        client,
+        vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::Pause { span: Duration::from_millis(30) },
+        ],
+    );
+    let boundary = world.now().saturating_add(Duration::from_millis(50));
+    let outcome = world.run(Until::Time(boundary));
+    assert!(matches!(outcome.verdict, skein_world::domain::Verdict::Open { .. }));
+    assert_eq!(
+        world.front().session.driver.world.reached_cut,
+        Some(jig_core_world::effects::Cut::Submitted(submitted))
+    );
+    assert_eq!(answers(&mut world), 1);
+    assert!(world.front().session.driver.withhold_completion().expect("actual durable commit").is_none());
+    assert_eq!(answers(&mut world), 2);
+    assert!(!shown(&world, client, b"Held stopped"));
+    world.fault(crate::FrontFault::NoAnswer);
+    world.fault(crate::Fault::Reload { client });
+    world.front().session.driver.release_commits();
+    world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    assert_eq!(answers(&mut world), 2);
+    let owner = &world.front().session.driver.world;
+    assert_eq!(owner.cancellations.iter().filter(|(task, _)| *task == 1).count(), 1);
+    let asks: Vec<_> = owner
+        .trace
+        .iter()
+        .filter(|event| event.starts_with("input Core(People(Ask") && event.contains("ask: Stop"))
+        .collect();
+    assert!(asks.len() >= 2, "the pending stop is actually replayed after reload");
+    let keys: std::collections::BTreeSet<_> = asks
+        .iter()
+        .map(|event| {
+            let start = event.find("key: [").expect("actual request key");
+            let end = event[start..].find("], ask:").expect("complete key") + start + 1;
+            &event[start..end]
+        })
+        .collect();
+    assert_eq!(keys.len(), 1);
+}
