@@ -73,16 +73,22 @@ fn app(domain: &mut Domain, key: ObjectKey) -> Box<[Request]> {
 }
 fn task_watch(domain: &mut Domain, section: TaskSection) -> Token {
     let output = drive(domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Task { task: 8, section }) });
-    output
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { task: 8 } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap()
+    let mut found = None;
+    for request in &output {
+        if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+            assert!(found.replace(*watch).is_none());
+        }
+    }
+    found.unwrap()
 }
-fn parts(output: &[Request]) -> Vec<Request> {
-    output.iter().filter(|r| matches!(r, Request::ShowPart { .. })).cloned().collect()
+fn parts(output: &[Request]) -> Box<[Request]> {
+    let mut parts = List::with_capacity(LIMITS.parts.saturating_add(1));
+    for request in output {
+        if let Request::ShowPart { .. } = request {
+            parts.push(request.clone()).unwrap();
+        }
+    }
+    parts.into_boxed()
 }
 fn expected(generation: u32) -> Request {
     Request::ShowPart { part: part(), generation, scope: PartScope::Project(41) }
@@ -92,11 +98,11 @@ fn bounded(domain: &mut Domain, count: u32, event: Event) -> Box<[Request]> {
     limits.parts = count;
     let mut out = Queue::with_capacity(crate::max_out(&limits));
     crate::step(domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
-    let mut values = Vec::new();
+    let mut values = List::with_capacity(crate::max_out(&limits));
     while let Some(request) = out.pop() {
-        values.push(request);
+        values.push(request).unwrap();
     }
-    values.into_boxed_slice()
+    values.into_boxed()
 }
 
 #[test]
@@ -119,7 +125,7 @@ fn native_hold_account_is_shown_once_by_whole_task_reads_in_every_section_and_le
             Time::ZERO,
             Event::Read { read: token, result: ReadResult::Value(ReadValue::Task(Box::new(exact.clone()))) },
         );
-        assert_eq!(parts(&shown), vec![expected(1)]);
+        assert_eq!(parts(&shown).as_ref(), &[expected(1)]);
         let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
         assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(exact.clone()))));
         let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
@@ -142,13 +148,13 @@ fn native_hold_account_application_chips_use_supplied_scope_and_whole_task_and_e
     for cached in [false, true] {
         let (mut domain, _) = objects::live();
         let shown = app(&mut domain, ObjectKey::Task(8));
-        let watch = shown
-            .iter()
-            .find_map(|r| match r {
-                Request::Open { watch, subject: Subject::Chips { .. } } => Some(*watch),
-                _ => None,
-            })
-            .unwrap();
+        let mut watch = None;
+        for request in &shown {
+            if let Request::Open { watch: found, subject: Subject::Chips { .. } } = request {
+                assert!(watch.replace(*found).is_none());
+            }
+        }
+        let watch = watch.unwrap();
         let mut old = super::confirmation::task();
         old.project = 7;
         if cached {
@@ -165,7 +171,7 @@ fn native_hold_account_application_chips_use_supplied_scope_and_whole_task_and_e
             Time::ZERO,
             Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Chips(list([exact.clone()]))) },
         );
-        assert_eq!(parts(&shown), vec![expected(1)]);
+        assert_eq!(parts(&shown).as_ref(), &[expected(1)]);
         let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
         let body = if cached {
             old.chip = exact.clone();
@@ -198,7 +204,7 @@ fn native_hold_account_application_chips_use_supplied_scope_and_whole_task_and_e
             (ReadValue::Task(Box::new(exact.clone())), Body::Task(Box::new(exact)))
         };
         let shown = drive(&mut domain, Time::ZERO, Event::Read { read: token, result: ReadResult::Value(value) });
-        assert_eq!(parts(&shown), vec![expected(1)]);
+        assert_eq!(parts(&shown).as_ref(), &[expected(1)]);
         let id = domain.objects.find(key).unwrap();
         assert_eq!(domain.objects.get(id).unwrap().body, Some(body));
     }
@@ -206,7 +212,9 @@ fn native_hold_account_application_chips_use_supplied_scope_and_whole_task_and_e
 
 #[test]
 fn native_hold_account_absence_other_families_and_path_keys_never_invent_a_hold_from_the_independent_origin() {
-    let mut accounts = vec![None, Some(OwnerPart { key: origin().key, ..account() })];
+    let mut accounts = List::with_capacity(8);
+    accounts.push(None).unwrap();
+    accounts.push(Some(OwnerPart { key: origin().key, ..account() })).unwrap();
     for kind in [
         OwnerPartKind::Resource,
         OwnerPartKind::Pool,
@@ -215,9 +223,9 @@ fn native_hold_account_absence_other_families_and_path_keys_never_invent_a_hold_
         OwnerPartKind::Effect,
         OwnerPartKind::Outbox,
     ] {
-        accounts.push(Some(OwnerPart { kind, ..account() }));
+        accounts.push(Some(OwnerPart { kind, ..account() })).unwrap();
     }
-    for account in accounts {
+    for account in accounts.into_boxed() {
         for application in [false, true] {
             let (mut domain, _) = objects::live();
             let exact = task(account.clone());
@@ -262,7 +270,7 @@ fn native_hold_accounts_obey_bounded_application_and_task_parts_without_dropping
             (ReadValue::Task(Box::new(exact.clone())), Body::Task(Box::new(exact)))
         };
         let shown = bounded(&mut domain, 1, Event::Read { read: token, result: ReadResult::Value(value) });
-        assert_eq!(parts(&shown), vec![expected(1)]);
+        assert_eq!(parts(&shown).as_ref(), &[expected(1)]);
         let (notice, ()) = domain.notices().ids().iter().next().unwrap();
         assert_eq!(domain.notices().get(*notice).unwrap().kind, crate::notices::Kind::Refused(Limit::Objects));
         let id = domain.objects.find(key).unwrap();
@@ -277,7 +285,11 @@ fn native_hold_accounts_obey_bounded_application_and_task_parts_without_dropping
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(exact.clone()))) },
     );
     assert!(parts(&shown).is_empty());
-    assert!(matches!(domain.page(), crate::pages::Page::Work { refused: Some(Limit::Objects), .. }));
+    if let crate::pages::Page::Work { refused, .. } = domain.page() {
+        assert_eq!(*refused, Some(Limit::Objects));
+    } else {
+        panic!("task page retained with its bounded refusal");
+    }
     let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
     assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(exact))));
 }
