@@ -36,13 +36,13 @@ fn the_worlds_original_storage_counts_construct_a_finite_view() {
     assert_eq!(view.limits(), &limits);
     let mut builder = Builder::new(&limits.tree);
     builder.open(Role::Page);
-    for _ in 0..256 {
+    for _ in 0_u32..256_u32 {
         builder.slot(
             SlotRef { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, token: Token::new(1) },
             b"loading",
         );
     }
-    for _ in 0..511 {
+    for _ in 0_u32..511_u32 {
         builder.open(Role::Text);
         builder.close();
     }
@@ -67,7 +67,7 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
         jig_client_view::Limits::compose(&domain.jig, &jig, u32::try_from(application).unwrap(), 0, owner.depth + 4)
             .unwrap();
     let full_nodes = u64::from(base.nodes) + slots;
-    assert!(full_nodes <= u64::from(u32::MAX));
+    assert!(u32::try_from(full_nodes).is_ok());
     assert!(full_nodes * u64::from(base.text_per_node) > u64::from(u32::MAX));
     assert!(
         jig_client_view::Limits::compose(
