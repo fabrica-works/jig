@@ -69,6 +69,8 @@ pub enum JigPhrase {
     PartProposalTask,
     /// A party maker's proposal part.
     PartProposalParty,
+    /// A proposal number owned by the part's connector.
+    PartOwnerProposal,
     /// The executor stopped progressing.
     HoldStalled,
     /// Dependency task .
@@ -1131,6 +1133,7 @@ impl JigPhrase {
             Self::ProposedByParty => 570,
             Self::PartProposalTask => 571,
             Self::PartProposalParty => 572,
+            Self::PartOwnerProposal => 573,
             Self::RunIdle => 530,
             Self::RunDue => 531,
             Self::RunPreparing => 532,
@@ -2252,6 +2255,7 @@ impl JigPhrase {
             | Self::Charter
             | Self::Priority
             | Self::Closing
+            | Self::PartOwnerProposal
             | Self::ResultsThrough => Box::new([HoleShape { kind: HoleKind::Number, bytes: 0 }]),
             Self::PolicyEffect
             | Self::RunRetryFailed
@@ -2362,7 +2366,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 614] = [
+pub const ALL: [JigPhrase; 615] = [
     JigPhrase::OwnerHoldRelease,
     JigPhrase::QuestionFromTask,
     JigPhrase::QuestionFromPerson,
@@ -2411,6 +2415,7 @@ pub const ALL: [JigPhrase; 614] = [
     JigPhrase::ProposedByParty,
     JigPhrase::PartProposalTask,
     JigPhrase::PartProposalParty,
+    JigPhrase::PartOwnerProposal,
     JigPhrase::RunIdle,
     JigPhrase::RunDue,
     JigPhrase::RunPreparing,

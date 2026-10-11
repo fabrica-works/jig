@@ -106,6 +106,7 @@ impl Words {
             | Part::Panel { connector, .. }
             | Part::Result { connector, .. }
             | Part::Effect { connector, .. }
+            | Part::OwnerEffect { connector, .. }
             | Part::Outbox { connector, .. }
             | Part::Hold { connector, .. }
             | Part::Project { connector, .. }
@@ -144,6 +145,9 @@ impl Words {
                 self.text(b, JigPhrase::OutboxEntry, &[Hole::Number(*entry)]);
             }
             Part::Project { project, .. } => self.text(b, JigPhrase::PartProject, &[Hole::Number(u64::from(*project))]),
+            Part::OwnerEffect { proposal, .. } => {
+                self.text(b, JigPhrase::PartOwnerProposal, &[Hole::Number(*proposal)]);
+            }
             Part::Effect { proposal, .. } => {
                 let (phrase, maker) = match proposal.proposer {
                     jig_client::contract::Proposer::Task(task) => (JigPhrase::PartProposalTask, task),

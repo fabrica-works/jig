@@ -1914,3 +1914,65 @@ mod task_context;
 
 #[path = "owner_escalation.rs"]
 mod owner_escalation;
+
+#[test]
+fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
+    let words = words();
+    let connector = u16::MAX;
+    for proposal in [0, u64::MAX] {
+        let native = Part::OwnerEffect { connector, proposal };
+        let mut bindings = JigBindings::new(8, CLIENT.text);
+        let mut builder = Builder::new(&limits());
+        builder.open(Role::Page);
+        crate::cards::common::part(&mut builder, &native, &words, &mut bindings);
+        builder.close();
+        let tree = builder.finish();
+        let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
+        assert_eq!(slot.owner, crate::Owner::Side { connector });
+        assert_eq!(bindings.part(slot.token), Some(&native));
+        for proposer in [Proposer::Task(proposal), Proposer::Party(proposal)] {
+            let legacy = Part::Effect { connector, proposal: ProposalKey { proposer, number: proposal } };
+            let mut builder = Builder::new(&limits());
+            builder.open(Role::Page);
+            crate::cards::common::part(&mut builder, &legacy, &words, &mut bindings);
+            builder.close();
+            let tree = builder.finish();
+            let old = tree.nodes().iter().find_map(|node| node.slot).unwrap();
+            assert_eq!(old.owner, slot.owner);
+            assert_ne!(old.token, slot.token);
+            assert_eq!(bindings.part(old.token), Some(&legacy));
+            assert_eq!(bindings.part(slot.token), Some(&native));
+        }
+        bindings.begin();
+        assert_eq!(bindings.part(slot.token), None);
+    }
+}
+
+#[test]
+fn moved_effect_facts_say_the_supplied_connector_proposal_without_inventing_a_maker() {
+    let words = words();
+    for proposal in [0, u64::MAX] {
+        let mut builder = Builder::new(&limits());
+        builder.open(Role::Page);
+        words.refusal(
+            &mut builder,
+            &Refusal::Moved {
+                now: Revision { value: u64::MAX },
+                what: Moved::Hold {
+                    reason: Some(CurrentHold::Document(Box::new(HoldReason::EffectFailed {
+                        part: Part::OwnerEffect { connector: u16::MAX, proposal },
+                    }))),
+                },
+            },
+        );
+        builder.close();
+        let tree = builder.finish();
+        let expected =
+            words.say(crate::phrases::jig::JigPhrase::PartOwnerProposal, &[crate::phrases::Hole::Number(proposal)]);
+        assert!(contains(&tree, b"Connector 65535"));
+        assert!(contains(&tree, &expected));
+        assert!(!contains(&tree, b"by task"));
+        assert!(!contains(&tree, b"by party"));
+        assert!(tree.nodes().iter().all(|node| node.slot.is_none() && node.binding.is_none()));
+    }
+}

@@ -786,6 +786,10 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b", proposal ")),
                 Segment::Hole { index: 1, kind: HoleKind::Number },
             ]),
+            JigPhrase::PartOwnerProposal => Box::new([
+                Segment::Text(copy_of(b"Connector proposal ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::PartProposalTask => Box::new([
                 Segment::Text(copy_of(b"Proposal by task ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
