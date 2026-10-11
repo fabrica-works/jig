@@ -345,8 +345,20 @@ fn chip_parts(parts: &mut Parts, chip: &contract::Chip) {
 // The account is an explicit owner reference, independent of the hold's origin
 // (client/domain/contract.md, 5.1; objects.md, 3).
 pub(crate) fn owner_hold(chip: &contract::Chip) -> Option<Part> {
-    let contract::ChipPhase::Owner { details, .. } = chip.details.as_ref() else {
-        return None;
+    let details = match chip.details.as_ref() {
+        contract::ChipPhase::Owner { details, .. } => details,
+        contract::ChipPhase::Waiting { .. }
+        | contract::ChipPhase::Procedure { .. }
+        | contract::ChipPhase::Held { .. }
+        | contract::ChipPhase::Closing(_)
+        | contract::ChipPhase::Active(_)
+        | contract::ChipPhase::Idle { .. }
+        | contract::ChipPhase::Starting
+        | contract::ChipPhase::Running { .. }
+        | contract::ChipPhase::WaitingForWords { .. }
+        | contract::ChipPhase::BackingOff { .. }
+        | contract::ChipPhase::Person { .. }
+        | contract::ChipPhase::Ended { .. } => return None,
     };
     let account = details.hold.as_ref()?.account.as_ref()?;
     match account.kind {
