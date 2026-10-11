@@ -3,7 +3,7 @@ use super::*;
 
 #[test]
 fn a_real_engine_question_offers_exactly_its_admitted_answer_act() {
-    let mut world = world(8520, vec![Box::new([Script::Wait])]);
+    let mut world = configured_with_slots(8520, vec![Box::new([Script::Wait]), Box::new([Script::Wait])], 2, |_, _| {});
     let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
     world.person(member, start(b"ask a question"));
     let outcome = world.run(Until::Done);
@@ -11,9 +11,55 @@ fn a_real_engine_question_offers_exactly_its_admitted_answer_act() {
     assert!(outcome.judged.0 > 0);
     let assignment =
         world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen[0].clone();
+    // A real delegate may question its requester; self-messaging is not a
+    // permitted task reference. Preserve the genuine parent/person inbox.
+    let mut authority = match world
+        .front()
+        .session
+        .driver
+        .world
+        .store
+        .rows
+        .get(&jig_test_domain::Key::Core(jig_core::Key::Tasks(jig_core_tasks::Key::Live(assignment.task))))
+    {
+        Some(jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))) => {
+            task.authority.clone()
+        }
+        other => panic!("actual parent: {other:?}"),
+    };
+    authority.budget.spend = 20;
+    authority.delegation = jig_core_tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    let now = world.now();
+    world.front().session.driver.send(
+        now,
+        clock(now),
+        jig_test_domain::Event::Core(jig_core::Event::DelegateValidated {
+            to: skein_lib::ReplyTo::new(Token::new(9850)),
+            key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion: 1, position: 0 },
+            batch: Box::new([jig_core::Delegate {
+                executor: jig_core_tasks::Executor::Agent { charter: 1 },
+                spec: jig_core_tasks::Spec {
+                    words: b"ask its parent".as_slice().into(),
+                    parameters: Box::new([]),
+                    inputs: Box::new([]),
+                },
+                contract: jig_core_tasks::Contract::Report { words: 128 },
+                authority,
+                symbolic_grants: Box::new([]),
+                dependencies: Box::new([]),
+                wake: jig_core_tasks::WakePolicy::DEFAULT,
+            }]),
+            stubs: Box::new([]),
+        }),
+    );
+    world.person(member, vec![Step::Pause { span: Duration::from_millis(1) }]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let child = world.front().session.driver.world.peers.as_ref().expect("actual delegate").workers[0].seen[1].clone();
     super::engine_stories::action(
         &mut world,
-        &assignment,
+        &child,
         1,
         jig_core::NamedAction::Message {
             target: assignment.task,
