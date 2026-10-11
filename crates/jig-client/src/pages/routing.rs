@@ -572,9 +572,7 @@ fn read_value(
         ReadValue::Goals(page) => crate::pages::project::ended(domain, env, source, *page, out),
         ReadValue::Project(project) => crate::pages::project::document(domain, env, project, out),
         ReadValue::Deployment(deployment) => crate::pages::deployment::document(domain, env, deployment, out),
-        ReadValue::OwnerDeployment(deployment) => {
-            crate::pages::deployment::owner_document(domain, env, deployment, out);
-        }
+        ReadValue::OwnerDeployment(document) => crate::pages::deployment::owner_document(domain, env, document, out),
     }
 }
 
