@@ -148,11 +148,9 @@ pub fn hold_revision(object: &Object) -> Option<Revision> {
 fn words(fields: &Fields, purpose: Purpose) -> Option<Text> {
     Some(fields.get(purpose)?.text.clone())
 }
-/// Builds one request after the confirmation has checked its current facts and fields.
-#[must_use]
-pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Option<Ask> {
-    let project = match &object.body {
-        Some(Body::OwnerPersonTask(document)) => document.project()?,
+fn request_project(object: &Object) -> Option<u32> {
+    match &object.body {
+        Some(Body::OwnerPersonTask(document)) => document.project(),
         Some(
             Body::Chip(_)
             | Body::Task(_)
@@ -163,8 +161,13 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
             | Body::Result(_)
             | Body::Note { .. },
         )
-        | None => object.project?,
-    };
+        | None => object.project,
+    }
+}
+/// Builds one request after the confirmation has checked its current facts and fields.
+#[must_use]
+pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Option<Ask> {
+    let project = request_project(object)?;
     let task = match object.key {
         ObjectKey::Task(task)
         | ObjectKey::Escalation(task)

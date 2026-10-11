@@ -443,9 +443,37 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
     }
 }
 
+fn owner_answer_missing(
+    domain: &Domain,
+    open: &Confirmation,
+    document: &crate::contract::OwnerPersonTask,
+) -> Option<Missing> {
+    if crate::objects::person_task::answer(document, open.choices.option, &domain.fields).is_some() {
+        return None;
+    }
+    return Some(match &document.contract {
+        crate::contract::TaskContractDocument::Verdict { choices, .. } => {
+            let mut selectable = false;
+            if let Some(option) = open.choices.option {
+                for choice in choices {
+                    if choice.code == option && choice.fields.is_empty() {
+                        selectable = true;
+                    }
+                }
+            }
+            if selectable { Missing::Words { field: Purpose::Reason } } else { Missing::Choice }
+        }
+        crate::contract::TaskContractDocument::Report { .. } => Missing::Words { field: Purpose::Answer },
+        crate::contract::TaskContractDocument::Approval { .. }
+        | crate::contract::TaskContractDocument::Change { .. } => Missing::Refused { why: Refusal::NotOffered },
+    });
+}
 fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Missing> {
-    if object.project.is_none()
-        || matches!(&object.body, Some(Body::OwnerPersonTask(document)) if document.project().is_none())
+    if object.project.is_none() {
+        return Some(Missing::Context);
+    }
+    if let Some(document) = crate::objects::person_task::owner_facts(object)
+        && document.project().is_none()
     {
         return Some(Missing::Context);
     }
@@ -455,27 +483,9 @@ fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Miss
     }
     if open.act == ActKind::Answer
         && !open.choices.cannot
-        && let Some(Body::OwnerPersonTask(document)) = &object.body
+        && let Some(document) = crate::objects::person_task::owner_facts(object)
     {
-        if crate::objects::person_task::answer(document, open.choices.option, &domain.fields).is_some() {
-            return None;
-        }
-        return Some(match &document.contract {
-            crate::contract::TaskContractDocument::Verdict { choices, .. } => {
-                let mut selectable = false;
-                if let Some(option) = open.choices.option {
-                    for choice in choices {
-                        if choice.code == option && choice.fields.is_empty() {
-                            selectable = true;
-                        }
-                    }
-                }
-                if selectable { Missing::Words { field: Purpose::Reason } } else { Missing::Choice }
-            }
-            crate::contract::TaskContractDocument::Report { .. } => Missing::Words { field: Purpose::Answer },
-            crate::contract::TaskContractDocument::Approval { .. }
-            | crate::contract::TaskContractDocument::Change { .. } => Missing::Refused { why: Refusal::NotOffered },
-        });
+        return owner_answer_missing(domain, open, document);
     }
     let field = match open.act {
         ActKind::Reject | ActKind::LeaveHeld | ActKind::Cancel | ActKind::TakeOver => Some(Purpose::Reason),

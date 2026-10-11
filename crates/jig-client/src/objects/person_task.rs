@@ -34,7 +34,20 @@ pub fn revision(object: &Object) -> Option<crate::contract::Revision> {
 /// The separate pending owner envelope in this working-set object.
 #[must_use]
 pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerPersonTask> {
-    if let Some(Body::OwnerPersonTask(document)) = &object.body { Some(document) } else { None }
+    match &object.body {
+        Some(Body::OwnerPersonTask(document)) => Some(document),
+        Some(
+            Body::PersonTask(_)
+            | Body::Chip(_)
+            | Body::Task(_)
+            | Body::Proposal(_)
+            | Body::Escalation(_)
+            | Body::Question(_)
+            | Body::Result(_)
+            | Body::Note { .. },
+        )
+        | None => None,
+    }
 }
 /// Positive forms the current person answer schema can express.
 #[must_use]
@@ -50,7 +63,10 @@ pub fn answer(
     match &document.contract {
         TaskContractDocument::Approval { state, .. } => Some(PersonAnswer::Approved {
             state: state.clone(),
-            words: fields.get(Purpose::Reason).map(|field| field.text.clone()),
+            words: match fields.get(Purpose::Reason) {
+                Some(field) => Some(field.text.clone()),
+                None => None,
+            },
         }),
         TaskContractDocument::Report { words } => {
             let field = fields.get(Purpose::Answer)?;
