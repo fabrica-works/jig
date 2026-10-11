@@ -229,3 +229,121 @@ fn a_person_answers_a_choice_between_two_reports() {
             .any(|(_, _, _, words)| words.as_ref() == b"second report")
     );
 }
+
+#[test]
+fn two_parties_decide_one_proposal_and_the_second_is_told_who() {
+    let mut world = world(
+        8515,
+        vec![
+            Box::new([
+                Script::Call(Call::ProposeGoal {
+                    words: b"decide this goal".as_slice().into(),
+                    budget: 150,
+                    priority: 7,
+                }),
+                Script::Park,
+            ]),
+            Box::new([Script::Finish { report: b"one accepted goal".as_slice().into() }]),
+        ],
+    );
+    let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
+    world.person(member, start(b"propose once"));
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let owner = world.client_with(1, crate::stories::inbox(), receiving_limits(), client);
+    let maintainer = world.client_with(2, crate::stories::inbox(), receiving_limits(), client);
+    let within = Duration::from_secs(1);
+    for party in [owner, maintainer] {
+        world.person(
+            party,
+            vec![
+                Step::See { find: Find::exactly_named(Role::Button, b"Sign in with Test"), within },
+                Step::Press { find: Find::exactly_named(Role::Button, b"Sign in with Test") },
+                Step::See { find: Find::text(b"decide this goal"), within },
+                Step::See { find: Find::exactly_named(Role::Button, b"Accept"), within },
+                Step::Press { find: Find::exactly_named(Role::Button, b"Accept") },
+            ],
+        );
+    }
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let first_person = world.front().session.driver.world.peers.as_ref().expect("actual parties").parties[0]
+        .person
+        .expect("actual owner");
+    let by = format!("Decided by person: {first_person}").into_bytes();
+    // Both ready confirmations send before either released watch/answer is
+    // delivered; their distinct authenticated engine keys remain independent.
+    for party in [owner, maintainer] {
+        world.person(
+            party,
+            vec![
+                Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+                Step::See { find: Find::text(b"Accepted"), within },
+                Step::See { find: Find::text(&by), within },
+            ],
+        );
+    }
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let engine = &world.front().session.driver.world;
+    assert_eq!(
+        engine
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        if matches!(outcome, people::Outcome::ProposalDecided { by, choice: people::ProposalChoice::Accepted, .. }
+            if *by == first_person)))
+            .count(),
+        2
+    );
+    assert_eq!(
+        engine
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
+        if task.tracked == Some(7) && task.numbers.budget == 150))
+            .count(),
+        1
+    );
+    assert_eq!(engine.peers.as_ref().expect("actual worker").workers[0].seen.len(), 2);
+}
+
+#[test]
+fn an_observer_is_refused_a_request_and_told_why() {
+    let mut world = world(8516, vec![Box::new([Script::Wait])]);
+    let observer = world.client_with(4, crate::stories::conversation(), receiving_limits(), client);
+    let within = Duration::from_secs(1);
+    let mut steps = start(b"observer request");
+    // The failed request leaves its entered words with the owner's exact role refusal.
+    steps.pop();
+    steps.push(Step::See { find: Find::text(b"The held role does not permit this action"), within });
+    steps.push(Step::See { find: Find::text(b"Held role: observer"), within });
+    world.person(observer, steps);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let engine = &world.front().session.driver.world;
+    assert!(engine.peers.as_ref().expect("actual worker").workers[0].seen.is_empty());
+    assert!(!engine.store.rows.values().any(|row| matches!(
+        row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(_)))
+    )));
+    assert_eq!(
+        engine
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        if matches!(outcome, people::Outcome::Refused(people::Refusal::Role { held: Some(people::Role::Observer) }))))
+            .count(),
+        1
+    );
+}
