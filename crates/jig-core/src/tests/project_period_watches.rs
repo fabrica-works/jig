@@ -5,6 +5,7 @@ use super::*;
 
 fn period_core(configured: u64) -> (Core, Limits) {
     let (auth, mut limits) = watch_core();
+    limits.authority.projects = 2;
     limits.tasks.funders = 8;
     limits.views.watchers = 4;
     limits.views.watchers_per_party = 4;
