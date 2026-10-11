@@ -480,7 +480,13 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
     assert!(view::required(&value, &l, &w).is_some());
     let (domain, id) =
         super::cards_objects::loaded(ObjectKey::PersonTask(8), ReadValue::OwnerPersonTask(Box::new(value.clone())));
-    let cap = Limits::of_words(&l, &w).unwrap();
+    // Price this single enclosing card with the shared card bound.
+    let mut cap = limits(&w);
+    cap.nodes = crate::card_nodes(&l).unwrap().checked_add(1).unwrap();
+    cap.depth = l.rows.checked_add(32).unwrap();
+    cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
+    cap.bindings = cap.nodes;
+    cap.slots = cap.nodes;
     let mut builder = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, l.text);
     builder.open(Role::Page);
