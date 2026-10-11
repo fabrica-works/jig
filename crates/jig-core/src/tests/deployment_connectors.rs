@@ -1,6 +1,7 @@
 //! Configured deployment connector references are supplied independently of their
 //! owners' values (`client/domain/pages.md`, 7; `client/domain/root.md`, 6).
 use super::*;
+use crate::documents::Deployment;
 
 fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
     let mut limits = limits();
@@ -35,7 +36,7 @@ fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
 
 fn deployment(core: &Core, limits: &Limits) -> Deployment {
     match make(core, limits, 1, &Subject::Deployment, &window()).unwrap() {
-        Document::Deployment(value) => value,
+        Document::Deployment(value) => *value,
         _ => panic!("deployment document"),
     }
 }
