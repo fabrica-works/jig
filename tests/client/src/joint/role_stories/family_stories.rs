@@ -1,6 +1,17 @@
 //! Actual connector documents fill the procedure, effect and Hold slots.
 use super::*;
 
+fn family_limits() -> jig_test_client_domain::Limits {
+    let mut limits = receiving_limits();
+    limits.first.connector.paths = 2;
+    limits.first.connector.segments = 2;
+    limits.first.connector.segment_bytes = 16;
+    limits
+}
+fn family_client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+    crate::test::new(&family_limits(), seed)
+}
+
 fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &jig_test_domain::Limits) {
     let kinds: Box<[jig_core_authority::Executor]> =
         Box::new([jig_core_authority::Executor::Charter(1), jig_core_authority::Executor::Procedure(1)]);
@@ -27,15 +38,15 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
 
 #[test]
 fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_page() {
-    let mut world = configured(8524, vec![], procedure_configuration);
+    let mut world = configured_with_bounds(8524, vec![], 1, procedure_configuration, family_limits());
     let owner = world.client_with(
         1,
         jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
             project: 1,
             section: jig_client::address::ProjectSection::Goals,
         }),
-        receiving_limits(),
-        client,
+        family_limits(),
+        family_client,
     );
     let within = Duration::from_secs(1);
     world.person(
@@ -129,8 +140,9 @@ fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig
 
 #[test]
 fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card() {
-    let mut world = configured(8526, vec![Box::new([Script::Wait])], effect_configuration);
-    let owner = world.client_with(1, crate::stories::conversation(), receiving_limits(), client);
+    let mut world =
+        configured_with_bounds(8526, vec![Box::new([Script::Wait])], 1, effect_configuration, family_limits());
+    let owner = world.client_with(1, crate::stories::conversation(), family_limits(), family_client);
     world.person(owner, start(b"describe its effect"));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
