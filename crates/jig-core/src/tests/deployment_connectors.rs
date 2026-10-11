@@ -1,5 +1,9 @@
 //! Configured deployment connector references are supplied independently of their
 //! owners' values (`client/domain/pages.md`, 7; `client/domain/root.md`, 6).
+#![expect(
+    clippy::disallowed_macros,
+    reason = "producer proofs are ordinary Rust under programming-model.md section 10.2"
+)]
 use super::*;
 use crate::documents::Deployment;
 
@@ -34,6 +38,7 @@ fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
     (core, limits)
 }
 
+#[expect(clippy::wildcard_enum_match_arm, reason = "ordinary proof helper receives a Deployment document")]
 fn deployment(core: &Core, limits: &Limits) -> Deployment {
     match make(core, limits, 1, &Subject::Deployment, &window()).unwrap() {
         Document::Deployment(value) => *value,

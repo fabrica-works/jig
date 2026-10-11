@@ -1,5 +1,9 @@
 //! Frame deployment membership comes from the same source as deployment admission,
 //! independently of bounded project rows and their loss.
+#![expect(
+    clippy::disallowed_macros,
+    reason = "producer proofs are ordinary Rust under programming-model.md section 10.2"
+)]
 use super::*;
 
 fn source(deployment_role: Option<people::Role>) -> (Core, Limits) {
@@ -32,6 +36,7 @@ fn source(deployment_role: Option<people::Role>) -> (Core, Limits) {
     (core, limits)
 }
 
+#[expect(clippy::wildcard_enum_match_arm, reason = "ordinary proof helper receives a Frame document")]
 fn frame(core: &Core, limits: &Limits) -> Frame {
     match make(core, limits, 1, &Subject::Frame { party: 1 }, &window()).expect("frame document") {
         Document::Frame(value) => value,
