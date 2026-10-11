@@ -887,6 +887,7 @@ fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token
         | ReadValue::Proposal(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::Escalation(_)
+        | ReadValue::OwnerEscalation(_)
         | ReadValue::Question(_)
         | ReadValue::PersonTask(_)
         | ReadValue::OwnerPersonTask(_)
