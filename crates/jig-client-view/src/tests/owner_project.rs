@@ -1018,3 +1018,206 @@ fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects
     value.members = List::with_capacity(5);
     assert!(view::required(&value, &limits(), w).is_none());
 }
+
+fn native_historical_project() -> (Domain, OwnerSpendPage) {
+    use jig_client::{
+        Event, Request,
+        action::{Act, End},
+        address::{Address, ProjectSection},
+    };
+    let mut value = source();
+    value.number = 4;
+    let mut domain = Domain::new(&limits(), 9181);
+    let start = native_drive(
+        &mut domain,
+        Event::Start {
+            address: Address::Project { project: 4, section: ProjectSection::Spend },
+            kept: List::with_capacity(0),
+            offset: jig_client::boundary::Offset { minutes: 0 },
+        },
+    );
+    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    let watch = start
+        .iter()
+        .find_map(|request| match request {
+            Request::Open { watch, subject: Subject::Frame } => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let ready = native_drive(
+        &mut domain,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+    );
+    let read = ready
+        .iter()
+        .find_map(|request| match request {
+            Request::Read { read, what: Read::Project { project: 4 } } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    native_drive(
+        &mut domain,
+        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) },
+    );
+    let read = ready
+        .iter()
+        .find_map(|request| match request {
+            Request::Read { read, what: Read::Spend { project: 4, after: None } } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    let before = Cursor { value: Text::new(copy_of(&[255, 0, 1]), 32).unwrap() };
+    let after = Cursor { value: Text::new(copy_of(&[254, 0, 2]), 32).unwrap() };
+    let old = SpendPage {
+        rows: list(
+            4,
+            [SpendPeriod {
+                period: 997,
+                budget: Budget {
+                    total: 1061,
+                    own: 1063,
+                    ended: 1067,
+                    reserved: 1069,
+                    left: 1087,
+                    funder: Actor::Task(3),
+                },
+                pools: List::with_capacity(4),
+                tasks: List::with_capacity(4),
+            }],
+        ),
+        before: Some(before.clone()),
+        after: Some(after.clone()),
+        cut: true,
+    };
+    native_drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Spend(Box::new(old))) });
+    let requests = native_drive(
+        &mut domain,
+        Event::Act {
+            act: Act::More { window: skein_lib::Token::new(jig_client::pages::project::SPEND_WINDOW), end: End::After },
+        },
+    );
+    let read = requests
+        .iter()
+        .find_map(|request| match request {
+            Request::Read { read, what: Read::Spend { project: 4, after: Some(cursor) } } if cursor == &after => {
+                Some(*read)
+            }
+            _ => None,
+        })
+        .unwrap();
+    let page = OwnerSpendPage {
+        rows: list(
+            4,
+            [OwnerFundingRecord {
+                period: Some(OwnerPeriodTimes { began: Wall::EPOCH, next: Some(Wall::from_nanos(u64::MAX)) }),
+                funder: Funder::Period { project: 4, period: 777 },
+                parent: None,
+                numbers: OwnerNumbers { budget: 977, spent: 979, spent_below: 981, reserved: 983 },
+                made: 985,
+                closed: true,
+            }],
+        ),
+        before: Some(before),
+        after: Some(after),
+        cut: true,
+    };
+    native_drive(
+        &mut domain,
+        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
+    );
+    (domain, page)
+}
+fn historical_project_tree(domain: &Domain, w: &Words, bound: crate::Limits) -> (Tree, JigBindings) {
+    let mut b = Builder::new(&bound);
+    let mut bindings = JigBindings::new(bound.bindings, 32);
+    crate::pages::project::project(&mut b, domain, w, &mut bindings);
+    (b.finish(), bindings)
+}
+fn historical_project_bound(w: &Words) -> crate::Limits {
+    let mut bound = capacity(view::worst_case(&limits(), w).unwrap());
+    bound.nodes = bound.nodes.checked_add(32).unwrap();
+    bound.text_bytes = bound.text_bytes.checked_add(32_u32.checked_mul(bound.text_per_node).unwrap()).unwrap();
+    bound
+}
+#[test]
+fn owner_project_genuine_spend_keeps_live_historical_and_earlier_period_facts_with_both_opaque_edges() {
+    use jig_client::{
+        Event, Request,
+        action::{Act, End},
+    };
+    let (mut domain, page) = native_historical_project();
+    assert_eq!(domain.project_page().owner_spend.as_deref(), Some(&page));
+    assert_eq!(domain.project_page().spend.get(0).unwrap().period, 997);
+    assert_eq!(domain.project_page().spend_before, page.before);
+    assert_eq!(domain.project_page().spend_after, page.after);
+    assert!(domain.project_page().spend_cut);
+    let w = words(false);
+    let (tree, mut bindings) = historical_project_tree(&domain, w, historical_project_bound(w));
+    super::cards_access::check(&tree);
+    for supplied in [b"103".as_slice(), b"977", b"979", b"981", b"983", b"985", b"997", b"1087"] {
+        assert!(has(&tree, supplied), "missing {supplied:?}");
+    }
+    let position = |bytes: &[u8]| {
+        tree.nodes().iter().position(|node| node.text.iter().any(|run| find(&run.text, bytes).is_some())).unwrap()
+    };
+    assert!(position(b"103") < position(b"977"));
+    assert!(position(b"977") < position(b"997"));
+    let edges: Vec<_> = tree
+        .nodes()
+        .iter()
+        .filter_map(|node| node.binding)
+        .filter_map(|binding| crate::decode(&mut bindings, binding.token, crate::Act::Press))
+        .filter(|act| match act {
+            Act::More { window, .. } => *window == skein_lib::Token::new(22),
+            _ => false,
+        })
+        .collect();
+    assert_eq!(
+        edges,
+        [
+            Act::More { window: skein_lib::Token::new(22), end: End::Before },
+            Act::More { window: skein_lib::Token::new(22), end: End::After }
+        ]
+    );
+    for (act, expected) in edges.into_iter().zip([page.before.clone().unwrap(), page.after.clone().unwrap()]) {
+        let requests = native_drive(&mut domain, Event::Act { act });
+        assert!(requests.iter().any(|request| match request {
+            Request::Read { what: Read::Spend { project: 4, after: Some(cursor) }, .. } => cursor == &expected,
+            _ => false,
+        }));
+    }
+    assert_eq!(domain.project_page().owner_spend.as_deref(), Some(&page));
+}
+#[test]
+#[expect(clippy::assertions_on_result_states, reason = "independent exact and one-under whole companion allocations")]
+fn owner_project_historical_companion_prices_whole_languages_and_refuses_one_under_nodes_or_text() {
+    let (domain, page) = native_historical_project();
+    for second in [false, true] {
+        let w = words(second);
+        let bound = historical_project_bound(w);
+        let (tree, _) = historical_project_tree(&domain, w, bound);
+        assert!(tree.len() <= bound.nodes);
+        let mut exact = bound;
+        exact.nodes = tree.len();
+        exact.text_bytes = tree.nodes().iter().map(crate::Node::text_bytes).sum();
+        let (rebuilt, _) = historical_project_tree(&domain, w, exact);
+        assert_eq!(rebuilt.nodes(), tree.nodes());
+        for short in [
+            crate::Limits { nodes: exact.nodes - 1, ..exact },
+            crate::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+        ] {
+            assert!(
+                std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| historical_project_tree(&domain, w, short)))
+                    .is_err()
+            );
+        }
+        let historical = crate::historical_pages::spend_required(&page, &limits(), w).unwrap();
+        assert!(historical.nodes <= view::max_nodes(&limits()).unwrap());
+        if second {
+            assert!(has(&tree, b"second "));
+        }
+    }
+    assert!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..limits() }).is_none());
+    assert_eq!(domain.project_page().owner_spend.as_deref(), Some(&page));
+    assert_eq!(domain.project_page().spend.get(0).unwrap().period, 997);
+}

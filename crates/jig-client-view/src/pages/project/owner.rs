@@ -116,7 +116,22 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(6)?)?
         .checked_add(crate::sizes::refusal_nodes(l)?.checked_mul(3)?)?
         .checked_add(20)?
-        .checked_add(113)
+        .checked_add(113)?
+        .checked_add(historical_nodes(l)?)
+}
+// Earlier period rows include their task chips/cards and pool budgets. The
+// original cut and two edge controls cost ten nodes, independently of the
+// shared outer offered-action controls. Retained scalar funding adds its own
+// checked fragment exactly once.
+fn historical_nodes(l: &Limits) -> Option<u32> {
+    crate::card_nodes(l)?
+        .checked_add(crate::chip_nodes(l)?)?
+        .checked_add(8)?
+        .checked_mul(l.rows)?
+        .checked_add(8)?
+        .checked_mul(l.rows)?
+        .checked_add(10)?
+        .checked_add(crate::historical_pages::spend_nodes(l)?)
 }
 /// Every loaded saying and escaped source segment contributes to the envelope.
 #[must_use]
@@ -485,6 +500,7 @@ pub(super) fn section(
         ProjectSection::Settings => {
             render(b, value, client, words, bindings);
             forms(b, value, client, words, bindings);
+            super::historical_spend(b, client, words, bindings);
         }
         ProjectSection::Resources => resources(b, value, client, words, bindings),
         ProjectSection::Policy => {
@@ -495,6 +511,7 @@ pub(super) fn section(
         ProjectSection::Spend => {
             ledgers(b, value, client, words, bindings);
             spend(b, value, client, words, bindings);
+            super::historical_spend(b, client, words, bindings);
         }
         ProjectSection::Recurring => recurring(b, value, client, words, bindings),
         ProjectSection::Overview => {

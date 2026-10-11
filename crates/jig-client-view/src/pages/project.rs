@@ -299,3 +299,24 @@ fn genuine(
     b.close();
     super::excess(b, client, words);
 }
+
+/// Retained funding and earlier period rows preserve the original spend window.
+fn historical_spend(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    let page = client.project_page();
+    if let Some(spend) = &page.owner_spend {
+        crate::historical_pages::spend_render(b, spend, words);
+    }
+    for past in &page.spend {
+        period(b, past.period, &past.budget, &past.pools, words);
+        task_spend(b, client, &past.tasks, words, bindings);
+    }
+    super::cut(b, words, page.spend_cut);
+    super::work::cursors(
+        b,
+        words,
+        bindings,
+        page.spend_before.as_ref(),
+        page.spend_after.as_ref(),
+        jig_client::pages::project::SPEND_WINDOW,
+    );
+}
