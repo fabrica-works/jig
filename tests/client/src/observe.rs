@@ -384,6 +384,13 @@ pub fn window_changed(event: &Event) -> bool {
 /// Only decoded jig person acts explain a changed displayed window (QUESTIONS 34).
 #[must_use]
 pub fn jig_window_changed(act: &jig_client::action::Act) -> bool {
+    // Settings review and explicit service role selection keep the current windows.
+    if matches!(
+        act,
+        jig_client::action::Act::ProjectSettings { .. } | jig_client::action::Act::ProjectServiceRole { .. }
+    ) {
+        return false;
+    }
     matches!(
         act,
         jig_client::action::Act::Go { .. }
