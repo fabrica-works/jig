@@ -202,13 +202,27 @@ fn retained_proposal_fragment_preserves_absent_empty_and_independent_retained_lo
         cut: true,
         ..absent.clone()
     };
-    for (change, supplied) in [(absent, false), (empty, true)] {
+    let complete_empty = OwnerRetainedAmendment { instructions: Some(doc(b"", false)), cut: false, ..empty.clone() };
+    let local_loss = OwnerRetainedAmendment { cut: false, ..empty.clone() };
+    let dependency_loss = OwnerRetainedAmendment { cut: true, ..complete_empty.clone() };
+    for (change, supplied, text_cut, dependency_cut) in [
+        (absent, false, false, false),
+        (complete_empty, true, false, false),
+        (local_loss, true, true, false),
+        (dependency_loss, true, false, true),
+        (empty, true, true, true),
+    ] {
         let value = proposal(OwnerRetainedAction::Amend { task: 0, change: Box::new(change) });
         let (tree, _, _) = bare(&value, words);
         match &value.action {
             OwnerRetainedAction::Amend { change, .. } => {
                 assert_eq!(change.instructions.is_some(), supplied);
                 assert_eq!(change.dependencies.is_some(), supplied);
+                if let Some(instructions) = &change.instructions {
+                    assert!(instructions.bytes().is_empty());
+                    assert_eq!(instructions.cut, text_cut);
+                }
+                assert_eq!(change.cut, dependency_cut);
                 if let Some(values) = &change.dependencies {
                     assert!(values.is_empty());
                     assert_eq!(values.capacity(), 3);
@@ -220,10 +234,10 @@ fn retained_proposal_fragment_preserves_absent_empty_and_independent_retained_lo
             | OwnerRetainedAction::Release { .. } => unreachable!(),
         }
         assert_eq!(has(&tree, b"Instruction replacement not supplied"), !supplied);
-        assert_eq!(has(&tree, b"Instructions are empty"), supplied);
+        assert_eq!(has(&tree, b"Instructions are empty"), supplied && !text_cut);
         assert_eq!(has(&tree, b"Dependency replacement not supplied"), !supplied);
         assert_eq!(has(&tree, b"Retained dependency replacement"), supplied);
-        assert_eq!(has(&tree, b"Only part of this text was supplied"), supplied);
-        assert_eq!(has(&tree, b"Retained dependency list incomplete"), supplied);
+        assert_eq!(has(&tree, b"Only part of this text was supplied"), text_cut);
+        assert_eq!(has(&tree, b"Retained dependency list incomplete"), dependency_cut);
     }
 }
