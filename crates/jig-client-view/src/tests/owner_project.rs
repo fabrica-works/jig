@@ -81,7 +81,7 @@ fn chip(number: u64) -> Chip {
         executor: Executor::Role { project: u32::MAX, role: u32::MAX },
         phase: Phase::Preparing,
         details: Box::new(ChipPhase::Owner {
-            phase: OwnerChipPhase::Active(jig_client::contract::RunStage::Preparing),
+            phase: OwnerChipPhase::Active(RunStage::Preparing),
             details: Box::new(super::owner_chip::details()),
         }),
     }
