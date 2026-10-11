@@ -98,7 +98,7 @@ fn assert_observed_pool(project: &Project, before: &Project) {
     assert_eq!(project.number, 1);
     assert_eq!(project.current_period, before.current_period);
     assert_eq!(project.pools, before.pools);
-    assert_eq!(project.configured_pools.allocated(), 4);
+    assert_eq!(project.configured_pools.capacity(), 4);
     assert!(!project.configured_pools_cut);
     assert!(!project.cut);
     assert_eq!(project.pools.len(), 1);
