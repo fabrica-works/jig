@@ -443,3 +443,6 @@ mod proposed_story;
 
 #[path = "role_stories/card_stories.rs"]
 mod card_stories;
+
+#[path = "role_stories/fault_stories.rs"]
+mod fault_stories;
