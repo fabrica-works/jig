@@ -149,6 +149,8 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
         vec![
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
             Step::See { find: Find::text(b"Offline"), within: Duration::from_secs(1) },
+            // A real person wake keeps the stopped-state observation before the pending ask deadline.
+            Step::Pause { span: Duration::from_millis(250) },
         ],
     );
     let boundary = world.now().saturating_add(Duration::from_millis(250));
