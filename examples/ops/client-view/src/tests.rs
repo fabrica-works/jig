@@ -1269,3 +1269,74 @@ fn unknown_deployment_parts_keep_missing_owner_facts_without_not_kept_captions()
         assert!(view.tree().len() <= view.limits().tree.nodes);
     }
 }
+
+#[test]
+fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_holes() {
+    use jig_client_view::phrases::{
+        Form, Language, Phrase, PhraseLimits, PhraseShape, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit,
+        WallFormat,
+    };
+    for connector in [1, 2] {
+        let english = words::Words::english(connector, 32).unwrap();
+        let ids = [words::Word::SystemRequestBudgetNotKept, words::Word::LastSystemResponseNotKept];
+        let texts = [b"Budget non conserve".as_slice(), b"Derniere reponse non conservee".as_slice()];
+        let mut shapes = Vec::new();
+        let mut original = Vec::new();
+        let mut selected = Vec::new();
+        let mut text_bytes = 0;
+        for (word, text) in ids.into_iter().zip(texts) {
+            shapes.push(PhraseShape { id: word.id(connector), holes: Box::new([]), plural: None });
+            let literal = english.say(word, &[]);
+            text_bytes += u32::try_from(literal.len() + text.len()).unwrap();
+            original.push(Phrase {
+                id: word.id(connector),
+                forms: Box::new([Form { class: PluralClass::Other, segments: Box::new([Segment::Text(literal)]) }]),
+            });
+            selected.push(Phrase {
+                id: word.id(connector),
+                forms: Box::new([Form {
+                    class: PluralClass::Other,
+                    segments: Box::new([Segment::Text(Box::from(text))]),
+                }]),
+            });
+        }
+        let language = |phrases: Vec<Phrase>| Language {
+            plural: PluralRule::English,
+            span_unit: SpanUnit::Seconds,
+            wall: WallFormat::Seconds,
+            phrases: phrases.into_boxed_slice(),
+        };
+        let bounds = PhraseLimits { languages: 2, phrases: 2, holes: 0, segments: 4, text_bytes, hole_bytes: 0 };
+        let languages = Box::new([language(original), language(selected)]);
+        let book = Phrasebook::load(shapes.clone().into_boxed_slice(), languages.clone(), &bounds).unwrap();
+        let selected_words = words::Words { book, language: 1, connector };
+        let tree_limits = view().limits().tree;
+        let mut builder = jig_client_view::Builder::new(&tree_limits);
+        for (word, text) in ids.into_iter().zip(texts) {
+            assert_eq!(selected_words.say(word, &[]).as_ref(), text);
+            selected_words.text(&mut builder, word, &[]);
+        }
+        let tree = builder.finish();
+        assert_eq!(tree.len(), 2);
+        assert!(tree.len() <= tree_limits.nodes);
+        for (node, text) in tree.nodes().iter().zip(texts) {
+            assert!(node.binding.is_none() && node.link.is_none());
+            assert_eq!(node.text.as_slice()[0].text.as_ref(), text);
+            assert!(node.text.as_slice()[0].text.len() <= usize::try_from(tree_limits.text_per_node).unwrap());
+        }
+        let mut short = bounds;
+        short.text_bytes -= 1;
+        assert!(Phrasebook::load(shapes.clone().into_boxed_slice(), languages.clone(), &short).is_err());
+        for omitted in 0..2 {
+            let mut missing = languages.clone();
+            missing[1].phrases = missing[1]
+                .phrases
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != omitted)
+                .map(|(_, phrase)| phrase.clone())
+                .collect();
+            assert!(Phrasebook::load(shapes.clone().into_boxed_slice(), missing, &bounds).is_err());
+        }
+    }
+}
