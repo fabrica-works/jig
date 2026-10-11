@@ -67,7 +67,7 @@ fn configured_with_bounds(
     owner.core.documents.rows = 2;
     owner.core.documents.lines = 2;
     owner.core.documents.chips = 2;
-    owner.core.documents.text_bytes = 128;
+    owner.core.documents.text_bytes = receiving.jig.text;
     // This scenario offers its agent and human executor, not a procedure.
     let kinds = Box::new([jig_core_authority::Executor::Charter(1), jig_core_authority::Executor::Role(1)]);
     configuration.core.settings.chat_authority.delegation.kinds = kinds.clone();
