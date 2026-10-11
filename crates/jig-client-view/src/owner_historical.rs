@@ -32,7 +32,7 @@ fn at(b: &mut Builder, words: &Words, phrase: P, at: Wall) {
     text(b, words, phrase, &[Hole::Wall(words.adjusted_wall(at))]);
 }
 fn raw(b: &mut Builder, value: &Text) {
-    crate::literal_segment::render(b, value);
+    crate::literal_segment::render(b, value.bytes());
 }
 fn region(b: &mut Builder, words: &Words, phrase: P) {
     b.open(Role::Region);
@@ -57,7 +57,7 @@ fn goal(b: &mut Builder, value: &OwnerPersonProposalGoal, words: &Words, binding
     crate::proposed_task::executor(b, value.executor, words);
     crate::specification::specification(b, &value.spec, words);
     crate::proposed_task::contract(b, &value.contract, words, bindings);
-    crate::owner_authority::render_words(b, &value.authority, &words.book, words.language);
+    crate::owner_authority::render_words(b, &value.authority, words);
     for (phrase, amount) in [
         (P::Budget, value.numbers.budget),
         (P::Spent, value.numbers.spent),
@@ -107,6 +107,8 @@ fn proposal_decision(b: &mut Builder, value: &OwnerProposalDecision, words: &Wor
             OwnerProposalChoice::Accepted => P::AcceptChoice,
             OwnerProposalChoice::Rejected => P::RejectChoice,
             OwnerProposalChoice::Passed => P::Pass,
+            OwnerProposalChoice::Withdrawn => P::Withdrawn,
+            OwnerProposalChoice::Stale => P::Stale,
         },
     );
     match value.created {
@@ -391,7 +393,7 @@ fn task_fits(value: &Task, l: &Limits, words: &Words) -> Option<()> {
         || value.references.capacity() > l.rows
         || value.inputs.capacity() > l.rows
         || value.resources.capacity() > l.rows
-        || value.subscriptions.capacity() > l.rows
+        || value.subscriptions.entries.capacity() > l.rows
     {
         return None;
     }

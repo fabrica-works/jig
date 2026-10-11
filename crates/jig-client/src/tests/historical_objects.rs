@@ -1,4 +1,3 @@
-#![expect(clippy::disallowed_methods, reason = "ordinary proofs query whole native facts and original read receipts")]
 use super::{
     objects::{self, live, read_token, watched},
     spine::drive,

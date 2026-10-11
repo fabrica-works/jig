@@ -61,8 +61,10 @@ pub enum HistoricalPhrase {
     AmendKind,
     WidenKind,
     ReleaseKind,
+    Withdrawn,
+    Stale,
 }
-pub const ALL: [HistoricalPhrase; 51] = [
+pub const ALL: [HistoricalPhrase; 53] = [
     HistoricalPhrase::Historical,
     HistoricalPhrase::At,
     HistoricalPhrase::AtAbsent,
@@ -114,6 +116,8 @@ pub const ALL: [HistoricalPhrase; 51] = [
     HistoricalPhrase::AmendKind,
     HistoricalPhrase::WidenKind,
     HistoricalPhrase::ReleaseKind,
+    HistoricalPhrase::Withdrawn,
+    HistoricalPhrase::Stale,
 ];
 impl HistoricalPhrase {
     pub const fn id(self) -> PhraseId {
@@ -171,6 +175,8 @@ impl HistoricalPhrase {
                 Self::AmendKind => 9648,
                 Self::WidenKind => 9649,
                 Self::ReleaseKind => 9650,
+                Self::Withdrawn => 9651,
+                Self::Stale => 9652,
             },
         }
     }
@@ -227,6 +233,8 @@ impl HistoricalPhrase {
             Self::AmendKind => None,
             Self::WidenKind => None,
             Self::ReleaseKind => None,
+            Self::Withdrawn => None,
+            Self::Stale => None,
         }
     }
     fn label(self) -> &'static [u8] {
@@ -282,6 +290,8 @@ impl HistoricalPhrase {
             Self::AmendKind => b"Amendment decision",
             Self::WidenKind => b"Authority decision",
             Self::ReleaseKind => b"Release decision",
+            Self::Withdrawn => b"Withdrawn decision",
+            Self::Stale => b"Stale decision",
         }
     }
 }

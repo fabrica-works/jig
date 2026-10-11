@@ -99,6 +99,14 @@ fn end(b: &mut Builder, words: &Words, bindings: &mut JigBindings, dangerous: bo
 }
 fn context(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bindings: &mut JigBindings) {
     match &object.body {
+        Some(Body::Historical(_)) => b.text(
+            Run::Plain,
+            &words
+                .book
+                .say(words.language, crate::owner_historical_words::HistoricalPhrase::Historical.id(), &[])
+                .expect("checked passive historical caption")
+                .text,
+        ),
         Some(Body::Task(task)) => crate::cards::chip::chip(b, client, &task.chip, words, bindings),
         Some(Body::Chip(chip)) => crate::cards::chip::chip(b, client, chip, words, bindings),
         Some(Body::Escalation(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),

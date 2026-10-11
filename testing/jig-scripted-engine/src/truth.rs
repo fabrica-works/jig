@@ -303,10 +303,10 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         ReadValue::Task(v) => Some(v.project),
         ReadValue::OwnerEscalation(v) => Some(v.task.project),
         ReadValue::Proposal(v) => Some(v.project),
-        ReadValue::Historical(_) => None,
         ReadValue::OwnerProposal(v) => Some(v.project),
         ReadValue::OwnerPersonTask(v) => v.project(),
-        ReadValue::Frame(_)
+        ReadValue::Historical(_)
+        | ReadValue::Frame(_)
         | ReadValue::Escalation(_)
         | ReadValue::Question(_)
         | ReadValue::PersonTask(_)

@@ -472,7 +472,6 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
     match value {
         ReadValue::Task(v) => Some(&v.acts),
         ReadValue::Proposal(v) => Some(&v.acts),
-        ReadValue::Historical(_) => None,
         ReadValue::OwnerProposal(v) => Some(&v.acts),
         ReadValue::Escalation(v) => Some(&v.acts),
         ReadValue::OwnerEscalation(v) => Some(&v.acts),
@@ -480,7 +479,8 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         ReadValue::PersonTask(v) => Some(&v.acts),
         ReadValue::OwnerPersonTask(v) => Some(&v.acts),
         ReadValue::Result(v) => Some(&v.acts),
-        ReadValue::Frame(_)
+        ReadValue::Historical(_)
+        | ReadValue::Frame(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
         | ReadValue::Activity(_)
