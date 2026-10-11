@@ -95,14 +95,18 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             if domain.objects.named(key, source(domain)) {
-                let _ = put(domain, env, key, Body::OwnerProposal(proposal), out);
+                if put(domain, env, key, Body::OwnerProposal(proposal), out) {
+                    domain.changed();
+                }
             }
         }
         Delivery::Chips(chips) => {
             for chip in chips.into_boxed() {
                 let key = ObjectKey::Task(chip.task);
                 if domain.objects.named(key, source(domain)) {
-                    let _ = put(domain, env, key, Body::Chip(chip), out);
+                    if put(domain, env, key, Body::Chip(chip), out) {
+                        domain.changed();
+                    }
                 }
             }
         }
@@ -154,7 +158,7 @@ pub(crate) fn read_result(
             | contract::ReadNone::Unreachable => crate::pages::routing::refuse(domain, contract::Limit::Reads),
         },
         ReadResult::Value(value) => {
-            let _ = match value {
+            let stored = match value {
                 ReadValue::Task(document) => put(domain, env, key, Body::Task(document), out),
                 ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out),
                 ReadValue::Historical(document) => put(domain, env, key, Body::Historical(document), out),
@@ -182,6 +186,9 @@ pub(crate) fn read_result(
                 | ReadValue::Deployment(_)
                 | ReadValue::OwnerDeployment(_) => false,
             };
+            if stored {
+                domain.changed();
+            }
         }
     }
 }
@@ -207,6 +214,7 @@ fn key(what: &Read) -> Option<ObjectKey> {
     }
 }
 /// Stores the whole source and registers its bounded supplied parts only if accepted.
+/// The caller marks its accepted body change; a refused body leaves prior facts intact.
 #[must_use]
 pub(crate) fn put(
     domain: &mut Domain,
@@ -255,7 +263,6 @@ pub(crate) fn put(
             }
         }
 
-        domain.changed();
         true
     } else {
         false

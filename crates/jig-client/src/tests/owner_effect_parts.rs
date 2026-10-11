@@ -215,16 +215,31 @@ fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity
             Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(value.clone()))) },
         );
         let id = domain.objects().find(ObjectKey::Proposal(value.key)).unwrap();
-        let mut output = Queue::with_capacity(crate::max_out(&LIMITS));
-        let request = crate::intents::send_card(
-            &mut domain,
-            ObjectKey::Proposal(value.key),
-            ActKind::Accept,
-            Box::new(Ask::DecideProposal { project: value.project, proposal: value.key, decision: Decision::Accepted }),
-            &mut output,
-        )
-        .unwrap();
-        assert_eq!(output.len(), 1);
+        assert!(
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } }
+            )
+            .is_empty()
+        );
+        assert!(domain.confirmation().is_some());
+        let sent = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm });
+        assert_eq!(sent.len(), 1);
+        let mut request = None;
+        for row in &sent {
+            if let Request::Send { request: token, ask, .. } = row {
+                assert_eq!(
+                    ask.as_ref(),
+                    &Ask::DecideProposal { project: value.project, proposal: value.key, decision: Decision::Accepted }
+                );
+                assert!(request.replace(*token).is_none());
+            } else {
+                panic!("confirmation emits only its exact supplied decision");
+            }
+        }
+        let request = request.unwrap();
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm }).is_empty());
         assert!(
             drive(&mut domain, Time::ZERO, Event::Progress { request, progress: crate::intents::Progress::Unknown })
                 .is_empty()
@@ -240,7 +255,13 @@ fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity
                 panic!("inspection only reads, never resends the decision");
             }
         }
-        domain.objects.get_mut(id).unwrap().shown = shown_card;
+        if !shown_card {
+            exact(&domain, &value);
+            let left =
+                drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Inbox { project: None }) });
+            assert!(left.contains(&Request::PartsLeft { generation: 1 }));
+            assert!(domain.objects().find(ObjectKey::Proposal(value.key)).is_none());
+        }
         value.action = OwnerProposalAction::Effect {
             part: native(17),
             authority: objects::owner_authority(),
@@ -273,9 +294,18 @@ fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity
             let (notice, ()) = domain.notices().ids().iter().next().unwrap();
             assert_eq!(domain.notices().get(*notice).unwrap().kind, crate::notices::Kind::Refused(Limit::Objects));
         }
-        exact(&domain, &value);
-        assert_eq!(domain.objects().get(id).unwrap().card, crate::objects::Card::Open);
+        if shown_card {
+            exact(&domain, &value);
+            assert_eq!(domain.objects().get(id).unwrap().card, crate::objects::Card::Open);
+        } else {
+            assert!(output.is_empty());
+            assert!(domain.objects().find(ObjectKey::Proposal(value.key)).is_none());
+        }
         assert!(drive(&mut domain, Time::ZERO, event).is_empty());
-        exact(&domain, &value);
+        if shown_card {
+            exact(&domain, &value);
+        } else {
+            assert!(domain.objects().find(ObjectKey::Proposal(value.key)).is_none());
+        }
     }
 }
