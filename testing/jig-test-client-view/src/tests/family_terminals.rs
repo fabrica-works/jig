@@ -99,7 +99,7 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
         assert!(view.tree().len() <= view.limits().tree.nodes);
         let family = family_words();
         let jig = words();
-        let bounds = Limits::of(&limits(), &jig, &family).unwrap();
+        let bounds = Limits::for_world(&limits(), &jig, &family, 1024, 256).unwrap();
         assert!(crate::worst_case(&bounds, &limits(), &jig, &family).unwrap() > 0);
         assert_eq!(family.book.limits().phrases, 29);
         assert!(patches(&mut view, &root).is_empty());
