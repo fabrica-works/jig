@@ -409,19 +409,27 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     assert_eq!(domain.objects().get(id).unwrap().body, Some(jig_client::objects::Body::OwnerEscalation(Box::new(row))));
 }
 
-fn check_presence_envelopes() {
-    for result in [false, true] {
-        for person in [false, true] {
-            for proposal in [false, true] {
-                for loaded in [false, true] {
-                    check_presence_case([result, person, proposal], loaded, false);
-                    if person {
-                        check_presence_case([result, person, proposal], loaded, true);
-                    }
+fn check_presence_envelopes(result: bool) {
+    for person in [false, true] {
+        for proposal in [false, true] {
+            for loaded in [false, true] {
+                check_presence_case([result, person, proposal], loaded, false);
+                if person {
+                    check_presence_case([result, person, proposal], loaded, true);
                 }
             }
         }
     }
+}
+
+#[test]
+fn owner_escalation_without_result_key_keeps_whole_person_inputs_loading_and_repeated_proposals_in_finite_view() {
+    check_presence_envelopes(false);
+}
+
+#[test]
+fn owner_escalation_with_repeated_result_key_keeps_whole_person_inputs_loading_and_repeated_proposals_in_finite_view() {
+    check_presence_envelopes(true);
 }
 
 #[test]
@@ -505,5 +513,4 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         Some(jig_client::objects::Body::OwnerEscalation(Box::new(original)))
     );
     assert_eq!(crate::sizes::owner_escalation_nodes(&jig_client::Limits { rows: u32::MAX, ..CLIENT }), None);
-    check_presence_envelopes();
 }
