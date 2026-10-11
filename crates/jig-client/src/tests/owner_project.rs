@@ -319,7 +319,7 @@ fn owner_project_settings_unknown_retires_only_matching_pending_and_late_answer_
     let (mut domain, token) = live(0);
     let value = source(0);
     install(&mut domain, token, value.clone());
-    let ask = Ask::ChangePolicy { project: 0, edit: PolicyEdit::ProjectSpend(19) };
+    let ask = Ask::ChangePolicy { project: 0, edit: PolicyEdit::ProjectSpend { period_spend: 19 } };
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(ask) }).is_empty());
     let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
     let request = out

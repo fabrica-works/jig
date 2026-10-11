@@ -139,7 +139,7 @@ pub fn worst_case(l: &Limits, words: &Words) -> Option<ProjectFragment> {
 /// Check every reserved row, raw path and nested authority/template before allocation.
 #[must_use]
 pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<ProjectFragment> {
-    if value.acts.capacity() > l.rows
+    if value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS
         || value.resources.capacity() > l.rows
         || value.members.capacity() > l.rows
         || value.pools.capacity() > l.rows

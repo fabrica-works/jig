@@ -168,3 +168,128 @@ fn owner_project_kit_distinguishes_missing_empty_and_full_width_permission_capac
     value.configured_pools = List::with_capacity(3);
     assert!(!owner_project::fits(&value, &bounds));
 }
+
+// Independently sum the inline carrier and every empty ordinary reservation.
+fn reserved_project_bytes(offer_slots: u32) -> u64 {
+    u64::try_from(core::mem::size_of::<OwnerProject>()).unwrap()
+        + List::<Offered>::worst_case(offer_slots).unwrap()
+        + List::<OwnerProjectResource>::worst_case(2).unwrap()
+        + List::<OwnerGrant>::worst_case(2).unwrap()
+        + List::<OwnerProjectPolicyRole>::worst_case(2).unwrap()
+        + List::<PolicyRequirement>::worst_case(2).unwrap()
+        + List::<OwnerProjectMember>::worst_case(2).unwrap()
+        + List::<PoolLedger>::worst_case(2).unwrap() * 2
+        + List::<OwnerProjectSpend>::worst_case(2).unwrap()
+        + List::<Recurring>::worst_case(2).unwrap()
+}
+fn project_offers(populated: u32, capacity: u32) -> List<Offered> {
+    let kinds = [ActKind::SetGoal, ActKind::ChangePolicy, ActKind::SetRoles, ActKind::MakeService, ActKind::SetPool];
+    let mut offers = List::with_capacity(capacity);
+    for index in 0..populated {
+        offers
+            .push(Offered { act: kinds[usize::try_from(index % 5).unwrap()], admission: Admission::Allowed })
+            .unwrap();
+    }
+    offers
+}
+#[test]
+fn owner_project_closed_offer_reservations_price_empty_partial_and_twenty_five_at_exact_whole_read_bytes() {
+    for populated in [0, 1, MAX_OFFERED_ACTS] {
+        let mut value = source();
+        value.acts = project_offers(populated, MAX_OFFERED_ACTS);
+        let original = value.clone();
+        let bytes = reserved_project_bytes(MAX_OFFERED_ACTS);
+        let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
+        assert_eq!(owner_project::bytes(&value, &bounds), Some(bytes));
+        assert!(owner_project::fits(&value, &bounds));
+        bounds.document_bytes -= 1;
+        assert!(!owner_project::fits(&value, &bounds));
+        assert_eq!(value, original);
+        let envelope = bytes + u64::try_from(core::mem::size_of::<ReadValue>()).unwrap();
+        let mut setup = script();
+        setup.bounds.rows = 2;
+        setup.bounds.document_bytes = envelope;
+        setup.truth.owner_projects.insert(1, value.clone());
+        let mut engine = Engine::new(setup, 9130).unwrap();
+        engine.read(Time::ZERO, 11, Token::new(3), Read::Project { project: 1 }).unwrap();
+        let outputs = engine.poll(Time::ZERO);
+        assert_eq!(
+            outputs,
+            vec![crate::Up::Read {
+                token: Token::new(3),
+                terminal: ReadResult::Value(ReadValue::OwnerProject(Box::new(value.clone())))
+            }]
+        );
+        assert_eq!(engine.truth().owner_projects.get(&1), Some(&original));
+        let mut short = script();
+        short.bounds.rows = 2;
+        short.bounds.document_bytes = envelope - 1;
+        short.truth.owner_projects.insert(1, value.clone());
+        let mut engine = Engine::new(short, 9131).unwrap();
+        engine.read(Time::ZERO, 11, Token::new(4), Read::Project { project: 1 }).unwrap();
+        assert_eq!(
+            engine.poll(Time::ZERO),
+            vec![crate::Up::Read { token: Token::new(4), terminal: ReadResult::None(ReadNone::Busy) }]
+        );
+        assert_eq!(engine.truth().owner_projects.get(&1), Some(&original));
+        value.acts = project_offers(populated, MAX_OFFERED_ACTS + 1);
+        let oversized = value.clone();
+        bounds.document_bytes = u64::MAX;
+        assert!(!owner_project::fits(&value, &bounds));
+        assert_eq!(value, oversized);
+        let mut setup = script();
+        setup.bounds.rows = 2;
+        setup.truth.owner_projects.insert(1, value);
+        assert!(matches!(Engine::new(setup, 9132), Err(Invalid::Payload)));
+    }
+}
+#[test]
+fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_order_independent() {
+    let mut value = source();
+    value.acts = project_offers(MAX_OFFERED_ACTS, MAX_OFFERED_ACTS);
+    let last = MAX_OFFERED_ACTS - 1;
+    let mut charters = List::with_capacity(2);
+    charters.push(u32::MAX).unwrap();
+    charters.push(0).unwrap();
+    let mut roles = List::with_capacity(2);
+    roles.push(u32::MAX).unwrap();
+    roles.push(u32::MAX).unwrap();
+    value.acts.get_mut(last).unwrap().act = ActKind::SetGoal;
+    value.acts.get_mut(last).unwrap().admission = Admission::Bounded {
+        within: jig_client::contract::Bounds::Goal {
+            pool_left: u64::MAX,
+            charters,
+            procedures: List::with_capacity(2),
+            latest: Some(skein_lib::Wall::EPOCH),
+            budget: 0,
+            maximum_budget: u64::MAX,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Proposed { to: Recipient::Roles { project: u32::MAX, roles } },
+    };
+    let original = value.clone();
+    let bytes = reserved_project_bytes(MAX_OFFERED_ACTS)
+        + List::<u32>::worst_case(2).unwrap() * 2
+        + List::<GoalProcedure>::worst_case(2).unwrap();
+    let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
+    assert_eq!(owner_project::bytes(&value, &bounds), Some(bytes));
+    assert!(owner_project::fits(&value, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!owner_project::fits(&value, &bounds));
+    bounds.document_bytes = u64::MAX;
+    let Admission::Bounded { beyond: Beyond::Proposed { to: Recipient::Roles { roles, .. } }, .. } =
+        &mut value.acts.get_mut(last).unwrap().admission
+    else {
+        panic!("whole last admission")
+    };
+    *roles = List::with_capacity(3);
+    let malformed = value.clone();
+    assert!(!owner_project::fits(&value, &bounds));
+    assert_eq!(value, malformed);
+    assert_eq!(original.acts.capacity(), 25);
+    assert_eq!(original.acts.len(), 25);
+    assert_eq!(original.acts.get(last).unwrap().act, ActKind::SetGoal);
+    value = original.clone();
+    value.members = List::with_capacity(3);
+    assert!(!owner_project::fits(&value, &bounds));
+}

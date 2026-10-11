@@ -916,3 +916,57 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     assert!(native_drive(&mut domain, Event::Act { act: Act::Confirm }).is_empty());
     assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
 }
+
+#[test]
+fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects_reserved_twenty_six() {
+    let w = words(false);
+    let mut value = source();
+    let original_requirement = view::required(&value, &limits(), w).unwrap();
+    for populated in [0, 1, MAX_OFFERED_ACTS] {
+        value.acts = List::with_capacity(MAX_OFFERED_ACTS);
+        for index in 0..populated {
+            value
+                .acts
+                .push(Offered {
+                    act: if index % 2 == 0 { ActKind::SetPool } else { ActKind::ChangePolicy },
+                    admission: Admission::Allowed,
+                })
+                .unwrap();
+        }
+        let original = value.clone();
+        // Standalone facts and supported forms are already charged by their own envelope.
+        assert_eq!(view::required(&value, &limits(), w), Some(original_requirement));
+        let domain = native_owner(value.clone());
+        assert_eq!(domain.project_page().owner.as_deref(), Some(&original));
+        let (tree, _) = owner_page(&domain);
+        assert!(!tree.is_empty());
+        assert_eq!(value, original);
+        value.acts = List::with_capacity(MAX_OFFERED_ACTS + 1);
+        let oversized = value.clone();
+        assert!(view::required(&value, &limits(), w).is_none());
+        assert_eq!(value, oversized);
+    }
+    value.acts = List::with_capacity(MAX_OFFERED_ACTS);
+    value
+        .acts
+        .push(Offered {
+            act: ActKind::SetGoal,
+            admission: Admission::Bounded {
+                within: Bounds::Goal {
+                    pool_left: 0,
+                    charters: List::with_capacity(5),
+                    procedures: List::with_capacity(4),
+                    latest: None,
+                    budget: 0,
+                    maximum_budget: 0,
+                    maximum_deadline: None,
+                },
+                beyond: Beyond::Proposed { to: Recipient::Roles { project: u32::MAX, roles: List::with_capacity(4) } },
+            },
+        })
+        .unwrap();
+    assert!(view::required(&value, &limits(), w).is_none());
+    value.acts = List::with_capacity(MAX_OFFERED_ACTS);
+    value.members = List::with_capacity(5);
+    assert!(view::required(&value, &limits(), w).is_none());
+}
