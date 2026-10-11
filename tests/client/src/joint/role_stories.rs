@@ -446,3 +446,6 @@ mod card_stories;
 
 #[path = "role_stories/fault_stories.rs"]
 mod fault_stories;
+
+#[path = "role_stories/family_stories.rs"]
+mod family_stories;
