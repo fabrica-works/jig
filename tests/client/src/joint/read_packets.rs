@@ -87,6 +87,13 @@ pub fn read(
                 }
                 client::ReadResult::Value(wire::documents::proposal_read(value, limits).map_err(Invalid::Document)?)
             }
+            documents::Document::Escalation(value) => {
+                let client::Read::Escalation { task } = what else { return Err(Invalid::OwnerRoute) };
+                if *task != value.task.chip.number {
+                    return Err(Invalid::OwnerRoute);
+                }
+                client::ReadResult::Value(wire::documents::escalation_read(value, limits).map_err(Invalid::Document)?)
+            }
             documents::Document::PersonTask(value) => {
                 let client::Read::PersonTask { task } = what else { return Err(Invalid::OwnerRoute) };
                 if *task != value.task.number {
@@ -113,7 +120,6 @@ pub fn read(
             | documents::Document::Tree(_)
             | documents::Document::Goals(_)
             | documents::Document::Tasks(_)
-            | documents::Document::Escalation(_)
             | documents::Document::Project(_)
             | documents::Document::Note(_)
             | documents::Document::Inbox(_)
@@ -127,12 +133,16 @@ pub fn read(
 }
 
 #[cfg(test)]
+#[path = "read_escalations.rs"]
+mod escalation_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::harness::ClientId;
     use jig_core_people as people;
     use skein_lib::List;
-    fn transport() -> Transport {
+    pub(super) fn transport() -> Transport {
         let mut value = Transport::new(client::VersionRange { first: 1, last: u32::MAX });
         value.bind(
             ClientId(0),

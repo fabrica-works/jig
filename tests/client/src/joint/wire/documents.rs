@@ -66,6 +66,14 @@ pub fn proposal_read(source: &documents::Proposal, limits: &Limits) -> Result<cl
 }
 
 /// # Errors
+/// Refuses any whole held Task or independent escalation allocation above bounds.
+pub fn escalation_read(source: &documents::Escalation, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+    let value = client::ReadValue::OwnerEscalation(Box::new(super::escalations::document(source, limits)?));
+    admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
+    Ok(value)
+}
+
+/// # Errors
 /// Refuses any whole pending person work or optional complete shown result above bounds.
 pub fn person_task_read(source: &documents::PersonTask, limits: &Limits) -> Result<client::ReadValue, Invalid> {
     let value = client::ReadValue::OwnerPersonTask(Box::new(

@@ -7,6 +7,7 @@ pub mod asks;
 pub mod chips;
 pub mod cursor;
 pub mod documents;
+pub mod escalations;
 pub mod family;
 pub mod history;
 pub mod inbox;
