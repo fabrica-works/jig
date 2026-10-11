@@ -983,6 +983,7 @@ fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token
         | ReadValue::Conversations(_)
         | ReadValue::Goals(_)
         | ReadValue::Spend(_)
+        | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => true,
