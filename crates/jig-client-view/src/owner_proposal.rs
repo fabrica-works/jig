@@ -72,7 +72,8 @@ pub fn required(value: &OwnerProposal, limits: &Limits, words: &Words) -> Option
                 crate::owner_history::proposed_fits(task, limits)?;
             }
         }
-        OwnerProposalAction::Effect { part, authority, .. } => {
+        OwnerProposalAction::Effect { part, authority, .. }
+        | OwnerProposalAction::ProcedureEffect { part, authority, .. } => {
             crate::owner_chip::part_fits(part, limits)?;
             crate::owner_amendment::authority_fits(authority, limits)?;
         }
@@ -166,6 +167,12 @@ pub fn action(
             saying(b, words, P::Attempt, &[Hole::Number(*attempt)]);
             saying(b, words, P::Completion, &[Hole::Number(u64::from(*completion))]);
             saying(b, words, P::Position, &[Hole::Number(u64::from(*position))]);
+            saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
+        }
+        OwnerProposalAction::ProcedureEffect { part, authority, purpose, .. } => {
+            saying(b, words, P::Effect, &[]);
+            crate::proposed_task::part(b, part, words, bindings);
+            crate::owner_authority::document_words(b, authority, words);
             saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
         }
         OwnerProposalAction::Amend { task, addressed, before, after, reason, release } => {

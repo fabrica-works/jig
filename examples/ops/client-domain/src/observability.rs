@@ -11,6 +11,7 @@
 //! | Closed/Unknown | retire watch; unknown hides supplied facts | replacement Read/Open |
 //! | Confirmed/Link | restrict lifetimes to confirmed party and live link | reacquire or hide |
 pub mod documents;
+pub mod native;
 use alloc::boxed::Box;
 pub use documents::{Document, Kind, ReadResult, Scope, Subject, WatchEnd, WatchEvent};
 use jig_client::{contract::Part, frame::FrameShown, link::Link};
@@ -54,6 +55,8 @@ pub enum Out {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
+    ReadNotAllowed,
+    WatchTerminal { end: WatchEnd },
     Full,
     InvalidDocument,
     SignedOut,
@@ -379,7 +382,10 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
     let object = side.objects.get_mut(id).expect("named object exists");
     match &object.value {
         Value::Known(current) => {
-            if current.revision().value > document.revision().value {
+            if let Some(current) = current.revision()
+                && let Some(incoming) = document.revision()
+                && current.value > incoming.value
+            {
                 return;
             }
         }
@@ -490,6 +496,16 @@ fn ended(side: &mut Side, env: &Env<Limits>, id: Id<Watching>, end: WatchEnd, ou
                 side.watches.get_mut(id).expect("watch exists").state =
                     Following::Dropped { again: env.now.saturating_add(env.limits.retry) }
             }
+            WatchEnd::NotAllowed | WatchEnd::SubjectEnded | WatchEnd::Stopping => {
+                retire_watch(side, id);
+                unknown(side, subject);
+                out.push(Request::Out(Out::Fact { fact: Fact::WatchTerminal { end } }));
+            }
+            WatchEnd::Busy => {
+                side.watches.get_mut(id).expect("watch exists").state =
+                    Following::Dropped { again: env.now.saturating_add(env.limits.retry) };
+                out.push(Request::Out(Out::Fact { fact: Fact::WatchTerminal { end } }));
+            }
             WatchEnd::Unknown => {
                 retire_watch(side, id);
                 unknown(side, subject);
@@ -501,7 +517,7 @@ fn ended(side: &mut Side, env: &Env<Limits>, id: Id<Watching>, end: WatchEnd, ou
             WatchEnd::Closed => retire_watch(side, id),
         }
     }
-    if closing || end != WatchEnd::Dropped {
+    if closing || end != WatchEnd::Dropped && end != WatchEnd::Busy {
         if let Some(object) = side.find(subject) {
             let object = side.objects.get_mut(object).expect("named object exists");
             if object.watch == Some(id) {
@@ -615,6 +631,10 @@ fn read_result(side: &mut Side, env: &Env<Limits>, read: Token, result: ReadResu
     }
     match result {
         ReadResult::Value(document) => received(side, env, subject, *document, out),
+        ReadResult::NotAllowed => {
+            unknown(side, subject);
+            out.push(Request::Out(Out::Fact { fact: Fact::ReadNotAllowed }));
+        }
         ReadResult::Unknown => unknown(side, subject),
         ReadResult::Busy => full(out),
         ReadResult::SignedOut => out.push(Request::Out(Out::Fact { fact: Fact::SignedOut })),

@@ -118,9 +118,15 @@ pub struct Effect {
 /// One authoritative document for a family page or connector part.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Document {
-    Incidents { subject: Subject, revision: Revision, incidents: List<Incident> },
+    Incidents {
+        subject: Subject,
+        revision: Revision,
+        incidents: List<Incident>,
+    },
     Incident(Incident),
     Part(Box<PartDocument>),
+    /// Whole genuine connector facts, with no artificial owner revision.
+    Native(Box<super::native::Document>),
 }
 impl Document {
     /// The identity echoed by this whole document.
@@ -132,15 +138,17 @@ impl Document {
                 Subject { scope: Scope::Project(incident.project), kind: Kind::Incident(incident.number) }
             }
             Self::Part(part) => part.subject,
+            Self::Native(document) => document.subject,
         }
     }
     /// The owner's current document revision.
     #[must_use]
-    pub fn revision(&self) -> Revision {
+    pub fn revision(&self) -> Option<Revision> {
         match self {
-            Self::Incidents { revision, .. } => *revision,
-            Self::Incident(incident) => incident.revision,
-            Self::Part(part) => part.revision,
+            Self::Incidents { revision, .. } => Some(*revision),
+            Self::Incident(incident) => Some(incident.revision),
+            Self::Part(part) => Some(part.revision),
+            Self::Native(_) => None,
         }
     }
     /// Whole-value admission against the configured text, row and byte bounds.
@@ -174,6 +182,24 @@ impl Document {
                     }
                 }
             }
+            Self::Native(document) => match &document.value {
+                super::native::Value::Incident { incident, .. } => {
+                    if let Some(lead) = incident.lead {
+                        objects.push(ObjectKey::Task(lead)).expect("lead capacity");
+                    }
+                }
+                super::native::Value::Service { .. }
+                | super::native::Value::Alert { .. }
+                | super::native::Value::Outbox { .. }
+                | super::native::Value::Deployment { .. } => {}
+                super::native::Value::Project { incidents, .. } => {
+                    for incident in incidents {
+                        if let Some(lead) = incident.lead {
+                            objects.push(ObjectKey::Task(lead)).expect("incident lead capacity");
+                        }
+                    }
+                }
+            },
             Self::Part(_) => {}
         }
         objects
@@ -208,6 +234,7 @@ fn price(document: &Document, limits: &super::Limits) -> Option<u64> {
             }
             Some(bytes)
         }
+        Document::Native(document) => super::native::price(document, limits),
         Document::Part(part) => {
             if part.effects.capacity() > limits.rows
                 || part.incidents.capacity() > limits.rows
@@ -239,6 +266,7 @@ fn price(document: &Document, limits: &super::Limits) -> Option<u64> {
 /// A scoped whole-read terminal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReadResult {
+    NotAllowed,
     Value(Box<Document>),
     Unknown,
     Busy,
@@ -254,6 +282,10 @@ pub enum WatchEvent {
 /// One terminal for every opened watch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WatchEnd {
+    NotAllowed,
+    SubjectEnded,
+    Stopping,
+    Busy,
     Closed,
     Dropped,
     Unknown,

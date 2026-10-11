@@ -229,3 +229,85 @@ fn a_committed_person_retry_opens_restart_but_waits_for_the_old_deadline() {
     };
     assert_eq!(attempt, 2);
 }
+
+#[test]
+fn environment_document_supplies_the_request_revision_without_creating_an_end_or_rewriting_the_lease() {
+    let mut domain = Domain::new(Backend::OperationIds, &limits());
+    let environment = environment();
+    let fact = EnvironmentFact { created_by: key(), ready_at: 2, until: 1000, price: 50 };
+    let _out = event(
+        &mut domain,
+        1,
+        Event::Restore { record: Record::Made { environment: environment.clone(), key: key(), project: Some(3) } },
+    );
+    domain.environments.insert(environment.clone(), Some(fact)).expect("bounded observed environment");
+    let token = Token::new(21);
+    let _out = event(
+        &mut domain,
+        1,
+        Event::DocumentPrepare {
+            token,
+            subject: ClientSubject::Environment { project: 3, environment: environment.clone() },
+        },
+    );
+    let mut out = event(
+        &mut domain,
+        1,
+        Event::Document { watcher: Token::new(22), scope: ClientScope::Project(3), subject: token, party: 7 },
+    );
+    let Some(Request::Document {
+        document: Ok(ClientDocument::Environment { environment: supplied, fact: supplied_fact, end_revision, end, .. }),
+        ..
+    }) = out.pop()
+    else {
+        panic!("actual environment document")
+    };
+    assert_eq!(supplied, environment);
+    assert_eq!(supplied_fact, fact);
+    assert_eq!(end_revision, 0);
+    assert_eq!(end, None);
+    let owner = Token::new(23);
+    let _out = event(
+        &mut domain,
+        1,
+        Event::ApplicationPrepare {
+            owner,
+            value: ApplicationRequest { environment: environment.clone(), revision: end_revision, until: 2000 },
+        },
+    );
+    let _out = event(
+        &mut domain,
+        1,
+        Event::Application {
+            request: Token::new(24),
+            token: Token::new(25),
+            owner,
+            person: 7,
+            project: 3,
+            role: 1,
+            retention: skein_lib::Duration::from_secs(60),
+        },
+    );
+    assert_eq!(
+        domain.application_outcome(Token::new(25)),
+        Some(ApplicationOutcome::MovedEnd {
+            environment: environment.clone(),
+            now: EnvironmentEnd { revision: 1, until: 2000 }
+        })
+    );
+    let mut out = event(
+        &mut domain,
+        1,
+        Event::Document { watcher: Token::new(22), scope: ClientScope::Project(3), subject: token, party: 7 },
+    );
+    let Some(Request::Document {
+        document: Ok(ClientDocument::Environment { fact: supplied_fact, end_revision, end, .. }),
+        ..
+    }) = out.pop()
+    else {
+        panic!("current actual environment document")
+    };
+    assert_eq!(supplied_fact, fact, "desired end does not rewrite the observed backend lease");
+    assert_eq!(end_revision, 1);
+    assert_eq!(end, Some(EnvironmentEnd { revision: 1, until: 2000 }));
+}

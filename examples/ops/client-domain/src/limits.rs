@@ -50,7 +50,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(u64::from(jig_out).checked_mul(limits.jig.document_bytes)?.checked_mul(3)?)?;
     total = total.checked_add(u64::from(root_out).checked_mul(limits.jig.document_bytes)?)?;
     let family_payload =
-        skein_lib::List::<jig_client::contract::ObjectKey>::worst_case(limits.infrastructure.rows.checked_add(1)?)?;
+        skein_lib::List::<jig_client::contract::ObjectKey>::worst_case(limits.infrastructure.rows.checked_add(1)?)?
+            .checked_add(u64::from(limits.infrastructure.text).checked_mul(2)?)?;
     total = total.checked_add(
         u64::from(infrastructure::max_out(&limits.infrastructure)).checked_mul(family_payload)?.checked_mul(3)?,
     )?;

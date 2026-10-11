@@ -22,6 +22,7 @@ pub struct View {
     infrastructure: Bindings,
     limits: Limits,
     project: u32,
+    native_environments: bool,
 }
 impl View {
     #[must_use]
@@ -60,7 +61,12 @@ impl View {
             infrastructure_words,
             limits: *limits,
             project,
+            native_environments: false,
         }
+    }
+    /// Select the native owner environment vocabulary before building a tree.
+    pub fn native_environments(&mut self) {
+        self.native_environments = true;
     }
     #[must_use]
     pub fn tree(&self) -> &Tree {
@@ -133,6 +139,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                             infrastructure::navigation(
                                 &mut fragment,
                                 view.project,
+                                view.native_environments,
                                 &view.infrastructure_words,
                                 &mut view.infrastructure,
                             );
@@ -154,12 +161,12 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                             }
                         }
                     }
-                    Some(Connector::Infrastructure) => match view.jig.part(slot.reference.token) {
+                    Some(Connector::Infrastructure) => match infrastructure_part(&view.jig, slot.reference.token) {
                         Some(part) => {
                             infrastructure::part(
                                 &mut fragment,
                                 root.infrastructure(),
-                                part,
+                                &part,
                                 root.jig().generation(),
                                 &view.infrastructure_words,
                                 &view.words,
@@ -181,6 +188,15 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
         }
     }
     view.render.finish(builder, shown, out);
+}
+fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Option<jig_client::contract::Part> {
+    match bindings.part(token) {
+        Some(part) => Some(part.clone()),
+        None => match bindings.owner_part(token) {
+            Some(part) => jig_client::application::owner_effect(part),
+            None => None,
+        },
+    }
 }
 #[must_use]
 #[expect(clippy::manual_map, reason = "step code explicitly wraps the owner action")]

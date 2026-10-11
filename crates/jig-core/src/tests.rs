@@ -939,6 +939,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
             position: 9,
             purpose: 11,
         },
+        tasks::ProposalAction::ProcedureEffect { connector: 2, authority: wider.clone(), step: 13, purpose: 17 },
         tasks::ProposalAction::Amend {
             task: 2,
             amendment: tasks::Amendment {
@@ -983,6 +984,15 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
                 assert_eq!(part.connector, 2);
                 assert_eq!(part.key, PartKey::Number(number));
                 assert_eq!(purpose, 11);
+                assert!(proposal.funding.is_empty());
+            }
+            ProposalAction::ProcedureEffect { part, authority, step, purpose } => {
+                assert_eq!(part.connector, 2);
+                assert_eq!(part.kind, PartKind::Effect);
+                assert_eq!(part.key, PartKey::Number(number));
+                assert_eq!(step, 13);
+                assert_eq!(purpose, 17);
+                assert_eq!(authority.ceiling.spend, 15);
                 assert!(proposal.funding.is_empty());
             }
             ProposalAction::Amend { before, after, release, .. } => {

@@ -80,7 +80,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                     }
                 }
             }
-            let jig_address = match address {
+            let jig_address = match address.clone() {
                 Address::Jig(address) => address,
                 Address::Infrastructure(_) | Address::Observability(_) => {
                     jig_client::address::Address::Inbox { project: None }
@@ -226,7 +226,11 @@ pub(crate) fn route_infrastructure(
                 | infrastructure::Out::Open { .. }
                 | infrastructure::Out::Close { .. }
                 | infrastructure::Out::Fact {
-                    fact: infrastructure::Fact::Full | infrastructure::Fact::InvalidDocument,
+                    fact:
+                        infrastructure::Fact::Full
+                        | infrastructure::Fact::InvalidDocument
+                        | infrastructure::Fact::ReadNotAllowed
+                        | infrastructure::Fact::WatchTerminal { .. },
                 } => {
                     out.push(Request::Infrastructure(value));
                 }
@@ -260,8 +264,13 @@ pub(crate) fn route_observability(
                 observability::Out::Read { .. }
                 | observability::Out::Open { .. }
                 | observability::Out::Close { .. }
-                | observability::Out::Fact { fact: observability::Fact::Full | observability::Fact::InvalidDocument } =>
-                {
+                | observability::Out::Fact {
+                    fact:
+                        observability::Fact::Full
+                        | observability::Fact::InvalidDocument
+                        | observability::Fact::ReadNotAllowed
+                        | observability::Fact::WatchTerminal { .. },
+                } => {
                     out.push(Request::Observability(value));
                 }
             },

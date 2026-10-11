@@ -418,6 +418,7 @@ fn supported_proposal(task: &jig_core_tasks::TaskRecord, deployment: &Deployment
         tasks::ProposalAction::Effect { attempt, completion, .. } => {
             *attempt != 0 && *attempt <= deployment.runs && *completion != 0
         }
+        tasks::ProposalAction::ProcedureEffect { step, .. } => *step != 0,
         tasks::ProposalAction::Batch(batch) => {
             for member in batch {
                 if member.number == 0 || member.number > deployment.tasks {

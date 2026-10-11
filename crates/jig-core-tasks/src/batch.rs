@@ -153,6 +153,7 @@ fn matches_result_action(parent: &crate::TaskRecord, number: u64, batch: &[New])
         Some(proposal) if parent.result_proposal && proposal.number == number => match &proposal.action {
             crate::ProposalAction::Batch(members) => members,
             crate::ProposalAction::Effect { .. }
+            | crate::ProposalAction::ProcedureEffect { .. }
             | crate::ProposalAction::Amend { .. }
             | crate::ProposalAction::Widen { .. }
             | crate::ProposalAction::Release { .. } => return false,

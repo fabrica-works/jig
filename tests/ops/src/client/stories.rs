@@ -242,7 +242,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
         }),
     );
     let panel_subject = infra::Subject { scope: infra::Scope::Project(1), kind: infra::Kind::Panel(10) };
-    let mut panel = part(panel_subject);
+    let mut panel = part(panel_subject.clone());
     panel.panel = Some(infra::documents::Panel {
         task: 10,
         procedure: infra::documents::Procedure::Remediate {
@@ -260,7 +260,7 @@ pub fn incident_world(seed: u64) -> ClientWorld {
         Document::Infrastructure(infra::Document::Part(Box::new(panel))),
     );
     let effect_subject = infra::Subject { scope: infra::Scope::Project(1), kind: infra::Kind::Effect(p.key) };
-    let mut effect = part(effect_subject);
+    let mut effect = part(effect_subject.clone());
     effect.description = Some(infra::documents::Description {
         words: b"Restart checkout".as_slice().into(),
         resource: b"checkout in production".as_slice().into(),
@@ -453,7 +453,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     };
     let mut ops = OpsScript::default();
     let subject = infra::Subject { scope: infra::Scope::Project(1), kind: infra::Kind::Effect(p.key) };
-    let mut effect = part(subject);
+    let mut effect = part(subject.clone());
     effect.description = Some(infra::documents::Description {
         words: b"Provision staging".as_slice().into(),
         resource: b"Q pool".as_slice().into(),
@@ -469,8 +469,10 @@ pub fn environment_world(seed: u64) -> ClientWorld {
         until: Wall::from_nanos(600_000_000_000),
         price: 40,
     });
-    ops.documents
-        .insert(Subject::Infrastructure(subject), Document::Infrastructure(infra::Document::Part(Box::new(effect))));
+    ops.documents.insert(
+        Subject::Infrastructure(subject.clone()),
+        Document::Infrastructure(infra::Document::Part(Box::new(effect))),
+    );
     configured(seed, truth, ops, vec![rule, accept])
 }
 /// The connector supplies completion and readiness in one application commit.
@@ -482,7 +484,7 @@ pub fn provision(world: &mut ClientWorld) {
     ops.documents.insert(Subject::Infrastructure(document.subject()), Document::Infrastructure(document));
     let subject = infra::Subject { scope: infra::Scope::Project(1), kind: infra::Kind::Environments { pool: None } };
     ops.documents.insert(
-        Subject::Infrastructure(subject),
+        Subject::Infrastructure(subject.clone()),
         Document::Infrastructure(infra::Document::Environments {
             subject,
             revision: Revision { value: 1 },

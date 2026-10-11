@@ -11,7 +11,7 @@ use skein_lib::{Env, Queue, ReplyTo, Time, Wall};
 fn kind(action: &ProposalAction) -> ProposalKind {
     match action {
         ProposalAction::Batch(_) => ProposalKind::Batch,
-        ProposalAction::Effect { .. } => ProposalKind::Effect,
+        ProposalAction::Effect { .. } | ProposalAction::ProcedureEffect { .. } => ProposalKind::Effect,
         ProposalAction::Amend { .. } => ProposalKind::Amend,
         ProposalAction::Widen { .. } => ProposalKind::Widen,
         ProposalAction::Release { .. } => ProposalKind::Release,
@@ -82,6 +82,8 @@ pub enum ProposalAction {
     /// Connector-owned payload retained under this proposal's number. Only
     /// the needed authority and original call purpose cross the child boundary.
     Effect { connector: u16, authority: Authority, attempt: u64, completion: u32, position: u32, purpose: u64 },
+    /// A procedure-origin effect keeps its genuine stable purpose and step.
+    ProcedureEffect { connector: u16, authority: Authority, step: u64, purpose: u64 },
     /// Change an existing live task after its holder accepts the needed authority.
     Amend { task: u64, amendment: Amendment },
     /// Widen a task's current authority.
@@ -642,6 +644,7 @@ pub(crate) fn check_result(domain: &Domain, env: &Env<Limits>, task: u64, propos
         | (
             Phase::Active(_),
             ProposalAction::Effect { .. }
+            | ProposalAction::ProcedureEffect { .. }
             | ProposalAction::Amend { .. }
             | ProposalAction::Widen { .. }
             | ProposalAction::Release { .. },

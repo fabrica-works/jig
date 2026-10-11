@@ -21,7 +21,9 @@ impl Payload for OwnerProposalAction {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Batch(tasks) => tasks.heap(bounds),
-            Self::Effect { part, authority, .. } => part.heap(bounds)?.checked_add(authority.heap(bounds)?),
+            Self::Effect { part, authority, .. } | Self::ProcedureEffect { part, authority, .. } => {
+                part.heap(bounds)?.checked_add(authority.heap(bounds)?)
+            }
             Self::Amend { task, addressed, before, after, reason, release } => task
                 .heap(bounds)?
                 .checked_add(addressed.heap(bounds)?)?

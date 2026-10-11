@@ -188,6 +188,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     ] {
         total = total.checked_add(Map::<CallKey, Event>::worst_case(capacity)?)?;
     }
+    total = total
+        .checked_add(Map::<skein_lib::Token, crate::effects::ProcedureProposal>::worst_case(limits.tasks.tasks)?)?;
     total = total.checked_add(Map::<skein_lib::Token, crate::WatchBinding>::worst_case(limits.views.watchers)?)?;
     total = total.checked_add(Slab::<crate::WatchedSubject>::worst_case(limits.views.watchers)?)?;
     total = total.checked_add(Set::<Id<crate::WatchedSubject>>::worst_case(limits.views.watchers)?.checked_mul(2)?)?;

@@ -70,6 +70,14 @@ pub fn action(
                 purpose: *purpose,
             }
         }
+        documents::RetainedAction::ProcedureEffect { part, authority, step, purpose } => {
+            client::OwnerRetainedAction::ProcedureEffect {
+                part: owner::part(part, limits)?,
+                authority: owner::authority(authority, limits)?,
+                step: *step,
+                purpose: *purpose,
+            }
+        }
         documents::RetainedAction::Amend { task, change } => {
             client::OwnerRetainedAction::Amend { task: *task, change: Box::new(amendment(change, limits)?) }
         }

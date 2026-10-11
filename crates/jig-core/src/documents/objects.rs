@@ -60,6 +60,12 @@ pub enum ProposalAction {
         position: u32,
         purpose: u64,
     },
+    ProcedureEffect {
+        part: Part,
+        authority: AuthorityLine,
+        step: u64,
+        purpose: u64,
+    },
     Amend {
         task: TaskLink,
         addressed: Option<tasks::AddressChange>,
@@ -197,6 +203,7 @@ pub enum ProposalHistoryState {
 pub enum RetainedAction {
     Batch(List<ProposedTask>),
     Effect { part: Part, authority: AuthorityLine, attempt: u64, completion: u32, position: u32, purpose: u64 },
+    ProcedureEffect { part: Part, authority: AuthorityLine, step: u64, purpose: u64 },
     Amend { task: u64, change: Box<AmendmentChange> },
     Widen { task: u64, authority: AuthorityLine },
     Release { task: u64 },
@@ -374,6 +381,14 @@ fn action(
                 purpose: *purpose,
             }
         }
+        tasks::ProposalAction::ProcedureEffect { connector, authority, step, purpose } => {
+            ProposalAction::ProcedureEffect {
+                part: Part { connector: *connector, kind: PartKind::Effect, key: PartKey::Number(number) },
+                authority: super::task_tree::authority(limits, authority)?,
+                step: *step,
+                purpose: *purpose,
+            }
+        }
         tasks::ProposalAction::Amend { task, amendment: change } => {
             let row = super::small::visible(core, party, *task)?;
             ProposalAction::Amend {
@@ -507,7 +522,7 @@ pub(super) fn proposal(
             }
             offers.push(funding(core, source, needed)).expect("one acceptance source");
         }
-        ProposalAction::Effect { .. } | ProposalAction::Release { .. } => {
+        ProposalAction::Effect { .. } | ProposalAction::ProcedureEffect { .. } | ProposalAction::Release { .. } => {
             // Price belongs to the connector's effect description; authority's
             // budget is a ceiling, never a quoted effect price.
         }
@@ -520,7 +535,10 @@ pub(super) fn proposal(
             let ceiling = match &made {
                 ProposalAction::Amend { after, .. } => after.authority.ceiling.spend,
                 ProposalAction::Widen { after, .. } => after.ceiling.spend,
-                ProposalAction::Batch(_) | ProposalAction::Effect { .. } | ProposalAction::Release { .. } => {
+                ProposalAction::Batch(_)
+                | ProposalAction::Effect { .. }
+                | ProposalAction::ProcedureEffect { .. }
+                | ProposalAction::Release { .. } => {
                     unreachable!("matched authority action")
                 }
             };
@@ -821,6 +839,14 @@ pub fn retained_action(limits: &Limits, number: u64, value: &tasks::ProposalActi
                 attempt: *attempt,
                 completion: *completion,
                 position: *position,
+                purpose: *purpose,
+            }
+        }
+        tasks::ProposalAction::ProcedureEffect { connector, authority, step, purpose } => {
+            RetainedAction::ProcedureEffect {
+                part: Part { connector: *connector, kind: PartKind::Effect, key: PartKey::Number(number) },
+                authority: super::task_tree::authority(limits, authority)?,
+                step: *step,
                 purpose: *purpose,
             }
         }

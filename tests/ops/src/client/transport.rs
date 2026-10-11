@@ -110,11 +110,11 @@ fn envelope(envelope: Envelope) -> RequestEnvelope {
         Envelope::SignedOut => RequestEnvelope::SignedOut,
     }
 }
-fn scope(subject: Subject) -> ApplicationScope {
+fn scope(subject: &Subject) -> ApplicationScope {
     match subject {
         Subject::Observability(obs::Subject { scope: obs::Scope::Project(project), .. })
         | Subject::Infrastructure(infra::Subject { scope: infra::Scope::Project(project), .. }) => {
-            ApplicationScope::Project(project)
+            ApplicationScope::Project(*project)
         }
         Subject::Observability(obs::Subject { scope: obs::Scope::Deployment, .. })
         | Subject::Infrastructure(infra::Subject { scope: infra::Scope::Deployment, .. }) => {
@@ -205,7 +205,9 @@ impl Front<Ops> for Scripted {
                         self.engine.send(now, wall, party, key, attempt, *ask).expect("jig send admitted");
                     }
                     domain::Ask::Infrastructure(ask) => {
-                        let infra::Ask::MoveEnd { project, environment, revision, until } = &ask;
+                        let infra::Ask::MoveEnd { project, environment, revision, until } = &ask else {
+                            panic!("native environments use the actual joint front");
+                        };
                         let mut canonical = Sha256::new();
                         canonical.update(b"Ops.MoveEnd.v1");
                         canonical.update(project.to_be_bytes());
@@ -278,7 +280,7 @@ impl Front<Ops> for Scripted {
                             party,
                             token,
                             connector(Channel::Observability),
-                            scope(subject),
+                            scope(&subject),
                             &subject,
                         )
                         .expect("incident read admitted");
@@ -293,7 +295,7 @@ impl Front<Ops> for Scripted {
                             party,
                             token,
                             connector(Channel::Observability),
-                            scope(subject),
+                            scope(&subject),
                             subject,
                         )
                         .expect("incident watch admitted");
@@ -315,7 +317,7 @@ impl Front<Ops> for Scripted {
                             party,
                             token,
                             connector(Channel::Infrastructure),
-                            scope(subject),
+                            scope(&subject),
                             &subject,
                         )
                         .expect("environment read admitted");
@@ -330,7 +332,7 @@ impl Front<Ops> for Scripted {
                             party,
                             token,
                             connector(Channel::Infrastructure),
-                            scope(subject),
+                            scope(&subject),
                             subject,
                         )
                         .expect("environment watch admitted");

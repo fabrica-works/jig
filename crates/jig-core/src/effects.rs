@@ -90,6 +90,15 @@ impl EffectOrigin {
     }
 }
 
+/// A real procedure step awaiting the task child's proposal admission.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ProcedureProposal {
+    pub task: u64,
+    pub step: u64,
+    pub connector: u16,
+    pub proposal: u64,
+}
+
 #[derive(Debug)]
 pub(crate) struct Flight {
     connector: u16,
@@ -565,6 +574,19 @@ fn complete(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, out: &m
     if checked == authority::Answer::Allow && !writers_ready(core, env, &origin, &description) {
         checked = authority::Answer::Wait;
     }
+    if checked == authority::Answer::Propose {
+        match &origin {
+            EffectOrigin::Procedure { task, step, entry: None } => {
+                procedure_propose(core, env, work, out, owner, flight.connector, *task, *step, &description);
+                return;
+            }
+            EffectOrigin::Projection { .. }
+            | EffectOrigin::Call { .. }
+            | EffectOrigin::Accept { .. }
+            | EffectOrigin::Procedure { entry: Some(_), .. } => {}
+            EffectOrigin::Propose { .. } => unreachable!("explicit proposals completed above"),
+        }
+    }
     if checked != authority::Answer::Allow {
         drop_effect(out, flight.connector, owner, checked);
         match origin {
@@ -850,6 +872,7 @@ fn complete_accept(
         tasks::ProposalAction::Effect { attempt, completion, position, .. } => {
             EffectPurpose::Call { attempt, completion, position }
         }
+        tasks::ProposalAction::ProcedureEffect { purpose, .. } => EffectPurpose::Procedure { purpose },
         tasks::ProposalAction::Batch(_)
         | tasks::ProposalAction::Amend { .. }
         | tasks::ProposalAction::Widen { .. }
@@ -1002,7 +1025,8 @@ fn check(
             }
 
             let (number, needed, purpose) = match &proposal.action {
-                tasks::ProposalAction::Effect { connector, authority, purpose, .. } => {
+                tasks::ProposalAction::Effect { connector, authority, purpose, .. }
+                | tasks::ProposalAction::ProcedureEffect { connector, authority, purpose, .. } => {
                     (*connector, authority, *purpose)
                 }
                 tasks::ProposalAction::Batch(_)
@@ -1135,6 +1159,99 @@ fn accept_refused(
             },
         })),
     }
+}
+
+/// The core owns the Propose answer and chooses its nearest covering holder.
+/// No Call identity is substituted for the procedure's genuine step/purpose.
+#[expect(clippy::too_many_arguments, reason = "one original procedure effect admission")]
+fn procedure_propose(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    out: &mut Queue<Request>,
+    owner: Token,
+    connector: u16,
+    task: u64,
+    step: u64,
+    description: &connector::EffectDescription,
+) {
+    let Some(context) = core.tasks.delegation(task) else {
+        drop_effect(out, connector, owner, authority::Answer::Refuse);
+        return;
+    };
+    let Some(needed) = authority::needs(&authority::Action::Effect(description.effect.clone())) else {
+        drop_effect(out, connector, owner, authority::Answer::Refuse);
+        procedure_wait(core, work, task, step);
+        return;
+    };
+    let action = tasks::ProposalAction::ProcedureEffect {
+        connector,
+        authority: crate::translate::task_authority(&needed),
+        step,
+        purpose: description.purpose,
+    };
+    if core.proposal_admit_action(context.project, &action).is_err()
+        || core.procedure_proposals.len() >= env.limits.tasks.tasks
+    {
+        drop_effect(out, connector, owner, authority::Answer::Refuse);
+        procedure_wait(core, work, task, step);
+        return;
+    }
+    let Some(holder) = core.proposal_holder(&env.limits, task, &action, None) else {
+        drop_effect(out, connector, owner, authority::Answer::Refuse);
+        procedure_wait(core, work, task, step);
+        return;
+    };
+    let Some(proposal) = fresh(&mut core.counters, Family::Message) else {
+        drop_effect(out, connector, owner, authority::Answer::Refuse);
+        procedure_wait(core, work, task, step);
+        return;
+    };
+    core.procedure_proposals
+        .insert(owner, ProcedureProposal { task, step, connector, proposal })
+        .expect("admitted procedure proposal route");
+    work.push(Event::Tasks(tasks::Event::Propose {
+        reply_to: ReplyTo::new(owner),
+        proposal: tasks::Proposal {
+            number: proposal,
+            proposer: task,
+            project: context.project,
+            action,
+            // The effect request supplied no separate reason words.
+            reason: Box::new([]),
+            as_holder: false,
+            state: tasks::ProposalState::Pending { holder, since: env.wall },
+        },
+    }));
+}
+
+pub(crate) fn procedure_proposed(
+    core: &mut Core,
+    out: &mut Queue<Request>,
+    token: Token,
+    admitted: bool,
+) -> Option<tasks::Event> {
+    let route = core.procedure_proposals.remove(&token)?;
+    if admitted {
+        out.push(Request::Ask {
+            connector: route.connector,
+            ask: Ask::Effect(connector::Ask::KeepProposal {
+                owner: token,
+                proposal: route.proposal,
+                task: route.task,
+                project: core.tasks.task(route.task).expect("proposer exists").project,
+            }),
+        });
+    } else {
+        drop_effect(out, route.connector, token, authority::Answer::Refuse);
+    }
+    Some(tasks::Event::Procedure {
+        reply_to: ReplyTo::new(Token::new(u64::MAX)),
+        task: route.task,
+        step: route.step,
+        read: core.tasks.procedure_offered(route.task),
+        decision: tasks::ProcedureDecision::Wait,
+    })
 }
 
 fn procedure_wait(core: &Core, work: &mut Queue<Event>, task: u64, step: u64) {

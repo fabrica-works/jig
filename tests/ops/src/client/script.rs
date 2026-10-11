@@ -6,7 +6,7 @@ use skein_lib::Wall;
 use std::collections::BTreeMap;
 
 /// The two connector subjects retain their original scope and numeric identity.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Subject {
     Observability(obs::Subject),
     Infrastructure(infra::Subject),
@@ -28,7 +28,12 @@ impl Application for OpsScript {
     type Subject = Subject;
     type Document = Document;
     fn decide(&mut self, _: &Truth, _: u64, ask: &infra::Ask, _: Wall) -> Decision<infra::Answer> {
-        let infra::Ask::MoveEnd { project, environment, revision, until } = ask;
+        let infra::Ask::MoveEnd { project, environment, revision, until } = ask else {
+            return Decision {
+                answer: infra::Answer::Refused { why: infra::documents::Refusal::Invalid },
+                changes: vec![],
+            };
+        };
         let subject = Subject::Infrastructure(infra::Subject {
             scope: infra::Scope::Project(*project),
             kind: infra::Kind::Environment(*environment),
@@ -67,7 +72,7 @@ impl Application for OpsScript {
         visible.then(|| self.documents.get(subject).cloned()).flatten()
     }
     fn marks(&self, _: &Change) -> Vec<Subject> {
-        self.documents.keys().copied().collect()
+        self.documents.keys().cloned().collect()
     }
     fn fits(&self, value: ApplicationValue<'_, Self>, bounds: &Bounds) -> bool {
         let mut limits = super::limits();

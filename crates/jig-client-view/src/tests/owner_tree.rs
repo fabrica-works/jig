@@ -69,6 +69,9 @@ fn source() -> OwnerTree {
     }
 }
 fn domain(value: &OwnerTree) -> Domain {
+    domain_and_watch(value).0
+}
+fn domain_and_watch(value: &OwnerTree) -> (Domain, skein_lib::Token) {
     let (mut d, frame) = start();
     drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
     let asks = drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
@@ -94,7 +97,7 @@ fn domain(value: &OwnerTree) -> Domain {
         })
         .unwrap();
     drive(&mut d, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
-    d
+    (d, watch)
 }
 fn build(value: &OwnerTree, d: &Domain, w: &Words, nodes: Option<u32>) -> Tree {
     let f = view::required(value, &CLIENT, w).unwrap();
@@ -269,4 +272,108 @@ fn owner_tree_local_filters_folds_cycles_and_empty_loss_continuations_remain_bou
         assert!(contains(&tree, b"Held below: 19"));
         assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
     }
+}
+
+#[test]
+fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_once() {
+    let mut value = source();
+    let key = value.rows.get(0).unwrap().proposals.get(0).copied().unwrap();
+    let (mut d, tree_watch) = domain_and_watch(&value);
+    let mut objects = List::with_capacity(1);
+    objects.push(ObjectKey::Proposal(key)).unwrap();
+    let asks = drive(&mut d, Event::ShowObjects { objects });
+    let proposal_watch = asks
+        .iter()
+        .find_map(|ask| match ask {
+            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let mut acts = List::with_capacity(1);
+    acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+    let proposal = OwnerProposal {
+        key,
+        project: 4,
+        reason: DocumentText::complete(super::cards::text(b"supplied pending reason")),
+        action: OwnerProposalAction::Release { task: OwnerTaskLink::Live(chip(9)), hold: None },
+        as_holder: true,
+        waiting: OwnerProposalWaiting { holder: OwnerHistoryHolder::Task(9), since: Wall::EPOCH },
+        funding: List::with_capacity(0),
+        acts,
+    };
+    drive(
+        &mut d,
+        Event::Watch {
+            watch: proposal_watch,
+            event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(proposal))),
+        },
+    );
+    let id = d.objects().find(ObjectKey::Proposal(key)).unwrap();
+    drive(&mut d, Event::Act { act: jig_client::action::Act::Intend { object: id.token(), act: ActKind::Accept } });
+    let sent = drive(&mut d, Event::Act { act: jig_client::action::Act::Confirm });
+    let request = sent
+        .iter()
+        .find_map(|ask| match ask {
+            Request::Send { request, .. } => Some(*request),
+            _ => None,
+        })
+        .unwrap();
+    let w = words();
+    let build_page = |domain: &Domain| {
+        let mut cap = crate::Limits::of_words(&CLIENT, &w).unwrap();
+        cap.nodes = cap.nodes.max(4096);
+        cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
+        let mut b = Builder::new(&cap);
+        let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
+        b.open(Role::Page);
+        view::render(
+            &mut b,
+            domain.task_page().plan.owner.as_ref().unwrap(),
+            &domain.task_page().plan,
+            domain,
+            &w,
+            &mut bindings,
+        );
+        crate::pages::after_page(&mut b, domain, &w, &mut bindings);
+        b.close();
+        b.finish()
+    };
+    let card_key = crate::pages::object_key(ObjectKey::Proposal(key));
+    let before = build_page(&d);
+    assert_eq!(before.nodes().iter().filter(|node| node.key == Some(card_key)).count(), 1);
+    let row = d.objects().find(ObjectKey::Task(9)).unwrap();
+    drive(&mut d, Event::Act { act: jig_client::action::Act::Fold { object: row.token(), open: false } });
+    assert_eq!(
+        build_page(&d).nodes().iter().filter(|node| node.key == Some(card_key)).count(),
+        0,
+        "person fold stays hidden"
+    );
+    drive(&mut d, Event::Act { act: jig_client::action::Act::Fold { object: row.token(), open: true } });
+    value.rows.get_mut(0).unwrap().proposals.clear();
+    drive(
+        &mut d,
+        Event::Watch { watch: tree_watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
+    );
+    assert!(!d.objects().get(id).unwrap().sources.is_empty());
+    assert!(d.task_page().plan.owner.as_ref().unwrap().rows.get(0).unwrap().proposals.is_empty());
+    let pending = build_page(&d);
+    assert_eq!(pending.nodes().iter().filter(|node| node.key == Some(card_key)).count(), 1);
+    assert!(contains(&pending, b"Being decided"));
+    assert!(contains(&pending, b"supplied pending reason"));
+    drive(
+        &mut d,
+        Event::Answered {
+            request,
+            answer: Answer::Done(Outcome::Owner(OwnerOutcome::ProposalDecided {
+                proposal: key,
+                by: 1,
+                at: Wall::EPOCH,
+                choice: OwnerProposalChoice::Accepted,
+            })),
+        },
+    );
+    let answered = build_page(&d);
+    assert_eq!(answered.nodes().iter().filter(|node| node.key == Some(card_key)).count(), 1);
+    assert!(contains(&answered, b"Accepted"));
+    assert!(contains(&answered, b"supplied pending reason"));
 }

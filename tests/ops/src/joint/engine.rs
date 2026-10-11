@@ -1,0 +1,298 @@
+//! Real Ops domain on the conformance loop, retaining scripted non-person peers
+//! (client/domain/testing.md, 5; examples.md, 10).
+use crate::conformance::{self, Config, Delivery, Ops, Systems};
+use jig_client_world::harness::Observed;
+use jig_client_world::joint::{transport::Transport, truth::Truth};
+use jig_conformance::{Application, Clock, Input, Output, referee};
+use jig_core as core;
+use jig_fake_store::Store;
+use jig_ops_domain as root;
+use skein_lib::Time;
+
+pub type Rows = Store<root::Key, root::Record>;
+
+pub struct Peers {
+    pub conformance: conformance::Peers,
+    pub transport: Transport,
+    pub packets: Vec<root::Output>,
+    pub truth: Truth,
+    pub observations: Vec<Observed>,
+    pub protocol: jig_client_world::joint::referee::Referee,
+    applied: u64,
+    delayed_infrastructure: Vec<(u64, root::Output)>,
+}
+
+pub struct OpsApplication;
+
+/// Project only actual durable core rows into the reusable jig observer/store face.
+/// Connector rows remain with Ops's own conformance referee.
+#[must_use]
+pub fn core_store(store: &Rows) -> jig_core_world::Store {
+    let mut values = jig_core_world::Store::default();
+    for row in store.rows.values() {
+        match row {
+            root::Record::Core(record) => {
+                let row = jig_test_domain::Record::Core(record.clone());
+                values.rows.insert(row.key(), row);
+            }
+            root::Record::Infrastructure(_) | root::Record::Observability(_) => {}
+        }
+    }
+    values.applied = store.applied;
+    values
+}
+
+impl Application for OpsApplication {
+    type Domain = root::Domain;
+    type Config = Config;
+    type Systems = Systems;
+    type Peers = Peers;
+    type Key = root::Key;
+    type Record = root::Record;
+    type Event = root::Event;
+    type Delivery = Delivery;
+
+    fn build(config: &Config) -> root::Domain {
+        Ops::build(config)
+    }
+    fn systems(config: &Config, seed: u64) -> Systems {
+        Ops::systems(config, seed)
+    }
+    fn peers(config: &Config, seed: u64) -> Peers {
+        let versions = config.limits().core.documents.versions;
+        Peers {
+            conformance: Ops::peers(config, seed),
+            transport: Transport::new(jig_client::contract::VersionRange {
+                first: versions.minimum,
+                last: versions.maximum,
+            }),
+            packets: Vec::new(),
+            truth: Truth::default(),
+            observations: Vec::new(),
+            protocol: jig_client_world::joint::referee::Referee::default(),
+            applied: 0,
+            delayed_infrastructure: Vec::new(),
+        }
+    }
+    fn policy(peers: &Peers) -> &referee::Policy {
+        Ops::policy(&peers.conformance)
+    }
+    fn recovery(config: &Config, connector: u16, kind: u16) -> referee::Recovery {
+        Ops::recovery(config, connector, kind)
+    }
+    fn start(config: &Config, store: &mut Rows) -> Vec<root::Event> {
+        Ops::start(config, store)
+    }
+    fn cold(peers: &mut Peers, store: &Rows, clock: Clock) {
+        Ops::cold(&mut peers.conformance, store, clock);
+    }
+    fn timers(config: &Config) -> Vec<root::Event> {
+        Ops::timers(config)
+    }
+    fn step(domain: &mut root::Domain, config: &Config, clock: Clock, input: Input<root::Event, root::Record>) {
+        Ops::step(domain, config, clock, input);
+    }
+    fn release(
+        domain: &mut root::Domain,
+        config: &Config,
+        clock: Clock,
+    ) -> Vec<Output<root::Key, root::Record, Delivery>> {
+        Ops::release(domain, config, clock)
+    }
+    fn inbound(peers: &mut Peers, store: &Rows, clock: Clock, event: &mut root::Event) {
+        if let root::Event::Core(core::Event::Delivered { watcher }) = event {
+            peers.protocol.acknowledged(*watcher);
+        }
+        Ops::inbound(&mut peers.conformance, store, clock, event);
+    }
+    #[expect(clippy::too_many_lines, reason = "held root outputs retain their original exhaustive owner routes")]
+    fn deliver(
+        peers: &mut Peers,
+        systems: &mut Systems,
+        store: &mut Rows,
+        clock: Clock,
+        delivery: Delivery,
+    ) -> Vec<Input<root::Event, root::Record>> {
+        let delivery = match delivery {
+            Delivery::Root(value) => *value,
+            other @ Delivery::Results { .. } => {
+                return Ops::deliver(&mut peers.conformance, systems, store, clock, other);
+            }
+        };
+        if let root::Output::Core(core::Held::ReadLoad { load, range }) = delivery {
+            let loaded = jig_core_world::reads::page(&core_store(store), &range);
+            return vec![Input::Event(root::Event::Core(core::Event::ReadLoaded { load, result: loaded }))];
+        }
+        match &delivery {
+            root::Output::ApplicationDocument { document, .. }
+            | root::Output::ApplicationRead { answer: Ok(document), .. } => {
+                conformance::client_document(&mut peers.conformance, store, document);
+            }
+            root::Output::ApplicationRead { answer: Err(_), .. }
+            | root::Output::IncidentAssociationRefused { .. }
+            | root::Output::Application { .. }
+            | root::Output::Commit { .. }
+            | root::Output::Load { .. }
+            | root::Output::CoreLoad(_)
+            | root::Output::Core(_)
+            | root::Output::Now(_)
+            | root::Output::Observability(_)
+            | root::Output::Infrastructure(_)
+            | root::Output::Read { .. }
+            | root::Output::Llm { .. }
+            | root::Output::ToChild(_)
+            | root::Output::Busy
+            | root::Output::Stop => {}
+        }
+        // The genuine external system has a finite response latency. Keep its
+        // original Apply and let P see the committed restarting panel meanwhile.
+        if let root::Output::Infrastructure(jig_ops_domain_infrastructure::SystemRequest::Apply { .. }) = &delivery {
+            peers
+                .delayed_infrastructure
+                .push((clock.now.checked_add(1_000_000_000).expect("finite system response"), delivery));
+            return Vec::new();
+        }
+        let client_owned = match &delivery {
+            root::Output::Core(
+                core::Held::PeopleReply { .. }
+                | core::Held::Read { .. }
+                | core::Held::Delivery { .. }
+                | core::Held::WatchEnded { .. }
+                | core::Held::ApplicationWatchEnded { .. },
+            )
+            | root::Output::ApplicationDocument { .. }
+            | root::Output::ApplicationRead { .. }
+            | root::Output::Application { .. }
+            | root::Output::Now(
+                core::Now::RunText { .. } | core::Now::WatchRefused { .. } | core::Now::SignInRefused { .. },
+            ) => true,
+            root::Output::Core(
+                core::Held::ApplicationDelivery { .. }
+                | core::Held::ReadLoad { .. }
+                | core::Held::Applied { .. }
+                | core::Held::MakeEffect { .. }
+                | core::Held::SettledCall { .. }
+                | core::Held::Assign { .. }
+                | core::Held::Relayed { .. }
+                | core::Held::Inbound { .. }
+                | core::Held::Relay { .. }
+                | core::Held::CallAnswer { .. }
+                | core::Held::Result { .. }
+                | core::Held::Acknowledge { .. }
+                | core::Held::TaskTerminalAcknowledged { .. }
+                | core::Held::TaskTurnKept { .. }
+                | core::Held::AcknowledgeTurn { .. }
+                | core::Held::Cancel { .. }
+                | core::Held::Refuse { .. }
+                | core::Held::TurnBusy { .. }
+                | core::Held::StopRun { .. }
+                | core::Held::NotesLoad { .. }
+                | core::Held::NotesWritten { .. }
+                | core::Held::NotesDeleted { .. },
+            )
+            | root::Output::Now(
+                core::Now::Relayed { .. }
+                | core::Now::EffectAnswer { .. }
+                | core::Now::SettledCallRefused { .. }
+                | core::Now::Call { .. }
+                | core::Now::DropCall { .. }
+                | core::Now::Undelivered { .. }
+                | core::Now::Account(_)
+                | core::Now::NotesIndexed { .. }
+                | core::Now::NotesRecalled { .. }
+                | core::Now::NotesRefused { .. }
+                | core::Now::NoteBusy { .. }
+                | core::Now::DropPayload { .. }
+                | core::Now::DropAssignment { .. }
+                | core::Now::TurnPayload { .. }
+                | core::Now::AnswerPayload { .. }
+                | core::Now::AcceptedTurn { .. }
+                | core::Now::RefusedPayload { .. }
+                | core::Now::Activate { .. }
+                | core::Now::PrepareAgent { .. }
+                | core::Now::StartPreparation { .. }
+                | core::Now::SeenChat { .. }
+                | core::Now::HistoricalProposal { .. }
+                | core::Now::HistoricalPersonTask { .. }
+                | core::Now::CompleteBrief { .. }
+                | core::Now::BriefCorePlanned { .. }
+                | core::Now::WorkspaceRequest { .. }
+                | core::Now::RunPreparationFailed { .. }
+                | core::Now::RunPrepared { .. }
+                | core::Now::HistoricalEscalation { .. }
+                | core::Now::ProcedureDelegateOutcome { .. }
+                | core::Now::RestoreRefused,
+            )
+            | root::Output::IncidentAssociationRefused { .. }
+            | root::Output::Commit { .. }
+            | root::Output::Load { .. }
+            | root::Output::CoreLoad(_)
+            | root::Output::Observability(_)
+            | root::Output::Infrastructure(_)
+            | root::Output::Read { .. }
+            | root::Output::Llm { .. }
+            | root::Output::ToChild(_)
+            | root::Output::Busy
+            | root::Output::Stop => false,
+        };
+        if client_owned {
+            peers.packets.push(delivery);
+            Vec::new()
+        } else {
+            Ops::deliver(&mut peers.conformance, systems, store, clock, Delivery::Root(Box::new(delivery)))
+        }
+    }
+    fn poll(
+        peers: &mut Peers,
+        systems: &mut Systems,
+        store: &mut Rows,
+        clock: Clock,
+        ready: bool,
+    ) -> Vec<Input<root::Event, root::Record>> {
+        let mut events = Ops::poll(&mut peers.conformance, systems, store, clock, ready);
+        let delayed = std::mem::take(&mut peers.delayed_infrastructure);
+        for (due, delivery) in delayed {
+            if clock.now >= due {
+                events.extend(Ops::deliver(
+                    &mut peers.conformance,
+                    systems,
+                    store,
+                    clock,
+                    Delivery::Root(Box::new(delivery)),
+                ));
+            } else {
+                peers.delayed_infrastructure.push((due, delivery));
+            }
+        }
+        events
+    }
+    fn submitted(peers: &mut Peers, store: &Rows, clock: Clock) {
+        Ops::submitted(&mut peers.conformance, store, clock);
+    }
+    fn observed(peers: &mut Peers, systems: &Systems, store: &Rows, clock: Clock) -> Vec<referee::Observed> {
+        if peers.applied != store.applied {
+            peers.observations.extend(peers.truth.applied(jig_core_world::store_peer::DurableSnapshot {
+                commit: store.applied,
+                at: Time::from_nanos(clock.now),
+                rows: core_store(store).rows,
+            }));
+            peers.applied = store.applied;
+        }
+        Ops::observed(&mut peers.conformance, systems, store, clock)
+    }
+    fn ready(domain: &root::Domain) -> bool {
+        Ops::ready(domain)
+    }
+    fn quiescent(domain: &root::Domain) -> bool {
+        Ops::quiescent(domain)
+    }
+    fn reclaim(domain: &mut root::Domain) {
+        Ops::reclaim(domain);
+    }
+    fn maximum(config: &Config) -> u64 {
+        Ops::maximum(config)
+    }
+    fn configuration_heap(config: &Config) -> u64 {
+        Ops::configuration_heap(config)
+    }
+}

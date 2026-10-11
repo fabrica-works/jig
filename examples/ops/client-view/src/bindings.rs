@@ -8,6 +8,7 @@ use skein_lib::{List, Token};
 pub enum Meaning {
     Action(Action),
     Until { object: Token, revision: Revision },
+    NativeUntil { object: Token, revision: Revision },
     Object(ObjectKey),
 }
 #[derive(Debug)]
@@ -43,7 +44,7 @@ impl Bindings {
             if e.token == token {
                 return match &e.meaning {
                     Meaning::Object(key) => Some(*key),
-                    Meaning::Action(_) | Meaning::Until { .. } => None,
+                    Meaning::Action(_) | Meaning::Until { .. } | Meaning::NativeUntil { .. } => None,
                 };
             }
         }
@@ -72,6 +73,19 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                     }
                     Act::Press | Act::Toggle | Act::Submit => None,
                 },
+                Meaning::NativeUntil { object, revision } => match act {
+                    Act::Input { value } => {
+                        if value.len() > usize::try_from(bindings.text).ok()? {
+                            return None;
+                        }
+                        Some(Action::Infrastructure(infrastructure::Act::NativeUntil {
+                            object: *object,
+                            revision: *revision,
+                            value: jig_client_view::number(&value)?,
+                        }))
+                    }
+                    Act::Press | Act::Toggle | Act::Submit => None,
+                },
                 Meaning::Object(_) => None,
             };
         }
@@ -79,6 +93,6 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
     None
 }
 #[must_use]
-pub fn worst_case(capacity: u32) -> Option<u64> {
-    List::<Entry>::worst_case(capacity)
+pub fn worst_case(capacity: u32, text: u32) -> Option<u64> {
+    List::<Entry>::worst_case(capacity)?.checked_add(u64::from(capacity).checked_mul(u64::from(text).checked_mul(2)?)?)
 }

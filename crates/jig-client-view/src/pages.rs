@@ -130,6 +130,45 @@ pub fn jig(b: &mut Builder, client: &Domain, nav: crate::SlotRef, words: &Words,
     }
     built
 }
+// A proposal's own watch can still name it after the plan stops listing it.
+// Preserve the domain-owned pending/terminal card without changing supplied rows
+// or restoring cards hidden by the person's fold (objects.md, 1–2; pages.md, 5.2).
+fn retained_outside_plan(client: &Domain, object: &jig_client::objects::Object) -> bool {
+    if object.sources.is_empty() {
+        return true;
+    }
+    match client.page() {
+        jig_client::pages::Page::Work {
+            address: jig_client::address::Address::Task { section: jig_client::address::TaskSection::Plan, .. },
+            ..
+        } => {}
+        jig_client::pages::Page::Work { .. }
+        | jig_client::pages::Page::Elsewhere
+        | jig_client::pages::Page::Starting
+        | jig_client::pages::Page::SigningIn
+        | jig_client::pages::Page::Missing
+        | jig_client::pages::Page::OutOfDate
+        | jig_client::pages::Page::SomeoneElse => return false,
+    }
+    let key = match object.key {
+        jig_client::contract::ObjectKey::Proposal(key) => key,
+        jig_client::contract::ObjectKey::Task(_)
+        | jig_client::contract::ObjectKey::Escalation { .. }
+        | jig_client::contract::ObjectKey::Question { .. }
+        | jig_client::contract::ObjectKey::PersonTask(_)
+        | jig_client::contract::ObjectKey::Result(_)
+        | jig_client::contract::ObjectKey::Note { .. } => return false,
+    };
+    let Some(tree) = &client.task_page().plan.owner else {
+        return false;
+    };
+    for row in &tree.rows {
+        if row.proposals.as_slice().contains(&key) {
+            return false;
+        }
+    }
+    true
+}
 /// Finish page composition with the one confirmation and visible notices.
 pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     // A source can stop naming a card before its terminal facts arrive. The
@@ -138,12 +177,21 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
         jig_client::pages::Page::Work { .. } | jig_client::pages::Page::Elsewhere => {
             for (_, id) in client.objects().ids() {
                 let object = client.objects().get(*id).expect("indexed card exists");
-                if object.shown && object.sources.is_empty() {
+                if object.shown && retained_outside_plan(client, object) {
                     match object.card {
                         jig_client::objects::Card::Deciding { .. }
                         | jig_client::objects::Card::Leaving { .. }
                         | jig_client::objects::Card::Unknown { .. } => {
-                            crate::cards::card(b, client, *id, &crate::cards::Place::Elsewhere, words, bindings);
+                            let key = object_key(object.key);
+                            let mut present = false;
+                            for node in b.tree.nodes() {
+                                if node.key == Some(key) {
+                                    present = true;
+                                }
+                            }
+                            if !present {
+                                crate::cards::card(b, client, *id, &crate::cards::Place::Elsewhere, words, bindings);
+                            }
                         }
                         jig_client::objects::Card::Open | jig_client::objects::Card::Refused { .. } => {}
                     }

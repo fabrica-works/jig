@@ -41,6 +41,14 @@ impl State {
     pub(crate) fn end(&self, environment: &Environment) -> Option<EnvironmentEnd> {
         Some(self.ends.get(environment)?.1)
     }
+    /// The request basis is the saved desired end, or the owner's initial
+    /// revision and observed lease when no desired record exists (examples.md, 8).
+    pub(crate) fn request_end(&self, environment: &Environment, fact: EnvironmentFact) -> (Key, EnvironmentEnd) {
+        self.ends
+            .get(environment)
+            .copied()
+            .unwrap_or((fact.created_by, EnvironmentEnd { revision: 0, until: fact.until }))
+    }
     pub(crate) fn new(limits: &Limits) -> Self {
         Self {
             prepared: Map::with_capacity(limits.staged),
@@ -143,12 +151,7 @@ pub(crate) fn decide(
     } else {
         match domain.environments.get(&value.environment) {
             Some(Some(fact)) => {
-                let now = domain
-                    .application
-                    .ends
-                    .get(&value.environment)
-                    .copied()
-                    .unwrap_or((fact.created_by, EnvironmentEnd { revision: 0, until: fact.until }));
+                let now = domain.application.request_end(&value.environment, *fact);
                 let (created_by, now) = now;
                 if created_by != fact.created_by {
                     return keep(domain, env, request, token, retention, ApplicationOutcome::Exhausted, out);

@@ -259,7 +259,7 @@ fn owner_proposal_five_whole_actions_keep_effect_coordinates_release_hold_links_
             }
         }
         match &v.action {
-            OwnerProposalAction::Effect { .. } => {
+            OwnerProposalAction::Effect { .. } | OwnerProposalAction::ProcedureEffect { .. } => {
                 assert!(has(&tree, b"Effect attempt: 18446744073709551615"));
                 assert!(has(&tree, b"Effect completion: 4294967295"));
                 assert!(has(&tree, b"Effect position: 4294967295"));

@@ -663,8 +663,14 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
         core::connector::Ask::DescribeProposal { owner, proposal } => {
             work.push(Work::Infrastructure(infrastructure::Event::DescribeProposal { token: owner, number: proposal }));
         }
-        core::connector::Ask::KeepProposal { owner, proposal, task, project: _ } => work
-            .push(Work::Infrastructure(infrastructure::Event::KeepProposal { token: owner, number: proposal, task })),
+        core::connector::Ask::KeepProposal { owner, proposal, task, project: _ } => {
+            domain.effect_procedures.remove(&owner);
+            work.push(Work::Infrastructure(infrastructure::Event::KeepProposal {
+                token: owner,
+                number: proposal,
+                task,
+            }));
+        }
         core::connector::Ask::DropProposal { proposal } => {
             work.push(Work::Infrastructure(infrastructure::Event::DropProposal { number: proposal }));
         }

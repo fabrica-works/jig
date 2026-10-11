@@ -167,7 +167,15 @@ pub(crate) fn ask(root: &mut Domain, env: &Env<Limits>, owner: Owner, scope: u64
 pub(crate) fn ask_size(limits: &Limits, ask: &Ask) -> u64 {
     match ask {
         Ask::Jig(_) => limits.jig.document_bytes,
-        Ask::Infrastructure(_) => u64::try_from(size_of::<infrastructure::Ask>()).expect("ask size fits"),
+        Ask::Infrastructure(ask) => {
+            let base = u64::try_from(size_of::<infrastructure::Ask>()).expect("ask size fits");
+            match ask {
+                infrastructure::Ask::MoveEnd { .. } => base,
+                infrastructure::Ask::NativeMoveEnd { environment, .. } => base
+                    .saturating_add(u64::try_from(environment.pool.len()).expect("name size fits"))
+                    .saturating_add(u64::try_from(environment.name.len()).expect("name size fits")),
+            }
+        }
     }
 }
 

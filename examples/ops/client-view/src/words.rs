@@ -233,8 +233,18 @@ pub enum Word {
     LastSystemResponseNotKept,
     /// Read table capacity.
     ReadLimit,
+    ResourceUnavailable,
+    ServiceHealthy,
+    ServiceUnhealthy,
+    Restarting,
+    WaitingHealthy,
+    EndSeconds,
+    ObservedEndSeconds,
+    ReadyAtSeconds,
+    DeadlineSeconds,
+    ObservedSeconds,
 }
-const ALL: [Word; 111] = [
+const ALL: [Word; 121] = [
     Word::Incidents,
     Word::Environments,
     Word::Incident,
@@ -346,6 +356,16 @@ const ALL: [Word; 111] = [
     Word::SystemRequestBudgetNotKept,
     Word::LastSystemResponseNotKept,
     Word::ReadLimit,
+    Word::ResourceUnavailable,
+    Word::ServiceHealthy,
+    Word::ServiceUnhealthy,
+    Word::Restarting,
+    Word::WaitingHealthy,
+    Word::EndSeconds,
+    Word::ObservedEndSeconds,
+    Word::ReadyAtSeconds,
+    Word::DeadlineSeconds,
+    Word::ObservedSeconds,
 ];
 impl Word {
     #[must_use]
@@ -463,6 +483,16 @@ impl Word {
             Self::SystemRequestBudgetNotKept => 108,
             Self::LastSystemResponseNotKept => 109,
             Self::ReadLimit => 110,
+            Self::ResourceUnavailable => 111,
+            Self::ServiceHealthy => 112,
+            Self::ServiceUnhealthy => 113,
+            Self::Restarting => 114,
+            Self::WaitingHealthy => 115,
+            Self::EndSeconds => 116,
+            Self::ObservedEndSeconds => 117,
+            Self::ReadyAtSeconds => 118,
+            Self::DeadlineSeconds => 119,
+            Self::ObservedSeconds => 120,
         };
         PhraseId { owner: Owner::Side { connector }, number }
     }
@@ -476,8 +506,8 @@ pub struct Words {
 impl Words {
     #[expect(clippy::too_many_lines, reason = "closed English phrase data is matched exhaustively")]
     pub fn english(connector: u16, text: u32) -> Result<Self, Invalid> {
-        let mut shapes = List::with_capacity(111);
-        let mut phrases = List::with_capacity(111);
+        let mut shapes = List::with_capacity(121);
+        let mut phrases = List::with_capacity(121);
         for word in ALL {
             let (literal, hole) = match word {
                 Word::Incidents => (b"Incidents".as_slice(), None),
@@ -593,6 +623,18 @@ impl Words {
                 Word::LastSystemResponseNotKept => {
                     (b"What the system last said: not kept by this connector".as_slice(), None)
                 }
+                Word::ResourceUnavailable => (b"Unavailable resource".as_slice(), None),
+                Word::ServiceHealthy => (b"Service is healthy".as_slice(), None),
+                Word::ServiceUnhealthy => (b"Service is unhealthy".as_slice(), None),
+                Word::Restarting => (b"Restarting".as_slice(), None),
+                Word::WaitingHealthy => (b"Waiting for healthy".as_slice(), None),
+                Word::EndSeconds => (b"Desired end (seconds since epoch): ".as_slice(), Some(HoleKind::Number)),
+                Word::ObservedEndSeconds => {
+                    (b"Observed backend lease (seconds since epoch): ".as_slice(), Some(HoleKind::Number))
+                }
+                Word::ReadyAtSeconds => (b"Ready at (seconds since epoch): ".as_slice(), Some(HoleKind::Number)),
+                Word::DeadlineSeconds => (b"Deadline (seconds since epoch): ".as_slice(), Some(HoleKind::Number)),
+                Word::ObservedSeconds => (b"Observed at (seconds since epoch): ".as_slice(), Some(HoleKind::Number)),
                 Word::ReadLimit => (b"Read capacity: ".as_slice(), Some(HoleKind::Number)),
             };
             let (holes, segments): (Box<[HoleShape]>, Box<[Segment]>) = match hole {
@@ -644,5 +686,5 @@ impl Words {
 }
 #[must_use]
 pub const fn phrase_limits(text: u32) -> PhraseLimits {
-    PhraseLimits { languages: 1, phrases: 111, holes: 1, segments: 222, text_bytes: 8192, hole_bytes: text }
+    PhraseLimits { languages: 1, phrases: 121, holes: 1, segments: 242, text_bytes: 8192, hole_bytes: text }
 }

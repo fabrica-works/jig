@@ -293,6 +293,18 @@ impl App for Ops {
         let Request::Send { attempt, key, ask } = request else { return None };
         Some(match ask {
             domain::Ask::Jig(ask) => observe::jig_sent(*attempt, *key, ask),
+            domain::Ask::Infrastructure(infra::Ask::NativeMoveEnd { object, revision, .. }) => Sent {
+                attempt: *attempt,
+                key: *key,
+                card: Some(CardKey::of(jig_client_view::Key {
+                    owner: jig_client_view::Owner::Side { connector: 2 },
+                    kind: 12,
+                    a: 0,
+                    b: object.raw(),
+                })),
+                revision: Some((0, revision.value)),
+                words: None,
+            },
             domain::Ask::Infrastructure(infra::Ask::MoveEnd { project, environment, revision, .. }) => Sent {
                 attempt: *attempt,
                 key: *key,
@@ -366,8 +378,11 @@ impl App for Ops {
 }
 #[must_use]
 pub(super) fn environment_key(project: u32, environment: u64) -> CardKey {
-    CardKey::of(view::infrastructure::key(&infra::Subject {
-        scope: infra::Scope::Project(project),
-        kind: infra::Kind::Environment(environment),
-    }))
+    CardKey::of(
+        view::infrastructure::key(&infra::Subject {
+            scope: infra::Scope::Project(project),
+            kind: infra::Kind::Environment(environment),
+        })
+        .expect("legacy numeric environment key"),
+    )
 }

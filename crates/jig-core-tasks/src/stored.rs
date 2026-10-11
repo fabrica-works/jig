@@ -122,6 +122,7 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
     let result_batch = match proposal.action {
         crate::ProposalAction::Batch(_) => true,
         crate::ProposalAction::Effect { .. }
+        | crate::ProposalAction::ProcedureEffect { .. }
         | crate::ProposalAction::Amend { .. }
         | crate::ProposalAction::Widen { .. }
         | crate::ProposalAction::Release { .. } => false,
@@ -151,7 +152,9 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
                 && kind
                     == match proposal.action {
                         crate::ProposalAction::Batch(_) => crate::ProposalKind::Batch,
-                        crate::ProposalAction::Effect { .. } => crate::ProposalKind::Effect,
+                        crate::ProposalAction::Effect { .. } | crate::ProposalAction::ProcedureEffect { .. } => {
+                            crate::ProposalKind::Effect
+                        }
                         crate::ProposalAction::Amend { .. } => crate::ProposalKind::Amend,
                         crate::ProposalAction::Widen { .. } => crate::ProposalKind::Widen,
                         crate::ProposalAction::Release { .. } => crate::ProposalKind::Release,
@@ -189,6 +192,9 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
         }
         crate::ProposalAction::Effect { authority, attempt, completion, .. } => {
             *attempt != 0 && *completion != 0 && crate::batch::valid_authority(limits, authority)
+        }
+        crate::ProposalAction::ProcedureEffect { authority, step, .. } => {
+            *step != 0 && crate::batch::valid_authority(limits, authority)
         }
         crate::ProposalAction::Amend { task: target, amendment } => {
             *target != 0

@@ -60,6 +60,8 @@ pub enum ClientDocument {
     Environment {
         environment: Environment,
         fact: EnvironmentFact,
+        /// Current revision accepted by `MoveEnd`, independent of record absence.
+        end_revision: u64,
         end: Option<crate::EnvironmentEnd>,
         pool: Option<ClientPool>,
     },
@@ -223,6 +225,7 @@ fn make(
             Ok(ClientDocument::Environment {
                 environment: environment.clone(),
                 fact,
+                end_revision: domain.application.request_end(environment, fact).1.revision,
                 end: domain.application.end(environment),
                 pool: pool(domain, &crate::Pool(environment.pool.clone())),
             })

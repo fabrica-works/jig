@@ -74,6 +74,12 @@ pub enum OwnerRetainedAction {
         position: u32,
         purpose: u64,
     },
+    ProcedureEffect {
+        part: OwnerPart,
+        authority: OwnerAuthorityDocument,
+        step: u64,
+        purpose: u64,
+    },
     Amend {
         task: u64,
         change: Box<OwnerRetainedAmendment>,

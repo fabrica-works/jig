@@ -34,13 +34,32 @@ pub struct Config {
     pub story: Story,
     limits: root::Limits,
     documents: bool,
+    client_backed: bool,
 }
 
 impl Config {
     /// Fix the finite limits once; cold starts still rebuild the same root.
     #[must_use]
     pub fn new(seed: u64, story: Story) -> Self {
-        Self { seed, story, limits: config::root(seed).1, documents: false }
+        Self { seed, story, limits: config::root(seed).1, documents: false, client_backed: false }
+    }
+
+    /// Replace only the on-call person with clients; retain scripted hosts and systems.
+    #[must_use]
+    pub fn client_backed(mut self) -> Self {
+        self.client_backed = true;
+        // A public task page watches its frame, task, plan, chips and live turn,
+        // with application parts beside them. The inline person watched none.
+        self.limits.core.views.watchers = 32;
+        self.limits.core.views.watchers_per_party = 32;
+        self.limits.core.views.runs = 8;
+        self
+    }
+
+    /// The exact finite engine bounds used by this fixture.
+    #[must_use]
+    pub fn limits(&self) -> &root::Limits {
+        &self.limits
     }
 
     /// Bound the retained connector answers for an application-request story.
@@ -77,6 +96,7 @@ pub struct Peers {
     pub ended_documents: Vec<u64>,
     pub lead_commits: Vec<(u64, obs::Incident, obs::Delegation)>,
     document_story: bool,
+    client_documents: bool,
     watched_documents: std::collections::BTreeSet<u64>,
     document_rows: Vec<(u64, root::Record)>,
     pending_document_effects: Vec<infra::SystemRequest>,
@@ -127,7 +147,7 @@ impl Application for Ops {
             application_requests: false,
             sign_in: None,
             account_ready: false,
-            asked_sign_in: false,
+            asked_sign_in: config.client_backed,
             results: Vec::new(),
             delivered_results: std::collections::BTreeSet::new(),
             pending_results: Vec::new(),
@@ -139,11 +159,16 @@ impl Application for Ops {
             documents: Vec::new(),
             ended_documents: Vec::new(),
             document_story: config.documents,
+            client_documents: config.client_backed,
             watched_documents: std::collections::BTreeSet::new(),
             document_rows: Vec::new(),
             lead_commits: Vec::new(),
             pending_document_effects: Vec::new(),
-            llm: scripts::Llm::new(config.seed),
+            llm: if config.client_backed {
+                scripts::Llm::with_client(config.seed, true)
+            } else {
+                scripts::Llm::new(config.seed)
+            },
             asked_accept: std::collections::BTreeSet::new(),
         }
     }
@@ -564,7 +589,7 @@ impl Application for Ops {
     }
     fn submitted(peers: &mut Peers, store: &Store, _: Clock) {
         documents::leads_submitted(peers, store);
-        if peers.document_story {
+        if peers.document_story || peers.client_documents {
             documents::submitted(peers, store);
         }
         if peers.application_requests {
@@ -625,10 +650,21 @@ impl Application for Ops {
         domain.reclaim();
     }
     fn maximum(config: &Config) -> u64 {
-        root::worst_case(&config::root(config.seed).1).expect("finite scenario root")
+        root::worst_case(&config.limits).expect("finite scenario root")
     }
     fn configuration_heap(_: &Config) -> u64 {
         0
+    }
+}
+
+/// Native client facts share the independent submitted-row durability check.
+pub(crate) fn client_document(peers: &mut Peers, store: &Store, document: &root::ClientDocument) {
+    let retained = match document {
+        root::ClientDocument::Observability(value) => matches!(value.as_ref(), obs::ClientDocument::Incident { .. }),
+        root::ClientDocument::Infrastructure(value) => matches!(value.as_ref(), infra::ClientDocument::Panel { .. }),
+    };
+    if retained {
+        documents::delivered(peers, store, document.clone());
     }
 }
 

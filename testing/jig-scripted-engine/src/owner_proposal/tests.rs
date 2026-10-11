@@ -116,6 +116,15 @@ fn owner_proposal_exact_whole_action_allocations_include_reserved_lists_boxes_an
             part_heap + authority_heap,
         ),
         (
+            OwnerProposalAction::ProcedureEffect {
+                part: part(),
+                authority: authority(),
+                step: u64::MAX,
+                purpose: u64::MAX,
+            },
+            part_heap + authority_heap,
+        ),
+        (
             OwnerProposalAction::Amend {
                 task: OwnerTaskLink::Stored { number: u64::MAX, status: None },
                 addressed: Some(AddressChange {

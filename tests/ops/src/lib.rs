@@ -11,3 +11,6 @@ pub mod conformance;
 
 /// Ops client adapters on the reusable client world.
 pub mod client;
+
+/// Ops clients in front of the actual conformance engine.
+pub mod joint;

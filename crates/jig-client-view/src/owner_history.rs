@@ -109,7 +109,8 @@ fn proposal_fits(proposal: &OwnerProposalHistory, limits: &Limits) -> Option<()>
                 proposed_fits(task, limits)?;
             }
         }
-        OwnerRetainedAction::Effect { part, authority, .. } => {
+        OwnerRetainedAction::Effect { part, authority, .. }
+        | OwnerRetainedAction::ProcedureEffect { part, authority, .. } => {
             crate::owner_chip::part_fits(part, limits)?;
             crate::owner_amendment::authority_fits(authority, limits)?;
         }
@@ -300,6 +301,12 @@ fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings:
             ] {
                 saying(b, words, phrase, &[Hole::Number(number)]);
             }
+        }
+        OwnerRetainedAction::ProcedureEffect { part, authority, purpose, .. } => {
+            saying(b, words, P::Effect, &[]);
+            crate::proposed_task::part(b, part, words, bindings);
+            crate::owner_authority::document_words(b, authority, words);
+            saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
         }
         OwnerRetainedAction::Amend { task, change } => {
             saying(b, words, P::Amend, &[]);

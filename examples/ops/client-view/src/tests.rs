@@ -186,6 +186,7 @@ fn deployment_keys_are_distinct_from_both_zero_and_maximum_project_identifiers()
     ]
     .map(|scope| {
         crate::infrastructure::key(&infrastructure::Subject { scope, kind: infrastructure::Kind::Outbox(17) })
+            .expect("numeric owner key")
     });
     let observability =
         [observability::Scope::Project(0), observability::Scope::Project(u32::MAX), observability::Scope::Deployment]
@@ -276,6 +277,7 @@ fn equal_task_and_party_maker_numbers_keep_full_width_effect_keys_in_both_famili
             scope: infrastructure::Scope::Project(1),
             kind: infrastructure::Kind::Effect(ProposalKey { proposer, number: u64::MAX }),
         })
+        .expect("maker key")
     });
     for keys in [obs_keys, infra_keys] {
         for (index, key) in keys.iter().enumerate() {
@@ -893,7 +895,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
         let (read, subject) = rows
             .iter()
             .find_map(|request| match request {
-                Request::Infrastructure(infrastructure::Out::Read { read, subject }) => Some((*read, *subject)),
+                Request::Infrastructure(infrastructure::Out::Read { read, subject }) => Some((*read, subject.clone())),
                 _ => None,
             })
             .unwrap();
@@ -926,7 +928,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
             scope: expected_scope,
             kind: infrastructure::Kind::Effect(ProposalKey { proposer: Proposer::Task(17), number: 17 }),
         });
-        assert_ne!(expected_key, proposal_key);
+        assert_ne!(Some(expected_key), proposal_key);
     }
 }
 
@@ -1175,7 +1177,7 @@ fn known_deployment_parts_name_actual_capacities_and_deferred_diagnostics_withou
                         kind: infrastructure::Kind::Deployment
                     }
                 );
-                let document = infrastructure_deployment(subject);
+                let document = infrastructure_deployment(subject.clone());
                 drive(
                     &mut root,
                     Event::Infrastructure(infrastructure::Event::Read {
@@ -1347,7 +1349,7 @@ fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_h
 }
 
 #[test]
-fn native_effect_slots_say_unshowable_without_loading_a_maker_effect() {
+fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_keep_observability_unsupported() {
     let domain_limits = limits();
     let (jig_words, obs_words, infra_words) = phrasebooks();
     let mut tree_limits = Limits::of(&domain_limits, &jig_words, &obs_words, &infra_words).unwrap().tree;
@@ -1398,13 +1400,94 @@ fn native_effect_slots_say_unshowable_without_loading_a_maker_effect() {
             let status: Vec<_> =
                 tree.nodes().iter().filter(|node| node.role == jig_client_view::Role::Status).collect();
             assert_eq!(status.len(), 1);
-            assert_eq!(status[0].name.as_deref(), Some(b"Cannot show this part".as_slice()));
+            let expected = if connector == 1 { b"Cannot show this part".as_slice() } else { b"Loading".as_slice() };
+            assert_eq!(status[0].name.as_deref(), Some(expected));
             // Builder::text creates a Text child under the named Status region.
             let text: Vec<_> =
                 tree.nodes().iter().flat_map(|node| node.text.iter()).map(|run| run.text.as_ref()).collect();
-            assert_eq!(text, [b"Cannot show this part".as_slice()]);
+            assert_eq!(text, [expected]);
             assert!(tree.nodes().iter().all(|node| node.binding.is_none() && node.link.is_none()));
             assert!(tree.len() <= tree_limits.nodes);
         }
     }
+}
+
+#[test]
+fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_width_seconds() {
+    use infrastructure::native as n;
+    let environment = n::Environment { pool: Box::from(*b"Q.pool"), name: Box::from(*b"preview") };
+    let subject = infrastructure::Subject {
+        scope: infrastructure::Scope::Project(3),
+        kind: infrastructure::Kind::NativeEnvironment(environment.clone()),
+    };
+    let document = infrastructure::Document::Native(Box::new(n::Document {
+        subject: subject.clone(),
+        value: n::Value::Environment {
+            environment: environment.clone(),
+            end_revision: 17,
+            fact: n::EnvironmentFact {
+                created_by: n::Key {
+                    deployment: [7; 16],
+                    task: 9,
+                    origin: n::Purpose::Procedure { purpose: 2 },
+                    purpose: 4,
+                },
+                ready_at: u64::MAX,
+                until: u64::MAX,
+                price: 12,
+            },
+            end: None,
+            pool: None,
+        },
+    }));
+    let mut root = ready();
+    let requests = drive(
+        &mut root,
+        Event::Went {
+            place: jig_ops_client_domain::Place::Address(Address::Infrastructure(
+                infrastructure::Address::NativeEnvironment { project: 3, environment: environment.clone() },
+            )),
+        },
+    );
+    let read = requests
+        .iter()
+        .find_map(|request| match request {
+            Request::Infrastructure(infrastructure::Out::Read { read, .. }) => Some(*read),
+            _ => None,
+        })
+        .expect("native read");
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read,
+            result: infrastructure::ReadResult::Value(Box::new(document)),
+        }),
+    );
+    let mut view = view();
+    let mut patches = Queue::with_capacity(view.limits().tree.patches);
+    build(&mut view, &root, &mut patches);
+    assert!(contains(&view, b"Observed backend lease (seconds since epoch): 18446744073709551615"));
+    assert!(contains(&view, b"Ready at (seconds since epoch): 18446744073709551615"));
+    assert!(!contains(&view, b"Desired end"));
+    let id = root.infrastructure().find(subject).expect("opaque environment");
+    let field = view
+        .tree()
+        .nodes()
+        .iter()
+        .find(|node| {
+            node.role == jig_client_view::Role::TextField
+                && node.name.as_deref() == Some(b"New end (seconds since epoch)".as_slice())
+        })
+        .expect("native end field");
+    assert_eq!(field.value.as_ref().expect("native value").text.as_ref(), b"18446744073709551615");
+    assert_eq!(field.value.as_ref().expect("native value").written, 17);
+    let field = field.id;
+    assert_eq!(
+        crate::decode(&mut view, field, jig_client_view::Act::Input { value: Box::from(*b"18446744073709551614") }),
+        Some(jig_ops_client_domain::Action::Infrastructure(infrastructure::Act::NativeUntil {
+            object: id.token(),
+            revision: Revision { value: 17 },
+            value: u64::MAX - 1
+        }))
+    );
 }

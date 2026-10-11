@@ -301,7 +301,8 @@ fn parts(body: &Body, limit: u32) -> Parts {
             | contract::ProposalAction::Amend { .. } => {}
         },
         Body::OwnerProposal(proposal) => match &proposal.action {
-            contract::OwnerProposalAction::Effect { part, .. } => {
+            contract::OwnerProposalAction::Effect { part, .. }
+            | contract::OwnerProposalAction::ProcedureEffect { part, .. } => {
                 if let Some(part) = owner_effect(part) {
                     push(&mut parts, part);
                 }
@@ -403,7 +404,11 @@ pub(crate) fn owner_hold(chip: &contract::Chip) -> Option<Part> {
 }
 // The connector's effect number is independent of the jig proposal maker
 // (client/domain/root.md, 6; objects.md, 4).
-fn owner_effect(part: &contract::OwnerPart) -> Option<Part> {
+/// Preserve the raw effect subject namespace for a supplied owner part.
+/// Maker-keyed legacy effects remain distinct; other owner part shapes do not
+/// acquire a guessed subject.
+#[must_use]
+pub fn owner_effect(part: &contract::OwnerPart) -> Option<Part> {
     match part.kind {
         contract::OwnerPartKind::Effect => match &part.key {
             contract::OwnerPartKey::Number(proposal) => {

@@ -507,6 +507,19 @@ pub(super) fn tag_tasks(
                     );
                     continue;
                 }
+                if let Some(event) = crate::effects::procedure_proposed(core, &mut out, token, true) {
+                    let mut follow = Queue::with_capacity(room);
+                    tasks::step(
+                        &mut core.tasks,
+                        &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                        event,
+                        &mut follow,
+                    );
+                    for _ in 0..follow.len() {
+                        pending.push(follow.pop().expect("procedure proposal outcome"));
+                    }
+                    continue;
+                }
                 let person_route = if person_proposal { core.routing_people_proposals.remove(&token) } else { None };
                 if let Some(PersonProposalRoute::Accepting { request, person, proposer, proposal, message }) =
                     person_route
@@ -716,12 +729,15 @@ pub(super) fn tag_tasks(
                             };
                             if terminal {
                                 match proposal.action {
-                                    tasks::ProposalAction::Effect { connector, .. } => out.push(Request::Ask {
-                                        connector,
-                                        ask: Ask::Effect(crate::connector::Ask::DropProposal {
-                                            proposal: proposal.number,
-                                        }),
-                                    }),
+                                    tasks::ProposalAction::Effect { connector, .. }
+                                    | tasks::ProposalAction::ProcedureEffect { connector, .. } => {
+                                        out.push(Request::Ask {
+                                            connector,
+                                            ask: Ask::Effect(crate::connector::Ask::DropProposal {
+                                                proposal: proposal.number,
+                                            }),
+                                        });
+                                    }
                                     tasks::ProposalAction::Batch(_)
                                     | tasks::ProposalAction::Amend { .. }
                                     | tasks::ProposalAction::Widen { .. }
@@ -1008,6 +1024,19 @@ pub(super) fn tag_tasks(
                         },
                         &mut out,
                     );
+                    continue;
+                }
+                if let Some(event) = crate::effects::procedure_proposed(core, &mut out, token, false) {
+                    let mut follow = Queue::with_capacity(room);
+                    tasks::step(
+                        &mut core.tasks,
+                        &Env { now: env.now, wall: env.wall, limits: env.limits.tasks },
+                        event,
+                        &mut follow,
+                    );
+                    for _ in 0..follow.len() {
+                        pending.push(follow.pop().expect("procedure proposal outcome"));
+                    }
                     continue;
                 }
                 let person_route = if person_proposal { core.routing_people_proposals.remove(&token) } else { None };

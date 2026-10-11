@@ -74,7 +74,7 @@ pub(super) fn named_proposal_accept(
         return proposal_refused(core, to, key, why);
     }
     match proposal.action {
-        tasks::ProposalAction::Effect { connector, .. } => {
+        tasks::ProposalAction::Effect { connector, .. } | tasks::ProposalAction::ProcedureEffect { connector, .. } => {
             assert!(core.pending_calls.insert(key, true).is_ok(), "effect acceptance call room");
             let owner = to.into_token();
             return crate::effects::start(
@@ -100,7 +100,9 @@ pub(super) fn named_proposal_accept(
     };
     let token = to.into_token();
     let event = match proposal.action {
-        tasks::ProposalAction::Effect { .. } => unreachable!("effect accepted through its connector"),
+        tasks::ProposalAction::Effect { .. } | tasks::ProposalAction::ProcedureEffect { .. } => {
+            unreachable!("effect accepted through its connector")
+        }
         tasks::ProposalAction::Batch(mut batch) => {
             let creator =
                 if proposal.as_holder { tasks::Party::Task(key.task) } else { tasks::Party::Task(proposal.proposer) };

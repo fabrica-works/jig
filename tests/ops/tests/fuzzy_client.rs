@@ -20,7 +20,7 @@ fn sweep(incident: bool) {
             Address::Jig(JigAddress::Conversations { project: None })
         };
         for party in [7, 8] {
-            let client = world.client(party, address);
+            let client = world.client(party, address.clone());
             world.random_person(client);
             let tab = world.tab(client);
             world.random_person(tab);

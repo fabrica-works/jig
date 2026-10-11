@@ -133,6 +133,12 @@ fn actions() -> Vec<OwnerRetainedAction> {
             position: u32::MAX,
             purpose: u64::MAX,
         },
+        OwnerRetainedAction::ProcedureEffect {
+            part: part(),
+            authority: state().authority,
+            step: u64::MAX,
+            purpose: u64::MAX,
+        },
         OwnerRetainedAction::Amend { task: u64::MAX, change: Box::new(delta()) },
         OwnerRetainedAction::Widen { task: u64::MAX, authority: state().authority },
         OwnerRetainedAction::Release { task: u64::MAX },
@@ -297,7 +303,7 @@ fn expected_action(action: &OwnerRetainedAction) -> u64 {
                     + List::<OwnerPart>::worst_case(3).unwrap()
                     + path)
         }
-        OwnerRetainedAction::Effect { .. } => path + authority,
+        OwnerRetainedAction::Effect { .. } | OwnerRetainedAction::ProcedureEffect { .. } => path + authority,
         OwnerRetainedAction::Amend { .. } => {
             u64::try_from(size_of::<OwnerRetainedAmendment>()).unwrap()
                 + spec

@@ -289,6 +289,7 @@ pub struct Core {
     pub(crate) projections: Map<u64, Box<Projection>>,
     /// Connector payloads awaiting the task hub's proposal admission.
     pub(crate) proposing_effects: Map<Token, (u16, Token)>,
+    pub(crate) procedure_proposals: Map<Token, effects::ProcedureProposal>,
     /// Correlations while the notes child loads a page for a caller.
     pub(crate) note_routes: Map<Token, routing::NoteRoute>,
     /// Preparations waiting for the notes child's current load or write.
@@ -555,6 +556,7 @@ impl Core {
             ),
             projections: Map::with_capacity(limits.tasks.tasks),
             proposing_effects: Map::with_capacity(limits.call_records),
+            procedure_proposals: Map::with_capacity(limits.tasks.tasks),
             note_routes: Map::with_capacity(2),
             pending_note_briefs: Map::with_capacity(limits.brief.briefs),
             next_note_owner: 1,
@@ -617,6 +619,7 @@ impl Core {
             && self.pending_calls.is_empty()
             && self.effect_flights.is_empty()
             && self.proposing_effects.is_empty()
+            && self.procedure_proposals.is_empty()
             && self.routing_calls.is_empty()
             && self.note_routes.is_empty()
             && self.pending_note_briefs.is_empty()

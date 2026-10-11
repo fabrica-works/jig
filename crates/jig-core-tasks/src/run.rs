@@ -242,6 +242,7 @@ pub(crate) fn invalid_followups(
         crate::ResultFollowups::Proposal(proposal) => match &proposal.action {
             crate::ProposalAction::Batch(batch) => batch.len(),
             crate::ProposalAction::Effect { .. }
+            | crate::ProposalAction::ProcedureEffect { .. }
             | crate::ProposalAction::Amend { .. }
             | crate::ProposalAction::Widen { .. }
             | crate::ProposalAction::Release { .. } => {

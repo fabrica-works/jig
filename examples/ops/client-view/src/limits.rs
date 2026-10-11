@@ -67,7 +67,10 @@ pub fn worst_case(
 ) -> Option<u64> {
     jig_client_view::worst_case(&limits.tree)?
         .checked_add(jig_client_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
-        .checked_add(bindings::worst_case(limits.tree.bindings)?.checked_mul(2)?)?
+        .checked_add(
+            bindings::worst_case(limits.tree.bindings, domain.infrastructure.text.max(domain.observability.text))?
+                .checked_mul(2)?,
+        )?
         .checked_add(jig_client_view::phrases::worst_case(jig.book.limits())?)?
         .checked_add(jig_client_view::phrases::worst_case(observability.book.limits())?)?
         .checked_add(jig_client_view::phrases::worst_case(infrastructure.book.limits())?)?

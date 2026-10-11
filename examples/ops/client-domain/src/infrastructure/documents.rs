@@ -11,20 +11,28 @@ pub enum Scope {
     Deployment,
 }
 /// Whole-document identity; proposed effects and retained entries are distinct.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
-    Environments { pool: Option<u32> },
+    Environments {
+        pool: Option<u32>,
+    },
     Environment(u64),
+    NativeEnvironment(super::native::Environment),
+    NativeEnvironments {
+        pool: Option<super::native::Pool>,
+    },
     Panel(u64),
     Result(u64),
     Effect(ProposalKey),
+    /// The connector's raw proposal identity, independent of a jig maker.
+    OwnerEffect(u64),
     Outbox(u64),
     Hold(u64),
     Project(u32),
     Deployment,
 }
 /// A subject and its actual scope.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Subject {
     pub scope: Scope,
     pub kind: Kind,
@@ -239,6 +247,7 @@ pub struct PartDocument {
 /// One whole owner document, admitted without partial truncation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Document {
+    Native(Box<super::native::Document>),
     Environments { subject: Subject, revision: Revision, pools: List<Pool>, environments: List<Environment> },
     Environment(Environment),
     Part(Box<PartDocument>),
@@ -248,30 +257,32 @@ impl Document {
     #[must_use]
     pub fn subject(&self) -> Subject {
         match self {
-            Self::Environments { subject, .. } => *subject,
+            Self::Environments { subject, .. } => subject.clone(),
             Self::Environment(environment) => {
                 Subject { scope: Scope::Project(environment.project), kind: Kind::Environment(environment.number) }
             }
-            Self::Part(part) => part.subject,
+            Self::Part(part) => part.subject.clone(),
+            Self::Native(document) => document.subject.clone(),
         }
     }
     /// The owner's current document revision.
     #[must_use]
-    pub fn revision(&self) -> Revision {
+    pub fn revision(&self) -> Option<Revision> {
         match self {
-            Self::Environments { revision, .. } => *revision,
-            Self::Environment(environment) => environment.revision,
-            Self::Part(part) => part.revision,
+            Self::Environments { revision, .. } => Some(*revision),
+            Self::Environment(environment) => Some(environment.revision),
+            Self::Part(part) => Some(part.revision),
+            Self::Native(_) => None,
         }
     }
     /// Whole-value admission against configured bounds.
     #[must_use]
     pub fn fits(&self, limits: &super::Limits) -> bool {
-        match price(self, limits) {
-            Some(bytes) => match bytes.checked_add(u64::try_from(size_of::<Document>()).expect("document layout")) {
-                Some(bytes) => bytes <= limits.document_bytes,
-                None => false,
-            },
+        let Some(identity) = subject_price(&self.subject(), limits) else { return false };
+        let Some(bytes) = price(self, limits) else { return false };
+        let Some(bytes) = bytes.checked_add(identity) else { return false };
+        match bytes.checked_add(u64::try_from(size_of::<Document>()).expect("document layout")) {
+            Some(bytes) => bytes <= limits.document_bytes,
             None => false,
         }
     }
@@ -331,6 +342,7 @@ fn resource_price(resource: &Resource, limits: &super::Limits) -> Option<u64> {
 }
 fn price(document: &Document, limits: &super::Limits) -> Option<u64> {
     match document {
+        Document::Native(document) => super::native::price(document, limits),
         Document::Environment(environment) => environment_price(environment, limits),
         Document::Environments { pools, environments, .. } => {
             if pools.capacity() > limits.rows || environments.capacity() > limits.rows {
@@ -406,7 +418,19 @@ fn price(document: &Document, limits: &super::Limits) -> Option<u64> {
 /// A keyed request naming exactly the revision the person saw.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
-    MoveEnd { project: u32, environment: u64, revision: Revision, until: Wall },
+    MoveEnd {
+        project: u32,
+        environment: u64,
+        revision: Revision,
+        until: Wall,
+    },
+    NativeMoveEnd {
+        object: skein_lib::Token,
+        project: u32,
+        environment: super::native::Environment,
+        revision: Revision,
+        until: u64,
+    },
 }
 /// A faithful bounded refusal; admission never becomes a false Gone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -423,6 +447,8 @@ pub enum Refusal {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answer {
     MovedEnd { environment: u64, revision: Revision, until: Wall },
+    NativeMovedEnd { environment: super::native::Environment, revision: Revision, until: u64 },
+    NativeMoved { environment: super::native::Environment, revision: Revision, until: u64 },
     Moved { environment: u64, revision: Revision, until: Option<Wall> },
     Gone,
     Refused { why: Refusal },
@@ -431,6 +457,7 @@ pub enum Answer {
 /// A scoped whole-read terminal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReadResult {
+    NotAllowed,
     Value(Box<Document>),
     Unknown,
     Busy,
@@ -446,6 +473,10 @@ pub enum WatchEvent {
 /// One terminal for every opened watch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WatchEnd {
+    NotAllowed,
+    SubjectEnded,
+    Stopping,
+    Busy,
     Closed,
     Dropped,
     Unknown,
@@ -458,6 +489,10 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
         Part::Panel { task, .. } => Kind::Panel(*task),
         Part::Result { task, .. } => Kind::Result(*task),
         Part::Effect { proposal, .. } => Kind::Effect(*proposal),
+        Part::OwnerEffect { proposal, .. } => match scope {
+            Scope::Project(_) => Kind::OwnerEffect(*proposal),
+            Scope::Deployment => return None,
+        },
         Part::Outbox { scope, entry, .. } => {
             let scope = match scope {
                 jig_client::contract::PartScope::Project(project) => Scope::Project(*project),
@@ -470,8 +505,40 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
             return Some(Subject { scope: Scope::Project(*project), kind: Kind::Project(*project) });
         }
         Part::Deployment { .. } => return Some(Subject { scope: Scope::Deployment, kind: Kind::Deployment }),
-        // Native connector proposal numbers do not name this side's typed maker effects.
-        Part::OwnerEffect { .. } | Part::Connector { .. } | Part::Resource { .. } | Part::Kind { .. } => return None,
+        Part::Connector { .. } | Part::Resource { .. } | Part::Kind { .. } => return None,
     };
     Some(Subject { scope, kind })
+}
+
+/// Heap bytes of the opaque owner identity, checked before retaining it.
+pub(crate) fn subject_price(subject: &Subject, limits: &super::Limits) -> Option<u64> {
+    match &subject.kind {
+        Kind::NativeEnvironment(environment) => {
+            if environment.pool.len() > usize::try_from(limits.text).ok()?
+                || environment.name.len() > usize::try_from(limits.text).ok()?
+            {
+                return None;
+            }
+            u64::try_from(environment.pool.len()).ok()?.checked_add(u64::try_from(environment.name.len()).ok()?)
+        }
+        Kind::NativeEnvironments { pool } => match pool {
+            Some(pool) => {
+                if pool.0.len() > usize::try_from(limits.text).ok()? {
+                    return None;
+                }
+                u64::try_from(pool.0.len()).ok()
+            }
+            None => Some(0),
+        },
+        Kind::Environments { .. }
+        | Kind::Environment(_)
+        | Kind::Panel(_)
+        | Kind::Result(_)
+        | Kind::Effect(_)
+        | Kind::OwnerEffect(_)
+        | Kind::Outbox(_)
+        | Kind::Hold(_)
+        | Kind::Project(_)
+        | Kind::Deployment => Some(0),
+    }
 }

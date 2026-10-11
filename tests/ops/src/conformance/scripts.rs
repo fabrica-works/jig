@@ -13,6 +13,9 @@ pub struct Llm {
 }
 impl Llm {
     pub fn new(seed: u64) -> Self {
+        Self::with_client(seed, false)
+    }
+    pub fn with_client(seed: u64, client_backed: bool) -> Self {
         let mut limits = smith_agent_world::Settings::calm(seed).provider;
         limits.latency_min = Duration::ZERO;
         limits.latency_max = Duration::ZERO;
@@ -23,7 +26,7 @@ impl Llm {
             provider: provider::Domain::configured(
                 &limits,
                 seed,
-                scripts(),
+                scripts(client_backed),
                 provider::api::Menu { arguments: Box::new([]), invalid: Box::new([]) },
             )
             .expect("finite ops scripts"),
@@ -54,7 +57,7 @@ impl Llm {
         });
         let acted = query.messages.iter().flat_map(|message| message.parts.iter()).any(|part| match part {
             provider::api::Part::ToolCall { name, .. } => {
-                name.as_ref() == if lead { b"propose".as_slice() } else { b"delegate".as_slice() }
+                name.as_ref() == b"delegate" || (lead && name.as_ref() == b"propose")
             }
             provider::api::Part::Text { text } => {
                 let needle =
@@ -149,7 +152,7 @@ fn logs() -> Turn {
             .into(),
     )
 }
-fn scripts() -> Box<[Script]> {
+fn scripts(client_backed: bool) -> Box<[Script]> {
     let watch = delegate(
         "watch checkout",
         r#"{"kind":"procedure","connector":1,"code":1}"#,
@@ -166,7 +169,7 @@ fn scripts() -> Box<[Script]> {
         10,
         0,
         0,
-        true,
+        !client_backed,
         r#"{"name":1,"kind":"bytes","value":"production"},{"name":2,"kind":"bytes","value":"checkout"},{"name":3,"kind":"number","value":77},{"name":4,"kind":"number","value":7200}"#,
         "",
     );
@@ -200,8 +203,14 @@ fn scripts() -> Box<[Script]> {
                         .into(),
                 ),
                 call(
-                    "propose",
-                    format!(r#"{{"action":"batch","reason":"restart checkout in production","batch":[{remediate}]}}"#),
+                    if client_backed { "delegate" } else { "propose" },
+                    if client_backed {
+                        format!(r#"{{"batch":[{remediate}]}}"#)
+                    } else {
+                        format!(
+                            r#"{{"action":"batch","reason":"restart checkout in production","batch":[{remediate}]}}"#
+                        )
+                    },
                 ),
                 wait(),
                 yield_main(),

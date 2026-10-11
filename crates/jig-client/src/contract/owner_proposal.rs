@@ -41,6 +41,12 @@ pub enum OwnerProposalAction {
         position: u32,
         purpose: u64,
     },
+    ProcedureEffect {
+        part: OwnerPart,
+        authority: OwnerAuthorityDocument,
+        step: u64,
+        purpose: u64,
+    },
     Amend {
         task: OwnerTaskLink,
         addressed: Option<AddressChange>,

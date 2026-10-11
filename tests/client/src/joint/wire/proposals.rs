@@ -37,6 +37,14 @@ pub fn action(
                 purpose: *purpose,
             }
         }
+        documents::ProposalAction::ProcedureEffect { part, authority, step, purpose } => {
+            client::OwnerProposalAction::ProcedureEffect {
+                part: owner::part(part, limits)?,
+                authority: owner::authority(authority, limits)?,
+                step: *step,
+                purpose: *purpose,
+            }
+        }
         documents::ProposalAction::Amend { task, addressed, before, after, reason, release } => {
             client::OwnerProposalAction::Amend {
                 task: results::link(task, limits)?,

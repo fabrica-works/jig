@@ -1160,7 +1160,10 @@ fn native_effect_parts_keep_connector_numbers_separate_from_maker_subjects() {
                 for project in [0, u32::MAX] {
                     assert_eq!(
                         infrastructure::documents::subject(&native, infrastructure::Scope::Project(project)),
-                        None
+                        Some(infrastructure::Subject {
+                            scope: infrastructure::Scope::Project(project),
+                            kind: infrastructure::Kind::OwnerEffect(number),
+                        })
                     );
                     assert_eq!(obs::documents::subject(&native, obs::Scope::Project(project)), None);
                     assert_eq!(
@@ -1219,4 +1222,118 @@ fn native_effect_parts_keep_connector_numbers_separate_from_maker_subjects() {
             assert!(out.is_empty());
         }
     }
+}
+
+#[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one whole native environment request exercises document, draft, journal and opaque identity"
+)]
+fn native_environment_names_request_revision_and_whole_width_end_survive_the_client_request() {
+    use infrastructure::native as n;
+    let environment = n::Environment { pool: Box::from(*b"Q.pool"), name: Box::from(*b"preview") };
+    let subject = infrastructure::Subject {
+        scope: infrastructure::Scope::Project(3),
+        kind: infrastructure::Kind::NativeEnvironment(environment.clone()),
+    };
+    let document = infrastructure::Document::Native(Box::new(n::Document {
+        subject: subject.clone(),
+        value: n::Value::Environment {
+            environment: environment.clone(),
+            end_revision: 0,
+            fact: n::EnvironmentFact {
+                created_by: n::Key {
+                    deployment: [7; 16],
+                    task: 9,
+                    origin: n::Purpose::Procedure { purpose: 2 },
+                    purpose: 4,
+                },
+                ready_at: 5,
+                until: 50,
+                price: 12,
+            },
+            end: None,
+            pool: None,
+        },
+    }));
+    assert!(document.fits(&limits().infrastructure));
+    let mut root = ready(512);
+    let requests = drive(
+        &mut root,
+        Event::Went {
+            place: crate::Place::Address(Address::Infrastructure(infrastructure::Address::NativeEnvironment {
+                project: 3,
+                environment: environment.clone(),
+            })),
+        },
+    );
+    let read = requests
+        .iter()
+        .find_map(|request| match request {
+            Request::Infrastructure(infrastructure::Out::Read { read, .. }) => Some(*read),
+            _ => None,
+        })
+        .expect("native read");
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read,
+            result: infrastructure::ReadResult::Value(Box::new(document.clone())),
+        }),
+    );
+    let id = root.infrastructure().find(subject.clone()).expect("opaque subject retained");
+    assert_eq!(
+        root.infrastructure().object(id).expect("named object").value,
+        infrastructure::Value::Known(Box::new(document))
+    );
+    drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::Infrastructure(infrastructure::Act::NativeUntil {
+                object: id.token(),
+                revision: contract::Revision { value: 0 },
+                value: u64::MAX,
+            }),
+        },
+    );
+    let requests = drive(
+        &mut root,
+        Event::Act {
+            action: crate::Action::Infrastructure(infrastructure::Act::NativeMoveEnd {
+                object: id.token(),
+                revision: contract::Revision { value: 0 },
+            }),
+        },
+    );
+    assert!(requests.is_empty(), "the table journals before sending");
+    let requests = taken(&mut root);
+    assert!(requests.iter().any(|request| match request {
+        Request::Save { record: crate::store::Record::Table { record, .. } } =>
+            record.request
+                == Ask::Infrastructure(infrastructure::Ask::NativeMoveEnd {
+                    object: id.token(),
+                    project: 3,
+                    environment: environment.clone(),
+                    revision: contract::Revision { value: 0 },
+                    until: u64::MAX,
+                }),
+        _ => false,
+    }));
+    assert_ne!(
+        subject,
+        infrastructure::Subject {
+            scope: infrastructure::Scope::Project(3),
+            kind: infrastructure::Kind::Environment(0)
+        }
+    );
+    let mut different = environment.clone();
+    different.pool = Box::from(*b"P.pool");
+    assert!(
+        root.infrastructure()
+            .find(infrastructure::Subject {
+                scope: infrastructure::Scope::Project(3),
+                kind: infrastructure::Kind::NativeEnvironment(different)
+            })
+            .is_none()
+    );
 }
