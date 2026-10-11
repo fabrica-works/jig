@@ -269,6 +269,7 @@ impl Session {
         self.lost_answers.clear();
         self.source_events.clear();
         let watches = self.driver.transport.watches();
+        eprintln!("RECOVERY_RESTART {now:?} watches={watches:?} parked={:?}", self.parked);
         for watcher in &watches {
             let Incoming::Callback { client, event } =
                 packets::dropped(&mut self.driver.transport, *watcher).map_err(Invalid::Packet)?
@@ -333,6 +334,7 @@ impl Session {
         for event in std::mem::take(&mut self.source_events) {
             self.driver.send(now, wall, event);
         }
+        eprintln!("RECOVERY_PARKED {now:?} {:?}", self.parked);
         for (client, requests) in std::mem::take(&mut self.parked) {
             for request in requests {
                 self.send(client, now, wall, request)?;
@@ -867,6 +869,9 @@ impl Session {
 
     /// A normal callback taken by the shell releases only its normal flight.
     pub fn received(&mut self, client: ClientId, now: Time, wall: Wall, event: &Event) {
+        if now > Time::from_nanos(700_000_000) {
+            eprintln!("RECOVERY_RECEIVED {now:?} {event:?}");
+        }
         self.stopping().expect("whole original stopped routes");
         if let Event::Jig(jig_client::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) = event
             && !matches!(value, client::Delivery::Run(_))
