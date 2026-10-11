@@ -103,6 +103,9 @@ fn native_proposal_page_reads_and_watches_refuse_part_capacity_while_preserving_
         let (mut domain, watch) = live_inbox(10);
         let value = proposal(Proposer::Party(8), 17);
         let read = named(&mut domain, watch, value.key);
+        let Page::Work { refused: None, .. } = domain.page() else {
+            panic!("the named Inbox starts without a capacity refusal");
+        };
         let event = if watch_delivery {
             Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(value.clone()))) }
         } else {
@@ -117,7 +120,11 @@ fn native_proposal_page_reads_and_watches_refuse_part_capacity_while_preserving_
             }
         }
         exact(&domain, &value);
-        let (notice, ()) = domain.notices().ids().iter().next().unwrap();
-        assert_eq!(domain.notices().get(*notice).unwrap().kind, crate::notices::Kind::Refused(Limit::Objects));
+        let Page::Work { address, refused, .. } = domain.page() else {
+            panic!("a refused connector part keeps the Inbox page");
+        };
+        assert_eq!(*address, Address::Inbox { project: None });
+        assert_eq!(*refused, Some(Limit::Objects));
+        assert!(domain.notices().ids().iter().next().is_none(), "work-page refusals remain on their page");
     }
 }
