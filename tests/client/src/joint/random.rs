@@ -230,7 +230,7 @@ pub fn world(seed: u64) -> (Outcome, Reach) {
     match engine {
         EngineFault::Held => world.front().session.driver.release_commits(),
         EngineFault::Crash | EngineFault::Failed => {
-            world.fault(FrontFault::Restart { offline: Duration::from_millis(rng.between(120, 170)) })
+            world.fault(FrontFault::Restart { offline: Duration::from_millis(rng.between(120, 170)) });
         }
     }
     world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(2) }]);

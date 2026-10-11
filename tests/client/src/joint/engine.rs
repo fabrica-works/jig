@@ -54,6 +54,7 @@ impl Driver {
     }
 
     pub fn poll(&mut self, now: Time, wall: Wall) -> Vec<Packet> {
+        self.referee.check().expect("peer dropped a normal delivery acknowledgement");
         self.register_replies();
         if self.world.reached_cut.is_none() {
             self.world.fire_due(now, wall);
