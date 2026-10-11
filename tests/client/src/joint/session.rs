@@ -759,6 +759,14 @@ impl Session {
         }
         loop {
             let packets = self.driver.poll(now, wall);
+            if self.task_offers.is_some() {
+                eprintln!("joint diagnostic now={now:?} packets={packets:?}");
+                eprintln!(
+                    "joint diagnostic upstream={:?}",
+                    self.driver.world.peers.as_ref().map(|peers| &peers.upstream)
+                );
+                eprintln!("joint diagnostic trace={:?}", self.driver.world.trace);
+            }
             self.stopping()?;
             if self.driver.world.stopped {
                 break;
