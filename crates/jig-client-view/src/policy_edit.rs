@@ -40,7 +40,15 @@ impl PolicyFragment {
 /// Counts all checked labels, whole authority and escaped literal segment leaves.
 #[must_use]
 pub fn required(value: &PolicyEdit, words: &Words) -> Option<PolicyFragment> {
-    let mut result = PolicyFragment { nodes: 1, text_bytes: 0, text_per_node: 0, depth: 3 };
+    let phrase = match value {
+        PolicyEdit::ProjectSpend { .. } => JigPhrase::PolicyPeriodSpend,
+        PolicyEdit::Role(_) => JigPhrase::PolicyEditRole,
+        PolicyEdit::Requirements { .. } => JigPhrase::PolicyRequirements,
+        PolicyEdit::Projections { .. } => JigPhrase::PolicyProjections,
+        PolicyEdit::Permissions { .. } => JigPhrase::PolicyPermissions,
+    };
+    let name_bytes = words.book.capacity(phrase.id())?;
+    let mut result = PolicyFragment { nodes: 1, text_bytes: name_bytes, text_per_node: name_bytes, depth: 3 };
     match value {
         PolicyEdit::ProjectSpend { .. } => result.phrase(words, JigPhrase::PolicyPeriodSpend)?,
         PolicyEdit::Role(role) => {
@@ -114,6 +122,16 @@ fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
 /// Display one whole edit without inventing role names or parsing resource names.
 pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words) {
     b.open(Role::Region);
+    let name = match value {
+        PolicyEdit::ProjectSpend { period_spend } => {
+            words.say(JigPhrase::PolicyPeriodSpend, &[Hole::Amount(*period_spend)])
+        }
+        PolicyEdit::Role(role) => words.say(JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]),
+        PolicyEdit::Requirements { .. } => words.say(JigPhrase::PolicyRequirements, &[]),
+        PolicyEdit::Projections { .. } => words.say(JigPhrase::PolicyProjections, &[]),
+        PolicyEdit::Permissions { .. } => words.say(JigPhrase::PolicyPermissions, &[]),
+    };
+    b.name(&name);
     match value {
         PolicyEdit::ProjectSpend { period_spend } => {
             words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(*period_spend)]);

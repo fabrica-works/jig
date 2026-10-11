@@ -1100,6 +1100,9 @@ fn read_final_task(domain: &mut Domain, watch: Id<Watch>, task: u64, generation:
 }
 pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
     crate::signin::signed_out(domain, out);
+    if !domain.blocked {
+        domain.project_page.clear();
+    }
 }
 /// Fires at most one expired deadline, respecting watch terminal obligations.
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
