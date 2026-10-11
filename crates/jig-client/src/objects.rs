@@ -482,7 +482,17 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
             }
             Some(false)
         }
-        Delivery::Task(task) => Some(key == ObjectKey::Task(task.chip.task)),
+        Delivery::Task(task) => {
+            if key == ObjectKey::Task(task.chip.task) {
+                return Some(true);
+            }
+            for proposal in &task.proposals {
+                if key == ObjectKey::Proposal(*proposal) {
+                    return Some(true);
+                }
+            }
+            Some(false)
+        }
         Delivery::OwnerProposal(proposal) => Some(key == ObjectKey::Proposal(proposal.key)),
         Delivery::OwnerInbox(inbox) => {
             for entries in [&inbox.needs, &inbox.updates] {
