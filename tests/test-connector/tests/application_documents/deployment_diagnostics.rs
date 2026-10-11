@@ -60,6 +60,10 @@ fn deployment_source_keeps_every_outbox_phase_and_true_capacities_with_explicit_
             phase,
         };
         world.event(Event::Restore { record: connector::Record::Outbox(original.clone()) });
+        let mut restored = original;
+        if phase == EffectPhase::Sent {
+            restored.phase = EffectPhase::Uncertain;
+        }
         let records = world.records.clone();
         let commits = world.commits;
         for read in [false, true] {
@@ -74,7 +78,7 @@ fn deployment_source_keeps_every_outbox_phase_and_true_capacities_with_explicit_
             else {
                 panic!("Deployment remains whole")
             };
-            assert_eq!(outbox.as_slice(), std::slice::from_ref(&original));
+            assert_eq!(outbox.as_slice(), std::slice::from_ref(&restored));
             assert_eq!(outbox.capacity(), jig_test_connector_world::LIMITS.entries);
             assert_eq!(subject_limit, jig_test_connector_world::LIMITS.values);
             assert_eq!(staged_limit, jig_test_connector_world::LIMITS.staged);
