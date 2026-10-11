@@ -339,8 +339,8 @@ pub(super) mod tests {
         let account =
             tasks::Part { connector: u16::MAX, kind: tasks::PartKind::Hold, key: tasks::PartKey::Number(u64::MAX) };
         let mut path = List::with_capacity(2);
-        path.push(Box::from(&b"a/b"[..])).unwrap();
-        path.push(Box::from(&[255_u8, 0][..])).unwrap();
+        path.push(Box::from(&b"a/b"[..])).expect("first whole origin segment");
+        path.push(Box::from(&[255_u8, 0][..])).expect("second whole origin segment");
         for origin in [
             None,
             Some(tasks::Part { connector: 7, kind: tasks::PartKind::Resource, key: tasks::PartKey::Path(path) }),
@@ -366,13 +366,17 @@ pub(super) mod tests {
                         key: client::OwnerPartKey::Number(u64::MAX),
                     })
                 );
-                assert_eq!(native.source, origin.as_ref().map(|part| owner::part(part, &limits).unwrap()));
+                assert_eq!(
+                    native.source,
+                    origin.as_ref().map(|part| owner::part(part, &limits).expect("whole unchanged origin"))
+                );
                 assert_eq!(native.revision, 29);
                 assert_eq!(native.before, client::OwnerPriorPhase::Active(client::RunStage::Running { attempt: 31 }));
                 assert_eq!(native.hold_wait_since, Some(Wall::from_nanos(37)));
                 let mut chip = source_chip();
                 chip.details.hold = Some(source);
-                let metadata = details(&chip.details, &Limits { rows: 4, text: 4, ..limits }).unwrap();
+                let metadata =
+                    details(&chip.details, &Limits { rows: 4, text: 4, ..limits }).expect("whole chip details");
                 assert_eq!(metadata.hold, Some(native));
             }
         }

@@ -744,14 +744,14 @@ fn supplied_hold_account_and_origin_keep_distinct_public_slots_and_absence() {
             let mut value = details();
             value.hold = Some(held);
             let (tree, bindings, envelope) = build(&value, words());
-            let parts: Vec<_> = tree
+            let parts: Box<[_]> = tree
                 .nodes()
                 .iter()
                 .filter_map(|node| {
                     node.slot.map(|slot| bindings.owner_part(slot.token).expect("exact owner part").clone())
                 })
                 .collect();
-            let expected: Vec<_> = supplied.iter().chain(source.iter()).cloned().collect();
+            let expected: Box<[_]> = supplied.iter().chain(source.iter()).cloned().collect();
             assert_eq!(parts, expected);
             assert_eq!(contains(&tree, b"Hold account reference"), supplied.is_some());
             assert_eq!(contains(&tree, b"\\xFF\\x00"), source.is_some());
