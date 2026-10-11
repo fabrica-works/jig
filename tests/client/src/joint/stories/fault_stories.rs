@@ -227,3 +227,46 @@ fn a_reload_with_a_stop_pending_recovers_its_lost_committed_answer_by_the_origin
         .collect();
     assert_eq!(keys.len(), 1);
 }
+
+#[test]
+fn a_dropped_watch_and_slow_delivery_show_the_page_behind_before_the_held_chat_is_released() {
+    let (mut world, client) = stop_ready_in(super::bounded_world(
+        super::turn(),
+        |_| {},
+        |limits| {
+            limits.core.views.watchers = 12;
+        },
+    ));
+    let within = Duration::from_secs(1);
+    world.person(
+        client,
+        vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Held stopped"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert_eq!(answers(&mut world), 2);
+    world.fault(crate::FrontFault::DropWatch);
+    world.fault(crate::FrontFault::Slow { span: Duration::from_millis(40) });
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::text(b"Behind: waiting for current facts"), within },
+            Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Released"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    assert_eq!(outcome.faults, 2);
+    assert_eq!(answers(&mut world), 3);
+    let assignments = &world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen;
+    assert_eq!(assignments.len(), 2);
+    assert_eq!(assignments[0].task, assignments[1].task);
+    assert_ne!(assignments[0].attempt, assignments[1].attempt);
+}
