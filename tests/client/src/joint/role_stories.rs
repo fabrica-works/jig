@@ -321,7 +321,15 @@ fn two_parties_decide_one_proposal_and_the_second_is_told_who() {
             .count(),
         1
     );
-    assert_eq!(engine.peers.as_ref().expect("actual worker").workers[0].seen.len(), 2);
+    let assignments = &engine.peers.as_ref().expect("actual worker").workers[0].seen;
+    assert_eq!(assignments.len(), 3, "the proposing chat resumes after its one accepted goal");
+    let tasks: std::collections::BTreeSet<_> = assignments.iter().map(|row| row.task).collect();
+    assert_eq!(tasks.len(), 2, "only the proposing chat and its accepted goal");
+    let parent = assignments[0].task;
+    let parent_attempts: std::collections::BTreeSet<_> =
+        assignments.iter().filter(|row| row.task == parent).map(|row| row.attempt).collect();
+    assert_eq!(parent_attempts.len(), 2, "the original chat parks and then resumes");
+    assert_eq!(assignments.iter().filter(|row| row.task != parent).count(), 1, "one goal assignment");
 }
 
 #[test]
