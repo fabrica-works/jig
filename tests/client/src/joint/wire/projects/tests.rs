@@ -240,7 +240,7 @@ fn whole_project_keeps_all_resource_roles_members_raw_text_and_independent_sourc
     assert_eq!(actual.members.get(2).expect("person").kind, client::PartyKind::Person);
     assert_eq!(actual.members.get(4).expect("service").kind, client::PartyKind::Service);
     assert_eq!(actual.members.get(4).expect("party identity").party, u64::MAX);
-    for member in actual.members.iter() {
+    for member in &actual.members {
         assert_eq!(member.login.bytes(), &[255, 0]);
         assert!(member.login.cut);
         assert!(member.name.bytes().is_empty());
