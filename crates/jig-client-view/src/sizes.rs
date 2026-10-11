@@ -236,29 +236,7 @@ pub use pages::{
 /// Whole held-task escalation, including bounded input-result and person cards.
 #[must_use]
 pub fn owner_escalation_nodes(l: &Limits) -> Option<u32> {
-    // Each input key names only a Result; the executor adds at most one
-    // separately typed PersonTask, whose stored body may use either contract.
-    // The supplied task ending is charged below.
-    let person = person_task_nodes(l)?.max(
-        frame_of_card(l)?
-            .checked_add(crate::owner_person_task::max_nodes(l)?)?
-            .checked_add(crate::owner_person_task::controls_nodes(l)?)?,
-    );
-    let nested = result_nodes(l)?.checked_mul(l.rows)?.checked_add(person)?;
-    frame_of_card(l)?
-        .checked_add(chip_nodes(l)?)?
-        .checked_add(crate::owner_chip::max_nodes(l)?)?
-        .checked_add(l.rows.checked_add(20)?.checked_mul(l.rows)?)?
-        .checked_add(crate::task_result::nodes(l)?)?
-        .checked_add(crate::specification::nodes(l)?)?
-        .checked_add(crate::instructions::nodes(l)?)?
-        .checked_add(crate::proposed_task::contract_nodes(l)?)?
-        .checked_add(crate::owner_wake::policy_nodes())?
-        .checked_add(crate::owner_wake::subscription_nodes(l.rows)?)?
-        .checked_add(chip_nodes(l)?.checked_add(4)?.checked_mul(l.rows)?.checked_mul(3)?)?
-        .checked_add(nested)?
-        .checked_add(l.rows.checked_mul(36)?)?
-        .checked_add(crate::owner_authority::document_nodes(l.rows)?)?
-        .checked_add(crate::owner_budget::budget_nodes())?
-        .checked_add(28)
+    owner_escalation::nodes(l)
 }
+
+mod owner_escalation;

@@ -225,6 +225,198 @@ fn check_exact_storage(row: &OwnerEscalation, allocation: crate::Limits, tree: &
     }
 }
 
+fn presence_step(domain: &mut Domain, l: jig_client::Limits, event: Event) -> Vec<Request> {
+    let mut queue = skein_lib::Queue::with_capacity(jig_client::max_out(&l));
+    jig_client::step(
+        domain,
+        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: l },
+        event,
+        &mut queue,
+    );
+    let mut requests = Vec::new();
+    while let Some(request) = queue.pop() {
+        requests.push(request);
+    }
+    requests
+}
+
+fn presence_result(key: ProposalKey) -> Result {
+    let mut result = super::result();
+    result.task.task = 42;
+    result.task.details = Box::new(ChipPhase::Waiting { dependencies: list([70, 70]), hold: None });
+    result.value = Some(ResultValue::Verdict {
+        verdict: u32::MAX,
+        words: DocumentText::complete(text(b"repeated whole verdict")),
+        fields: list([
+            ResultField { name: Box::from(*b"a"), value: Box::from(*b"**whole field**") },
+            ResultField { name: Box::from(*b"b"), value: Box::from(*b"**whole field**") },
+        ]),
+        tasks: list([result.task.clone(), result.task.clone()]),
+        proposal: Some(key),
+    });
+    result.acts = closed_offers(true).acts;
+    result
+}
+
+fn presence_person(result: &Result, owner: bool) -> ReadValue {
+    let mut original = super::person(PersonContract::Words);
+    original.inputs = list([result.clone(), result.clone()]);
+    original.acts = closed_offers(true).acts;
+    if !owner {
+        return ReadValue::PersonTask(Box::new(original));
+    }
+    ReadValue::OwnerPersonTask(Box::new(OwnerPersonTask {
+        task: original.task,
+        revision: original.revision,
+        requester: OwnerRequester::Person(1),
+        spec: original.spec,
+        address: PersonAddress::Party(1),
+        taken_by: None,
+        since: original.since,
+        stall: original.stall,
+        deadline: original.deadline,
+        contract: TaskContractDocument::Report { words: 2 },
+        results: list((0..CLIENT.rows).map(|_| OwnerShownResult {
+            task: OwnerTaskLink::Retained { chip: result.task.clone(), at: None },
+            result: Some(Box::new(result.clone())),
+        })),
+        cut: true,
+        acts: original.acts,
+    }))
+}
+
+fn presence_domain(l: jig_client::Limits, documents: &[(ObjectKey, Option<ReadValue>)]) -> Domain {
+    let mut domain = Domain::new(&l, 1);
+    let mut requests = presence_step(
+        &mut domain,
+        l,
+        Event::Start {
+            address: jig_client::address::Address::Inbox { project: None },
+            kept: List::with_capacity(0),
+            offset: jig_client::boundary::Offset { minutes: 60 },
+        },
+    );
+    requests.extend(presence_step(&mut domain, l, Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
+    let frame = requests
+        .into_iter()
+        .find_map(|request| match request {
+            Request::Open { watch, subject: Subject::Frame } => Some(watch),
+            _ => None,
+        })
+        .unwrap();
+    presence_step(
+        &mut domain,
+        l,
+        Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
+    );
+    let requests =
+        presence_step(&mut domain, l, Event::ShowObjects { objects: list(documents.iter().map(|(key, _)| *key)) });
+    for request in requests {
+        if let Request::Read { read, what } = request {
+            let key = match what {
+                Read::Escalation { task } => ObjectKey::Escalation(task),
+                Read::Result { task } => ObjectKey::Result(task),
+                Read::PersonTask { task } => ObjectKey::PersonTask(task),
+                Read::Proposal { proposal } => ObjectKey::Proposal(proposal),
+                Read::Task { task } => ObjectKey::Task(task),
+                _ => panic!("only the exact named fixture objects are read"),
+            };
+            let value = documents.iter().find(|(named, _)| *named == key).unwrap().1.clone();
+            if let Some(value) = value {
+                presence_step(&mut domain, l, Event::Read { read, result: ReadResult::Value(value) });
+            }
+        }
+    }
+    assert_eq!(domain.objects().len(), l.objects);
+    domain
+}
+
+fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
+    let mut proposal = super::proposal(ProposalAction::Widen { before: super::authority(), after: super::authority() });
+    proposal.acts = closed_offers(true).acts;
+    let result = presence_result(proposal.key);
+    let mut row = closed_offers(true);
+    row.task.chip.executor = Executor::Party { party: 1 };
+    row.task.inputs = list((0..CLIENT.rows).map(|_| OwnerTaskLink::Retained { chip: result.task.clone(), at: None }));
+    row.task.dependencies = row.task.inputs.clone();
+    row.task.references = row.task.inputs.clone();
+    row.task.result = Some(TaskResult::Document(Box::new(result.clone())));
+    let ChipPhase::Owner { details, .. } = row.task.chip.details.as_mut() else { panic!("owned held metadata") };
+    details.ending = Some(OwnerChipEnding::Done(Box::new(result.value.clone().unwrap())));
+    let mut documents = vec![(ObjectKey::Escalation(8), Some(ReadValue::OwnerEscalation(Box::new(row.clone()))))];
+    for (yes, key, value) in [
+        (present[0], ObjectKey::Result(42), ReadValue::Result(Box::new(result))),
+        (present[1], ObjectKey::PersonTask(8), presence_person(&presence_result(proposal.key), owner)),
+        (present[2], ObjectKey::Proposal(proposal.key), ReadValue::Proposal(Box::new(proposal))),
+    ] {
+        if yes {
+            documents.push((key, loaded.then_some(value)));
+        }
+    }
+    if loaded {
+        for (number, dependency) in [(70, 71), (71, 70)] {
+            let mut task = task_doc(&[]);
+            task.chip.task = number;
+            task.chip.title = DocumentText::complete(text(b"reachable stored dependency"));
+            task.chip.details =
+                Box::new(ChipPhase::Waiting { dependencies: list([dependency, dependency]), hold: None });
+            documents.push((ObjectKey::Task(number), Some(ReadValue::Task(Box::new(task)))));
+        }
+    }
+    let l = jig_client::Limits { objects: u32::try_from(documents.len()).unwrap(), ..CLIENT };
+    let domain = presence_domain(l, &documents);
+    let id = domain.objects().find(ObjectKey::Escalation(8)).unwrap();
+    let bound = crate::owner_escalation_nodes(&l).unwrap().checked_add(1).unwrap();
+    let allocation = crate::Limits {
+        nodes: bound,
+        depth: 64,
+        text_bytes: bound.checked_mul(1024).unwrap(),
+        bindings: bound,
+        slots: bound,
+        ..limits()
+    };
+    let mut builder = Builder::new(&allocation);
+    let mut bindings = JigBindings::new(allocation.bindings, l.text);
+    builder.open(Role::Page);
+    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words(), &mut bindings));
+    builder.close();
+    let tree = builder.finish();
+    super::super::cards_access::check(&tree);
+    assert!(tree.len() <= bound);
+    assert!(
+        u32::try_from(tree.nodes().iter().filter(|node| node.binding.is_some()).count()).unwrap()
+            <= allocation.bindings
+    );
+    assert!(contains(&tree, b"whole task specification"));
+    assert!(contains(&tree, b"repeated whole verdict"));
+    assert_eq!(contains(&tree, b"reachable stored dependency"), loaded);
+    if loaded && present[2] {
+        assert!(
+            tree.nodes()
+                .iter()
+                .filter(|node| node.text.iter().any(|run| skein_lib::bytes::find(&run.text, b"whole reason").is_some()))
+                .count()
+                >= 4
+        );
+    }
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(jig_client::objects::Body::OwnerEscalation(Box::new(row))));
+}
+
+fn check_presence_envelopes() {
+    for result in [false, true] {
+        for person in [false, true] {
+            for proposal in [false, true] {
+                for loaded in [false, true] {
+                    check_presence_case([result, person, proposal], loaded, false);
+                    if person {
+                        check_presence_case([result, person, proposal], loaded, true);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and_refuse_one_under_storage() {
     let w = words();
@@ -306,4 +498,5 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         Some(jig_client::objects::Body::OwnerEscalation(Box::new(original)))
     );
     assert_eq!(crate::sizes::owner_escalation_nodes(&jig_client::Limits { rows: u32::MAX, ..CLIENT }), None);
+    check_presence_envelopes();
 }
