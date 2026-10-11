@@ -916,6 +916,7 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "jig-core-authority",
                 "jig-core-people",
                 "jig-core-fleet",
+                "jig-core-accounts",
                 "jig-core-tasks",
                 "jig-core-views",
                 "jig-core-notes",
