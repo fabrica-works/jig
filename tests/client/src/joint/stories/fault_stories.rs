@@ -57,3 +57,70 @@ fn a_draft_kept_across_a_reload_stays_unsent_on_the_actual_engine() {
     );
     assert!(owner.peers.as_ref().expect("actual worker").workers[0].messages.is_empty());
 }
+
+fn stop_ready() -> (World<Test, Joint>, crate::ClientId) {
+    let mut world = super::world(super::turn());
+    let client = world.client(1, crate::stories::conversation());
+    let within = Duration::from_secs(1);
+    let mut script = start();
+    script.extend([
+        Step::Press { find: Find::exactly_named(Role::Button, b"Stop") },
+        Step::See { find: Find::text(b"Stop the live run and hold its task"), within },
+    ]);
+    world.person(client, script);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    (world, client)
+}
+fn answers(world: &World<Test, Joint>) -> usize {
+    world
+        .front()
+        .session
+        .driver
+        .world
+        .store
+        .rows
+        .values()
+        .filter(|record| {
+            matches!(record, jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. })))
+        })
+        .count()
+}
+fn shown(world: &World<Test, Joint>, client: crate::ClientId, words: &[u8]) -> bool {
+    use jig_fake_person::{Face, Found, TreeFace};
+    matches!(TreeFace::new(world.tree(client)).find(&Find::text(words)), Found::Node(_))
+}
+
+#[test]
+fn a_held_actual_commit_keeps_the_stop_answer_pending_until_its_completion() {
+    let (mut world, client) = stop_ready();
+    let submitted = world.front().session.driver.world.store.applied.checked_add(1).expect("next transaction");
+    world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
+    world.person(
+        client,
+        vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::Pause { span: Duration::from_millis(30) },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    assert_eq!(
+        world.front().session.driver.world.reached_cut,
+        Some(jig_core_world::effects::Cut::Submitted(submitted))
+    );
+    assert_eq!(answers(&world), 1, "only starting the chat is answered durably");
+    assert!(!shown(&world, client, b"Held stopped"));
+    assert!(world.front().session.driver.withhold_completion().expect("actual store applied").is_none());
+    assert_eq!(answers(&world), 2, "the stop is durable while its completion is withheld");
+    assert!(!shown(&world, client, b"Held stopped"), "durability alone cannot fabricate a callback");
+    world.front().session.driver.release_commits();
+    world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    assert_eq!(answers(&world), 2);
+    assert!(world.front().session.driver.world.cancellations.iter().any(|(task, _)| *task == 1));
+}
