@@ -46,6 +46,10 @@ pub fn phrase_count() -> u32 {
         .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_deployment_words::ALL.len()).expect("deployment phrase count fits"))
         .expect("composed phrase count fits")
+        .checked_add(
+            u32::try_from(crate::owner_historical_words::ALL.len()).expect("historical object phrase count fits"),
+        )
+        .expect("composed phrase count fits")
 }
 
 #[must_use]
@@ -110,6 +114,9 @@ pub fn shapes(normal: Box<[PhraseShape]>) -> Box<[PhraseShape]> {
     }
     for shape in crate::owner_deployment_words::shapes() {
         result.push(shape).expect("deployment shapes fit");
+    }
+    for value in crate::owner_historical_words::shapes() {
+        result.push(value).expect("historical object words fit");
     }
     result.into_boxed()
 }
@@ -177,6 +184,9 @@ pub fn language(normal: Language) -> Language {
     for phrase in crate::owner_deployment_words::language().phrases {
         phrases.push(phrase).expect("deployment words fit");
     }
+    for value in crate::owner_historical_words::language().phrases {
+        phrases.push(value).expect("historical object words fit");
+    }
     Language { plural: normal.plural, span_unit: normal.span_unit, wall: normal.wall, phrases: phrases.into_boxed() }
 }
 
@@ -239,6 +249,9 @@ pub fn phrase_bytes(book: &Phrasebook) -> Option<u32> {
         largest = largest.max(book.capacity(phrase.id())?);
     }
     for phrase in crate::owner_deployment_words::ALL {
+        largest = largest.max(book.capacity(phrase.id())?);
+    }
+    for phrase in crate::owner_historical_words::ALL {
         largest = largest.max(book.capacity(phrase.id())?);
     }
     Some(largest)

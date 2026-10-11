@@ -156,6 +156,7 @@ pub(crate) fn read_result(
         ReadResult::Value(value) => match value {
             ReadValue::Task(document) => put(domain, env, key, Body::Task(document), out),
             ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out),
+            ReadValue::Historical(document) => put(domain, env, key, Body::Historical(document), out),
             ReadValue::OwnerProposal(document) => put(domain, env, key, Body::OwnerProposal(document), out),
             ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out),
             ReadValue::OwnerEscalation(document) => put(domain, env, key, Body::OwnerEscalation(document), out),
@@ -215,9 +216,12 @@ fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body
         Body::OwnerProposal(proposal) => Some(proposal.project),
         Body::OwnerPersonTask(person) => person.project(),
         Body::Note { project, .. } => Some(*project),
-        Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {
-            object_project(domain, key)
-        }
+        Body::Historical(_)
+        | Body::Chip(_)
+        | Body::Escalation(_)
+        | Body::Question(_)
+        | Body::PersonTask(_)
+        | Body::Result(_) => object_project(domain, key),
     };
     if domain.objects.put(key, body) {
         for part in parts.values.into_boxed() {

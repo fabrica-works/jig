@@ -102,6 +102,7 @@ pub fn state(b: &mut Builder, card: &Card, object: Id<Object>, words: &Words, bi
                 Left::Answered { outcome } => words.outcome(b, outcome),
                 Left::Ended { how } => words.ending(b, how),
                 Left::OwnerEnded { how } => crate::owner_chip::ending_summary(b, how, words),
+                Left::Historical { .. } => words.text(b, JigPhrase::Leaving, &[]),
                 Left::Unknown => words.text(b, JigPhrase::GoneUnknown, &[]),
             }
             b.close();
@@ -136,10 +137,14 @@ pub fn card(
     let Some(facts) = client.objects().get(object) else {
         return false;
     };
+    if crate::owner_historical::card(b, client, object, place, words, bindings) {
+        return true;
+    }
     if facts.reply.is_some() {
         return result::reply(b, client, object, place, words, bindings);
     }
     match &facts.body {
+        Some(jig_client::objects::Body::Historical(_)) => return false,
         Some(jig_client::objects::Body::OwnerProposal(_)) => {
             proposal::owner_proposal(b, client, object, place, words, bindings);
         }

@@ -98,7 +98,7 @@ fn attach(domain: &mut Domain, source: Source, line: ConversationLine) {
     }
     let id = domain.objects.find(key).expect("named chat exists");
     let chip_only = match &domain.objects.get(id).expect("named chat exists").body {
-        None | Some(Body::Chip(_)) => true,
+        None | Some(Body::Historical(_) | Body::Chip(_)) => true,
         Some(
             Body::Task(_)
             | Body::Proposal(_)

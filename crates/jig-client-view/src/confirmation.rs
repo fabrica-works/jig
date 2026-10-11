@@ -135,6 +135,7 @@ fn action(
                 }
                 Some(
                     Body::Task(_)
+                    | Body::Historical(_)
                     | Body::Chip(_)
                     | Body::Escalation(_)
                     | Body::OwnerEscalation(_)
@@ -181,6 +182,7 @@ fn action(
                 }
                 Some(
                     Body::Task(_)
+                    | Body::Historical(_)
                     | Body::Chip(_)
                     | Body::Proposal(_)
                     | Body::OwnerProposal(_)
@@ -305,7 +307,8 @@ fn held(object: &Object) -> bool {
         Some(Body::OwnerEscalation(doc)) => doc.task.hold.is_some(),
         Some(Body::Escalation(_)) => true,
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -331,7 +334,8 @@ fn release_object(b: &mut Builder, client: &Domain, object: &Object, words: &Wor
             None => {}
         },
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -379,7 +383,8 @@ fn impact(object: &Object) -> Option<&Impact> {
         Some(Body::Escalation(doc)) => Some(&doc.impact),
         Some(Body::OwnerEscalation(doc)) => Some(&doc.task.context.as_ref()?.impact),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -479,7 +484,8 @@ fn delegates(
     let doc = match &object.body {
         Some(Body::Task(doc)) => doc,
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)

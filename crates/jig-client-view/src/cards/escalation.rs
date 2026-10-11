@@ -25,7 +25,8 @@ pub fn escalation(
     let document = match &facts.body {
         Some(Body::Escalation(document)) => document,
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)

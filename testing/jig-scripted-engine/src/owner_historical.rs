@@ -73,6 +73,9 @@ impl Payload for OwnerHistoricalValue {
 }
 impl Payload for OwnerHistorical {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        if !self.matches(self.key) {
+            return None;
+        }
         self.value.heap(bounds)
     }
 }

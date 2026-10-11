@@ -7,7 +7,8 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Question> {
     match &object.body {
         Some(Body::Question(document)) => Some(document),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)

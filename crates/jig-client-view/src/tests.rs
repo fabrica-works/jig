@@ -57,3 +57,5 @@ mod historical_pages;
 mod offered;
 mod owner_deployment;
 mod owner_project;
+
+mod historical_objects;

@@ -44,6 +44,8 @@ pub enum Body {
     Chip(Chip),
     /// The full task document.
     Task(Box<Task>),
+    /// Whole historical owner facts for the original object identity.
+    Historical(Box<crate::contract::OwnerHistorical>),
     /// A proposal document.
     Proposal(Box<Proposal>),
     OwnerProposal(Box<crate::contract::OwnerProposal>),
@@ -76,6 +78,8 @@ pub enum Left {
     Ended { how: Ending },
     /// Its task owner supplies the complete ending independently of a result document.
     OwnerEnded { how: Box<crate::contract::OwnerChipEnding> },
+    /// Its whole historical terminal facts, independent of subsequent body refreshes.
+    Historical { facts: Box<crate::contract::OwnerHistorical> },
     /// Its terminal facts are no longer available.
     Unknown,
 }
@@ -182,7 +186,12 @@ impl Objects {
                         | Card::Refused { .. }
                         | Card::Unknown { .. }
                         | Card::Leaving {
-                            how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+                            how:
+                                Left::Answered { .. }
+                                | Left::Ended { .. }
+                                | Left::OwnerEnded { .. }
+                                | Left::Historical { .. }
+                                | Left::Unknown,
                             ..
                         } => {}
                     }
@@ -218,7 +227,7 @@ impl Objects {
     }
     /// Replaces only the facts, preserving one card and its source set.
     pub fn put(&mut self, key: ObjectKey, body: Body) -> bool {
-        if body.key() != key {
+        if body.key() != key || matches!(&body, Body::Historical(value) if !value.matches(key)) {
             return false;
         }
         let Some(id) = self.find(key) else {
@@ -231,12 +240,18 @@ impl Objects {
             Body::Proposal(proposal) => object.project = Some(proposal.project),
             Body::OwnerProposal(proposal) => object.project = Some(proposal.project),
             Body::OwnerPersonTask(task) => object.project = task.project(),
-            Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {}
+            Body::Historical(_)
+            | Body::Chip(_)
+            | Body::Escalation(_)
+            | Body::Question(_)
+            | Body::PersonTask(_)
+            | Body::Result(_) => {}
             Body::Note { project, .. } => object.project = Some(*project),
         }
         match body {
             Body::Chip(chip) => match &mut object.body {
                 Some(Body::Task(task)) => task.chip = chip,
+                Some(Body::Historical(_)) => {}
                 Some(
                     Body::Chip(_)
                     | Body::Proposal(_)
@@ -251,7 +266,8 @@ impl Objects {
                 )
                 | None => object.body = Some(Body::Chip(chip)),
             },
-            Body::Task(_)
+            Body::Historical(_)
+            | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
@@ -322,7 +338,12 @@ impl Objects {
                 | Card::Refused { .. }
                 | Card::Unknown { .. }
                 | Card::Leaving {
-                    how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+                    how:
+                        Left::Answered { .. }
+                        | Left::Ended { .. }
+                        | Left::OwnerEnded { .. }
+                        | Left::Historical { .. }
+                        | Left::Unknown,
                     ..
                 } => {}
             }
@@ -586,7 +607,11 @@ pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queu
         let looking = match &object.card {
             Card::Leaving { how, .. } => match how {
                 Left::Looking => true,
-                Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown => false,
+                Left::Answered { .. }
+                | Left::Ended { .. }
+                | Left::OwnerEnded { .. }
+                | Left::Historical { .. }
+                | Left::Unknown => false,
             },
             Card::Open | Card::Deciding { .. } | Card::Refused { .. } | Card::Unknown { .. } => false,
         };
@@ -646,7 +671,12 @@ pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
                 | Card::Refused { .. }
                 | Card::Unknown { .. }
                 | Card::Leaving {
-                    how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+                    how:
+                        Left::Answered { .. }
+                        | Left::Ended { .. }
+                        | Left::OwnerEnded { .. }
+                        | Left::Historical { .. }
+                        | Left::Unknown,
                     ..
                 } => false,
             }
@@ -661,6 +691,17 @@ pub(crate) fn read_card(
     out: &mut skein_lib::Queue<crate::Request>,
 ) {
     use crate::contract::{ReadNone, ReadResult};
+    if let ReadResult::Value(crate::contract::ReadValue::Historical(value)) = &result {
+        let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+            return;
+        };
+        let Some(key) = read_key(&read.what) else {
+            return;
+        };
+        if !value.matches(key) {
+            return;
+        }
+    }
     let Some(receipt) = domain.reads.terminal(token) else {
         return;
     };
@@ -688,7 +729,12 @@ pub(crate) fn read_card(
         Card::Open | Card::Refused { .. } | Card::Unknown { .. } | Card::Deciding { request: None, .. } => false,
         Card::Deciding { request: Some(_), .. }
         | Card::Leaving {
-            how: Left::Answered { .. } | Left::Ended { .. } | Left::OwnerEnded { .. } | Left::Unknown,
+            how:
+                Left::Answered { .. }
+                | Left::Ended { .. }
+                | Left::OwnerEnded { .. }
+                | Left::Historical { .. }
+                | Left::Unknown,
             ..
         } => return,
     };
@@ -733,6 +779,14 @@ pub(crate) fn read_card(
         domain.changed();
         return;
     }
+    if matches!(domain.objects.get(id).expect("terminal card exists").body.as_ref(),
+        Some(Body::Historical(value)) if !value.is_terminal())
+    {
+        domain.objects.get_mut(id).expect("terminal card exists").card = Card::Open;
+        domain.objects.prune();
+        domain.changed();
+        return;
+    }
     let how = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
         Some(body) => match body.terminal() {
             Some(ending) => ending,
@@ -748,6 +802,13 @@ pub(crate) fn read_card(
 fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> {
     use crate::contract::ReadValue;
     match value {
+        ReadValue::Historical(value) => {
+            if value.matches(key) {
+                Some(Body::Historical(value))
+            } else {
+                None
+            }
+        }
         ReadValue::Task(task) => Some(Body::Task(task)),
         ReadValue::Proposal(proposal) => Some(Body::Proposal(proposal)),
         ReadValue::OwnerProposal(proposal) => Some(Body::OwnerProposal(proposal)),
@@ -797,6 +858,7 @@ impl Body {
     #[must_use]
     pub fn key(&self) -> ObjectKey {
         match self {
+            Self::Historical(value) => value.key,
             Self::Chip(chip) => ObjectKey::Task(chip.task),
             Self::Task(task) => ObjectKey::Task(task.chip.task),
             Self::Proposal(proposal) => ObjectKey::Proposal(proposal.key),
@@ -819,6 +881,13 @@ impl Body {
                 Some(crate::contract::TaskResult::Document(result)) => Some(Left::Ended { how: result.ending.clone() }),
                 None => None,
             },
+            Self::Historical(value) => {
+                if value.is_terminal() {
+                    Some(Left::Historical { facts: value.clone() })
+                } else {
+                    None
+                }
+            }
             Self::OwnerEscalation(_) => None,
             Self::Chip(_)
             | Self::Proposal(_)
@@ -847,7 +916,8 @@ impl Body {
             Self::PersonTask(task) => task.ending.as_ref(),
             Self::Result(result) => Some(&result.ending),
             Self::Escalation(escalation) => escalation.ending.as_ref(),
-            Self::Chip(_)
+            Self::Historical(_)
+            | Self::Chip(_)
             | Self::OwnerProposal(_)
             | Self::OwnerPersonTask(_)
             | Self::OwnerEscalation(_)
@@ -915,7 +985,8 @@ pub(crate) fn apply_contexts(domain: &mut crate::Domain, rows: List<Context>) {
                 Some(Body::OwnerPersonTask(document)) => document.project(),
                 Some(Body::OwnerEscalation(document)) => Some(document.task.project),
                 Some(
-                    Body::Chip(_)
+                    Body::Historical(_)
+                    | Body::Chip(_)
                     | Body::Task(_)
                     | Body::Proposal(_)
                     | Body::OwnerProposal(_)

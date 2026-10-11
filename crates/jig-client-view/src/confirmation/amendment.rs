@@ -192,7 +192,8 @@ pub fn form(
         Some(Body::OwnerEscalation(doc)) => crate::proposed_task::funder(b, doc.task.budget.funder, words),
         Some(Body::Escalation(doc)) => words.actor(b, doc.steering.budget.funder),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -210,7 +211,8 @@ fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
         Some(Body::OwnerEscalation(doc)) => Some(&doc.task.authority),
         Some(Body::Escalation(doc)) => Some(&doc.steering.authority),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -233,6 +235,7 @@ fn task_loss(b: &mut Builder, object: &Object, words: &Words) {
         Some(Body::OwnerEscalation(doc)) if doc.task.cut => words.text(b, JigPhrase::TaskListsCut, &[]),
         Some(
             Body::Task(_)
+            | Body::Historical(_)
             | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
@@ -253,7 +256,8 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
         Some(Body::OwnerEscalation(doc)) => crate::instructions::before(b, doc.task.instructions.as_ref(), words),
         Some(Body::Escalation(doc)) => crate::instructions::before(b, doc.steering.instructions.as_ref(), words),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -269,7 +273,8 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
         Some(Body::OwnerEscalation(doc)) => Some(&doc.task.spec),
         Some(Body::Escalation(doc)) => Some(&doc.steering.spec),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -368,7 +373,8 @@ fn before(object: &Object) -> Option<Amendment> {
             authority: doc.steering.authority.whole(),
         },
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)

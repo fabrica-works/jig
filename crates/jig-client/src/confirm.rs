@@ -169,7 +169,8 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
             }
         }
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
@@ -303,7 +304,8 @@ fn answer_field(open: &Confirmation, object: &Object) -> Result<Option<Purpose>,
                 PersonContract::Approval { .. } => None,
             },
             Some(
-                Body::Chip(_)
+                Body::Historical(_)
+                | Body::Chip(_)
                 | Body::Task(_)
                 | Body::Proposal(_)
                 | Body::OwnerProposal(_)
@@ -322,7 +324,8 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
     };
     let task = match body {
         Body::Task(task) => task,
-        Body::Chip(_)
+        Body::Historical(_)
+        | Body::Chip(_)
         | Body::Proposal(_)
         | Body::OwnerProposal(_)
         | Body::Escalation(_)
@@ -382,7 +385,8 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
             | HoldReason::Procedure { .. } => false,
         }),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -414,7 +418,8 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
                 Some(Body::OwnerEscalation(document)) => &document.task.authority,
                 Some(Body::Escalation(document)) => &document.steering.authority,
                 Some(
-                    Body::Chip(_)
+                    Body::Historical(_)
+                    | Body::Chip(_)
                     | Body::Proposal(_)
                     | Body::OwnerProposal(_)
                     | Body::Question(_)

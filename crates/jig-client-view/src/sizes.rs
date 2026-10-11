@@ -181,6 +181,7 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
             .max(reply_nodes(limits)?)
             .max(escalation_nodes(limits)?)
             .max(owner_escalation_nodes(limits)?)
+            .max(frame_of_card(limits)?.checked_add(crate::owner_historical::max_nodes(limits)?)?)
             .max(refusal_nodes(limits)?)
             .max(
                 frame_of_card(limits)?

@@ -481,6 +481,9 @@ fn read_value(
         ReadValue::Notes(page) => crate::pages::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
+        ReadValue::Historical(value) => {
+            read_body(domain, value.key, Body::Historical(value));
+        }
         ReadValue::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::OwnerProposal(proposal));
@@ -655,6 +658,7 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
             ReadValue::Frame(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
+            | ReadValue::Historical(_)
             | ReadValue::OwnerProposal(_)
             | ReadValue::Escalation(_)
             | ReadValue::OwnerEscalation(_)
@@ -794,6 +798,7 @@ fn received_value(
         ReadValue::Frame(_)
         | ReadValue::Task(_)
         | ReadValue::Proposal(_)
+        | ReadValue::Historical(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::Escalation(_)
         | ReadValue::OwnerEscalation(_)
@@ -866,7 +871,8 @@ fn owner_tree_delivery(
     {
         match body {
             Body::Task(_) => put_root = false,
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
@@ -981,6 +987,7 @@ fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token
         ReadValue::Frame(_)
         | ReadValue::Task(_)
         | ReadValue::Proposal(_)
+        | ReadValue::Historical(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::Escalation(_)
         | ReadValue::OwnerEscalation(_)
@@ -1025,6 +1032,7 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
             ReadValue::Frame(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
+            | ReadValue::Historical(_)
             | ReadValue::OwnerProposal(_)
             | ReadValue::Escalation(_)
             | ReadValue::OwnerProject(_)

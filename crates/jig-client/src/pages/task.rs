@@ -379,7 +379,8 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
     let task = match &domain.objects.get(id).expect("named task exists").body {
         Some(Body::Task(task)) => task,
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)

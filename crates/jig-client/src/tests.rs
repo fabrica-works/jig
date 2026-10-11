@@ -65,3 +65,5 @@ mod task_context;
 mod historical_pages;
 mod owner_deployment;
 mod owner_project;
+
+mod historical_objects;

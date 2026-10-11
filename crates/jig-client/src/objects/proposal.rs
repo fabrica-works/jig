@@ -8,6 +8,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Proposal> {
         Some(Body::Proposal(document)) => Some(document),
         Some(
             Body::OwnerProposal(_)
+            | Body::Historical(_)
             | Body::Chip(_)
             | Body::Task(_)
             | Body::Escalation(_)
@@ -27,7 +28,8 @@ pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerProposal> {
     match &object.body {
         Some(Body::OwnerProposal(document)) => Some(document),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::Escalation(_)

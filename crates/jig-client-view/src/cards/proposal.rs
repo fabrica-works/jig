@@ -151,7 +151,8 @@ pub fn owner_proposal(
     let document = match &facts.body {
         Some(jig_client::objects::Body::OwnerProposal(document)) => document,
         Some(
-            jig_client::objects::Body::Chip(_)
+            jig_client::objects::Body::Historical(_)
+            | Body::Chip(_)
             | jig_client::objects::Body::Task(_)
             | jig_client::objects::Body::Proposal(_)
             | jig_client::objects::Body::Escalation(_)

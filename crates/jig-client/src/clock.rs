@@ -38,7 +38,7 @@ fn showing(domain: &Domain) -> bool {
                     | Body::Result(_)
                     | Body::Note { .. },
                 ) => return true,
-                Some(Body::Chip(_)) | None => {}
+                Some(Body::Historical(_) | Body::Chip(_)) | None => {}
             }
         }
     }

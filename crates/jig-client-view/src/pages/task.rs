@@ -37,7 +37,8 @@ pub fn task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     let doc = match &object.body {
         Some(Body::Task(doc)) => doc,
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)

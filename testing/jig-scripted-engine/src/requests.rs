@@ -121,6 +121,7 @@ impl<A: crate::Application> Engine<A> {
                         ReadValue::Frame(_)
                         | ReadValue::Task(_)
                         | ReadValue::Proposal(_)
+                        | ReadValue::Historical(_)
                         | ReadValue::OwnerProposal(_)
                         | ReadValue::Escalation(_)
                         | ReadValue::OwnerEscalation(_)
@@ -158,6 +159,7 @@ impl<A: crate::Application> Engine<A> {
                                     }
                                     ReadValue::Frame(_)
                                     | ReadValue::Proposal(_)
+                                    | ReadValue::Historical(_)
                                     | ReadValue::OwnerProposal(_)
                                     | ReadValue::Question(_)
                                     | ReadValue::PersonTask(_)
@@ -205,7 +207,8 @@ impl<A: crate::Application> Engine<A> {
             let waiting = match value {
                 ReadValue::Proposal(value) => Some(&value.waiting),
                 ReadValue::Escalation(value) => Some(&value.waiting),
-                ReadValue::OwnerProposal(_)
+                ReadValue::Historical(_)
+                | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Task(_)
@@ -412,7 +415,8 @@ impl<A: crate::Application> Engine<A> {
                     v.chip.phase = Phase::Due;
                     *v.chip.details = ChipPhase::Starting;
                 }
-                ReadValue::OwnerProposal(_)
+                ReadValue::Historical(_)
+                | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Question(_)
@@ -468,6 +472,7 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
     match value {
         ReadValue::Task(v) => Some(&v.acts),
         ReadValue::Proposal(v) => Some(&v.acts),
+        ReadValue::Historical(_) => None,
         ReadValue::OwnerProposal(v) => Some(&v.acts),
         ReadValue::Escalation(v) => Some(&v.acts),
         ReadValue::OwnerEscalation(v) => Some(&v.acts),
@@ -511,6 +516,7 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         ReadValue::PersonTask(v) => v.ending.clone(),
         ReadValue::Result(v) => Some(v.ending.clone()),
         ReadValue::OwnerPersonTask(_)
+        | ReadValue::Historical(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::OwnerEscalation(_)
         | ReadValue::Frame(_)

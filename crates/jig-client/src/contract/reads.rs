@@ -153,6 +153,8 @@ pub struct NotePage {
 pub enum ReadValue {
     /// Whole authentic project owner document.
     OwnerProject(Box<super::OwnerProject>),
+    /// Whole historical facts for one existing object query.
+    Historical(Box<super::OwnerHistorical>),
     /// The frame.
     Frame(Box<Frame>),
     /// A task.

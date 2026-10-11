@@ -196,7 +196,8 @@ impl Domain {
                     match &object.body {
                         Some(crate::objects::Body::Task(task)) => summary.project = Some(task.project),
                         Some(
-                            crate::objects::Body::Chip(_)
+                            crate::objects::Body::Historical(_)
+                            | Body::Chip(_)
                             | crate::objects::Body::Proposal(_)
                             | crate::objects::Body::OwnerProposal(_)
                             | crate::objects::Body::Escalation(_)
@@ -625,7 +626,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::ShowObjects { objects } => crate::application::show(domain, env, objects, out),
         Event::ObjectsLeft => crate::application::left(domain, out),
         Event::Read { read, result } => {
-            if crate::objects::is_card_read(domain, read) {
+            if matches!(&result, crate::contract::ReadResult::Value(crate::contract::ReadValue::Historical(_)))
+                || crate::objects::is_card_read(domain, read)
+            {
                 crate::objects::read_card(domain, read, result, out);
             } else {
                 crate::pages::routing::read_result(domain, env, read, result, out);

@@ -606,6 +606,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 ReadValue::Task(t) => t.result.is_some(),
                 ReadValue::Result(_) => true,
                 ReadValue::OwnerPersonTask(_)
+                | ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
                 | ReadValue::Frame(_)
@@ -634,6 +635,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 ReadValue::Task(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Proposal(_)
+                | ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::Escalation(_)
                 | ReadValue::OwnerEscalation(_)

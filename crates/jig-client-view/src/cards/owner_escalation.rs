@@ -26,7 +26,8 @@ pub fn card(
     let document = match &facts.body {
         Some(Body::OwnerEscalation(document)) => document,
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)

@@ -126,6 +126,7 @@ pub(super) fn reread(domain: &mut Domain, body: Body, what: Read) {
         | Body::OwnerProposal(_)
         | Body::Question(_)
         | Body::Result(_)
+        | Body::Historical(_)
         | Body::Chip(_)
         | Body::Note { .. } => unreachable!(),
     };

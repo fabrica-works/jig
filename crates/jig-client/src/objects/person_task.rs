@@ -9,6 +9,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::PersonTask> {
         Some(Body::PersonTask(document)) => Some(document),
         Some(
             Body::OwnerPersonTask(_)
+            | Body::Historical(_)
             | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
@@ -40,6 +41,7 @@ pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerPersonTask>
         Some(
             Body::PersonTask(_)
             | Body::OwnerEscalation(_)
+            | Body::Historical(_)
             | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)

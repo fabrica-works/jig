@@ -27,7 +27,7 @@ pub fn offered(object: &Object, act: ActKind) -> Admission {
         Some(Body::OwnerPersonTask(document)) => &document.acts,
         Some(Body::Result(document)) => &document.acts,
         Some(Body::Note { document, .. }) => &document.acts,
-        Some(Body::Chip(_)) | None => return Admission::Refused(Refusal::NotOffered),
+        Some(Body::Historical(_) | Body::Chip(_)) | None => return Admission::Refused(Refusal::NotOffered),
     };
     admission(rows, act)
 }
@@ -48,7 +48,8 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
             Some(Body::OwnerEscalation(document)) => Some(document.task.hold.as_ref()?.revision()),
             Some(Body::Task(document)) => Some(document.hold.as_ref()?.revision()),
             Some(
-                Body::Chip(_)
+                Body::Historical(_)
+                | Body::Chip(_)
                 | Body::Proposal(_)
                 | Body::OwnerProposal(_)
                 | Body::Question(_)
@@ -64,7 +65,8 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
             Some(Body::Escalation(document)) => Some(document.steering.revision),
             Some(Body::OwnerEscalation(document)) => Some(document.task.spec_revision),
             Some(
-                Body::Chip(_)
+                Body::Historical(_)
+                | Body::Chip(_)
                 | Body::Proposal(_)
                 | Body::OwnerProposal(_)
                 | Body::Question(_)
@@ -79,7 +81,8 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
             Some(Body::PersonTask(document)) => Some(document.revision),
             Some(Body::OwnerPersonTask(document)) => Some(document.revision),
             Some(
-                Body::Chip(_)
+                Body::Historical(_)
+                | Body::Chip(_)
                 | Body::Task(_)
                 | Body::Proposal(_)
                 | Body::OwnerProposal(_)
@@ -94,7 +97,8 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
         ActKind::EditNote | ActKind::DeleteNote => match &object.body {
             Some(Body::Note { document, .. }) => Some(document.revision),
             Some(
-                Body::Chip(_)
+                Body::Historical(_)
+                | Body::Chip(_)
                 | Body::Task(_)
                 | Body::Proposal(_)
                 | Body::OwnerProposal(_)
@@ -139,7 +143,8 @@ pub fn hold_revision(object: &Object) -> Option<Revision> {
         Some(Body::Escalation(document)) => Some(document.hold.revision),
         Some(Body::OwnerEscalation(document)) => Some(document.task.hold.as_ref()?.revision()),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Question(_)
@@ -159,7 +164,8 @@ fn request_project(object: &Object) -> Option<u32> {
         Some(Body::OwnerPersonTask(document)) => document.project(),
         Some(Body::OwnerEscalation(document)) => Some(document.task.project),
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
@@ -371,7 +377,8 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
             Some(Ask::AnswerPerson { project, task, revision: confirmation.revision?, answer })
         }
         Some(
-            Body::Chip(_)
+            Body::Historical(_)
+            | Body::Chip(_)
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
