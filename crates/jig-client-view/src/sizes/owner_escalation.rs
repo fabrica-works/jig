@@ -4,7 +4,7 @@
 use super::{Limits, chip_nodes, frame_of_card, markdown};
 
 fn value(l: &Limits, proposals: u32) -> Option<u32> {
-    // Kept legacy proposals appear in Conversation, never with Inbox lineage.
+    // Kept original proposals appear in Conversation, never with Inbox lineage.
     let proposal = if proposals == 0 {
         0
     } else {
