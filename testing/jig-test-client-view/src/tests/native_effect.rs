@@ -127,7 +127,8 @@ fn a_native_effect_slot_reads_its_separate_scoped_description_and_releases_it_on
         })
         .unwrap();
     patches(&mut view, &root);
-    for text in [b"Effect description".as_slice(), b"Kind: 5", b"Purpose: 19", b"literal/slash", b"\\xFF\\x00"] {
+    named(&view, Role::Region, b"Effect description");
+    for text in [b"Effect kind: 5".as_slice(), b"Effect purpose: 19", b"literal/slash", b"\\xFF\\x00"] {
         assert!(contains(&view, text), "missing {}", String::from_utf8_lossy(text));
     }
     assert!(view.tree().nodes().iter().any(|node| node.key == Some(crate::family_key(&subject))));
@@ -149,7 +150,7 @@ fn a_native_effect_slot_reads_its_separate_scoped_description_and_releases_it_on
         _ => false,
     }));
     patches(&mut view, &root);
-    assert!(!contains(&view, b"Effect description"));
+    assert!(view.tree().nodes().iter().all(|node| node.name.as_deref() != Some(b"Effect description".as_slice())));
     assert!(root.first().find(subject).is_none());
 }
 
@@ -172,7 +173,7 @@ fn a_path_keyed_native_effect_keeps_whole_proposal_facts_without_inventing_a_rea
     patches(&mut view, &root);
     assert!(contains(&view, b"number/17"));
     assert!(contains(&view, b"\\xFF\\x00"));
-    assert!(!contains(&view, b"Effect description"));
+    assert!(view.tree().nodes().iter().all(|node| node.name.as_deref() != Some(b"Effect description".as_slice())));
     assert!(view.tree().nodes().iter().any(|node| node.name.as_deref() == Some(b"Cannot show this part".as_slice())));
     let retained =
         root.jig().objects().get(root.jig().objects().find(ObjectKey::Proposal(original.key)).unwrap()).unwrap();
