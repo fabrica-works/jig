@@ -586,20 +586,25 @@ mod tests {
             assert_eq!(front.watch_token(ClientId(0), native), Some(jig));
             let replacement = front.open(ClientId(0), native, family.clone());
             assert_ne!(replacement, application);
-            assert_eq!(front.end_watch(application).unwrap().subject, family);
+            assert_eq!(
+                front.end_watch(application).expect("closed application watch has its original route").subject,
+                family
+            );
             assert_eq!(front.application_watch_token(ClientId(0), native), Some(replacement));
-            assert!(matches!(front.continued(ClientId(0), native, run).unwrap(),
-                Some(Event::StreamDelivered { watcher }) if watcher == jig));
+            assert!(
+                matches!(front.continued(ClientId(0), native, run).expect("the Jig run watch retains its supplied subject"),
+                Some(Event::StreamDelivered { watcher }) if watcher == jig)
+            );
             assert!(matches!(front.taken(ClientId(0), native),
                 Some(Event::Delivered { watcher }) if watcher == jig));
             assert!(front.taken(ClientId(0), native).is_none());
             assert!(matches!(front.application_taken(ClientId(1), native),
                 Some(Event::Delivered { watcher }) if watcher == sibling));
             assert!(front.delivered(replacement, Pace::Document));
-            front.end_watch(jig).unwrap();
+            front.end_watch(jig).expect("the Jig watch is independent of its application sibling");
             assert!(matches!(front.application_taken(ClientId(0), native),
                 Some(Event::Delivered { watcher }) if watcher == replacement));
-            assert_eq!(front.watch(sibling).unwrap().subject, family);
+            assert_eq!(front.watch(sibling).expect("the other tab retains its original route").subject, family);
         }
     }
 }
