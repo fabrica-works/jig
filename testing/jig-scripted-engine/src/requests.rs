@@ -476,9 +476,9 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         ReadValue::Escalation(v) => v.ending.clone(),
         ReadValue::Question(v) => v.ending.clone(),
         ReadValue::PersonTask(v) => v.ending.clone(),
-        ReadValue::OwnerPersonTask(_) => None,
         ReadValue::Result(v) => Some(v.ending.clone()),
-        ReadValue::OwnerProposal(_)
+        ReadValue::OwnerPersonTask(_)
+        | ReadValue::OwnerProposal(_)
         | ReadValue::Frame(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
