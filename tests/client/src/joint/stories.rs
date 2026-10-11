@@ -43,6 +43,10 @@ fn turn() -> Box<[u8]> {
 }
 
 fn world(body: Box<[u8]>) -> World<Test, Joint> {
+    configured_world(body, |_| {})
+}
+
+fn configured_world(body: Box<[u8]>, configure: fn(&mut Joint)) -> World<Test, Joint> {
     let mut owner = jig_core_world::world::limits();
     owner.core.documents.rows = 2;
     owner.core.documents.lines = 2;
@@ -81,6 +85,7 @@ fn world(body: Box<[u8]>) -> World<Test, Joint> {
     front.unsigned_on_bind();
     front.session.stream_heartbeat(Duration::from_millis(50));
     front.session.capture_task_offers();
+    configure(&mut front);
     World::new(Settings { seed: 8510, ..Settings::default() }, front)
 }
 
