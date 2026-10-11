@@ -641,6 +641,7 @@ pub(super) fn route_period(
     if period > 0 && period >= core.settings.period && allowed {
         if period != core.settings.period {
             core.touch_frames();
+            core.touch_project_periods();
         }
         core.settings.period = period;
         core.settings.period_budget = budget;
