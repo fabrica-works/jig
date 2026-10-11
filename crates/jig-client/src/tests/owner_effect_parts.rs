@@ -135,7 +135,7 @@ fn application_native_effect_parts_preserve_raw_numbers_scope_whole_facts_and_th
 }
 
 #[test]
-fn native_effect_registration_refuses_other_kinds_and_paths_and_preserves_the_separate_legacy_effect_key() {
+fn native_effect_registration_refuses_other_kinds_and_paths_and_preserves_the_separate_maker_effect_key() {
     let mut invalid = List::with_capacity(7);
     invalid.push(OwnerPart { key: OwnerPartKey::Path(List::with_capacity(0)), ..native(99) }).unwrap();
     for kind in [
@@ -162,8 +162,8 @@ fn native_effect_registration_refuses_other_kinds_and_paths_and_preserves_the_se
     }
     let (mut domain, _) = objects::live();
     let mut value = objects::proposal();
-    let legacy = Part::Effect { connector: 2, proposal: ProposalKey { proposer: Proposer::Party(99), number: 17 } };
-    value.action = ProposalAction::Effect { part: legacy.clone() };
+    let maker_part = Part::Effect { connector: 2, proposal: ProposalKey { proposer: Proposer::Party(99), number: 17 } };
+    value.action = ProposalAction::Effect { part: maker_part.clone() };
     let (read, _) = shown(&mut domain, value.key);
     let output = drive(
         &mut domain,
@@ -172,7 +172,7 @@ fn native_effect_registration_refuses_other_kinds_and_paths_and_preserves_the_se
     );
     assert_eq!(
         parts(&output).as_ref(),
-        &[Request::ShowPart { part: legacy, generation: 1, scope: PartScope::Project(1) }]
+        &[Request::ShowPart { part: maker_part, generation: 1, scope: PartScope::Project(1) }]
     );
     let object = domain.objects().get(domain.objects().find(ObjectKey::Proposal(value.key)).unwrap()).unwrap();
     assert_eq!(object.body, Some(Body::Proposal(Box::new(value))));
