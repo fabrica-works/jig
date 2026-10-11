@@ -92,7 +92,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
             Step::Go {
                 address: jig_test_client_domain::Address::Jig(jig_client::address::Address::Task {
                     task,
-                    tab: jig_client::address::TaskTab::Overview,
+                    section: jig_client::address::TaskSection::Overview,
                 }),
             },
             Step::See { find: Find::text(b"Procedure panel"), within },
