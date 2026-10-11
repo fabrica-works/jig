@@ -1,3 +1,4 @@
+#![expect(clippy::wildcard_enum_match_arm, reason = "ordinary story fixtures reject every unexpected public result")]
 //! Genuine engine acts feed the root; the person's corrections use the view
 //! (domain/engine.md, 15; client/domain/testing.md, 5).
 use super::*;
@@ -120,6 +121,7 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "one ordered engine/person escalation story retains its assertions together")]
 fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
     use jig_core_tasks as tasks;
     use jig_test_domain as root;

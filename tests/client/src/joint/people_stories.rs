@@ -188,6 +188,7 @@ fn a_request_sent_twice_is_made_once_across_an_engine_restart() {
 
 #[test]
 fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
+    use jig_fake_person::{Face, Found, TreeFace};
     let mut world = super::configured_world(super::turn(), |front| {
         front.session.sources_at(vec![(
             Time::from_nanos(650_000_000),
@@ -221,7 +222,6 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
-    use jig_fake_person::{Face, Found, TreeFace};
     let mut face = TreeFace::new(world.tree(client));
     let confirm = match face.find(&Find::exactly_named(Role::Button, b"Confirm")) {
         Found::Node(id) => id,

@@ -61,7 +61,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
                 outcome: people::Outcome::GoalProposed { proposal },
                 ..
             })) => Some(*proposal),
-            _ => None,
+            jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
         })
         .collect();
     assert_eq!(answers.len(), 1);
