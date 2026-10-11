@@ -157,6 +157,7 @@ fn words(fields: &Fields, purpose: Purpose) -> Option<Text> {
 fn request_project(object: &Object) -> Option<u32> {
     match &object.body {
         Some(Body::OwnerPersonTask(document)) => document.project(),
+        Some(Body::OwnerEscalation(document)) => Some(document.task.project),
         Some(
             Body::Chip(_)
             | Body::Task(_)

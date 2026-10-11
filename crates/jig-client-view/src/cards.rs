@@ -181,7 +181,7 @@ pub fn card(
             }
         }
         Some(jig_client::objects::Body::OwnerEscalation(_)) => {
-            owner_escalation::card(b, client, object, place, words, bindings);
+            return owner_escalation::card(b, client, object, place, words, bindings);
         }
         Some(jig_client::objects::Body::Escalation(_)) => {
             escalation::escalation(b, client, object, place, words, bindings);

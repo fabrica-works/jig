@@ -902,6 +902,7 @@ pub(crate) fn apply_contexts(domain: &mut crate::Domain, rows: List<Context>) {
             let object = domain.objects.get_mut(id).expect("indexed object exists");
             object.project = match &object.body {
                 Some(Body::OwnerPersonTask(document)) => document.project(),
+                Some(Body::OwnerEscalation(document)) => Some(document.task.project),
                 Some(
                     Body::Chip(_)
                     | Body::Task(_)
