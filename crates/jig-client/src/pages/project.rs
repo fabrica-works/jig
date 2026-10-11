@@ -123,6 +123,8 @@ impl ProjectPage {
         self.spend_after = None;
         self.form.confirmation = None;
         self.settings.review = None;
+        self.settings.service_role = None;
+        self.settings.pool_period = None;
         self.settings.before = None;
         self.settings.refused = None;
     }

@@ -1194,6 +1194,7 @@ fn confirm_act(domain: &mut Domain, out: &mut Queue<Request>) {
 fn dismiss_act(domain: &mut Domain) {
     if domain.project_page.settings.review.take().is_some() {
         domain.project_page.settings.before = None;
+        domain.project_page.settings.pool_period = None;
         domain.changed();
         return;
     }
