@@ -58,6 +58,7 @@ pub struct Session {
     stopped_seen: bool,
     lifecycle: Vec<Observed>,
     task_offers: Option<BTreeMap<(ClientId, u64), TaskOffers>>,
+    card_offers: Option<super::offered_packets::Captured>,
     stream_heartbeat: Option<Duration>,
     stream_due: BTreeMap<ClientId, Time>,
 }
@@ -85,6 +86,7 @@ impl Session {
             stopped_seen: false,
             lifecycle: Vec::new(),
             task_offers: None,
+            card_offers: None,
             stream_heartbeat: None,
             stream_due: BTreeMap::new(),
         }
@@ -94,6 +96,7 @@ impl Session {
     /// worlds keep this off and allocate no copies of the offered lists.
     pub fn capture_task_offers(&mut self) {
         self.task_offers = Some(BTreeMap::new());
+        self.card_offers = Some(BTreeMap::new());
     }
 
     /// Supply the protocol stream's comment interval (protocol/client.md, 4).
@@ -108,6 +111,12 @@ impl Session {
     #[must_use]
     pub fn task_offers(&self, client: ClientId, task: u64) -> Option<&TaskOffers> {
         self.task_offers.as_ref()?.get(&(client, task))
+    }
+
+    /// Original engine and receiving offered lists for an admitted card read.
+    #[must_use]
+    pub fn card_offers(&self, client: ClientId, key: client::ObjectKey) -> Option<&super::offered_packets::CardOffers> {
+        self.card_offers.as_ref()?.get(&(client, key))
     }
 
     /// Start with an externally supplied identity and genuine configured Hello.
@@ -514,6 +523,7 @@ impl Session {
         } else {
             let value =
                 read_packets::read(&mut self.driver.transport, to, answer, &self.limits.jig).map_err(Invalid::Read)?;
+            super::offered_packets::read(&mut self.card_offers, answer, &value);
             self.incoming(value, now, wall)?;
         }
         Ok(())
