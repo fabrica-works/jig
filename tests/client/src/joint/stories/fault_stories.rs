@@ -73,7 +73,7 @@ fn stop_ready() -> (World<Test, Joint>, crate::ClientId) {
     assert!(outcome.judged.0 > 0);
     (world, client)
 }
-fn answers(world: &World<Test, Joint>) -> usize {
+fn answers(world: &mut World<Test, Joint>) -> usize {
     world
         .front()
         .session
@@ -111,16 +111,16 @@ fn a_held_actual_commit_keeps_the_stop_answer_pending_until_its_completion() {
         world.front().session.driver.world.reached_cut,
         Some(jig_core_world::effects::Cut::Submitted(submitted))
     );
-    assert_eq!(answers(&world), 1, "only starting the chat is answered durably");
+    assert_eq!(answers(&mut world), 1, "only starting the chat is answered durably");
     assert!(!shown(&world, client, b"Held stopped"));
     assert!(world.front().session.driver.withhold_completion().expect("actual store applied").is_none());
-    assert_eq!(answers(&world), 2, "the stop is durable while its completion is withheld");
+    assert_eq!(answers(&mut world), 2, "the stop is durable while its completion is withheld");
     assert!(!shown(&world, client, b"Held stopped"), "durability alone cannot fabricate a callback");
     world.front().session.driver.release_commits();
     world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert!(outcome.judged.0 > 0);
-    assert_eq!(answers(&world), 2);
+    assert_eq!(answers(&mut world), 2);
     assert!(world.front().session.driver.world.cancellations.iter().any(|(task, _)| *task == 1));
 }
