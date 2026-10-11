@@ -990,7 +990,7 @@ mod tests {
             ),
             Err(Invalid::Application(wire::family::Invalid::Identity))
         ));
-        assert!(transport.taken(ClientId(0), native).is_none());
+        assert!(transport.application_taken(ClientId(0), native).is_none());
         let Incoming::Callback {
             client: ClientId(0),
             event:
@@ -1013,10 +1013,10 @@ mod tests {
         assert_eq!(value.subject, subject);
         assert_eq!(*value.value, jig_test_connector::ClientDocument::Result { task: u64::MAX, code: u16::MAX });
         assert!(
-            matches!(transport.taken(ClientId(0), native), Some(jig_core::Event::Delivered { watcher: actual }) if actual == watcher)
+            matches!(transport.application_taken(ClientId(0), native), Some(jig_core::Event::Delivered { watcher: actual }) if actual == watcher)
         );
-        assert!(transport.taken(ClientId(0), native).is_none());
-        assert!(transport.taken(ClientId(1), native).is_none());
+        assert!(transport.application_taken(ClientId(0), native).is_none());
+        assert!(transport.application_taken(ClientId(1), native).is_none());
         assert!(transport.watch(other).is_some());
     }
     #[test]
@@ -1098,7 +1098,7 @@ mod tests {
             assert_eq!(end, expected);
             assert!(transport.watch(original).is_none());
             assert!(transport.watch(other).is_some());
-            assert!(transport.taken(ClientId(0), native).is_none());
+            assert!(transport.application_taken(ClientId(0), native).is_none());
         }
     }
 }

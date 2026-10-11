@@ -107,7 +107,7 @@ pub fn send(
                 }
             }
             first::Out::Close { watch } => {
-                let Some(watcher) = driver.transport.watch_token(client, *watch) else { return Ok(()) };
+                let Some(watcher) = driver.transport.application_watch_token(client, *watch) else { return Ok(()) };
                 let terminals = driver.transport.close_watch(watcher);
                 driver.send(now, wall, root::Event::Core(core::Event::Unwatch { watcher }));
                 for event in terminals {

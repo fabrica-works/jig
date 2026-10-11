@@ -40,6 +40,20 @@ pub enum Watched {
     Application { subject: family::Subject, scope: ApplicationScope },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WatchOwner {
+    Jig,
+    Application,
+}
+impl Watched {
+    fn owner(&self) -> WatchOwner {
+        match self {
+            Self::Jig(_) => WatchOwner::Jig,
+            Self::Application { .. } => WatchOwner::Application,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Watch {
     pub client: ClientId,
@@ -187,19 +201,33 @@ impl Transport {
 
     pub fn open(&mut self, client: ClientId, native: Token, subject: Watched) -> Token {
         assert!(
-            self.watch_token(client, native).is_none(),
-            "one live native watch per tab: client={client:?}, native={native:?}, new={subject:?}, existing={:?}",
-            self.watches
+            self.owner_watch_token(client, native, subject.owner()).is_none(),
+            "one live native watch per child and tab"
         );
         let token = self.token();
         assert!(self.watches.insert(token, Watch { client, native, subject }).is_none(), "fresh watch token");
         token
     }
 
+    /// The jig child's opaque native watch name.
     #[must_use]
     pub fn watch_token(&self, client: ClientId, native: Token) -> Option<Token> {
+        self.owner_watch_token(client, native, WatchOwner::Jig)
+    }
+
+    /// The application's child has an independent native-token namespace.
+    #[must_use]
+    pub fn application_watch_token(&self, client: ClientId, native: Token) -> Option<Token> {
+        self.owner_watch_token(client, native, WatchOwner::Application)
+    }
+
+    fn owner_watch_token(&self, client: ClientId, native: Token, owner: WatchOwner) -> Option<Token> {
         self.watches.iter().find_map(|(token, watch)| {
-            if watch.client == client && watch.native == native && !self.closing.contains(token) {
+            if watch.client == client
+                && watch.native == native
+                && watch.subject.owner() == owner
+                && !self.closing.contains(token)
+            {
                 Some(*token)
             } else {
                 None
@@ -263,7 +291,16 @@ impl Transport {
 
     /// The shell took a normal document. This never acknowledges provisional text.
     pub fn taken(&mut self, client: ClientId, native: Token) -> Option<Event> {
-        let watcher = self.watch_token(client, native)?;
+        self.taken_owner(client, native, WatchOwner::Jig)
+    }
+
+    /// An application callback releases only its own normal flight.
+    pub fn application_taken(&mut self, client: ClientId, native: Token) -> Option<Event> {
+        self.taken_owner(client, native, WatchOwner::Application)
+    }
+
+    fn taken_owner(&mut self, client: ClientId, native: Token, owner: WatchOwner) -> Option<Event> {
+        let watcher = self.owner_watch_token(client, native, owner)?;
         self.documents.remove(&watcher).then_some(Event::Delivered { watcher })
     }
 
@@ -517,5 +554,52 @@ mod tests {
         assert_eq!(front.take_reply(reply_to.into_token()), Some(Reply::SignIn { client: ClientId(0) }));
         assert_eq!(front.sign_in(ClientId(0)), None);
         assert_eq!(front.party(ClientId(0)), u64::MAX);
+    }
+    #[test]
+    fn equal_child_watch_tokens_keep_original_routes_and_independent_pacing() {
+        for native in [Token::new(0), Token::new(u64::MAX)] {
+            let mut front = Transport::new(VersionRange { first: 1, last: 1 });
+            front.bind(ClientId(0), 7, identity(b"same"));
+            front.bind(ClientId(1), 7, identity(b"same"));
+            let run = Subject::Run { task: 7, turn: None, offset: 0 };
+            let family = Watched::Application {
+                subject: family::Subject { scope: family::Scope::Project(3), kind: family::Kind::Hold(7) },
+                scope: ApplicationScope::Project(3),
+            };
+            let jig = front.open(ClientId(0), native, Watched::Jig(run.clone()));
+            let application = front.open(ClientId(0), native, family.clone());
+            let sibling = front.open(ClientId(1), native, family.clone());
+            assert_ne!(jig, application);
+            assert_ne!(application, sibling);
+            assert_eq!(front.watch_token(ClientId(0), native), Some(jig));
+            assert_eq!(front.application_watch_token(ClientId(0), native), Some(application));
+            assert_eq!(front.application_watch_token(ClientId(1), native), Some(sibling));
+            for owner in [jig, application, sibling] {
+                assert!(front.delivered(owner, Pace::Document));
+            }
+            assert!(front.delivered(jig, Pace::Stream));
+            assert!(matches!(front.application_taken(ClientId(0), native),
+                Some(Event::Delivered { watcher }) if watcher == application));
+            assert!(front.application_taken(ClientId(0), native).is_none());
+            assert!(front.close_watch(application).is_empty());
+            assert_eq!(front.application_watch_token(ClientId(0), native), None);
+            assert_eq!(front.watch_token(ClientId(0), native), Some(jig));
+            let replacement = front.open(ClientId(0), native, family.clone());
+            assert_ne!(replacement, application);
+            assert_eq!(front.end_watch(application).unwrap().subject, family);
+            assert_eq!(front.application_watch_token(ClientId(0), native), Some(replacement));
+            assert!(matches!(front.continued(ClientId(0), native, run).unwrap(),
+                Some(Event::StreamDelivered { watcher }) if watcher == jig));
+            assert!(matches!(front.taken(ClientId(0), native),
+                Some(Event::Delivered { watcher }) if watcher == jig));
+            assert!(front.taken(ClientId(0), native).is_none());
+            assert!(matches!(front.application_taken(ClientId(1), native),
+                Some(Event::Delivered { watcher }) if watcher == sibling));
+            assert!(front.delivered(replacement, Pace::Document));
+            front.end_watch(jig).unwrap();
+            assert!(matches!(front.application_taken(ClientId(0), native),
+                Some(Event::Delivered { watcher }) if watcher == replacement));
+            assert_eq!(front.watch(sibling).unwrap().subject, family);
+        }
     }
 }

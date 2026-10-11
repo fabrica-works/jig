@@ -876,7 +876,7 @@ impl Session {
             watch,
             event: jig_test_client_domain::family::WatchEvent::Delivered(_),
         }) = event
-            && let Some(event) = self.driver.transport.taken(client, *watch)
+            && let Some(event) = self.driver.transport.application_taken(client, *watch)
         {
             self.driver.send(now, wall, root::Event::Core(event));
         }
