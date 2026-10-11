@@ -240,3 +240,74 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         .collect();
     assert_eq!(attempts.len(), 3, "two failures then the person's released activation");
 }
+
+fn drift_limits() -> jig_test_client_domain::Limits {
+    let mut limits = receiving_limits();
+    limits.first.connector.paths = 2;
+    limits.first.connector.segments = 2;
+    limits.first.connector.segment_bytes = 16;
+    limits
+}
+
+fn drift_client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+    crate::test::new(&drift_limits(), seed)
+}
+
+#[test]
+fn drift_holds_a_task_and_the_person_is_told_why() {
+    use jig_test_connector as connector;
+    use jig_test_domain as root;
+    let mut world = configured_with_bounds(8519, vec![Box::new([Script::Wait])], 1, |_, _| {}, drift_limits());
+    let person = world.client_with(1, crate::stories::conversation(), drift_limits(), drift_client);
+    world.person(person, start(b"watch the resource drift"));
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let assignment =
+        world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen[0].clone();
+    let resource = jig_test_connector_world::path(1, 1);
+    for event in [
+        connector::Event::Adopt { project: 1, resource: resource.clone(), role: connector::ResourceRole::Owned },
+        connector::Event::Names { task: assignment.task, project: 1, resources: Box::new([resource.clone()]) },
+    ] {
+        let now = world.now();
+        world.front().session.driver.send(now, clock(now), root::Event::Connector { number: 1, event });
+    }
+    for state in [10, 11] {
+        let now = world.now();
+        world.front().session.driver.world.systems[0].other_hand(&resource, state);
+        world.front().session.driver.send(
+            now,
+            clock(now),
+            root::Event::Connector {
+                number: 1,
+                event: connector::Event::System(connector::SystemEvent::Fact {
+                    resource: resource.clone(),
+                    fact: connector::Fact { state: Some(state), observed: clock(now), pending: false },
+                    origin: connector::Origin::Other,
+                }),
+            },
+        );
+    }
+    assert!(
+        matches!(world.front().session.driver.world.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(jig_core_tasks::Key::Live(assignment.task)))),
+        Some(root::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(row))))
+        if matches!(row.phase, jig_core_tasks::Phase::Held { why: jig_core_tasks::Hold::Drift, .. }))
+    );
+    let within = Duration::from_secs(1);
+    world.person(
+        person,
+        vec![
+            Step::See { find: Find::text(b"Held drift"), within },
+            Step::See { find: Find::text(b"Hold account"), within },
+            Step::See { find: Find::text(b"Observed resource state: 11"), within },
+            Step::See { find: Find::text(b"Owned resource"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    let owner = &world.front().session.driver.world;
+    assert!(owner.cancellations.contains(&(assignment.task, assignment.attempt)));
+    assert_eq!(owner.peers.as_ref().expect("actual worker").workers[0].seen.len(), 1);
+}

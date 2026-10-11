@@ -38,6 +38,16 @@ fn configured_with_slots(
     slots: u32,
     configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
 ) -> World<Test, Joint> {
+    configured_with_bounds(seed, scripts, slots, configure, receiving_limits())
+}
+
+fn configured_with_bounds(
+    seed: u64,
+    scripts: Vec<Box<[Script]>>,
+    slots: u32,
+    configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
+    receiving: jig_test_client_domain::Limits,
+) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
     owner.core.fleet.slots = slots;
     // Four adoption identities and their four later public client sign-ins.
@@ -129,7 +139,7 @@ fn configured_with_slots(
             )
         })
         .collect();
-    let mut front = Joint::new(Session::new(driver, receiving_limits(), codec), identities, clock);
+    let mut front = Joint::new(Session::new(driver, receiving, codec), identities, clock);
     front.unsigned_on_bind();
     front.session.capture_task_offers();
     front.session.stream_heartbeat(Duration::from_millis(50));
