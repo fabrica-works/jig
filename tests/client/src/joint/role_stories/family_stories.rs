@@ -52,7 +52,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
             Step::Type { find: Find::exactly_named(Role::TextField, b"Goal budget"), words: b"50".as_slice().into() },
             Step::Press { find: Find::exactly_named(Role::Button, b"Set goal") },
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-            Step::See { find: Find::text(b"Goal started"), within },
+            Step::See { find: Find::text(b"Task 1: a live procedure"), within },
         ],
     );
     let outcome = world.run(Until::Done);
@@ -92,7 +92,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
             Step::Go {
                 address: jig_test_client_domain::Address::Jig(jig_client::address::Address::Task {
                     task,
-                    section: jig_client::address::TaskSection::Overview,
+                    section: jig_client::address::TaskSection::Activity,
                 }),
             },
             Step::See { find: Find::text(b"Procedure panel"), within },
