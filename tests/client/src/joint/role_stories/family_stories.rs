@@ -106,7 +106,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
                     section: jig_client::address::TaskSection::Activity,
                 }),
             },
-            Step::See { find: Find::text(b"Procedure panel"), within },
+            Step::See { find: Find::exactly_named(Role::Region, b"Procedure panel"), within },
             Step::See { find: Find::text(b"Procedure program: 1"), within },
         ],
     );
@@ -169,7 +169,7 @@ fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card()
             Step::Go { address: crate::stories::inbox() },
             Step::See { find: Find::text(b"ask the holder"), within },
             Step::See { find: Find::text(b"Proposed effect"), within },
-            Step::See { find: Find::text(b"Effect description"), within },
+            Step::See { find: Find::exactly_named(Role::Region, b"Effect description"), within },
             Step::See { find: Find::text(b"Effect kind: 5"), within },
             Step::See { find: Find::text(b"Effect purpose: 19"), within },
         ],
