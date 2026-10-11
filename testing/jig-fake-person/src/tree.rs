@@ -45,23 +45,34 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
 fn text(node: &Node) -> Vec<u8> {
     node.text.as_slice().iter().flat_map(|run| run.text.iter().copied()).collect()
 }
-fn named(nodes: &[Node], index: usize, role: jig_client_view::Role, name: &[u8], exact: bool) -> bool {
+fn exactly_named(nodes: &[Node], index: usize, role: jig_client_view::Role, name: &[u8]) -> bool {
     let node = &nodes[index];
     if node.role != role {
         return false;
     }
     if let Some(name_text) = &node.name {
-        return if exact { name_text.as_ref() == name } else { contains(name_text, name) };
+        return name_text.as_ref() == name;
     }
     let end = index.checked_add(usize::try_from(node.size).expect("subtree fits usize")).expect("subtree end fits");
     let fallback: Vec<u8> = nodes[index..end].iter().flat_map(text).collect();
-    if exact { fallback == name } else { contains(&fallback, name) }
+    fallback == name
 }
 fn matches(nodes: &[Node], index: usize, target: &Target) -> bool {
     let node = &nodes[index];
     match target {
-        Target::Role { role, name } => named(nodes, index, *role, name, false),
-        Target::ExactRole { role, name } => named(nodes, index, *role, name, true),
+        Target::Role { role, name } => {
+            if node.role != *role {
+                return false;
+            }
+            if let Some(name_text) = &node.name {
+                return contains(name_text, name);
+            }
+            let end =
+                index.checked_add(usize::try_from(node.size).expect("subtree fits usize")).expect("subtree end fits");
+            let fallback: Vec<u8> = nodes[index..end].iter().flat_map(text).collect();
+            contains(&fallback, name)
+        }
+        Target::ExactRole { role, name } => exactly_named(nodes, index, *role, name),
         Target::Text { text: words } => !node.text.is_empty() && contains(&text(node), words),
     }
 }
