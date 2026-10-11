@@ -111,62 +111,101 @@ fn comment_end(source: &[u8], start: usize) -> usize {
     end
 }
 
-fn has_candidate(source: &str, lower: &str) -> bool {
-    lower.contains("typed")
-        || lower.contains("legacy")
-        || source.match_indices('V').any(|(at, _)| source.as_bytes().get(at + 1).is_some_and(u8::is_ascii_digit))
-        || lower.match_indices("_v").any(|(at, _)| lower.as_bytes().get(at + 2).is_some_and(u8::is_ascii_digit))
+fn vocabulary_at(
+    path: &Path,
+    source: &str,
+    at: usize,
+    words: &[String],
+    starts: &[bool; 256],
+    failures: &mut Vec<String>,
+) {
+    let bytes = source.as_bytes();
+    if !starts[usize::from(bytes[at].to_ascii_lowercase())] {
+        return;
+    }
+    if at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(u8::is_ascii_alphanumeric) {
+        return;
+    }
+    for word in words {
+        if !bytes[at].eq_ignore_ascii_case(&word.as_bytes()[0]) {
+            continue;
+        }
+        let end = at + word.len();
+        if bytes.get(at..end).is_some_and(|candidate| candidate.eq_ignore_ascii_case(word.as_bytes()))
+            && !bytes.get(end).is_some_and(|after| after.is_ascii_alphanumeric() && !after.is_ascii_uppercase())
+        {
+            failures.push(format!("{}: {word}", path.display()));
+        }
+    }
 }
 
-pub(super) fn breaches(path: &Path, source: &str, lower: &str) -> Vec<String> {
+pub(super) fn breaches(path: &Path, source: &str, _lower: &str) -> Vec<String> {
+    scan(path, source, &[], true)
+}
+
+// One source walk checks every vocabulary pattern and each lexeme's name rule.
+pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> Vec<String> {
     let mut failures = Vec::new();
-    if !has_candidate(source, lower) {
-        return failures;
+    let mut starts = [false; 256];
+    for word in words {
+        starts[usize::from(word.as_bytes()[0].to_ascii_lowercase())] = true;
     }
     let bytes = source.as_bytes();
     let mut index = 0;
     let mut line = 1;
     while index < bytes.len() {
         let start = index;
-        let literal =
-            if matches!(bytes[index], b'b' | b'c' | b'r' | b'"' | b'\'') { literal_end(source, index) } else { None };
+        let literal = if names && matches!(bytes[index], b'b' | b'c' | b'r' | b'"' | b'\'') {
+            literal_end(source, index)
+        } else {
+            None
+        };
+        let mut comment = false;
         if let Some(end) = literal {
             index = end;
-        } else if matches!(bytes.get(index..index + 2), Some(b"//" | b"/*")) {
+        } else if names && matches!(bytes.get(index..index + 2), Some(b"//" | b"/*")) {
             index = comment_end(bytes, index);
-            for (offset, byte) in bytes[start..index].iter().enumerate() {
-                if !matches!(byte, b'l' | b'L') {
-                    continue;
-                }
-                let at = start + offset;
-                if bytes.get(at..at + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"))
-                    && !at
-                        .checked_sub(1)
-                        .and_then(|before| bytes.get(before))
-                        .is_some_and(|byte| identifier_byte(*byte))
-                    && !bytes.get(at + 6).is_some_and(|byte| identifier_byte(*byte))
-                {
-                    let comment_line = line + source[start..at].matches('\n').count();
-                    let word = &source[at..at + 6];
-                    failures.push(format!("{}:{comment_line}: comment {word}", path.display()));
-                }
-            }
-        } else if identifier_byte(bytes[index]) && !bytes[index].is_ascii_digit() {
-            index += 1;
+            comment = true;
+        } else if names && identifier_byte(bytes[index]) && !bytes[index].is_ascii_digit() {
+            let mut candidate = false;
             while bytes.get(index).is_some_and(|byte| identifier_byte(*byte)) {
+                candidate |= matches!(bytes[index], b't' | b'T')
+                    && bytes.get(index..index + 5).is_some_and(|word| word.eq_ignore_ascii_case(b"typed"));
+                candidate |= matches!(bytes[index], b'l' | b'L')
+                    && bytes.get(index..index + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"));
+                candidate |= bytes[index] == b'V' && bytes.get(index + 1).is_some_and(u8::is_ascii_digit);
+                candidate |=
+                    bytes.get(index..index + 2) == Some(b"_v") && bytes.get(index + 2).is_some_and(u8::is_ascii_digit);
                 index += 1;
             }
             let name = &source[start..index];
-            if forbidden_name(name) {
+            if candidate && forbidden_name(name) {
                 failures.push(format!("{}:{line}: identifier {name}", path.display()));
             }
         } else {
-            index += 1;
+            index += source[index..].chars().next().expect("source character").len_utf8();
             while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
                 index += 1;
             }
         }
-        line += source[start..index].matches('\n').count();
+        for (offset, ch) in source[start..index].char_indices() {
+            let at = start + offset;
+            if !words.is_empty() {
+                vocabulary_at(path, source, at, words, &starts, &mut failures);
+            }
+            if comment
+                && matches!(ch, 'l' | 'L')
+                && bytes.get(at..at + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"))
+                && !at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(|byte| identifier_byte(*byte))
+                && !bytes.get(at + 6).is_some_and(|byte| identifier_byte(*byte))
+            {
+                let word = &source[at..at + 6];
+                failures.push(format!("{}:{line}: comment {word}", path.display()));
+            }
+            if ch == '\n' {
+                line += 1;
+            }
+        }
     }
     failures
 }

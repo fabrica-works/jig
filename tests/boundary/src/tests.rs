@@ -202,23 +202,8 @@ fn forbidden_words() -> Vec<String> {
     .collect()
 }
 
-fn word_char(ch: char) -> bool {
-    ch.is_ascii_alphanumeric()
-}
-
-fn vocabulary_breaches(path: &Path, source: &str, lower: &str, words: &[String]) -> Vec<String> {
-    let mut breaches = Vec::new();
-    for word in words {
-        for (index, _) in lower.match_indices(word) {
-            let before = source[..index].chars().next_back();
-            let after = source[index + word.len()..].chars().next();
-            let end_boundary = !after.is_some_and(word_char) || after.is_some_and(char::is_uppercase);
-            if !before.is_some_and(word_char) && end_boundary {
-                breaches.push(format!("{}: {word}", path.display()));
-            }
-        }
-    }
-    breaches
+fn vocabulary_breaches(path: &Path, source: &str, _lower: &str, words: &[String]) -> Vec<String> {
+    super::names::scan(path, source, words, false)
 }
 
 #[test]
@@ -302,12 +287,7 @@ fn kit_sources_keep_the_kit_vocabulary() {
             } else {
                 source
             };
-            let lower = source.to_ascii_lowercase();
-            let mut failures = vocabulary_breaches(path, &source, &lower, &words);
-            if path.extension().is_some_and(|extension| extension == "rs") {
-                failures.extend(super::names::breaches(path, &source, &lower));
-            }
-            failures
+            super::names::scan(path, &source, &words, path.extension().is_some_and(|extension| extension == "rs"))
         })
         .collect();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
@@ -650,4 +630,35 @@ fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
     let source = fs::read_to_string(kit_root().join("examples/ops/client-view/src/lib.rs")).expect("view source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
+}
+
+#[test]
+fn one_source_walk_checks_all_patterns_in_quotes_comments_and_name_boundaries() {
+    let words = forbidden_words();
+    let mut source = String::new();
+    for word in &words {
+        source.push_str(&format!(" {word} {word}Upper x{word} {word}lower _{word} é{word} "));
+        source.push_str(&format!("\n// {word}\nconst SUBJECT: &str = r#\"{word}\"#;\n"));
+    }
+    let path = Path::new("fixture/patterns.rs");
+    let lower = source.to_ascii_lowercase();
+    let mut expected = Vec::new();
+    for word in &words {
+        for (at, _) in lower.match_indices(word) {
+            let before = source[..at].chars().next_back();
+            let after = source[at + word.len()..].chars().next();
+            let word_char = |ch: char| ch.is_ascii_alphanumeric();
+            if !before.is_some_and(word_char)
+                && (!after.is_some_and(word_char) || after.is_some_and(char::is_uppercase))
+            {
+                expected.push(format!("{}: {word}", path.display()));
+            }
+        }
+    }
+    expected.sort();
+    for names in [false, true] {
+        let mut actual = super::names::scan(path, &source, &words, names);
+        actual.sort();
+        assert_eq!(actual, expected, "all patterns retain the independent boundary definition");
+    }
 }

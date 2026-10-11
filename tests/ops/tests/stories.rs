@@ -59,6 +59,41 @@ fn the_nights_scale_entry_survives_the_commits_around_its_admission() {
 fn the_alert_storm_reaches_triage_and_the_person_accepts_the_production_restart() {
     let world = jig_ops_world::conformance::alert(17, Cut::None);
     assert_alert(&world);
+}
+
+#[test]
+fn the_alert_storm_survives_the_commit_before_lead_receipt() {
+    alert_at(0);
+}
+
+#[test]
+fn the_alert_storm_survives_the_commit_at_lead_receipt() {
+    alert_at(1);
+}
+
+#[test]
+fn the_alert_storm_survives_the_commit_after_lead_receipt() {
+    alert_at(2);
+}
+
+#[test]
+fn the_alert_storm_survives_the_commit_at_person_acceptance() {
+    alert_at(3);
+}
+
+#[test]
+fn the_alert_storm_survives_the_commit_at_restart_entry() {
+    alert_at(4);
+}
+
+#[test]
+fn the_alert_storm_survives_the_commit_after_restart_entry() {
+    alert_at(5);
+}
+
+fn alert_at(selected: usize) {
+    let world = jig_ops_world::conformance::alert(17, Cut::None);
+    assert_alert(&world);
     let acceptance = world.peers.accepted[0];
     let entry = world
         .peers
@@ -68,11 +103,10 @@ fn the_alert_storm_reaches_triage_and_the_person_accepts_the_production_restart(
         .min()
         .expect("restart entry");
     let lead_commit = world.peers.lead_commits.first().expect("same-decision incident lead receipt").0;
-    for commit in [lead_commit - 1, lead_commit, lead_commit + 1, acceptance, entry, entry + 1] {
-        let recovered = jig_ops_world::conformance::alert(17, Cut::AfterCommit(commit));
-        assert_eq!(recovered.outcome().crashes, vec![commit]);
-        assert_alert(&recovered);
-    }
+    let commit = [lead_commit - 1, lead_commit, lead_commit + 1, acceptance, entry, entry + 1][selected];
+    let recovered = jig_ops_world::conformance::alert(17, Cut::AfterCommit(commit));
+    assert_eq!(recovered.outcome().crashes, vec![commit]);
+    assert_alert(&recovered);
 }
 
 fn assert_alert(world: &jig_conformance::Harness<jig_ops_world::conformance::Ops>) {

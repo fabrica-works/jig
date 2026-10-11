@@ -21,60 +21,68 @@ fn press(words: &[u8]) -> Step<Address> {
 }
 #[test]
 fn p_accepts_a_restart_from_the_incidents_page() {
-    for seed in [501, 502] {
-        let mut world = stories::incident_world(seed);
-        world.measure_heap();
-        let p = world.client(7, Address::Observability(obs::Address::Incidents { project: 1, open: true }));
-        let inbox = world.client(7, Address::Jig(JigAddress::Inbox { project: None }));
-        world.person(
-            p,
-            vec![
-                Step::See { find: Find::named(Role::Link, b"Incident 12"), within: WITHIN },
-                Step::Press { find: Find::named(Role::Link, b"Incident 12") },
-                Step::See {
-                    find: Find::text(b"Error rate 30").within(Box::from([jig_fake_person::Target::Role {
-                        role: Role::Drawing,
-                        name: b"Error rate".as_slice().into(),
-                    }])),
-                    within: WITHIN,
-                },
-                see(b"I incident lead"),
-                Step::Go { address: stories::lead() },
-                see(b"delegate"),
-                Step::Go { address: Address::Jig(JigAddress::Task { task: 9, section: TaskSection::Plan }) },
-                see(b"R restart checkout"),
-                see(b"Restart checkout in production"),
-                press(b"Accept"),
-                press(b"Confirm"),
-                see(b"Accepted"),
-                Step::Go { address: Address::Jig(JigAddress::Task { task: 10, section: TaskSection::Panels }) },
-                see(b"Restart service"),
-                see(b"Waiting for condition"),
-            ],
-        );
-        world.person(
-            inbox,
-            vec![
-                see(b"Restart checkout in production"),
-                see(b"Accepted"),
-                Step::Pause { span: Duration::from_millis(50) },
-                see(b"Accepted"),
-                Step::Pause { span: Ops::limits().jig.linger.saturating_add(Duration::from_millis(100)) },
-                Step::Gone { find: Find::text(b"Restart checkout in production"), within: WITHIN },
-            ],
-        );
-        let outcome = world.run(Until::Done);
-        assert_eq!(outcome.verdict, Verdict::Passed);
-        assert!(outcome.judged.0 > 0);
-        stories::resolve(&mut world);
-        world.person(p, vec![Step::Go { address: stories::incident() }, see(b"Resolved"), see(b"Incident resolved")]);
-        assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
-        assert_eq!(world.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 1);
-        let ReadValue::Task(lead) = &world.front().engine.truth().objects[&ObjectKey::Task(9)] else { unreachable!() };
-        assert!(lead.result.is_some());
-        assert_eq!(lead.chip.task, 9);
-    }
+    accept_restart(501);
 }
+
+#[test]
+fn p_accepts_a_restart_from_the_incidents_page_with_a_second_seed() {
+    accept_restart(502);
+}
+
+fn accept_restart(seed: u64) {
+    let mut world = stories::incident_world(seed);
+    world.measure_heap();
+    let p = world.client(7, Address::Observability(obs::Address::Incidents { project: 1, open: true }));
+    let inbox = world.client(7, Address::Jig(JigAddress::Inbox { project: None }));
+    world.person(
+        p,
+        vec![
+            Step::See { find: Find::named(Role::Link, b"Incident 12"), within: WITHIN },
+            Step::Press { find: Find::named(Role::Link, b"Incident 12") },
+            Step::See {
+                find: Find::text(b"Error rate 30").within(Box::from([jig_fake_person::Target::Role {
+                    role: Role::Drawing,
+                    name: b"Error rate".as_slice().into(),
+                }])),
+                within: WITHIN,
+            },
+            see(b"I incident lead"),
+            Step::Go { address: stories::lead() },
+            see(b"delegate"),
+            Step::Go { address: Address::Jig(JigAddress::Task { task: 9, section: TaskSection::Plan }) },
+            see(b"R restart checkout"),
+            see(b"Restart checkout in production"),
+            press(b"Accept"),
+            press(b"Confirm"),
+            see(b"Accepted"),
+            Step::Go { address: Address::Jig(JigAddress::Task { task: 10, section: TaskSection::Panels }) },
+            see(b"Restart service"),
+            see(b"Waiting for condition"),
+        ],
+    );
+    world.person(
+        inbox,
+        vec![
+            see(b"Restart checkout in production"),
+            see(b"Accepted"),
+            Step::Pause { span: Duration::from_millis(50) },
+            see(b"Accepted"),
+            Step::Pause { span: Ops::limits().jig.linger.saturating_add(Duration::from_millis(100)) },
+            Step::Gone { find: Find::text(b"Restart checkout in production"), within: WITHIN },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    stories::resolve(&mut world);
+    world.person(p, vec![Step::Go { address: stories::incident() }, see(b"Resolved"), see(b"Incident resolved")]);
+    assert_eq!(world.run(Until::Done).verdict, Verdict::Passed);
+    assert_eq!(world.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 1);
+    let ReadValue::Task(lead) = &world.front().engine.truth().objects[&ObjectKey::Task(9)] else { unreachable!() };
+    assert!(lead.result.is_some());
+    assert_eq!(lead.chip.task, 9);
+}
+
 #[test]
 fn q_asks_for_an_environment_in_a_chat_and_accepts_what_it_costs() {
     for seed in [503, 504] {

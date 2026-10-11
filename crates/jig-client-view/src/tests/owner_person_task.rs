@@ -340,23 +340,22 @@ fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_
     assert!(contains(&tree, b"selected 4294967295"));
     assert!(!contains(&tree, b"Taker not supplied"));
     let nodes = tree.len();
-    let depth = u32::try_from(
-        tree.nodes()
-            .iter()
-            .enumerate()
-            .map(|(at, _)| {
-                1 + tree
-                    .nodes()
-                    .iter()
-                    .enumerate()
-                    .take(at)
-                    .filter(|(index, node)| index + usize::try_from(node.size).unwrap() > at)
-                    .count()
-            })
-            .max()
-            .unwrap(),
-    )
-    .unwrap();
+    // A preorder node's size gives the end of its subtree. Keep only the
+    // ancestors whose subtrees include this node, matching the independent
+    // ancestor-count definition without rescanning earlier nodes.
+    let mut ancestors = Vec::new();
+    let mut deepest = 0;
+    for (at, node) in tree.nodes().iter().enumerate() {
+        while ancestors.last().is_some_and(|end| *end <= at) {
+            ancestors.pop();
+        }
+        deepest = deepest.max(1 + ancestors.len());
+        let end = at + usize::try_from(node.size).unwrap();
+        if end > at + 1 {
+            ancestors.push(end);
+        }
+    }
+    let depth = u32::try_from(deepest).unwrap();
     let per_node = tree
         .nodes()
         .iter()

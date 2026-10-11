@@ -99,6 +99,30 @@ pub fn every_cut_traced(
     scenario: Scenario,
     seed: u64,
     enabled: Option<bool>,
+    visit: impl FnMut(u64, World) + 'static,
+) -> Result<Outcome, Violation> {
+    cuts_traced(scenario, seed, enabled, None, visit)
+}
+
+/// Compare selected durable snapshots without replaying the other cuts.
+///
+/// # Errors
+/// Returns the same baseline or resumed scenario failure as all-cut replay.
+pub fn chosen_cuts_traced(
+    scenario: Scenario,
+    seed: u64,
+    enabled: Option<bool>,
+    cuts: &[u64],
+    visit: impl FnMut(u64, World) + 'static,
+) -> Result<Outcome, Violation> {
+    cuts_traced(scenario, seed, enabled, Some(cuts.to_vec()), visit)
+}
+
+fn cuts_traced(
+    scenario: Scenario,
+    seed: u64,
+    enabled: Option<bool>,
+    selected: Option<Vec<u64>>,
     mut visit: impl FnMut(u64, World) + 'static,
 ) -> Result<Outcome, Violation> {
     let config = Testing::configuration(scenario, seed).expect("testing binds every shared story");
@@ -115,6 +139,9 @@ pub fn every_cut_traced(
             return;
         }
         let cut = world.store.applied;
+        if selected.as_ref().is_some_and(|cuts| !cuts.contains(&cut)) {
+            return;
+        }
         let continuation = hook_position.borrow().clone();
         let result = World::from_snapshot(world.cold_snapshot()).and_then(|mut replay| {
             finish(&mut replay, scenario, seed, continuation, &RefCell::new(Position::default()))?;
