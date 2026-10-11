@@ -933,6 +933,7 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
             | ReadValue::OwnerPersonTask(_)
             | ReadValue::Result(_)
             | ReadValue::Ended(_)
+            | ReadValue::OwnerEnded(_)
             | ReadValue::History(_)
             | ReadValue::Activity(_)
             | ReadValue::Inbox(_)
@@ -940,6 +941,7 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
             | ReadValue::Conversations(_)
             | ReadValue::Goals(_)
             | ReadValue::Spend(_)
+            | ReadValue::OwnerSpend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
             | ReadValue::Deployment(_),
