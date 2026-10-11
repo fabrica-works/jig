@@ -94,19 +94,15 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
     match delivery {
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
-            if domain.objects.named(key, source(domain)) {
-                if put(domain, env, key, Body::OwnerProposal(proposal), out) {
-                    domain.changed();
-                }
+            if domain.objects.named(key, source(domain)) && put(domain, env, key, Body::OwnerProposal(proposal), out) {
+                domain.changed();
             }
         }
         Delivery::Chips(chips) => {
             for chip in chips.into_boxed() {
                 let key = ObjectKey::Task(chip.task);
-                if domain.objects.named(key, source(domain)) {
-                    if put(domain, env, key, Body::Chip(chip), out) {
-                        domain.changed();
-                    }
+                if domain.objects.named(key, source(domain)) && put(domain, env, key, Body::Chip(chip), out) {
+                    domain.changed();
                 }
             }
         }
