@@ -615,7 +615,8 @@ fn owner_project_read_valid(domain: &Domain, token: Token, result: &ReadResult) 
             | ReadValue::Spend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
-            | ReadValue::Deployment(_) => return true,
+            | ReadValue::Deployment(_)
+            | ReadValue::OwnerDeployment(_) => return true,
         },
         ReadResult::None(_) => return true,
     };
