@@ -104,3 +104,70 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
     assert!(outcome.judged.0 > 0);
     assert!(world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen.is_empty());
 }
+
+fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig_test_domain::Limits) {
+    let grant = jig_core_authority::Grant {
+        connector: 1,
+        kind: 5,
+        pattern: jig_core_authority::Pattern {
+            segments: Box::new([]),
+            last: jig_core_authority::Last::Open(Box::new([])),
+        },
+    };
+    configuration.core.settings.chat_authority.grants = Box::new([grant.clone()]);
+    let mut rules = configuration.core.authority.rules().clone();
+    rules.ceiling.grants = Box::new([grant.clone()]);
+    let mut policy = configuration.core.authority.policy(1).expect("actual effect policy").clone();
+    policy.ceiling.grants = Box::new([grant.clone()]);
+    policy.roles[0].authority.grants = Box::new([grant]);
+    let mut checked = jig_core_authority::Domain::new(rules, owner.core.authority).expect("declared grant bounds");
+    let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
+    jig_core_authority::step(&mut checked, jig_core_authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
+    configuration.core.authority = checked;
+}
+
+#[test]
+fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card() {
+    let mut world = configured(8526, vec![Box::new([Script::Wait])], effect_configuration);
+    let owner = world.client_with(1, crate::stories::conversation(), receiving_limits(), client);
+    world.person(owner, start(b"describe its effect"));
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let assignment =
+        world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen[0].clone();
+    let now = world.now();
+    world.front().session.driver.send(
+        now,
+        clock(now),
+        jig_test_domain::Event::EffectCall {
+            to: skein_lib::ReplyTo::new(Token::new(9860)),
+            key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion: 1, position: 0 },
+            number: 1,
+            effect: jig_core_world::effects::World::effect(),
+            deadline: clock(now).saturating_add(Duration::from_secs(1)),
+            proposal: Some(b"ask the holder".as_slice().into()),
+        },
+    );
+    let within = Duration::from_secs(1);
+    world.person(
+        owner,
+        vec![
+            Step::Go { address: crate::stories::inbox() },
+            Step::See { find: Find::text(b"ask the holder"), within },
+            Step::See { find: Find::text(b"Proposed effect"), within },
+            Step::See { find: Find::text(b"Effect description"), within },
+            Step::See { find: Find::text(b"Kind: 5"), within },
+            Step::See { find: Find::text(b"Purpose: 19"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    let engine = &world.front().session.driver.world;
+    assert_eq!(engine.answers.len(), 1);
+    assert!(matches!(engine.answers[0].2, jig_core::CallPart::Proposed { .. }));
+    assert!(engine.outbox.is_empty(), "a description does not make the proposed effect");
+    assert!(engine.systems[0].observed.is_empty());
+}
