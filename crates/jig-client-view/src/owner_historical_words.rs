@@ -120,6 +120,7 @@ pub const ALL: [HistoricalPhrase; 53] = [
     HistoricalPhrase::Stale,
 ];
 impl HistoricalPhrase {
+    #[must_use]
     pub const fn id(self) -> PhraseId {
         PhraseId {
             owner: Owner::Jig,
@@ -182,59 +183,54 @@ impl HistoricalPhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Historical => None,
-            Self::At => Some(HoleKind::Wall),
-            Self::AtAbsent => None,
-            Self::By => None,
-            Self::ByAbsent => None,
-            Self::Task => None,
-            Self::PersonTask => None,
-            Self::TaskProposal => None,
-            Self::PersonProposal => None,
-            Self::Escalation => None,
-            Self::Question => None,
-            Self::Pending => None,
-            Self::Accepted => None,
-            Self::Rejected => None,
-            Self::Release => None,
-            Self::Pass => None,
-            Self::DecisionAbsent => None,
-            Self::HoldAbsent => None,
-            Self::AnswerAbsent => None,
-            Self::EndingAbsent => None,
-            Self::CreatedAbsent => None,
-            Self::TrackedAbsent => None,
-            Self::Number => Some(HoleKind::Number),
-            Self::Project => Some(HoleKind::Number),
-            Self::Proposer => Some(HoleKind::Number),
-            Self::Goal => Some(HoleKind::Number),
-            Self::Budget => Some(HoleKind::Amount),
-            Self::Spent => Some(HoleKind::Amount),
-            Self::SpentBelow => Some(HoleKind::Amount),
-            Self::Reserved => Some(HoleKind::Amount),
-            Self::Dependency => Some(HoleKind::Number),
-            Self::Write => None,
-            Self::Slot => None,
-            Self::Connector => Some(HoleKind::Number),
-            Self::Kind => Some(HoleKind::Number),
-            Self::Tracked => Some(HoleKind::Number),
-            Self::Revision => Some(HoleKind::Number),
-            Self::Requester => Some(HoleKind::Number),
-            Self::DecisionBy => Some(HoleKind::Number),
-            Self::DecisionAt => Some(HoleKind::Wall),
-            Self::FirstCreated => Some(HoleKind::Number),
-            Self::LastCreated => Some(HoleKind::Number),
-            Self::Message => Some(HoleKind::Number),
-            Self::Since => Some(HoleKind::Wall),
-            Self::AcceptChoice => None,
-            Self::RejectChoice => None,
-            Self::BatchKind => None,
-            Self::EffectKind => None,
-            Self::AmendKind => None,
-            Self::WidenKind => None,
-            Self::ReleaseKind => None,
-            Self::Withdrawn => None,
-            Self::Stale => None,
+            Self::Historical
+            | Self::AtAbsent
+            | Self::By
+            | Self::ByAbsent
+            | Self::Task
+            | Self::PersonTask
+            | Self::TaskProposal
+            | Self::PersonProposal
+            | Self::Escalation
+            | Self::Question
+            | Self::Pending
+            | Self::Accepted
+            | Self::Rejected
+            | Self::Release
+            | Self::Pass
+            | Self::DecisionAbsent
+            | Self::HoldAbsent
+            | Self::AnswerAbsent
+            | Self::EndingAbsent
+            | Self::CreatedAbsent
+            | Self::TrackedAbsent
+            | Self::Write
+            | Self::Slot
+            | Self::AcceptChoice
+            | Self::RejectChoice
+            | Self::BatchKind
+            | Self::EffectKind
+            | Self::AmendKind
+            | Self::WidenKind
+            | Self::ReleaseKind
+            | Self::Withdrawn
+            | Self::Stale => None,
+            Self::At | Self::DecisionAt | Self::Since => Some(HoleKind::Wall),
+            Self::Number
+            | Self::Project
+            | Self::Proposer
+            | Self::Goal
+            | Self::Dependency
+            | Self::Connector
+            | Self::Kind
+            | Self::Tracked
+            | Self::Revision
+            | Self::Requester
+            | Self::DecisionBy
+            | Self::FirstCreated
+            | Self::LastCreated
+            | Self::Message => Some(HoleKind::Number),
+            Self::Budget | Self::Spent | Self::SpentBelow | Self::Reserved => Some(HoleKind::Amount),
         }
     }
     fn label(self) -> &'static [u8] {

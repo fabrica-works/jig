@@ -122,7 +122,7 @@ fn build(value: &OwnerHistorical, words: &crate::words::Words) -> (Tree, JigBind
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(tree.len() <= f.nodes);
-    assert!(tree.text_bytes() <= f.text_bytes);
+    assert!(tree.nodes().iter().map(crate::tree::Node::text_bytes).sum::<u32>() <= f.text_bytes);
     assert!(
         tree.nodes()
             .iter()
@@ -509,7 +509,7 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
                 phrases: crate::owner_words::phrase_count(),
                 holes: 4,
                 segments: 9000,
-                text_bytes: 200000,
+                text_bytes: 200_000,
                 hole_bytes: CLIENT.text,
             },
         )
@@ -524,7 +524,7 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
     assert!(contains(&tree, b"Reserved: 18446744073709551615"));
     let f = view::required(&value, &CLIENT, &words).unwrap();
     assert!(tree.len() <= f.nodes);
-    assert!(tree.text_bytes() <= f.text_bytes);
+    assert!(tree.nodes().iter().map(crate::tree::Node::text_bytes).sum::<u32>() <= f.text_bytes);
     for phrase in crate::owner_historical_words::ALL {
         assert!(words.book.capacity(phrase.id()).is_some());
     }

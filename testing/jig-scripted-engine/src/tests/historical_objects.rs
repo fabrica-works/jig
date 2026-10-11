@@ -5,7 +5,7 @@ use skein_lib::{List, Wall};
 fn goal() -> OwnerPersonProposalGoal {
     let mut parameters = List::with_capacity(3);
     parameters.push(Parameter::Number { name: u32::MAX, value: u64::MAX }).expect("number fits");
-    parameters.push(Parameter::Bytes { name: 0, value: Box::from([255, 0, 47]) }).expect("bytes fit");
+    parameters.push(Parameter::Bytes { name: 0, value: super::text(&[255, 0, 47]) }).expect("bytes fit");
     parameters.push(Parameter::Resource { name: 7, connector: u16::MAX, resource: u64::MAX }).expect("resource fits");
     let mut inputs = List::with_capacity(3);
     inputs.push(u64::MAX).expect("input fits");
@@ -111,7 +111,7 @@ fn historical_person_goal_keeps_raw_project_all_four_numbers_parameters_and_dist
     assert_eq!(proposal.goal.spec.parameters.get(0), Some(&Parameter::Number { name: u32::MAX, value: u64::MAX }));
     assert_eq!(
         proposal.goal.spec.parameters.get(1),
-        Some(&Parameter::Bytes { name: 0, value: Box::from([255, 0, 47]) })
+        Some(&Parameter::Bytes { name: 0, value: super::text(&[255, 0, 47]) })
     );
     assert_eq!(
         proposal.goal.spec.parameters.get(2),

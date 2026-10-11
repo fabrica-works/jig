@@ -4,7 +4,16 @@
 use crate::{
     Builder, JigBindings, Role, Run, owner_historical_words::HistoricalPhrase as P, phrases::Hole, words::Words,
 };
-use jig_client::{Domain, Limits, contract::*};
+use alloc::boxed::Box;
+use jig_client::{
+    Domain, Limits,
+    contract::{
+        Chip, ChipPhase, OwnerEscalationDecision, OwnerGoalHolding, OwnerHistorical, OwnerHistoricalValue,
+        OwnerMessageProposalKind, OwnerPattern, OwnerPatternEnd, OwnerPersonProposalGoal, OwnerPersonProposalState,
+        OwnerProposalChoice, OwnerProposalDecision, OwnerRequester, OwnerTaskLink, Parameter, ParameterDocument,
+        Proposer, Result, Specification, Task, TaskContractDocument, TaskResource, TaskResult, Text,
+    },
+};
 use skein_lib::{Id, Wall};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,7 +25,7 @@ pub struct HistoricalFragment {
     pub bindings: u32,
     pub slots: u32,
 }
-fn saying(words: &Words, phrase: P, holes: &[Hole]) -> alloc::boxed::Box<[u8]> {
+fn saying(words: &Words, phrase: P, holes: &[Hole]) -> Box<[u8]> {
     words.book.say(words.language, phrase.id(), holes).expect("checked historical sayings and typed holes").text
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
@@ -305,7 +314,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(4)?)?
         .checked_add(120)?;
     let person = crate::owner_person_task::max_nodes(l)?.checked_add(result)?;
-    Some(task.max(escalation).max(proposal).max(person_goal).max(question).max(person).checked_add(12)?)
+    task.max(escalation).max(proposal).max(person_goal).max(question).max(person).checked_add(12)
 }
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<HistoricalFragment> {

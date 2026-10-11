@@ -137,11 +137,8 @@ pub fn card(
     let Some(facts) = client.objects().get(object) else {
         return false;
     };
-    if crate::owner_historical::card(b, client, object, place, words, bindings) {
-        return true;
-    }
-    if facts.reply.is_some() {
-        return result::reply(b, client, object, place, words, bindings);
+    if let Some(rendered) = received_card(b, client, object, place, words, bindings, facts.reply.is_some()) {
+        return rendered;
     }
     match &facts.body {
         Some(jig_client::objects::Body::Historical(_)) => return false,
@@ -235,6 +232,23 @@ pub fn card(
         }
     }
     true
+}
+fn received_card(
+    b: &mut Builder,
+    client: &Domain,
+    object: Id<Object>,
+    place: &Place,
+    words: &Words,
+    bindings: &mut JigBindings,
+    reply: bool,
+) -> Option<bool> {
+    if crate::owner_historical::card(b, client, object, place, words, bindings) {
+        return Some(true);
+    }
+    if reply {
+        return Some(result::reply(b, client, object, place, words, bindings));
+    }
+    None
 }
 /// A refusal without a current object remains a named card of its whole facts.
 pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: &Words) {
