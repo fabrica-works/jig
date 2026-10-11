@@ -124,6 +124,19 @@ fn view_bounds(
     view::worst_case(&bounds, limits, jig, obs, infra).expect("world profile fits");
     bounds
 }
+// The ordinary world uses one immutable limits/English profile. Keep all
+// composition and heap checks in its initializer before admitting clients.
+fn fixture_profile() -> (view::Limits, u64) {
+    static PROFILE: OnceLock<(view::Limits, u64)> = OnceLock::new();
+    *PROFILE.get_or_init(|| {
+        let limits = limits();
+        let (jig, obs, infra) = phrasebooks(&limits);
+        let bounds = view_bounds(&limits, &jig, &obs, &infra);
+        let heap = domain::worst_case(&limits).expect("root bound")
+            + 2 * view::worst_case(&bounds, &limits, &jig, &obs, &infra).expect("shell model projection bound");
+        (bounds, heap)
+    })
+}
 impl App for Ops {
     type Root = domain::Domain;
     type View = view::View;
@@ -139,7 +152,7 @@ impl App for Ops {
     fn new(seed: u64) -> (Self::Root, Self::View) {
         let limits = limits();
         let (jig, obs, infra) = phrasebooks(&limits);
-        let bounds = view_bounds(&limits, &jig, &obs, &infra);
+        let bounds = fixture_profile().0;
         let mut root = domain::new(&limits, seed);
         domain::provider(
             &mut root,
@@ -247,6 +260,9 @@ impl App for Ops {
         view.limits().tree.patches
     }
     fn worst_case(limits: &Self::Limits) -> u64 {
+        if *limits == self::limits() {
+            return fixture_profile().1;
+        }
         let (jig, obs, infra) = phrasebooks(limits);
         let bounds = view_bounds(limits, &jig, &obs, &infra);
         domain::worst_case(limits).expect("root bound")
