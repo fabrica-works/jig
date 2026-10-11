@@ -298,6 +298,29 @@ pub fn seen(tree: &Tree) -> Vec<Seen> {
 pub fn jig_seen(tree: &Tree) -> Vec<Seen> {
     visible(tree, false)
 }
+fn frame_link(tree: &Tree) -> Option<bool> {
+    let (at, frame) = tree
+        .nodes()
+        .iter()
+        .enumerate()
+        .find(|(_, node)| node.role == Role::Region && node.name.as_deref() == Some(b"Work"))?;
+    let end = at + usize::try_from(frame.size).expect("frame subtree");
+    let mut child = at + 1;
+    // The frame's own status is current; notices and navigation slots can
+    // retain other link words. Read direct frame children, not their descendants.
+    while child < end {
+        let node = &tree.nodes()[child];
+        if node.role == Role::Status {
+            match node.name.as_deref() {
+                Some(b"Live") => return Some(true),
+                Some(b"Offline") => return Some(false),
+                _ => {}
+            }
+        }
+        child += usize::try_from(node.size).expect("frame child subtree");
+    }
+    None
+}
 fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
     let mut seen = Vec::new();
     if [b"Sign in".as_slice(), b"Someone else's work", b"Page missing", b"Client out of date"].iter().any(|name| {
@@ -309,9 +332,7 @@ fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
     }) {
         seen.push(Seen::HiddenPage);
     }
-    let offline = matches!(TreeFace::new(tree).find(&Find::named(Role::Status, b"Offline")), Found::Node(_));
-    let live = matches!(TreeFace::new(tree).find(&Find::named(Role::Status, b"Live")), Found::Node(_));
-    if offline || live {
+    if let Some(live) = frame_link(tree) {
         seen.push(Seen::Link { live });
     }
     for (at, node) in tree.nodes().iter().enumerate() {
@@ -367,6 +388,10 @@ fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
     }
     seen
 }
+
+#[cfg(test)]
+#[path = "observe/link_tests.rs"]
+mod link_tests;
 
 /// Only decoded public person acts explain changing the displayed window (QUESTIONS 34).
 #[must_use]
