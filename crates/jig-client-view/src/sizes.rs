@@ -236,7 +236,9 @@ pub use pages::{
 /// Whole held-task escalation, including bounded input-result and person cards.
 #[must_use]
 pub fn owner_escalation_nodes(l: &Limits) -> Option<u32> {
-    let nested = result_nodes(l)?.max(person_task_nodes(l)?);
+    // Each input key names only a Result; the executor adds at most one
+    // separately typed PersonTask. The supplied task ending is charged below.
+    let nested = result_nodes(l)?.checked_mul(l.rows)?.checked_add(person_task_nodes(l)?)?;
     frame_of_card(l)?
         .checked_add(chip_nodes(l)?)?
         .checked_add(crate::owner_chip::max_nodes(l)?)?
@@ -248,7 +250,7 @@ pub fn owner_escalation_nodes(l: &Limits) -> Option<u32> {
         .checked_add(crate::owner_wake::policy_nodes())?
         .checked_add(crate::owner_wake::subscription_nodes(l.rows)?)?
         .checked_add(chip_nodes(l)?.checked_add(4)?.checked_mul(l.rows)?.checked_mul(3)?)?
-        .checked_add(nested.checked_mul(l.rows.checked_add(2)?)?)?
+        .checked_add(nested)?
         .checked_add(l.rows.checked_mul(36)?)?
         .checked_add(crate::owner_authority::document_nodes(l.rows)?)?
         .checked_add(crate::owner_budget::budget_nodes())?
