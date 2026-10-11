@@ -219,7 +219,7 @@ fn historical_funding_view_preserves_all_source_parent_coordinates_four_counters
     }
 }
 #[test]
-fn historical_checked_selected_language_has_no_fallback_and_rejects_a_missing_typed_counter_hole() {
+fn historical_checked_selected_language_has_no_fallback_and_rejects_a_missing_number_counter_hole() {
     let english = crate::phrases::english::language();
     let mut selected = english.clone();
     for phrase in &mut selected.phrases {
