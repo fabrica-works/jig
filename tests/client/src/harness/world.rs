@@ -85,6 +85,7 @@ struct Client<A: App> {
     at: usize,
     party: u64,
     epoch: u64,
+    navigation: u64,
     acted_card: Option<CardKey>,
 }
 enum PersonKind<A: App> {
@@ -101,7 +102,7 @@ struct Due<A: App> {
     client: ClientId,
     epoch: u64,
     event: A::Event,
-    navigation: bool,
+    navigation: Option<u64>,
 }
 /// One deterministic loop shared by client, joint and application worlds.
 pub struct World<A: App, F: Front<A>> {
@@ -190,6 +191,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             at: 0,
             party,
             epoch: 0,
+            navigation: 0,
             acted_card: None,
         });
         self.observe(Observation::Client { client: id });
@@ -248,6 +250,7 @@ impl<A: App, F: Front<A>> World<A, F> {
     pub fn go(&mut self, id: ClientId, address: A::Address) {
         self.observe(Observation::LeftPage { client: id });
         self.clients[id.0].acted_card = None;
+        self.advance_navigation(id);
         self.history(id, address.clone(), false);
         self.callback(id, Some(A::went(address)));
     }
@@ -256,6 +259,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         if self.clients[id.0].at > 0 {
             self.observe(Observation::LeftPage { client: id });
             self.clients[id.0].acted_card = None;
+            self.advance_navigation(id);
             self.clients[id.0].at -= 1;
             let address = self.clients[id.0].history[self.clients[id.0].at].clone();
             self.callback(id, Some(A::went(address)));
@@ -266,6 +270,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         if self.clients[id.0].at + 1 < self.clients[id.0].history.len() {
             self.observe(Observation::LeftPage { client: id });
             self.clients[id.0].acted_card = None;
+            self.advance_navigation(id);
             self.clients[id.0].at += 1;
             let address = self.clients[id.0].history[self.clients[id.0].at].clone();
             self.callback(id, Some(A::went(address)));
@@ -424,6 +429,11 @@ impl<A: App, F: Front<A>> World<A, F> {
             c.at += 1;
         }
     }
+    fn advance_navigation(&mut self, id: ClientId) -> u64 {
+        let c = &mut self.clients[id.0];
+        c.navigation = c.navigation.checked_add(1).expect("world navigation generation fits");
+        c.navigation
+    }
     fn platform_show(&mut self, id: ClientId, address: A::Address, replace: bool) {
         self.observe(Observation::LeftPage { client: id });
         self.clients[id.0].acted_card = None;
@@ -432,9 +442,17 @@ impl<A: App, F: Front<A>> World<A, F> {
         // A Went may ask to replace the current history entry; that acknowledgement
         // does not change the platform address and must not trigger another Went.
         if changed {
+            // A later platform move supersedes this acknowledgement even within
+            // one reload epoch, including leaving and returning to this address.
+            let navigation = self.advance_navigation(id);
             self.schedule.send(
                 self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(address), navigation: true },
+                Due {
+                    client: id,
+                    epoch: self.clients[id.0].epoch,
+                    event: A::went(address),
+                    navigation: Some(navigation),
+                },
             );
         }
     }
@@ -500,7 +518,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 if let Some(event) = A::unsent(request) {
                     self.schedule.send(
                         self.now.saturating_add(Duration::from_nanos(1)),
-                        Due { client: id, epoch: self.clients[id.0].epoch, event, navigation: false },
+                        Due { client: id, epoch: self.clients[id.0].epoch, event, navigation: None },
                     );
                 }
             } else {
@@ -518,9 +536,10 @@ impl<A: App, F: Front<A>> World<A, F> {
         }
         for back in signs {
             self.front.sign_in(id, self.now, env.wall);
+            let navigation = self.advance_navigation(id);
             self.schedule.send(
                 self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(back), navigation: true },
+                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(back), navigation: Some(navigation) },
             );
         }
         self.build(id);
@@ -658,7 +677,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             for (client, event) in self.front.poll(self.now, wall) {
                 self.schedule.send(
                     self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                    Due { client, epoch: self.clients[client.0].epoch, event, navigation: false },
+                    Due { client, epoch: self.clients[client.0].epoch, event, navigation: None },
                 );
             }
             for observed in self.front.observed() {
@@ -667,8 +686,9 @@ impl<A: App, F: Front<A>> World<A, F> {
             self.referee.fire(self.now, &mut Vec::new());
             self.referee.assert_holding(self.settings.seed);
             while let Some(due) = self.schedule.next(self.now) {
-                if due.epoch == self.clients[due.client.0].epoch {
-                    if due.navigation {
+                let c = &self.clients[due.client.0];
+                if due.epoch == c.epoch && due.navigation.is_none_or(|generation| generation == c.navigation) {
+                    if due.navigation.is_some() {
                         self.observe(Observation::LeftPage { client: due.client });
                         self.clients[due.client.0].acted_card = None;
                     }
@@ -773,3 +793,7 @@ mod tests {
         assert!(outcome.judged.0 > 0);
     }
 }
+
+#[cfg(test)]
+#[path = "navigation_tests.rs"]
+mod navigation_tests;
