@@ -86,6 +86,19 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
             .iter()
             .any(|(_, connector, code, context)| *connector == 1 && *code == 1 && context.task == task)
     );
+    eprintln!(
+        "actual task connector rows: {:?}",
+        world
+            .front()
+            .session
+            .driver
+            .world
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(row, jig_test_domain::Record::Connector { number: 1, .. }))
+            .collect::<Vec<_>>()
+    );
     world.person(
         owner,
         vec![
