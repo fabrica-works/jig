@@ -213,9 +213,10 @@ fn a_supplied_native_hold_slot_reads_and_renders_its_actual_scoped_account() {
         &mut root,
         Event::Went { place: Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })) },
     );
-    assert!(
-        left.iter().any(|row| matches!(row, Request::First(first::Out::Close { watch: actual }) if *actual == watch))
-    );
+    assert!(left.iter().any(|row| match row {
+        Request::First(first::Out::Close { watch: actual }) => *actual == watch,
+        _ => false,
+    }));
     patches(&mut view, &root);
     assert!(!contains(&view, b"Hold account"));
 }
@@ -224,7 +225,10 @@ fn a_supplied_native_hold_slot_reads_and_renders_its_actual_scoped_account() {
 fn an_absent_native_hold_account_keeps_its_origin_without_opening_a_family_read() {
     let mut root = ready();
     let rows = load(&mut root, task(None));
-    assert!(!rows.iter().any(|row| matches!(row, Request::First(first::Out::Read { .. }))));
+    assert!(!rows.iter().any(|row| match row {
+        Request::First(first::Out::Read { .. }) => true,
+        _ => false,
+    }));
     let mut view = view();
     patches(&mut view, &root);
     assert!(contains(&view, b"origin/only"));
