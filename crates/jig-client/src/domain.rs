@@ -197,7 +197,7 @@ impl Domain {
                         Some(crate::objects::Body::Task(task)) => summary.project = Some(task.project),
                         Some(
                             crate::objects::Body::Historical(_)
-                            | Body::Chip(_)
+                            | crate::objects::Body::Chip(_)
                             | crate::objects::Body::Proposal(_)
                             | crate::objects::Body::OwnerProposal(_)
                             | crate::objects::Body::Escalation(_)

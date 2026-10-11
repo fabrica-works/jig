@@ -292,7 +292,7 @@ fn parts(body: &Body, limit: u32) -> Parts {
                 | None => {}
             }
         }
-        Body::OwnerProposal(_) | Body::Note { .. } => {}
+        Body::Historical(_) | Body::OwnerProposal(_) | Body::Note { .. } => {}
     }
     parts
 }
