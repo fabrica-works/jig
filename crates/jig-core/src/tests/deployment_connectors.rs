@@ -139,9 +139,9 @@ fn deployment_complete_connector_registry_does_not_hide_original_refusal_history
             },
             &mut out,
         );
-        assert!(
-            matches!(out.pop(), Some(fleet::Request::Refuse { channel: refused }) if refused == Token::new(channel))
-        );
+        let hello_refused =
+            matches!(out.pop(), Some(fleet::Request::Refuse { channel: refused }) if refused == Token::new(channel));
+        assert!(hello_refused);
         assert_eq!(out.pop(), None);
     }
     let value = deployment(&core, &limits);
