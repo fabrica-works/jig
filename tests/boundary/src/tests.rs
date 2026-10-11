@@ -634,11 +634,13 @@ fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
 
 #[test]
 fn one_source_walk_checks_all_patterns_in_quotes_comments_and_name_boundaries() {
+    use std::fmt::Write as _;
+
     let words = forbidden_words();
     let mut source = String::new();
     for word in &words {
-        source.push_str(&format!(" {word} {word}Upper x{word} {word}lower _{word} é{word} "));
-        source.push_str(&format!("\n// {word}\nconst SUBJECT: &str = r#\"{word}\"#;\n"));
+        write!(source, " {word} {word}Upper x{word} {word}lower _{word} é{word} ").expect("fixture string");
+        write!(source, "\n// {word}\nconst SUBJECT: &str = r#\"{word}\"#;\n").expect("fixture string");
     }
     let path = Path::new("fixture/patterns.rs");
     let lower = source.to_ascii_lowercase();
