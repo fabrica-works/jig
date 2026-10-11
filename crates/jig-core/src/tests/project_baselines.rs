@@ -2,6 +2,7 @@
 //! equating the configured target with the observed display period.
 use super::*;
 
+#[expect(clippy::wildcard_enum_match_arm, reason = "ordinary proof helper receives a Project document")]
 fn project(core: &Core, limits: &Limits) -> Box<Project> {
     match make(core, limits, 1, &Subject::Project { project: 1 }, &window()).expect("project document") {
         Document::Project(value) => value,
