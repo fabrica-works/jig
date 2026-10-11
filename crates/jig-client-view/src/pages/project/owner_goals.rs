@@ -50,10 +50,10 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
     let mut pool = None;
     if let Some(frame) = &client.frame().document {
         for project in &frame.projects {
-            if project.project == doc.number {
-                if let Some(ledger) = &project.pool {
-                    pool = Some(ledger.left);
-                }
+            if project.project == doc.number
+                && let Some(ledger) = &project.pool
+            {
+                pool = Some(ledger.left);
             }
         }
         if !doc.configured_pools_cut {
@@ -62,7 +62,7 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
                     Funder::Pool { project, person, period }
                         if project == doc.number && person == frame.party.number && period == doc.configured_period =>
                     {
-                        pool = Some(ledger.left)
+                        pool = Some(ledger.left);
                     }
                     Funder::Task(_) | Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {}
                 }

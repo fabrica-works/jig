@@ -32,10 +32,10 @@ pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<
     let mut listed = false;
     if let Some(frame) = &domain.frame.document {
         for project in &frame.projects {
-            if project.project == form.project {
-                if let Some(ledger) = &project.pool {
-                    pool = Some(ledger.left);
-                }
+            if project.project == form.project
+                && let Some(ledger) = &project.pool
+            {
+                pool = Some(ledger.left);
             }
         }
         for project in &frame.charters {
@@ -59,7 +59,7 @@ pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<
                 Funder::Pool { project, person, period }
                     if project == doc.number && person == scope && period == doc.configured_period =>
                 {
-                    pool = Some(ledger.left)
+                    pool = Some(ledger.left);
                 }
                 Funder::Task(_) | Funder::Pool { .. } | Funder::Period { .. } | Funder::Recurring { .. } => {}
             }

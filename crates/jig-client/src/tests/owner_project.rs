@@ -1,5 +1,7 @@
 #![expect(
     clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs inspect original read tokens and whole keyed requests"
 )]

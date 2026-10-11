@@ -1,5 +1,7 @@
 #![expect(
     clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::disallowed_macros,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary public proofs inspect complete accessible trees, raw slots and decoded actions"
 )]

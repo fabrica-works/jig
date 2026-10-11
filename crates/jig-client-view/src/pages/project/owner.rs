@@ -927,10 +927,10 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
     if let Some(refused) = &state.refused {
         words.refusal(b, refused);
     }
-    if let Some(request) = state.pending {
-        if let Some(intent) = client.intents().get(skein_lib::Id::from_token(request)) {
-            words.progress(b, intent.progress);
-        }
+    if let Some(request) = state.pending
+        && let Some(intent) = client.intents().get(skein_lib::Id::from_token(request))
+    {
+        words.progress(b, intent.progress);
     }
 }
 fn pool_forms(
@@ -1063,12 +1063,11 @@ fn service_form(
         b.open(Role::TextField);
         let name = words.book.say(words.language, P::Name.id(), &[]).expect("checked service name").text;
         b.name(&name);
-        if let Some(ask) = &state.review {
-            if let Some((name, chosen)) = service_request(ask) {
-                if chosen == role {
-                    b.value(name.bytes(), 0);
-                }
-            }
+        if let Some(ask) = &state.review
+            && let Some((name, chosen)) = service_request(ask)
+            && chosen == role
+        {
+            b.value(name.bytes(), 0);
         }
         b.bind(bindings.insert(JigMeaning::ProjectServiceName { project: value.number, role }));
         b.close();

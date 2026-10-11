@@ -189,8 +189,8 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
             }
             None
         }
-        Ask::MakeService { .. } => None,
-        Ask::StartChat { .. }
+        Ask::MakeService { .. }
+        | Ask::StartChat { .. }
         | Ask::Write { .. }
         | Ask::AnswerQuestion { .. }
         | Ask::AnswerPerson { .. }
@@ -214,13 +214,14 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
 /// Keep previously edited channels when the rendered baseline is unchanged.
 #[must_use]
 pub fn draft(state: &Form, before: &Ask) -> Ask {
-    if state.before.as_deref() == Some(before) {
-        if let Some(review) = &state.review {
-            return review.as_ref().clone();
-        }
+    if state.before.as_deref() == Some(before)
+        && let Some(review) = &state.review
+    {
+        return review.as_ref().clone();
     }
     before.clone()
 }
+#[expect(clippy::manual_map, reason = "step code matches Option without closures")]
 pub(crate) fn review(domain: &mut Domain, ask: Box<Ask>) {
     if domain.blocked || domain.project_page.settings.pending.is_some() {
         return;
@@ -228,10 +229,7 @@ pub(crate) fn review(domain: &mut Domain, ask: Box<Ask>) {
     let Some(doc) = &domain.project_page.owner else {
         return;
     };
-    if !supported(doc, &ask) {
-        domain.project_page.settings.review = None;
-        domain.project_page.settings.refused = Some(Refusal::NotOffered);
-    } else {
+    if supported(doc, &ask) {
         domain.project_page.settings.pool_period = match ask.as_ref() {
             Ask::SetPool { .. } => Some(doc.configured_period),
             Ask::MakeService { .. }
@@ -257,12 +255,19 @@ pub(crate) fn review(domain: &mut Domain, ask: Box<Ask>) {
             | Ask::EditNote { .. }
             | Ask::DeleteNote { .. } => None,
         };
-        domain.project_page.settings.before = baseline(doc, &ask).map(Box::new);
+        domain.project_page.settings.before = match baseline(doc, &ask) {
+            Some(before) => Some(Box::new(before)),
+            None => None,
+        };
         domain.project_page.settings.review = Some(ask);
         domain.project_page.settings.refused = None;
+    } else {
+        domain.project_page.settings.review = None;
+        domain.project_page.settings.refused = Some(Refusal::NotOffered);
     }
     domain.changed();
 }
+#[expect(clippy::manual_map, reason = "step code matches Option without closures")]
 pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
     if domain.blocked || domain.project_page.settings.pending.is_some() {
         return;
