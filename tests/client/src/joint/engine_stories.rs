@@ -123,7 +123,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         2,
         |_, _| {},
     );
-    let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
+    let member = world.client_with(1, crate::stories::conversation(), receiving_limits(), client);
     world.person(member, start(b"release the exhausted delegate"));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
@@ -197,13 +197,22 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         2,
         jig_core::NamedAction::DecideEscalation { task: child, revision, choice: jig_core::EscalationChoice::Pass },
     );
+    let requester = world.front().session.driver.world.peers.as_ref().expect("actual owner").parties[0]
+        .person
+        .expect("owner sign-in");
+    assert!(
+        matches!(world.front().session.driver.world.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child)))),
+        Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row))))
+        if matches!(row.escalation, tasks::Escalation::Waiting { holder: tasks::EscalationHolder::Person(person), .. } if person == requester))
+    );
     let within = Duration::from_secs(1);
     world.person(
         member,
         vec![
             Step::Go { address: crate::stories::inbox() },
             Step::See { find: Find::text(b"retry this delegate"), within },
-            Step::See { find: Find::text(b"Held: out of tries"), within },
+            Step::See { find: Find::text(b"Failure tries exhausted"), within },
+            Step::See { find: Find::text(b"Run tries: 2"), within },
             Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
             Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
