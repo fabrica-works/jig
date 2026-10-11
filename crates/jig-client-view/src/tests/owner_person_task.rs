@@ -345,14 +345,6 @@ fn person_owner_selected_words_reject_overflow_and_invalid_phrase_holes() {
     reason = "ordinary test entry retains the complete original fixture, assertions and one-under arithmetic"
 )]
 fn person_storage_dimension(selected_dimension: Option<usize>) {
-    let phrase_limits = PhraseLimits {
-        languages: 2,
-        phrases: crate::owner_words::phrase_count(),
-        holes: 4,
-        segments: 4096,
-        text_bytes: 100_000,
-        hole_bytes: 128,
-    };
     let normal = crate::phrases::english::language();
     let mut selected = crate::phrases::english::language();
     for phrase in &mut selected.phrases {
@@ -364,6 +356,20 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
             }
         }
     }
+    let segments = [&normal, &selected]
+        .into_iter()
+        .flat_map(|language| language.phrases.iter())
+        .flat_map(|phrase| phrase.forms.iter())
+        .try_fold(0_u32, |total, form| total.checked_add(u32::try_from(form.segments.len()).ok()?))
+        .expect("whole supplied languages fit their segment count");
+    let phrase_limits = PhraseLimits {
+        languages: 2,
+        phrases: crate::owner_words::phrase_count(),
+        holes: 4,
+        segments,
+        text_bytes: 100_000,
+        hole_bytes: 128,
+    };
     let w = Words {
         book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([normal, selected]), &phrase_limits)
             .unwrap(),
