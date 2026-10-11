@@ -261,6 +261,7 @@ mod tests {
             record: jig_test_connector::Record::Proposal {
                 number: u64::MAX,
                 task: 7,
+                project: u32::MAX,
                 effect: jig_test_connector::Effect {
                     kind: u16::MAX,
                     resources: Box::new([]),
