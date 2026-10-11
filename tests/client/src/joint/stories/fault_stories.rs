@@ -192,8 +192,8 @@ fn a_reload_with_a_stop_pending_recovers_its_lost_committed_answer_by_the_origin
     assert_eq!(answers(&mut world), 2);
     assert!(!shown(&world, client, b"Held stopped"));
     world.fault(crate::FrontFault::NoAnswer);
-    world.fault(crate::Fault::Reload { client });
     world.front().session.driver.release_commits();
+    world.fault(crate::Fault::Reload { client });
     world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
