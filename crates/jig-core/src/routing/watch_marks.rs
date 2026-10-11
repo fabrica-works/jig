@@ -77,36 +77,6 @@ impl Core {
         }
     }
 
-    /// A configured period changes every project's target funding baseline.
-    pub(crate) fn touch_project_periods(&mut self) {
-        for (_, binding) in &self.view_subjects {
-            let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
-            let touched = match subject {
-                Subject::Project { .. } => true,
-                Subject::Deployment
-                | Subject::Task { .. }
-                | Subject::Tree { .. }
-                | Subject::Chips { .. }
-                | Subject::Inbox { .. }
-                | Subject::Goals { .. }
-                | Subject::Tasks { .. }
-                | Subject::Conversations { .. }
-                | Subject::Run { .. }
-                | Subject::Proposal { .. }
-                | Subject::Escalation { .. }
-                | Subject::Question { .. }
-                | Subject::PersonTask { .. }
-                | Subject::Result { .. }
-                | Subject::Frame { .. }
-                | Subject::Note { .. }
-                | Subject::Application { .. } => false,
-            };
-            if touched {
-                let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
-            }
-        }
-    }
-
     /// Gather deployment facts after host, account or task capacity changes.
     pub fn touch_deployment(&mut self) {
         for (_, binding) in &self.view_subjects {
