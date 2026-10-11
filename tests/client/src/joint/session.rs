@@ -54,6 +54,7 @@ pub struct Session {
     lost_answers: BTreeSet<(ClientId, skein_lib::Token)>,
     offline_until: Option<Time>,
     source_events: Vec<root::Event>,
+    scheduled_sources: Vec<(Time, root::Event)>,
     stopped_seen: bool,
     lifecycle: Vec<Observed>,
     task_offers: Option<BTreeMap<(ClientId, u64), TaskOffers>>,
@@ -80,6 +81,7 @@ impl Session {
             lost_answers: BTreeSet::new(),
             offline_until: None,
             source_events: Vec::new(),
+            scheduled_sources: Vec::new(),
             stopped_seen: false,
             lifecycle: Vec::new(),
             task_offers: None,
@@ -185,9 +187,16 @@ impl Session {
         self.source(now, wall, root::Event::Core(core::Event::People(people::Event::SignOut { reply_to, sign_in })));
     }
 
+    /// Supply external source events at declared world times. This ordinary
+    /// transport owns delivery; the real core decides each outcome.
+    pub fn sources_at(&mut self, mut sources: Vec<(Time, root::Event)>) {
+        self.scheduled_sources.append(&mut sources);
+        self.scheduled_sources.sort_by_key(|(at, _)| *at);
+    }
+
     #[must_use]
     pub fn next_due(&self) -> Option<Time> {
-        if self.callbacks.is_empty() {
+        let due = if self.callbacks.is_empty() {
             if self.driver.world.stopped {
                 if self.stopped_seen { None } else { Some(Time::ZERO) }
             } else if let Some(until) = self.offline_until {
@@ -198,7 +207,13 @@ impl Session {
             }
         } else {
             Some(Time::ZERO)
-        }
+        };
+        let source = if self.driver.world.stopped || self.offline_until.is_some() {
+            None
+        } else {
+            self.scheduled_sources.first().map(|(at, _)| *at)
+        };
+        [due, source].into_iter().flatten().min()
     }
 
     fn hello(&mut self, client: ClientId) {
@@ -775,6 +790,9 @@ impl Session {
             }
             self.recover(now, wall)?;
         }
+        let ready = self.scheduled_sources.partition_point(|(at, _)| *at <= now);
+        let sources: Vec<_> = self.scheduled_sources.drain(..ready).collect();
+        for (_, event) in sources { self.source(now, wall, event); }
         if self.delay_until.is_some_and(|until| now >= until) {
             self.delay_until = None;
             self.callbacks.append(&mut self.delayed);

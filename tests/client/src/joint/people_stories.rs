@@ -157,3 +157,55 @@ fn a_request_sent_twice_is_made_once_across_an_engine_restart() {
     assert_eq!(keys.len(), 1, "every actual retry preserves the original request key");
 
 }
+
+#[test]
+fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
+    let mut world = super::configured_world(super::turn(), |front| {
+        front.session.sources_at(vec![(Time::from_nanos(650_000_000), jig_test_domain::Event::Core(
+            jig_core::Event::Tasks(jig_core_tasks::Event::Hold { task: 1, why: jig_core_tasks::Hold::Budget })))]);
+    });
+    let client = world.client(1, crate::stories::conversation());
+    let within = Duration::from_secs(1);
+    world.person(client, vec![
+        Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+        Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+        Step::See { find: Find::named(Role::TextArea, b"First words"), within },
+        Step::Type { find: Find::named(Role::TextArea, b"First words"), words: b"Hello".as_slice().into() },
+        Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+        Step::See { find: Find::text(b"Hello"), within },
+        Step::Pause { span: Duration::from_millis(450) },
+        Step::Press { find: Find::exactly_named(Role::Button, b"Stop") },
+        Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+        Step::See { find: Find::text(b"Held stopped"), within },
+        Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
+        Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
+        Step::Pause { span: Duration::from_millis(250) },
+        Step::See { find: Find::text(b"The revision this action names changed"), within },
+    ]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    use jig_fake_person::{Face, Found, TreeFace};
+    let mut face = TreeFace::new(world.tree(client));
+    let confirm = match face.find(&Find::exactly_named(Role::Button, b"Confirm")) {
+        Found::Node(id) => id,
+        Found::Absent | Found::Pending => panic!("changed confirmation stays in place"),
+    };
+    assert!(!face.allows(confirm, &jig_client_view::Act::Press), "the moved revision disables Confirm");
+    world.person(client, vec![
+        Step::Press { find: Find::exactly_named(Role::Button, b"Dismiss") },
+        Step::See { find: Find::text(b"Held budget"), within },
+    ]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let owner = &world.front().session.driver.world;
+    assert_eq!(owner.peers.as_ref().expect("actual worker").workers[0].seen[0].task, 1);
+    assert_eq!(owner.peers.as_ref().expect("actual worker").workers[0].seen.len(), 1);
+    assert!(owner.store.rows.values().any(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))
+        if task.number == 1 && task.revisions.hold == 2 && matches!(task.phase,
+            jig_core_tasks::Phase::Held { why: jig_core_tasks::Hold::Budget, .. }))));
+    assert_eq!(owner.store.rows.values().filter(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. })))).count(), 2);
+}
