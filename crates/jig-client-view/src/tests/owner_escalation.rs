@@ -145,7 +145,7 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
     }
 }
 
-fn build_closed_offers(row: &OwnerEscalation, allocation: crate::Limits, w: &crate::words::Words) -> crate::Tree {
+fn build_closed_offers(row: &OwnerEscalation, allocation: crate::Limits, w: &crate::words::Words) -> Tree {
     let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
@@ -155,42 +155,80 @@ fn build_closed_offers(row: &OwnerEscalation, allocation: crate::Limits, w: &cra
     builder.finish()
 }
 
+fn closed_offers(refused: bool) -> OwnerEscalation {
+    let kinds = [ActKind::Release, ActKind::LeaveHeld, ActKind::PassUp, ActKind::AmendRelease, ActKind::Cancel];
+    let mut row = escalation();
+    row.acts = List::with_capacity(MAX_OFFERED_ACTS);
+    let reason = HoldReason::Tries {
+        failures: list([
+            AttemptFailure {
+                attempt: 0,
+                class: FailureClass::HostLost,
+                reason: text(b"whole offered failure"),
+                at: Wall::EPOCH,
+            },
+            AttemptFailure {
+                attempt: u64::MAX,
+                class: FailureClass::Permanent,
+                reason: text(b"whole offered failure"),
+                at: Wall::from_nanos(u64::MAX),
+            },
+        ]),
+    };
+    for _ in 0_u32..5 {
+        for act in kinds {
+            let admission = if refused {
+                Admission::Refused(Refusal::Moved {
+                    now: Revision { value: u64::MAX },
+                    what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(reason.clone()))) },
+                })
+            } else {
+                Admission::Allowed
+            };
+            row.acts.push(Offered { act, admission }).unwrap();
+        }
+    }
+    row
+}
+
+fn check_exact_storage(row: &OwnerEscalation, allocation: crate::Limits, tree: &Tree, w: &crate::words::Words) {
+    let depth = u32::try_from(
+        tree.nodes()
+            .iter()
+            .enumerate()
+            .map(|(at, _)| {
+                1 + tree
+                    .nodes()
+                    .iter()
+                    .enumerate()
+                    .take(at)
+                    .filter(|(index, node)| index + usize::try_from(node.size).unwrap() > at)
+                    .count()
+            })
+            .max()
+            .unwrap(),
+    )
+    .unwrap();
+    let per_node = tree.nodes().iter().map(crate::tree::Node::text_bytes).max().unwrap();
+    let total = tree.nodes().iter().map(crate::tree::Node::text_bytes).sum::<u32>();
+    let exact = crate::Limits { nodes: tree.len(), depth, text_per_node: per_node, text_bytes: total, ..allocation };
+    assert_eq!(build_closed_offers(row, exact, w).len(), tree.len());
+    for below in [
+        crate::Limits { nodes: exact.nodes - 1, ..exact },
+        crate::Limits { depth: exact.depth - 1, ..exact },
+        crate::Limits { text_per_node: exact.text_per_node - 1, ..exact },
+        crate::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+    ] {
+        std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build_closed_offers(row, below, w)))
+            .expect_err("one-under storage refuses the whole escalation tree");
+    }
+}
+
 #[test]
 fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and_refuse_one_under_storage() {
     let w = words();
-    let kinds = [ActKind::Release, ActKind::LeaveHeld, ActKind::PassUp, ActKind::AmendRelease, ActKind::Cancel];
     for refused in [false, true] {
-        let mut row = escalation();
-        row.acts = List::with_capacity(MAX_OFFERED_ACTS);
-        let reason = HoldReason::Tries {
-            failures: list([
-                AttemptFailure {
-                    attempt: 0,
-                    class: FailureClass::HostLost,
-                    reason: text(b"whole offered failure"),
-                    at: Wall::EPOCH,
-                },
-                AttemptFailure {
-                    attempt: u64::MAX,
-                    class: FailureClass::Permanent,
-                    reason: text(b"whole offered failure"),
-                    at: Wall::from_nanos(u64::MAX),
-                },
-            ]),
-        };
-        for _ in 0..5 {
-            for act in kinds {
-                let admission = if refused {
-                    Admission::Refused(Refusal::Moved {
-                        now: Revision { value: u64::MAX },
-                        what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(reason.clone()))) },
-                    })
-                } else {
-                    Admission::Allowed
-                };
-                row.acts.push(Offered { act, admission }).unwrap();
-            }
-        }
+        let row = closed_offers(refused);
         let original = row.clone();
         assert_eq!(row.acts.capacity(), MAX_OFFERED_ACTS);
         assert_eq!(row.acts.len(), MAX_OFFERED_ACTS);
@@ -244,37 +282,7 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         assert!(contains(&tree, b"whole task specification"));
         assert!(contains(&tree, b"supplied prior task failure"));
         assert_eq!(domain.objects().get(id).unwrap().body.as_ref().unwrap().ending(), None);
-        let depth = u32::try_from(
-            tree.nodes()
-                .iter()
-                .enumerate()
-                .map(|(at, _)| {
-                    1 + tree
-                        .nodes()
-                        .iter()
-                        .enumerate()
-                        .take(at)
-                        .filter(|(index, node)| index + usize::try_from(node.size).unwrap() > at)
-                        .count()
-                })
-                .max()
-                .unwrap(),
-        )
-        .unwrap();
-        let per_node = tree.nodes().iter().map(|node| node.text_bytes()).max().unwrap();
-        let total = tree.nodes().iter().map(|node| node.text_bytes()).sum::<u32>();
-        let exact =
-            crate::Limits { nodes: tree.len(), depth, text_per_node: per_node, text_bytes: total, ..allocation };
-        assert_eq!(build_closed_offers(&row, exact, &w).len(), tree.len());
-        for below in [
-            crate::Limits { nodes: exact.nodes - 1, ..exact },
-            crate::Limits { depth: exact.depth - 1, ..exact },
-            crate::Limits { text_per_node: exact.text_per_node - 1, ..exact },
-            crate::Limits { text_bytes: exact.text_bytes - 1, ..exact },
-        ] {
-            std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build_closed_offers(&row, below, &w)))
-                .expect_err("one-under storage refuses the whole escalation tree");
-        }
+        check_exact_storage(&row, allocation, &tree, &w);
         assert_eq!(row, original);
         assert_eq!(
             domain.objects().get(id).unwrap().body,
