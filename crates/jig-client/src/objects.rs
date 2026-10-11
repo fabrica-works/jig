@@ -752,6 +752,8 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
         | ReadValue::Conversations(_)
         | ReadValue::Ended(_)
         | ReadValue::Spend(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::OwnerSpend(_)
         | ReadValue::Goals(_)
         | ReadValue::Project(_)
         | ReadValue::Deployment(_) => None,

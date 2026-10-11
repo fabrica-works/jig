@@ -36,6 +36,7 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
             client.task_page().ended_after.as_ref(),
             jig_client::pages::task::ENDED_WINDOW,
         );
+        owner_ended(b, client, words, bindings);
         return;
     }
     b.open(Role::Tree);
@@ -98,6 +99,7 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
         client.task_page().ended_after.as_ref(),
         jig_client::pages::task::ENDED_WINDOW,
     );
+    owner_ended(b, client, words, bindings);
 }
 fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::TreeItem);
@@ -161,4 +163,10 @@ pub(super) fn scratch(rows: u32) -> Option<u64> {
     Stack::<Visit>::worst_case(rows.checked_mul(2)?)?
         .checked_add(Set::<u64>::worst_case(rows)?)?
         .checked_add(crate::owner_tree::scratch(rows)?)
+}
+
+fn owner_ended(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    if let Some(page) = &client.task_page().owner_ended {
+        crate::historical_pages::ended_render(b, client, page, words, bindings);
+    }
 }

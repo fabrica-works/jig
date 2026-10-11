@@ -36,6 +36,8 @@ pub struct NoteFilter {
 )]
 pub struct ProjectPage {
     pub document: Option<Box<Project>>,
+    /// Retained historical funding rows, independent of live project spend.
+    pub owner_spend: Option<Box<contract::OwnerSpendPage>>,
     pub goals: List<GoalLine>,
     /// The current read window, which may include both live and ended goals.
     pub ended: List<GoalLine>,
@@ -65,6 +67,7 @@ impl ProjectPage {
     pub(crate) fn new(rows: u32) -> Self {
         Self {
             document: None,
+            owner_spend: None,
             goals: List::with_capacity(rows),
             ended: List::with_capacity(rows),
             listed_goals: List::with_capacity(rows.checked_mul(2).expect("goal source rows fit")),
@@ -90,6 +93,7 @@ impl ProjectPage {
     }
     pub(crate) fn clear(&mut self) {
         self.document = None;
+        self.owner_spend = None;
         self.goals.clear();
         self.ended.clear();
         self.listed_goals.clear();
@@ -326,7 +330,8 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(List::<TaskLine>::worst_case(limits.rows)?)?
         .checked_add(List::<Id<Object>>::worst_case(limits.rows)?)?
         .checked_add(List::<contract::SpendPeriod>::worst_case(limits.rows)?)?
-        .checked_add(u64::from(limits.text).checked_mul(10)?)
+        .checked_add(u64::from(limits.text).checked_mul(10)?)?
+        .checked_add(limits.document_bytes)
 }
 
 fn merge_goals(page: &mut ProjectPage) {
@@ -520,5 +525,14 @@ pub(crate) fn live(
             break;
         }
     }
+    domain.changed();
+}
+
+/// Install the complete historical source page in supplied order.
+pub(crate) fn owner_spend(domain: &mut Domain, page: Box<contract::OwnerSpendPage>) {
+    domain.project_page.spend_cut = page.cut;
+    domain.project_page.spend_before = page.before.clone();
+    domain.project_page.spend_after = page.after.clone();
+    domain.project_page.owner_spend = Some(page);
     domain.changed();
 }

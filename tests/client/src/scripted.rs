@@ -629,6 +629,8 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Conversations(_)
                 | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
+                | ReadValue::OwnerEnded(_)
+                | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => false,
@@ -655,6 +657,8 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Conversations(_)
                 | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
+                | ReadValue::OwnerEnded(_)
+                | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => {}

@@ -131,6 +131,8 @@ impl<A: crate::Application> Engine<A> {
                         | ReadValue::Conversations(_)
                         | ReadValue::Goals(_)
                         | ReadValue::Spend(_)
+                        | ReadValue::OwnerEnded(_)
+                        | ReadValue::OwnerSpend(_)
                         | ReadValue::Project(_)
                         | ReadValue::Notes(_)
                         | ReadValue::Deployment(_),
@@ -161,6 +163,8 @@ impl<A: crate::Application> Engine<A> {
                                     | ReadValue::Activity(_)
                                     | ReadValue::History(_)
                                     | ReadValue::Spend(_)
+                                    | ReadValue::OwnerEnded(_)
+                                    | ReadValue::OwnerSpend(_)
                                     | ReadValue::Project(_)
                                     | ReadValue::Notes(_)
                                     | ReadValue::Deployment(_) => None,
@@ -206,6 +210,8 @@ impl<A: crate::Application> Engine<A> {
                 | ReadValue::Conversations(_)
                 | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
+                | ReadValue::OwnerEnded(_)
+                | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => None,
@@ -403,6 +409,8 @@ impl<A: crate::Application> Engine<A> {
                 | ReadValue::Conversations(_)
                 | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
+                | ReadValue::OwnerEnded(_)
+                | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => return Ok((Answer::Refused(Refusal::NotOffered), Vec::new())),
@@ -455,6 +463,8 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         | ReadValue::Conversations(_)
         | ReadValue::Goals(_)
         | ReadValue::Spend(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::OwnerSpend(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => None,
@@ -488,6 +498,8 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         | ReadValue::Conversations(_)
         | ReadValue::Goals(_)
         | ReadValue::Spend(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::OwnerSpend(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => None,

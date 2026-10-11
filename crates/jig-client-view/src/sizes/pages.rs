@@ -57,7 +57,7 @@ fn plan(l: &Limits) -> Option<u32> {
         .checked_add(18)?
         .checked_mul(l.rows)?
         .checked_add(26)?;
-    Some(older.max(crate::owner_tree::max_nodes(l)?.checked_add(6)?))
+    older.max(crate::owner_tree::max_nodes(l)?.checked_add(6)?).checked_add(crate::historical_pages::ended_nodes(l)?)
 }
 fn overview(l: &Limits) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?
@@ -154,7 +154,12 @@ fn settings(l: &Limits) -> Option<u32> {
         .checked_add(l.rows.checked_mul(2)?)?
         .checked_add(18)?
         .checked_mul(l.rows)?;
-    policy.checked_add(spend(l)?)?.checked_add(recurring)?.checked_add(l.rows.checked_mul(24)?)?.checked_add(32)
+    policy
+        .checked_add(spend(l)?)?
+        .checked_add(crate::historical_pages::spend_nodes(l)?)?
+        .checked_add(recurring)?
+        .checked_add(l.rows.checked_mul(24)?)?
+        .checked_add(32)
 }
 /// Project board, filtered windows and every settings subregion together.
 #[must_use]

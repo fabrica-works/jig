@@ -131,6 +131,8 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::Conversations(_)
         | ReadValue::Goals(_)
         | ReadValue::Spend(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::OwnerSpend(_)
         | ReadValue::Project(_)
         | ReadValue::Deployment(_) => vec![],
     }

@@ -168,6 +168,9 @@ fn settings(
         ProjectSection::Spend => {
             period(b, doc.period, &doc.spend, &doc.pools, words);
             task_spend(b, client, &doc.spend_lines, words, bindings);
+            if let Some(page) = &client.project_page().owner_spend {
+                crate::historical_pages::spend_render(b, page, words);
+            }
             for past in &client.project_page().spend {
                 period(b, past.period, &past.budget, &past.pools, words);
                 task_spend(b, client, &past.tasks, words, bindings);

@@ -51,6 +51,8 @@ pub struct Plan {
 #[derive(Debug)]
 pub struct TaskPage {
     pub header: Option<Id<Object>>,
+    /// Whole owner ended page under the selected original read.
+    pub owner_ended: Option<Box<contract::OwnerEndedPage>>,
     pub plan: Plan,
     pub subtree_history: bool,
     /// Loss reported by the current ended-delegate read window.
@@ -63,6 +65,7 @@ impl TaskPage {
     pub(crate) fn new(rows: u32) -> Self {
         Self {
             header: None,
+            owner_ended: None,
             plan: Plan {
                 owner: None,
                 nodes: List::with_capacity(rows),
@@ -80,6 +83,7 @@ impl TaskPage {
     }
     pub(crate) fn clear(&mut self) {
         self.header = None;
+        self.owner_ended = None;
         self.plan.owner = None;
         self.plan.nodes.clear();
         self.plan.folded = counts();
@@ -549,6 +553,7 @@ pub(crate) fn open_ended(domain: &mut Domain, task: u64, out: &mut Queue<Request
     if !found {
         return;
     }
+    domain.task_page.owner_ended = None;
     domain.task_page.ended_task = Some(task);
     domain.task_page.ended_cut = false;
     domain.task_page.ended_after = None;
@@ -604,10 +609,19 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(List::<u64>::worst_case(limits.rows.checked_add(1)?)?)?
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(2)?)?
         .checked_add(u64::from(limits.text).checked_mul(2)?)?
+        .checked_add(limits.document_bytes)?
         .checked_add(limits.document_bytes)
 }
 
 pub(crate) fn ended(domain: &mut Domain, before: Option<contract::Cursor>, after: Option<contract::Cursor>) {
     domain.task_page.ended_before = before;
     domain.task_page.ended_after = after;
+}
+
+/// Install one admitted owner page without naming synthetic Result objects.
+pub(crate) fn owner_ended(domain: &mut Domain, page: Box<contract::OwnerEndedPage>) {
+    domain.task_page.ended_cut = page.cut;
+    ended(domain, page.before.clone(), page.after.clone());
+    domain.task_page.owner_ended = Some(page);
+    domain.changed();
 }

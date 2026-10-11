@@ -263,6 +263,8 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
         | ReadValue::Conversations(_)
         | ReadValue::Goals(_)
         | ReadValue::Spend(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::OwnerSpend(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => None,
@@ -288,6 +290,8 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         | ReadValue::Conversations(_)
         | ReadValue::Goals(_)
         | ReadValue::Spend(_)
+        | ReadValue::OwnerEnded(_)
+        | ReadValue::OwnerSpend(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => None,

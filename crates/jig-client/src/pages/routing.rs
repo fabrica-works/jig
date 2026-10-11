@@ -374,7 +374,7 @@ pub(crate) fn read_result(
     result: ReadResult,
     out: &mut Queue<Request>,
 ) {
-    if !owner_inbox_read_valid(domain, env, token, &result) {
+    if !owner_inbox_read_valid(domain, env, token, &result) || !historical_read_valid(domain, env, token, &result) {
         refuse(domain, Limit::Reads);
         return;
     }
@@ -470,7 +470,7 @@ fn read_value(
     out: &mut Queue<Request>,
 ) {
     match value {
-        ReadValue::Frame(_) | ReadValue::OwnerInbox(_) => {}
+        ReadValue::Frame(_) | ReadValue::OwnerInbox(_) | ReadValue::OwnerEnded(_) | ReadValue::OwnerSpend(_) => {}
         ReadValue::Notes(page) => crate::pages::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
@@ -595,6 +595,8 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
             | ReadValue::Conversations(_)
             | ReadValue::Goals(_)
             | ReadValue::Spend(_)
+            | ReadValue::OwnerEnded(_)
+            | ReadValue::OwnerSpend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
             | ReadValue::Deployment(_) => return true,
@@ -658,6 +660,8 @@ fn received_value(
     out: &mut Queue<Request>,
 ) {
     match value {
+        ReadValue::OwnerEnded(page) => super::task::owner_ended(domain, page),
+        ReadValue::OwnerSpend(page) => super::project::owner_spend(domain, page),
         ReadValue::OwnerInbox(page) => {
             let group = match &query {
                 Read::Inbox { group, .. } => *group,
@@ -775,4 +779,127 @@ fn owner_tree_delivery(
         let _stored = domain.objects.put(ObjectKey::Task(row.chip.task), Body::Chip(row.chip.clone()));
     }
     domain.changed();
+}
+
+/// Validate the retained original request before consuming its terminal.
+fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
+    let value = match result {
+        ReadResult::Value(value) => value,
+        ReadResult::None(_) => return true,
+    };
+    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+        return true;
+    };
+    if read.abandoned || read.terminal || read.generation != domain.generation {
+        return true;
+    }
+    match value {
+        ReadValue::OwnerEnded(page) => {
+            let task = match &read.what {
+                Read::Ended { task, .. } => *task,
+                Read::Frame
+                | Read::Task { .. }
+                | Read::Proposal { .. }
+                | Read::Escalation { .. }
+                | Read::Question { .. }
+                | Read::PersonTask { .. }
+                | Read::Result { .. }
+                | Read::History { .. }
+                | Read::Activity { .. }
+                | Read::Inbox { .. }
+                | Read::Conversations { .. }
+                | Read::Goals { .. }
+                | Read::Spend { .. }
+                | Read::Project { .. }
+                | Read::Notes { .. }
+                | Read::Deployment => return false,
+            };
+            let source = match read.source {
+                Source::Window { number: 16, .. } => true,
+                Source::Window { .. } | Source::Watch(_) | Source::Card(_) => false,
+            };
+            source
+                && domain.task_page.ended_task == Some(task)
+                && page.rows.capacity() <= env.limits.rows
+                && historical_edges_fit(page.before.as_ref(), page.after.as_ref(), env.limits.text)
+        }
+        ReadValue::OwnerSpend(page) => {
+            let project = match &read.what {
+                Read::Spend { project, .. } => *project,
+                Read::Frame
+                | Read::Task { .. }
+                | Read::Proposal { .. }
+                | Read::Escalation { .. }
+                | Read::Question { .. }
+                | Read::PersonTask { .. }
+                | Read::Result { .. }
+                | Read::Ended { .. }
+                | Read::History { .. }
+                | Read::Activity { .. }
+                | Read::Inbox { .. }
+                | Read::Conversations { .. }
+                | Read::Goals { .. }
+                | Read::Project { .. }
+                | Read::Notes { .. }
+                | Read::Deployment => return false,
+            };
+            let source = match read.source {
+                Source::Window { number: 23, .. } => true,
+                Source::Window { .. } | Source::Watch(_) | Source::Card(_) => false,
+            };
+            if !source
+                || super::project::number(domain) != Some(project)
+                || page.rows.capacity() > env.limits.rows
+                || !historical_edges_fit(page.before.as_ref(), page.after.as_ref(), env.limits.text)
+            {
+                return false;
+            }
+            for row in &page.rows {
+                match row.funder {
+                    contract::Funder::Period { project: owner, .. } => {
+                        if owner != project {
+                            return false;
+                        }
+                    }
+                    contract::Funder::Pool { .. } | contract::Funder::Task(_) | contract::Funder::Recurring { .. } => {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+        ReadValue::Frame(_)
+        | ReadValue::Task(_)
+        | ReadValue::Proposal(_)
+        | ReadValue::OwnerProposal(_)
+        | ReadValue::Escalation(_)
+        | ReadValue::Question(_)
+        | ReadValue::PersonTask(_)
+        | ReadValue::OwnerPersonTask(_)
+        | ReadValue::Result(_)
+        | ReadValue::Ended(_)
+        | ReadValue::History(_)
+        | ReadValue::Activity(_)
+        | ReadValue::Inbox(_)
+        | ReadValue::OwnerInbox(_)
+        | ReadValue::Conversations(_)
+        | ReadValue::Goals(_)
+        | ReadValue::Spend(_)
+        | ReadValue::Project(_)
+        | ReadValue::Notes(_)
+        | ReadValue::Deployment(_) => true,
+    }
+}
+fn historical_edges_fit(before: Option<&contract::Cursor>, after: Option<&contract::Cursor>, text: u32) -> bool {
+    if let Some(cursor) = before
+        && !cursor.value.fits(text)
+    {
+        return false;
+    }
+    if let Some(cursor) = after
+        && !cursor.value.fits(text)
+    {
+        return false;
+    }
+    true
 }

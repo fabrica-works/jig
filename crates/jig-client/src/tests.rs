@@ -61,3 +61,5 @@ mod task_resources;
 mod owner_person_task;
 mod owner_proposal;
 mod task_context;
+
+mod historical_pages;

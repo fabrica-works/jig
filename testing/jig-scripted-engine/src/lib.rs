@@ -444,3 +444,5 @@ pub mod owner_tree;
 
 pub mod owner_person_task;
 pub mod owner_proposal;
+
+pub mod historical_pages;

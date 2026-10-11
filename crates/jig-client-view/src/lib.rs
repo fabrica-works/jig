@@ -97,3 +97,6 @@ pub mod owner_person_task;
 pub mod owner_person_task_words;
 pub mod owner_proposal;
 pub mod owner_proposal_words;
+
+pub mod historical_pages;
+pub mod historical_pages_words;
