@@ -44,7 +44,11 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 /// Choices, entered fields and Cannot alongside the full contract.
 #[must_use]
 pub fn form_nodes(l: &Limits) -> Option<u32> {
-    crate::proposed_task::contract_nodes(l)?.checked_add(l.rows.checked_mul(3)?)?.checked_add(5)
+    crate::proposed_task::contract_nodes(l)?.checked_add(controls_nodes(l)?)
+}
+/// Form controls beside a contract already rendered in the card.
+pub(crate) fn controls_nodes(l: &Limits) -> Option<u32> {
+    l.rows.checked_mul(3)?.checked_add(5)
 }
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<PersonFragment> {

@@ -172,7 +172,7 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
             .max(
                 frame_of_card(limits)?
                     .checked_add(crate::owner_person_task::max_nodes(limits)?)?
-                    .checked_add(crate::owner_person_task::form_nodes(limits)?)?,
+                    .checked_add(crate::owner_person_task::controls_nodes(limits)?)?,
             )
             .max(result_nodes(limits)?)
             .max(reply_nodes(limits)?)
