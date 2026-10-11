@@ -406,6 +406,33 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
     assert_eq!(displayed, [9, 0, u64::MAX, 9]);
     assert_eq!(value.spend.iter().map(|s| s.chip.task).collect::<Vec<_>>(), [9, 0, u64::MAX, 9]);
     assert_eq!(value.recurring.get(0).unwrap().batch.iter().map(|t| t.number).collect::<Vec<_>>(), [u64::MAX, 0]);
+    let region_name = words(false)
+        .say(crate::phrases::jig::JigPhrase::RecurringKey, &[crate::phrases::Hole::Number(u64::from(u32::MAX))]);
+    let (index, recurring) = tree
+        .nodes()
+        .iter()
+        .enumerate()
+        .find(|(_, node)| node.role == Role::Region && node.name.as_deref() == Some(region_name.as_ref()))
+        .unwrap();
+    let last_links: Vec<_> = tree.nodes()[index..index + usize::try_from(recurring.size).unwrap()]
+        .iter()
+        .filter(|node| {
+            node.role == Role::Link
+                && node.name.as_deref().is_some_and(|name| {
+                    [0, u64::MAX].into_iter().any(|task| {
+                        name == words(false)
+                            .say(crate::phrases::jig::JigPhrase::TaskPage, &[crate::phrases::Hole::Number(task)])
+                            .as_ref()
+                    })
+                })
+        })
+        .filter_map(|node| node.binding.and_then(|binding| bindings.address(binding.token)))
+        .map(|address| match address {
+            jig_client::address::Address::Task { task, .. } => task,
+            _ => panic!("recurring task link"),
+        })
+        .collect();
+    assert_eq!(last_links, [u64::MAX, 0, u64::MAX]);
     assert_eq!(value.recurring.get(0).unwrap().last_batch.as_slice(), [u64::MAX, 0, u64::MAX]);
     assert_eq!(value.resources.capacity(), 4);
     assert_eq!(value.recurring.get(0).unwrap().batch.capacity(), 4);
