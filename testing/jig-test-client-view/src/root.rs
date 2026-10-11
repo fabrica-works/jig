@@ -98,21 +98,27 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                     true
                                 }
                                 None => match view.jig.owner_part(slot.reference.token) {
-                                    Some(owner) => match jig_test_client_domain::family::owner_hold(owner) {
-                                        Some(part) => {
-                                            family::part(
-                                                &mut fragment,
-                                                root.first(),
-                                                &part,
-                                                root.jig().generation(),
-                                                &view.first_words,
-                                                &view.words,
-                                                &mut view.first,
-                                            );
-                                            true
+                                    Some(owner) => {
+                                        let part = match jig_test_client_domain::family::owner_hold(owner) {
+                                            Some(part) => Some(part),
+                                            None => jig_test_client_domain::family::owner_effect(owner),
+                                        };
+                                        match part {
+                                            Some(part) => {
+                                                family::part(
+                                                    &mut fragment,
+                                                    root.first(),
+                                                    &part,
+                                                    root.jig().generation(),
+                                                    &view.first_words,
+                                                    &view.words,
+                                                    &mut view.first,
+                                                );
+                                                true
+                                            }
+                                            None => false,
                                         }
-                                        None => false,
-                                    },
+                                    }
                                     None => false,
                                 },
                             }
@@ -163,6 +169,7 @@ fn second(
         Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::OwnerEffect { .. }
         | Part::Outbox { .. }
         | Part::Hold { .. }
         | Part::Project { .. }

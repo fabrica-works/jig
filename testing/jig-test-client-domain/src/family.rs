@@ -184,6 +184,7 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
         Part::Panel { task, .. } => Kind::Panel(*task),
         Part::Result { task, .. } => Kind::Result(*task),
         Part::Effect { proposal, .. } => Kind::Effect(*proposal),
+        Part::OwnerEffect { proposal, .. } => Kind::OwnerEffect(*proposal),
         Part::Outbox { scope, entry, .. } => {
             let scope = match scope {
                 jig_client::contract::PartScope::Project(project) => Scope::Project(*project),
@@ -215,6 +216,23 @@ pub fn owner_hold(part: &OwnerPart) -> Option<Part> {
         | OwnerPartKind::Result
         | OwnerPartKind::Procedure
         | OwnerPartKind::Effect
+        | OwnerPartKind::Outbox => None,
+    }
+}
+
+/// A connector-owned effect reference keeps its numbered namespace (root.md, 6).
+#[must_use]
+pub fn owner_effect(part: &OwnerPart) -> Option<Part> {
+    match part.kind {
+        OwnerPartKind::Effect => match part.key {
+            OwnerPartKey::Number(proposal) => Some(Part::OwnerEffect { connector: part.connector, proposal }),
+            OwnerPartKey::Path(_) => None,
+        },
+        OwnerPartKind::Resource
+        | OwnerPartKind::Pool
+        | OwnerPartKind::Result
+        | OwnerPartKind::Procedure
+        | OwnerPartKind::Hold
         | OwnerPartKind::Outbox => None,
     }
 }

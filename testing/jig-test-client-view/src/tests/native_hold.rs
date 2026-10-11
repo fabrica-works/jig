@@ -1,7 +1,7 @@
 use super::*;
 use jig_test_client_domain::connector_values as owner;
 
-fn limits() -> jig_test_client_domain::Limits {
+pub(super) fn limits() -> jig_test_client_domain::Limits {
     let mut limits = super::limits();
     limits.jig.document_bytes = 65536;
     limits.first.connector.rows = 1;
@@ -10,7 +10,7 @@ fn limits() -> jig_test_client_domain::Limits {
     limits.first.connector.segment_bytes = 16;
     limits
 }
-fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
+pub(super) fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
     let limits = limits();
     let mut out = Queue::with_capacity(jig_test_client_domain::max_out(&limits));
     jig_test_client_domain::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
@@ -20,7 +20,7 @@ fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
     }
     rows
 }
-fn ready() -> Domain {
+pub(super) fn ready() -> Domain {
     let mut root = jig_test_client_domain::new(&limits(), 43);
     let rows = drive(
         &mut root,
@@ -133,7 +133,7 @@ fn load(root: &mut Domain, task: Task) -> Vec<Request> {
         Event::Jig(jig_client::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) }),
     )
 }
-fn view() -> View {
+pub(super) fn view() -> View {
     let jig = words();
     let first = family_words();
     let limits = limits();

@@ -954,6 +954,7 @@ fn part_fits(part: &Part, rows: u32, text: u32) -> bool {
         | Part::Panel { .. }
         | Part::Result { .. }
         | Part::Effect { .. }
+        | Part::OwnerEffect { .. }
         | Part::Outbox { .. }
         | Part::Hold { .. }
         | Part::Project { .. }

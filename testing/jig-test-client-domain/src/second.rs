@@ -49,6 +49,7 @@ impl Side {
             | Part::Panel { .. }
             | Part::Result { .. }
             | Part::Effect { .. }
+            | Part::OwnerEffect { .. }
             | Part::Outbox { .. }
             | Part::Hold { .. }
             | Part::Project { .. }
