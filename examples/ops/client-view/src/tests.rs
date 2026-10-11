@@ -1398,9 +1398,12 @@ fn native_effect_slots_say_unshowable_without_loading_a_typed_maker_effect() {
             let status: Vec<_> =
                 tree.nodes().iter().filter(|node| node.role == jig_client_view::Role::Status).collect();
             assert_eq!(status.len(), 1);
-            let text: Vec<_> = status[0].text.iter().map(|run| run.text.as_ref()).collect();
+            assert_eq!(status[0].name.as_deref(), Some(b"Cannot show this part".as_slice()));
+            // Builder::text creates a Text child under the named Status region.
+            let text: Vec<_> =
+                tree.nodes().iter().flat_map(|node| node.text.iter()).map(|run| run.text.as_ref()).collect();
             assert_eq!(text, [b"Cannot show this part".as_slice()]);
-            assert!(tree.nodes().iter().all(|node| node.binding.is_none()));
+            assert!(tree.nodes().iter().all(|node| node.binding.is_none() && node.link.is_none()));
             assert!(tree.len() <= tree_limits.nodes);
         }
     }
