@@ -111,22 +111,30 @@ fn a_person_stops_a_run_and_releases_it() {
 #[test]
 fn a_request_sent_twice_is_made_once_across_an_engine_restart() {
     use jig_fake_person::{Face, Found, TreeFace};
-    fn configuration() -> jig_test_domain::Config { jig_core_world::world::config(8510) }
+    fn configuration() -> jig_test_domain::Config {
+        jig_core_world::world::config(8510)
+    }
     let mut world = super::configured_world(super::turn(), |front| front.restart_configuration(configuration));
     let client = world.client(1, crate::stories::conversation());
     let within = Duration::from_secs(1);
-    world.person(client, vec![
-        Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
-        Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
-        Step::See { find: Find::named(Role::TextArea, b"First words"), within },
-        Step::Type { find: Find::named(Role::TextArea, b"First words"), words: b"Hello".as_slice().into() },
-        Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
-        Step::See { find: Find::text(b"Hello"), within },
-        Step::Pause { span: Duration::from_millis(450) },
-        Step::See { find: Find::exactly_named(Role::Button, b"Write"), within },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Write") },
-        Step::Type { find: Find::named(Role::TextArea, b"Your answer"), words: b"Once after restart".as_slice().into() },
-    ]);
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::named(Role::TextArea, b"First words"), within },
+            Step::Type { find: Find::named(Role::TextArea, b"First words"), words: b"Hello".as_slice().into() },
+            Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+            Step::See { find: Find::text(b"Hello"), within },
+            Step::Pause { span: Duration::from_millis(450) },
+            Step::See { find: Find::exactly_named(Role::Button, b"Write"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Write") },
+            Step::Type {
+                find: Find::named(Role::TextArea, b"Your answer"),
+                words: b"Once after restart".as_slice().into(),
+            },
+        ],
+    );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     let confirm = match TreeFace::new(world.tree(client)).find(&Find::exactly_named(Role::Button, b"Confirm")) {
@@ -141,47 +149,75 @@ fn a_request_sent_twice_is_made_once_across_an_engine_restart() {
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
     let owner = &world.front().session.driver.world;
-    assert_eq!(owner.store.rows.values().filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. })))).count(), 2);
+    assert_eq!(
+        owner
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(
+                row,
+                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+            ))
+            .count(),
+        2
+    );
     let peers = owner.peers.as_ref().expect("actual worker across restart");
-    assert_eq!(peers.workers[0].messages.iter().filter(|(_, _, _, words)| words.as_ref() == b"Once after restart").count(), 1);
+    assert_eq!(
+        peers.workers[0].messages.iter().filter(|(_, _, _, words)| words.as_ref() == b"Once after restart").count(),
+        1
+    );
     let words = format!("words: {:?}", b"Once after restart");
-    let asks: Vec<_> = owner.trace.iter().filter(|event| event.starts_with("input Core(People(Ask")
-        && event.contains("ask: Say") && event.contains(&words)).collect();
+    let asks: Vec<_> = owner
+        .trace
+        .iter()
+        .filter(|event| {
+            event.starts_with("input Core(People(Ask") && event.contains("ask: Say") && event.contains(&words)
+        })
+        .collect();
     assert!(asks.len() >= 2, "the actual Say must reach the engine again after restart");
-    let keys: std::collections::BTreeSet<_> = asks.iter().map(|event| {
-        let start = event.find("key: [").expect("actual request key");
-        let end = event[start..].find("], ask:").expect("whole key followed by ask") + start + 1;
-        &event[start..end]
-    }).collect();
+    let keys: std::collections::BTreeSet<_> = asks
+        .iter()
+        .map(|event| {
+            let start = event.find("key: [").expect("actual request key");
+            let end = event[start..].find("], ask:").expect("whole key followed by ask") + start + 1;
+            &event[start..end]
+        })
+        .collect();
     assert_eq!(keys.len(), 1, "every actual retry preserves the original request key");
-
 }
 
 #[test]
 fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
     let mut world = super::configured_world(super::turn(), |front| {
-        front.session.sources_at(vec![(Time::from_nanos(650_000_000), jig_test_domain::Event::Core(
-            jig_core::Event::Tasks(jig_core_tasks::Event::Hold { task: 1, why: jig_core_tasks::Hold::Budget })))]);
+        front.session.sources_at(vec![(
+            Time::from_nanos(650_000_000),
+            jig_test_domain::Event::Core(jig_core::Event::Tasks(jig_core_tasks::Event::Hold {
+                task: 1,
+                why: jig_core_tasks::Hold::Budget,
+            })),
+        )]);
     });
     let client = world.client(1, crate::stories::conversation());
     let within = Duration::from_secs(1);
-    world.person(client, vec![
-        Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
-        Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
-        Step::See { find: Find::named(Role::TextArea, b"First words"), within },
-        Step::Type { find: Find::named(Role::TextArea, b"First words"), words: b"Hello".as_slice().into() },
-        Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
-        Step::See { find: Find::text(b"Hello"), within },
-        Step::Pause { span: Duration::from_millis(450) },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Stop") },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-        Step::See { find: Find::text(b"Held stopped"), within },
-        Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
-        Step::Pause { span: Duration::from_millis(250) },
-        Step::See { find: Find::text(b"The revision this action names changed"), within },
-    ]);
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::named(Role::TextArea, b"First words"), within },
+            Step::Type { find: Find::named(Role::TextArea, b"First words"), words: b"Hello".as_slice().into() },
+            Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+            Step::See { find: Find::text(b"Hello"), within },
+            Step::Pause { span: Duration::from_millis(450) },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Stop") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Held stopped"), within },
+            Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
+            Step::Pause { span: Duration::from_millis(250) },
+            Step::See { find: Find::text(b"The revision this action names changed"), within },
+        ],
+    );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
@@ -192,10 +228,13 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
         Found::Absent | Found::Pending => panic!("changed confirmation stays in place"),
     };
     assert!(!face.allows(confirm, &jig_client_view::Act::Press), "the moved revision disables Confirm");
-    world.person(client, vec![
-        Step::Press { find: Find::exactly_named(Role::Button, b"Dismiss") },
-        Step::See { find: Find::text(b"Held budget"), within },
-    ]);
+    world.person(
+        client,
+        vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Dismiss") },
+            Step::See { find: Find::text(b"Held budget"), within },
+        ],
+    );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
@@ -206,6 +245,16 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
         jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))
         if task.number == 1 && task.revisions.hold == 2 && matches!(task.phase,
             jig_core_tasks::Phase::Held { why: jig_core_tasks::Hold::Budget, .. }))));
-    assert_eq!(owner.store.rows.values().filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. })))).count(), 2);
+    assert_eq!(
+        owner
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(
+                row,
+                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+            ))
+            .count(),
+        2
+    );
 }

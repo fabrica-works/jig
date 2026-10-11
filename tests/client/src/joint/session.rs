@@ -792,7 +792,9 @@ impl Session {
         }
         let ready = self.scheduled_sources.partition_point(|(at, _)| *at <= now);
         let sources: Vec<_> = self.scheduled_sources.drain(..ready).collect();
-        for (_, event) in sources { self.source(now, wall, event); }
+        for (_, event) in sources {
+            self.source(now, wall, event);
+        }
         if self.delay_until.is_some_and(|until| now >= until) {
             self.delay_until = None;
             self.callbacks.append(&mut self.delayed);

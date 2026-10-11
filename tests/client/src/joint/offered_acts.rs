@@ -11,9 +11,10 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
         (packet.source.clone(), packet.native_task.chip.title.bytes().to_vec())
     };
     let words = jig_test_client_view::connector_values_words::english(32).expect("fixture English");
-    let title = words.say(jig_client_view::phrases::jig::JigPhrase::ChipNumber,
-        &[jig_client_view::phrases::Hole::Number(number),
-          jig_client_view::words::name(&title)]);
+    let title = words.say(
+        jig_client_view::phrases::jig::JigPhrase::ChipNumber,
+        &[jig_client_view::phrases::Hole::Number(number), jig_client_view::words::name(&title)],
+    );
     let tree = world.tree(client);
     let card = match TreeFace::new(tree).find(&Find::exactly_named(Role::Region, &title)) {
         Found::Node(id) => id,
@@ -21,9 +22,14 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
     };
     let mut face = TreeFace::subtree(tree, card).expect("whole public Task card");
     let captions: [(Act, &[u8]); 9] = [
-        (Act::Write, b"Write"), (Act::Amend, b"Amend"), (Act::TakeOver, b"Take over"),
-        (Act::Close, b"Close"), (Act::AmendRelease, b"Amend and release"),
-        (Act::Release, b"Release"), (Act::Stop, b"Stop"), (Act::Cancel, b"Cancel"),
+        (Act::Write, b"Write"),
+        (Act::Amend, b"Amend"),
+        (Act::TakeOver, b"Take over"),
+        (Act::Close, b"Close"),
+        (Act::AmendRelease, b"Amend and release"),
+        (Act::Release, b"Release"),
+        (Act::Stop, b"Stop"),
+        (Act::Cancel, b"Cancel"),
         (Act::MarkSeen, b"Mark read"),
     ];
     assert!(source.iter().all(|offer| captions.iter().any(|(act, _)| *act == offer.act)));
@@ -35,16 +41,21 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
             Admission::Refused(_) => false,
         });
         assert_eq!(matches!(button, Found::Node(_)), actionable, "source act {act:?}");
-        if offered.is_some() { assert!(matches!(face.find(&Find::text(caption)), Found::Node(_))); }
+        if offered.is_some() {
+            assert!(matches!(face.find(&Find::text(caption)), Found::Node(_)));
+        }
     }
     // The card has no unrelated navigation controls; every button names one
     // of this source packet's actionable acts.
     let start = tree.nodes().iter().position(|node| node.id == card).expect("card index");
     let end = start + usize::try_from(tree.nodes()[start].size).expect("card size");
     let count = tree.nodes()[start..end].iter().filter(|node| node.role == Role::Button).count();
-    let expected = source.iter().filter(|offer| match &offer.admission {
-        Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => true,
-        Admission::Refused(_) => false,
-    }).count();
+    let expected = source
+        .iter()
+        .filter(|offer| match &offer.admission {
+            Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => true,
+            Admission::Refused(_) => false,
+        })
+        .count();
     assert_eq!(count, expected);
 }

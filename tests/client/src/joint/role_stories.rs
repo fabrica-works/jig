@@ -4,6 +4,22 @@ use super::*;
 use jig_fake_parties::{Act, Party, Role as PartyRole};
 use jig_fake_workers::Call;
 
+fn receiving_limits() -> jig_test_client_domain::Limits {
+    let mut limits = crate::test::limits();
+    limits.jig.text = 128;
+    limits.jig.rows = 2;
+    limits.jig.projects = 2;
+    limits.jig.charters = 2;
+    limits.jig.roles = 4;
+    limits.jig.delegates = 2;
+    limits.first.text = 128;
+    limits
+}
+
+fn client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+    crate::test::new(&receiving_limits(), seed)
+}
+
 fn world(seed: u64, scripts: Vec<Box<[Script]>>) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
     // Four adoption identities and their four later public client sign-ins.
@@ -13,42 +29,88 @@ fn world(seed: u64, scripts: Vec<Box<[Script]>>) -> World<Test, Joint> {
     owner.core.documents.rows = 2;
     owner.core.documents.lines = 2;
     owner.core.documents.chips = 2;
-    owner.core.documents.text_bytes = 32;
+    owner.core.documents.text_bytes = 128;
     // This scenario offers its agent and human executor, not a procedure.
-    let kinds = Box::new([
-        jig_core_authority::Executor::Charter(1), jig_core_authority::Executor::Role(1),
-    ]);
+    let kinds = Box::new([jig_core_authority::Executor::Charter(1), jig_core_authority::Executor::Role(1)]);
     configuration.core.settings.chat_authority.delegation.kinds = kinds.clone();
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds = kinds.clone();
     let mut policy = configuration.core.authority.policy(1).expect("role policy").clone();
     policy.ceiling.delegation.kinds = kinds.clone();
-    for role in &mut policy.roles { role.authority.delegation.kinds = kinds.clone(); }
-    configuration.core.authority = jig_core_authority::Domain::new(rules, owner.core.authority)
-        .expect("role scenario bounds");
+    for role in &mut policy.roles {
+        role.authority.delegation.kinds = kinds.clone();
+    }
+    configuration.core.authority =
+        jig_core_authority::Domain::new(rules, owner.core.authority).expect("role scenario bounds");
     let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
-    jig_core_authority::step(&mut configuration.core.authority,
-        jig_core_authority::Event::Policy { project: 1, policy }, &mut out);
+    jig_core_authority::step(
+        &mut configuration.core.authority,
+        jig_core_authority::Event::Policy { project: 1, policy },
+        &mut out,
+    );
     assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
     let roles = [PartyRole::Owner, PartyRole::Maintainer, PartyRole::Member, PartyRole::Observer];
-    let parties = roles.iter().enumerate().map(|(i, role)| Party::new(1, *role, 10_000 * (i as u64 + 1),
-        Box::new([Act::SignIn { provider: 0, subject: (7 + i as u64).to_be_bytes().into() }]))).collect();
-    let mut driver = Driver::new(configuration, owner,
-        Peers::new(vec![Worker::new(7, 1, scripts)], parties), Time::ZERO, clock(Time::ZERO));
-    let holdings = driver.world.peers.as_ref().expect("setup peers").parties.iter().enumerate()
-        .map(|(i, party)| people::Holding { person: party.person.expect("setup sign-in"), role: match i {
-            0 => people::Role::Owner, 1 => people::Role::Maintainer, 2 => people::Role::Member,
-            3 => people::Role::Observer, _ => unreachable!("four setup roles"),
-        }}).collect();
-    driver.send(Time::ZERO, clock(Time::ZERO), jig_test_domain::Event::Core(
-        jig_core::Event::People(people::Event::Roles { project: 1, holdings })));
-    let codec = jig_client_transcript::Limits { smith: smith_transcript::v2::CEILINGS,
-        bytes: 1_048_576, turn: client::TurnLimits { messages: 8, blocks: 8, text: 128 } };
-    let identities = (1..=4).map(|id| (id, people::Identity {
-        key: people::IdentityKey { provider: 0, subject: (id + 6_u64).to_be_bytes().into() },
-        login: b"login".as_slice().into(), name: b"Person".as_slice().into(),
-    })).collect();
-    let mut front = Joint::new(Session::new(driver, crate::test::limits(), codec), identities, clock);
+    let parties = roles
+        .iter()
+        .enumerate()
+        .map(|(i, role)| {
+            Party::new(
+                1,
+                *role,
+                10_000 * (i as u64 + 1),
+                Box::new([Act::SignIn { provider: 0, subject: (7 + i as u64).to_be_bytes().into() }]),
+            )
+        })
+        .collect();
+    let mut driver = Driver::new(
+        configuration,
+        owner,
+        Peers::new(vec![Worker::new(7, 1, scripts)], parties),
+        Time::ZERO,
+        clock(Time::ZERO),
+    );
+    let holdings = driver
+        .world
+        .peers
+        .as_ref()
+        .expect("setup peers")
+        .parties
+        .iter()
+        .enumerate()
+        .map(|(i, party)| people::Holding {
+            person: party.person.expect("setup sign-in"),
+            role: match i {
+                0 => people::Role::Owner,
+                1 => people::Role::Maintainer,
+                2 => people::Role::Member,
+                3 => people::Role::Observer,
+                _ => unreachable!("four setup roles"),
+            },
+        })
+        .collect();
+    driver.send(
+        Time::ZERO,
+        clock(Time::ZERO),
+        jig_test_domain::Event::Core(jig_core::Event::People(people::Event::Roles { project: 1, holdings })),
+    );
+    let codec = jig_client_transcript::Limits {
+        smith: smith_transcript::v2::CEILINGS,
+        bytes: 1_048_576,
+        turn: client::TurnLimits { messages: 8, blocks: 8, text: 128 },
+    };
+    let identities = (1..=4)
+        .map(|id| {
+            (
+                id,
+                people::Identity {
+                    key: people::IdentityKey { provider: 0, subject: (id + 6_u64).to_be_bytes().into() },
+                    login: b"login".as_slice().into(),
+                    name: b"Person".as_slice().into(),
+                },
+            )
+        })
+        .collect();
+    let mut front = Joint::new(Session::new(driver, receiving_limits(), codec), identities, clock);
     front.unsigned_on_bind();
     front.session.capture_task_offers();
     front.session.stream_heartbeat(Duration::from_millis(50));
@@ -69,32 +131,45 @@ fn start(words: &[u8]) -> Vec<Step<jig_test_client_domain::Address>> {
 
 #[test]
 fn a_chat_proposing_a_goal_its_member_cannot_fund_is_accepted_by_a_maintainer() {
-    let mut world = world(8513, vec![
-        Box::new([Script::Call(Call::ProposeGoal { words: b"fund a larger goal".as_slice().into(),
-            budget: 150, priority: 7 }), Script::Park]),
-        Box::new([Script::Finish { report: b"goal completed".as_slice().into() }]),
-    ]);
-    let member = world.client(3, crate::stories::conversation());
+    let mut world = world(
+        8513,
+        vec![
+            Box::new([
+                Script::Call(Call::ProposeGoal {
+                    words: b"fund a larger goal".as_slice().into(),
+                    budget: 150,
+                    priority: 7,
+                }),
+                Script::Park,
+            ]),
+            Box::new([Script::Finish { report: b"goal completed".as_slice().into() }]),
+        ],
+    );
+    let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
     world.person(member, start(b"please propose"));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
-    let maintainer = world.client(2, crate::stories::inbox());
+    let maintainer = world.client_with(2, crate::stories::inbox(), receiving_limits(), client);
     let within = Duration::from_secs(1);
-    world.person(maintainer, vec![
-        Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
-        Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
-        Step::See { find: Find::text(b"fund a larger goal"), within },
-        Step::See { find: Find::exactly_named(Role::Button, b"Accept"), within },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Accept") },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-        Step::See { find: Find::text(b"Accepted"), within },
-    ]);
+    world.person(
+        maintainer,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::text(b"fund a larger goal"), within },
+            Step::See { find: Find::exactly_named(Role::Button, b"Accept"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Accept") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Accepted"), within },
+        ],
+    );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert!(outcome.judged.0 > 0);
     let actual = world.front().session.driver.world.peers.as_ref().expect("actual peers").parties[1]
-        .person.expect("actual maintainer");
+        .person
+        .expect("actual maintainer");
     assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
         jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
         if task.tracked == Some(7) && task.requester == jig_core_tasks::Party::Person(actual)
@@ -103,32 +178,42 @@ fn a_chat_proposing_a_goal_its_member_cannot_fund_is_accepted_by_a_maintainer() 
 
 #[test]
 fn a_person_answers_a_choice_between_two_reports() {
-    let mut world = world(8514, vec![Box::new([
-        Script::Call(Call::Choose { role: 1, first: b"first report".as_slice().into(),
-            second: b"second report".as_slice().into() }),
-        Script::Wait, Script::Finish { report: b"choice received".as_slice().into() },
-    ])]);
-    let member = world.client(3, crate::stories::conversation());
+    let mut world = world(
+        8514,
+        vec![Box::new([
+            Script::Call(Call::Choose {
+                role: 1,
+                first: b"first report".as_slice().into(),
+                second: b"second report".as_slice().into(),
+            }),
+            Script::Wait,
+            Script::Finish { report: b"choice received".as_slice().into() },
+        ])],
+    );
+    let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
     world.person(member, start(b"ask a maintainer"));
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
-    let maintainer = world.client(2, crate::stories::inbox());
+    let maintainer = world.client_with(2, crate::stories::inbox(), receiving_limits(), client);
     let within = Duration::from_secs(1);
-    world.person(maintainer, vec![
-        Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
-        Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
-        Step::See { find: Find::text(b"first report or second report"), within },
-        Step::See { find: Find::exactly_named(Role::Button, b"Take it"), within },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Take it") },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-        Step::See { find: Find::exactly_named(Role::Button, b"Answer"), within },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Answer") },
-        Step::See { find: Find::exactly_named(Role::Choice, b"Choice code: 2"), within },
-        Step::Press { find: Find::exactly_named(Role::Choice, b"Choice code: 2") },
-        Step::Type { find: Find::named(Role::TextArea, b"Your reason"), words: b"second report".as_slice().into() },
-        Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-    ]);
+    world.person(
+        maintainer,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::text(b"first report or second report"), within },
+            Step::See { find: Find::exactly_named(Role::Button, b"Take it"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Take it") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::exactly_named(Role::Button, b"Answer"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Answer") },
+            Step::See { find: Find::exactly_named(Role::Choice, b"Choice code: 2"), within },
+            Step::Press { find: Find::exactly_named(Role::Choice, b"Choice code: 2") },
+            Step::Type { find: Find::named(Role::TextArea, b"Your reason"), words: b"second report".as_slice().into() },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+        ],
+    );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
@@ -137,6 +222,10 @@ fn a_person_answers_a_choice_between_two_reports() {
         jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
         if matches!(&task.phase, jig_core_tasks::Phase::Ended(jig_core_tasks::Ending::Done(
             jig_core_tasks::TaskResult::Verdict { code: 2, words, .. })) if words.as_ref() == b"second report"))));
-    assert!(owner.peers.as_ref().expect("actual worker").workers[0].messages.iter()
-        .any(|(_, _, _, words)| words.as_ref() == b"second report"));
+    assert!(
+        owner.peers.as_ref().expect("actual worker").workers[0]
+            .messages
+            .iter()
+            .any(|(_, _, _, words)| words.as_ref() == b"second report")
+    );
 }
