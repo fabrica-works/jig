@@ -231,7 +231,7 @@ fn every_part_is_owned_scoped_and_read_without_mutating_its_records() {
     let ClientDocument::Project { project, resources: adopted } = &documents[4] else { panic!("project") };
     assert_eq!(*project, 1);
     assert_eq!(adopted, resources);
-    let ClientDocument::Deployment { outbox, subject_limit, staged_limit } = &documents[5] else {
+    let ClientDocument::Deployment { outbox, subject_limit, staged_limit, .. } = &documents[5] else {
         panic!("deployment")
     };
     assert_eq!(outbox, effects);
@@ -289,3 +289,5 @@ fn an_outbox_part_uses_the_retained_entry_and_marks_its_removal() {
     assert!(marked(&settled, subject));
     assert_eq!(document(&mut world, subject), Err(connector::DocumentMissing::Unknown));
 }
+
+mod deployment_diagnostics;

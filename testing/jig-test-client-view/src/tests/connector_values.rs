@@ -149,7 +149,13 @@ fn connector_values_view_renders_all_eight_complete_documents_at_maximum_scalar_
         ),
         (ClientDocument::Project { project: u32::MAX, resources: list(3, [resource()]) }, b"Owner project"),
         (
-            ClientDocument::Deployment { outbox: list(3, [entry()]), subject_limit: u32::MAX, staged_limit: u32::MAX },
+            ClientDocument::Deployment {
+                outbox: list(3, [entry()]),
+                subject_limit: u32::MAX,
+                staged_limit: u32::MAX,
+                request_budget: DiagnosticAvailability::NotKept,
+                system_last_response: DiagnosticAvailability::NotKept,
+            },
             b"Owner deployment",
         ),
     ];
@@ -750,3 +756,5 @@ fn connector_values_view_every_moved_hold_reason_failure_and_ending_keeps_only_a
         );
     }
 }
+
+mod deployment_diagnostics;

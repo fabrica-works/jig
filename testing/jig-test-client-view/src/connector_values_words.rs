@@ -107,8 +107,10 @@ pub enum Word {
     ProposableNo,
     ProposableUnknown,
     FactState,
+    SystemRequestBudgetNotKept,
+    LastSystemResponseNotKept,
 }
-pub const ALL: [Word; 95] = [
+pub const ALL: [Word; 97] = [
     Word::ScopeProject,
     Word::ScopeDeployment,
     Word::Object,
@@ -204,6 +206,8 @@ pub const ALL: [Word; 95] = [
     Word::ProposableNo,
     Word::ProposableUnknown,
     Word::FactState,
+    Word::SystemRequestBudgetNotKept,
+    Word::LastSystemResponseNotKept,
 ];
 impl Word {
     #[must_use]
@@ -304,6 +308,8 @@ impl Word {
             Self::ProposableNo => 6692,
             Self::ProposableUnknown => 6693,
             Self::FactState => 6694,
+            Self::SystemRequestBudgetNotKept => 6695,
+            Self::LastSystemResponseNotKept => 6696,
         };
         PhraseId { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, number }
     }
@@ -404,6 +410,8 @@ impl Word {
             Self::ProposableNo => (b"Proposal not permitted", None),
             Self::ProposableUnknown => (b"Proposal eligibility not supplied", None),
             Self::FactState => (b"Observed resource state: ", Some(HoleKind::Number)),
+            Self::SystemRequestBudgetNotKept => (b"System request budget: not kept by this connector", None),
+            Self::LastSystemResponseNotKept => (b"What the system last said: not kept by this connector", None),
         }
     }
     #[must_use]
@@ -420,7 +428,7 @@ impl Word {
 #[must_use]
 pub fn shapes(normal: Box<[PhraseShape]>) -> Box<[PhraseShape]> {
     let capacity =
-        u32::try_from(normal.len()).expect("normal shape count fits").checked_add(95).expect("owner shapes fit");
+        u32::try_from(normal.len()).expect("normal shape count fits").checked_add(97).expect("owner shapes fit");
     let mut result = List::with_capacity(capacity);
     for shape in normal {
         result.push(shape).expect("normal shapes fit");
@@ -435,7 +443,7 @@ pub fn shapes(normal: Box<[PhraseShape]>) -> Box<[PhraseShape]> {
 pub fn language(normal: Language) -> Language {
     let capacity = u32::try_from(normal.phrases.len())
         .expect("normal phrase count fits")
-        .checked_add(95)
+        .checked_add(97)
         .expect("owner phrases fit");
     let mut result = List::with_capacity(capacity);
     for phrase in normal.phrases {

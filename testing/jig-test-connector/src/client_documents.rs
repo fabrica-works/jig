@@ -37,6 +37,14 @@ pub struct ClientResource {
     pub fact: Option<crate::Fact>,
 }
 
+/// Whether the connector supplies a system diagnostic in its deployment document.
+/// No system response or rate budget is retained.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DiagnosticAvailability {
+    /// This connector does not keep the diagnostic.
+    NotKept,
+}
+
 /// Whole current values; paths and lists keep this connector's bounds.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ClientDocument {
@@ -78,6 +86,8 @@ pub enum ClientDocument {
         outbox: List<crate::OutboxEntry>,
         subject_limit: u32,
         staged_limit: u32,
+        request_budget: DiagnosticAvailability,
+        system_last_response: DiagnosticAvailability,
     },
 }
 
@@ -251,6 +261,8 @@ fn make(
                 outbox: effects(domain, limits, None),
                 subject_limit: limits.values,
                 staged_limit: limits.staged,
+                request_budget: DiagnosticAvailability::NotKept,
+                system_last_response: DiagnosticAvailability::NotKept,
             })
         }
     }

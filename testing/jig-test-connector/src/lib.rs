@@ -31,7 +31,8 @@ mod application;
 mod client_documents;
 mod client_marks;
 pub use client_documents::{
-    ClientDocument, ClientResource, ClientScope, ClientSubject, DocumentMissing, document_worst_case,
+    ClientDocument, ClientResource, ClientScope, ClientSubject, DiagnosticAvailability, DocumentMissing,
+    document_worst_case,
 };
 pub mod application_core;
 pub use application::{

@@ -6,8 +6,8 @@ use jig_client_view::{Builder, Role, Run, phrases::Hole, words::Words};
 use jig_test_client_domain::{
     connector_values::{
         ApplicationObject, ApplicationOutcome, ClientDocument, ClientResource, ConnectorAnswer, ConnectorDocument,
-        ConnectorLimits, Description, Effect, EffectPhase, Form, Hold, HoldMode, OutboxEntry, Path, ProcedureState,
-        Recovery, ResourceRole, application_core,
+        ConnectorLimits, Description, DiagnosticAvailability, Effect, EffectPhase, Form, Hold, HoldMode, OutboxEntry,
+        Path, ProcedureState, Recovery, ResourceRole, application_core,
     },
     family::Scope,
 };
@@ -241,9 +241,15 @@ pub fn document(b: &mut Builder, value: &ConnectorDocument, words: &Words) {
             number(b, words, Word::ProjectNumber, u64::from(*project));
             resources(b, words, rows);
         }
-        ClientDocument::Deployment { outbox, subject_limit, staged_limit } => {
+        ClientDocument::Deployment { outbox, subject_limit, staged_limit, request_budget, system_last_response } => {
             number(b, words, Word::SubjectLimit, u64::from(*subject_limit));
             number(b, words, Word::StagedLimit, u64::from(*staged_limit));
+            match request_budget {
+                DiagnosticAvailability::NotKept => text(b, words, Word::SystemRequestBudgetNotKept, &[]),
+            }
+            match system_last_response {
+                DiagnosticAvailability::NotKept => text(b, words, Word::LastSystemResponseNotKept, &[]),
+            }
             entries(b, words, outbox);
         }
     }

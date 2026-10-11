@@ -102,7 +102,13 @@ fn variants() -> [ClientDocument; 8] {
         ClientDocument::Outbox { entry: entry(), description: description() },
         ClientDocument::Hold { task: u64::MAX, resources: list(3, [resource()]), effects: list(3, [entry()]) },
         ClientDocument::Project { project: u32::MAX, resources: list(3, [resource()]) },
-        ClientDocument::Deployment { outbox: list(3, [entry()]), subject_limit: u32::MAX, staged_limit: u32::MAX },
+        ClientDocument::Deployment {
+            outbox: list(3, [entry()]),
+            subject_limit: u32::MAX,
+            staged_limit: u32::MAX,
+            request_budget: DiagnosticAvailability::NotKept,
+            system_last_response: DiagnosticAvailability::NotKept,
+        },
     ]
 }
 #[test]
@@ -177,7 +183,13 @@ fn connector_values_each_structural_capacity_checks_its_own_boundary() {
         bound.paths = paths;
         assert_eq!(document_fits(&document, &bound), admitted);
     }
-    let document = carrier(ClientDocument::Deployment { outbox: list(2, []), subject_limit: 0, staged_limit: 0 });
+    let document = carrier(ClientDocument::Deployment {
+        outbox: list(2, []),
+        subject_limit: 0,
+        staged_limit: 0,
+        request_budget: DiagnosticAvailability::NotKept,
+        system_last_response: DiagnosticAvailability::NotKept,
+    });
     for (rows, admitted) in [(1, false), (2, true), (3, true)] {
         let mut bound = bounds();
         bound.rows = rows;
@@ -264,3 +276,5 @@ fn connector_values_the_full_panel_attains_the_priced_structural_worst_case() {
     overflow.segment_bytes = u32::MAX;
     assert!(document_worst_case(&overflow).is_none());
 }
+
+mod deployment_diagnostics;
