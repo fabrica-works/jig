@@ -258,3 +258,77 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
         2
     );
 }
+
+#[test]
+fn a_hold_moved_in_the_engine_is_refused_as_moved_and_shown_current() {
+    let mut world = super::world(super::turn());
+    let client = world.client(1, crate::stories::conversation());
+    let within = Duration::from_secs(1);
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+            Step::See { find: Find::named(Role::TextArea, b"First words"), within },
+            Step::Type { find: Find::named(Role::TextArea, b"First words"), words: b"Hello".as_slice().into() },
+            Step::Press { find: Find::named(Role::Button, b"Start a conversation") },
+            Step::See { find: Find::text(b"Hello"), within },
+            Step::Pause { span: Duration::from_millis(450) },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Stop") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Held stopped"), within },
+            Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let moved_at = world.now().saturating_add(Duration::from_millis(20));
+    world.front().session.sources_at(vec![(
+        moved_at,
+        jig_test_domain::Event::Core(jig_core::Event::Tasks(jig_core_tasks::Event::Hold {
+            task: 1,
+            why: jig_core_tasks::Hold::Budget,
+        })),
+    )]);
+    // Hold back deliveries, preserving the person's old revision while the
+    // actual engine admits the scheduled new hold and judges the release.
+    world.fault(crate::FrontFault::Slow { span: Duration::from_millis(80) });
+    world.person(
+        client,
+        vec![
+            Step::Pause { span: Duration::from_millis(40) },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"The hold or its reason changed"), within },
+            Step::See { find: Find::text(b"Held budget"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    super::offered_acts::task(&mut world, client, 1);
+    let owner = &world.front().session.driver.world;
+    assert_eq!(owner.peers.as_ref().expect("actual worker").workers[0].seen.len(), 1);
+    assert!(owner.store.rows.values().any(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))
+        if task.number == 1 && task.revisions.hold == 2 && matches!(task.phase,
+            jig_core_tasks::Phase::Held { why: jig_core_tasks::Hold::Budget, .. }))));
+    assert_eq!(
+        owner
+            .store
+            .rows
+            .values()
+            .filter(|row| matches!(
+                row,
+                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+            ))
+            .count(),
+        3
+    );
+    assert!(owner.store.rows.values().any(|row| matches!(row,
+    jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+    if matches!(outcome, people::Outcome::Refused(people::Refusal::Moved {
+        now: people::Moved::Hold { revision: 2, reason: people::HoldReason::Budget },
+    })))));
+}
