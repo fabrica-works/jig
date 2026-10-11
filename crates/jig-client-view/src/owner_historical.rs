@@ -123,9 +123,7 @@ fn task(b: &mut Builder, client: &Domain, value: &Task, words: &Words, bindings:
     crate::pages::task::overview(b, client, value, words, bindings);
     crate::pages::task::budget(b, value, words, bindings);
 }
-/// Render each genuine source separately. No current card controls are added.
-pub fn render(b: &mut Builder, client: &Domain, value: &OwnerHistorical, words: &Words, bindings: &mut JigBindings) {
-    region(b, words, P::Historical);
+fn outer(b: &mut Builder, value: &OwnerHistorical, words: &Words) {
     match value.at {
         Some(time) => at(b, words, P::At, time),
         None => label(b, words, P::AtAbsent),
@@ -137,6 +135,11 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerHistorical, words: 
         }
         None => label(b, words, P::ByAbsent),
     }
+}
+/// Render each genuine source separately. No current card controls are added.
+pub fn render(b: &mut Builder, client: &Domain, value: &OwnerHistorical, words: &Words, bindings: &mut JigBindings) {
+    region(b, words, P::Historical);
+    outer(b, value, words);
     match &value.value {
         OwnerHistoricalValue::Task { document, result } => {
             label(b, words, P::Task);
