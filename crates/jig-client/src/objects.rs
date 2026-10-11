@@ -838,7 +838,11 @@ impl Body {
             Self::PersonTask(task) => task.ending.as_ref(),
             Self::Result(result) => Some(&result.ending),
             Self::Escalation(escalation) => escalation.ending.as_ref(),
-            Self::Chip(_) | Self::OwnerProposal(_) | Self::OwnerPersonTask(_) | Self::OwnerEscalation(_) | Self::Note { .. } => None,
+            Self::Chip(_)
+            | Self::OwnerProposal(_)
+            | Self::OwnerPersonTask(_)
+            | Self::OwnerEscalation(_)
+            | Self::Note { .. } => None,
         }
     }
 }
