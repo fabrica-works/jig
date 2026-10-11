@@ -119,10 +119,14 @@ fn world_for(seed: u64, story: Story) -> World<Client, Joint> {
         turn: jig_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
     };
     let front = Joint::for_story(seed, limits(), codec, story);
-    World::new(
+    let mut world = World::new(
         Settings { seed, heap_bytes_per_client: 64 * 1024 * 1024, iterations: 4096, ..Settings::default() },
         front,
-    )
+    );
+    // Draw transport faults explicitly from the real fault sources below;
+    // the generic person still explores every kind of displayed binding.
+    world.randomness(2, 0, 0);
+    world
 }
 pub fn watch_setup(front: &mut Joint) {
     front.source(root::Event::Infrastructure(infra::Event::Names {
@@ -172,7 +176,7 @@ pub fn refresh(front: &mut Joint) {
 }
 #[must_use]
 pub fn source_limits(seed: u64) -> root::Limits {
-    *Config::new(seed, Story::Alert).client_backed().limits()
+    *Config::new(seed, Story::Alert).client_backed().client_recovery().limits()
 }
 
 /// Same Ops root/shell observer with the joint world's declared receiving profile.

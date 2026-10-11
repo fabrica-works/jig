@@ -907,7 +907,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
         }
         Event::Restore { record } => restore(domain, record),
-        Event::ReadAfresh => read_afresh(domain),
+        Event::ReadAfresh => read_afresh(domain, out),
         Event::Restart => {
             domain.restart = Some(crate::RestartStage::Outbox);
             for (key, entry) in &domain.effects {
@@ -1013,7 +1013,7 @@ pub fn next_deadline(domain: &Domain) -> Option<Time> {
     }
 }
 
-fn read_afresh(domain: &mut Domain) {
+fn read_afresh(domain: &mut Domain, out: &mut Queue<Request>) {
     domain.restart = Some(crate::RestartStage::ReadAfresh);
     domain.application.read_afresh(&mut domain.refresh);
     for (environment, _) in &domain.made {
@@ -1022,7 +1022,10 @@ fn read_afresh(domain: &mut Domain) {
             .insert(Resource::Environment(environment.clone()), false)
             .expect("retained creation resources fit");
     }
-    for (_, (_, resources)) in &domain.reliance {
+    // connectors.md, 14: restored owner facts also rebuild the core's
+    // volatile resource reports; the root carries this existing Named fact.
+    for (task, (project, resources)) in &domain.reliance {
+        out.push(Request::Named { task: *task, project: *project, resources: resources.clone() });
         for named in resources {
             domain.refresh.insert(named.resource.clone(), false).expect("restored live resources fit");
         }

@@ -66,6 +66,15 @@ impl Config {
         self
     }
 
+    /// The joint client story's finite recovery profile. Its actual owner
+    /// deadline remains committed before every attempt (connectors.md, 4.3).
+    #[must_use]
+    pub fn client_recovery(mut self) -> Self {
+        self.limits.infrastructure.retry_after_seconds = 1;
+        self.limits.core.fleet.grace = Duration::from_secs(1);
+        self
+    }
+
     /// The exact finite engine bounds used by this fixture.
     #[must_use]
     pub fn limits(&self) -> &root::Limits {

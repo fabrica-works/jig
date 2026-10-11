@@ -1337,3 +1337,103 @@ fn native_environment_names_request_revision_and_whole_width_end_survive_the_cli
             .is_none()
     );
 }
+
+#[test]
+fn infrastructure_reopens_a_dropped_watch_after_the_link_goes_offline_and_live() {
+    let mut root = ready(61);
+    let initial = family_page(&mut root);
+    let old = family_watch(&initial);
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
+            read: family_read(&initial),
+            result: infrastructure::ReadResult::Value(Box::new(environment(2))),
+        }),
+    );
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Ended { watch: old, end: infrastructure::WatchEnd::Dropped }),
+    );
+    drive(&mut root, Event::Infrastructure(infrastructure::Event::Link { link: Link::Offline }));
+    let id = root.infrastructure().page().unwrap();
+    let rows = drive(&mut root, Event::Infrastructure(infrastructure::Event::Link { link: Link::Live }));
+    let watch = family_watch(&rows);
+    assert_ne!(old, watch, "the retired watch epoch is not reused");
+    let subject = root.infrastructure().object(id).unwrap().subject.clone();
+    assert!(rows.iter().any(|row| match row {
+        Request::Infrastructure(infrastructure::Out::Open { subject: got, .. }) => got == &subject,
+        _ => false,
+    }));
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Ended { watch: old, end: infrastructure::WatchEnd::NotAllowed }),
+    );
+    let document = environment(3);
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Watch {
+            watch,
+            event: infrastructure::WatchEvent::Delivered(Box::new(document.clone())),
+        }),
+    );
+    assert_eq!(root.infrastructure().object(id).unwrap().value, infrastructure::Value::Known(Box::new(document)));
+}
+
+#[test]
+fn observability_reopens_a_dropped_watch_after_the_link_goes_offline_and_live() {
+    use crate::observability;
+    let mut root = ready(62);
+    let initial = drive(
+        &mut root,
+        Event::Went {
+            place: crate::Place::Address(Address::Observability(observability::Address::Incidents {
+                project: 3,
+                open: true,
+            })),
+        },
+    );
+    let old = initial
+        .iter()
+        .find_map(|row| match row {
+            Request::Observability(observability::Out::Open { watch, .. }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    drive(
+        &mut root,
+        Event::Observability(observability::Event::Ended { watch: old, end: observability::WatchEnd::Dropped }),
+    );
+    drive(&mut root, Event::Observability(observability::Event::Link { link: Link::Offline }));
+    let id = root.observability().page().unwrap();
+    let rows = drive(&mut root, Event::Observability(observability::Event::Link { link: Link::Live }));
+    let watch = rows
+        .iter()
+        .find_map(|row| match row {
+            Request::Observability(observability::Out::Open { watch, .. }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    assert_ne!(old, watch, "the retired watch epoch is not reused");
+    let subject = root.observability().object(id).unwrap().subject;
+    assert!(rows.iter().any(|row| match row {
+        Request::Observability(observability::Out::Open { subject: got, .. }) => got == &subject,
+        _ => false,
+    }));
+    drive(
+        &mut root,
+        Event::Observability(observability::Event::Ended { watch: old, end: observability::WatchEnd::NotAllowed }),
+    );
+    let document = observability::Document::Incidents {
+        subject,
+        revision: contract::Revision { value: 3 },
+        incidents: List::with_capacity(2),
+    };
+    drive(
+        &mut root,
+        Event::Observability(observability::Event::Watch {
+            watch,
+            event: observability::WatchEvent::Delivered(Box::new(document.clone())),
+        }),
+    );
+    assert_eq!(root.observability().object(id).unwrap().value, observability::Value::Known(Box::new(document)));
+}

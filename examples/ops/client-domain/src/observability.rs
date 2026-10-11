@@ -450,6 +450,13 @@ fn close(side: &mut Side, id: Id<Watching>, out: &mut Queue<Request>) {
     }
 }
 fn retire_watch(side: &mut Side, id: Id<Watching>) {
+    let subject = side.watches.get(id).expect("retired watch exists").subject;
+    if let Some(object) = side.find(subject) {
+        let object = side.objects.get_mut(object).expect("named object exists");
+        if object.watch == Some(id) {
+            object.watch = None;
+        }
+    }
     let old = side.watch_ids.remove(&id);
     assert!(old.is_some(), "retired watch was indexed");
     side.watches.retire(id);

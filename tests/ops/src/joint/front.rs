@@ -16,7 +16,7 @@ use jig_core as core;
 use jig_core_people as people;
 use jig_ops_client_domain::{self as client, infrastructure as infra, observability as obs};
 use jig_ops_domain as root;
-use skein_lib::{ReplyTo, Time, Token, Wall};
+use skein_lib::{Duration, ReplyTo, Time, Token, Wall};
 use std::collections::BTreeMap;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Subject {
@@ -39,6 +39,9 @@ pub struct Joint {
     /// Whole Environment facts actually returned to a client, independent of
     /// the conformance peers' incident/procedure-only document observations.
     pub environment_documents: Vec<jig_ops_domain_infrastructure::ClientDocument>,
+    pub lost_final_answers: u64,
+    pub disconnects: u64,
+    pub reconnects: u64,
     pub limits: client::Limits,
     codec: jig_client_transcript::Limits,
     story: Story,
@@ -54,6 +57,10 @@ pub struct Joint {
     work: bool,
     observed: Vec<Observed>,
     pending_observed: Vec<Observed>,
+    offline_until: Option<Time>,
+    delay_until: Option<Time>,
+    lose_answers: u32,
+    crashes_seen: usize,
 }
 impl Joint {
     #[must_use]
@@ -62,13 +69,16 @@ impl Joint {
     }
     #[must_use]
     pub fn for_story(seed: u64, limits: client::Limits, codec: jig_client_transcript::Limits, story: Story) -> Self {
-        let configuration = Config::new(seed, story).client_backed();
+        let configuration = Config::new(seed, story).client_backed().client_recovery();
         let application_rows = configuration.limits().core.documents.rows;
         let mut engine = Harness::with_trace(configuration, seed, false);
         engine.drain().expect("actual Ops cold start");
         Self {
             engine,
             environment_documents: Vec::new(),
+            lost_final_answers: 0,
+            disconnects: 0,
+            reconnects: 0,
             limits,
             codec,
             story,
@@ -84,6 +94,10 @@ impl Joint {
             work: true,
             observed: Vec::new(),
             pending_observed: Vec::new(),
+            offline_until: None,
+            delay_until: None,
+            lose_answers: 0,
+            crashes_seen: 0,
         }
     }
     fn token(&mut self) -> Token {
@@ -96,6 +110,12 @@ impl Joint {
         self.engine.send(event);
     }
     pub fn source(&mut self, event: root::Event) {
+        if let root::Event::Observability(jig_ops_domain_observability::Event::System(
+            jig_ops_domain_observability::SystemEvent::Alert { own, alert },
+        )) = &event
+        {
+            self.engine.peers.alert_news.push((*own, alert.clone()));
+        }
         self.send_event(event);
     }
     fn advance(&mut self, now: Time) {
@@ -148,6 +168,10 @@ impl Joint {
         }
     }
     fn request(&mut self, client: ClientId, value: client::Request) {
+        if self.offline_until.is_some() {
+            self.parked.entry(client).or_default().push(value);
+            return;
+        }
         let Some(sign_in) = self.engine.peers.transport.sign_in(client) else {
             self.parked.entry(client).or_default().push(value);
             return;
@@ -364,6 +388,105 @@ fn subject_route(subject: Subject) -> Result<(core::documents::ApplicationScope,
     }
 }
 impl Joint {
+    fn release_callbacks(&mut self) -> Vec<(ClientId, client::Event)> {
+        let mut callbacks = Vec::new();
+        for (client, event) in std::mem::take(&mut self.callbacks) {
+            if matches!(event, client::Event::Answer { envelope: skein_lib::RequestEnvelope::Final, .. })
+                && self.lose_answers > 0
+            {
+                self.lose_answers -= 1;
+                self.lost_final_answers += 1;
+            } else {
+                callbacks.push((client, event));
+            }
+        }
+        callbacks
+    }
+    fn drop_watches(&mut self) {
+        for watcher in self.engine.peers.transport.watches() {
+            let packet = packets::dropped(&mut self.engine.peers.transport, watcher).expect("original dropped route");
+            self.incoming(packet);
+            self.send_event(root::Event::Core(core::Event::Unwatch { watcher }));
+        }
+        for (watcher, watch) in std::mem::take(&mut self.watches) {
+            let event = match watch.subject {
+                Subject::Infrastructure(_) => client::Event::Infrastructure(infra::Event::Ended {
+                    watch: watch.native,
+                    end: infra::WatchEnd::Dropped,
+                }),
+                Subject::Observability(_) => {
+                    client::Event::Observability(obs::Event::Ended { watch: watch.native, end: obs::WatchEnd::Dropped })
+                }
+            };
+            self.callbacks.push((watch.client, event));
+            self.send_event(root::Event::Core(core::Event::Unwatch { watcher }));
+        }
+    }
+    fn detach(&mut self, client: ClientId) {
+        self.archives.detach(client);
+        self.parked.remove(&client);
+        self.callbacks.retain(|(owner, _)| *owner != client);
+        self.reads.retain(|_, read| read.client != client);
+        for watcher in self.engine.peers.transport.detach(client) {
+            self.send_event(root::Event::Core(core::Event::Unwatch { watcher }));
+        }
+        let watches: Vec<_> =
+            self.watches.iter().filter_map(|(token, watch)| (watch.client == client).then_some(*token)).collect();
+        for watcher in watches {
+            self.watches.remove(&watcher).expect("original application watch");
+            self.send_event(root::Event::Core(core::Event::Unwatch { watcher }));
+        }
+    }
+    fn disconnected(&mut self, now: Time, offline: Duration) {
+        self.disconnects += 1;
+        for (client, event) in std::mem::take(&mut self.callbacks) {
+            let event = match event {
+                client::Event::Infrastructure(infra::Event::Read { read, .. }) => {
+                    Some(client::Event::Infrastructure(infra::Event::Read { read, result: infra::ReadResult::Busy }))
+                }
+                client::Event::Observability(obs::Event::Read { read, .. }) => {
+                    Some(client::Event::Observability(obs::Event::Read { read, result: obs::ReadResult::Busy }))
+                }
+                client::Event::Start { .. }
+                | client::Event::Went { .. }
+                | client::Event::Act { .. }
+                | client::Event::Answer { .. }
+                | client::Event::Jig(_)
+                | client::Event::Infrastructure(_)
+                | client::Event::Observability(_)
+                | client::Event::SignedOut => None,
+            };
+            if let Some(event) = event {
+                self.callbacks.push((client, event));
+            }
+        }
+        for (_, read) in std::mem::take(&mut self.reads) {
+            let event = match read.subject {
+                Subject::Infrastructure(_) => client::Event::Infrastructure(infra::Event::Read {
+                    read: read.native,
+                    result: infra::ReadResult::Busy,
+                }),
+                Subject::Observability(_) => {
+                    client::Event::Observability(obs::Event::Read { read: read.native, result: obs::ReadResult::Busy })
+                }
+            };
+            self.callbacks.push((read.client, event));
+        }
+        self.delay_until = None;
+        self.due = None;
+        self.lose_answers = 0;
+        self.drop_watches();
+        for client in self.engine.peers.transport.clients() {
+            self.archives.detach(client);
+            self.engine.peers.transport.detach(client);
+        }
+        // Cold restoration can advance the engine clock beyond this front's
+        // poll. Publish its durable facts only once the client clock catches up.
+        self.pending_observed.append(&mut self.engine.peers.observations);
+        self.observed.push(Observed::Reachable { live: false });
+        self.offline_until = Some(now.saturating_add(offline));
+        self.work = true;
+    }
     fn observe_environment(&mut self, document: &root::ClientDocument) {
         if let root::ClientDocument::Infrastructure(document) = document
             && matches!(document.as_ref(), jig_ops_domain_infrastructure::ClientDocument::Environment { .. })
@@ -555,7 +678,10 @@ impl Joint {
             root::Output::Now(core::Now::SignInRefused { .. }) => panic!("actual provider capacity exhausted"),
             root::Output::Application { to, outcome } => {
                 let to = to.into_token();
-                let route = self.engine.peers.transport.take_reply(to).expect("original native application reply");
+                let Some(route) = self.engine.peers.transport.take_reply(to) else {
+                    // A real reload retired this reply's original client epoch.
+                    return;
+                };
                 let Reply::Keyed { client, attempt, owner: KeyedOwner::Application { connector: 2 }, .. } = route
                 else {
                     panic!("wrong native application owner");
@@ -726,22 +852,47 @@ impl Front<super::fixture::Client> for Joint {
     }
     fn poll(&mut self, now: Time, _wall: Wall) -> Vec<(ClientId, client::Event)> {
         self.advance(now);
+        if let Some(until) = self.offline_until {
+            if now < until {
+                return std::mem::take(&mut self.callbacks);
+            }
+            self.offline_until = None;
+            self.reconnects += 1;
+            self.observed.append(&mut self.pending_observed);
+            self.observed.push(Observed::Reachable { live: true });
+            for client in self.engine.peers.transport.clients() {
+                self.callbacks.push((client, client::Event::Jig(self.engine.peers.transport.hello())));
+            }
+            for (client, requests) in std::mem::take(&mut self.parked) {
+                for request in requests {
+                    self.request(client, request);
+                }
+            }
+        }
         if self.due.is_some_and(|due| now < due) {
             return Vec::new();
         }
         if self.due.take().is_some() {
+            self.delay_until = None;
             self.observed.append(&mut self.pending_observed);
-            return std::mem::take(&mut self.callbacks);
+            return self.release_callbacks();
         }
         if self.work {
             self.work = false;
             for _ in 0..128 {
                 self.engine.drain().expect("actual Ops decisions satisfy conformance referee");
                 self.engine.peers.protocol.check().expect("every consumed normal packet reaches its original ACK");
+                let crashes = self.engine.outcome().crashes.len();
+                if crashes != self.crashes_seen {
+                    self.crashes_seen = crashes;
+                    self.disconnected(Time::from_nanos(self.engine.clock().now), Duration::from_millis(150));
+                    return std::mem::take(&mut self.callbacks);
+                }
                 let packets = std::mem::take(&mut self.engine.peers.packets);
                 if packets.is_empty() {
                     self.work = false;
-                    self.due = Some(Time::from_nanos(self.engine.clock().now));
+                    let due = Time::from_nanos(self.engine.clock().now);
+                    self.due = Some(self.delay_until.map_or(due, |until| until.max(due)));
                     self.pending_observed.append(&mut self.engine.peers.observations);
                     return Vec::new();
                 }
@@ -754,25 +905,52 @@ impl Front<super::fixture::Client> for Joint {
         Vec::new()
     }
     fn next_due(&self) -> Option<Time> {
+        if let Some(until) = self.offline_until {
+            return Some(until);
+        }
         self.due.or_else(|| {
             if self.work {
                 Some(self.now)
             } else {
-                // The conformance shell supplies its timer events when its clock advances.
-                // Its connectors use whole-second deadlines; keep those ticks visible
-                // while a person waits, rather than waking only at that person's timeout.
-                Some(Time::from_nanos(self.engine.clock().now.checked_add(1_000_000_000).expect("finite timer clock")))
+                // Advancing the conformance clock supplies the actual owners'
+                // timer events, including fleet adoption and subsecond task retries.
+                Some(Time::from_nanos(self.engine.clock().now.checked_add(100_000_000).expect("finite timer clock")))
             }
         })
     }
     fn observed(&mut self) -> Vec<Observed> {
         std::mem::take(&mut self.observed)
     }
-    fn fault(&mut self, _now: Time, fault: FrontFault) {
-        panic!("session 51.3 fault implementation outstanding: {fault:?}");
+    fn fault(&mut self, now: Time, fault: FrontFault) {
+        self.advance(now);
+        match fault {
+            FrontFault::Restart { offline } => {
+                self.engine.crash().expect("actual conformance cold restart");
+                self.crashes_seen = self.engine.outcome().crashes.len();
+                self.disconnected(now, offline);
+            }
+            FrontFault::Slow { span } => {
+                let until = now.saturating_add(span);
+                self.delay_until = Some(until);
+                self.due = self.due.map(|due| due.max(until));
+            }
+            FrontFault::NoAnswer => self.lose_answers = self.lose_answers.checked_add(1).expect("finite lost answers"),
+            FrontFault::DropWatch => self.drop_watches(),
+            FrontFault::Busy
+            | FrontFault::NotReady
+            | FrontFault::SignedOut
+            | FrontFault::Versions
+            | FrontFault::ObjectGone => {
+                panic!("not an Ops joint story fault: {fault:?}");
+            }
+        }
     }
-    fn reload(&mut self, _client: ClientId, _now: Time) {
-        panic!("session 51.3 reload implementation outstanding");
+    fn reload(&mut self, client: ClientId, now: Time) {
+        self.advance(now);
+        self.detach(client);
+        if self.offline_until.is_none() {
+            self.callbacks.push((client, client::Event::Jig(self.engine.peers.transport.hello())));
+        }
     }
     fn received(&mut self, client: ClientId, event: &client::Event) {
         match event {

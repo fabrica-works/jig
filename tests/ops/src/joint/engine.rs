@@ -5,11 +5,21 @@ use jig_client_world::harness::Observed;
 use jig_client_world::joint::{transport::Transport, truth::Truth};
 use jig_conformance::{Application, Clock, Input, Output, referee};
 use jig_core as core;
+use jig_core_people as people;
 use jig_fake_store::Store;
 use jig_ops_domain as root;
 use skein_lib::Time;
 
 pub type Rows = Store<root::Key, root::Record>;
+
+/// Commit positions read from durable owner rows, for replaying actual cuts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Milestone {
+    Acceptance(u64),
+    Outbox(u64),
+    Made,
+    MoveEnd,
+}
 
 pub struct Peers {
     pub conformance: conformance::Peers,
@@ -18,6 +28,14 @@ pub struct Peers {
     pub truth: Truth,
     pub observations: Vec<Observed>,
     pub protocol: jig_client_world::joint::referee::Referee,
+    /// Whole authenticated requests observed at the actual root boundary.
+    pub keyed_asks: Vec<(u64, [u8; 16], people::Ask)>,
+    pub application_asks: Vec<(u64, [u8; 16], jig_ops_domain_infrastructure::ApplicationRequest, [u8; 32])>,
+    pub milestones: Vec<(Milestone, u64)>,
+    /// The outside alert sender retains its whole notifications across a
+    /// receiver crash; cold recovery redelivers without inventing new facts.
+    pub alert_news: Vec<(bool, jig_ops_domain_observability::Alert)>,
+    replay_news: bool,
     applied: u64,
     delayed_infrastructure: Vec<(u64, root::Output)>,
 }
@@ -151,6 +169,11 @@ impl Application for OpsApplication {
             truth: Truth::default(),
             observations: Vec::new(),
             protocol: jig_client_world::joint::referee::Referee::default(),
+            keyed_asks: Vec::new(),
+            application_asks: Vec::new(),
+            milestones: Vec::new(),
+            alert_news: Vec::new(),
+            replay_news: false,
             applied: 0,
             delayed_infrastructure: Vec::new(),
         }
@@ -165,6 +188,8 @@ impl Application for OpsApplication {
         Ops::start(config, store)
     }
     fn cold(peers: &mut Peers, store: &Rows, clock: Clock) {
+        peers.packets.clear();
+        peers.replay_news = true;
         Ops::cold(&mut peers.conformance, store, clock);
     }
     fn timers(config: &Config) -> Vec<root::Event> {
@@ -181,6 +206,12 @@ impl Application for OpsApplication {
         Ops::release(domain, config, clock)
     }
     fn inbound(peers: &mut Peers, store: &Rows, clock: Clock, event: &mut root::Event) {
+        if let root::Event::Core(core::Event::People(people::Event::Ask { sign_in, key, ask, .. })) = event {
+            peers.keyed_asks.push((*sign_in, *key, ask.clone()));
+        }
+        if let root::Event::Application { sign_in, key, value, digest, .. } = event {
+            peers.application_asks.push((*sign_in, *key, value.clone(), *digest));
+        }
         if let root::Event::Core(core::Event::Delivered { watcher }) = event {
             peers.protocol.acknowledged(*watcher);
         }
@@ -200,6 +231,15 @@ impl Application for OpsApplication {
                 return Ops::deliver(&mut peers.conformance, systems, store, clock, other);
             }
         };
+        if let root::Output::CoreLoad(core::Now::SeenChat { request, task }) = delivery {
+            let row = store.rows.values().find_map(|record| match record {
+                root::Record::Core(core::Record::Tasks(jig_core_tasks::Stored::Ended(row))) if row.number == task => {
+                    Some(row.clone())
+                }
+                root::Record::Core(_) | root::Record::Infrastructure(_) | root::Record::Observability(_) => None,
+            });
+            return vec![Input::Event(root::Event::Core(core::Event::SeenChatLoaded { request, row, busy: false }))];
+        }
         if let root::Output::Core(core::Held::ReadLoad { load, range }) = delivery {
             let loaded = read_page(store, &range);
             return vec![Input::Event(root::Event::Core(core::Event::ReadLoaded { load, result: loaded }))];
@@ -331,6 +371,14 @@ impl Application for OpsApplication {
         ready: bool,
     ) -> Vec<Input<root::Event, root::Record>> {
         let mut events = Ops::poll(&mut peers.conformance, systems, store, clock, ready);
+        if ready && peers.replay_news {
+            peers.replay_news = false;
+            for (own, alert) in &peers.alert_news {
+                events.push(Input::Event(root::Event::Observability(jig_ops_domain_observability::Event::System(
+                    jig_ops_domain_observability::SystemEvent::Alert { own: *own, alert: alert.clone() },
+                ))));
+            }
+        }
         let delayed = std::mem::take(&mut peers.delayed_infrastructure);
         for (due, delivery) in delayed {
             if clock.now >= due {
@@ -352,6 +400,34 @@ impl Application for OpsApplication {
     }
     fn observed(peers: &mut Peers, systems: &Systems, store: &Rows, clock: Clock) -> Vec<referee::Observed> {
         if peers.applied != store.applied {
+            for row in store.rows.values() {
+                let milestone = match row {
+                    root::Record::Core(core::Record::Core(core::CoreRecord::ProposalDecision(decision)))
+                        if decision.choice == people::ProposalChoice::Accepted =>
+                    {
+                        match decision.proposer {
+                            people::Proposer::Task(task) => Some(Milestone::Acceptance(task)),
+                            people::Proposer::Party(_) => None,
+                        }
+                    }
+                    root::Record::Infrastructure(jig_ops_domain_infrastructure::Record::Outbox(entry)) => {
+                        Some(Milestone::Outbox(entry.key.task))
+                    }
+                    root::Record::Infrastructure(jig_ops_domain_infrastructure::Record::Made { .. }) => {
+                        Some(Milestone::Made)
+                    }
+                    root::Record::Infrastructure(jig_ops_domain_infrastructure::Record::ApplicationAnswer {
+                        outcome: jig_ops_domain_infrastructure::ApplicationOutcome::MovedEnd { .. },
+                        ..
+                    }) => Some(Milestone::MoveEnd),
+                    root::Record::Core(_) | root::Record::Infrastructure(_) | root::Record::Observability(_) => None,
+                };
+                if let Some(milestone) = milestone
+                    && !peers.milestones.iter().any(|(found, _)| *found == milestone)
+                {
+                    peers.milestones.push((milestone, store.applied));
+                }
+            }
             peers.observations.extend(peers.truth.applied(jig_core_world::store_peer::DurableSnapshot {
                 commit: store.applied,
                 at: Time::from_nanos(clock.now),

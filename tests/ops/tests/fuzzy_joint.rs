@@ -1,9 +1,14 @@
 //! P reads and acts on the actual engine's public Ops client tree.
 use jig_client::address::{Address as JigAddress, TaskSection};
 use jig_client_view::Role;
-use jig_client_world::Until;
+use jig_client_world::{
+    Until,
+    harness::{ClientId, FrontFault},
+};
+use jig_conformance::Cut;
 use jig_fake_person::{Find, Step};
 use jig_ops_client_domain::{Address, observability as obs};
+use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
 use skein_lib::Duration;
 use skein_world::domain::{Verdict, heap::Counting};
@@ -18,7 +23,14 @@ fn press(role: Role, words: &[u8]) -> Step<Address> {
 }
 #[test]
 fn p_accepts_the_restart_from_the_incidents_page() {
-    let (mut world, p) = monitor(511);
+    p_story(511, Cut::None, false);
+}
+
+type StoryWorld = jig_client_world::World<fixture::Client, jig_ops_world::joint::front::Joint>;
+
+fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
+    let (mut world, p) = monitor(seed);
+    world.front().engine.cut(cut);
     fixture::alert(world.front());
     world.person(
         p,
@@ -34,6 +46,15 @@ fn p_accepts_the_restart_from_the_incidents_page() {
             see(b"Restart service"),
             see(b"checkout"),
             see(b"production"),
+        ],
+    );
+    passed(&mut world);
+    if noise {
+        wander(&mut world, p, seed);
+    }
+    world.person(
+        p,
+        vec![
             Step::Go { address: Address::Jig(JigAddress::Task { task: 5, section: TaskSection::Plan }) },
             see(b"restart checkout"),
             see(b"Restart service"),
@@ -68,6 +89,8 @@ fn p_accepts_the_restart_from_the_incidents_page() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
     assert_durable_restart(&world.front().engine);
+    assert_acceptance_key(&mut world, false);
+    world
 }
 
 fn monitor(
@@ -238,13 +261,20 @@ fn assert_durable_restart(engine: &jig_conformance::Harness<jig_ops_world::joint
 
 #[test]
 fn q_asks_for_an_environment_in_a_chat_and_accepts_what_it_costs() {
-    let mut world = fixture::environment_world(513);
+    q_story(513, Cut::None, false, false);
+}
+
+fn q_story(seed: u64, cut: Cut, noise: bool, reload: bool) -> StoryWorld {
+    let mut world = fixture::environment_world(seed);
     let q = world.client_with(
         1,
         Address::Jig(JigAddress::Conversations { project: None }),
         fixture::limits(),
         fixture::client,
     );
+    world.person(q, vec![Step::See { find: Find::named(Role::TextArea, b"First words"), within: WITHIN }]);
+    passed(&mut world);
+    world.front().engine.cut(cut);
     world.person(
         q,
         vec![
@@ -269,6 +299,9 @@ fn q_asks_for_an_environment_in_a_chat_and_accepts_what_it_costs() {
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
     let outcome = world.run(Until::Time(outcome.now.saturating_add(Duration::from_secs(8))));
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
+    if noise {
+        wander(&mut world, q, seed);
+    }
     let front = world.front();
     let native =
         jig_ops_domain_infrastructure::Environment::new(b"staging".as_slice().into(), b"payments".as_slice().into());
@@ -297,15 +330,53 @@ fn q_asks_for_an_environment_in_a_chat_and_accepts_what_it_costs() {
                 find: Find::named(Role::TextField, b"New end (seconds since epoch)"),
                 words: b"1209600".as_slice().into(),
             },
-            press(Role::Button, b"Move end"),
-            see(b"End moved"),
-            see(b"Revision 1"),
-            see(b"1209600"),
         ],
     );
+    passed(&mut world);
+    move_end(&mut world, q, reload);
+    world
+}
+
+fn move_end(world: &mut StoryWorld, q: ClientId, reload: bool) {
+    if reload {
+        world.fault(FrontFault::NoAnswer);
+    }
+    world.person(q, vec![press(Role::Button, b"Move end")]);
+    let outcome = world.run(Until::Steps(1));
+    assert!(matches!(outcome.verdict, Verdict::Passed | Verdict::Open { .. }), "{}", outcome.trace.join("\n"));
+    if reload {
+        let crashes_before = world.front().engine.outcome().crashes.len();
+        let mut retired = false;
+        for _ in 0..128 {
+            let until = world.now().saturating_add(Duration::from_millis(10));
+            world.run(Until::Time(until));
+            let front = world.front();
+            if front.lost_final_answers == 1 || front.engine.outcome().crashes.len() > crashes_before {
+                retired = true;
+                break;
+            }
+        }
+        let front = world.front();
+        assert!(
+            retired,
+            "actual original reply loss: asks {:?} lost {} crashes {:?}",
+            front.engine.peers.application_asks,
+            front.lost_final_answers,
+            front.engine.outcome().crashes
+        );
+        world.reload(q);
+        // A restored table request belongs to Kept, rather than the former
+        // volatile environment card. Read the owner's actual resulting revision.
+        world.person(q, vec![see(b"Revision 1"), see(b"1209600")]);
+    } else {
+        world.person(q, vec![see(b"End moved"), see(b"Revision 1"), see(b"1209600")]);
+    }
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
     assert_durable_environment(world.front());
+    if reload {
+        assert_native_retries(world);
+    }
 }
 
 fn assert_durable_environment(front: &jig_ops_world::joint::front::Joint) {
@@ -481,4 +552,207 @@ fn assert_durable_end(
         })
         .expect("the owner saved its desired end separately from the observed lease");
     assert_eq!(end, infra::EnvironmentEnd { revision: 1, until: 1_209_600 });
+}
+
+fn passed(world: &mut StoryWorld) {
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
+}
+
+/// Seeded choices among links from the actual displayed tree. Every press goes
+/// through the fake person's ordinary binding, between the story's steps.
+fn wander(world: &mut StoryWorld, person: ClientId, seed: u64) {
+    world.person(
+        person,
+        vec![Step::Go { address: Address::Observability(obs::Address::Incidents { project: 1, open: true }) }],
+    );
+    passed(world);
+    world.random_person(person);
+    passed(world);
+    let mut random = skein_lib::Rng::new(seed);
+    for _ in 0..3 {
+        let links: Vec<_> = world
+            .tree(person)
+            .nodes()
+            .iter()
+            .filter(|node| node.role == Role::Link && node.link.is_some())
+            .filter_map(|node| node.name.clone())
+            .collect();
+        assert!(!links.is_empty(), "actual story page has navigation links");
+        let selected = usize::try_from(random.below(links.len() as u64)).expect("bounded link index");
+        world.person(person, vec![press(Role::Link, &links[selected])]);
+        passed(world);
+        match random.below(3) {
+            0 => world.fault(FrontFault::DropWatch),
+            1 => world.fault(FrontFault::Slow { span: Duration::from_millis(20) }),
+            2 => {}
+            value => panic!("bounded random choice {value}"),
+        }
+        passed(world);
+    }
+}
+
+fn position(world: &mut StoryWorld, wanted: Milestone) -> u64 {
+    world
+        .front()
+        .engine
+        .peers
+        .milestones
+        .iter()
+        .find_map(|(milestone, commit)| (*milestone == wanted).then_some(*commit))
+        .expect("genuine durable milestone reached")
+}
+
+fn assert_recovered(world: &mut StoryWorld, commit: u64) {
+    let until = world.now().saturating_add(Duration::from_millis(100));
+    let outcome = world.run(Until::Time(until));
+    assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
+    let front = world.front();
+    assert_eq!(front.engine.outcome().crashes, vec![commit]);
+    assert_eq!(front.disconnects, 1);
+    assert_eq!(front.reconnects, 1);
+    assert!(!front.engine.outcome().stopped);
+    front.engine.peers.protocol.check().expect("all consumed packets retain their actual ACK");
+}
+
+fn assert_acceptance_key(world: &mut StoryWorld, replayed: bool) {
+    use jig_core_people as people;
+    let front = world.front();
+    let requests: Vec<_> = front
+        .engine
+        .peers
+        .keyed_asks
+        .iter()
+        .filter(|(_, _, ask)| {
+            matches!(
+                ask,
+                people::Ask::DecideProposal {
+                    proposer: people::Proposer::Task(6),
+                    decision: people::ProposalDecision::Accept,
+                    ..
+                }
+            )
+        })
+        .collect();
+    assert!(requests.len() >= if replayed { 2 } else { 1 }, "actual authenticated acceptance attempts: {requests:?}");
+    assert!(
+        requests.iter().all(|request| request == &requests[0]),
+        "P's whole original authenticated key and ask survive"
+    );
+    let (_, key, ask) = requests[0];
+    let answers: Vec<_> = front
+        .engine
+        .store
+        .rows
+        .values()
+        .filter_map(|row| match row {
+            jig_ops_domain::Record::Core(jig_core::Record::People(people::Stored::Answer {
+                key: found,
+                ask: made_ask,
+                outcome,
+                ..
+            })) if found.key == *key => Some((found, made_ask, outcome)),
+            jig_ops_domain::Record::Core(_)
+            | jig_ops_domain::Record::Infrastructure(_)
+            | jig_ops_domain::Record::Observability(_) => None,
+        })
+        .collect();
+    assert_eq!(answers.len(), 1, "one actual keyed acceptance answer");
+    assert_eq!(answers[0].0.person, 1);
+    assert_eq!(answers[0].1.as_ref(), ask);
+    assert!(matches!(
+        answers[0].2,
+        people::Outcome::ProposalDecided {
+            proposer: people::Proposer::Task(6),
+            by: 1,
+            choice: people::ProposalChoice::Accepted,
+            ..
+        }
+    ));
+}
+
+fn assert_native_retries(world: &mut StoryWorld) {
+    let front = world.front();
+    let requests = &front.engine.peers.application_asks;
+    assert!(requests.len() >= 2, "actual pending whole request was replayed after reload: {requests:?}");
+    assert!(requests.iter().all(|request| request == &requests[0]), "same authenticated key, whole request and digest");
+    let key = requests[0].1;
+    assert!(
+        front.engine.store.rows.values().any(|row| matches!(row,
+        jig_ops_domain::Record::Core(jig_core::Record::People(jig_core_people::Stored::Answer {
+            key: found, outcome: jig_core_people::Outcome::Applied { connector: 2, .. }, ..
+        })) if found.key == key)),
+        "the actual keyed answer survived the reload"
+    );
+}
+
+#[test]
+fn p_acceptance_survives_the_commit_before_its_durable_decision() {
+    let mut baseline = p_story(531, Cut::None, false);
+    let commit = position(&mut baseline, Milestone::Acceptance(6)) - 1;
+    let mut recovered = p_story(531, Cut::AfterCommit(commit), false);
+    assert_recovered(&mut recovered, commit);
+    assert_acceptance_key(&mut recovered, false);
+}
+
+#[test]
+fn p_acceptance_survives_its_durable_decision_commit() {
+    let mut baseline = p_story(532, Cut::None, false);
+    let commit = position(&mut baseline, Milestone::Acceptance(6));
+    let mut recovered = p_story(532, Cut::AfterCommit(commit), false);
+    assert_recovered(&mut recovered, commit);
+    assert_acceptance_key(&mut recovered, true);
+}
+
+#[test]
+fn p_acceptance_survives_the_commit_after_its_durable_decision() {
+    let mut baseline = p_story(533, Cut::None, false);
+    let commit = position(&mut baseline, Milestone::Acceptance(6)) + 1;
+    let mut recovered = p_story(533, Cut::AfterCommit(commit), false);
+    assert_recovered(&mut recovered, commit);
+    assert_acceptance_key(&mut recovered, true);
+}
+
+#[test]
+fn q_provision_survives_its_acceptance_commit_and_move_end_survives_reload() {
+    let mut baseline = q_story(534, Cut::None, false, false);
+    let commit = position(&mut baseline, Milestone::Acceptance(1));
+    let mut recovered = q_story(534, Cut::AfterCommit(commit), false, true);
+    assert_recovered(&mut recovered, commit);
+}
+
+#[test]
+fn q_provision_survives_its_made_commit_and_move_end_survives_reload() {
+    let mut baseline = q_story(535, Cut::None, false, false);
+    let commit = position(&mut baseline, Milestone::Made);
+    let mut recovered = q_story(535, Cut::AfterCommit(commit), false, true);
+    assert_recovered(&mut recovered, commit);
+}
+
+#[test]
+fn q_move_end_survives_its_durable_answer_commit_and_reload() {
+    let mut baseline = q_story(536, Cut::None, false, false);
+    let commit = position(&mut baseline, Milestone::MoveEnd);
+    let mut recovered = q_story(536, Cut::AfterCommit(commit), false, true);
+    assert_recovered(&mut recovered, commit);
+}
+
+#[test]
+fn p_story_survives_seeded_commit_crashes_and_random_presses() {
+    for seed in [537, 538] {
+        let mut world = p_story(seed, Cut::Random { seed: seed ^ 0x33 }, true);
+        assert_eq!(world.front().engine.outcome().crashes.len(), 1);
+        assert_eq!(world.front().disconnects, 1);
+        assert_eq!(world.front().reconnects, 1);
+    }
+}
+
+#[test]
+fn q_story_survives_seeded_commit_crashes_reload_and_random_presses() {
+    for seed in [539, 540] {
+        let mut world = q_story(seed, Cut::Random { seed: seed ^ 0x33 }, true, true);
+        assert_eq!(world.front().engine.outcome().crashes.len(), 1);
+        assert_eq!(world.front().disconnects, 1);
+        assert_eq!(world.front().reconnects, 1);
+    }
 }

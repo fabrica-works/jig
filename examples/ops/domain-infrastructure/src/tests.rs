@@ -542,3 +542,74 @@ fn assert_restored_provision_timer(domain: &Domain, fact: Option<EnvironmentFact
     assert_eq!(out.pop(), Some(Request::Wake { task: 7 }));
     assert!(out.is_empty(), "restoring a time condition makes no effect and invents no fact change");
 }
+
+#[test]
+fn restored_resource_reports_keep_owner_roles_holds_and_task_scopes_during_read_afresh() {
+    let first: Box<[Named]> = Box::from([
+        Named { resource: Resource::Service(service()), role: ResourceRole::Owned, hold: Hold::ExclusiveWait },
+        Named {
+            resource: Resource::Pool(Pool(Box::from(*b"staging"))),
+            role: ResourceRole::Participant,
+            hold: Hold::PooledWait,
+        },
+    ]);
+    let second: Box<[Named]> =
+        Box::from([Named { resource: Resource::Service(service()), role: ResourceRole::Context, hold: Hold::None }]);
+    let mut domain = Domain::new(Backend::OperationIds, &limits());
+    assert!(
+        event(
+            &mut domain,
+            1,
+            Event::Restore { record: Record::Rely { task: 7, project: 1, resources: first.clone() } }
+        )
+        .is_empty()
+    );
+    assert!(
+        event(
+            &mut domain,
+            1,
+            Event::Restore { record: Record::Rely { task: 8, project: 2, resources: second.clone() } }
+        )
+        .is_empty()
+    );
+    let mut out = event(&mut domain, 2, Event::ReadAfresh);
+    assert_eq!(out.pop(), Some(Request::Named { task: 7, project: 1, resources: first }));
+    assert_eq!(out.pop(), Some(Request::Named { task: 8, project: 2, resources: second }));
+    let mut reads = 0_u32;
+    while let Some(request) = out.pop() {
+        match request {
+            Request::System(SystemRequest::Service { service: got }) => {
+                assert_eq!(got, service());
+                reads += 1;
+            }
+            Request::System(SystemRequest::Pool { pool }) => {
+                assert_eq!(pool, Pool(Box::from(*b"staging")));
+                reads += 1;
+            }
+            other @ (Request::Document { .. }
+            | Request::ReadAnswered { .. }
+            | Request::Marked { .. }
+            | Request::ApplicationDone { .. }
+            | Request::ApplicationBusy { .. }
+            | Request::Closed { .. }
+            | Request::Released { .. }
+            | Request::Restarted { .. }
+            | Request::Named { .. }
+            | Request::Slots { .. }
+            | Request::Drift { .. }
+            | Request::Wake { .. }
+            | Request::Changed { .. }
+            | Request::Described { .. }
+            | Request::Refused { .. }
+            | Request::Make { .. }
+            | Request::Outcome { .. }
+            | Request::Step { .. }
+            | Request::Save { .. }
+            | Request::Erase { .. }
+            | Request::System(_)) => {
+                panic!("restoration supplies facts and fresh reads, not new writes or effects: {other:?}");
+            }
+        }
+    }
+    assert_eq!(reads, 2, "the shared service has one actual fresh read");
+}
