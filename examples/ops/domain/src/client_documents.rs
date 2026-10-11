@@ -210,6 +210,7 @@ pub(crate) fn read(
                     | infrastructure::Request::Restarted { .. }
                     | infrastructure::Request::Named { .. }
                     | infrastructure::Request::Slots { .. }
+                    | infrastructure::Request::Wake { .. }
                     | infrastructure::Request::Drift { .. }
                     | infrastructure::Request::Changed { .. }
                     | infrastructure::Request::Described { .. }

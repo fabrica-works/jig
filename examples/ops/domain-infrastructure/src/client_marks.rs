@@ -20,6 +20,7 @@ pub(crate) fn collect(domain: &Domain, env: &Env<Limits>, out: &mut Queue<Reques
             | Request::Released { .. }
             | Request::Restarted { .. }
             | Request::Named { .. }
+            | Request::Wake { .. }
             | Request::Drift { .. }
             | Request::Described { .. }
             | Request::Refused { .. }

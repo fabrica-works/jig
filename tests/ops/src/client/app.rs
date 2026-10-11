@@ -368,7 +368,7 @@ impl App for Ops {
             .filter_map(|(_, n)| {
                 n.key.filter(|k| {
                     matches!(k.owner, Owner::Side { connector } if connector == number(Connector::Infrastructure))
-                        && k.kind == 2
+                        && matches!(k.kind, 2 | 12)
                         && n.role == Role::Item
                 })
             })

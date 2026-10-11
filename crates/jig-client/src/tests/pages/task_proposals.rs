@@ -96,6 +96,61 @@ fn a_task_proposal_removed_from_its_last_watch_reads_its_actual_ending_and_keeps
     assert!(deliver(&mut domain, watch, task(&[key], 13)).is_empty());
     assert!(domain.task_page().proposals.is_empty());
 }
+
+#[test]
+fn a_genuine_watch_ending_keeps_a_shown_waiting_proposal_until_its_supplied_withdrawal() {
+    for end in [WatchEnd::Unknown, WatchEnd::SubjectEnded] {
+        let key = ProposalKey { proposer: Proposer::Task(8), number: 1 };
+        let (mut domain, watch) = opened();
+        let output = deliver(&mut domain, watch, task(&[key], 11));
+        receive(&mut domain, proposal_read(&output, key), proposal(key));
+        let id = domain.objects().find(ObjectKey::Proposal(key)).unwrap();
+        assert!(domain.objects().get(id).unwrap().shown);
+        let output = drive(&mut domain, Time::ZERO, Event::Ended { watch, end });
+        let read = proposal_read(&output, key);
+        assert_eq!(domain.objects().find(ObjectKey::Proposal(key)), Some(id));
+        assert!(domain.objects().get(id).unwrap().sources.is_empty());
+        let Card::Leaving { how: Left::Looking, .. } = domain.objects().get(id).unwrap().card else {
+            panic!("genuine source ending retains the shown proposal for its final read");
+        };
+        assert!(drive(&mut domain, Time::ZERO, Event::Ended { watch, end }).is_empty());
+        let supplied = OwnerHistorical {
+            key: ObjectKey::Proposal(key),
+            value: OwnerHistoricalValue::Proposal(OwnerProposalHistory {
+                action: OwnerRetainedAction::Batch(List::with_capacity(0)),
+                number: key.number,
+                proposer: 8,
+                as_holder: false,
+                state: OwnerProposalHistoryState::Withdrawn,
+            }),
+            at: None,
+            by: None,
+        };
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+        );
+        assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Historical(Box::new(supplied.clone()))));
+        let Card::Leaving { how: Left::Historical { .. }, .. } = domain.objects().get(id).unwrap().card else {
+            panic!("the supplied withdrawal explains the retained proposal");
+        };
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+        assert!(!domain.objects().get(id).unwrap().shown);
+        assert!(drive(&mut domain, Time::ZERO, Event::Ended { watch, end }).is_empty());
+    }
+    let key = ProposalKey { proposer: Proposer::Task(8), number: 1 };
+    let (mut domain, watch) = opened();
+    let output = deliver(&mut domain, watch, task(&[key], 11));
+    receive(&mut domain, proposal_read(&output, key), proposal(key));
+    let output = drive(&mut domain, Time::ZERO, Event::Ended { watch, end: WatchEnd::NotAllowed });
+    assert!(domain.objects().find(ObjectKey::Proposal(key)).is_none());
+    for request in &output {
+        if let Request::Read { what: Read::Proposal { .. }, .. } = request {
+            panic!("privacy retirement must not read the hidden proposal");
+        }
+    }
+}
 #[test]
 fn task_proposal_registration_keeps_the_header_then_refuses_excess_distinct_makers_without_guessing_identity() {
     let task_key = ProposalKey { proposer: Proposer::Task(8), number: 1 };

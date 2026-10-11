@@ -36,10 +36,10 @@ pub fn environment() -> Address {
 }
 pub(super) fn seen(tree: &ViewTree) -> Vec<Seen> {
     let mut seen = observe::jig_seen(tree);
-    for node in tree.nodes() {
+    for (at, node) in tree.nodes().iter().enumerate() {
         let Some(key) = node.key else { continue };
         if key.owner != (Owner::Side { connector: number(Connector::Infrastructure) })
-            || key.kind != 2
+            || !matches!(key.kind, 2 | 12)
             || node.role != Role::Item
         {
             continue;
@@ -55,7 +55,18 @@ pub(super) fn seen(tree: &ViewTree) -> Vec<Seen> {
         } else {
             CardSeen::Waiting
         };
-        seen.push(Seen::Card { key: CardKey::of(key), state, revision: None });
+        // The native form supplies the owner's end revision as the public
+        // field's write version, alongside the whole client object identity.
+        let revision = if key.kind == 12 {
+            tree.nodes()[at..at + usize::try_from(node.size).expect("card subtree")]
+                .iter()
+                .find(|field| field.role == Role::TextField)
+                .and_then(|field| field.value.as_ref())
+                .map(|value| value.written)
+        } else {
+            None
+        };
+        seen.push(Seen::Card { key: CardKey::of(key), state, revision });
     }
     seen
 }

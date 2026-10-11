@@ -36,8 +36,12 @@ struct Read {
 }
 pub struct Joint {
     pub engine: Harness<OpsApplication>,
+    /// Whole Environment facts actually returned to a client, independent of
+    /// the conformance peers' incident/procedure-only document observations.
+    pub environment_documents: Vec<jig_ops_domain_infrastructure::ClientDocument>,
     pub limits: client::Limits,
     codec: jig_client_transcript::Limits,
+    story: Story,
     archives: Archives,
     watches: BTreeMap<Token, Watch>,
     reads: BTreeMap<Token, Read>,
@@ -54,14 +58,20 @@ pub struct Joint {
 impl Joint {
     #[must_use]
     pub fn new(seed: u64, limits: client::Limits, codec: jig_client_transcript::Limits) -> Self {
-        let configuration = Config::new(seed, Story::Alert).client_backed();
+        Self::for_story(seed, limits, codec, Story::Alert)
+    }
+    #[must_use]
+    pub fn for_story(seed: u64, limits: client::Limits, codec: jig_client_transcript::Limits, story: Story) -> Self {
+        let configuration = Config::new(seed, story).client_backed();
         let application_rows = configuration.limits().core.documents.rows;
         let mut engine = Harness::with_trace(configuration, seed, false);
         engine.drain().expect("actual Ops cold start");
         Self {
             engine,
+            environment_documents: Vec::new(),
             limits,
             codec,
+            story,
             archives: Archives::default(),
             watches: BTreeMap::new(),
             reads: BTreeMap::new(),
@@ -354,6 +364,13 @@ fn subject_route(subject: Subject) -> Result<(core::documents::ApplicationScope,
     }
 }
 impl Joint {
+    fn observe_environment(&mut self, document: &root::ClientDocument) {
+        if let root::ClientDocument::Infrastructure(document) = document
+            && matches!(document.as_ref(), jig_ops_domain_infrastructure::ClientDocument::Environment { .. })
+        {
+            self.environment_documents.push(document.as_ref().clone());
+        }
+    }
     fn read_packet(&mut self, reply: Token, answer: &core::reads::Answer) {
         let Some(route) = self.engine.peers.transport.reply(reply) else {
             return;
@@ -456,6 +473,7 @@ impl Joint {
                 self.application_end(watcher, connector, why);
             }
             root::Output::ApplicationDocument { watcher, document } => {
+                self.observe_environment(&document);
                 if let Some(route) = self.watches.get_mut(&watcher) {
                     assert!(!route.flight, "one actual application document in flight");
                     let callback = application_document(route.subject.clone(), document, &self.limits);
@@ -478,6 +496,9 @@ impl Joint {
                 }
             }
             root::Output::ApplicationRead { reply, answer } => {
+                if let Ok(document) = &answer {
+                    self.observe_environment(document);
+                }
                 if let Some(route) = self.reads.remove(&reply.into_token()) {
                     let event = match route.subject {
                         Subject::Infrastructure(_) => {
@@ -681,13 +702,17 @@ fn application_document(
 }
 impl Front<super::fixture::Client> for Joint {
     fn bind(&mut self, client: ClientId, party: u64) {
-        assert_eq!(party, 1, "51.1 actual on-call account");
+        assert_eq!(party, 1, "the independently configured story account");
+        let (subject, login): (u64, &[u8]) = match self.story {
+            Story::Alert | Story::Night => (7, b"oncall"),
+            Story::Environment => (8, b"developer"),
+        };
         self.engine.peers.transport.bind(
             client,
             party,
             people::Identity {
-                key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
-                login: b"oncall".as_slice().into(),
+                key: people::IdentityKey { provider: 0, subject: subject.to_be_bytes().into() },
+                login: login.into(),
                 name: Box::new([]),
             },
         );

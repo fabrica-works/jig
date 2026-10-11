@@ -604,6 +604,23 @@ pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &cra
         }
     }
 }
+/// A genuine ending can remove a source without a replacement delivery. Keep
+/// each shown waiting card until its own final read supplies the explanation
+/// (objects.md, 1–2; Q34).
+pub(crate) fn ending_source(domain: &mut crate::Domain, watch: Id<Watch>) {
+    let source = Source::Watch(watch);
+    for (_, id) in &domain.objects.index {
+        let object = domain.objects.slab.get_mut(*id).expect("indexed object exists");
+        if object.shown && object.sources.len() == 1 && object.sources.contains(&source) {
+            match object.card {
+                Card::Open | Card::Refused { .. } => {
+                    object.card = Card::Leaving { how: Left::Looking, until: domain.now.saturating_add(domain.linger) };
+                }
+                Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => {}
+            }
+        }
+    }
+}
 pub(crate) fn document_read(key: ObjectKey) -> crate::contract::Read {
     use crate::contract::Read;
     match key {

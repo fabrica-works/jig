@@ -42,6 +42,87 @@ pub fn core_store(store: &Rows) -> jig_core_world::Store {
     values
 }
 
+fn task_row(store: &jig_core_world::Store, number: u64) -> Option<&jig_core_tasks::TaskRecord> {
+    store.rows.values().find_map(|record| match record {
+        jig_test_domain::Record::Core(core::Record::Tasks(
+            jig_core_tasks::Stored::Live(task) | jig_core_tasks::Stored::Ended(task),
+        )) if task.number == number => Some(task.as_ref()),
+        jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
+    })
+}
+
+/// The independent store supplies real withdrawn proposal history too. The
+/// core world's minimal read peer intentionally does not select this family.
+fn read_page(store: &Rows, range: &core::reads::Range) -> core::reads::Loaded {
+    let store = core_store(store);
+    let core::reads::Scope::Proposal { proposer: core::documents::Proposer::Task(task), proposal } = range.scope else {
+        return jig_core_world::reads::page(&store, range);
+    };
+    let mut ordered = std::collections::BTreeMap::new();
+    for record in store.rows.values() {
+        let jig_test_domain::Record::Core(core::Record::Tasks(jig_core_tasks::Stored::History(history))) = record
+        else {
+            continue;
+        };
+        let Some(kept) = &history.proposal else { continue };
+        if kept.proposer != task || kept.number != proposal {
+            continue;
+        }
+        let Some(owner) = task_row(&store, history.task) else { continue };
+        let mut ancestors = Vec::new();
+        let mut parent = owner.requester;
+        while let jig_core_tasks::Party::Task(number) = parent {
+            assert!(!ancestors.contains(&number), "actual task ancestry is acyclic");
+            ancestors.push(number);
+            let Some(row) = task_row(&store, number) else { break };
+            parent = row.requester;
+        }
+        let row = core::reads::Row {
+            value: core::Record::Tasks(jig_core_tasks::Stored::History(history.clone())),
+            owner: Some(Box::new(owner.clone())),
+            ancestors: ancestors.into(),
+            related: None,
+            linked: Box::new([]),
+            inbox: None,
+        };
+        ordered.insert(core::reads::row_key(&row).expect("actual history position"), row);
+    }
+    let mut candidates: Vec<_> = ordered
+        .into_iter()
+        .filter(|(position, _)| match &range.after {
+            Some(after) => {
+                if range.backwards {
+                    position < after
+                } else {
+                    position > after
+                }
+            }
+            None => true,
+        })
+        .collect();
+    if range.backwards {
+        candidates.reverse();
+    }
+    let mut rows = Vec::new();
+    let mut bytes = 0;
+    let mut last = None;
+    let mut more = false;
+    for (position, row) in candidates {
+        let size = row.owned_bytes().expect("whole actual history row pricing");
+        if rows.len() == range.rows as usize || size > range.bytes - bytes {
+            if rows.is_empty() {
+                return core::reads::Loaded::Busy;
+            }
+            more = true;
+            break;
+        }
+        bytes += size;
+        last = Some(position);
+        rows.push(row);
+    }
+    core::reads::Loaded::Page { rows: rows.into(), next: if more { last } else { None } }
+}
+
 impl Application for OpsApplication {
     type Domain = root::Domain;
     type Config = Config;
@@ -120,7 +201,7 @@ impl Application for OpsApplication {
             }
         };
         if let root::Output::Core(core::Held::ReadLoad { load, range }) = delivery {
-            let loaded = jig_core_world::reads::page(&core_store(store), &range);
+            let loaded = read_page(store, &range);
             return vec![Input::Event(root::Event::Core(core::Event::ReadLoaded { load, result: loaded }))];
         }
         match &delivery {

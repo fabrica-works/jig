@@ -13,9 +13,9 @@ pub struct Llm {
 }
 impl Llm {
     pub fn new(seed: u64) -> Self {
-        Self::with_client(seed, false)
+        Self::with_client(seed, false, false)
     }
-    pub fn with_client(seed: u64, client_backed: bool) -> Self {
+    pub fn with_client(seed: u64, client_backed: bool, environment_chat: bool) -> Self {
         let mut limits = smith_agent_world::Settings::calm(seed).provider;
         limits.latency_min = Duration::ZERO;
         limits.latency_max = Duration::ZERO;
@@ -26,7 +26,7 @@ impl Llm {
             provider: provider::Domain::configured(
                 &limits,
                 seed,
-                scripts(client_backed),
+                scripts(client_backed, environment_chat),
                 provider::api::Menu { arguments: Box::new([]), invalid: Box::new([]) },
             )
             .expect("finite ops scripts"),
@@ -47,6 +47,7 @@ impl Llm {
         let mut query = smith_agent_world::translate::query(prompt);
         let has = |needle: &[u8]| query.system.windows(needle.len()).any(|part| part == needle);
         let lead = has(b"@incident_lead");
+        let environment = has(b"@environment_chat");
         let result = query.messages.iter().flat_map(|message| message.parts.iter()).any(|part| match part {
             provider::api::Part::Text { text } => {
                 text.windows(b"Result from task ".len()).any(|bytes| bytes == b"Result from task ")
@@ -57,18 +58,23 @@ impl Llm {
         });
         let acted = query.messages.iter().flat_map(|message| message.parts.iter()).any(|part| match part {
             provider::api::Part::ToolCall { name, .. } => {
-                name.as_ref() == b"delegate" || (lead && name.as_ref() == b"propose")
+                name.as_ref() == b"delegate" || ((lead || environment) && name.as_ref() == b"propose")
             }
             provider::api::Part::Text { text } => {
-                let needle =
-                    if lead { b"tool=propose result:".as_slice() } else { b"tool=delegate result:".as_slice() };
+                let needle = if lead || environment {
+                    b"tool=propose result:".as_slice()
+                } else {
+                    b"tool=delegate result:".as_slice()
+                };
                 text.windows(needle.len()).any(|bytes| bytes == needle)
             }
             provider::api::Part::Opaque { .. } | provider::api::Part::ToolOutput { .. } => false,
         });
-        let cue = if lead && result {
+        let cue = if environment && result {
+            Some(b"@environment_complete".as_slice())
+        } else if lead && result {
             Some(b"@lead_complete".as_slice())
-        } else if (lead || has(b"@watch_setup")) && acted {
+        } else if (lead || environment || has(b"@watch_setup")) && acted {
             Some(b"@await_result".as_slice())
         } else {
             None
@@ -152,7 +158,7 @@ fn logs() -> Turn {
             .into(),
     )
 }
-fn scripts(client_backed: bool) -> Box<[Script]> {
+fn scripts(client_backed: bool, environment_chat: bool) -> Box<[Script]> {
     let watch = delegate(
         "watch checkout",
         r#"{"kind":"procedure","connector":1,"code":1}"#,
@@ -173,7 +179,7 @@ fn scripts(client_backed: bool) -> Box<[Script]> {
         r#"{"name":1,"kind":"bytes","value":"production"},{"name":2,"kind":"bytes","value":"checkout"},{"name":3,"kind":"number","value":77},{"name":4,"kind":"number","value":7200}"#,
         "",
     );
-    Box::new([
+    let mut scripts = vec![
         Script {
             cue: b"@lead_complete".as_slice().into(),
             turns: (0..32).map(|_| finish("checkout recovered after the accepted restart")).collect(),
@@ -220,7 +226,25 @@ fn scripts(client_backed: bool) -> Box<[Script]> {
             ]
             .into(),
         },
-    ])
+    ];
+    if environment_chat {
+        let provision = format!(
+            r#"{{"executor":{{"kind":"procedure","connector":2,"code":{}}},"spec":{{"words":"staging for payments, a week","parameters":[{{"name":1,"kind":"bytes","value":"staging"}},{{"name":2,"kind":"bytes","value":"payments"}},{{"name":3,"kind":"number","value":604800}},{{"name":4,"kind":"number","value":40}},{{"name":5,"kind":"number","value":7200}}]}},"contract":{{"kind":"report","words":128}},"authority":{{"tools":1023,"grants":[{{"connector":2,"kind":4,"segments":["pool"],"terminal":"exact","last":"staging"}},{{"connector":2,"kind":4,"segments":["pool","staging","environment"],"terminal":"open","last":""}}],"delegation":{{"kinds":[],"tasks":0,"depth":0}},"budget":{{"spend":40}},"notes":0}}}}"#,
+            jig_ops_domain_infrastructure::PROVISION_CODE,
+        );
+        scripts.insert(
+            0,
+            Script {
+                cue: b"@environment_complete".as_slice().into(),
+                turns: (0..32).map(|_| finish("staging/payments is ready for the requested week")).collect(),
+            },
+        );
+        scripts.insert(1, Script {
+            cue: b"@environment_chat".as_slice().into(),
+            turns: vec![call("propose", format!(r#"{{"action":"batch","reason":"staging for payments, a week; maximum cost 40","batch":[{provision}]}}"#)), wait(), yield_main()].into(),
+        });
+    }
+    scripts.into()
 }
 
 pub fn triage() -> Box<[u8]> {

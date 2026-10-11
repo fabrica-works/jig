@@ -941,6 +941,15 @@ pub(crate) fn infrastructure_out(
                         code,
                         action: core::ProcedureAction::Result(tasks::TaskResult::Report { words: Box::new([]) }),
                     })),
+                    infrastructure::StepDecision::FinishReport { words } => {
+                        work.push(Work::Core(core::Event::ProcedureStep {
+                            task,
+                            step,
+                            connector,
+                            code,
+                            action: core::ProcedureAction::Result(tasks::TaskResult::Report { words }),
+                        }));
+                    }
                     infrastructure::StepDecision::Hold { .. } => work.push(Work::Core(core::Event::ProcedureStep {
                         task,
                         step,
@@ -967,6 +976,9 @@ pub(crate) fn infrastructure_out(
                     },
                     slots: quota,
                 })));
+            }
+            infrastructure::Request::Wake { task } => {
+                work.push(Work::Core(core::Event::Tasks(tasks::Event::WakeProcedure { task })));
             }
             infrastructure::Request::Changed { resource } => {
                 for task in domain.infrastructure.readers(&resource) {

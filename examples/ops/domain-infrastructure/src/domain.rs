@@ -204,13 +204,46 @@ fn names(
     out.push(Request::Named { task, project, resources });
 }
 
+// examples.md 7.3 and connectors.md 11: a pending restart has not written;
+// its healthy condition is read again rather than held as write drift.
+fn pending_restart_satisfied(domain: &Domain, task: u64, resource: &Resource) -> bool {
+    let Some(state) = domain.procedures.get(&task) else { return false };
+    if state.phase != ProcedurePhase::EffectOutstanding {
+        return false;
+    }
+    let effect = match &state.procedure {
+        Procedure::Remediate { service, operation, .. } => {
+            if resource != &Resource::Service(service.clone()) {
+                return false;
+            }
+            let Some(fact) = domain.services.get(service) else { return false };
+            if !fact.healthy {
+                return false;
+            }
+            Effect::Restart { service: service.clone(), operation: *operation }
+        }
+        Procedure::Scale { .. } | Procedure::Provision { .. } | Procedure::TearDown { .. } => return false,
+    };
+    for (key, entry) in &domain.effects {
+        if key.task == task && entry.effect == effect {
+            return false;
+        }
+    }
+    for (_, proposal) in &domain.proposals {
+        if proposal.0 == task && proposal.1 == effect {
+            return true;
+        }
+    }
+    false
+}
+
 fn drift(domain: &Domain, resource: Resource, out: &mut Queue<Request>) {
     for (task, (_, resources)) in &domain.reliance {
         let mut found = false;
         for named in resources {
             found |= named.resource == resource;
         }
-        if found {
+        if found && !pending_restart_satisfied(domain, *task, &resource) {
             out.push(Request::Drift { task: *task, resource: resource.clone() });
         }
     }
@@ -592,6 +625,15 @@ fn decide(
                 );
             };
             if fact.healthy {
+                if pending_restart_satisfied(domain, state.task, &Resource::Service(service.clone())) {
+                    return (
+                        ProcedurePhase::Done,
+                        Some(StepDecision::FinishReport {
+                            words: Box::from(*b"Service is already healthy; finished without restarting it."),
+                        }),
+                        None,
+                    );
+                }
                 return (ProcedurePhase::Done, Some(StepDecision::Finish), None);
             }
             match state.phase {
@@ -656,9 +698,9 @@ fn decide(
                 Some(Some(found)) if found.ready_at <= now => {
                     (ProcedurePhase::Holding, Some(StepDecision::Finish), None)
                 }
-                Some(Some(_)) => (
+                Some(Some(found)) => (
                     ProcedurePhase::WaitingCondition,
-                    Some(StepDecision::Wait { until: *deadline }),
+                    Some(StepDecision::Wait { until: found.ready_at.min(*deadline) }),
                     Some(SystemRequest::Environment { environment: environment.clone() }),
                 ),
                 Some(None) => match state.phase {
@@ -896,7 +938,23 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     crate::client_marks::collect(domain, env, out);
 }
 
-/// Rechecks uncertain entries once their absolute retry deadline passes.
+// connectors.md 6.2: the connector top arms the procedure's genuine time
+// condition. Readiness comes from the supplied fact; deadlines are inclusive
+// in decide, so a missing/late fact stalls in the following whole second.
+fn provision_deadline(domain: &Domain, state: &ProcedureState) -> Option<u64> {
+    if state.phase != ProcedurePhase::WaitingCondition {
+        return None;
+    }
+    match &state.procedure {
+        Procedure::Provision { environment, deadline, .. } => match domain.environments.get(environment) {
+            Some(Some(fact)) if fact.ready_at <= *deadline => Some(fact.ready_at),
+            Some(Some(_) | None) | None => deadline.checked_add(1),
+        },
+        Procedure::Scale { .. } | Procedure::Remediate { .. } | Procedure::TearDown { .. } => None,
+    }
+}
+
+/// Rechecks uncertain entries and wakes due procedures at their absolute deadlines.
 pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     assert!(out.room() >= MAX_OUT, "the root reserves MAX_OUT slots");
     for (key, entry) in &domain.effects {
@@ -917,10 +975,16 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             None => break,
         }
     }
+    for (task, state) in &domain.procedures {
+        match provision_deadline(domain, state) {
+            Some(at) if wall_seconds(env) >= at => out.push(Request::Wake { task: *task }),
+            Some(_) | None => {}
+        }
+    }
     crate::client_marks::collect(domain, env, out);
 }
 
-/// Earliest absolute retry deadline in the world's clock domain.
+/// Earliest absolute retry or procedure deadline in the world's clock domain.
 #[must_use]
 #[expect(clippy::manual_map, reason = "step code uses no closure-taking methods")]
 pub fn next_deadline(domain: &Domain) -> Option<Time> {
@@ -928,6 +992,15 @@ pub fn next_deadline(domain: &Domain) -> Option<Time> {
     for (_, entry) in &domain.effects {
         if entry.phase == Phase::Uncertain || (entry.phase == Phase::Kept && entry.attempt > 0) {
             let at = entry.deadline.checked_mul(1_000_000_000)?;
+            soonest = Some(match soonest {
+                Some(earlier) if earlier < at => earlier,
+                Some(_) | None => at,
+            });
+        }
+    }
+    for (_, state) in &domain.procedures {
+        if let Some(at) = provision_deadline(domain, state) {
+            let at = at.checked_mul(1_000_000_000)?;
             soonest = Some(match soonest {
                 Some(earlier) if earlier < at => earlier,
                 Some(_) | None => at,

@@ -19,6 +19,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
     smith.run.brief_sections = 32;
     let mut core_limits = jig_core_world::world::limits().core;
     core_limits.fleet.engine_slots = 1;
+    core_limits.tasks.hold_kinds = 3;
     let limits = Limits {
         core: core_limits,
         infrastructure: jig_ops_world::infrastructure_limits(),
@@ -740,4 +741,108 @@ fn malformed_machine_fields_are_refused_without_reading_an_explanation() {
         ),
         observability::WatchMessage::InvalidTriage { child: 100 }
     );
+}
+
+fn environment_spec() -> jig_core_tasks::Spec {
+    use jig_core_tasks::Parameter;
+    jig_core_tasks::Spec {
+        words: Box::from(b"staging for payments, a week".as_slice()),
+        parameters: Box::new([
+            Parameter::Bytes { name: 1, value: Box::from(b"staging".as_slice()) },
+            Parameter::Bytes { name: 2, value: Box::from(b"payments".as_slice()) },
+            Parameter::Number { name: 3, value: 604_800 },
+            Parameter::Number { name: 4, value: 40 },
+            Parameter::Number { name: 5, value: 7200 },
+        ]),
+        inputs: Box::new([]),
+    }
+}
+
+#[test]
+fn provision_preserves_opaque_environment_parameters_and_distinct_pool_hold() {
+    use jig_core_tasks::{Executor, HoldKind, Holding, Name, Taken};
+    let mut spec = environment_spec();
+    let environment =
+        infrastructure::Environment::new(Box::from(b"staging".as_slice()), Box::from(b"payments".as_slice()));
+    assert_eq!(
+        crate::translate::procedure(infrastructure::PROVISION_CODE, &spec),
+        Some(infrastructure::Procedure::Provision {
+            environment: environment.clone(),
+            until: 604_800,
+            price: 40,
+            deadline: 7200,
+        })
+    );
+    assert_eq!(
+        crate::translate::holdings(
+            2,
+            Executor::Procedure { connector: 2, code: infrastructure::PROVISION_CODE },
+            &spec
+        ),
+        Some(Box::from([
+            Holding::Write {
+                resource: Name { connector: 2, path: infrastructure::Resource::Environment(environment).segments() },
+                kind: 2
+            },
+            Holding::Slot {
+                pool: Name {
+                    connector: 2,
+                    path: infrastructure::Resource::Pool(infrastructure::Pool(Box::from(b"staging".as_slice())))
+                        .segments()
+                },
+                kind: 3
+            },
+        ]))
+    );
+    let kinds = crate::translate::hold_kinds(2);
+    assert_eq!(
+        kinds.as_ref(),
+        &[
+            jig_core_tasks::Kind { connector: 2, kind: 1, hold: HoldKind::Exclusive { taken: Taken::Waits } },
+            jig_core_tasks::Kind { connector: 2, kind: 2, hold: HoldKind::Exclusive { taken: Taken::Waits } },
+            jig_core_tasks::Kind { connector: 2, kind: 3, hold: HoldKind::Pooled { taken: Taken::Waits } },
+        ]
+    );
+    spec.parameters = spec.parameters[..4].into();
+    assert_eq!(
+        crate::translate::procedure(infrastructure::PROVISION_CODE, &spec),
+        None,
+        "a missing deadline is not manufactured"
+    );
+    spec.parameters[1] = jig_core_tasks::Parameter::Number { name: 2, value: 99 };
+    assert_eq!(
+        crate::translate::holdings(
+            2,
+            Executor::Procedure { connector: 2, code: infrastructure::PROVISION_CODE },
+            &spec
+        ),
+        None,
+        "numeric service identities are not substituted for an environment name"
+    );
+}
+
+#[test]
+fn adding_provision_preserves_scale_and_remediate_codes_and_service_hold() {
+    use jig_core_tasks::{Executor, Holding, Name};
+    let mut spec = environment_spec();
+    spec.parameters = spec.parameters[..4].into();
+    let service = infrastructure::Service::new(Box::from(b"staging".as_slice()), Box::from(b"payments".as_slice()));
+    assert_eq!(
+        crate::translate::procedure(1, &spec),
+        Some(infrastructure::Procedure::Scale { service: service.clone(), replicas: 604_800, deadline: 40 })
+    );
+    assert_eq!(
+        crate::translate::procedure(2, &spec),
+        Some(infrastructure::Procedure::Remediate { service: service.clone(), operation: 604_800, deadline: 40 })
+    );
+    for code in [1, 2] {
+        assert_eq!(
+            crate::translate::holdings(2, Executor::Procedure { connector: 2, code }, &spec),
+            Some(Box::from([Holding::Write {
+                resource: Name { connector: 2, path: infrastructure::Resource::Service(service.clone()).segments() },
+                kind: 1
+            },]))
+        );
+    }
+    assert_eq!(crate::translate::procedure(99, &spec), None);
 }

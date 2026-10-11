@@ -6,7 +6,7 @@ use skein_lib::{Duration, JournalLimits, List};
 
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "the fixture lists every child bound")]
-pub fn root(seed: u64) -> (Config, Limits) {
+pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     let mut smith = smith_agent_world::Settings::calm(seed).limits;
     smith.run.budget.spend = 100;
     smith.run.budget.turns = 32;
@@ -19,6 +19,7 @@ pub fn root(seed: u64) -> (Config, Limits) {
     let mut core_limits = jig_core_world::world::limits().core;
     core_limits.fleet.engine_slots = 1;
     core_limits.tasks.tasks = 8;
+    core_limits.tasks.hold_kinds = 3;
     core_limits.tasks.project_tasks = 8;
     core_limits.tasks.tree_tasks = 8;
     core_limits.tasks.depth = 4;
@@ -28,8 +29,12 @@ pub fn root(seed: u64) -> (Config, Limits) {
     core_limits.tasks.spec_bytes = 512;
     core_limits.tasks.authority_grants = 8;
     core_limits.tasks.authority_segments = 3;
-    core_limits.tasks.authority_bytes = 64;
+    core_limits.tasks.authority_bytes = if environment_chat { 128 } else { 64 };
     core_limits.tasks.executor_kinds = 3;
+    if environment_chat {
+        core_limits.tasks.parameters = 5;
+        core_limits.tasks.executor_kinds = 4;
+    }
     core_limits.tasks.funders = 16;
     core_limits.tasks.inbox_messages = 16;
     core_limits.tasks.inbox_bytes = 2048;
@@ -44,7 +49,7 @@ pub fn root(seed: u64) -> (Config, Limits) {
     core_limits.authority.grants = 8;
     core_limits.notes.scopes = 11;
     core_limits.authority.segments = 4;
-    core_limits.authority.executors = 3;
+    core_limits.authority.executors = if environment_chat { 4 } else { 3 };
     core_limits.authority.batch = 2;
     core_limits.authority.requirements = 2;
     core_limits.fleet.attempts = 8;
@@ -123,8 +128,15 @@ pub fn root(seed: u64) -> (Config, Limits) {
     limits.observability.answer_bytes = 2048;
     limits.infrastructure.tasks = 8;
     limits.infrastructure.procedures = 8;
-    config.core.authority = policy_domain(&limits.core.authority);
+    config.core.authority = policy_domain(&limits.core.authority, environment_chat);
     config.core.settings.chat_authority = authority(100, false);
+    if environment_chat {
+        config.core.settings.chat_authority = environment_authority(20, false);
+        config.core.owners = Box::new([jig_core_people::InitialOwner {
+            project: 1,
+            identity: jig_core_people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
+        }]);
+    }
     config.core.settings.period = 1;
     config.core.settings.run.resume = true;
     config.core.settings.resume_bytes = 32768;
@@ -132,6 +144,10 @@ pub fn root(seed: u64) -> (Config, Limits) {
     config.core.settings.run.turns = 32;
     config.core.settings.run.time = Duration::from_secs(7200);
     (config, limits)
+}
+
+pub fn root(seed: u64) -> (Config, Limits) {
+    root_for(seed, false)
 }
 
 use jig_core_authority as authority;
@@ -183,7 +199,39 @@ pub fn authority(spend: u64, person: bool) -> authority::Authority {
     }
 }
 
-fn policy_domain(limits: &authority::Limits) -> authority::Domain {
+pub fn environment_authority(spend: u64, person: bool) -> authority::Authority {
+    let mut value = authority(spend, person);
+    let mut grants = value.grants.into_vec();
+    grants.push(authority::Grant {
+        connector: 2,
+        kind: 4,
+        pattern: authority::Pattern {
+            segments: Box::new([b"pool".as_slice().into()]),
+            last: authority::Last::Exact(b"staging".as_slice().into()),
+        },
+    });
+    for kind in [4, 5] {
+        grants.push(authority::Grant {
+            connector: 2,
+            kind,
+            pattern: authority::Pattern {
+                segments: Box::new([
+                    b"pool".as_slice().into(),
+                    b"staging".as_slice().into(),
+                    b"environment".as_slice().into(),
+                ]),
+                last: authority::Last::Open(Box::new([])),
+            },
+        });
+    }
+    value.grants = grants.into();
+    let mut kinds = value.delegation.kinds.into_vec();
+    kinds.push(authority::Executor::Procedure(infrastructure::PROVISION_CODE));
+    value.delegation.kinds = kinds.into();
+    value
+}
+
+fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> authority::Domain {
     let requirements: Box<[_]> = [
         authority::Requirement {
             connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure),
@@ -211,7 +259,7 @@ fn policy_domain(limits: &authority::Limits) -> authority::Domain {
         },
     ]
     .into();
-    let ceiling = authority(1000, true);
+    let ceiling = if environment_chat { environment_authority(1000, true) } else { authority(1000, true) };
     let mut domain = authority::Domain::new(
         authority::Rules {
             ceiling: ceiling.clone(),
@@ -236,7 +284,7 @@ fn policy_domain(limits: &authority::Limits) -> authority::Domain {
                 period_spend: 1000,
                 roles: Box::new([authority::Role {
                     number: 0,
-                    authority: authority(500, true),
+                    authority: if environment_chat { environment_authority(500, true) } else { authority(500, true) },
                     period_spend: 500,
                     requests: authority::Requests::ALL,
                     decides: authority::Proposals::ALL,

@@ -1064,7 +1064,19 @@ fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Q
     {
         read_final_task(domain, id, task, generation, out);
     }
+    let preserve = match owner {
+        Owner::Page { generation } | Owner::Application { generation } => {
+            generation == domain.generation && (end == WatchEnd::SubjectEnded || end == WatchEnd::Unknown)
+        }
+        Owner::Frame => false,
+    };
+    if preserve {
+        crate::objects::ending_source(domain, id);
+    }
     domain.retire(id);
+    if preserve {
+        crate::objects::read_dropped(domain, out);
+    }
     match owner {
         Owner::Frame => domain.set_link(Link::Offline, out),
         Owner::Application { .. } => {}

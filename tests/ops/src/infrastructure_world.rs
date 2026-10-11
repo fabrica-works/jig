@@ -145,6 +145,7 @@ impl InfrastructureWorld {
                 | infra::Request::Restarted { .. }
                 | infra::Request::Named { .. }
                 | infra::Request::Slots { .. }
+                | infra::Request::Wake { .. }
                 | infra::Request::Drift { .. }
                 | infra::Request::Document { .. }
                 | infra::Request::ReadAnswered { .. }
@@ -188,6 +189,7 @@ impl InfrastructureWorld {
                 | infra::Request::Erase { .. }
                 | infra::Request::Named { .. }
                 | infra::Request::Slots { .. }
+                | infra::Request::Wake { .. }
                 | infra::Request::Drift { .. }
                 | infra::Request::Document { .. }
                 | infra::Request::ReadAnswered { .. }

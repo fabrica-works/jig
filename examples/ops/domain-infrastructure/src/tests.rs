@@ -184,6 +184,145 @@ fn a_procedure_waits_for_current_facts_and_never_asks_for_two_effects() {
     assert_eq!(second.pop(), Some(Request::Step { task: 7, decision: StepDecision::Wait { until: 100 } }));
 }
 
+fn pending_restart() -> Domain {
+    let mut domain = Domain::new(Backend::OperationIds, &limits());
+    event(
+        &mut domain,
+        1,
+        Event::StartProcedure {
+            task: 7,
+            project: 1,
+            procedure: Procedure::Remediate { service: service(), operation: 9, deadline: 100 },
+        },
+    );
+    event(
+        &mut domain,
+        1,
+        Event::System(SystemEvent::Service {
+            service: service(),
+            fact: ServiceFact { version: Box::from(*b"v1"), replicas: 2, healthy: false, revision: 1, observed: 1 },
+            other_hand: false,
+        }),
+    );
+    event(&mut domain, 1, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
+    event(
+        &mut domain,
+        1,
+        Event::Describe { token: Token::new(1), effect: Effect::Restart { service: service(), operation: 9 } },
+    );
+    event(&mut domain, 1, Event::KeepProposal { token: Token::new(1), number: 3, task: 7 });
+    domain
+}
+
+fn healthy_by_hand(domain: &mut Domain) -> Queue<Request> {
+    event(
+        domain,
+        2,
+        Event::System(SystemEvent::Service {
+            service: service(),
+            fact: ServiceFact { version: Box::from(*b"v1"), replicas: 2, healthy: true, revision: 2, observed: 2 },
+            other_hand: true,
+        }),
+    )
+}
+
+#[test]
+fn an_unmade_pending_restart_reads_healthy_without_suppressing_other_drift() {
+    let mut domain = pending_restart();
+    event(&mut domain, 1, Event::Names { task: 8, project: 1, resources: Box::from([Resource::Service(service())]) });
+    let mut refreshed = healthy_by_hand(&mut domain);
+    let mut pending_drift = false;
+    let mut other_drift = false;
+    let mut observed = false;
+    let mut changed = false;
+    while let Some(request) = refreshed.pop() {
+        match request {
+            Request::Drift { task, resource } => {
+                assert_eq!(resource, Resource::Service(service()));
+                pending_drift |= task == 7;
+                other_drift |= task == 8;
+            }
+            Request::Save { record: Record::Drift(account) } => {
+                assert_eq!(account.resource, Resource::Service(service()));
+                assert_eq!(account.kind, DriftKind::Changed);
+                observed = true;
+            }
+            Request::Changed { resource } => {
+                assert_eq!(resource, Resource::Service(service()));
+                changed = true;
+            }
+            Request::Document { .. }
+            | Request::ReadAnswered { .. }
+            | Request::Marked { .. }
+            | Request::ApplicationDone { .. }
+            | Request::ApplicationBusy { .. }
+            | Request::Closed { .. }
+            | Request::Released { .. }
+            | Request::Restarted { .. }
+            | Request::Named { .. }
+            | Request::Slots { .. }
+            | Request::Wake { .. }
+            | Request::Described { .. }
+            | Request::Refused { .. }
+            | Request::Make { .. }
+            | Request::Outcome { .. }
+            | Request::Step { .. }
+            | Request::Save { .. }
+            | Request::Erase { .. }
+            | Request::System(_) => {}
+        }
+    }
+    assert!(!pending_drift && other_drift && observed && changed);
+    assert!(domain.effects.is_empty(), "a kept proposal has no permission or outbox");
+    let mut finished = event(&mut domain, 2, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
+    assert_eq!(finished.pop(), Some(Request::Erase { key: RecordKey::Procedure(7) }));
+    assert_eq!(
+        finished.pop(),
+        Some(Request::Step {
+            task: 7,
+            decision: StepDecision::FinishReport {
+                words: Box::from(*b"Service is already healthy; finished without restarting it."),
+            },
+        })
+    );
+    assert!(finished.is_empty());
+
+    let mut written = pending_restart();
+    event(
+        &mut written,
+        1,
+        Event::Restore {
+            record: Record::Outbox(Entry {
+                project: Some(1),
+                number: 3,
+                key: key(),
+                effect: Effect::Restart { service: service(), operation: 9 },
+                attempt: 0,
+                deadline: 1,
+                phase: Phase::Kept,
+            }),
+        },
+    );
+    let mut requests = healthy_by_hand(&mut written);
+    let mut held = false;
+    while let Some(request) = requests.pop() {
+        held |= request == Request::Drift { task: 7, resource: Resource::Service(service()) };
+    }
+    assert!(held, "an admitted write retains ordinary drift behavior");
+
+    let mut no_proposal = pending_restart();
+    event(&mut no_proposal, 1, Event::DropProposal { number: 3 });
+    let mut requests = healthy_by_hand(&mut no_proposal);
+    let mut held = false;
+    while let Some(request) = requests.pop() {
+        held |= request == Request::Drift { task: 7, resource: Resource::Service(service()) };
+    }
+    assert!(held, "the exception requires the genuine pending proposal");
+    let mut finished = event(&mut no_proposal, 2, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
+    assert_eq!(finished.pop(), Some(Request::Erase { key: RecordKey::Procedure(7) }));
+    assert_eq!(finished.pop(), Some(Request::Step { task: 7, decision: StepDecision::Finish }));
+}
+
 #[test]
 fn a_committed_person_retry_opens_restart_but_waits_for_the_old_deadline() {
     let mut domain = Domain::new(Backend::NoOperationIds, &limits());
@@ -310,4 +449,96 @@ fn environment_document_supplies_the_request_revision_without_creating_an_end_or
     assert_eq!(supplied_fact, fact, "desired end does not rewrite the observed backend lease");
     assert_eq!(end_revision, 1);
     assert_eq!(end, Some(EnvironmentEnd { revision: 1, until: 2000 }));
+}
+
+#[test]
+fn provision_wakes_at_supplied_readiness_and_keeps_deadline_and_holding_behavior() {
+    for deadline in [4, 10] {
+        let mut domain = Domain::new(Backend::OperationIds, &limits());
+        event(
+            &mut domain,
+            0,
+            Event::StartProcedure {
+                task: 7,
+                project: 1,
+                procedure: Procedure::Provision { environment: environment(), until: 100, price: 50, deadline },
+            },
+        );
+        let fact = Some(EnvironmentFact { created_by: key(), ready_at: 5, until: 100, price: 50 });
+        event(
+            &mut domain,
+            0,
+            Event::System(SystemEvent::Environment { environment: environment(), fact, other_hand: false }),
+        );
+        let mut out = event(&mut domain, 0, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
+        let mut decisions = skein_lib::List::with_capacity(MAX_OUT);
+        while let Some(request) = out.pop() {
+            if let Request::Step { task: 7, decision } = request {
+                decisions.push(decision).expect("finite decisions fit the output bound");
+            }
+        }
+        assert_eq!(decisions.as_slice(), &[StepDecision::Wait { until: deadline.min(5) }]);
+        assert_eq!(next_deadline(&domain), Some(Time::from_nanos(5_000_000_000)));
+        assert_restored_provision_timer(&domain, fact);
+        for seconds in [4, 5] {
+            let env = Env {
+                now: Time::from_nanos(seconds * 1_000_000_000),
+                wall: Wall::from_nanos(seconds * 1_000_000_000),
+                limits: limits(),
+            };
+            let mut timer = Queue::with_capacity(MAX_OUT);
+            fire(&mut domain, &env, &mut timer);
+            if seconds == 4 {
+                assert!(timer.is_empty());
+            } else {
+                assert_eq!(timer.pop(), Some(Request::Wake { task: 7 }));
+                assert!(timer.is_empty(), "a timed wake is neither a write nor a fact change");
+            }
+        }
+        let mut unchanged = event(
+            &mut domain,
+            3,
+            Event::System(SystemEvent::Environment { environment: environment(), fact, other_hand: false }),
+        );
+        while let Some(request) = unchanged.pop() {
+            if let Request::Changed { .. } = request {
+                panic!("readiness is a time condition, not a manufactured fact change");
+            }
+        }
+        let mut out = event(&mut domain, 5, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
+        let mut decisions = skein_lib::List::with_capacity(MAX_OUT);
+        while let Some(request) = out.pop() {
+            if let Request::Step { task: 7, decision } = request {
+                decisions.push(decision).expect("finite decisions fit the output bound");
+            }
+        }
+        assert_eq!(
+            decisions.as_slice(),
+            &[if deadline == 4 { StepDecision::Hold { reason: 2 } } else { StepDecision::Finish }]
+        );
+        assert_eq!(next_deadline(&domain), None);
+        let mut repeated = event(&mut domain, 6, Event::Procedure { task: 7, signal: ProcedureSignal::Step });
+        while let Some(request) = repeated.pop() {
+            if let Request::Step { .. } = request {
+                panic!("Holding or Held remains settled");
+            }
+        }
+    }
+}
+
+fn assert_restored_provision_timer(domain: &Domain, fact: Option<EnvironmentFact>) {
+    let mut restored = Domain::new(Backend::OperationIds, &limits());
+    let state = domain.procedures.get(&7).expect("the waiting state was supplied for saving").clone();
+    event(&mut restored, 3, Event::Restore { record: Record::Procedure(state) });
+    event(
+        &mut restored,
+        3,
+        Event::System(SystemEvent::Environment { environment: environment(), fact, other_hand: false }),
+    );
+    assert_eq!(next_deadline(&restored), Some(Time::from_nanos(5_000_000_000)));
+    let env = Env { now: Time::from_nanos(5_000_000_000), wall: Wall::from_nanos(5_000_000_000), limits: limits() };
+    let mut out = Queue::with_capacity(MAX_OUT);
+    fire(&mut restored, &env, &mut out);
+    assert_eq!(out.pop(), Some(Request::Wake { task: 7 }));
+    assert!(out.is_empty(), "restoring a time condition makes no effect and invents no fact change");
 }

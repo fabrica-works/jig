@@ -25,6 +25,7 @@ pub use systems::Systems;
 pub enum Story {
     Alert,
     Night,
+    Environment,
 }
 
 /// The same seed and story reconstruct every cold domain.
@@ -41,7 +42,13 @@ impl Config {
     /// Fix the finite limits once; cold starts still rebuild the same root.
     #[must_use]
     pub fn new(seed: u64, story: Story) -> Self {
-        Self { seed, story, limits: config::root(seed).1, documents: false, client_backed: false }
+        Self {
+            seed,
+            story,
+            limits: config::root_for(seed, story == Story::Environment).1,
+            documents: false,
+            client_backed: false,
+        }
     }
 
     /// Replace only the on-call person with clients; retain scripted hosts and systems.
@@ -53,6 +60,9 @@ impl Config {
         self.limits.core.views.watchers = 32;
         self.limits.core.views.watchers_per_party = 32;
         self.limits.core.views.runs = 8;
+        // A closing plan can require final reads for its shown cards and header
+        // together. Match this client's declared simultaneous read capacity.
+        self.limits.core.load_slots = 32;
         self
     }
 
@@ -129,18 +139,19 @@ impl Application for Ops {
     type Delivery = Delivery;
 
     fn build(config: &Config) -> root::Domain {
-        let configuration = config::root(config.seed).0;
+        let configuration = config::root_for(config.seed, config.story == Story::Environment).0;
         root::Domain::new(configuration, &config.limits)
     }
     fn systems(_: &Config, _: u64) -> Systems {
         let mut production = production::Production::new(0, production::Backend::Fake);
         production.add_service(production::ServiceName::new("production", "checkout"), "v2", 3);
         production.add_service(production::ServiceName::new("staging", "checkout"), "v2", 3);
+        production.set_pool_quota("staging", 5);
         Systems { production, now: 0 }
     }
     fn peers(config: &Config, _: u64) -> Peers {
         Peers {
-            policy: observations::policy(config.seed),
+            policy: observations::policy(config.seed, config.story == Story::Environment),
             applied: 0,
             observed: Vec::new(),
             application_observed: Vec::new(),
@@ -165,7 +176,7 @@ impl Application for Ops {
             lead_commits: Vec::new(),
             pending_document_effects: Vec::new(),
             llm: if config.client_backed {
-                scripts::Llm::with_client(config.seed, true)
+                scripts::Llm::with_client(config.seed, true, config.story == Story::Environment)
             } else {
                 scripts::Llm::new(config.seed)
             },
@@ -177,7 +188,7 @@ impl Application for Ops {
     }
     fn recovery(_: &Config, connector: u16, kind: u16) -> r::Recovery {
         match (connector, kind) {
-            (2, 1) => r::Recovery::Keyed,
+            (2, 1 | 4) => r::Recovery::Keyed,
             (2, 2) => r::Recovery::Conditional,
             _ => panic!("declared story kinds"),
         }
@@ -380,33 +391,79 @@ impl Application for Ops {
                 if let infra::SystemRequest::Apply { key, attempt, effect } = &call {
                     let attempt = *attempt;
                     let stable = observations::key(*key);
-                    let (kind, service, condition, target) = observations::parts(effect);
+                    let (kind, resources, condition, target) = observations::parts(effect);
                     peers
                         .observed
                         .push(r::Observed::Released { requires: vec![r::Receipt::Outbox(2, stable, attempt)] });
-                    let name = production::ServiceName::new(
-                        std::str::from_utf8(&service.environment).expect("fixture bytes"),
-                        std::str::from_utf8(&service.name).expect("fixture bytes"),
-                    );
                     let before = match effect {
                         infra::Effect::Restart { operation, .. } => {
-                            systems.production.find_restart(*operation).map(|_| *operation)
+                            vec![jig_test_system::ValueObserved {
+                                state: systems.production.find_restart(*operation).map(|_| *operation),
+                                owner: None,
+                            }]
                         }
-                        infra::Effect::Scale { .. } => {
-                            Some(u64::from(systems.production.read_service(&name).expect("fixture service").replicas))
+                        infra::Effect::Scale { service, .. } => {
+                            let name = production::ServiceName::new(
+                                std::str::from_utf8(&service.environment).expect("fixture bytes"),
+                                std::str::from_utf8(&service.name).expect("fixture bytes"),
+                            );
+                            vec![jig_test_system::ValueObserved {
+                                state: Some(u64::from(
+                                    systems.production.read_service(&name).expect("fixture service").replicas,
+                                )),
+                                owner: None,
+                            }]
                         }
-                        infra::Effect::Rollback { .. }
-                        | infra::Effect::CreateEnvironment { .. }
-                        | infra::Effect::TearDown { .. } => panic!("two story effects"),
+                        infra::Effect::CreateEnvironment { environment, .. } => {
+                            let pool = std::str::from_utf8(&environment.pool).expect("fixture pool");
+                            let name = production::EnvironmentName::new(
+                                pool,
+                                std::str::from_utf8(&environment.name).expect("fixture environment"),
+                            );
+                            let before = systems.production.read_environment(&name);
+                            peers.observed.push(r::Observed::Read {
+                                resource: r::Name {
+                                    connector: 2,
+                                    path: infra::Resource::Pool(infra::Pool(environment.pool.clone()))
+                                        .segments()
+                                        .iter()
+                                        .map(|v| v.to_vec())
+                                        .collect(),
+                                },
+                                state: Some(u64::from(systems.production.used_slots(pool))),
+                                at: clock.now,
+                            });
+                            vec![jig_test_system::ValueObserved {
+                                state: before.as_ref().map(|row| row.until),
+                                owner: before.map(|row| {
+                                    let (attempt, completion, position) = match row.key.origin {
+                                        production::Purpose::Call { attempt, completion, position } => {
+                                            (attempt, completion, position)
+                                        }
+                                        production::Purpose::Procedure { .. } => (0, 0, 0),
+                                        production::Purpose::Projection { .. } => (0, 0, 1),
+                                    };
+                                    jig_test_system::SystemKey {
+                                        deployment: row.key.deployment,
+                                        task: row.key.task,
+                                        purpose: row.key.purpose,
+                                        attempt,
+                                        completion,
+                                        position,
+                                    }
+                                }),
+                            }]
+                        }
+                        infra::Effect::Rollback { .. } | infra::Effect::TearDown { .. } => panic!("two story effects"),
                     };
                     let previous = systems.production.observed().len();
                     let event = systems.infrastructure(call);
                     let applied = match &systems.production.observed()[previous] {
                         production::ObservedEffect::Restart { applied, .. }
-                        | production::ObservedEffect::Scale { applied, .. } => *applied,
+                        | production::ObservedEffect::Scale { applied, .. }
+                        | production::ObservedEffect::Create { applied, .. } => *applied,
                         production::ObservedEffect::Silence { .. }
                         | production::ObservedEffect::Rollback { .. }
-                        | production::ObservedEffect::Create { .. }
                         | production::ObservedEffect::TearDown { .. } => panic!("two story effects"),
                     };
                     peers.observed.push(r::Observed::Effect {
@@ -414,10 +471,13 @@ impl Application for Ops {
                         effect: jig_test_system::Observed {
                             kind,
                             key: stable,
-                            resources: vec![jig_test_system::Name(observations::resource(&service, 2).path)],
+                            resources: resources
+                                .into_iter()
+                                .map(|resource| jig_test_system::Name(resource.path))
+                                .collect(),
                             condition,
                             target,
-                            before: vec![jig_test_system::ValueObserved { state: before, owner: None }],
+                            before,
                             applied,
                             copy: if attempt == 1 {
                                 jig_test_system::Copy::First

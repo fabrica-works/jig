@@ -170,7 +170,27 @@ pub(crate) fn spec_number(spec: &tasks::Spec, number: u32) -> Option<u64> {
     }
     None
 }
+fn spec_environment(spec: &tasks::Spec) -> Option<infrastructure::Environment> {
+    let mut pool = None;
+    let mut name = None;
+    for parameter in &spec.parameters {
+        match parameter {
+            tasks::Parameter::Bytes { name: 1, value } => pool = Some(value.clone()),
+            tasks::Parameter::Bytes { name: 2, value } => name = Some(value.clone()),
+            tasks::Parameter::Bytes { .. } | tasks::Parameter::Number { .. } | tasks::Parameter::Resource { .. } => {}
+        }
+    }
+    Some(infrastructure::Environment::new(pool?, name?))
+}
 pub(crate) fn procedure(code: u32, spec: &tasks::Spec) -> Option<infrastructure::Procedure> {
+    if code == infrastructure::PROVISION_CODE {
+        return Some(infrastructure::Procedure::Provision {
+            environment: spec_environment(spec)?,
+            until: spec_number(spec, 3)?,
+            price: spec_number(spec, 4)?,
+            deadline: spec_number(spec, 5)?,
+        });
+    }
     let service = spec_service(spec)?;
     match code {
         1 => Some(infrastructure::Procedure::Scale {
@@ -192,8 +212,28 @@ pub(crate) fn holdings(number: u16, executor: tasks::Executor, spec: &tasks::Spe
         Some(jig_ops_connectors::Connector::Observability) | None => return Some(Box::new([])),
     }
     match executor {
-        tasks::Executor::Procedure { connector, .. } => match jig_ops_connectors::connector(connector) {
-            Some(jig_ops_connectors::Connector::Infrastructure) => {}
+        tasks::Executor::Procedure { connector, code } => match jig_ops_connectors::connector(connector) {
+            Some(jig_ops_connectors::Connector::Infrastructure) => {
+                if code == infrastructure::PROVISION_CODE {
+                    let environment = spec_environment(spec)?;
+                    return Some(Box::from([
+                        tasks::Holding::Write {
+                            resource: tasks::Name {
+                                connector: number,
+                                path: infrastructure::Resource::Environment(environment.clone()).segments(),
+                            },
+                            kind: 2,
+                        },
+                        tasks::Holding::Slot {
+                            pool: tasks::Name {
+                                connector: number,
+                                path: infrastructure::Resource::Pool(infrastructure::Pool(environment.pool)).segments(),
+                            },
+                            kind: 3,
+                        },
+                    ]));
+                }
+            }
             Some(jig_ops_connectors::Connector::Observability) | None => return Some(Box::new([])),
         },
         tasks::Executor::Agent { .. } | tasks::Executor::Person(_) => return Some(Box::new([])),
@@ -1182,13 +1222,13 @@ pub(crate) const fn resource_role(role: infrastructure::ResourceRole) -> core::c
     }
 }
 
-/// The same configured service-write kind is used by holdings translation and cold restore.
+/// Connector-local service/environment write and pool-slot kinds, also used at cold restore.
 pub(crate) fn hold_kinds(number: u16) -> Box<[tasks::Kind]> {
-    Box::new([tasks::Kind {
-        connector: number,
-        kind: 1,
-        hold: tasks::HoldKind::Exclusive { taken: tasks::Taken::Waits },
-    }])
+    Box::new([
+        tasks::Kind { connector: number, kind: 1, hold: tasks::HoldKind::Exclusive { taken: tasks::Taken::Waits } },
+        tasks::Kind { connector: number, kind: 2, hold: tasks::HoldKind::Exclusive { taken: tasks::Taken::Waits } },
+        tasks::Kind { connector: number, kind: 3, hold: tasks::HoldKind::Pooled { taken: tasks::Taken::Waits } },
+    ])
 }
 
 /// The owner templates always request one delegate, matching the outcome's one child.

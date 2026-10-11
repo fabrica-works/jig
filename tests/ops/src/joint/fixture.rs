@@ -99,12 +99,26 @@ pub fn client(seed: u64) -> (client::Domain, view::View) {
 }
 #[must_use]
 pub fn world(seed: u64) -> World<Client, Joint> {
+    world_for(seed, Story::Alert)
+}
+#[must_use]
+pub fn environment_world(seed: u64) -> World<Client, Joint> {
+    let mut world = world_for(seed, Story::Environment);
+    let front = world.front();
+    let fact = front
+        .engine
+        .systems
+        .infrastructure(infra::SystemRequest::Pool { pool: infra::Pool(b"staging".as_slice().into()) });
+    front.source(root::Event::Infrastructure(infra::Event::System(fact)));
+    world
+}
+fn world_for(seed: u64, story: Story) -> World<Client, Joint> {
     let codec = jig_client_transcript::Limits {
         smith: smith_transcript::v2::CEILINGS,
         bytes: 32768,
         turn: jig_client::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
     };
-    let front = Joint::new(seed, limits(), codec);
+    let front = Joint::for_story(seed, limits(), codec, story);
     World::new(
         Settings { seed, heap_bytes_per_client: 64 * 1024 * 1024, iterations: 4096, ..Settings::default() },
         front,

@@ -40,11 +40,25 @@ pub fn key(value: infra::Key) -> SystemKey {
     SystemKey { deployment: value.deployment, task: value.task, purpose: value.purpose, attempt, completion, position }
 }
 
-pub fn parts(effect: &infra::Effect) -> (u16, infra::Service, Option<u64>, u64) {
+pub fn parts(effect: &infra::Effect) -> (u16, Vec<r::Name>, Option<u64>, u64) {
     match effect {
-        infra::Effect::Restart { service, operation } => (1, service.clone(), None, *operation),
-        infra::Effect::Scale { service, from, to } => (2, service.clone(), Some(u64::from(*from)), u64::from(*to)),
-        infra::Effect::Rollback { .. } | infra::Effect::CreateEnvironment { .. } | infra::Effect::TearDown { .. } => {
+        infra::Effect::Restart { service, operation } => (1, vec![resource(service, 2)], None, *operation),
+        infra::Effect::Scale { service, from, to } => {
+            (2, vec![resource(service, 2)], Some(u64::from(*from)), u64::from(*to))
+        }
+        // This system write creates the environment. Its pool is an authority
+        // and quota dependency; used_slots is derived from existing environments,
+        // not a pool value overwritten with this environment's lease end.
+        infra::Effect::CreateEnvironment { environment, until, .. } => (
+            4,
+            vec![r::Name {
+                connector: 2,
+                path: infra::Resource::Environment(environment.clone()).segments().iter().map(|v| v.to_vec()).collect(),
+            }],
+            None,
+            *until,
+        ),
+        infra::Effect::Rollback { .. } | infra::Effect::TearDown { .. } => {
             panic!("the two stories use restart and scale")
         }
     }
@@ -57,15 +71,22 @@ pub fn resource(service: &infra::Service, connector: u16) -> r::Name {
     }
 }
 
-pub fn policy(seed: u64) -> r::Policy {
-    let (configuration, _) = super::config::root(seed);
+pub fn policy(seed: u64, environment_chat: bool) -> r::Policy {
+    let (configuration, _) = super::config::root_for(seed, environment_chat);
     let rules = configuration.core.authority.rules();
     let ceiling = jig_core_world::observations::scope(&rules.ceiling);
     let mut policy = r::Policy {
         deployment: ceiling.clone(),
         projects: BTreeMap::from([(1, ceiling)]),
         projections: BTreeMap::new(),
-        people: BTreeMap::from([((1, 1), jig_core_world::observations::scope(&super::config::authority(500, true)))]),
+        people: BTreeMap::from([(
+            (1, 1),
+            jig_core_world::observations::scope(&if environment_chat {
+                super::config::environment_authority(500, true)
+            } else {
+                super::config::authority(500, true)
+            }),
+        )]),
         effect_accepters: BTreeSet::from([(1, 1)]),
         requirements: Vec::new(),
         implications: BTreeSet::new(),
@@ -80,6 +101,10 @@ pub fn policy(seed: u64) -> r::Policy {
         uncertainty_bound: 60_000_000_000,
         story_steps: 2000,
     };
+    if environment_chat {
+        policy.kinds.insert((2, 4), r::Kind { recovery: r::Recovery::Keyed, price: 40 });
+        policy.owned.push((2, r::Pattern { base: vec![b"pool".to_vec()], terminal: Vec::new(), open: true }));
+    }
     for kind in [1, 2] {
         policy.requirements.push(r::Requirement {
             project: None,
@@ -169,7 +194,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
             }
             root::Record::Infrastructure(infra::Record::Outbox(row)) => {
                 let key = key(row.key);
-                let (kind, service, condition, target) = parts(&row.effect);
+                let (kind, resources, condition, target) = parts(&row.effect);
                 if row.attempt > 0 {
                     snapshot.receipts.insert(r::Receipt::Outbox(2, key, row.attempt));
                     snapshot.attempts.insert((2, key), (row.attempt, row.deadline * 1_000_000_000));
@@ -182,7 +207,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                     connector: 2,
                     key,
                     kind,
-                    resources: vec![resource(&service, 2)],
+                    resources,
                     condition,
                     target,
                     judged_state: target,

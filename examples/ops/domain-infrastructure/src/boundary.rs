@@ -308,6 +308,11 @@ pub struct EnvironmentFact {
     pub price: u64,
 }
 
+/// Connector-local code for provisioning an environment.
+/// `PROVISION_CODE` uses byte parameters 1 (pool), 2 (name), and number
+/// parameters 3 (lease end), 4 (maximum price), 5 (readiness deadline).
+pub const PROVISION_CODE: u32 = 3;
+
 /// Procedure parameters kept under a task's number.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Procedure {
@@ -377,6 +382,8 @@ pub enum StepDecision {
     Wait { until: u64 },
     /// End successfully.
     Finish,
+    /// End successfully with the procedure owner's explanation.
+    FinishReport { words: Box<[u8]> },
     /// Hold for a person with a connector-local reason.
     Hold { reason: u16 },
 }
@@ -566,6 +573,8 @@ pub enum Request {
     Slots { pool: Pool, quota: u32, used: u32 },
     /// Another hand changed an owned resource a task relies on.
     Drift { task: u64, resource: Resource },
+    /// This procedure's owner-declared time condition is due.
+    Wake { task: u64 },
     /// A fact changed and procedures should step again.
     Changed { resource: Resource },
     /// Description for the core's authority check.
