@@ -338,6 +338,7 @@ impl Payload for Part {
                 sum(&[connector.heap(bounds), task.heap(bounds)])
             }
             Self::Effect { connector, proposal } => sum(&[connector.heap(bounds), proposal.heap(bounds)]),
+            Self::OwnerEffect { connector, proposal } => sum(&[connector.heap(bounds), proposal.heap(bounds)]),
             Self::Outbox { connector, scope, entry } => {
                 sum(&[connector.heap(bounds), scope.heap(bounds), entry.heap(bounds)])
             }
