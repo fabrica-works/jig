@@ -395,3 +395,5 @@ mod role_stories;
 
 #[path = "offered_acts.rs"]
 mod offered_acts;
+
+mod fault_stories;
