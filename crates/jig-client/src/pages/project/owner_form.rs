@@ -13,6 +13,7 @@ use skein_lib::{Queue, Token};
 #[derive(Debug)]
 pub struct Form {
     pub review: Option<Box<Ask>>,
+    pub service_role: Option<crate::contract::HeldRole>,
     pub before: Option<Box<Ask>>,
     pub pending: Option<Token>,
     pub refused: Option<Refusal>,
@@ -51,6 +52,54 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
     }
     for offer in &doc.acts {
         if offer.act == kind {
+            return match &offer.admission {
+                Admission::Allowed | Admission::Proposed { .. } => true,
+                Admission::Refused(_) | Admission::Bounded { .. } => false,
+            };
+        }
+    }
+    false
+}
+/// An explicit role choice has no implicit service name or request.
+pub(crate) fn service_role(domain: &mut Domain, role: crate::contract::HeldRole) {
+    if domain.blocked || domain.project_page.settings.pending.is_some() {
+        return;
+    }
+    let Some(doc) = &domain.project_page.owner else {
+        return;
+    };
+    if !service_offered(doc) {
+        return;
+    }
+    match role {
+        crate::contract::HeldRole::Policy { role } => {
+            let mut supplied = false;
+            for row in &doc.policy.roles {
+                if row.number == role {
+                    supplied = true;
+                    break;
+                }
+            }
+            if !supplied {
+                return;
+            }
+        }
+        crate::contract::HeldRole::Owner
+        | crate::contract::HeldRole::Maintainer
+        | crate::contract::HeldRole::Member
+        | crate::contract::HeldRole::Observer => {}
+    }
+    domain.project_page.settings.service_role = Some(role);
+    domain.project_page.settings.review = None;
+    domain.project_page.settings.before = None;
+    domain.project_page.settings.refused = None;
+    domain.changed();
+}
+/// Source admission for a role/name service form, before either input is chosen.
+#[must_use]
+pub fn service_offered(doc: &OwnerProject) -> bool {
+    for offer in &doc.acts {
+        if offer.act == ActKind::MakeService {
             return match &offer.admission {
                 Admission::Allowed | Admission::Proposed { .. } => true,
                 Admission::Refused(_) | Admission::Bounded { .. } => false,
@@ -209,6 +258,6 @@ pub fn action(ask: Ask) -> Act {
 
 impl Form {
     pub(crate) const fn new() -> Self {
-        Self { review: None, before: None, pending: None, refused: None }
+        Self { review: None, service_role: None, before: None, pending: None, refused: None }
     }
 }

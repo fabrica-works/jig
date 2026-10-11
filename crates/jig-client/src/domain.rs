@@ -642,6 +642,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
 fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<Request>) {
     match act {
         Act::ProjectSettings { ask } => crate::pages::project::owner_form::review(domain, ask),
+        Act::ProjectServiceRole { role } => crate::pages::project::owner_form::service_role(domain, role),
         Act::Go { address } => {
             crate::confirm::close(domain);
             crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out);

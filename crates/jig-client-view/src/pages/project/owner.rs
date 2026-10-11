@@ -109,7 +109,9 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(chip.checked_add(10)?.checked_mul(l.rows)?)?
         .checked_add(recurring)?
         .checked_add(l.rows.checked_mul(16)?)?
-        .checked_add(100)
+        .checked_add(l.rows.checked_add(4)?.checked_mul(l.rows.checked_add(1)?)?.checked_mul(2)?)?
+        .checked_add(l.rows.checked_mul(2)?)?
+        .checked_add(110)
 }
 /// Every loaded saying and escaped source segment contributes to the envelope.
 #[must_use]
@@ -467,11 +469,13 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         edit: PolicyEdit::ProjectSpend { period_spend: value.policy.period_spend },
     };
     if owner_form::supported(value, &spend) {
+        named_region(b, words, JigPhrase::PolicyProjectSpend, &[]);
         let spend = owner_form::draft(state, &spend);
         if let Ask::ChangePolicy { edit: PolicyEdit::ProjectSpend { period_spend }, .. } = &spend {
             request_field(b, &spend, Field::Spend, *period_spend, words, bindings);
         }
         control(b, &spend, words, bindings);
+        b.close();
     }
     for role in &value.policy.roles {
         if let Some(authority) = role.authority.whole() {
@@ -486,6 +490,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
                 }),
             };
             if owner_form::supported(value, &ask) {
+                named_region(b, words, JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]);
                 let ask = owner_form::draft(state, &ask);
                 if let Ask::ChangePolicy { edit: PolicyEdit::Role(chosen), .. } = &ask {
                     request_field(b, &ask, Field::Spend, chosen.period_spend, words, bindings);
@@ -493,6 +498,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
                     request_field(b, &ask, Field::Decides, u64::from(chosen.decides), words, bindings);
                 }
                 control(b, &ask, words, bindings);
+                b.close();
             }
         }
     }
@@ -501,6 +507,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         edit: PolicyEdit::Requirements { requirements: value.policy.requirements.clone() },
     };
     if owner_form::supported(value, &requirements) {
+        named_region(b, words, JigPhrase::PolicyRequirements, &[]);
         let draft = owner_form::draft(state, &requirements);
         if let Ask::ChangePolicy { edit: PolicyEdit::Requirements { requirements }, .. } = &draft {
             for remove in 0..requirements.len() {
@@ -524,12 +531,14 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
                 );
             }
         }
+        b.close();
     }
     let projections = Ask::ChangePolicy {
         project: value.number,
         edit: PolicyEdit::Projections { grants: value.policy.projections.clone() },
     };
     if owner_form::supported(value, &projections) {
+        named_region(b, words, JigPhrase::PolicyProjections, &[]);
         let draft = owner_form::draft(state, &projections);
         if let Ask::ChangePolicy { edit: PolicyEdit::Projections { grants }, .. } = &draft {
             for remove in 0..grants.len() {
@@ -550,6 +559,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
                 );
             }
         }
+        b.close();
     }
     let mut holdings = skein_lib::List::with_capacity(value.members.capacity());
     for member in &value.members {
@@ -562,6 +572,27 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         let draft = owner_form::draft(state, &roles);
         if let Ask::SetRoles { holdings, .. } = &draft {
             for remove in 0..holdings.len() {
+                let member = holdings.get(remove).expect("bounded holding");
+                region(b, words, P::Member, &[Hole::Number(member.party)]);
+                for role in [
+                    jig_client::contract::HeldRole::Owner,
+                    jig_client::contract::HeldRole::Maintainer,
+                    jig_client::contract::HeldRole::Member,
+                    jig_client::contract::HeldRole::Observer,
+                ] {
+                    holding_control(b, value.number, holdings, remove, role, words, bindings);
+                }
+                for role in &value.policy.roles {
+                    holding_control(
+                        b,
+                        value.number,
+                        holdings,
+                        remove,
+                        jig_client::contract::HeldRole::Policy { role: role.number },
+                        words,
+                        bindings,
+                    );
+                }
                 let mut remaining = skein_lib::List::with_capacity(holdings.capacity());
                 for index in 0..holdings.len() {
                     if index != remove {
@@ -575,9 +606,11 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
                     words,
                     bindings,
                 );
+                b.close();
             }
         }
     }
+    service_form(b, value, state, words, bindings);
     if let Some(ask) = &state.review {
         region(b, words, P::Review, &[]);
         words.text(b, JigPhrase::Before, &[]);
@@ -598,6 +631,88 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
             words.progress(b, intent.progress);
         }
     }
+}
+fn named_region(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole]) {
+    b.open(Role::Region);
+    b.name(&words.say(phrase, holes));
+}
+fn role_label(words: &Words, role: jig_client::contract::HeldRole) -> Box<[u8]> {
+    match role {
+        jig_client::contract::HeldRole::Owner => words.say(JigPhrase::HeldOwner, &[]),
+        jig_client::contract::HeldRole::Maintainer => words.say(JigPhrase::HeldMaintainer, &[]),
+        jig_client::contract::HeldRole::Member => words.say(JigPhrase::HeldMember, &[]),
+        jig_client::contract::HeldRole::Observer => words.say(JigPhrase::HeldObserver, &[]),
+        jig_client::contract::HeldRole::Policy { role } => {
+            words.say(JigPhrase::HeldPolicy, &[Hole::Number(u64::from(role))])
+        }
+    }
+}
+fn role_control(
+    b: &mut Builder,
+    role: jig_client::contract::HeldRole,
+    action: Act,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    b.open(Role::Button);
+    let label = role_label(words, role);
+    b.name(&label);
+    b.text(Run::Plain, &label);
+    b.bind(bindings.insert(JigMeaning::Action(action)));
+    b.close();
+}
+fn holding_control(
+    b: &mut Builder,
+    project: u32,
+    source: &skein_lib::List<jig_client::contract::Holding>,
+    index: u32,
+    role: jig_client::contract::HeldRole,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let mut holdings = source.clone();
+    holdings.get_mut(index).expect("bounded selected holding").role = role;
+    role_control(b, role, owner_form::action(Ask::SetRoles { project, holdings }), words, bindings);
+}
+fn service_form(
+    b: &mut Builder,
+    value: &OwnerProject,
+    state: &owner_form::Form,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    if !owner_form::service_offered(value) {
+        return;
+    }
+    named_region(b, words, JigPhrase::ActMakeService, &[]);
+    for role in [
+        jig_client::contract::HeldRole::Owner,
+        jig_client::contract::HeldRole::Maintainer,
+        jig_client::contract::HeldRole::Member,
+        jig_client::contract::HeldRole::Observer,
+    ] {
+        role_control(b, role, Act::ProjectServiceRole { role }, words, bindings);
+    }
+    for row in &value.policy.roles {
+        let role = jig_client::contract::HeldRole::Policy { role: row.number };
+        role_control(b, role, Act::ProjectServiceRole { role }, words, bindings);
+    }
+    if let Some(role) = state.service_role {
+        words.held_role(b, Some(role));
+        b.open(Role::TextField);
+        let name = words.book.say(words.language, P::Name.id(), &[]).expect("checked service name").text;
+        b.name(&name);
+        if let Some(ask) = &state.review {
+            if let Ask::MakeService { name, role: chosen, .. } = ask.as_ref() {
+                if *chosen == role {
+                    b.value(name.bytes(), 0);
+                }
+            }
+        }
+        b.bind(bindings.insert(JigMeaning::ProjectServiceName { project: value.number, role }));
+        b.close();
+    }
+    b.close();
 }
 fn remove_control(b: &mut Builder, ask: &Ask, index: u32, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Button);

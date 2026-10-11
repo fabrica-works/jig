@@ -53,6 +53,8 @@ pub fn number(bytes: &[u8]) -> Option<u64> {
 pub enum JigMeaning {
     /// One typed Project settings field, preserving other whole channels.
     ProjectSetting { ask: Box<jig_client::contract::Ask>, field: crate::owner_project::Field },
+    /// A new service name, after an explicit supplied role choice.
+    ProjectServiceName { project: u32, role: jig_client::contract::HeldRole },
     /// Pressing, submitting or toggling asks this already typed action.
     Action(jig_client::action::Act),
     /// Whole text edits a domain field; submit names that same field.
@@ -122,6 +124,7 @@ impl JigBindings {
                     | JigMeaning::Priority
                     | JigMeaning::Amendment { .. }
                     | JigMeaning::ProjectSetting { .. }
+                    | JigMeaning::ProjectServiceName { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -143,6 +146,7 @@ impl JigBindings {
                     | JigMeaning::Priority
                     | JigMeaning::Amendment { .. }
                     | JigMeaning::ProjectSetting { .. }
+                    | JigMeaning::ProjectServiceName { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -187,6 +191,7 @@ impl JigBindings {
                         | jig_client::action::Act::OpenUpdates
                         | jig_client::action::Act::StartChat { .. }
                         | jig_client::action::Act::ProjectSettings { .. }
+                        | jig_client::action::Act::ProjectServiceRole { .. }
                         | jig_client::action::Act::GoalForm { .. }
                         | jig_client::action::Act::FilterTasks { .. }
                         | jig_client::action::Act::FilterNotes { .. }
@@ -202,6 +207,7 @@ impl JigBindings {
                     | JigMeaning::Priority
                     | JigMeaning::Amendment { .. }
                     | JigMeaning::ProjectSetting { .. }
+                    | JigMeaning::ProjectServiceName { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -218,6 +224,16 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
         if entry.token == token {
             return match &entry.meaning {
                 JigMeaning::Part(_) | JigMeaning::OwnerPart(_) => None,
+                JigMeaning::ProjectServiceName { project, role } => match act {
+                    Act::Input { value } => {
+                        Some(jig_client::pages::project::owner_form::action(jig_client::contract::Ask::MakeService {
+                            project: *project,
+                            role: *role,
+                            name: jig_client::contract::Text::new(value, view.text_limit).ok()?,
+                        }))
+                    }
+                    Act::Press | Act::Submit | Act::Toggle => None,
+                },
                 JigMeaning::ProjectSetting { ask, field } => match act {
                     Act::Input { value } => crate::owner_project::edit(ask, *field, value, view.text_limit),
                     Act::Press | Act::Submit | Act::Toggle => None,

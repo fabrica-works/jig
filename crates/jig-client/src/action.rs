@@ -12,6 +12,8 @@ use skein_lib::Token;
 pub enum Act {
     /// Review one whole settings replacement against the supplied Project owner.
     ProjectSettings { ask: Box<crate::contract::Ask> },
+    /// Choose a service role before supplying its explicit name.
+    ProjectServiceRole { role: crate::contract::HeldRole },
     /// Go to a jig page.
     Go { address: Address },
     /// Edit a field.
