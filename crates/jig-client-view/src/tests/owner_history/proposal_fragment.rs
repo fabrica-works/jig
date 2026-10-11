@@ -41,7 +41,10 @@ fn bare(value: &OwnerProposalHistory, words: &Words) -> (Tree, JigBindings, Hist
             bytes = bytes.checked_add(u32::try_from(name.len()).unwrap()).unwrap();
         }
         assert!(node.binding.is_none(), "retained facts supply no current controls");
-        assert!(!matches!(node.role, Role::Button | Role::TextField | Role::TextArea | Role::Choice));
+        assert_ne!(node.role, Role::Button);
+        assert_ne!(node.role, Role::TextField);
+        assert_ne!(node.role, Role::TextArea);
+        assert_ne!(node.role, Role::Choice);
         if let Some(slot) = node.slot {
             slots = slots.checked_add(1).unwrap();
             assert_eq!(bindings.owner_part(slot.token), Some(&part()));
@@ -155,7 +158,10 @@ fn retained_proposal_fragment_selected_language_and_exact_occupied_nodes_refuse_
     let (again, _) = render(&value, &words, &exact);
     assert_eq!(again.nodes(), tree.nodes());
     let one_under = Limits { nodes: exact.nodes.checked_sub(1).unwrap(), ..exact };
-    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render(&value, &words, &one_under))).is_err());
+    match std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| render(&value, &words, &one_under))) {
+        Err(_) => {}
+        Ok(_) => panic!("one node below the occupied fragment must refuse"),
+    }
 }
 #[test]
 fn retained_proposal_fragment_validation_refuses_whole_allocated_rows_and_text_without_projection() {
@@ -208,7 +214,10 @@ fn retained_proposal_fragment_preserves_absent_empty_and_independent_retained_lo
                     assert_eq!(values.capacity(), 3);
                 }
             }
-            _ => unreachable!(),
+            OwnerRetainedAction::Batch(_)
+            | OwnerRetainedAction::Effect { .. }
+            | OwnerRetainedAction::Widen { .. }
+            | OwnerRetainedAction::Release { .. } => unreachable!(),
         }
         assert_eq!(has(&tree, b"Instruction replacement not supplied"), !supplied);
         assert_eq!(has(&tree, b"Instructions are empty"), supplied);
