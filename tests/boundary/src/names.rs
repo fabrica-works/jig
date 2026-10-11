@@ -111,21 +111,8 @@ fn comment_end(source: &[u8], start: usize) -> usize {
     end
 }
 
-fn vocabulary_at(
-    path: &Path,
-    source: &str,
-    at: usize,
-    words: &[String],
-    starts: &[bool; 256],
-    failures: &mut Vec<String>,
-) {
+fn vocabulary_at(path: &Path, source: &str, at: usize, words: &[String], failures: &mut Vec<String>) {
     let bytes = source.as_bytes();
-    if !starts[usize::from(bytes[at].to_ascii_lowercase())] {
-        return;
-    }
-    if at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(u8::is_ascii_alphanumeric) {
-        return;
-    }
     for word in words {
         if !bytes[at].eq_ignore_ascii_case(&word.as_bytes()[0]) {
             continue;
@@ -149,6 +136,7 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
     let mut starts = [false; 256];
     for word in words {
         starts[usize::from(word.as_bytes()[0].to_ascii_lowercase())] = true;
+        starts[usize::from(word.as_bytes()[0].to_ascii_uppercase())] = true;
     }
     let bytes = source.as_bytes();
     let mut index = 0;
@@ -188,13 +176,13 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 index += 1;
             }
         }
-        for (offset, ch) in source[start..index].char_indices() {
+        for (offset, byte) in bytes[start..index].iter().copied().enumerate() {
             let at = start + offset;
-            if !words.is_empty() {
-                vocabulary_at(path, source, at, words, &starts, &mut failures);
+            if starts[usize::from(byte)] && (at == 0 || !bytes[at - 1].is_ascii_alphanumeric()) {
+                vocabulary_at(path, source, at, words, &mut failures);
             }
             if comment
-                && matches!(ch, 'l' | 'L')
+                && matches!(byte, b'l' | b'L')
                 && bytes.get(at..at + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"))
                 && !at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(|byte| identifier_byte(*byte))
                 && !bytes.get(at + 6).is_some_and(|byte| identifier_byte(*byte))
@@ -202,7 +190,7 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 let word = &source[at..at + 6];
                 failures.push(format!("{}:{line}: comment {word}", path.display()));
             }
-            if ch == '\n' {
+            if byte == b'\n' {
                 line += 1;
             }
         }
