@@ -82,7 +82,13 @@ fn person_owner_public_read_preserves_reserved_offers_and_nested_result_admissio
             {
                 Some(document)
             }
-            _ => None,
+            Up::Answer { .. }
+            | Up::Read { .. }
+            | Up::Watch { .. }
+            | Up::ApplicationAnswer { .. }
+            | Up::ApplicationRead { .. }
+            | Up::App { .. }
+            | Up::Ended { .. } => None,
         })
         .expect("normal whole owner read returned");
     assert_eq!(supplied.as_ref(), &original);
