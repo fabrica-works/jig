@@ -1,0 +1,262 @@
+//! Whole deployment owner facts (client/domain/contract.md, 5 and 7.1).
+//! Clock options, independent loss, configured order and reserved collections
+//! cross unchanged. Connector values remain their application owners' facts.
+use super::{chips, owner, refusals, results};
+use jig_client::{Limits, contract as client};
+use jig_core::documents;
+use jig_core_accounts as accounts;
+use jig_core_fleet as fleet;
+use jig_core_people as people;
+use jig_core_tasks as tasks;
+
+/// # Errors
+/// Refuses any whole reserved collection or nested owner value above bounds.
+pub fn document(source: &documents::Deployment, limits: &Limits) -> Result<client::OwnerDeployment, owner::Invalid> {
+    Ok(client::OwnerDeployment {
+        hosts: owner::list(&source.hosts, limits, |value| host(value, limits))?,
+        attempts: owner::list(&source.attempts, limits, |value| run(value, limits))?,
+        accounts: owner::list(&source.accounts, limits, |value| account(value, limits))?,
+        tasks: capacity(source.tasks),
+        workers: capacity(source.workers),
+        attempts_capacity: capacity(source.attempts_capacity),
+        waiting_attempts: source.waiting_attempts,
+        proposals: capacity(source.proposals),
+        projects: owner::list(&source.projects, limits, |value| {
+            Ok(client::OwnerProjectCapacity {
+                project: value.project,
+                tasks: capacity(value.tasks),
+                proposals: value.proposals,
+            })
+        })?,
+        grace_bound: source.grace_bound,
+        hello_refusals: owner::list(&source.hello_refusals, limits, |value| {
+            Ok(client::OwnerHelloRefusalLine {
+                channel: value.channel,
+                at: value.at,
+                slots: value.slots,
+                stop_bound: value.stop_bound,
+                why: hello(value.why),
+            })
+        })?,
+        hosts_forgotten: source.hosts_forgotten,
+        hello_refusals_forgotten: source.hello_refusals_forgotten,
+        person_room_refusals: owner::list(&source.person_room_refusals, limits, |value| Ok(person_refusal(value)))?,
+        person_room_refusals_forgotten: source.person_room_refusals_forgotten,
+        person_answer_retention: source.person_answer_retention,
+        task_room_refusals: owner::list(&source.task_room_refusals, limits, |value| Ok(task_refusal(value)))?,
+        task_room_refusals_forgotten: source.task_room_refusals_forgotten,
+        connectors: owner::list(&source.connectors, limits, |value| Ok(*value))?,
+        connectors_cut: source.connectors_cut,
+        cut: source.cut,
+    })
+}
+
+fn capacity(value: documents::Capacity) -> client::OwnerCapacity {
+    client::OwnerCapacity { used: value.used, limit: value.limit }
+}
+
+fn host(value: &documents::Host, limits: &Limits) -> Result<client::OwnerHost, owner::Invalid> {
+    Ok(client::OwnerHost {
+        channel: value.channel,
+        kind: host_kind(value.kind),
+        slots: value.slots,
+        used: value.used,
+        free: value.free,
+        draining: value.draining,
+        connected: value.connected,
+        grace_until: value.grace_until,
+        grace_remaining: value.grace_remaining,
+        runs: owner::list(&value.runs, limits, |value| run(value, limits))?,
+        cut: value.cut,
+    })
+}
+
+fn run(value: &documents::HostRun, limits: &Limits) -> Result<client::OwnerHostRun, owner::Invalid> {
+    Ok(client::OwnerHostRun {
+        task: results::link(&value.task, limits)?,
+        attempt: value.attempt,
+        kept: value.kept,
+        listed: value.listed,
+        state: attempt(value.state),
+        location: match value.location {
+            documents::RunLocation::None => client::OwnerRunLocation::None,
+            documents::RunLocation::Connected { channel, kind } => {
+                client::OwnerRunLocation::Connected { channel, kind: host_kind(kind) }
+            }
+            documents::RunLocation::Adrift { channel, until, remaining } => {
+                client::OwnerRunLocation::Adrift { channel, until, remaining }
+            }
+        },
+        grace_until: value.grace_until,
+    })
+}
+
+fn account(value: &documents::Account, limits: &Limits) -> Result<client::OwnerAccount, owner::Invalid> {
+    Ok(client::OwnerAccount {
+        number: value.number,
+        generation: value.generation,
+        state: account_state(value.state),
+        usable: value.usable,
+        unsaved: value.unsaved,
+        attention: value.attention,
+        spent_until: value.spent_until,
+        runs: owner::list(&value.runs, limits, |value| chips::chip(value, limits))?,
+        waiting: owner::list(&value.waiting, limits, |value| chips::chip(value, limits))?,
+        cut: value.cut,
+    })
+}
+
+fn person_refusal(value: &people::CapacityRefusal) -> client::OwnerPersonCapacityRefusal {
+    client::OwnerPersonCapacityRefusal {
+        key: client::OwnerRequestKey { person: value.key.person, key: value.key.key },
+        project: value.project,
+        action: person_action(value.action),
+        at: value.at,
+        cause: match value.cause {
+            people::CapacityCause::Requests { limit } => client::OwnerPersonCapacityCause::Requests { limit },
+            people::CapacityCause::Pending { limit } => client::OwnerPersonCapacityCause::Pending { limit },
+            people::CapacityCause::Waiters { limit } => client::OwnerPersonCapacityCause::Waiters { limit },
+            people::CapacityCause::Limit { which } => {
+                client::OwnerPersonCapacityCause::Limit { which: refusals::limit(which) }
+            }
+        },
+    }
+}
+
+fn task_refusal(value: &tasks::CapacityRefusal) -> client::OwnerTaskCapacityRefusal {
+    client::OwnerTaskCapacityRefusal {
+        request: client::OwnerTaskCapacityRequest {
+            project: value.request.project,
+            by: results::requester(value.request.by),
+            action: task_action(value.request.action),
+            cause: task_cause(value.request.cause),
+        },
+        at: value.at,
+    }
+}
+
+fn host_kind(value: fleet::HostKind) -> client::OwnerHostKind {
+    match value {
+        fleet::HostKind::Worker => client::OwnerHostKind::Worker,
+        fleet::HostKind::Engine => client::OwnerHostKind::Engine,
+    }
+}
+
+fn attempt(value: fleet::AttemptState) -> client::OwnerAttemptState {
+    match value {
+        fleet::AttemptState::Waiting => client::OwnerAttemptState::Waiting,
+        fleet::AttemptState::Adopted => client::OwnerAttemptState::Adopted,
+        fleet::AttemptState::Claimed => client::OwnerAttemptState::Claimed,
+        fleet::AttemptState::Cancelled => client::OwnerAttemptState::Cancelled,
+        fleet::AttemptState::Handed => client::OwnerAttemptState::Handed,
+        fleet::AttemptState::Acknowledged => client::OwnerAttemptState::Acknowledged,
+        fleet::AttemptState::Stray => client::OwnerAttemptState::Stray,
+        fleet::AttemptState::Kept => client::OwnerAttemptState::Kept,
+        fleet::AttemptState::Fenced => client::OwnerAttemptState::Fenced,
+        fleet::AttemptState::Closed => client::OwnerAttemptState::Closed,
+    }
+}
+
+fn account_state(value: accounts::State) -> client::OwnerAccountState {
+    match value {
+        accounts::State::Fresh => client::OwnerAccountState::Fresh,
+        accounts::State::Refreshing => client::OwnerAccountState::Refreshing,
+        accounts::State::Retrying => client::OwnerAccountState::Retrying,
+        accounts::State::Revoked => client::OwnerAccountState::Revoked,
+        accounts::State::Closing => client::OwnerAccountState::Closing,
+    }
+}
+
+fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
+    match value {
+        fleet::HelloRefusal::ReservedChannel => client::OwnerHelloRefusal::ReservedChannel,
+        fleet::HelloRefusal::Workers { limit } => client::OwnerHelloRefusal::Workers { limit },
+        fleet::HelloRefusal::StopBound { grace } => client::OwnerHelloRefusal::StopBound { grace },
+    }
+}
+
+fn person_action(value: people::CapacityAction) -> client::OwnerPersonCapacityAction {
+    match value {
+        people::CapacityAction::Close => client::OwnerPersonCapacityAction::Close,
+        people::CapacityAction::Application { connector } => {
+            client::OwnerPersonCapacityAction::Application { connector }
+        }
+        people::CapacityAction::Note { name } => client::OwnerPersonCapacityAction::Note { name },
+        people::CapacityAction::Service => client::OwnerPersonCapacityAction::Service,
+        people::CapacityAction::Adoption => client::OwnerPersonCapacityAction::Adoption,
+        people::CapacityAction::Roles => client::OwnerPersonCapacityAction::Roles,
+        people::CapacityAction::Policy => client::OwnerPersonCapacityAction::Policy,
+        people::CapacityAction::Pool { person } => client::OwnerPersonCapacityAction::Pool { person },
+        people::CapacityAction::Chat => client::OwnerPersonCapacityAction::Chat,
+        people::CapacityAction::Goal => client::OwnerPersonCapacityAction::Goal,
+        people::CapacityAction::Escalation { task } => client::OwnerPersonCapacityAction::Escalation { task },
+        people::CapacityAction::Proposal { proposer, number } => client::OwnerPersonCapacityAction::Proposal {
+            proposer: match proposer {
+                people::Proposer::Task(value) => client::Proposer::Task(value),
+                people::Proposer::Party(value) => client::Proposer::Party(value),
+            },
+            number,
+        },
+        people::CapacityAction::Words { task } => client::OwnerPersonCapacityAction::Words { task },
+        people::CapacityAction::Question { task, question } => {
+            client::OwnerPersonCapacityAction::Question { task, question }
+        }
+        people::CapacityAction::Priority => client::OwnerPersonCapacityAction::Priority,
+        people::CapacityAction::Amend { task } => client::OwnerPersonCapacityAction::Amend { task },
+        people::CapacityAction::Move { task } => client::OwnerPersonCapacityAction::Move { task },
+        people::CapacityAction::TakePerson { task } => client::OwnerPersonCapacityAction::TakePerson { task },
+        people::CapacityAction::HandBackPerson { task } => client::OwnerPersonCapacityAction::HandBackPerson { task },
+        people::CapacityAction::AnswerPerson { task } => client::OwnerPersonCapacityAction::AnswerPerson { task },
+        people::CapacityAction::Stop { task } => client::OwnerPersonCapacityAction::Stop { task },
+        people::CapacityAction::Cancel { task } => client::OwnerPersonCapacityAction::Cancel { task },
+        people::CapacityAction::Release { task } => client::OwnerPersonCapacityAction::Release { task },
+        people::CapacityAction::MarkSeen { seen } => client::OwnerPersonCapacityAction::MarkSeen {
+            seen: match seen {
+                people::Seen::Results { through } => client::Seen::Results { through },
+                people::Seen::Chat { task, through } => client::Seen::Replies { chat: task, through },
+            },
+        },
+    }
+}
+
+fn task_action(value: tasks::CapacityAction) -> client::OwnerTaskCapacityAction {
+    match value {
+        tasks::CapacityAction::Batch { first, members } => client::OwnerTaskCapacityAction::Batch { first, members },
+        tasks::CapacityAction::Proposal { number } => client::OwnerTaskCapacityAction::Proposal { number },
+        tasks::CapacityAction::PersonProposal { number } => client::OwnerTaskCapacityAction::PersonProposal { number },
+        tasks::CapacityAction::Message { task, number } => client::OwnerTaskCapacityAction::Message { task, number },
+        tasks::CapacityAction::Source { funder } => {
+            client::OwnerTaskCapacityAction::Source { funder: owner::funder(funder) }
+        }
+        tasks::CapacityAction::Introduce { left, right } => client::OwnerTaskCapacityAction::Introduce { left, right },
+        tasks::CapacityAction::Subscription { number } => client::OwnerTaskCapacityAction::Subscription { number },
+        tasks::CapacityAction::Effect { entry } => client::OwnerTaskCapacityAction::Effect { entry },
+        tasks::CapacityAction::Claim { attempt } => client::OwnerTaskCapacityAction::Claim { attempt },
+        tasks::CapacityAction::Release => client::OwnerTaskCapacityAction::Release,
+        tasks::CapacityAction::Move => client::OwnerTaskCapacityAction::Move,
+    }
+}
+
+fn task_cause(value: tasks::CapacityCause) -> client::OwnerTaskCapacityCause {
+    match value {
+        tasks::CapacityCause::Tasks { limit } => client::OwnerTaskCapacityCause::Tasks { limit },
+        tasks::CapacityCause::CreationFlights { limit } => client::OwnerTaskCapacityCause::CreationFlights { limit },
+        tasks::CapacityCause::ResourceReports { limit } => client::OwnerTaskCapacityCause::ResourceReports { limit },
+        tasks::CapacityCause::ProjectTasks { limit } => client::OwnerTaskCapacityCause::ProjectTasks { limit },
+        tasks::CapacityCause::Tree { limit } => client::OwnerTaskCapacityCause::Tree { limit },
+        tasks::CapacityCause::Delegates { limit } => client::OwnerTaskCapacityCause::Delegates { limit },
+        tasks::CapacityCause::Inbox { task, messages, bytes } => {
+            client::OwnerTaskCapacityCause::Inbox { task, messages, bytes }
+        }
+        tasks::CapacityCause::Holdings { limit } => client::OwnerTaskCapacityCause::Holdings { limit },
+        tasks::CapacityCause::HoldWaiters { limit } => client::OwnerTaskCapacityCause::HoldWaiters { limit },
+        tasks::CapacityCause::Proposals { limit } => client::OwnerTaskCapacityCause::Proposals { limit },
+        tasks::CapacityCause::References { limit } => client::OwnerTaskCapacityCause::References { limit },
+        tasks::CapacityCause::Subscriptions { limit } => client::OwnerTaskCapacityCause::Subscriptions { limit },
+        tasks::CapacityCause::Funders { limit } => client::OwnerTaskCapacityCause::Funders { limit },
+        tasks::CapacityCause::Writers { limit } => client::OwnerTaskCapacityCause::Writers { limit },
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests;

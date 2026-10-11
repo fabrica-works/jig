@@ -116,7 +116,7 @@ pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Frame,
         charters,
         cut: value.cut,
         retention: value.retention,
-        deployment_role: None,
+        deployment_role: value.deployment_role.map(held_role),
     })
 }
 

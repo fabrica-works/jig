@@ -6,6 +6,7 @@ pub mod answers;
 pub mod asks;
 pub mod chips;
 pub mod cursor;
+pub mod deployment;
 pub mod documents;
 pub mod escalations;
 pub mod family;

@@ -47,7 +47,7 @@ pub fn limits() -> jig_test_client_domain::Limits {
         },
         first: first::Limits {
             connector: jig_test_client_domain::connector_values::ConnectorLimits {
-                rows: 0,
+                rows: 4,
                 paths: 0,
                 segments: 0,
                 segment_bytes: 0,

@@ -83,6 +83,26 @@ pub fn project_read(source: &documents::Project, limits: &Limits) -> Result<clie
 }
 
 /// # Errors
+/// Refuses any owner fact, reserved allocation or complete Deployment read envelope above bounds.
+pub fn deployment_read(source: &documents::Deployment, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+    let value = client::ReadValue::OwnerDeployment(Box::new(
+        super::deployment::document(source, limits).map_err(Invalid::Owner)?,
+    ));
+    admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
+    Ok(value)
+}
+
+/// # Errors
+/// Refuses any owner fact, reserved allocation or complete Deployment delivery envelope above bounds.
+pub fn deployment_delivery(source: &documents::Deployment, limits: &Limits) -> Result<client::Delivery, Invalid> {
+    let value = client::Delivery::OwnerDeployment(Box::new(
+        super::deployment::document(source, limits).map_err(Invalid::Owner)?,
+    ));
+    admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
+    Ok(value)
+}
+
+/// # Errors
 /// Refuses any whole pending person work or optional complete shown result above bounds.
 pub fn person_task_read(source: &documents::PersonTask, limits: &Limits) -> Result<client::ReadValue, Invalid> {
     let value = client::ReadValue::OwnerPersonTask(Box::new(

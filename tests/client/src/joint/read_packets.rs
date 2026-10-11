@@ -89,6 +89,7 @@ pub fn read(
             }
             documents::Document::Escalation(value) => escalation(what, value, limits)?,
             documents::Document::Project(value) => project(what, value, limits)?,
+            documents::Document::Deployment(value) => deployment(what, value, limits)?,
             documents::Document::PersonTask(value) => {
                 let client::Read::PersonTask { task } = what else { return Err(Invalid::OwnerRoute) };
                 if *task != value.task.number {
@@ -117,8 +118,7 @@ pub fn read(
             | documents::Document::Tasks(_)
             | documents::Document::Note(_)
             | documents::Document::Inbox(_)
-            | documents::Document::Conversations(_)
-            | documents::Document::Deployment(_) => return Err(Invalid::PendingValue),
+            | documents::Document::Conversations(_) => return Err(Invalid::PendingValue),
         },
         reads::Answer::Historical(_) => return Err(Invalid::PendingValue),
     };
@@ -667,3 +667,18 @@ mod tests {
         assert_eq!(read(&mut transport, to, &source, &limits).err(), Some(Invalid::MissingRoute));
     }
 }
+
+fn deployment(
+    what: &client::Read,
+    value: &documents::Deployment,
+    limits: &Limits,
+) -> Result<client::ReadResult, Invalid> {
+    if *what != client::Read::Deployment {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(wire::documents::deployment_read(value, limits).map_err(Invalid::Document)?))
+}
+
+#[cfg(test)]
+#[path = "deployment_packets.rs"]
+mod deployment_tests;

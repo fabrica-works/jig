@@ -375,3 +375,6 @@ fn a_person_reads_actual_project_settings_and_returns_to_its_overview() {
         jig_test_domain::Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(_)))
     )));
 }
+
+#[path = "deployment_story.rs"]
+mod deployment;
