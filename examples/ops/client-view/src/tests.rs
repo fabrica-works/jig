@@ -1345,3 +1345,63 @@ fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_h
         }
     }
 }
+
+#[test]
+fn native_effect_slots_say_unshowable_without_loading_a_typed_maker_effect() {
+    let domain_limits = limits();
+    let (jig_words, obs_words, infra_words) = phrasebooks();
+    let mut tree_limits = Limits::of(&domain_limits, &jig_words, &obs_words, &infra_words).unwrap().tree;
+    tree_limits.nodes = 8;
+    tree_limits.slots = 0;
+    tree_limits.text_bytes = tree_limits.nodes.checked_mul(tree_limits.text_per_node).unwrap();
+    for connector in [1, 2] {
+        for proposal in [0, u64::MAX] {
+            let part = Part::OwnerEffect { connector, proposal };
+            let mut builder = jig_client_view::Builder::new(&tree_limits);
+            builder.open(jig_client_view::Role::Page);
+            let mut bindings = crate::bindings::Bindings::new(0, 32, connector);
+            if connector == 1 {
+                let mut side = observability::Side::new(&domain_limits.observability, 84);
+                let mut out = Queue::with_capacity(observability::max_out(&domain_limits.observability));
+                observability::step(
+                    &mut side,
+                    &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.observability },
+                    observability::Event::Show {
+                        part: part.clone(),
+                        generation: 9,
+                        scope: observability::Scope::Project(0),
+                    },
+                    &mut out,
+                );
+                assert!(side.contains(&part, 9));
+                assert!(out.is_empty());
+                crate::observability::part(&mut builder, &side, &part, 9, &obs_words, &mut bindings);
+            } else {
+                let mut side = infrastructure::Side::new(&domain_limits.infrastructure, 85);
+                let mut out = Queue::with_capacity(infrastructure::max_out(&domain_limits.infrastructure));
+                infrastructure::step(
+                    &mut side,
+                    &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.infrastructure },
+                    infrastructure::Event::Show {
+                        part: part.clone(),
+                        generation: 9,
+                        scope: infrastructure::Scope::Project(0),
+                    },
+                    &mut out,
+                );
+                assert!(side.contains(&part, 9));
+                assert!(out.is_empty());
+                crate::infrastructure::part(&mut builder, &side, &part, 9, &infra_words, &jig_words, &mut bindings);
+            }
+            builder.close();
+            let tree = builder.finish();
+            let status: Vec<_> =
+                tree.nodes().iter().filter(|node| node.role == jig_client_view::Role::Status).collect();
+            assert_eq!(status.len(), 1);
+            let text: Vec<_> = status[0].text.iter().map(|run| run.text.as_ref()).collect();
+            assert_eq!(text, [b"Cannot show this part".as_slice()]);
+            assert!(tree.nodes().iter().all(|node| node.binding.is_none()));
+            assert!(tree.len() <= tree_limits.nodes);
+        }
+    }
+}

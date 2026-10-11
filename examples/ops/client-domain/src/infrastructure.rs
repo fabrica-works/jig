@@ -809,6 +809,7 @@ fn part_fits(part: &Part, rows: u32, text: u32) -> bool {
         | Part::Kind { .. }
         | Part::Panel { .. }
         | Part::Result { .. }
+        | Part::OwnerEffect { .. }
         | Part::Effect { .. }
         | Part::Outbox { .. }
         | Part::Hold { .. }

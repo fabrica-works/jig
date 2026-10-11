@@ -503,6 +503,7 @@ pub fn part(
         Part::Kind { kind, .. } => words.text(builder, Word::Kind, &[Hole::Number(u64::from(*kind))]),
         Part::Panel { .. }
         | Part::Result { .. }
+        | Part::OwnerEffect { .. }
         | Part::Effect { .. }
         | Part::Outbox { .. }
         | Part::Hold { .. }

@@ -52,6 +52,7 @@ pub fn connector(part: &Part) -> u16 {
         | Part::Kind { connector, .. }
         | Part::Panel { connector, .. }
         | Part::Result { connector, .. }
+        | Part::OwnerEffect { connector, .. }
         | Part::Effect { connector, .. }
         | Part::Outbox { connector, .. }
         | Part::Hold { connector, .. }

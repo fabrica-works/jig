@@ -470,6 +470,8 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
             return Some(Subject { scope: Scope::Project(*project), kind: Kind::Project(*project) });
         }
         Part::Deployment { .. } => return Some(Subject { scope: Scope::Deployment, kind: Kind::Deployment }),
+        // Native connector proposal numbers do not name this side's typed maker effects.
+        Part::OwnerEffect { .. } => return None,
         Part::Connector { .. } | Part::Resource { .. } | Part::Kind { .. } => return None,
     };
     Some(Subject { scope, kind })

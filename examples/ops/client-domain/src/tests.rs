@@ -1144,3 +1144,79 @@ fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_conne
         }
     }
 }
+
+#[test]
+fn native_effect_parts_keep_their_connector_without_inventing_typed_maker_subjects() {
+    use crate::observability as obs;
+    let limits = limits();
+    for connector in [1, 2, u16::MAX] {
+        for number in [0, u64::MAX] {
+            let native = contract::Part::OwnerEffect { connector, proposal: number };
+            assert_eq!(crate::parts::connector(&native), connector);
+            for proposer in [contract::Proposer::Task(number), contract::Proposer::Party(number)] {
+                let key = contract::ProposalKey { proposer, number };
+                let legacy = contract::Part::Effect { connector, proposal: key };
+                assert_ne!(native, legacy);
+                for project in [0, u32::MAX] {
+                    assert_eq!(
+                        infrastructure::documents::subject(&native, infrastructure::Scope::Project(project)),
+                        None
+                    );
+                    assert_eq!(obs::documents::subject(&native, obs::Scope::Project(project)), None);
+                    assert_eq!(
+                        infrastructure::documents::subject(&legacy, infrastructure::Scope::Project(project)),
+                        Some(infrastructure::Subject {
+                            scope: infrastructure::Scope::Project(project),
+                            kind: infrastructure::Kind::Effect(key)
+                        })
+                    );
+                    assert_eq!(
+                        obs::documents::subject(&legacy, obs::Scope::Project(project)),
+                        Some(obs::Subject { scope: obs::Scope::Project(project), kind: obs::Kind::Effect(key) })
+                    );
+                }
+            }
+            assert_eq!(infrastructure::documents::subject(&native, infrastructure::Scope::Deployment), None);
+            assert_eq!(obs::documents::subject(&native, obs::Scope::Deployment), None);
+            let mut infra = infrastructure::Side::new(&limits.infrastructure, 82);
+            let mut infra_out = Queue::with_capacity(infrastructure::max_out(&limits.infrastructure));
+            let infra_env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.infrastructure };
+            infrastructure::step(
+                &mut infra,
+                &infra_env,
+                infrastructure::Event::Show {
+                    part: native.clone(),
+                    generation: 9,
+                    scope: infrastructure::Scope::Deployment,
+                },
+                &mut infra_out,
+            );
+            assert!(infra.contains(&native, 9));
+            assert!(infra.part(&native).is_none());
+            assert!(infra_out.is_empty());
+            infrastructure::step(
+                &mut infra,
+                &infra_env,
+                infrastructure::Event::PartsLeft { generation: 9 },
+                &mut infra_out,
+            );
+            assert!(!infra.contains(&native, 9));
+            assert!(infra_out.is_empty());
+            let mut side = obs::Side::new(&limits.observability, 83);
+            let mut out = Queue::with_capacity(obs::max_out(&limits.observability));
+            let side_env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.observability };
+            obs::step(
+                &mut side,
+                &side_env,
+                obs::Event::Show { part: native.clone(), generation: 9, scope: obs::Scope::Deployment },
+                &mut out,
+            );
+            assert!(side.contains(&native, 9));
+            assert!(side.part(&native).is_none());
+            assert!(out.is_empty());
+            obs::step(&mut side, &side_env, obs::Event::PartsLeft { generation: 9 }, &mut out);
+            assert!(!side.contains(&native, 9));
+            assert!(out.is_empty());
+        }
+    }
+}
