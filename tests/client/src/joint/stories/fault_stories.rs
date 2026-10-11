@@ -148,13 +148,6 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
             Step::See { find: Find::text(b"Offline"), within: Duration::from_secs(1) },
         ],
     );
-    {
-        for cut in 0..5 {
-            let observed = world.run(Until::Steps(2));
-            eprintln!("FAILED_COMMIT_EARLY_{cut} {observed:?}");
-            eprintln!("FAILED_COMMIT_TREE_{cut} {:?}", world.tree(client).nodes());
-        }
-    }
     let boundary = world.now().saturating_add(Duration::from_millis(250));
     let outcome = world.run(Until::Time(boundary));
     assert!(matches!(outcome.verdict, skein_world::domain::Verdict::Open { .. }));

@@ -305,9 +305,7 @@ impl Session {
         self.delayed.clear();
         self.delay_until = None;
         self.lost_answers.clear();
-        eprintln!("FAILED_COMMIT_ROUTES {:?}", self.driver.transport.watches());
         for watcher in self.driver.transport.watches() {
-            eprintln!("FAILED_COMMIT_ROUTE {:?}", self.driver.transport.watch(watcher));
             let Incoming::Callback { client, event } =
                 packets::dropped(&mut self.driver.transport, watcher).map_err(Invalid::Packet)?
             else {
@@ -319,7 +317,6 @@ impl Session {
             self.archives.detach(client);
             self.driver.transport.detach(client);
         }
-        eprintln!("FAILED_COMMIT_CALLBACKS {:?}", self.callbacks);
         self.stopped_seen = true;
         self.lifecycle.push(Observed::Reachable { live: false });
         Ok(())
@@ -870,9 +867,6 @@ impl Session {
 
     /// A normal callback taken by the shell releases only its normal flight.
     pub fn received(&mut self, client: ClientId, now: Time, wall: Wall, event: &Event) {
-        if let Event::Jig(jig_client::Event::Ended { .. }) = event {
-            eprintln!("FAILED_COMMIT_RECEIVED {now:?} {event:?}");
-        }
         self.stopping().expect("whole original stopped routes");
         if let Event::Jig(jig_client::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) = event
             && !matches!(value, client::Delivery::Run(_))
