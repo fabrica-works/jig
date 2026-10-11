@@ -73,15 +73,25 @@ fn answers(world: &mut World<Test, Joint>) -> usize {
         })
         .count()
 }
+fn receiving() -> jig_test_client_domain::Limits {
+    let mut limits = crate::test::limits();
+    limits.jig.text = 128;
+    limits.first.text = 128;
+    limits
+}
+fn client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+    crate::test::new(&receiving(), seed)
+}
 fn ready(seed: u64) -> (World<Test, Joint>, crate::ClientId) {
-    let mut world = fixture::seeded_world(
+    let mut world = fixture::seeded_world_with_receiving(
         seed,
         fixture::turn(),
         |front| front.restart_configuration(configuration),
         |limits| limits.core.views.watchers = 12,
+        receiving(),
     );
     world.randomness(8, 0, 0);
-    let client = world.client(1, crate::stories::conversation());
+    let client = world.client_with(1, crate::stories::conversation(), receiving(), client);
     let within = Duration::from_secs(1);
     world.person(
         client,
