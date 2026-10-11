@@ -265,7 +265,8 @@ fn drift_holds_a_task_and_the_person_is_told_why() {
     assert!(outcome.judged.0 > 0);
     let assignment =
         world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen[0].clone();
-    let resource = jig_test_connector_world::path(1, 1);
+    let resource = connector::Path::new(crate::test::list([Box::from([1_u8]), Box::from([1_u8])]), 16)
+        .expect("two authentic connector path segments");
     for event in [
         connector::Event::Adopt { project: 1, resource: resource.clone(), role: connector::ResourceRole::Owned },
         connector::Event::Names { task: assignment.task, project: 1, resources: Box::new([resource.clone()]) },
