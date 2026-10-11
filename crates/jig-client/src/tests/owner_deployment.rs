@@ -71,13 +71,13 @@ fn native_deployment_authority_none_builtins_and_admitted_policy_numbers_are_ind
         let out = deploy(&mut domain);
         if role.is_none() {
             assert_eq!(domain.page(), &Page::Missing);
-            let opened = out
-                .iter()
-                .find_map(|r| match r {
-                    Request::Open { subject: Subject::Deployment, .. } => Some(r),
-                    _ => None,
-                })
-                .is_some();
+            let mut opened = false;
+            for request in &out {
+                if let Request::Open { subject: Subject::Deployment, .. } = request {
+                    opened = true;
+                    break;
+                }
+            }
             assert!(!opened);
         } else {
             let token = out
@@ -200,12 +200,12 @@ fn native_deployment_only_supplied_configured_references_open_ordered_parts_in_t
         Time::ZERO,
         Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerDeployment(Box::new(whole))) },
     );
-    let shown = late
-        .iter()
-        .find_map(|r| match r {
-            Request::ShowPart { .. } => Some(r),
-            _ => None,
-        })
-        .is_some();
+    let mut shown = false;
+    for request in &late {
+        if let Request::ShowPart { .. } = request {
+            shown = true;
+            break;
+        }
+    }
     assert!(!shown);
 }
