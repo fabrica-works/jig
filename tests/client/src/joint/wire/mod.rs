@@ -11,6 +11,7 @@ pub mod escalations;
 pub mod family;
 pub mod history;
 pub mod inbox;
+pub mod ledger_pages;
 pub mod notes;
 pub mod offers;
 pub mod outcomes;

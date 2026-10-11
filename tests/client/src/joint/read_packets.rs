@@ -51,6 +51,8 @@ pub fn read(
                 client::Read::History { task, subtree, .. } => {
                     wire::pages::history_page(*task, *subtree, value, limits)
                 }
+                client::Read::Ended { task, .. } => wire::ledger_pages::ended(*task, value, limits),
+                client::Read::Spend { project, .. } => wire::ledger_pages::spend(*project, value, limits),
                 client::Read::Frame
                 | client::Read::Task { .. }
                 | client::Read::Proposal { .. }
@@ -58,8 +60,6 @@ pub fn read(
                 | client::Read::Question { .. }
                 | client::Read::PersonTask { .. }
                 | client::Read::Result { .. }
-                | client::Read::Ended { .. }
-                | client::Read::Spend { .. }
                 | client::Read::Project { .. }
                 | client::Read::Deployment => return Err(Invalid::PendingValue),
             }
@@ -141,6 +141,10 @@ fn escalation(
 #[cfg(test)]
 #[path = "read_escalations.rs"]
 mod escalation_tests;
+
+#[cfg(test)]
+#[path = "read_ledger_pages.rs"]
+mod ledger_page_tests;
 
 #[cfg(test)]
 mod tests {
