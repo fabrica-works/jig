@@ -202,6 +202,31 @@ fn native_effect_parts_refuse_full_capacity_while_retaining_the_whole_pending_do
     assert_eq!(domain.notices().get(*notice).unwrap().kind, crate::notices::Kind::Refused(Limit::Objects));
 }
 
+fn confirmed_accept(domain: &mut Domain, object: Token, value: &OwnerProposal) -> Token {
+    assert!(
+        drive(domain, Time::ZERO, Event::Act { act: crate::action::Act::Intend { object, act: ActKind::Accept } })
+            .is_empty()
+    );
+    assert!(domain.confirmation().is_some());
+    let sent = drive(domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm });
+    assert_eq!(sent.len(), 1);
+    let mut request = None;
+    for row in &sent {
+        if let Request::Send { request: token, ask, .. } = row {
+            assert_eq!(
+                ask.as_ref(),
+                &Ask::DecideProposal { project: value.project, proposal: value.key, decision: Decision::Accepted }
+            );
+            assert!(request.replace(*token).is_none());
+        } else {
+            panic!("confirmation emits only its exact supplied decision");
+        }
+    }
+    let request = request.unwrap();
+    assert!(drive(domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm }).is_empty());
+    request
+}
+
 #[test]
 fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity_and_never_resends() {
     for (shown_card, part_capacity) in [(true, LIMITS.parts), (true, 0), (false, LIMITS.parts)] {
@@ -215,31 +240,7 @@ fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity
             Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(value.clone()))) },
         );
         let id = domain.objects().find(ObjectKey::Proposal(value.key)).unwrap();
-        assert!(
-            drive(
-                &mut domain,
-                Time::ZERO,
-                Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } }
-            )
-            .is_empty()
-        );
-        assert!(domain.confirmation().is_some());
-        let sent = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm });
-        assert_eq!(sent.len(), 1);
-        let mut request = None;
-        for row in &sent {
-            if let Request::Send { request: token, ask, .. } = row {
-                assert_eq!(
-                    ask.as_ref(),
-                    &Ask::DecideProposal { project: value.project, proposal: value.key, decision: Decision::Accepted }
-                );
-                assert!(request.replace(*token).is_none());
-            } else {
-                panic!("confirmation emits only its exact supplied decision");
-            }
-        }
-        let request = request.unwrap();
-        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm }).is_empty());
+        let request = confirmed_accept(&mut domain, id.token(), &value);
         assert!(
             drive(&mut domain, Time::ZERO, Event::Progress { request, progress: crate::intents::Progress::Unknown })
                 .is_empty()
