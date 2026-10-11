@@ -39,6 +39,8 @@ fn two_tabs_decide_one_proposal_and_both_receive_the_original_once_only_decision
     world.person(
         other,
         vec![
+            Step::See { find: Find::exactly_named(Role::Button, b"Sign in with Test"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Sign in with Test") },
             Step::See { find: Find::text(b"decide this goal"), within },
             Step::See { find: Find::exactly_named(Role::Button, b"Accept"), within },
         ],
