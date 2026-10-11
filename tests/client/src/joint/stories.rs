@@ -381,3 +381,6 @@ mod deployment;
 
 #[path = "historical_story.rs"]
 mod historical;
+
+#[path = "people_stories.rs"]
+mod person_stories;
