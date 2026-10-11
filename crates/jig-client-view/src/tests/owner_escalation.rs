@@ -197,13 +197,14 @@ fn check_exact_storage(row: &OwnerEscalation, allocation: crate::Limits, tree: &
             .iter()
             .enumerate()
             .map(|(at, _)| {
-                1 + tree
-                    .nodes()
+                tree.nodes()
                     .iter()
                     .enumerate()
                     .take(at)
-                    .filter(|(index, node)| index + usize::try_from(node.size).unwrap() > at)
+                    .filter(|(index, node)| index.checked_add(usize::try_from(node.size).unwrap()).unwrap() > at)
                     .count()
+                    .checked_add(1)
+                    .unwrap()
             })
             .max()
             .unwrap(),
@@ -214,10 +215,10 @@ fn check_exact_storage(row: &OwnerEscalation, allocation: crate::Limits, tree: &
     let exact = crate::Limits { nodes: tree.len(), depth, text_per_node: per_node, text_bytes: total, ..allocation };
     assert_eq!(build_closed_offers(row, exact, w).len(), tree.len());
     for below in [
-        crate::Limits { nodes: exact.nodes - 1, ..exact },
-        crate::Limits { depth: exact.depth - 1, ..exact },
-        crate::Limits { text_per_node: exact.text_per_node - 1, ..exact },
-        crate::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+        crate::Limits { nodes: exact.nodes.checked_sub(1).unwrap(), ..exact },
+        crate::Limits { depth: exact.depth.checked_sub(1).unwrap(), ..exact },
+        crate::Limits { text_per_node: exact.text_per_node.checked_sub(1).unwrap(), ..exact },
+        crate::Limits { text_bytes: exact.text_bytes.checked_sub(1).unwrap(), ..exact },
     ] {
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build_closed_offers(row, below, w)))
             .expect_err("one-under storage refuses the whole escalation tree");
