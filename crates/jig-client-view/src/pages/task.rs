@@ -8,7 +8,7 @@ use jig_client::{
     Domain,
     action::Act,
     address::{Address, TaskSection},
-    contract::{ChipPhase, Executor, ObjectKey, Task},
+    contract::{Executor, ObjectKey, Task},
     objects::Body,
 };
 mod history;
@@ -219,6 +219,7 @@ fn task_link(
     }
 }
 fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+    use jig_client::contract::ChipPhase;
     match doc.chip.executor {
         Executor::Agent { .. } => {
             match doc.chip.details.as_ref() {

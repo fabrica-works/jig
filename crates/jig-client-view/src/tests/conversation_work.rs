@@ -5,7 +5,7 @@
     reason = "ordinary view proofs drive public events and inspect selected semantic trees"
 )]
 use super::cards::{CLIENT, contains, text};
-use crate::{Builder, Tree, owner_chip, owner_chip_words::ChipPhrase as P, words::Words};
+use crate::{Builder, Tree, owner_chip, owner_chip_words::ChipPhrase as P, tree::Node, words::Words};
 use jig_client::{
     Domain, Request,
     address::{Address, TaskSection},
@@ -150,9 +150,17 @@ fn owner_work_activity_without_synthetic_context_shows_all_seven_reports_and_ind
                 let caption = words().book.say(0, P::Started.id(), &[crate::phrases::Hole::Wall(at)]).unwrap();
                 assert!(contains(&tree, &caption.text));
             }
-            if matches!(work, OwnerChipWork::Tool { .. }) {
-                assert!(contains(&tree, b"\\xFF\\x00"));
-                assert!(contains(&tree, b"literal/tool"));
+            match work {
+                OwnerChipWork::Tool { .. } => {
+                    assert!(contains(&tree, b"\\xFF\\x00"));
+                    assert!(contains(&tree, b"literal/tool"));
+                }
+                OwnerChipWork::Preparing
+                | OwnerChipWork::Starting
+                | OwnerChipWork::Active
+                | OwnerChipWork::Writing
+                | OwnerChipWork::Waiting
+                | OwnerChipWork::Ending => {}
             }
             let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
             let Some(jig_client::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
@@ -224,8 +232,8 @@ fn fragment(value: &OwnerChipObservation, capacity: &crate::Limits) -> Tree {
 fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_storage() {
     let value = report(
         OwnerChipWork::Tool {
-            call: vec![255; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(),
-            tool: vec![254; usize::try_from(CLIENT.text).unwrap()].into_boxed_slice(),
+            call: std::iter::repeat_n(255, usize::try_from(CLIENT.text).unwrap()).collect(),
+            tool: std::iter::repeat_n(254, usize::try_from(CLIENT.text).unwrap()).collect(),
         },
         Some(Wall::from_nanos(u64::MAX)),
     );
@@ -250,8 +258,8 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
     let tree = fragment(&value, &capacity);
     assert_eq!(tree.len(), bound.nodes);
     assert!(tree.nodes().iter().all(|node| node.binding.is_none() && node.slot.is_none()));
-    let total = tree.nodes().iter().map(|node| node.text_bytes()).sum::<u32>();
-    let largest = tree.nodes().iter().map(|node| node.text_bytes()).max().unwrap();
+    let total = tree.nodes().iter().map(Node::text_bytes).sum::<u32>();
+    let largest = tree.nodes().iter().map(Node::text_bytes).max().unwrap();
     assert!(bound.text_per_node >= largest.checked_mul(2).unwrap());
     assert!(bound.text_bytes >= total);
     let exact = crate::Limits { text_per_node: largest, text_bytes: total, ..capacity };
@@ -261,7 +269,7 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
         crate::Limits { text_per_node: largest - 1, ..exact },
         crate::Limits { text_bytes: total - 1, ..exact },
     ] {
-        assert!(std::panic::catch_unwind(|| fragment(&value, &smaller)).is_err());
+        std::panic::catch_unwind(|| fragment(&value, &smaller)).unwrap_err();
     }
     assert!(
         owner_chip::observation_required(&value, &jig_client::Limits { text: CLIENT.text - 1, ..CLIENT }, words())
