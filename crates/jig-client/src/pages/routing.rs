@@ -1000,6 +1000,7 @@ fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
+        | ReadValue::OwnerDeployment(_)
         | ReadValue::Deployment(_) => true,
     }
 }
