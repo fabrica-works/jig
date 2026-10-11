@@ -5,6 +5,9 @@ fn escalation() -> OwnerEscalation {
     task.context = None;
     task.person_revision = Some(Revision { value: 23 });
     task.taken_by = Some(u64::MAX);
+    task.result = Some(TaskResult::Ending(Box::new(OwnerChipEnding::Failed(DocumentText::complete(text(
+        b"supplied prior task failure",
+    ))))));
     task.chip.executor = Executor::Agent { charter: 1 };
     let held = OwnerChipHold {
         source: None,
@@ -37,8 +40,46 @@ fn escalation() -> OwnerEscalation {
     }
 }
 
+fn maximum_card_envelope() {
+    let mut row = escalation();
+    let whole = vec![b'x'; usize::try_from(CLIENT.text).unwrap()];
+    row.task.spec = specification(text(&whole));
+    row.task.instructions = Some(DocumentText::complete(text(&whole)));
+    row.task.dependencies = list(
+        (0..CLIENT.rows)
+            .map(|number| OwnerTaskLink::Stored { number: u64::from(number), status: Some(OwnerTaskStatus::Done) }),
+    );
+    row.task.references = row.task.dependencies.clone();
+    row.task.inputs = row.task.dependencies.clone();
+    row.task.resources = list((0..CLIENT.rows).map(|number| {
+        TaskResource::Part(Part::Resource {
+            connector: u16::try_from(number).unwrap(),
+            path: list((0..CLIENT.rows).map(|_| Box::<[u8]>::from(whole.clone()))),
+        })
+    }));
+    let original = row.clone();
+    let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row)));
+    let bound = crate::sizes::owner_escalation_nodes(&CLIENT).unwrap().checked_add(1).unwrap();
+    let allocation =
+        crate::Limits { nodes: bound, depth: 32, text_bytes: bound.checked_mul(1024).unwrap(), ..limits() };
+    let mut builder = Builder::new(&allocation);
+    let mut bindings = JigBindings::new(bound, CLIENT.text);
+    builder.open(Role::Page);
+    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &words(), &mut bindings));
+    builder.close();
+    let tree = builder.finish();
+    super::super::cards_access::check(&tree);
+    assert!(tree.len() <= bound);
+    assert!(contains(&tree, &whole));
+    assert_eq!(
+        domain.objects().get(id).unwrap().body,
+        Some(jig_client::objects::Body::OwnerEscalation(Box::new(original)))
+    );
+}
+
 #[test]
 fn owner_escalation_named_card_keeps_current_holder_prior_stage_and_whole_task_without_other_context() {
+    maximum_card_envelope();
     let row = escalation();
     let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
@@ -49,6 +90,9 @@ fn owner_escalation_named_card_keeps_current_holder_prior_stage_and_whole_task_w
     assert!(contains(&tree, b"Hold revision: 18446744073709551615"));
     assert!(contains(&tree, b"18446744073709551615"));
     assert!(contains(&tree, b"Budget: 20"));
+    assert!(contains(&tree, b"supplied prior task failure"));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Region && node.name.as_deref() == Some(b"Project: 4")));
+    assert_eq!(domain.objects().get(id).unwrap().body.as_ref().unwrap().ending(), None);
     let names: Vec<_> = tree.nodes().iter().filter_map(|node| node.name.as_deref()).collect();
     assert!(names.contains(&b"Escalation".as_slice()));
     assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Release")));

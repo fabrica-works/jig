@@ -6,7 +6,22 @@ fn row(act: ActKind, reason: HoldCategory) -> OwnerEscalation {
     task.person_revision = Some(Revision { value: 23 });
     task.taken_by = Some(u64::MAX);
     task.dependencies = List::with_capacity(2);
-    task.dependencies.push(OwnerTaskLink::Stored { number: 99, status: None }).unwrap();
+    task.dependencies.push(OwnerTaskLink::Stored { number: 99, status: Some(OwnerTaskStatus::Done) }).unwrap();
+    task.inputs = List::with_capacity(2);
+    task.inputs.push(OwnerTaskLink::Stored { number: 31, status: None }).unwrap();
+    task.references = List::with_capacity(2);
+    task.references.push(OwnerTaskLink::Live(chip(32))).unwrap();
+    task.delegates = List::with_capacity(2);
+    task.delegates.push(chip(33)).unwrap();
+    task.lineage_chips = List::with_capacity(2);
+    task.lineage_chips.push(chip(34)).unwrap();
+    task.resources = List::with_capacity(2);
+    let mut path = List::with_capacity(2);
+    path.push(Box::<[u8]>::from(*b"whole-resource")).unwrap();
+    task.resources.push(TaskResource::Part(Part::Resource { connector: 7, path })).unwrap();
+    task.result = Some(TaskResult::Ending(Box::new(OwnerChipEnding::Failed(DocumentText::complete(text(
+        b"supplied retained task failure",
+    ))))));
     let held = OwnerChipHold {
         source: None,
         reason,
@@ -56,6 +71,10 @@ fn owner_escalation_original_reads_keep_whole_task_and_independent_offers_and_re
     assert_eq!(original.task.context, None);
     assert_eq!(original.task.person_revision, Some(Revision { value: 23 }));
     assert_eq!(original.task.dependencies.capacity(), 2);
+    assert_eq!(original.task.delegates.get(0).unwrap().task, 33);
+    assert_eq!(original.task.references.get(0).unwrap().number(), 32);
+    assert!(original.task.result.is_some());
+    assert_eq!(object.body.as_ref().unwrap().ending(), None);
     assert_eq!(original.task.taken_by.unwrap(), u64::MAX);
 }
 
