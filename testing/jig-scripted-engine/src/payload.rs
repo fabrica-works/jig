@@ -1322,4 +1322,4 @@ impl Payload for TaskHold {
     }
 }
 
-fields!(jig_client::contract::OwnerEscalation { acts, task });
+fields!(jig_client::contract::OwnerEscalation { task; acts });

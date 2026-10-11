@@ -144,3 +144,157 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
         );
     }
 }
+
+fn build_closed_offers(row: &OwnerEscalation, allocation: crate::Limits, w: &crate::words::Words) -> crate::Tree {
+    let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
+    let mut builder = Builder::new(&allocation);
+    let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
+    builder.open(Role::Page);
+    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings));
+    builder.close();
+    builder.finish()
+}
+
+#[test]
+fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and_refuse_one_under_storage() {
+    let w = words();
+    let kinds = [ActKind::Release, ActKind::LeaveHeld, ActKind::PassUp, ActKind::AmendRelease, ActKind::Cancel];
+    for refused in [false, true] {
+        let mut row = escalation();
+        row.acts = List::with_capacity(MAX_OFFERED_ACTS);
+        let reason = HoldReason::Tries {
+            failures: list([
+                AttemptFailure {
+                    attempt: 0,
+                    class: FailureClass::HostLost,
+                    reason: text(b"whole offered failure"),
+                    at: Wall::EPOCH,
+                },
+                AttemptFailure {
+                    attempt: u64::MAX,
+                    class: FailureClass::Permanent,
+                    reason: text(b"whole offered failure"),
+                    at: Wall::from_nanos(u64::MAX),
+                },
+            ]),
+        };
+        for _ in 0..5 {
+            for act in kinds {
+                let admission = if refused {
+                    Admission::Refused(Refusal::Moved {
+                        now: Revision { value: u64::MAX },
+                        what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(reason.clone()))) },
+                    })
+                } else {
+                    Admission::Allowed
+                };
+                row.acts.push(Offered { act, admission }).unwrap();
+            }
+        }
+        let original = row.clone();
+        assert_eq!(row.acts.capacity(), MAX_OFFERED_ACTS);
+        assert_eq!(row.acts.len(), MAX_OFFERED_ACTS);
+        assert_eq!(row.task.context, None);
+        let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row.clone())));
+        let mut allocation = crate::Limits::of_words(&CLIENT, &w).unwrap();
+        allocation.nodes = crate::sizes::owner_escalation_nodes(&CLIENT).unwrap() + 1;
+        allocation.text_bytes = allocation.nodes * allocation.text_per_node;
+        let mut builder = Builder::new(&allocation);
+        let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
+        builder.open(Role::Page);
+        assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &w, &mut bindings));
+        builder.close();
+        let tree = builder.finish();
+        super::super::cards_access::check(&tree);
+        assert!(tree.len() <= allocation.nodes);
+        let decoded: Vec<_> = tree
+            .nodes()
+            .iter()
+            .filter_map(|node| {
+                if node.role != Role::Button {
+                    return None;
+                }
+                let binding = node.binding?;
+                match decode(&mut bindings, binding.token, Act::Press) {
+                    Some(Action::Intend { object, act }) => {
+                        assert_eq!(object, id.token());
+                        Some(act)
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+        if refused {
+            assert!(decoded.is_empty());
+            assert!(contains(&tree, b"whole offered failure"));
+            assert!(
+                tree.nodes()
+                    .iter()
+                    .filter(|node| node.text.iter().any(|run| skein_lib::bytes::find(
+                        &run.text,
+                        b"whole offered failure"
+                    )
+                    .is_some()))
+                    .count()
+                    >= usize::try_from(MAX_OFFERED_ACTS).unwrap()
+            );
+        } else {
+            assert_eq!(decoded, row.acts.iter().map(|offer| offer.act).collect::<Vec<_>>());
+        }
+        assert!(contains(&tree, b"whole task specification"));
+        assert!(contains(&tree, b"supplied prior task failure"));
+        assert_eq!(domain.objects().get(id).unwrap().body.as_ref().unwrap().ending(), None);
+        let depth = u32::try_from(
+            tree.nodes()
+                .iter()
+                .enumerate()
+                .map(|(at, _)| {
+                    1 + tree
+                        .nodes()
+                        .iter()
+                        .enumerate()
+                        .take(at)
+                        .filter(|(index, node)| index + usize::try_from(node.size).unwrap() > at)
+                        .count()
+                })
+                .max()
+                .unwrap(),
+        )
+        .unwrap();
+        let per_node = tree.nodes().iter().map(|node| node.text_bytes()).max().unwrap();
+        let total = tree.nodes().iter().map(|node| node.text_bytes()).sum::<u32>();
+        let exact =
+            crate::Limits { nodes: tree.len(), depth, text_per_node: per_node, text_bytes: total, ..allocation };
+        assert_eq!(build_closed_offers(&row, exact, &w).len(), tree.len());
+        for below in [
+            crate::Limits { nodes: exact.nodes - 1, ..exact },
+            crate::Limits { depth: exact.depth - 1, ..exact },
+            crate::Limits { text_per_node: exact.text_per_node - 1, ..exact },
+            crate::Limits { text_bytes: exact.text_bytes - 1, ..exact },
+        ] {
+            std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build_closed_offers(&row, below, &w)))
+                .expect_err("one-under storage refuses the whole escalation tree");
+        }
+        assert_eq!(row, original);
+        assert_eq!(
+            domain.objects().get(id).unwrap().body,
+            Some(jig_client::objects::Body::OwnerEscalation(Box::new(original)))
+        );
+    }
+    let mut oversized = escalation();
+    oversized.acts = List::with_capacity(MAX_OFFERED_ACTS + 1);
+    let original = oversized.clone();
+    let (domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(oversized)));
+    let allocation = crate::Limits::of_words(&CLIENT, &w).unwrap();
+    let mut builder = Builder::new(&allocation);
+    let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
+    builder.open(Role::Page);
+    assert!(!cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, &w, &mut bindings));
+    builder.close();
+    assert_eq!(builder.finish().len(), 1);
+    assert_eq!(
+        domain.objects().get(id).unwrap().body,
+        Some(jig_client::objects::Body::OwnerEscalation(Box::new(original)))
+    );
+    assert_eq!(crate::sizes::owner_escalation_nodes(&jig_client::Limits { rows: u32::MAX, ..CLIENT }), None);
+}

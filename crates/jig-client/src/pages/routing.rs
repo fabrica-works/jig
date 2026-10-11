@@ -930,6 +930,7 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
             | ReadValue::Escalation(_)
             | ReadValue::Question(_)
             | ReadValue::PersonTask(_)
+            | ReadValue::OwnerPersonTask(_)
             | ReadValue::Result(_)
             | ReadValue::Ended(_)
             | ReadValue::History(_)
