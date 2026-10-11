@@ -42,7 +42,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
         member,
         vec![
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-            Step::See { find: Find::text(b"Proposed by party"), within },
+            Step::See { find: Find::text(b"Goal proposed"), within },
         ],
     );
     let outcome = world.run(Until::Done);
@@ -65,7 +65,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
         })
         .collect();
     assert_eq!(answers.len(), 1);
-    let label = format!("proposal {}", answers[0]).into_bytes();
+    let label = format!("Proposal number: {}", answers[0]).into_bytes();
     world.person(member, vec![Step::See { find: Find::text(&label), within }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
