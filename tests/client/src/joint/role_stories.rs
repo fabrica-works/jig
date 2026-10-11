@@ -298,6 +298,12 @@ fn two_parties_decide_one_proposal_and_the_second_is_told_who() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
+    for party in [owner, maintainer] {
+        let keys = world.front().session.card_offer_keys(party);
+        let proposals: Vec<_> = keys.into_iter().filter(|key| matches!(key, client::ObjectKey::Proposal(_))).collect();
+        assert_eq!(proposals.len(), 1, "one supplied pending proposal");
+        super::offered_acts::card(&mut world, party, proposals[0], b"Proposal");
+    }
     let first_person = world.front().session.driver.world.peers.as_ref().expect("actual parties").parties[0]
         .person
         .expect("actual owner");

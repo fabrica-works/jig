@@ -119,6 +119,14 @@ impl Session {
         self.card_offers.as_ref()?.get(&(client, key))
     }
 
+    /// Keys of the original admitted card packets for an external observer.
+    #[must_use]
+    pub fn card_offer_keys(&self, client: ClientId) -> Vec<client::ObjectKey> {
+        self.card_offers.as_ref().map_or_else(Vec::new, |rows| {
+            rows.keys().filter_map(|(owner, key)| if *owner == client { Some(*key) } else { None }).collect()
+        })
+    }
+
     /// Start with an externally supplied identity and genuine configured Hello.
     pub fn bind(&mut self, client: ClientId, party: u64, identity: people::Identity, now: Time, wall: Wall) {
         self.stopping().expect("whole original stopped routes");

@@ -74,6 +74,20 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
             },
             Step::See { find: Find::text(b"original"), within },
             Step::See { find: Find::exactly_named(Role::Button, b"Edit note"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    super::super::offered_acts::card(
+        &mut world,
+        member,
+        client::ObjectKey::Note { project: 1, note: name },
+        b"original",
+    );
+    world.person(
+        member,
+        vec![
             Step::Press { find: Find::exactly_named(Role::Button, b"Edit note") },
             Step::Type {
                 find: Find::named(Role::TextArea, b"Note description"),
@@ -214,6 +228,15 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
             Step::See { find: Find::text(b"Failure tries exhausted"), within },
             Step::See { find: Find::text(b"Run tries: 2"), within },
             Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    super::super::offered_acts::card(&mut world, member, client::ObjectKey::Escalation(child), b"Escalation");
+    world.person(
+        member,
+        vec![
             Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
             Step::See { find: Find::text(b"Released"), within },
