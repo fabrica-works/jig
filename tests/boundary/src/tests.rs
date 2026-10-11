@@ -273,14 +273,16 @@ fn host_hub_links_only_skein() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
-#[test]
-fn kit_sources_keep_the_kit_vocabulary() {
+fn kit_vocabulary(part: usize) {
     let mut files = Vec::new();
     source_files(&kit_root(), true, &[".rs", "Cargo.toml"], &mut files);
+    files.sort();
     let words = forbidden_words();
     let failures: Vec<_> = files
         .iter()
-        .flat_map(|path| {
+        .enumerate()
+        .filter(|(index, _)| index % 16 == part)
+        .flat_map(|(_, path)| {
             let source = fs::read_to_string(path).expect("source is readable");
             let source = if path.file_name().is_some_and(|name| name == "Cargo.toml") && workspace_manifest(&source) {
                 workspace_vocabulary(&source)
@@ -291,6 +293,86 @@ fn kit_sources_keep_the_kit_vocabulary() {
         })
         .collect();
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn kit_sources_keep_the_kit_vocabulary() {
+    kit_vocabulary(0);
+}
+
+#[test]
+fn kit_sources_part_02_keep_the_kit_vocabulary() {
+    kit_vocabulary(1);
+}
+
+#[test]
+fn kit_sources_part_03_keep_the_kit_vocabulary() {
+    kit_vocabulary(2);
+}
+
+#[test]
+fn kit_sources_part_04_keep_the_kit_vocabulary() {
+    kit_vocabulary(3);
+}
+
+#[test]
+fn kit_sources_part_05_keep_the_kit_vocabulary() {
+    kit_vocabulary(4);
+}
+
+#[test]
+fn kit_sources_part_06_keep_the_kit_vocabulary() {
+    kit_vocabulary(5);
+}
+
+#[test]
+fn kit_sources_part_07_keep_the_kit_vocabulary() {
+    kit_vocabulary(6);
+}
+
+#[test]
+fn kit_sources_part_08_keep_the_kit_vocabulary() {
+    kit_vocabulary(7);
+}
+
+#[test]
+fn kit_sources_part_09_keep_the_kit_vocabulary() {
+    kit_vocabulary(8);
+}
+
+#[test]
+fn kit_sources_part_10_keep_the_kit_vocabulary() {
+    kit_vocabulary(9);
+}
+
+#[test]
+fn kit_sources_part_11_keep_the_kit_vocabulary() {
+    kit_vocabulary(10);
+}
+
+#[test]
+fn kit_sources_part_12_keep_the_kit_vocabulary() {
+    kit_vocabulary(11);
+}
+
+#[test]
+fn kit_sources_part_13_keep_the_kit_vocabulary() {
+    kit_vocabulary(12);
+}
+
+#[test]
+fn kit_sources_part_14_keep_the_kit_vocabulary() {
+    kit_vocabulary(13);
+}
+
+#[test]
+fn kit_sources_part_15_keep_the_kit_vocabulary() {
+    kit_vocabulary(14);
+}
+
+#[test]
+fn kit_sources_part_16_keep_the_kit_vocabulary() {
+    kit_vocabulary(15);
 }
 
 #[test]

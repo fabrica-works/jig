@@ -111,8 +111,21 @@ fn comment_end(source: &[u8], start: usize) -> usize {
     end
 }
 
-fn vocabulary_at(path: &Path, source: &str, at: usize, words: &[String], failures: &mut Vec<String>) {
+fn vocabulary_at(
+    path: &Path,
+    source: &str,
+    at: usize,
+    words: &[String],
+    starts: &[bool; 256],
+    failures: &mut Vec<String>,
+) {
     let bytes = source.as_bytes();
+    if !starts[usize::from(bytes[at].to_ascii_lowercase())] {
+        return;
+    }
+    if at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(u8::is_ascii_alphanumeric) {
+        return;
+    }
     for word in words {
         if !bytes[at].eq_ignore_ascii_case(&word.as_bytes()[0]) {
             continue;
@@ -136,7 +149,6 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
     let mut starts = [false; 256];
     for word in words {
         starts[usize::from(word.as_bytes()[0].to_ascii_lowercase())] = true;
-        starts[usize::from(word.as_bytes()[0].to_ascii_uppercase())] = true;
     }
     let bytes = source.as_bytes();
     let mut index = 0;
@@ -155,15 +167,18 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
             index = comment_end(bytes, index);
             comment = true;
         } else if names && identifier_byte(bytes[index]) && !bytes[index].is_ascii_digit() {
+            let mut candidate = false;
             while bytes.get(index).is_some_and(|byte| identifier_byte(*byte)) {
+                candidate |= matches!(bytes[index], b't' | b'T')
+                    && bytes.get(index..index + 5).is_some_and(|word| word.eq_ignore_ascii_case(b"typed"));
+                candidate |= matches!(bytes[index], b'l' | b'L')
+                    && bytes.get(index..index + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"));
+                candidate |= bytes[index] == b'V' && bytes.get(index + 1).is_some_and(u8::is_ascii_digit);
+                candidate |=
+                    bytes.get(index..index + 2) == Some(b"_v") && bytes.get(index + 2).is_some_and(u8::is_ascii_digit);
                 index += 1;
             }
             let name = &source[start..index];
-            let lower = name.to_ascii_lowercase();
-            let stem = name.trim_end_matches(|ch: char| ch.is_ascii_digit());
-            let candidate = lower.contains("typed")
-                || lower.contains("legacy")
-                || (stem.len() < name.len() && (stem.ends_with('V') || stem.ends_with("_v")));
             if candidate && forbidden_name(name) {
                 failures.push(format!("{}:{line}: identifier {name}", path.display()));
             }
@@ -173,15 +188,13 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 index += 1;
             }
         }
-        let mut offset = 0;
-        for part in source[start..index].split_inclusive(|ch: char| !ch.is_ascii_alphanumeric()) {
+        for (offset, ch) in source[start..index].char_indices() {
             let at = start + offset;
-            let byte = part.as_bytes()[0];
-            if starts[usize::from(byte)] && (at == 0 || !bytes[at - 1].is_ascii_alphanumeric()) {
-                vocabulary_at(path, source, at, words, &mut failures);
+            if !words.is_empty() {
+                vocabulary_at(path, source, at, words, &starts, &mut failures);
             }
             if comment
-                && matches!(byte, b'l' | b'L')
+                && matches!(ch, 'l' | 'L')
                 && bytes.get(at..at + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"))
                 && !at.checked_sub(1).and_then(|before| bytes.get(before)).is_some_and(|byte| identifier_byte(*byte))
                 && !bytes.get(at + 6).is_some_and(|byte| identifier_byte(*byte))
@@ -189,10 +202,9 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 let word = &source[at..at + 6];
                 failures.push(format!("{}:{line}: comment {word}", path.display()));
             }
-            if part.ends_with('\n') {
+            if ch == '\n' {
                 line += 1;
             }
-            offset += part.len();
         }
     }
     failures
