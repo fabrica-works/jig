@@ -18,7 +18,7 @@ use jig_core as core;
 use jig_core_fleet as fleet;
 use jig_core_tasks as tasks;
 use jig_test_connector as connector;
-use skein_lib::{Decision, Env, Journal, JournalLimits, JournalRoom, Map, Queue, ReplyTo, Token, Wall};
+use skein_lib::{Decision, Env, Journal, JournalLimits, JournalRoom, Map, Queue, ReplyTo, Time, Token, Wall};
 
 /// A store address owned by the core or one numbered connector.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -326,6 +326,32 @@ pub struct Domain {
 }
 
 impl Domain {
+    /// Project each child's already-armed elapsed deadline to the application's loop.
+    /// The loop sends the corresponding Timer input; this root chooses no cadence.
+    #[must_use]
+    pub fn core_deadlines(&self) -> [(core::Timer, Option<Time>); 6] {
+        [
+            (core::Timer::People, self.core.people.next_deadline()),
+            (core::Timer::Tasks, self.core.tasks.next_deadline()),
+            (core::Timer::Fleet, self.core.fleet.next_deadline()),
+            (core::Timer::Brief, self.core.brief.next_deadline()),
+            (core::Timer::Account, self.core.accounts.next_deadline()),
+            (core::Timer::View, self.core.views.next_deadline()),
+        ]
+    }
+
+    /// Project the two connector owners' existing absolute deadlines unchanged.
+    #[must_use]
+    pub fn connector_deadlines(&self) -> [(u16, Option<Wall>); 2] {
+        [(1, connector::next_deadline(&self.first)), (2, connector::next_deadline(&self.second))]
+    }
+
+    /// The core's retained effect reply deadline, including stale rights.
+    #[must_use]
+    pub fn effect_deadline(&self) -> Option<Wall> {
+        self.core.effect_deadline()
+    }
+
     /// Install the application's fixed hold vocabulary before its first input.
     pub fn configure_holds(&mut self, env: &Env<Limits>, connector: u16, kinds: Box<[tasks::Kind]>) {
         let mut out = Queue::with_capacity(tasks::max_out(&env.limits.core.tasks));

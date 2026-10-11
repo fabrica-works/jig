@@ -1,0 +1,452 @@
+//! Protocol correlation for the real Front (testing.md, 5; root.md, 4).
+//! These routes retain original shell tokens and authenticated session numbers.
+//! They do not inspect engine tasks, choose outcomes, or own request durability.
+use crate::harness::ClientId;
+use jig_client::contract::{Read, Subject, VersionRange};
+use jig_core::{Event, documents::ApplicationScope};
+use jig_core_people as people;
+use jig_test_client_domain::family;
+use skein_lib::{ReplyTo, Token};
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Pace {
+    Document,
+    Stream,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InvalidContinuation;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyedOwner {
+    Jig,
+    Application { connector: u16 },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reply {
+    SignIn { client: ClientId },
+    SignOut { client: ClientId },
+    Keyed { client: ClientId, attempt: Token, key: [u8; 16], owner: KeyedOwner },
+    Read { client: ClientId, read: Token, what: Read },
+    ApplicationRead { client: ClientId, read: Token, subject: family::Subject },
+    Archive { client: ClientId, request: Token, task: u64, attempt: u64, turn: u32 },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Watched {
+    Jig(Subject),
+    Application { subject: family::Subject, scope: ApplicationScope },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Watch {
+    pub client: ClientId,
+    pub native: Token,
+    pub subject: Watched,
+}
+
+#[derive(Clone, Debug)]
+struct Client {
+    party: u64,
+    identity: people::Identity,
+    sign_in: Option<u64>,
+}
+
+/// One transport's globally unique reply/watch namespace, shared across tabs.
+pub struct Transport {
+    versions: VersionRange,
+    next: u64,
+    clients: BTreeMap<ClientId, Client>,
+    replies: BTreeMap<Token, Reply>,
+    watches: BTreeMap<Token, Watch>,
+    documents: BTreeSet<Token>,
+    streams: BTreeSet<Token>,
+}
+
+impl Transport {
+    /// The caller supplies the genuine configured protocol Hello range.
+    #[must_use]
+    pub fn new(versions: VersionRange) -> Self {
+        Self {
+            versions,
+            next: 1,
+            clients: BTreeMap::new(),
+            replies: BTreeMap::new(),
+            watches: BTreeMap::new(),
+            documents: BTreeSet::new(),
+            streams: BTreeSet::new(),
+        }
+    }
+
+    pub fn bind(&mut self, client: ClientId, party: u64, identity: people::Identity) {
+        assert!(self.clients.insert(client, Client { party, identity, sign_in: None }).is_none(), "bind once");
+    }
+
+    #[must_use]
+    pub fn is_bound(&self, client: ClientId) -> bool {
+        self.clients.contains_key(&client)
+    }
+
+    /// The caller supplies the replacement authenticated identity independently
+    /// of its expected party number, after retiring every old protocol route.
+    pub fn replace_identity(&mut self, client: ClientId, party: u64, identity: people::Identity) {
+        assert!(self.watches.values().all(|watch| watch.client != client), "old watches are detached first");
+        assert!(
+            self.replies.values().all(|reply| match reply {
+                Reply::SignIn { client: owner }
+                | Reply::SignOut { client: owner }
+                | Reply::Keyed { client: owner, .. }
+                | Reply::Read { client: owner, .. }
+                | Reply::ApplicationRead { client: owner, .. }
+                | Reply::Archive { client: owner, .. } => *owner != client,
+            }),
+            "old replies are detached first"
+        );
+        let old = self.clients.get_mut(&client).expect("bound client");
+        *old = Client { party, identity, sign_in: None };
+    }
+
+    #[must_use]
+    pub fn hello(&self) -> jig_client::Event {
+        jig_client::Event::Hello { versions: self.versions }
+    }
+
+    /// Replace only the protocol's configured served range, supplied outside Frame.
+    pub fn versions(&mut self, versions: VersionRange) {
+        self.versions = versions;
+    }
+
+    #[must_use]
+    pub fn clients(&self) -> Vec<ClientId> {
+        self.clients.keys().copied().collect()
+    }
+
+    fn token(&mut self) -> Token {
+        let number = self.next;
+        self.next = self.next.checked_add(1).expect("finite transport token namespace");
+        Token::new(number)
+    }
+
+    pub fn reply_to(&mut self, reply: Reply) -> ReplyTo {
+        self.routed_reply(reply).1
+    }
+
+    /// Retain the transport's own token before moving its single-use reply door.
+    pub fn routed_reply(&mut self, reply: Reply) -> (Token, ReplyTo) {
+        let token = self.token();
+        assert!(self.replies.insert(token, reply).is_none(), "fresh reply token");
+        (token, ReplyTo::new(token))
+    }
+
+    #[must_use]
+    pub fn reply(&self, token: Token) -> Option<&Reply> {
+        self.replies.get(&token)
+    }
+
+    /// Explicit outstanding protocol destinations, independent of people,
+    /// sessions and whether an owner's answer is final.
+    #[must_use]
+    pub fn reply_tokens(&self) -> Vec<Token> {
+        self.replies.keys().copied().collect()
+    }
+
+    pub fn take_reply(&mut self, token: Token) -> Option<Reply> {
+        self.replies.remove(&token)
+    }
+
+    /// The core supplies the actual independent person and session on its reply.
+    pub fn signed_in(&mut self, client: ClientId, party: u64, sign_in: u64) {
+        let state = self.clients.get_mut(&client).expect("bound client");
+        assert_eq!(state.party, party, "the supplied authenticated identity names this party");
+        state.sign_in = Some(sign_in);
+    }
+
+    #[must_use]
+    pub fn sign_in(&self, client: ClientId) -> Option<u64> {
+        self.clients.get(&client).expect("bound client").sign_in
+    }
+
+    #[must_use]
+    pub fn party(&self, client: ClientId) -> u64 {
+        self.clients.get(&client).expect("bound client").party
+    }
+
+    pub fn signed_out(&mut self, client: ClientId) {
+        self.clients.get_mut(&client).expect("bound client").sign_in = None;
+    }
+
+    pub fn start_sign_in(&mut self, client: ClientId) -> Event {
+        let identity = self.clients.get(&client).expect("bound client").identity.clone();
+        let reply_to = self.reply_to(Reply::SignIn { client });
+        Event::SignIn { reply_to, identity }
+    }
+
+    pub fn open(&mut self, client: ClientId, native: Token, subject: Watched) -> Token {
+        assert!(self.watch_token(client, native).is_none(), "one live native watch per tab");
+        let token = self.token();
+        assert!(self.watches.insert(token, Watch { client, native, subject }).is_none(), "fresh watch token");
+        token
+    }
+
+    #[must_use]
+    pub fn watch_token(&self, client: ClientId, native: Token) -> Option<Token> {
+        self.watches.iter().find_map(
+            |(token, watch)| {
+                if watch.client == client && watch.native == native { Some(*token) } else { None }
+            },
+        )
+    }
+
+    #[must_use]
+    pub fn watch(&self, token: Token) -> Option<&Watch> {
+        self.watches.get(&token)
+    }
+
+    pub fn end_watch(&mut self, token: Token) -> Option<Watch> {
+        self.documents.remove(&token);
+        self.streams.remove(&token);
+        self.watches.remove(&token)
+    }
+
+    /// Record an actual owner delivery before queuing its shell callback.
+    /// The normal document and provisional stream have independent pacing.
+    pub fn delivered(&mut self, watcher: Token, pace: Pace) -> bool {
+        if !self.watches.contains_key(&watcher) {
+            return false;
+        }
+        let inserted = match pace {
+            Pace::Document => self.documents.insert(watcher),
+            Pace::Stream => self.streams.insert(watcher),
+        };
+        assert!(inserted, "one owner delivery in flight at each pace");
+        true
+    }
+
+    /// The shell took a normal document. This never acknowledges provisional text.
+    pub fn taken(&mut self, client: ClientId, native: Token) -> Option<Event> {
+        let watcher = self.watch_token(client, native)?;
+        self.documents.remove(&watcher).then_some(Event::Delivered { watcher })
+    }
+
+    /// Keep the client's exact consumed position for a later reopened watch,
+    /// and release only the actual provisional flight. A stale suffix may leave
+    /// the client's newer position unchanged; no source sequence is substituted.
+    /// # Errors
+    /// Rejects a continuation for an unrelated task or a non-run watch.
+    pub fn continued(
+        &mut self,
+        client: ClientId,
+        native: Token,
+        subject: Subject,
+    ) -> Result<Option<Event>, InvalidContinuation> {
+        let Some(watcher) = self.watch_token(client, native) else { return Ok(None) };
+        let watch = self.watches.get_mut(&watcher).expect("live route");
+        if let (Watched::Jig(Subject::Run { task: original, .. }), Subject::Run { task, .. }) =
+            (&watch.subject, &subject)
+        {
+            if original != task {
+                return Err(InvalidContinuation);
+            }
+        } else {
+            return Err(InvalidContinuation);
+        }
+        watch.subject = Watched::Jig(subject);
+        Ok(self.streams.remove(&watcher).then_some(Event::StreamDelivered { watcher }))
+    }
+
+    /// Original owner tokens of every open protocol watch, including siblings.
+    #[must_use]
+    pub fn watches(&self) -> Vec<Token> {
+        self.watches.keys().copied().collect()
+    }
+
+    /// Old tab callbacks lose their route. The Front sends these actual owner
+    /// watch tokens to Unwatch; retained keyed decisions stay in the core store.
+    pub fn detach(&mut self, client: ClientId) -> Vec<Token> {
+        self.replies.retain(|_, reply| match reply {
+            Reply::SignIn { client: owner }
+            | Reply::SignOut { client: owner }
+            | Reply::Keyed { client: owner, .. }
+            | Reply::Read { client: owner, .. }
+            | Reply::ApplicationRead { client: owner, .. }
+            | Reply::Archive { client: owner, .. } => *owner != client,
+        });
+        let watches: Vec<_> = self
+            .watches
+            .iter()
+            .filter_map(|(token, watch)| if watch.client == client { Some(*token) } else { None })
+            .collect();
+        for token in &watches {
+            self.end_watch(*token);
+        }
+        watches
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn identity(subject: &[u8]) -> people::Identity {
+        people::Identity {
+            key: people::IdentityKey { provider: u16::MAX, subject: subject.into() },
+            login: Box::from([255, 0]),
+            name: Box::new([]),
+        }
+    }
+
+    #[test]
+    fn normal_run_taken_and_provisional_continue_release_only_their_original_independent_flights() {
+        use jig_client::contract::ProvisionalTurnName;
+        let mut front = Transport::new(VersionRange { first: 1, last: 1 });
+        front.bind(ClientId(0), 7, identity(b"same"));
+        front.bind(ClientId(1), 7, identity(b"same"));
+        let native = Token::new(9);
+        let initial = Subject::Run { task: u64::MAX, turn: None, offset: 0 };
+        let owner = front.open(ClientId(0), native, Watched::Jig(initial.clone()));
+        let other = front.open(ClientId(1), native, Watched::Jig(initial));
+        assert!(front.delivered(owner, Pace::Document));
+        assert!(front.delivered(owner, Pace::Stream));
+        assert!(front.delivered(other, Pace::Document));
+        assert!(matches!(front.taken(ClientId(0), native), Some(Event::Delivered { watcher }) if watcher == owner));
+        assert!(front.taken(ClientId(0), native).is_none(), "normal callback is taken once");
+        let exact = Subject::Run {
+            task: u64::MAX,
+            turn: Some(ProvisionalTurnName { attempt: u64::MAX, number: u32::MAX, retry: u32::MAX }),
+            offset: u32::MAX,
+        };
+        assert!(
+            matches!(front.continued(ClientId(0), native, exact.clone()).expect("named run"), Some(Event::StreamDelivered { watcher }) if watcher == owner)
+        );
+        assert_eq!(front.watch(owner).expect("original watch").subject, Watched::Jig(exact.clone()));
+        assert!(front.continued(ClientId(0), native, exact.clone()).expect("duplicate callback").is_none());
+        let resumed = crate::joint::wire::watches::watch(Token::new(77), 23, 7, &exact, 2).expect("exact resume");
+        assert!(
+            matches!(resumed, Event::WatchRun { watcher, sign_in: 23, task: u64::MAX, turn: Some(jig_core_views::TurnName { attempt: u64::MAX, turn: u32::MAX, retry: u32::MAX }), offset: u32::MAX } if watcher == Token::new(77))
+        );
+        assert!(matches!(front.taken(ClientId(1), native), Some(Event::Delivered { watcher }) if watcher == other));
+    }
+
+    #[test]
+    fn unrelated_continue_and_old_tab_callbacks_cannot_release_or_relabel_a_live_run_flight() {
+        let mut front = Transport::new(VersionRange { first: 1, last: 1 });
+        front.bind(ClientId(0), 7, identity(b"same"));
+        front.bind(ClientId(1), 7, identity(b"same"));
+        let native = Token::new(3);
+        let original = Subject::Run { task: 41, turn: None, offset: 0 };
+        let owner = front.open(ClientId(0), native, Watched::Jig(original.clone()));
+        let other = front.open(ClientId(1), native, Watched::Jig(original.clone()));
+        assert!(front.delivered(owner, Pace::Document));
+        assert!(front.delivered(owner, Pace::Stream));
+        assert!(front.delivered(other, Pace::Stream));
+        assert!(matches!(
+            front.continued(ClientId(0), native, Subject::Run { task: 42, turn: None, offset: 0 }),
+            Err(InvalidContinuation)
+        ));
+        assert!(matches!(front.continued(ClientId(0), native, Subject::Frame), Err(InvalidContinuation)));
+        assert_eq!(front.watch(owner).expect("unchanged original").subject, Watched::Jig(original.clone()));
+        assert_eq!(front.detach(ClientId(0)), vec![owner]);
+        assert!(front.taken(ClientId(0), native).is_none());
+        assert!(front.continued(ClientId(0), native, original.clone()).expect("detached callback").is_none());
+        assert!(!front.delivered(owner, Pace::Stream), "detached owner delivery has no route");
+        assert!(
+            matches!(front.continued(ClientId(1), native, original).expect("other tab remains live"), Some(Event::StreamDelivered { watcher }) if watcher == other)
+        );
+    }
+
+    #[test]
+    fn equal_tab_tokens_keep_distinct_owner_routes_and_actual_session_numbers() {
+        let mut front = Transport::new(VersionRange { first: 1, last: u32::MAX });
+        front.bind(ClientId(0), 7, identity(b"opaque/one"));
+        front.bind(ClientId(1), 7, identity(b"opaque/one"));
+        front.signed_in(ClientId(0), 7, 41);
+        front.signed_in(ClientId(1), 7, u64::MAX);
+        assert_eq!(front.sign_in(ClientId(0)), Some(41));
+        assert_eq!(front.sign_in(ClientId(1)), Some(u64::MAX));
+        let native = Token::new(9);
+        let a = front.open(ClientId(0), native, Watched::Jig(Subject::Frame));
+        let b = front.open(ClientId(1), native, Watched::Jig(Subject::Frame));
+        assert_ne!(a, b);
+        assert_eq!(front.watch(a).expect("first owner watch").native, native);
+        assert_eq!(front.watch(b).expect("second owner watch").client, ClientId(1));
+        let reply = Reply::Keyed { client: ClientId(1), attempt: native, key: [255; 16], owner: KeyedOwner::Jig };
+        let to = front.reply_to(reply.clone()).into_token();
+        assert_ne!(to, a);
+        assert_ne!(to, b);
+        assert_eq!(front.take_reply(to), Some(reply));
+        assert_eq!(front.take_reply(to), None);
+    }
+
+    #[test]
+    fn reload_detaches_only_old_tab_routes_without_reusing_or_closing_another_tabs_watch() {
+        let mut front = Transport::new(VersionRange { first: 1, last: 1 });
+        front.bind(ClientId(0), 7, identity(b"same"));
+        front.bind(ClientId(1), 7, identity(b"same"));
+        let a = front.open(ClientId(0), Token::new(3), Watched::Jig(Subject::Frame));
+        let b = front.open(ClientId(1), Token::new(3), Watched::Jig(Subject::Frame));
+        let old =
+            front.reply_to(Reply::Read { client: ClientId(0), read: Token::new(3), what: Read::Frame }).into_token();
+        assert_eq!(front.detach(ClientId(0)), vec![a]);
+        assert_eq!(front.take_reply(old), None);
+        assert_eq!(front.watch(a), None);
+        assert!(front.watch(b).is_some());
+        let next = front.open(ClientId(0), Token::new(3), Watched::Jig(Subject::Frame));
+        assert_ne!(next, a);
+        assert_ne!(next, b);
+        assert_eq!(front.watch_token(ClientId(0), Token::new(3)), Some(next));
+    }
+
+    #[test]
+    fn original_read_queries_and_application_subjects_remain_distinct_under_equal_native_tokens() {
+        let mut front = Transport::new(VersionRange { first: 1, last: 1 });
+        front.bind(ClientId(0), 7, identity(b"seven"));
+        front.bind(ClientId(1), 8, identity(b"eight"));
+        let native = Token::new(u64::MAX);
+        let what = Read::Goals {
+            project: u32::MAX,
+            after: Some(jig_client::contract::Cursor {
+                value: jig_client::contract::Text::new(Box::from([255, 0]), 2).expect("whole opaque cursor"),
+            }),
+        };
+        let jig = Reply::Read { client: ClientId(0), read: native, what: what.clone() };
+        let subject =
+            family::Subject { scope: family::Scope::Project(u32::MAX), kind: family::Kind::OwnerEffect(u64::MAX) };
+        let application = Reply::ApplicationRead { client: ClientId(1), read: native, subject };
+        let first = front.reply_to(jig.clone()).into_token();
+        let second = front.reply_to(application.clone()).into_token();
+        assert_ne!(first, second);
+        assert_eq!(front.take_reply(second), Some(application));
+        assert_eq!(front.take_reply(first), Some(jig));
+        assert_eq!(front.take_reply(first), None);
+        assert_eq!(
+            what,
+            Read::Goals {
+                project: u32::MAX,
+                after: Some(jig_client::contract::Cursor {
+                    value: jig_client::contract::Text::new(Box::from([255, 0]), 2).expect("original whole cursor")
+                })
+            }
+        );
+        assert_eq!(subject.scope, family::Scope::Project(u32::MAX));
+        assert_eq!(subject.kind, family::Kind::OwnerEffect(u64::MAX));
+    }
+
+    #[test]
+    fn hello_and_sign_in_keep_configured_protocol_range_and_supplied_opaque_identity() {
+        let versions = VersionRange { first: u32::MAX, last: u32::MAX };
+        let mut front = Transport::new(versions);
+        let supplied = identity(&[255, b'/', 0]);
+        front.bind(ClientId(0), u64::MAX, supplied.clone());
+        assert_eq!(front.hello(), jig_client::Event::Hello { versions });
+        assert_eq!(front.sign_in(ClientId(0)), None);
+        let Event::SignIn { reply_to, identity: actual } = front.start_sign_in(ClientId(0)) else {
+            panic!("authentic sign-in input")
+        };
+        assert_eq!(actual, supplied);
+        assert_eq!(front.take_reply(reply_to.into_token()), Some(Reply::SignIn { client: ClientId(0) }));
+        assert_eq!(front.sign_in(ClientId(0)), None);
+        assert_eq!(front.party(ClientId(0)), u64::MAX);
+    }
+}

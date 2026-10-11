@@ -17,9 +17,14 @@ jig-fake-person.workspace = true
 jig-scripted-engine.workspace = true
 jig-core.workspace = true
 jig-core-people.workspace = true
+jig-core-fleet.workspace = true
 jig-core-tasks.workspace = true
 jig-core-views.workspace = true
 jig-core-notes.workspace = true
+jig-core-world = { path = "../core" }
+jig-fake-parties.workspace = true
+jig-fake-workers.workspace = true
+jig-test-domain.workspace = true
 jig-test-connector.workspace = true
 jig-test-client-kit.workspace = true
 sha2.workspace = true

@@ -89,6 +89,7 @@ pub struct World {
     hold_kinds: Vec<(u16, Box<[tasks::Kind]>)>,
     wall: u64,
     wall_lag: u64,
+    supplied_wall: Option<Wall>,
 }
 
 #[derive(Debug)]
@@ -283,6 +284,7 @@ impl World {
             hold_kinds: Vec::new(),
             wall: 0,
             wall_lag: 0,
+            supplied_wall: None,
         }
     }
 
@@ -300,7 +302,33 @@ impl World {
         peers: crate::peers::Peers,
         cut: Option<Cut>,
     ) -> World {
-        let mut world = Self::empty(configuration, &limits);
+        Self::scripted_clock_at(configuration, &limits, peers, cut, None)
+    }
+
+    /// Run the same root/store/peer machinery with the enclosing world's clocks.
+    /// Internal draining preserves these values until the caller supplies a new pair.
+    #[must_use]
+    pub fn scripted_clock(
+        configuration: root::Config,
+        limits: root::Limits,
+        peers: crate::peers::Peers,
+        now: Time,
+        wall: Wall,
+    ) -> World {
+        Self::scripted_clock_at(configuration, &limits, peers, None, Some((now, wall)))
+    }
+
+    fn scripted_clock_at(
+        configuration: root::Config,
+        limits: &root::Limits,
+        peers: crate::peers::Peers,
+        cut: Option<Cut>,
+        clock: Option<(Time, Wall)>,
+    ) -> World {
+        let mut world = Self::empty(configuration, limits);
+        if let Some((now, wall)) = clock {
+            world.set_clock(now, wall);
+        }
         world.cut = cut;
         world.peers = Some(peers);
         let row =
@@ -316,9 +344,75 @@ impl World {
         world
     }
 
+    /// Supply monotonic time and wall time independently, including wall corrections.
+    pub fn set_clock(&mut self, now: Time, wall: Wall) {
+        if self.supplied_wall.is_some() {
+            assert!(now.as_nanos() >= self.wall, "elapsed time is monotonic");
+        }
+        self.wall = now.as_nanos();
+        self.supplied_wall = Some(wall);
+    }
+
+    /// The pair actually supplied to the root and its children.
+    #[must_use]
+    pub fn clocks(&self) -> (Time, Wall) {
+        let env = self.env();
+        (env.now, env.wall)
+    }
+
+    /// Earliest armed owner deadline at the current supplied clock pair.
+    /// Absolute Wall values are sampled again after a correction or delivery.
+    #[must_use]
+    pub fn next_due(&self) -> Option<Time> {
+        let (now, wall) = self.clocks();
+        let mut next = None;
+        for (_, deadline) in self.domain.core_deadlines() {
+            if let Some(deadline) = deadline {
+                next = Some(next.map_or(deadline, |prior: Time| prior.min(deadline)));
+            }
+        }
+        for deadline in self
+            .domain
+            .connector_deadlines()
+            .into_iter()
+            .map(|(_, deadline)| deadline)
+            .chain([self.domain.effect_deadline()])
+            .flatten()
+        {
+            let remaining = deadline.as_nanos().saturating_sub(wall.as_nanos());
+            let due = Time::from_nanos(now.as_nanos().checked_add(remaining).expect("world deadline fits"));
+            next = Some(next.map_or(due, |prior| prior.min(due)));
+        }
+        next
+    }
+
+    /// Fire only currently due owners through their ordinary root inputs.
+    /// The caller supplies clocks; neither draining nor timer delivery advances them.
+    pub fn fire_due(&mut self, now: Time, wall: Wall) {
+        self.set_clock(now, wall);
+        let mut events = Vec::new();
+        for (timer, deadline) in self.domain.core_deadlines() {
+            if deadline.is_some_and(|deadline| deadline <= now) {
+                events.push(root::Event::Timer(timer));
+            }
+        }
+        for (number, deadline) in self.domain.connector_deadlines() {
+            if deadline.is_some_and(|deadline| deadline <= wall) {
+                events.push(root::Event::ConnectorTimer { number });
+            }
+        }
+        if self.domain.effect_deadline().is_some_and(|deadline| deadline <= wall) {
+            events.push(root::Event::Core(core::Event::EffectDeadline));
+        }
+        self.send_all(events);
+    }
+
     /// Advance simulated time, firing fleet and task deadlines through the root.
     pub fn advance(&mut self, by: Duration) {
         self.wall = self.wall.checked_add(by.as_nanos()).expect("world time fits");
+        self.supplied_wall = self
+            .supplied_wall
+            .map(|wall| Wall::from_nanos(wall.as_nanos().checked_add(by.as_nanos()).expect("supplied wall fits")));
         self.events.push_back(root::Event::Timer(core::Timer::Fleet));
         self.events.push_back(root::Event::Timer(core::Timer::Tasks));
         self.events.push_back(root::Event::ConnectorTimer { number: 1 });
@@ -334,7 +428,7 @@ impl World {
     fn env(&self) -> Env<root::Limits> {
         Env {
             now: Time::from_nanos(self.wall),
-            wall: Wall::from_nanos(self.wall.saturating_sub(self.wall_lag)),
+            wall: self.supplied_wall.unwrap_or_else(|| Wall::from_nanos(self.wall.saturating_sub(self.wall_lag))),
             limits: self.limits,
         }
     }
@@ -359,7 +453,9 @@ impl World {
             if self.stopped {
                 return;
             }
-            self.wall += 1_000_000;
+            if self.supplied_wall.is_none() {
+                self.wall += 1_000_000;
+            }
             self.observer.observe(self.wall, crate::referee::Observed::Tick);
             let env = self.env();
             self.observer.systems(self.wall, &self.systems);
