@@ -104,3 +104,130 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
         Some((_, _, jig_core::CallPart::NoteRecalled { entries, more: false }))
         if entries.len() == 1 && entries[0].revision == 2 && entries[0].body.as_ref() == b"second body"));
 }
+
+#[test]
+fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
+    use jig_core_tasks as tasks;
+    use jig_test_domain as root;
+    let mut world = configured_with_slots(
+        8518,
+        vec![
+            Box::new([
+                Script::Silence { for_: Duration::from_secs(3) },
+                Script::Finish { report: b"parent done".as_slice().into() },
+            ]),
+            Box::new([Script::Fail(jig_fake_workers::Failure::Run)]),
+            Box::new([Script::Fail(jig_fake_workers::Failure::Run)]),
+            Box::new([Script::Finish { report: b"delegate recovered".as_slice().into() }]),
+        ],
+        2,
+        |_, _| {},
+    );
+    let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
+    world.person(member, start(b"release the exhausted delegate"));
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let assignment =
+        world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen[0].clone();
+    let owner = &world.front().session.driver.world;
+    let mut authority =
+        match owner.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Live(assignment.task)))) {
+            Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) => row.authority.clone(),
+            other => panic!("actual parent authority: {other:?}"),
+        };
+    authority.budget.spend = 20;
+    authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    let now = world.now();
+    world.front().session.driver.send(
+        now,
+        clock(now),
+        root::Event::Core(jig_core::Event::DelegateValidated {
+            to: skein_lib::ReplyTo::new(Token::new(9801)),
+            key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion: 1, position: 0 },
+            batch: Box::new([jig_core::Delegate {
+                executor: tasks::Executor::Agent { charter: 1 },
+                spec: tasks::Spec {
+                    words: b"retry this delegate".as_slice().into(),
+                    parameters: Box::new([]),
+                    inputs: Box::new([]),
+                },
+                contract: tasks::Contract::Report { words: 128 },
+                authority,
+                symbolic_grants: Box::new([]),
+                dependencies: Box::new([]),
+                wake: tasks::WakePolicy::DEFAULT,
+            }]),
+            stubs: Box::new([]),
+        }),
+    );
+    let child = match &world.front().session.driver.world.answers.last().expect("delegate answer").2 {
+        jig_core::CallPart::Delegated(numbers) => numbers[0],
+        other => panic!("delegation must be admitted: {other:?}"),
+    };
+    world.person(member, vec![Step::Pause { for_: Duration::from_millis(2100) }]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let revision = match world
+        .front()
+        .session
+        .driver
+        .world
+        .store
+        .rows
+        .get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child))))
+    {
+        Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) => {
+            assert!(matches!(row.phase, tasks::Phase::Held { why: tasks::Hold::Failures(tasks::Class::Run), .. }));
+            match row.escalation {
+                tasks::Escalation::Waiting { revision, holder: tasks::EscalationHolder::Task(parent), .. }
+                    if parent == assignment.task =>
+                {
+                    revision
+                }
+                ref other => panic!("the parent receives the actual exhausted hold first: {other:?}"),
+            }
+        }
+        other => panic!("held delegate: {other:?}"),
+    };
+    action(
+        &mut world,
+        &assignment,
+        2,
+        jig_core::NamedAction::DecideEscalation { task: child, revision, choice: jig_core::EscalationChoice::Pass },
+    );
+    let within = Duration::from_secs(1);
+    world.person(
+        member,
+        vec![
+            Step::Go { address: crate::stories::inbox() },
+            Step::See { find: Find::text(b"retry this delegate"), within },
+            Step::See { find: Find::text(b"Held: out of tries"), within },
+            Step::See { find: Find::exactly_named(Role::Button, b"Release"), within },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Release") },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::See { find: Find::text(b"Released"), within },
+            Step::Pause { for_: Duration::from_secs(1) },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    let owner = &world.front().session.driver.world;
+    for (task, words) in [(child, b"delegate recovered".as_slice()), (assignment.task, b"parent done".as_slice())] {
+        assert!(matches!(owner.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(task)))),
+            Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))))
+            if matches!(&row.phase, tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: actual })) if actual.as_ref() == words)));
+    }
+    assert!(owner.store.rows.values().any(|row| matches!(row,
+        root::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        if matches!(outcome, people::Outcome::EscalationDecided { .. }))));
+    let attempts: std::collections::BTreeSet<_> = owner.peers.as_ref().expect("actual worker").workers[0]
+        .seen
+        .iter()
+        .filter(|row| row.task == child)
+        .map(|row| row.attempt)
+        .collect();
+    assert_eq!(attempts.len(), 3, "two failures then the person's released activation");
+}

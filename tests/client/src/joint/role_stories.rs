@@ -29,7 +29,17 @@ fn configured(
     scripts: Vec<Box<[Script]>>,
     configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
 ) -> World<Test, Joint> {
+    configured_with_slots(seed, scripts, 1, configure)
+}
+
+fn configured_with_slots(
+    seed: u64,
+    scripts: Vec<Box<[Script]>>,
+    slots: u32,
+    configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
+) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
+    owner.core.fleet.slots = slots;
     // Four adoption identities and their four later public client sign-ins.
     owner.core.people.sign_ins = 8;
     // Four adoption peer watches plus eight public watches per client.
@@ -74,7 +84,7 @@ fn configured(
     let mut driver = Driver::new(
         configuration,
         owner,
-        Peers::new(vec![Worker::new(7, 1, scripts)], parties),
+        Peers::new(vec![Worker::new(7, slots, scripts)], parties),
         Time::ZERO,
         clock(Time::ZERO),
     );
