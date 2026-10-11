@@ -149,8 +149,7 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
         ],
     );
     {
-        let early = world.now().saturating_add(Duration::from_millis(30));
-        let observed = world.run(Until::Time(early));
+        let observed = world.run(Until::Steps(2));
         eprintln!("FAILED_COMMIT_EARLY {observed:?}");
         eprintln!("FAILED_COMMIT_TREE {:?}", world.tree(client).nodes());
     }
