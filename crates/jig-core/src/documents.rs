@@ -247,12 +247,15 @@ pub struct FrameProjectRole {
 }
 
 /// Party identity, current roles, bounded counts and contract configuration.
+/// Deployment membership is supplied independently of the bounded project rows
+/// (`client/domain/contract.md`, sections 2, 5 and 7.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Frame {
     pub party: u64,
     pub kind: people::Kind,
     pub login: Text,
     pub name: Text,
+    pub deployment_role: Option<people::Role>,
     pub projects: List<FrameProjectRole>,
     pub needs: u32,
     /// Exact kinds, including needs beyond the recent inbox prefix.

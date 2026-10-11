@@ -2824,6 +2824,7 @@ mod periods;
 
 mod project_tasks;
 
+mod frame_deployment_role;
 mod frame_facts;
 mod project_baselines;
 
