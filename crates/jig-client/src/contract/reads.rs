@@ -151,6 +151,8 @@ pub struct NotePage {
 /// A read document or page.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ReadValue {
+    /// Whole authentic project owner document.
+    OwnerProject(Box<super::OwnerProject>),
     /// The frame.
     Frame(Box<Frame>),
     /// A task.

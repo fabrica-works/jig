@@ -32,6 +32,8 @@ pub enum Subject {
 /// A whole current watch value, except the run text stream.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Delivery {
+    /// Whole authentic project owner document.
+    OwnerProject(Box<super::OwnerProject>),
     /// The frame.
     Frame(Box<Frame>),
     /// A task.
