@@ -324,7 +324,7 @@ fn person_owner_selected_words_and_total_text_refuse_one_under_whole_requirement
     person_storage_dimension(3);
 }
 
-fn person_storage_dimension(selected: usize) {
+fn person_storage_dimension(selected_dimension: usize) {
     let phrase_limits = PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
@@ -403,7 +403,7 @@ fn person_storage_dimension(selected: usize) {
     .into_iter()
     .enumerate()
     {
-        if index != selected {
+        if index != selected_dimension {
             continue;
         }
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&value, &w, below)))
