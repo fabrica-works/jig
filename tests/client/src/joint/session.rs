@@ -305,7 +305,9 @@ impl Session {
         self.delayed.clear();
         self.delay_until = None;
         self.lost_answers.clear();
+        eprintln!("FAILED_COMMIT_ROUTES {:?}", self.driver.transport.watches());
         for watcher in self.driver.transport.watches() {
+            eprintln!("FAILED_COMMIT_ROUTE {:?}", self.driver.transport.watch(watcher));
             let Incoming::Callback { client, event } =
                 packets::dropped(&mut self.driver.transport, watcher).map_err(Invalid::Packet)?
             else {
@@ -317,6 +319,7 @@ impl Session {
             self.archives.detach(client);
             self.driver.transport.detach(client);
         }
+        eprintln!("FAILED_COMMIT_CALLBACKS {:?}", self.callbacks);
         self.stopped_seen = true;
         self.lifecycle.push(Observed::Reachable { live: false });
         Ok(())
