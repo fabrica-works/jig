@@ -436,6 +436,8 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
             Phrasebook::load(owner_person_task_words::shapes(), Box::new([bad]), &phrase_limits).err(),
             Some(Invalid::Holes { id: PersonPhrase::Party.id() })
         );
+    } else {
+        assert_eq!(value, untouched);
     }
 }
 
