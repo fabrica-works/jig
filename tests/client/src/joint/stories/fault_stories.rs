@@ -272,3 +272,66 @@ fn a_dropped_watch_and_slow_delivery_show_the_page_behind_before_the_held_chat_i
     assert_eq!(assignments[0].task, assignments[1].task);
     assert_ne!(assignments[0].attempt, assignments[1].attempt);
 }
+
+#[test]
+fn a_crash_after_the_stop_commit_cold_restarts_offline_and_answers_the_same_key_once() {
+    fn configuration() -> jig_test_domain::Config {
+        jig_core_world::world::config(8510)
+    }
+    let (mut world, client) = stop_ready_in(super::bounded_world(
+        super::turn(),
+        |front| front.restart_configuration(configuration),
+        |limits| limits.core.views.watchers = 12,
+    ));
+    let submitted = world.front().session.driver.world.store.applied.checked_add(1).expect("next transaction");
+    world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
+    world.person(
+        client,
+        vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+            Step::Pause { span: Duration::from_millis(30) },
+        ],
+    );
+    let boundary = world.now().saturating_add(Duration::from_millis(50));
+    let outcome = world.run(Until::Time(boundary));
+    assert!(matches!(outcome.verdict, skein_world::domain::Verdict::Open { .. }));
+    assert_eq!(
+        world.front().session.driver.world.reached_cut,
+        Some(jig_core_world::effects::Cut::Submitted(submitted))
+    );
+    assert_eq!(answers(&mut world), 1);
+    assert!(world.front().session.driver.withhold_completion().expect("actual durable commit").is_none());
+    assert_eq!(answers(&mut world), 2);
+    assert!(!shown(&world, client, b"Held stopped"));
+    // Crash the actual root before that durable transaction's completion is delivered.
+    world.fault(crate::FrontFault::Restart { offline: Duration::from_millis(150) });
+    let within = Duration::from_secs(1);
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::text(b"Offline"), within },
+            Step::See { find: Find::text(b"Held stopped"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
+    assert_eq!(answers(&mut world), 2);
+    let owner = &world.front().session.driver.world;
+    assert!(!owner.stopped);
+    let asks: Vec<_> = owner
+        .trace
+        .iter()
+        .filter(|event| event.starts_with("input Core(People(Ask") && event.contains("ask: Stop"))
+        .collect();
+    assert!(asks.len() >= 2, "the committed stop is genuinely asked again after cold restart");
+    let keys: std::collections::BTreeSet<_> = asks
+        .iter()
+        .map(|event| {
+            let start = event.find("key: [").expect("actual request key");
+            let end = event[start..].find("], ask:").expect("complete key") + start + 1;
+            &event[start..end]
+        })
+        .collect();
+    assert_eq!(keys.len(), 1);
+}
