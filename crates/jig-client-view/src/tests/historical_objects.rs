@@ -279,7 +279,7 @@ fn historical_whole_receiving_refuses_reserved_paths_and_nested_text_excess_with
     assert!(view::required(&value, &jig_client::Limits { rows: 1, ..CLIENT }, &words()).is_none());
     let mut large = value.clone();
     let OwnerHistoricalValue::PersonProposal { proposal, .. } = &mut large.value else { panic!("raw proposal") };
-    proposal.goal.spec.words = Text::new(vec![255; 129].into_boxed_slice(), 129).unwrap();
+    proposal.goal.spec.words = Text::new(Box::new([255; 129]), 129).unwrap();
     assert!(view::required(&large, &CLIENT, &words()).is_none());
     assert_eq!(value, original);
     assert!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
@@ -290,8 +290,8 @@ fn historical_passive_card_retains_named_whole_departure_and_does_not_bind_curre
     let (d, id) = super::cards_objects::loaded(value.key, ReadValue::Historical(Box::new(value.clone())));
     let f = view::required(&value, &CLIENT, &words()).unwrap();
     let mut l = limits(f);
-    l.nodes += 64;
-    l.text_bytes += 64 * l.text_per_node;
+    l.nodes = l.nodes.checked_add(64).unwrap();
+    l.text_bytes = l.text_bytes.checked_add(64_u32.checked_mul(l.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&l);
     let mut bindings = JigBindings::new(l.bindings, CLIENT.text);
     assert!(crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, &words(), &mut bindings));
@@ -300,9 +300,12 @@ fn historical_passive_card_retains_named_whole_departure_and_does_not_bind_curre
     assert!(contains(&tree, b"Historical question"));
     assert!(!contains(&tree, b"Answer not supplied"));
     assert!(tree.nodes().iter().all(|node| node.role != Role::Button));
-    assert!(
-        matches!(&d.objects().get(id).unwrap().card,jig_client::objects::Card::Leaving{how:jig_client::objects::Left::Historical{facts},..} if facts.as_ref()==&value)
-    );
+    let jig_client::objects::Card::Leaving { how: jig_client::objects::Left::Historical { facts }, .. } =
+        &d.objects().get(id).unwrap().card
+    else {
+        panic!("whole historical departure")
+    };
+    assert_eq!(facts.as_ref(), &value);
 }
 fn step(domain: &mut Domain, l: &jig_client::Limits, event: jig_client::Event) -> Vec<jig_client::Request> {
     let mut out = skein_lib::Queue::with_capacity(jig_client::max_out(l));
@@ -415,6 +418,10 @@ fn presence(mask: u8) {
         };
         step(&mut domain, &l, Event::Read { read, result: ReadResult::Value(value) });
     }
+    presence_finish(&mut domain, &l, task_read.unwrap(), mask);
+}
+fn presence_finish(domain: &mut Domain, l: &jig_client::Limits, task_read: skein_lib::Token, mask: u8) {
+    use jig_client::Event;
     let mut doc = task();
     doc.inputs = List::with_capacity(l.rows);
     for _ in 0..l.rows {
@@ -425,30 +432,33 @@ fn presence(mask: u8) {
         OwnerHistoricalValue::Task { document: Box::new(doc), result: Box::new(result()) },
     );
     step(
-        &mut domain,
-        &l,
-        Event::Read {
-            read: task_read.unwrap(),
-            result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))),
-        },
+        domain,
+        l,
+        Event::Read { read: task_read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
     );
     let id = domain.objects().find(supplied.key).unwrap();
     let words = words();
-    let f = view::required(&supplied, &l, &words).unwrap();
+    let f = view::required(&supplied, l, &words).unwrap();
     let mut cap = limits(f);
-    cap.nodes += 64;
-    cap.text_bytes += 64 * cap.text_per_node;
+    cap.nodes = cap.nodes.checked_add(64).unwrap();
+    cap.text_bytes = cap.text_bytes.checked_add(64_u32.checked_mul(cap.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, l.text);
-    assert!(crate::cards::card(&mut b, &domain, id, &crate::cards::Place::Elsewhere, &words, &mut bindings));
+    assert!(crate::cards::card(&mut b, domain, id, &crate::cards::Place::Elsewhere, &words, &mut bindings));
     let tree = b.finish();
     super::cards_access::check(&tree);
-    assert!(tree.len() <= f.nodes + 64);
+    assert!(tree.len() <= f.nodes.checked_add(64).unwrap());
     assert_eq!(contains(&tree, b"whole kept verdict"), mask & 1 != 0);
     assert_eq!(contains(&tree, b"whole kept proposal"), mask & 1 != 0 && mask & 4 != 0);
     assert_eq!(
         domain.objects().len(),
-        1 + u32::from(mask & 1 != 0) + u32::from(mask & 2 != 0) + u32::from(mask & 4 != 0)
+        1_u32
+            .checked_add(u32::from(mask & 1 != 0))
+            .unwrap()
+            .checked_add(u32::from(mask & 2 != 0))
+            .unwrap()
+            .checked_add(u32::from(mask & 4 != 0))
+            .unwrap()
     );
     assert!(tree.nodes().iter().all(|node| node.role != Role::Button));
 }
