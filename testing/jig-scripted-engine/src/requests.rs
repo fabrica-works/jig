@@ -141,7 +141,8 @@ impl<A: crate::Application> Engine<A> {
                         | ReadValue::OwnerProject(_)
                         | ReadValue::Project(_)
                         | ReadValue::Notes(_)
-                        | ReadValue::Deployment(_),
+                        | ReadValue::Deployment(_)
+                        | ReadValue::OwnerDeployment(_),
                         Moved::Hold { .. } | Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting,
                     ) => None,
                 };
@@ -175,7 +176,8 @@ impl<A: crate::Application> Engine<A> {
                                     | ReadValue::OwnerProject(_)
                                     | ReadValue::Project(_)
                                     | ReadValue::Notes(_)
-                                    | ReadValue::Deployment(_) => None,
+                                    | ReadValue::Deployment(_)
+                                    | ReadValue::OwnerDeployment(_) => None,
                                 };
                                 Moved::Hold { reason }
                             }
@@ -224,7 +226,8 @@ impl<A: crate::Application> Engine<A> {
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
-                | ReadValue::Deployment(_) => None,
+                | ReadValue::Deployment(_)
+                | ReadValue::OwnerDeployment(_) => None,
             };
             if waiting.is_some_and(|waiting| !recipient(&self.truth, party, waiting)) {
                 return Ok((
@@ -429,7 +432,8 @@ impl<A: crate::Application> Engine<A> {
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
-                | ReadValue::Deployment(_) => return Ok((Answer::Refused(Refusal::NotOffered), Vec::new())),
+                | ReadValue::Deployment(_)
+                | ReadValue::OwnerDeployment(_) => return Ok((Answer::Refused(Refusal::NotOffered), Vec::new())),
             }
             let change =
                 crate::Change::Object { project: project.expect("object requests name a project"), key, value };
@@ -485,7 +489,8 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
-        | ReadValue::Deployment(_) => None,
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => None,
     }
 }
 fn task_hold_reason(value: &TaskHold) -> CurrentHold {
@@ -522,7 +527,8 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
-        | ReadValue::Deployment(_) => None,
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => None,
     }
 }
 fn decision_kind(decision: &Decision) -> ActKind {

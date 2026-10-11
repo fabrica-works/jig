@@ -199,6 +199,8 @@ pub enum ReadValue {
     Notes(Box<NotePage>),
     /// Deployment state.
     Deployment(Box<Deployment>),
+    /// Whole deployment-owned facts and diagnostics.
+    OwnerDeployment(Box<super::OwnerDeployment>),
 }
 
 /// Why one read has no value.

@@ -142,7 +142,8 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::OwnerSpend(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
-        | ReadValue::Deployment(_) => vec![],
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => vec![],
     }
 }
 fn frame(frame: &Frame) -> Vec<Receipt> {

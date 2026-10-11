@@ -443,7 +443,8 @@ fn delivered_name(value: &crate::contract::Delivery, key: ObjectKey) -> Option<b
         | Delivery::Frame(_)
         | Delivery::Run(_)
         | Delivery::RunState(_)
-        | Delivery::Deployment(_) => None,
+        | Delivery::Deployment(_)
+        | Delivery::OwnerDeployment(_) => None,
         Delivery::Conversations(chats) => {
             for row in &chats.rows {
                 if key == ObjectKey::Task(row.chip.task) {
@@ -539,6 +540,7 @@ pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &cra
         | crate::contract::Delivery::Run(_)
         | crate::contract::Delivery::RunState(_)
         | crate::contract::Delivery::Deployment(_)
+        | Delivery::OwnerDeployment(_)
         | crate::contract::Delivery::Task(_)
         | crate::contract::Delivery::Tree(_)
         | crate::contract::Delivery::OwnerTree(_)
@@ -768,7 +770,8 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
         | ReadValue::Goals(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
-        | ReadValue::Deployment(_) => None,
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => None,
         ReadValue::Notes(page) => {
             let project = match key {
                 ObjectKey::Note { project, .. } => project,
@@ -899,7 +902,8 @@ pub(crate) fn contexts(value: &crate::contract::Delivery, capacity: u32) -> List
         | crate::contract::Delivery::Conversations(_)
         | crate::contract::Delivery::Run(_)
         | crate::contract::Delivery::RunState(_)
-        | crate::contract::Delivery::Deployment(_) => {}
+        | crate::contract::Delivery::Deployment(_)
+        | Delivery::OwnerDeployment(_) => {}
     }
     rows
 }

@@ -622,7 +622,8 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
-                | ReadValue::Deployment(_) => false,
+                | ReadValue::Deployment(_)
+                | ReadValue::OwnerDeployment(_) => false,
             };
             if terminal {
                 seen.push(Observed::Stopped { card: crate::observe::key(*key), commit });
@@ -652,7 +653,8 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::OwnerProject(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
-                | ReadValue::Deployment(_) => {}
+                | ReadValue::Deployment(_)
+                | ReadValue::OwnerDeployment(_) => {}
             }
         }
         engine::Change::Request(_)
@@ -663,6 +665,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
         | engine::Change::Note(_)
         | engine::Change::DeleteNote { .. }
         | engine::Change::Deployment(_)
+        | engine::Change::OwnerDeployment(_)
         | engine::Change::Tree(_)
         | engine::Change::Seen { .. } => {}
     }

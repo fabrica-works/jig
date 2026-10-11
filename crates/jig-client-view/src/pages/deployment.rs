@@ -8,6 +8,11 @@ use jig_client::Domain;
 /// Show the admitted deployment document and its connector-owned parts.
 pub fn deployment(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     super::heading(b, words, JigPhrase::Deployment, &[]);
+    if let Some(doc) = &client.deployment_page().owner {
+        crate::owner_deployment::render(b, client, doc, words, bindings);
+        super::excess(b, client, words);
+        return;
+    }
     let Some(doc) = &client.deployment_page().document else {
         words.status(b, JigPhrase::LoadingObject, &[]);
         return;

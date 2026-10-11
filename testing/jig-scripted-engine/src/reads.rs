@@ -226,6 +226,9 @@ impl<A: crate::Application> Engine<A> {
                     .checked_read(self.truth.projects.get(project).cloned().map(|v| ReadValue::Project(Box::new(v))));
             }
             Read::Deployment => {
+                if let Some(value) = &self.truth.owner_deployment {
+                    return self.checked_read(Some(ReadValue::OwnerDeployment(Box::new(value.clone()))));
+                }
                 return self.checked_read(self.truth.deployment.clone().map(|v| ReadValue::Deployment(Box::new(v))));
             }
             Read::Ended { .. }

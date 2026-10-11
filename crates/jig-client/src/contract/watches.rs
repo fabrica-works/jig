@@ -62,6 +62,8 @@ pub enum Delivery {
     RunState(Box<RunState>),
     /// Deployment capacity.
     Deployment(Box<Deployment>),
+    /// Whole deployment-owned facts and diagnostics.
+    OwnerDeployment(Box<super::OwnerDeployment>),
 }
 
 /// Current owner run state; absent writing does not assert a call ended.

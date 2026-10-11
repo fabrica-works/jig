@@ -990,6 +990,7 @@ impl Payload for ReadValue {
             Self::Project(value0) => sum(&[value0.heap(bounds)]),
             Self::Notes(value0) => sum(&[value0.heap(bounds)]),
             Self::Deployment(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerDeployment(value0) => value0.heap(bounds),
         }
     }
 }
@@ -1129,6 +1130,7 @@ impl Payload for Delivery {
             Self::Run(value0) => sum(&[value0.heap(bounds)]),
             Self::RunState(value0) => sum(&[value0.heap(bounds)]),
             Self::Deployment(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerDeployment(value0) => value0.heap(bounds),
         }
     }
 }

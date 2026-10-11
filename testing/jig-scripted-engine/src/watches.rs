@@ -326,7 +326,11 @@ impl<A: crate::Application> Engine<A> {
                 Delivery::Run(Box::new(value))
             }
             Subject::Deployment => {
-                Delivery::Deployment(Box::new(self.truth.deployment.clone().ok_or(WatchEnd::Unknown)?))
+                if let Some(value) = &self.truth.owner_deployment {
+                    Delivery::OwnerDeployment(Box::new(value.clone()))
+                } else {
+                    Delivery::Deployment(Box::new(self.truth.deployment.clone().ok_or(WatchEnd::Unknown)?))
+                }
             }
         };
         loop {
@@ -375,7 +379,8 @@ impl<A: crate::Application> Engine<A> {
                 | Delivery::Chips(_)
                 | Delivery::Run(_)
                 | Delivery::RunState(_)
-                | Delivery::Deployment(_) => return Err(WatchEnd::Busy),
+                | Delivery::Deployment(_)
+                | Delivery::OwnerDeployment(_) => return Err(WatchEnd::Busy),
             }
         }
     }

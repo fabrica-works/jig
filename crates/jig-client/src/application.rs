@@ -127,7 +127,8 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
         | Delivery::Conversations(_)
         | Delivery::Run(_)
         | Delivery::RunState(_)
-        | Delivery::Deployment(_) => {}
+        | Delivery::Deployment(_)
+        | Delivery::OwnerDeployment(_) => {}
     }
 }
 pub(crate) fn read_result(
@@ -176,7 +177,8 @@ pub(crate) fn read_result(
             | ReadValue::OwnerProject(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
-            | ReadValue::Deployment(_) => {}
+            | ReadValue::Deployment(_)
+            | ReadValue::OwnerDeployment(_) => {}
         },
     }
 }

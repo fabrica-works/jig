@@ -16,6 +16,8 @@ pub struct Truth {
     /// Whole authentic projects, independent of ordinary fixtures.
     pub owner_projects: BTreeMap<u32, jig_client::contract::OwnerProject>,
     pub deployment: Option<Deployment>,
+    /// Whole deployment diagnostics supplied by their owner.
+    pub owner_deployment: Option<jig_client::contract::OwnerDeployment>,
     pub notes: BTreeMap<u64, Note>,
     pub sources: Vec<Source>,
     pub results_seen: BTreeMap<u64, u64>,
@@ -46,6 +48,8 @@ pub enum Change {
     DeleteNote { note: u64 },
     /// Replace deployment hosts, accounts and capacities.
     Deployment(Deployment),
+    /// Replace whole owner deployment facts and bounded diagnostics.
+    OwnerDeployment(jig_client::contract::OwnerDeployment),
     /// Replace the retained rows of one scoped read; rows may span many protocol pages.
     Source(Source),
     /// Replace the authoritative subtree, including folded counts.
@@ -72,6 +76,7 @@ impl Change {
             Self::Project(value) => payload::fits(value, bounds),
             Self::Note(value) => payload::fits(value, bounds),
             Self::Deployment(value) => payload::fits(value, bounds),
+            Self::OwnerDeployment(value) => payload::fits(value, bounds),
             Self::SignIn { .. } | Self::SignedOut { .. } | Self::Forget { .. } | Self::DeleteNote { .. } => true,
         };
         if fits { Ok(()) } else { Err(Invalid::Payload) }
@@ -117,6 +122,9 @@ impl Truth {
         }
         if let Some(deployment) = &self.deployment {
             Change::Deployment(deployment.clone()).validate(bounds)?;
+        }
+        if let Some(deployment) = &self.owner_deployment {
+            Change::OwnerDeployment(deployment.clone()).validate(bounds)?;
         }
         for source in &self.sources {
             source.validate(bounds)?;
@@ -181,7 +189,12 @@ impl Truth {
             Change::DeleteNote { note } => {
                 self.notes.remove(note);
             }
+            Change::OwnerDeployment(deployment) => {
+                self.deployment = None;
+                self.owner_deployment = Some(deployment.clone());
+            }
             Change::Deployment(deployment) => {
+                self.owner_deployment = None;
                 self.deployment = Some(deployment.clone());
             }
         }
@@ -279,7 +292,8 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
-        | ReadValue::Deployment(_) => None,
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => None,
     }
 }
 
@@ -308,6 +322,7 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
-        | ReadValue::Deployment(_) => None,
+        | ReadValue::Deployment(_)
+        | ReadValue::OwnerDeployment(_) => None,
     }
 }

@@ -457,3 +457,5 @@ pub mod owner_proposal;
 
 pub mod historical_pages;
 pub mod owner_project;
+/// Deployment owner admission and recursive allocation bounds.
+pub mod owner_deployment;

@@ -83,6 +83,7 @@ pub(crate) fn navigate(
     domain.task_page.clear();
     domain.project_page.clear();
     domain.deployment_page.document = None;
+    domain.deployment_page.owner = None;
     domain.clock.page_times = false;
     domain.inbox.clear();
     domain.inbox.opening_updates = false;
@@ -357,6 +358,7 @@ pub(crate) fn delivery(
             super::conversations::delivered(domain, env, source, *conversations, out);
         }
         Delivery::Deployment(deployment) => crate::pages::deployment::document(domain, env, deployment, out),
+        Delivery::OwnerDeployment(deployment) => crate::pages::deployment::owner_document(domain, env, deployment, out),
     }
 }
 fn read_body(domain: &mut Domain, key: ObjectKey, body: Body) {
@@ -570,6 +572,9 @@ fn read_value(
         ReadValue::Goals(page) => crate::pages::project::ended(domain, env, source, *page, out),
         ReadValue::Project(project) => crate::pages::project::document(domain, env, project, out),
         ReadValue::Deployment(deployment) => crate::pages::deployment::document(domain, env, deployment, out),
+        ReadValue::OwnerDeployment(deployment) => {
+            crate::pages::deployment::owner_document(domain, env, deployment, out)
+        }
     }
 }
 
@@ -670,7 +675,8 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
             | ReadValue::OwnerProject(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
-            | ReadValue::Deployment(_) => return true,
+            | ReadValue::Deployment(_)
+            | ReadValue::OwnerDeployment(_) => return true,
         },
         ReadResult::None(_) => return true,
     };
@@ -756,6 +762,11 @@ fn received_value(
             | Read::Notes { .. }
             | Read::Deployment => {}
         },
+        ReadValue::OwnerDeployment(page) => {
+            if query == Read::Deployment {
+                crate::pages::deployment::owner_document(domain, env, page, out);
+            }
+        }
         ReadValue::OwnerInbox(page) => {
             let group = match &query {
                 Read::Inbox { group, .. } => *group,

@@ -3,7 +3,7 @@
 //! kept. See client/domain/pages.md, 7, and client/domain/root.md, 6.
 use crate::{
     Domain, Request,
-    contract::{Deployment, Part},
+    contract::{Deployment, OwnerDeployment, Part},
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue};
@@ -11,10 +11,12 @@ use skein_lib::{Env, List, Queue};
 #[derive(Debug)]
 pub struct DeploymentPage {
     pub document: Option<Box<Deployment>>,
+    /// The latest deployment owner facts, independent of the legacy parts path.
+    pub owner: Option<Box<OwnerDeployment>>,
 }
 impl DeploymentPage {
     pub(crate) const fn new() -> Self {
-        Self { document: None }
+        Self { document: None, owner: None }
     }
 }
 pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, doc: Box<Deployment>, out: &mut Queue<Request>) {
@@ -28,6 +30,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, doc: Box<D
         }
         parts.push(part.clone()).expect("part fits");
     }
+    domain.deployment_page.owner = None;
     domain.deployment_page.document = Some(doc);
     crate::pages::project::show(domain, env, parts, out);
     domain.changed();
@@ -36,4 +39,27 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, doc: Box<D
 #[must_use]
 pub const fn worst_case(limits: &crate::Limits) -> Option<u64> {
     Some(limits.document_bytes)
+}
+
+/// Keep the whole owner value only for the admitted current deployment page.
+pub(crate) fn owner_document(
+    domain: &mut Domain,
+    env: &Env<crate::Limits>,
+    doc: Box<OwnerDeployment>,
+    out: &mut Queue<Request>,
+) {
+    if domain.address != crate::address::Address::Deployment {
+        return;
+    }
+    let mut parts = List::with_capacity(env.limits.parts.saturating_add(1));
+    for connector in &doc.connectors {
+        if parts.room() == 0 {
+            break;
+        }
+        parts.push(Part::Deployment { connector: *connector }).expect("configured reference fits");
+    }
+    domain.deployment_page.document = None;
+    domain.deployment_page.owner = Some(doc);
+    crate::pages::project::show(domain, env, parts, out);
+    domain.changed();
 }

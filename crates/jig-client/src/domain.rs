@@ -803,6 +803,11 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
         WatchEvent::Opened | WatchEvent::Alive => {}
         WatchEvent::Delivered(delivery) => {
             match &delivery {
+                Delivery::OwnerDeployment(_) => {
+                    if watch.subject != Subject::Deployment {
+                        return;
+                    }
+                }
                 Delivery::OwnerTree(value) => match &watch.subject {
                     Subject::Tree { task, .. } => {
                         if *task != value.root.task {
@@ -857,7 +862,8 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                     | Delivery::Conversations(_)
                     | Delivery::Run(_)
                     | Delivery::RunState(_)
-                    | Delivery::Deployment(_) => {}
+                    | Delivery::Deployment(_)
+                    | Delivery::OwnerDeployment(_) => {}
                 },
                 Owner::Page { generation } => {
                     if generation == domain.generation {

@@ -102,3 +102,5 @@ pub mod historical_pages;
 pub mod historical_pages_words;
 pub mod owner_project_words;
 pub use pages::project::owner as owner_project;
+pub mod owner_deployment;
+pub mod owner_deployment_words;
