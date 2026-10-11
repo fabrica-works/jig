@@ -387,3 +387,6 @@ mod person_stories;
 
 #[path = "role_stories.rs"]
 mod role_stories;
+
+#[path = "offered_acts.rs"]
+mod offered_acts;

@@ -30,6 +30,7 @@ fn a_person_s_words_reach_a_running_run() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
+    super::offered_acts::task(&mut world, client, 1);
     let peers = world.front().session.driver.world.peers.as_ref().expect("worker peer");
     let assigned = peers.workers[0].seen.first().expect("assigned chat");
     assert!(peers.workers[0].messages.iter().any(|(_, task, attempt, words)| *task == assigned.task
@@ -82,6 +83,7 @@ fn a_person_stops_a_run_and_releases_it() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
+    super::offered_acts::task(&mut world, client, 1);
     let peers = world.front().session.driver.world.peers.as_ref().expect("worker peer");
     assert_eq!(peers.workers[0].seen.len(), 2);
     let before = &peers.workers[0].seen[0];
