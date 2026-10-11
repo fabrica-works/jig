@@ -269,7 +269,6 @@ impl Session {
         self.lost_answers.clear();
         self.source_events.clear();
         let watches = self.driver.transport.watches();
-        eprintln!("RECOVERY_RESTART {now:?} watches={watches:?} parked={:?}", self.parked);
         for watcher in &watches {
             let Incoming::Callback { client, event } =
                 packets::dropped(&mut self.driver.transport, *watcher).map_err(Invalid::Packet)?
@@ -334,7 +333,6 @@ impl Session {
         for event in std::mem::take(&mut self.source_events) {
             self.driver.send(now, wall, event);
         }
-        eprintln!("RECOVERY_PARKED {now:?} {:?}", self.parked);
         for (client, requests) in std::mem::take(&mut self.parked) {
             for request in requests {
                 self.send(client, now, wall, request)?;
@@ -646,11 +644,9 @@ impl Session {
                 if self.driver.transport.watch(watcher).is_none() {
                     return Ok(());
                 }
-                let closing = self.driver.transport.is_closing(watcher);
                 let value = packets::ended(&mut self.driver.transport, watcher, why).map_err(Invalid::Packet)?;
-                if !closing {
-                    self.incoming(value, now, wall)?;
-                }
+                // A silent client waits for this actual terminal before reopening its original watch.
+                self.incoming(value, now, wall)?;
             }
             root::Delivery::Application { to, number, outcome } => {
                 let to = to.into_token();
@@ -869,9 +865,6 @@ impl Session {
 
     /// A normal callback taken by the shell releases only its normal flight.
     pub fn received(&mut self, client: ClientId, now: Time, wall: Wall, event: &Event) {
-        if now > Time::from_nanos(700_000_000) {
-            eprintln!("RECOVERY_RECEIVED {now:?} {event:?}");
-        }
         self.stopping().expect("whole original stopped routes");
         if let Event::Jig(jig_client::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) = event
             && !matches!(value, client::Delivery::Run(_))
@@ -943,6 +936,33 @@ mod tests {
     }
     fn frame(watch: Token) -> Request {
         Request::Jig(jig_test_client_domain::JigOut::Open { watch, subject: client::Subject::Frame })
+    }
+
+    #[test]
+    fn a_closed_actual_watch_returns_its_terminal_before_the_same_native_watch_reopens() {
+        let (mut session, now, wall) = session();
+        let client = ClientId(0);
+        session.bind(client, 1, identity(), now, wall);
+        let _ = session.poll(now, wall).expect("actual authentication");
+        let native = Token::new(19);
+        session.send(client, now, wall, frame(native)).expect("actual owner watch");
+        let original = session.driver.transport.watch_token(client, native).expect("original route");
+        session
+            .send(client, now, wall, Request::Jig(jig_test_client_domain::JigOut::Close { watch: native }))
+            .expect("actual close");
+        let mut callbacks = session.poll(now, wall).expect("discard late body and finish actual flight");
+        callbacks.extend(session.poll(now, wall).expect("actual owning terminal"));
+        assert!(matches!(callbacks.as_slice(), [(owner, Event::Jig(jig_client::Event::Ended {
+            watch, end: client::WatchEnd::Closed,
+        }))] if *owner == client && *watch == native));
+        assert!(session.driver.transport.watch(original).is_none());
+        session.send(client, now, wall, frame(native)).expect("replacement actual watch");
+        let replacement = session.driver.transport.watch_token(client, native).expect("replacement route");
+        assert_ne!(replacement, original);
+        let callbacks = session.poll(now, wall).expect("replacement body");
+        assert!(matches!(callbacks.as_slice(), [(owner, Event::Jig(jig_client::Event::Watch {
+            watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)),
+        }))] if *owner == client && *watch == native));
     }
 
     #[test]
