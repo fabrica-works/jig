@@ -13,10 +13,10 @@ fn escalation_read_retains_original_reply_until_whole_identity_and_reserved_enve
     let limits = wire::rows::tests::limits();
     let mut wrong = source.clone();
     wrong.task.chip.number = 0;
-    let wrong = reads::Answer::Document(Box::new(documents::Document::Escalation(Box::new(wrong))));
+    let wrong = reads::Answer::Document(Box::new(documents::Document::Escalation(wrong)));
     assert_eq!(read(&mut transport, to, &wrong, &limits).err(), Some(Invalid::OwnerRoute));
     assert!(transport.reply(to).is_some());
-    let whole = reads::Answer::Document(Box::new(documents::Document::Escalation(Box::new(source))));
+    let whole = reads::Answer::Document(Box::new(documents::Document::Escalation(source)));
     assert_eq!(
         read(&mut transport, to, &whole, &Limits { document_bytes: 0, ..limits }).err(),
         Some(Invalid::Document(wire::documents::Invalid::Payload))
@@ -66,7 +66,7 @@ fn an_escalation_document_never_consumes_a_different_original_read_or_another_cl
     let other = transport
         .reply_to(Reply::Read { client: ClientId(1), read: Token::new(2), what: client::Read::Escalation { task: 0 } })
         .into_token();
-    let whole = reads::Answer::Document(Box::new(documents::Document::Escalation(Box::new(source))));
+    let whole = reads::Answer::Document(Box::new(documents::Document::Escalation(source)));
     for to in [wrong, other] {
         assert_eq!(read(&mut transport, to, &whole, &limits).err(), Some(Invalid::OwnerRoute));
         assert!(transport.reply(wrong).is_some());

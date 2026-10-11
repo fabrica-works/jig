@@ -87,13 +87,7 @@ pub fn read(
                 }
                 client::ReadResult::Value(wire::documents::proposal_read(value, limits).map_err(Invalid::Document)?)
             }
-            documents::Document::Escalation(value) => {
-                let client::Read::Escalation { task } = what else { return Err(Invalid::OwnerRoute) };
-                if *task != value.task.chip.number {
-                    return Err(Invalid::OwnerRoute);
-                }
-                client::ReadResult::Value(wire::documents::escalation_read(value, limits).map_err(Invalid::Document)?)
-            }
+            documents::Document::Escalation(value) => escalation(what, value, limits)?,
             documents::Document::PersonTask(value) => {
                 let client::Read::PersonTask { task } = what else { return Err(Invalid::OwnerRoute) };
                 if *task != value.task.number {
@@ -130,6 +124,18 @@ pub fn read(
     };
     transport.take_reply(to).expect("validated original read route");
     Ok(Incoming::Callback { client, event: Event::Jig(jig_client::Event::Read { read, result }) })
+}
+
+fn escalation(
+    what: &client::Read,
+    value: &documents::Escalation,
+    limits: &Limits,
+) -> Result<client::ReadResult, Invalid> {
+    let client::Read::Escalation { task } = what else { return Err(Invalid::OwnerRoute) };
+    if *task != value.task.chip.number {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(wire::documents::escalation_read(value, limits).map_err(Invalid::Document)?))
 }
 
 #[cfg(test)]
