@@ -1,5 +1,13 @@
 //! Faults across authenticated tabs use the actual proposal and retained decision.
 use super::*;
+use jig_fake_person::{Face, Found, TreeFace};
+
+fn confirm(world: &World<Test, Joint>, tab: crate::ClientId) -> jig_client_view::NodeId {
+    match TreeFace::new(world.tree(tab)).find(&Find::exactly_named(Role::Button, b"Confirm")) {
+        Found::Node(node) => node,
+        Found::Absent | Found::Pending => panic!("both real confirmations must be ready"),
+    }
+}
 
 #[test]
 fn two_tabs_decide_one_proposal_and_both_receive_the_original_once_only_decision() {
@@ -59,13 +67,6 @@ fn two_tabs_decide_one_proposal_and_both_receive_the_original_once_only_decision
         .person
         .expect("actual owner");
     let by = format!("Decided by person: {first_person}").into_bytes();
-    use jig_fake_person::{Face, Found, TreeFace};
-    let confirm = |world: &World<Test, Joint>, tab| match TreeFace::new(world.tree(tab))
-        .find(&Find::exactly_named(Role::Button, b"Confirm"))
-    {
-        Found::Node(node) => node,
-        Found::Absent | Found::Pending => panic!("both real confirmations must be ready"),
-    };
     let first_node = confirm(&world, owner);
     let second_node = confirm(&world, other);
     world.fault(crate::Fault::TwoTabs { first: owner, first_node, second: other, second_node });

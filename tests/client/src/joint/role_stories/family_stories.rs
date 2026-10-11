@@ -77,12 +77,16 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
         .store
         .rows
         .values()
-        .filter_map(|row| match row {
-            jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer {
+        .filter_map(|row| {
+            if let jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer {
                 outcome: people::Outcome::GoalStarted { task },
                 ..
-            })) => Some(*task),
-            _ => None,
+            })) = row
+            {
+                Some(*task)
+            } else {
+                None
+            }
         })
         .collect();
     assert_eq!(tasks.len(), 1);
