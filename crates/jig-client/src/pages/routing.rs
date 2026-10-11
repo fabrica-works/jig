@@ -926,6 +926,7 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
             ReadValue::Frame(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
+            | ReadValue::OwnerProposal(_)
             | ReadValue::Escalation(_)
             | ReadValue::Question(_)
             | ReadValue::PersonTask(_)

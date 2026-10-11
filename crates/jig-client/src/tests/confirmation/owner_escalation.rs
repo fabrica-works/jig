@@ -12,7 +12,7 @@ fn row(act: ActKind, reason: HoldCategory) -> OwnerEscalation {
     task.references = List::with_capacity(2);
     task.references.push(OwnerTaskLink::Live(chip(32))).unwrap();
     task.delegates = List::with_capacity(2);
-    task.delegates.push(chip(33)).unwrap();
+    task.delegates.push(LiveDelegate { chip: chip(33), takeover_budget: u64::MAX }).unwrap();
     task.lineage_chips = List::with_capacity(2);
     task.lineage_chips.push(chip(34)).unwrap();
     task.resources = List::with_capacity(2);
@@ -71,7 +71,7 @@ fn owner_escalation_original_reads_keep_whole_task_and_independent_offers_and_re
     assert_eq!(original.task.context, None);
     assert_eq!(original.task.person_revision, Some(Revision { value: 23 }));
     assert_eq!(original.task.dependencies.capacity(), 2);
-    assert_eq!(original.task.delegates.get(0).unwrap().task, 33);
+    assert_eq!(original.task.delegates.get(0).unwrap().chip.task, 33);
     assert_eq!(original.task.references.get(0).unwrap().number(), 32);
     assert!(original.task.result.is_some());
     assert_eq!(object.body.as_ref().unwrap().ending(), None);
@@ -170,7 +170,20 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
 #[test]
 fn owner_escalation_atomic_amend_release_preserves_supplied_reason_and_independent_whole_baseline() {
     let (mut domain, _) = live();
-    let original = row(ActKind::AmendRelease, HoldCategory::Budget);
+    let mut original = row(ActKind::AmendRelease, HoldCategory::Budget);
+    original.acts = offered(
+        ActKind::AmendRelease,
+        Admission::Bounded {
+            within: Bounds::Amend {
+                budget_left: 0,
+                implications: List::with_capacity(0),
+                grants: List::with_capacity(0),
+                authority: Box::new(original.task.authority.clone()),
+                ceiling: Box::new(original.task.authority.clone()),
+            },
+            beyond: Beyond::Refused(Refusal::NotOffered),
+        },
+    );
     let id = install(&mut domain, Body::OwnerEscalation(Box::new(original.clone())));
     intend(&mut domain, id, ActKind::AmendRelease);
     drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
