@@ -354,7 +354,7 @@ pub(super) mod tests {
                     revision: 29,
                     before: documents::PriorPhase::Active(tasks::Active::Running { attempt: 31 }),
                     escalation: None,
-                    tries: tasks::Tries::ZERO,
+                    tries: tasks::Tries::NONE,
                     hold_wait_since: Some(Wall::from_nanos(37)),
                 };
                 let native = held(&source, &limits).expect("whole supplied hold");
@@ -372,7 +372,7 @@ pub(super) mod tests {
                 assert_eq!(native.hold_wait_since, Some(Wall::from_nanos(37)));
                 let mut chip = source_chip();
                 chip.details.hold = Some(source);
-                let (_, metadata) = one(&chip, &Limits { rows: 4, text: 4, ..limits }).unwrap();
+                let metadata = details(&chip.details, &Limits { rows: 4, text: 4, ..limits }).unwrap();
                 assert_eq!(metadata.hold, Some(native));
             }
         }

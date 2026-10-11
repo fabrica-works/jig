@@ -143,7 +143,8 @@ pub fn specification(value: &documents::SpecLine, limits: &Limits) -> Result<cli
             | tasks::PartKind::Result
             | tasks::PartKind::Procedure
             | tasks::PartKind::Effect
-            | tasks::PartKind::Outbox => Err(Invalid::ParameterResource),
+            | tasks::PartKind::Outbox
+            | tasks::PartKind::Hold => Err(Invalid::ParameterResource),
         },
     })?;
     Ok(client::SpecificationDocument {
