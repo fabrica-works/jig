@@ -94,10 +94,8 @@ fn frame_deployment_role_is_independent_of_clipped_project_rows_and_never_inferr
             Some(role) => {
                 assert_eq!(value.projects.get(0).unwrap().project, 0);
                 assert_eq!(value.projects.get(0).unwrap().role, role);
-                let clipped_deployment_admitted = matches!(
-                    make(&core, &limits, 1, &Subject::Deployment, &window()),
-                    Ok(Document::Deployment(_))
-                );
+                let clipped_deployment_admitted =
+                    matches!(make(&core, &limits, 1, &Subject::Deployment, &window()), Ok(Document::Deployment(_)));
                 assert!(clipped_deployment_admitted);
             }
             None => {
