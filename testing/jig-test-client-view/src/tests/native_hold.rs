@@ -225,10 +225,14 @@ fn a_supplied_native_hold_slot_reads_and_renders_its_actual_scoped_account() {
 fn an_absent_native_hold_account_keeps_its_origin_without_opening_a_family_read() {
     let mut root = ready();
     let rows = load(&mut root, task(None));
-    assert!(!rows.iter().any(|row| match row {
-        Request::First(first::Out::Read { .. }) => true,
-        _ => false,
-    }));
+    assert!(
+        rows.iter()
+            .find_map(|row| match row {
+                Request::First(first::Out::Read { read, .. }) => Some(*read),
+                _ => None,
+            })
+            .is_none()
+    );
     let mut view = view();
     patches(&mut view, &root);
     assert!(contains(&view, b"origin/only"));
