@@ -1924,7 +1924,7 @@ fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
         let mut bindings = JigBindings::new(8, CLIENT.text);
         let mut builder = Builder::new(&limits());
         builder.open(Role::Page);
-        crate::cards::common::part(&mut builder, &native, &words, &mut bindings);
+        cards::common::part(&mut builder, &native, &words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
@@ -1934,7 +1934,7 @@ fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
             let legacy = Part::Effect { connector, proposal: ProposalKey { proposer, number: proposal } };
             let mut builder = Builder::new(&limits());
             builder.open(Role::Page);
-            crate::cards::common::part(&mut builder, &legacy, &words, &mut bindings);
+            cards::common::part(&mut builder, &legacy, &words, &mut bindings);
             builder.close();
             let tree = builder.finish();
             let old = tree.nodes().iter().find_map(|node| node.slot).unwrap();
