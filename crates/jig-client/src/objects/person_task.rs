@@ -51,6 +51,7 @@ pub fn owner_facts(object: &Object) -> Option<&crate::contract::OwnerPersonTask>
     }
 }
 /// Positive forms the current person answer schema can express.
+#[expect(clippy::manual_map, reason = "the strict step subset uses explicit Option matches without closures")]
 #[must_use]
 pub fn answer(
     document: &crate::contract::OwnerPersonTask,

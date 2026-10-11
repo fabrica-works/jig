@@ -1,7 +1,6 @@
 #![expect(
     clippy::disallowed_methods,
     clippy::disallowed_types,
-    clippy::wildcard_enum_match_arm,
     reason = "ordinary public-boundary proofs inspect emitted asks and retained documents"
 )]
 use super::{
@@ -91,7 +90,7 @@ fn person_owner_carrier_keeps_full_width_addresses_requesters_wait_options_and_i
             OwnerRequester::Person(u64::MAX),
             OwnerRequester::Deployment { project: u32::MAX },
         ] {
-            for mask in 0..16 {
+            for mask in 0_u8..16 {
                 let mut doc = value(TaskContractDocument::Verdict { choices: List::with_capacity(2), cut: true });
                 doc.task.task = u64::MAX;
                 doc.task.title.cut = true;
@@ -246,7 +245,7 @@ fn person_owner_role_actions_follow_offers_and_missing_metadata_never_uses_page_
         current.acts = List::with_capacity(3);
         reread(&mut d, current);
         assert!(act(&mut d, Act::Confirm).is_empty());
-        assert!(matches!(d.confirmation().unwrap().missing, Some(Missing::Refused { why: Refusal::NotOffered })));
+        assert_eq!(d.confirmation().unwrap().missing, Some(Missing::Refused { why: Refusal::NotOffered }));
         let mut partial = doc.clone();
         partial.task.details = Box::new(ChipPhase::Starting);
         let (mut d, id) = installed(partial);
