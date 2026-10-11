@@ -67,7 +67,7 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
         jig_client_view::Limits::compose(&domain.jig, &jig, u32::try_from(application).unwrap(), 0, owner.depth + 4)
             .unwrap();
     let full_nodes = u64::from(base.nodes) + slots;
-    assert!(u32::try_from(full_nodes).is_ok());
+    u32::try_from(full_nodes).unwrap();
     assert!(full_nodes * u64::from(base.text_per_node) > u64::from(u32::MAX));
     assert!(
         jig_client_view::Limits::compose(
