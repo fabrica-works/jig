@@ -237,8 +237,14 @@ pub use pages::{
 #[must_use]
 pub fn owner_escalation_nodes(l: &Limits) -> Option<u32> {
     // Each input key names only a Result; the executor adds at most one
-    // separately typed PersonTask. The supplied task ending is charged below.
-    let nested = result_nodes(l)?.checked_mul(l.rows)?.checked_add(person_task_nodes(l)?)?;
+    // separately typed PersonTask, whose stored body may use either contract.
+    // The supplied task ending is charged below.
+    let person = person_task_nodes(l)?.max(
+        frame_of_card(l)?
+            .checked_add(crate::owner_person_task::max_nodes(l)?)?
+            .checked_add(crate::owner_person_task::controls_nodes(l)?)?,
+    );
+    let nested = result_nodes(l)?.checked_mul(l.rows)?.checked_add(person)?;
     frame_of_card(l)?
         .checked_add(chip_nodes(l)?)?
         .checked_add(crate::owner_chip::max_nodes(l)?)?
