@@ -1931,16 +1931,16 @@ fn connector_effect_slots_keep_raw_numbers_separate_from_jig_proposal_makers() {
         assert_eq!(slot.owner, crate::Owner::Side { connector });
         assert_eq!(bindings.part(slot.token), Some(&native));
         for proposer in [Proposer::Task(proposal), Proposer::Party(proposal)] {
-            let legacy = Part::Effect { connector, proposal: ProposalKey { proposer, number: proposal } };
+            let maker_effect = Part::Effect { connector, proposal: ProposalKey { proposer, number: proposal } };
             let mut builder = Builder::new(&limits());
             builder.open(Role::Page);
-            cards::common::part(&mut builder, &legacy, &words, &mut bindings);
+            cards::common::part(&mut builder, &maker_effect, &words, &mut bindings);
             builder.close();
             let tree = builder.finish();
             let old = tree.nodes().iter().find_map(|node| node.slot).unwrap();
             assert_eq!(old.owner, slot.owner);
             assert_ne!(old.token, slot.token);
-            assert_eq!(bindings.part(old.token), Some(&legacy));
+            assert_eq!(bindings.part(old.token), Some(&maker_effect));
             assert_eq!(bindings.part(slot.token), Some(&native));
         }
         bindings.begin();
