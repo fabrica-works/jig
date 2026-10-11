@@ -66,7 +66,7 @@ fn whole_read_bytes(row: &OwnerEscalation, bounds: &Bounds) -> u64 {
     u64::try_from(size_of::<ReadValue>()).unwrap()
         + u64::try_from(size_of::<OwnerEscalation>()).unwrap()
         + u64::try_from(size_of::<Task>()).unwrap()
-        + row.task.heap(bounds).unwrap()
+        + row.task.as_ref().heap(bounds).unwrap()
         + crate::offered::heap(&row.acts, bounds).unwrap()
 }
 
