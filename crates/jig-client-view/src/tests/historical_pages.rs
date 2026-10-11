@@ -134,7 +134,17 @@ fn historical_ended_view_keeps_all_owner_causes_requesters_optional_times_loss_a
                     OwnerChipEnding::Cancelled { .. } => {
                         assert!(has(&tree, b"actual cancellation"));
                         assert!(has(&tree, b"actual result"));
-                        assert!(has(&tree, b"18446744073709551615"));
+                        let requester = match by {
+                            OwnerRequester::Task(_) => b"Cancellation requester task: 18446744073709551615".as_slice(),
+                            OwnerRequester::Person(_) => {
+                                b"Cancellation requester person: 18446744073709551615".as_slice()
+                            }
+                            OwnerRequester::Deployment { .. } => {
+                                b"Cancellation requester deployment project: 4294967295".as_slice()
+                            }
+                        };
+                        assert!(has(&tree, requester));
+                        assert!(has(&tree, b"Cancelled at: 18446744073709551615"));
                     }
                 }
                 assert!(tree.nodes().iter().all(|n| n.key.is_none()));

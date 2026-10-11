@@ -84,7 +84,8 @@ fn ended_read() -> (Domain, Token) {
         .unwrap();
     let mut task = super::confirmation::task();
     task.chip.phase = Phase::Done;
-    task.delegates = rows([objects::chip(9)]);
+    task.delegates = rows([LiveDelegate { chip: objects::chip(9), takeover_budget: 0 }]);
+    task.chip.details = Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH });
     let out =
         drive(&mut d, Time::ZERO, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) });
     let token = out
