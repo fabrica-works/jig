@@ -607,6 +607,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 ReadValue::PersonTask(row) => row.ending.is_some(),
                 ReadValue::Frame(_)
                 | ReadValue::Ended(_)
+                | ReadValue::OwnerEnded(_)
                 | ReadValue::History(_)
                 | ReadValue::Activity(_)
                 | ReadValue::Inbox(_)
@@ -616,6 +617,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::Conversations(_)
                 | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
+                | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => false,
@@ -635,6 +637,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)
                 | ReadValue::Ended(_)
+                | ReadValue::OwnerEnded(_)
                 | ReadValue::History(_)
                 | ReadValue::Activity(_)
                 | ReadValue::Inbox(_)
@@ -644,6 +647,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::Conversations(_)
                 | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
+                | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => {}
