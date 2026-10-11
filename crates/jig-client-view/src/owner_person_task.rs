@@ -127,7 +127,7 @@ fn contract_fits(contract: &TaskContractDocument, l: &Limits) -> Option<()> {
 /// keep their existing envelopes rather than expanding through task pages.
 #[must_use]
 pub fn required(value: &OwnerPersonTask, l: &Limits, words: &Words) -> Option<PersonFragment> {
-    if value.results.capacity() > l.rows || value.acts.capacity() > l.rows {
+    if value.results.capacity() > l.rows || value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS {
         return None;
     }
     chip_fits(&value.task, l, words)?;
@@ -150,7 +150,7 @@ pub fn required(value: &OwnerPersonTask, l: &Limits, words: &Words) -> Option<Pe
         link_fits(&shown.task, l, words)?;
         if let Some(result) = &shown.result {
             chip_fits(&result.task, l, words)?;
-            if result.acts.capacity() > l.rows {
+            if result.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS {
                 return None;
             }
             if let Some(value) = &result.value {

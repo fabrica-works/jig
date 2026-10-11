@@ -14,7 +14,7 @@ impl Payload for OwnerPersonTask {
             .checked_add(self.spec.heap(bounds)?)?
             .checked_add(self.contract.heap(bounds)?)?
             .checked_add(self.results.heap(bounds)?)?
-            .checked_add(self.acts.heap(bounds)?)
+            .checked_add(crate::offered::heap(&self.acts, bounds)?)
     }
 }
 #[must_use]

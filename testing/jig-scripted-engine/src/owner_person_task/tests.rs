@@ -110,7 +110,7 @@ fn person_owner_nested_reserved_overflow_refuses_whole_without_cut_or_missing_re
     v.results = List::with_capacity(4);
     too_large.push(v);
     let mut v = original.clone();
-    v.acts = List::with_capacity(4);
+    v.acts = List::with_capacity(MAX_OFFERED_ACTS.checked_add(1).expect("one offer slot above the ceiling"));
     too_large.push(v);
     let mut v = original.clone();
     v.spec.specification.parameters = List::with_capacity(4);
@@ -128,7 +128,7 @@ fn person_owner_nested_reserved_overflow_refuses_whole_without_cut_or_missing_re
     too_large.push(v);
     let mut v = original.clone();
     v.results.get_mut(1).expect("result row exists").result.as_mut().expect("result exists").acts =
-        List::with_capacity(4);
+        List::with_capacity(MAX_OFFERED_ACTS.checked_add(1).expect("one result offer slot above the ceiling"));
     too_large.push(v);
     let mut v = original.clone();
     v.results.get_mut(1).expect("result row exists").result.as_mut().expect("result exists").value =
@@ -174,4 +174,52 @@ fn person_owner_empty_reserved_results_and_opaque_approval_parts_remain_distinct
     );
     assert!(fits(&v, &Bounds { document_bytes: full, ..b }));
     assert!(!fits(&v, &Bounds { document_bytes: full - 1, ..b }));
+}
+
+#[test]
+fn person_owner_reserved_offer_slots_use_the_closed_ceiling_at_whole_byte_boundaries() {
+    let b = bounds();
+    let mut value = value();
+    let baseline = bytes(&value, &b).expect("initial whole value fits");
+    value.acts = List::with_capacity(MAX_OFFERED_ACTS);
+    value.acts.push(Offered { act: ActKind::Answer, admission: Admission::Allowed }).expect("answer fits");
+    let result = value.results.get_mut(1).expect("second row").result.as_mut().expect("whole result");
+    result.acts = List::with_capacity(MAX_OFFERED_ACTS);
+    result
+        .acts
+        .push(Offered { act: ActKind::MarkSeen, admission: Admission::Refused(Refusal::NotWaiting) })
+        .expect("refused offer fits");
+    let slots = List::<Offered>::worst_case(MAX_OFFERED_ACTS).expect("closed offer slots fit")
+        - List::<Offered>::worst_case(3).expect("initial offer slots fit");
+    let expected = baseline + slots * 2;
+    let original = value.clone();
+    assert_eq!(bytes(&value, &b), Some(expected));
+    assert!(fits(&value, &Bounds { document_bytes: expected, ..b }));
+    assert!(!fits(&value, &Bounds { document_bytes: expected - 1, ..b }));
+    let read = ReadValue::OwnerPersonTask(Box::new(value.clone()));
+    let packet = u64::try_from(size_of::<ReadValue>()).expect("read inline size fits") + expected;
+    assert!(payload::fits(&read, &Bounds { document_bytes: packet, ..b }));
+    assert!(!payload::fits(&read, &Bounds { document_bytes: packet - 1, ..b }));
+    for outer in [false, true] {
+        let mut oversized = value.clone();
+        let capacity = MAX_OFFERED_ACTS.checked_add(1).expect("one above ceiling");
+        if outer {
+            oversized.acts = List::with_capacity(capacity);
+        } else {
+            oversized.results.get_mut(1).expect("second row").result.as_mut().expect("whole result").acts =
+                List::with_capacity(capacity);
+        }
+        let unchanged = oversized.clone();
+        assert!(!fits(&oversized, &b));
+        assert!(!payload::fits(&ReadValue::OwnerPersonTask(Box::new(oversized.clone())), &b));
+        assert_eq!(oversized, unchanged);
+    }
+    value.acts = List::with_capacity(MAX_OFFERED_ACTS);
+    value.results.get_mut(1).expect("second row").result.as_mut().expect("whole result").acts =
+        List::with_capacity(MAX_OFFERED_ACTS);
+    assert_eq!(bytes(&value, &b), Some(expected), "reserved empty slots retain their allocation price");
+    assert_eq!(original.acts.capacity(), MAX_OFFERED_ACTS);
+    assert!(MAX_OFFERED_ACTS > b.rows);
+    value.results = List::with_capacity(b.rows + 1);
+    assert!(!fits(&value, &b), "shown rows retain their independent ceiling");
 }

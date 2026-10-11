@@ -397,3 +397,48 @@ fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_
         Some(Invalid::Holes { id: PersonPhrase::Party.id() })
     );
 }
+
+#[test]
+fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result_rows() {
+    let l = jig_client::Limits { rows: 3, ..client_limits() };
+    let w = words();
+    let mut value = value();
+    value.results = rows([OwnerShownResult {
+        task: OwnerTaskLink::Stored { number: 2, status: None },
+        result: Some(Box::new(result(2))),
+    }]);
+    value.acts = List::with_capacity(MAX_OFFERED_ACTS);
+    for act in [ActKind::HandBack, ActKind::Answer, ActKind::Take] {
+        value.acts.push(Offered { act, admission: Admission::Allowed }).unwrap();
+    }
+    value.results.get_mut(0).unwrap().result.as_mut().unwrap().acts = List::with_capacity(MAX_OFFERED_ACTS);
+    let original = value.clone();
+    assert!(view::required(&value, &l, &w).is_some());
+    let (domain, id) =
+        super::cards_objects::loaded(ObjectKey::PersonTask(8), ReadValue::OwnerPersonTask(Box::new(value.clone())));
+    let cap = Limits::of_words(&l, &w).unwrap();
+    let mut builder = Builder::new(&cap);
+    let mut bindings = JigBindings::new(cap.bindings, l.text);
+    builder.open(Role::Page);
+    assert!(crate::cards::card(&mut builder, &domain, id, &crate::cards::Place::Elsewhere, &w, &mut bindings));
+    builder.close();
+    let tree = builder.finish();
+    assert!(tree.len() <= crate::card_nodes(&l).unwrap() + 1);
+    super::cards_access::check(&tree);
+    for outer in [false, true] {
+        let mut oversized = value.clone();
+        let cap = MAX_OFFERED_ACTS.checked_add(1).unwrap();
+        if outer {
+            oversized.acts = List::with_capacity(cap);
+        } else {
+            oversized.results.get_mut(0).unwrap().result.as_mut().unwrap().acts = List::with_capacity(cap);
+        }
+        let unchanged = oversized.clone();
+        assert!(view::required(&oversized, &l, &w).is_none());
+        assert_eq!(oversized, unchanged);
+    }
+    value.results = List::with_capacity(l.rows + 1);
+    assert!(view::required(&value, &l, &w).is_none());
+    assert_eq!(original.acts.capacity(), MAX_OFFERED_ACTS);
+    assert!(MAX_OFFERED_ACTS > l.rows);
+}
