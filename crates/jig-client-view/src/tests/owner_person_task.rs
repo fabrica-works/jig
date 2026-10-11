@@ -331,7 +331,8 @@ fn person_owner_selected_words_and_total_text_refuse_one_under_whole_requirement
 
 #[expect(
     clippy::arithmetic_side_effects,
-    reason = "ordinary test entry retains the original fixture and one-under dimension arithmetic"
+    clippy::too_many_lines,
+    reason = "ordinary test entry retains the complete original fixture, assertions and one-under arithmetic"
 )]
 fn person_storage_dimension(selected_dimension: Option<usize>) {
     let phrase_limits = PhraseLimits {
