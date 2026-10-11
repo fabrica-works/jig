@@ -183,8 +183,8 @@ fn historical_ended_whole_chip_metadata_prices_reserved_resources_connectors_and
         None,
     );
     let plain = ended_bytes(&source, &bounds).expect("plain whole page");
-    source.rows.get_mut(0).expect("row").chip.details =
-        Box::new(ChipPhase::Owner { phase: OwnerChipPhase::Ended, details: Box::new(metadata.clone()) });
+    *source.rows.get_mut(0).expect("row").chip.details =
+        ChipPhase::Owner { phase: OwnerChipPhase::Ended, details: Box::new(metadata.clone()) };
     let whole = ended_bytes(&source, &bounds).expect("complete metadata page");
     assert_eq!(
         whole,

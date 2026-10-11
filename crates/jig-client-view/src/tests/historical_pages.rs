@@ -1,6 +1,5 @@
 #![expect(
     clippy::disallowed_methods,
-    clippy::disallowed_types,
     reason = "ordinary proofs inspect complete public trees and checked language data"
 )]
 use super::cards::CLIENT;
@@ -269,13 +268,16 @@ fn exact_limits(tree: &Tree, maximum: Limits) -> Limits {
         .iter()
         .enumerate()
         .map(|(at, _)| {
-            1 + tree
-                .nodes()
-                .iter()
-                .enumerate()
-                .take(at)
-                .filter(|(index, node)| index + usize::try_from(node.size).unwrap() > at)
-                .count()
+            1usize
+                .checked_add(
+                    tree.nodes()
+                        .iter()
+                        .enumerate()
+                        .take(at)
+                        .filter(|(index, node)| index.checked_add(usize::try_from(node.size).unwrap()).unwrap() > at)
+                        .count(),
+                )
+                .unwrap()
         })
         .max()
         .unwrap();
@@ -283,8 +285,8 @@ fn exact_limits(tree: &Tree, maximum: Limits) -> Limits {
     Limits {
         nodes: tree.len(),
         depth: u32::try_from(depth).unwrap(),
-        text_per_node: tree.nodes().iter().map(|n| n.text_bytes()).max().unwrap(),
-        text_bytes: tree.nodes().iter().map(|n| n.text_bytes()).sum(),
+        text_per_node: tree.nodes().iter().map(crate::tree::Node::text_bytes).max().unwrap(),
+        text_bytes: tree.nodes().iter().map(crate::tree::Node::text_bytes).sum(),
         bindings: u32::try_from(bindings).unwrap(),
         slots: u32::try_from(tree.nodes().iter().filter(|n| n.slot.is_some()).count()).unwrap(),
         ..maximum

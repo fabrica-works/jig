@@ -79,24 +79,18 @@ impl HistoricalPhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::EndedDelegates => None,
-            Self::EndedRow => Some(HoleKind::Number),
-            Self::At => Some(HoleKind::Wall),
-            Self::AtAbsent => None,
-            Self::FundingHistory => None,
-            Self::PeriodAbsent => None,
-            Self::Began => Some(HoleKind::Wall),
-            Self::Next => Some(HoleKind::Wall),
-            Self::NextAbsent => None,
-            Self::ParentAbsent => None,
-            Self::Parent => None,
-            Self::Made => Some(HoleKind::Number),
-            Self::Open => None,
-            Self::Closed => None,
-            Self::Budget => Some(HoleKind::Amount),
-            Self::Spent => Some(HoleKind::Amount),
-            Self::SpentBelow => Some(HoleKind::Amount),
-            Self::Reserved => Some(HoleKind::Amount),
+            Self::EndedDelegates
+            | Self::AtAbsent
+            | Self::FundingHistory
+            | Self::PeriodAbsent
+            | Self::NextAbsent
+            | Self::ParentAbsent
+            | Self::Parent
+            | Self::Open
+            | Self::Closed => None,
+            Self::EndedRow | Self::Made => Some(HoleKind::Number),
+            Self::At | Self::Began | Self::Next => Some(HoleKind::Wall),
+            Self::Budget | Self::Spent | Self::SpentBelow | Self::Reserved => Some(HoleKind::Amount),
         }
     }
     fn label(self) -> &'static [u8] {
