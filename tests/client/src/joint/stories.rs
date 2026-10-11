@@ -384,3 +384,6 @@ mod historical;
 
 #[path = "people_stories.rs"]
 mod person_stories;
+
+#[path = "role_stories.rs"]
+mod role_stories;
