@@ -620,6 +620,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::Spend(_)
                 | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
+                | ReadValue::OwnerProject(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => false,
             };
@@ -651,6 +652,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::Spend(_)
                 | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
+                | ReadValue::OwnerProject(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_) => {}
             }
