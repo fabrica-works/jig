@@ -137,3 +137,34 @@ fn owner_project_kit_original_public_read_keeps_whole_source_and_rejects_unadmit
     setup.truth.owner_projects.insert(0, value);
     assert!(matches!(Engine::new(setup, 9125), Err(Invalid::Identity)));
 }
+#[test]
+fn owner_project_kit_distinguishes_missing_empty_and_full_width_permission_capacities_and_configured_pool_loss() {
+    let mut value = source();
+    let mut bounds = Bounds { rows: 2, text: 4, document_bytes: u64::MAX, ..Bounds::default() };
+    let absent = owner_project::bytes(&value, &bounds).unwrap();
+    value.policy.permissions = Some(List::with_capacity(2));
+    assert_eq!(owner_project::bytes(&value, &bounds), Some(absent + List::<PolicyPermission>::worst_case(2).unwrap()));
+    value
+        .policy
+        .permissions
+        .as_mut()
+        .unwrap()
+        .push(PolicyPermission { connector: u16::MAX, permission: u16::MAX, role: u32::MAX })
+        .unwrap();
+    value.policy.permissions_cut = true;
+    value.configured_period = u64::MAX;
+    value.configured_pools_cut = true;
+    let whole = value.clone();
+    let bytes = owner_project::bytes(&value, &bounds).unwrap();
+    bounds.document_bytes = bytes;
+    assert!(owner_project::fits(&value, &bounds));
+    bounds.document_bytes -= 1;
+    assert!(!owner_project::fits(&value, &bounds));
+    assert_eq!(value, whole);
+    bounds.document_bytes = u64::MAX;
+    value.policy.permissions = Some(List::with_capacity(3));
+    assert!(!owner_project::fits(&value, &bounds));
+    value = whole;
+    value.configured_pools = List::with_capacity(3);
+    assert!(!owner_project::fits(&value, &bounds));
+}

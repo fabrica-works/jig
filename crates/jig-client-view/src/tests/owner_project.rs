@@ -636,3 +636,150 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render(short))).is_err());
     assert_eq!(value.resources.capacity(), 4);
 }
+fn native_owner(value: OwnerProject) -> Domain {
+    use jig_client::{
+        Event, Request,
+        address::{Address, ProjectSection},
+    };
+    let mut domain = Domain::new(&limits(), 9177);
+    let out = native_drive(
+        &mut domain,
+        Event::Start {
+            address: Address::Project { project: value.number, section: ProjectSection::Settings },
+            kept: List::with_capacity(0),
+            offset: jig_client::boundary::Offset { minutes: 0 },
+        },
+    );
+    native_drive(&mut domain, Event::Hello { versions: VersionRange { first: 1, last: 1 } });
+    let watch = out
+        .iter()
+        .find_map(|request| match request {
+            Request::Open { watch, subject: Subject::Frame } => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let out = native_drive(
+        &mut domain,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+    );
+    let read = out
+        .iter()
+        .find_map(|request| match request {
+            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            _ => None,
+        })
+        .unwrap();
+    native_drive(
+        &mut domain,
+        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) },
+    );
+    domain
+}
+fn owner_page(domain: &Domain) -> (Tree, JigBindings) {
+    let w = words(false);
+    let f = view::worst_case(&limits(), w).unwrap();
+    let mut bound = capacity(f);
+    bound.nodes += 32;
+    bound.text_bytes += 32 * bound.text_per_node;
+    let mut b = Builder::new(&bound);
+    let mut bindings = JigBindings::new(f.bindings, 32);
+    crate::pages::project::project(&mut b, domain, w, &mut bindings);
+    let tree = b.finish();
+    super::cards_access::check(&tree);
+    (tree, bindings)
+}
+#[test]
+fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_preserve_complete_membership_choices() {
+    use jig_client::{Event, Request, action::Act};
+    let mut value = source();
+    value.number = 4;
+    value.cut = false;
+    value.policy.cut = false;
+    value.acts = list(
+        4,
+        [ActKind::MakeService, ActKind::SetPool, ActKind::SetRoles]
+            .map(|act| Offered { act, admission: Admission::Allowed }),
+    );
+    let mut domain = native_owner(value.clone());
+    let (tree, mut bindings) = owner_page(&domain);
+    assert!(
+        tree.nodes()
+            .iter()
+            .all(|node| node.role != Role::TextField || node.name.as_deref() != Some(b"Name".as_slice()))
+    );
+    let selected = tree
+        .nodes()
+        .iter()
+        .filter(|node| node.role == Role::Button)
+        .find_map(|node| {
+            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::Act::Press) {
+                Some(act @ Act::ProjectServiceRole { role: HeldRole::Policy { role: u32::MAX } }) => Some(act),
+                _ => None,
+            })
+        })
+        .unwrap();
+    assert!(native_drive(&mut domain, Event::Act { act: selected }).is_empty());
+    let (tree, mut bindings) = owner_page(&domain);
+    let name = tree
+        .nodes()
+        .iter()
+        .find(|node| node.role == Role::TextField && node.name.as_deref() == Some(b"Name".as_slice()))
+        .unwrap();
+    assert!(name.value.is_none());
+    let act =
+        crate::decode(&mut bindings, name.binding.unwrap().token, crate::Act::Input { value: copy_of(b"") }).unwrap();
+    let Act::ProjectSettings { ask } = &act else { panic!("explicit service request") };
+    assert!(
+        matches!(ask.as_ref(),Ask::MakeService{project:4,name,role:HeldRole::Policy{role:u32::MAX}} if name.bytes().is_empty())
+    );
+    native_drive(&mut domain, Event::Act { act });
+    let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
+    assert!(
+        matches!(&sent[..],[Request::Send{ask,..}] if matches!(ask.as_ref(),Ask::MakeService {project:4,role:HeldRole::Policy{role:u32::MAX},name} if name.bytes().is_empty()))
+    );
+    let mut domain = native_owner(value.clone());
+    let (tree, mut bindings) = owner_page(&domain);
+    let pool = tree
+        .nodes()
+        .iter()
+        .filter(|node| node.role == Role::TextField)
+        .find_map(|node| {
+            node.binding.and_then(|binding| {
+                match crate::decode(
+                    &mut bindings,
+                    binding.token,
+                    crate::Act::Input { value: copy_of(b"18446744073709551615") },
+                ) {
+                    Some(Act::ProjectSettings { ask })
+                        if matches!(ask.as_ref(), Ask::SetPool { project: 4, party: 0, budget: u64::MAX }) =>
+                    {
+                        Some((node, Act::ProjectSettings { ask }))
+                    }
+                    _ => None,
+                }
+            })
+        })
+        .unwrap();
+    assert!(pool.0.value.is_none());
+    assert!(has(&tree, b"No pool exists for this configured target"));
+    native_drive(&mut domain, Event::Act { act: pool.1 });
+    assert!(domain.project_page().settings.before.is_none());
+    assert_eq!(domain.project_page().settings.pool_period, Some(0));
+    let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
+    assert!(
+        matches!(&sent[..],[Request::Send{ask,..}] if matches!(ask.as_ref(),Ask::SetPool{project:4,party:0,budget:u64::MAX}))
+    );
+    let domain = native_owner(value.clone());
+    let (tree, mut bindings) = owner_page(&domain);
+    let chosen=tree.nodes().iter().filter(|node|node.role==Role::Button).find_map(|node|node.binding.and_then(|binding|{
+        match crate::decode(&mut bindings,binding.token,crate::Act::Press) {
+            Some(Act::ProjectSettings{ask}) if matches!(ask.as_ref(),Ask::SetRoles{holdings,..} if holdings.len()==2 && holdings.get(0).unwrap().role==HeldRole::Observer)=>Some(ask),_=>None
+        }
+    })).unwrap();
+    let Ask::SetRoles { project, holdings } = chosen.as_ref() else { panic!("whole membership request") };
+    assert_eq!(*project, 4);
+    assert_eq!(holdings.capacity(), value.members.capacity());
+    assert_eq!(holdings.get(0).unwrap().party, u64::MAX);
+    assert_eq!(holdings.get(1).unwrap().party, 0);
+    assert_eq!(holdings.get(1).unwrap().role, HeldRole::Owner);
+}
