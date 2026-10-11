@@ -149,6 +149,8 @@ pub enum Word {
     Condition,
     /// State.
     State,
+    /// Native owner effect proposal number, independent of observed state.
+    NativeProposal,
     /// Creation.
     Creation,
     /// Transition.
@@ -244,7 +246,7 @@ pub enum Word {
     DeadlineSeconds,
     ObservedSeconds,
 }
-const ALL: [Word; 121] = [
+const ALL: [Word; 122] = [
     Word::Incidents,
     Word::Environments,
     Word::Incident,
@@ -314,6 +316,7 @@ const ALL: [Word; 121] = [
     Word::Unrecoverable,
     Word::Condition,
     Word::State,
+    Word::NativeProposal,
     Word::Creation,
     Word::Transition,
     Word::Set,
@@ -441,6 +444,7 @@ impl Word {
             Self::Unrecoverable => 66,
             Self::Condition => 67,
             Self::State => 68,
+            Self::NativeProposal => 121,
             Self::Creation => 69,
             Self::Transition => 70,
             Self::Set => 71,
@@ -506,8 +510,8 @@ pub struct Words {
 impl Words {
     #[expect(clippy::too_many_lines, reason = "closed English phrase data is matched exhaustively")]
     pub fn english(connector: u16, text: u32) -> Result<Self, Invalid> {
-        let mut shapes = List::with_capacity(121);
-        let mut phrases = List::with_capacity(121);
+        let mut shapes = List::with_capacity(122);
+        let mut phrases = List::with_capacity(122);
         for word in ALL {
             let (literal, hole) = match word {
                 Word::Incidents => (b"Incidents".as_slice(), None),
@@ -579,6 +583,7 @@ impl Words {
                 Word::Unrecoverable => (b"Outcome cannot be recovered automatically".as_slice(), None),
                 Word::Condition => (b"Condition required".as_slice(), None),
                 Word::State => (b"Observed state: ".as_slice(), Some(HoleKind::Number)),
+                Word::NativeProposal => (b"Proposal number: ".as_slice(), Some(HoleKind::Number)),
                 Word::Creation => (b"Creation".as_slice(), None),
                 Word::Transition => (b"Transition".as_slice(), None),
                 Word::Set => (b"Set".as_slice(), None),
@@ -686,5 +691,5 @@ impl Words {
 }
 #[must_use]
 pub const fn phrase_limits(text: u32) -> PhraseLimits {
-    PhraseLimits { languages: 1, phrases: 121, holes: 1, segments: 242, text_bytes: 8192, hole_bytes: text }
+    PhraseLimits { languages: 1, phrases: 122, holes: 1, segments: 244, text_bytes: 8192, hole_bytes: text }
 }

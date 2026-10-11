@@ -169,10 +169,11 @@ pub fn action(
             saying(b, words, P::Position, &[Hole::Number(u64::from(*position))]);
             saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
         }
-        OwnerProposalAction::ProcedureEffect { part, authority, purpose, .. } => {
+        OwnerProposalAction::ProcedureEffect { part, authority, step, purpose } => {
             saying(b, words, P::Effect, &[]);
             crate::proposed_task::part(b, part, words, bindings);
             crate::owner_authority::document_words(b, authority, words);
+            saying(b, words, P::ProcedureStep, &[Hole::Number(*step)]);
             saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
         }
         OwnerProposalAction::Amend { task, addressed, before, after, reason, release } => {

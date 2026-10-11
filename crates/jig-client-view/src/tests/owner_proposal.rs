@@ -225,6 +225,15 @@ fn owner_proposal_five_whole_actions_keep_effect_coordinates_release_hold_links_
             b"Proposed effect",
         ),
         (
+            OwnerProposalAction::ProcedureEffect {
+                part: part(),
+                authority: authority(),
+                step: u64::MAX,
+                purpose: u64::MAX,
+            },
+            b"Proposed effect",
+        ),
+        (
             OwnerProposalAction::Amend {
                 task: task.clone(),
                 addressed: None,
@@ -259,11 +268,20 @@ fn owner_proposal_five_whole_actions_keep_effect_coordinates_release_hold_links_
             }
         }
         match &v.action {
-            OwnerProposalAction::Effect { .. } | OwnerProposalAction::ProcedureEffect { .. } => {
+            OwnerProposalAction::Effect { .. } => {
                 assert!(has(&tree, b"Effect attempt: 18446744073709551615"));
                 assert!(has(&tree, b"Effect completion: 4294967295"));
                 assert!(has(&tree, b"Effect position: 4294967295"));
                 assert!(has(&tree, b"Effect purpose: 18446744073709551615"));
+                assert_eq!(v.funding.len(), 0);
+                assert!(!has(&tree, b"Funding needed: 0"));
+            }
+            OwnerProposalAction::ProcedureEffect { .. } => {
+                assert!(has(&tree, b"Procedure step: 18446744073709551615"));
+                assert!(has(&tree, b"Effect purpose: 18446744073709551615"));
+                assert!(!has(&tree, b"Effect attempt:"));
+                assert!(!has(&tree, b"Effect completion:"));
+                assert!(!has(&tree, b"Effect position:"));
                 assert_eq!(v.funding.len(), 0);
                 assert!(!has(&tree, b"Funding needed: 0"));
             }

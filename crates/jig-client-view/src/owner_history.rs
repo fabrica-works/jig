@@ -302,10 +302,11 @@ fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings:
                 saying(b, words, phrase, &[Hole::Number(number)]);
             }
         }
-        OwnerRetainedAction::ProcedureEffect { part, authority, purpose, .. } => {
+        OwnerRetainedAction::ProcedureEffect { part, authority, step, purpose } => {
             saying(b, words, P::Effect, &[]);
             crate::proposed_task::part(b, part, words, bindings);
             crate::owner_authority::document_words(b, authority, words);
+            saying(b, words, P::ProcedureStep, &[Hole::Number(*step)]);
             saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
         }
         OwnerRetainedAction::Amend { task, change } => {

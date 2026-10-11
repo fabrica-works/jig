@@ -24,6 +24,7 @@ pub enum ProposalPhrase {
     Completion,
     Position,
     Purpose,
+    ProcedureStep,
     Amend,
     Before,
     After,
@@ -42,7 +43,7 @@ pub enum ProposalPhrase {
     AfterAbsent,
     WaitingSince,
 }
-pub const ALL: [ProposalPhrase; 30] = [
+pub const ALL: [ProposalPhrase; 31] = [
     ProposalPhrase::Proposal,
     ProposalPhrase::Number,
     ProposalPhrase::Project,
@@ -56,6 +57,7 @@ pub const ALL: [ProposalPhrase; 30] = [
     ProposalPhrase::Completion,
     ProposalPhrase::Position,
     ProposalPhrase::Purpose,
+    ProposalPhrase::ProcedureStep,
     ProposalPhrase::Amend,
     ProposalPhrase::Before,
     ProposalPhrase::After,
@@ -93,6 +95,7 @@ impl ProposalPhrase {
                 Self::Completion => 8410,
                 Self::Position => 8411,
                 Self::Purpose => 8412,
+                Self::ProcedureStep => 8430,
                 Self::Amend => 8413,
                 Self::Before => 8414,
                 Self::After => 8415,
@@ -121,6 +124,7 @@ impl ProposalPhrase {
             | Self::Completion
             | Self::Position
             | Self::Purpose
+            | Self::ProcedureStep
             | Self::ReleaseRevision
             | Self::Needed
             | Self::Left
@@ -162,6 +166,7 @@ impl ProposalPhrase {
             Self::Completion => b"Effect completion: ",
             Self::Position => b"Effect position: ",
             Self::Purpose => b"Effect purpose: ",
+            Self::ProcedureStep => b"Procedure step: ",
             Self::Amend => b"Proposed amendment",
             Self::Before => b"Before proposed change",
             Self::After => b"After proposed change",
@@ -185,7 +190,7 @@ impl ProposalPhrase {
 
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut values = List::with_capacity(30);
+    let mut values = List::with_capacity(31);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -197,7 +202,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 }
 #[must_use]
 pub fn language() -> Language {
-    let mut values = List::with_capacity(30);
+    let mut values = List::with_capacity(31);
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase.hole() {
             Some(kind) => Box::new([Segment::Text(copy_of(phrase.label())), Segment::Hole { index: 0, kind }]),

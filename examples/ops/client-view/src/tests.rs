@@ -1400,7 +1400,8 @@ fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_ke
             let status: Vec<_> =
                 tree.nodes().iter().filter(|node| node.role == jig_client_view::Role::Status).collect();
             assert_eq!(status.len(), 1);
-            let expected = if connector == 1 { b"Cannot show this part".as_slice() } else { b"Loading".as_slice() };
+            let expected =
+                if connector == 1 { b"Cannot show this part".as_slice() } else { b"Loading document".as_slice() };
             assert_eq!(status[0].name.as_deref(), Some(expected));
             // Builder::text creates a Text child under the named Status region.
             let text: Vec<_> =
@@ -1410,6 +1411,74 @@ fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_ke
             assert!(tree.len() <= tree_limits.nodes);
         }
     }
+    native_effect_facts_have_distinct_proposal_and_state_labels();
+}
+
+fn native_effect_facts_have_distinct_proposal_and_state_labels() {
+    use infrastructure::native as n;
+    let limits = limits();
+    let (jig_words, _, words) = phrasebooks();
+    let tree_limits = Limits::of(&limits, &jig_words, &words, &words).unwrap().tree;
+    let part = Part::OwnerEffect { connector: 2, proposal: u64::MAX };
+    let mut side = infrastructure::Side::new(&limits.infrastructure, 86);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.infrastructure };
+    let mut out = Queue::with_capacity(infrastructure::max_out(&limits.infrastructure));
+    for event in [
+        infrastructure::Event::Link { link: jig_client::link::Link::Live },
+        infrastructure::Event::Confirmed { party: Some(1) },
+        infrastructure::Event::Show { part: part.clone(), generation: 9, scope: infrastructure::Scope::Project(0) },
+    ] {
+        infrastructure::step(&mut side, &env, event, &mut out);
+    }
+    let mut read = None;
+    while let Some(request) = out.pop() {
+        if let infrastructure::Request::Out(infrastructure::Out::Read { read: found, .. }) = request {
+            read = Some(found);
+        }
+    }
+    let document = infrastructure::Document::Native(Box::new(n::Document {
+        subject: infrastructure::Subject {
+            scope: infrastructure::Scope::Project(0),
+            kind: infrastructure::Kind::OwnerEffect(u64::MAX),
+        },
+        value: n::Value::Effect {
+            proposal: u64::MAX,
+            task: 6,
+            effect: n::Effect::Restart {
+                service: n::Service { environment: Box::from(*b"production"), name: Box::from(*b"checkout") },
+                operation: 77,
+            },
+            description: n::Description {
+                kind: 1,
+                resources: Box::new([]),
+                condition: true,
+                form: n::Form::Set,
+                recovery: n::Recovery::Keyed,
+                price: None,
+                state: 17,
+            },
+        },
+    }));
+    infrastructure::step(
+        &mut side,
+        &env,
+        infrastructure::Event::Read {
+            read: read.expect("raw effect subject read"),
+            result: infrastructure::ReadResult::Value(Box::new(document.clone())),
+        },
+        &mut out,
+    );
+    let mut builder = jig_client_view::Builder::new(&tree_limits);
+    builder.open(jig_client_view::Role::Page);
+    let mut bindings = crate::bindings::Bindings::new(tree_limits.bindings, limits.infrastructure.text, 2);
+    crate::infrastructure::part(&mut builder, &side, &part, 9, &words, &jig_words, &mut bindings);
+    builder.close();
+    let tree = builder.finish();
+    let text: Vec<_> = tree.nodes().iter().flat_map(|node| node.text.iter()).map(|run| run.text.as_ref()).collect();
+    assert!(text.contains(&b"Proposal number: 18446744073709551615".as_slice()));
+    assert!(text.contains(&b"Observed state: 17".as_slice()));
+    assert!(!text.contains(&b"Observed state: 18446744073709551615".as_slice()));
+    assert_eq!(&side.part(&part).expect("raw effect object").value, &infrastructure::Value::Known(Box::new(document)));
 }
 
 #[test]

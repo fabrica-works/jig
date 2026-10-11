@@ -100,6 +100,20 @@ fn retained_proposal_batch_fragment_keeps_full_nested_values_in_every_state_with
 #[test]
 fn retained_proposal_effect_fragment_keeps_full_width_raw_coordinates_in_every_state_without_scope() {
     states(actions().into_iter().nth(1).unwrap());
+    let action = OwnerRetainedAction::ProcedureEffect {
+        part: part(),
+        authority: state().authority,
+        step: u64::MAX,
+        purpose: u64::MAX,
+    };
+    states(action.clone());
+    let words = normal_words();
+    let (tree, _, _) = bare(&proposal(action), words);
+    saying(&tree, words, P::ProcedureStep, &[Hole::Number(u64::MAX)]);
+    saying(&tree, words, P::Purpose, &[Hole::Number(u64::MAX)]);
+    assert!(!has(&tree, b"Effect attempt:"));
+    assert!(!has(&tree, b"Effect completion:"));
+    assert!(!has(&tree, b"Effect position:"));
 }
 #[test]
 fn retained_proposal_amend_fragment_keeps_boxed_optional_replacements_in_every_state() {

@@ -868,7 +868,8 @@ fn native_document(
         }
         V::Effect { proposal, task, effect, description } => {
             words.text(builder, Word::Task, &[Hole::Number(*task)]);
-            words.text(builder, Word::State, &[Hole::Number(*proposal)]);
+            words.text(builder, Word::NativeProposal, &[Hole::Number(*proposal)]);
+            words.text(builder, Word::State, &[Hole::Number(description.state)]);
             native_effect(builder, effect, words);
             words.text(builder, Word::Kind, &[Hole::Number(u64::from(description.kind))]);
             if let Some(price) = description.price {

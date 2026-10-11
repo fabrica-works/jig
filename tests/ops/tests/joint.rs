@@ -37,17 +37,7 @@ fn p_accepts_the_restart_from_the_incidents_page() {
     );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
-    let inbox =
-        world.client_with(1, Address::Jig(JigAddress::Inbox { project: None }), fixture::limits(), fixture::client);
     fixture::alert(world.front());
-    world.person(
-        inbox,
-        vec![
-            see(b"Restart service"),
-            Step::Gone { find: Find::text(b"Restart service"), within: Duration::from_secs(8) },
-            see(b"0 need you"),
-        ],
-    );
     world.person(
         p,
         vec![
@@ -71,6 +61,9 @@ fn p_accepts_the_restart_from_the_incidents_page() {
             press(Role::Button, b"Accept"),
             press(Role::Button, b"Confirm"),
             see(b"Accepted"),
+            Step::Go { address: Address::Jig(JigAddress::Inbox { project: None }) },
+            Step::Gone { find: Find::text(b"Restart service"), within: Duration::from_secs(8) },
+            see(b"0 need you"),
             Step::Go { address: Address::Jig(JigAddress::Task { task: 6, section: TaskSection::Panels }) },
             see(b"Restart service"),
             see(b"Restarting"),
