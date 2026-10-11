@@ -24,6 +24,9 @@ pub fn facts(object: &Object) -> Option<&crate::contract::PersonTask> {
 /// Names only the independently decidable facts on this card.
 #[must_use]
 pub fn revision(object: &Object) -> Option<crate::contract::Revision> {
+    if let Some(document) = owner_facts(object) {
+        return Some(document.revision);
+    }
     let document = facts(object)?;
     Some(document.revision)
 }

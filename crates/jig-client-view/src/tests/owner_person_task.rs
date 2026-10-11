@@ -145,7 +145,7 @@ fn person_owner_view_retains_ordered_missing_links_full_results_and_independent_
         b"Some result metadata was omitted",
         b"result explanation",
         b"field/a",
-        b"\\xFF\\x00/",
+        b"\\xFF\\x00\\x2F",
     ] {
         assert!(contains(&tree, text), "missing {text:?}");
     }
@@ -200,7 +200,7 @@ fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_beari
         b"This choice requires fields the person answer cannot carry",
         b"Some contract choices were omitted",
     ] {
-        assert!(contains(&tree, text));
+        assert!(contains(&tree, text), "missing {text:?}");
     }
     let disabled =
         tree.nodes().iter().find(|n| n.role == Role::Choice && n.name.as_deref() == Some(b"Choice code: 7")).unwrap();
@@ -249,12 +249,12 @@ fn person_owner_approval_renders_opaque_parts_without_inventing_application_scop
     for text in [
         b"Person destination: 18446744073709551615".as_slice(),
         b"Taken by person: 18446744073709551615",
-        b"\\xFF\\x00/",
+        b"\\xFF\\x00\\x2F",
         b"a/b",
         b"\\x80\\x00",
         b"Outbox reference",
     ] {
-        assert!(contains(&tree, text));
+        assert!(contains(&tree, text), "missing {text:?}");
     }
     let slot = tree.nodes().iter().find_map(|node| node.slot).unwrap();
     let meaning = bindings.owner_part(slot.token).unwrap();
@@ -293,7 +293,45 @@ fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_
         language: 1,
         offset_minutes: 0,
     };
-    let value = value();
+    let mut value = value();
+    let l = client_limits();
+    value.task.title = doc(&[255; 128]);
+    value.spec.specification.words = doc(&[b'q'; 128]);
+    value.spec.specification.parameters =
+        rows((0..l.rows).map(|name| ParameterDocument::Bytes { name, value: doc(&[255; 128]) }));
+    value.spec.specification.inputs = rows(0..u64::from(l.rows));
+    let contract = TaskContractDocument::Verdict {
+        choices: rows((0..l.rows).map(|code| VerdictChoice {
+            code,
+            words: u32::MAX,
+            followups: u32::MAX,
+            fields: rows((0..l.rows).map(|_| FieldRule { name: copy_of(&[255; 128]), max: u32::MAX })),
+        })),
+        cut: true,
+    };
+    value.contract = contract.clone();
+    value.results = rows((0..l.rows).map(|number| {
+        let number = u64::from(number);
+        let mut result = result(number);
+        result.value = Some(ResultValue::OwnerVerdict {
+            verdict: u32::MAX,
+            words: doc(&[b'w'; 128]),
+            fields: rows((0..l.rows).map(|_| ResultField { name: copy_of(&[255; 128]), value: copy_of(&[128; 128]) })),
+        });
+        let details = result.details.as_mut().unwrap();
+        details.contract = contract.clone();
+        details.delegates = rows((0..l.rows).map(|task| OwnerTaskLink::Live(chip(u64::from(task)))));
+        details.followups =
+            Some(rows((0..l.rows).map(|task| OwnerTaskLink::Retained { chip: chip(u64::from(task)), at: None })));
+        result.acts = List::with_capacity(l.rows);
+        OwnerShownResult {
+            task: OwnerTaskLink::Retained { chip: chip(number), at: None },
+            result: Some(Box::new(result)),
+        }
+    }));
+    value.acts = List::with_capacity(l.rows);
+    let untouched = value.clone();
+    assert!(view::required(&value, &l, &w).is_some());
     let maximum = limits(&w);
     let tree = build(&value, &w, maximum);
     assert!(contains(&tree, b"selected 4294967295"));
@@ -347,7 +385,7 @@ fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_
     let mut over = value.clone();
     over.results = List::with_capacity(9);
     assert!(view::required(&over, &client_limits(), &w).is_none());
-    assert_eq!(value, value.clone());
+    assert_eq!(value, untouched);
     let mut bad = owner_person_task_words::language();
     bad.phrases[1].forms[0].segments = Box::new([Segment::Text(copy_of(b"missing number"))]);
     assert_eq!(

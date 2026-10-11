@@ -14,7 +14,7 @@ use crate::{
     confirm::Missing,
     contract::*,
     fields::Purpose,
-    objects::{Body, Card, Object, Source},
+    objects::{Body, Card, Left, Object, Source},
 };
 use skein_lib::{Duration, Id, List, Queue, Time, Wall};
 fn values<T>(items: impl IntoIterator<Item = T>) -> List<T> {
@@ -309,7 +309,12 @@ fn person_owner_original_read_identity_and_late_answer_remain_separate_from_curr
     let outcome = Outcome::Changed;
     drive(&mut d, Time::ZERO, Event::Answered { request, answer: Answer::Done(outcome.clone()) });
     assert_eq!(crate::objects::person_task::owner_facts(d.objects().get(id).unwrap()), Some(&newer));
-    assert_eq!(d.objects().get(id).unwrap().answer, Some(Answer::Done(outcome)));
-    assert_eq!(d.objects().get(id).unwrap().card, Card::Open);
+    assert_eq!(d.objects().get(id).unwrap().answer, Some(Answer::Done(outcome.clone())));
+    assert_eq!(
+        d.objects().get(id).unwrap().card,
+        Card::Leaving { how: Left::Answered { outcome }, until: Time::from_nanos(5_000_000_000) }
+    );
+    assert_eq!(d.objects().get(id).unwrap().body.as_ref().unwrap().ending(), None);
+    assert_eq!(crate::objects::person_task::revision(d.objects().get(id).unwrap()), Some(Revision { value: 100 }));
     assert!(crate::objects::person_task::facts(d.objects().get(id).unwrap()).is_none());
 }
