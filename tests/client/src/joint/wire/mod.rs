@@ -10,6 +10,8 @@ pub mod deployment;
 pub mod documents;
 pub mod escalations;
 pub mod family;
+pub mod historical;
+mod historical_goal;
 pub mod history;
 pub mod inbox;
 pub mod ledger_pages;

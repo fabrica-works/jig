@@ -17,6 +17,7 @@ pub enum Invalid {
     Document(wire::documents::Invalid),
     Page(wire::pages::Invalid),
     PendingValue,
+    Historical(wire::historical::Invalid),
 }
 
 /// Translate a held answer for its exact original native query.
@@ -120,7 +121,9 @@ pub fn read(
             | documents::Document::Inbox(_)
             | documents::Document::Conversations(_) => return Err(Invalid::PendingValue),
         },
-        reads::Answer::Historical(_) => return Err(Invalid::PendingValue),
+        reads::Answer::Historical(value) => {
+            client::ReadResult::Value(wire::historical::read(what, value, limits).map_err(Invalid::Historical)?)
+        }
     };
     transport.take_reply(to).expect("validated original read route");
     Ok(Incoming::Callback { client, event: Event::Jig(jig_client::Event::Read { read, result }) })
@@ -682,3 +685,7 @@ fn deployment(
 #[cfg(test)]
 #[path = "deployment_packets.rs"]
 mod deployment_tests;
+
+#[cfg(test)]
+#[path = "historical_packets.rs"]
+mod historical_tests;

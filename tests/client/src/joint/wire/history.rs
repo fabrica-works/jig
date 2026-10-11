@@ -100,7 +100,7 @@ pub(super) fn holder(value: tasks::ProposalHolder) -> client::OwnerHistoryHolder
     }
 }
 
-fn proposal(
+pub(super) fn proposal(
     value: &documents::ProposalHistory,
     limits: &Limits,
 ) -> Result<client::OwnerProposalHistory, owner::Invalid> {
