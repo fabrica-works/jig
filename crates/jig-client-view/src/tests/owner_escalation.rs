@@ -241,7 +241,7 @@ fn presence_step(domain: &mut Domain, l: jig_client::Limits, event: Event) -> Ve
 }
 
 fn presence_result(key: ProposalKey) -> Result {
-    let mut result = super::result();
+    let mut result = result();
     result.task.task = 42;
     result.task.details = Box::new(ChipPhase::Waiting { dependencies: list([70, 70]), hold: None });
     result.value = Some(ResultValue::Verdict {
@@ -259,7 +259,7 @@ fn presence_result(key: ProposalKey) -> Result {
 }
 
 fn presence_person(result: &Result, owner: bool) -> ReadValue {
-    let mut original = super::person(PersonContract::Words);
+    let mut original = person(PersonContract::Words);
     original.inputs = list([result.clone(), result.clone()]);
     original.acts = closed_offers(true).acts;
     if !owner {
@@ -332,7 +332,7 @@ fn presence_domain(l: jig_client::Limits, documents: &[(ObjectKey, Option<ReadVa
 }
 
 fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
-    let mut proposal = super::proposal(ProposalAction::Widen { before: super::authority(), after: super::authority() });
+    let mut proposal = proposal(ProposalAction::Widen { before: authority(), after: authority() });
     proposal.acts = closed_offers(true).acts;
     let result = presence_result(proposal.key);
     let mut row = closed_offers(true);
@@ -366,7 +366,7 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     let l = jig_client::Limits { objects: u32::try_from(documents.len()).unwrap(), ..CLIENT };
     let domain = presence_domain(l, &documents);
     let id = domain.objects().find(ObjectKey::Escalation(8)).unwrap();
-    let bound = crate::owner_escalation_nodes(&l).unwrap().checked_add(1).unwrap();
+    let bound = crate::sizes::owner_escalation_nodes(&l).unwrap().checked_add(1).unwrap();
     let allocation = crate::Limits {
         nodes: bound,
         depth: 64,
