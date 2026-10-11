@@ -74,6 +74,15 @@ pub fn escalation_read(source: &documents::Escalation, limits: &Limits) -> Resul
 }
 
 /// # Errors
+/// Refuses any owner fact, reserved allocation or complete Project envelope above bounds.
+pub fn project_read(source: &documents::Project, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+    let value =
+        client::ReadValue::OwnerProject(Box::new(super::projects::document(source, limits).map_err(Invalid::Owner)?));
+    admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
+    Ok(value)
+}
+
+/// # Errors
 /// Refuses any whole pending person work or optional complete shown result above bounds.
 pub fn person_task_read(source: &documents::PersonTask, limits: &Limits) -> Result<client::ReadValue, Invalid> {
     let value = client::ReadValue::OwnerPersonTask(Box::new(

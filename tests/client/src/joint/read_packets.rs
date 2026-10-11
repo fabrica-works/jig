@@ -88,6 +88,7 @@ pub fn read(
                 client::ReadResult::Value(wire::documents::proposal_read(value, limits).map_err(Invalid::Document)?)
             }
             documents::Document::Escalation(value) => escalation(what, value, limits)?,
+            documents::Document::Project(value) => project(what, value, limits)?,
             documents::Document::PersonTask(value) => {
                 let client::Read::PersonTask { task } = what else { return Err(Invalid::OwnerRoute) };
                 if *task != value.task.number {
@@ -114,7 +115,6 @@ pub fn read(
             | documents::Document::Tree(_)
             | documents::Document::Goals(_)
             | documents::Document::Tasks(_)
-            | documents::Document::Project(_)
             | documents::Document::Note(_)
             | documents::Document::Inbox(_)
             | documents::Document::Conversations(_)
@@ -137,6 +137,18 @@ fn escalation(
     }
     Ok(client::ReadResult::Value(wire::documents::escalation_read(value, limits).map_err(Invalid::Document)?))
 }
+
+fn project(what: &client::Read, value: &documents::Project, limits: &Limits) -> Result<client::ReadResult, Invalid> {
+    let client::Read::Project { project } = what else { return Err(Invalid::OwnerRoute) };
+    if *project != value.number {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(wire::documents::project_read(value, limits).map_err(Invalid::Document)?))
+}
+
+#[cfg(test)]
+#[path = "read_projects.rs"]
+mod project_tests;
 
 #[cfg(test)]
 #[path = "read_escalations.rs"]
