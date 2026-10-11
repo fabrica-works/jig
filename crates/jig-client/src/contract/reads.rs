@@ -171,6 +171,8 @@ pub enum ReadValue {
     Result(Box<Result>),
     /// Ended delegate results.
     Ended(Box<ObjectPage>),
+    /// Retained delegate endings without synthetic result details.
+    OwnerEnded(Box<super::OwnerEndedPage>),
     /// History lines.
     History(Box<HistoryPage>),
     /// Committed activity.
@@ -185,6 +187,8 @@ pub enum ReadValue {
     Goals(Box<GoalPage>),
     /// Project spend periods.
     Spend(Box<SpendPage>),
+    /// Retained whole funding records without inferred ledger facts.
+    OwnerSpend(Box<super::OwnerSpendPage>),
     /// A project.
     Project(Box<Project>),
     /// Notes.

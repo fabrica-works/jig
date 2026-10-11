@@ -96,3 +96,6 @@ mod owner_proposal;
 pub use owner_proposal::{OwnerFundingOffer, OwnerProposal, OwnerProposalAction, OwnerProposalWaiting};
 pub mod owner_person_task;
 pub use owner_person_task::{OwnerPersonTask, OwnerShownResult};
+
+pub mod historical_pages;
+pub use historical_pages::*;
