@@ -223,8 +223,8 @@ fn whole_project_keeps_all_resource_roles_members_raw_text_and_independent_sourc
         assert_eq!(actual.part, owner::part(&source.part, &limits()).expect("whole raw resource"));
         let client::OwnerPartKey::Path(path) = &actual.part.key else { panic!("literal path") };
         assert_eq!(path.capacity(), 3);
-        assert_eq!(path.get(0).expect("binary segment").bytes(), &[255, 0]);
-        assert_eq!(path.get(1).expect("slash segment").bytes(), &[b'/']);
+        assert_eq!(path.get(0).expect("binary segment").as_ref(), &[255, 0]);
+        assert_eq!(path.get(1).expect("slash segment").as_ref(), b"/");
     }
     assert_eq!((actual.members.capacity(), actual.members.len()), (8, 5));
     assert_eq!(
@@ -262,8 +262,8 @@ fn project_policy_keeps_raw_bits_literal_patterns_both_guards_and_independent_pe
     let projection = policy.projections.get(0).expect("projection");
     assert_eq!((projection.connector, projection.kind), (u16::MAX, 0));
     assert_eq!(projection.pattern.segments.capacity(), 3);
-    assert_eq!(projection.pattern.segments.get(0).expect("binary").bytes(), &[255, 0]);
-    assert!(matches!(&projection.pattern.last, client::OwnerPatternEnd::Open(value) if value.bytes() == [0, 255]));
+    assert_eq!(projection.pattern.segments.get(0).expect("binary").as_ref(), &[255, 0]);
+    assert!(matches!(&projection.pattern.last, client::OwnerPatternEnd::Open(value) if value.as_ref() == [0, 255]));
     assert_eq!(policy.roles.capacity(), 3);
     let role = policy.roles.get(0).expect("role");
     assert_eq!((role.number, role.period_spend, role.requests, role.decides), (u32::MAX, 17, u16::MAX, u8::MAX));
@@ -341,8 +341,8 @@ fn project_recurring_keeps_both_overlap_policies_whole_batches_reservations_and_
     let original = source.clone();
     let actual = document(&source, &limits()).expect("recurring");
     assert_eq!((actual.recurring.capacity(), actual.recurring.len()), (4, 2));
-    for (index, value) in actual.recurring.iter().enumerate() {
-        let raw = source.recurring.get(index).expect("source recurring");
+    assert_eq!(source.recurring.len(), 2);
+    for (index, (value, raw)) in actual.recurring.iter().zip(source.recurring.iter()).enumerate() {
         assert_eq!(value.chip, chips::chip(&raw.chip, &limits()).expect("whole template chip"));
         assert_eq!((value.key, value.budget), (u32::MAX, 0));
         assert_eq!(
