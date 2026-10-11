@@ -93,6 +93,9 @@ pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     let activity = conversation_nodes(l, 0)?
         .checked_add(runtime(l)?)?
         .checked_add(card_nodes(l)?.checked_mul(2)?)?
+        // The Task owner keeps departing cards alongside each fresh bounded
+        // source, so the shared working-set capacity bounds their union.
+        .checked_add(super::proposal_nodes(l)?.checked_mul(l.objects)?)?
         .checked_add(crate::owner_chip::observation_nodes())?;
     let panels = l
         .rows

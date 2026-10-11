@@ -247,6 +247,19 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
                 super::conversations::runtime(b, client, &context.runtime, words, bindings);
             }
             crate::turns::conversation(b, client, words, bindings);
+            for proposal in &client.task_page().proposals {
+                let key = ObjectKey::Proposal(*proposal);
+                if let Some(id) = client.objects().find(key)
+                    && !crate::turns::shows_object(client.conversation(), key)
+                {
+                    let object = client.objects().get(id).expect("shared proposal exists");
+                    // Source-less cards use the common after-page departure
+                    // region, including its final read and supplied ending.
+                    if !object.sources.is_empty() {
+                        cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
+                    }
+                }
+            }
         }
         Executor::Procedure { .. } => slots(b, doc, TaskSection::Activity, words, bindings),
         Executor::Party { .. } | Executor::Role { .. } => {

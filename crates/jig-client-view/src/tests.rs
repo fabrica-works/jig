@@ -59,3 +59,5 @@ mod owner_deployment;
 mod owner_project;
 
 mod historical_objects;
+
+mod task_proposals;
