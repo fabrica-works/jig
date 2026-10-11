@@ -8,7 +8,7 @@ static HEAP: skein_world::domain::heap::Counting = skein_world::domain::heap::Co
 #[test]
 fn every_night_commit_recovers_one_conditional_scale() {
     // Sweep the one procedure-only story, with one pinned seed. The alert's
-    // selected cuts stay focused; other ops scenarios belong to later.md.
+    // six selected cut positions run in fuzzy_alert_cuts; other scenarios belong to later.md.
     let baseline = night(17, Cut::None);
     for commit in 1..=baseline.outcome().commits {
         let world = night(17, Cut::AfterCommit(commit));

@@ -306,6 +306,25 @@ fn full_value(l: &jig_client::Limits) -> OwnerPersonTask {
 }
 #[test]
 fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_whole_requirements() {
+    person_storage_dimension(0);
+}
+
+#[test]
+fn person_owner_selected_words_and_depth_refuse_one_under_whole_requirements() {
+    person_storage_dimension(1);
+}
+
+#[test]
+fn person_owner_selected_words_and_per_node_text_refuse_one_under_whole_requirements() {
+    person_storage_dimension(2);
+}
+
+#[test]
+fn person_owner_selected_words_and_total_text_refuse_one_under_whole_requirements() {
+    person_storage_dimension(3);
+}
+
+fn person_storage_dimension(selected: usize) {
     let phrase_limits = PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
@@ -375,12 +394,18 @@ fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_
         ..maximum
     };
     assert_eq!(build(&value, &w, exact).len(), nodes);
-    for below in [
+    for (index, below) in [
         Limits { nodes: nodes - 1, ..exact },
         Limits { depth: depth - 1, ..exact },
         Limits { text_per_node: exact.text_per_node - 1, ..exact },
         Limits { text_bytes: exact.text_bytes - 1, ..exact },
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if index != selected {
+            continue;
+        }
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&value, &w, below)))
             .expect_err("one-under storage rejects the whole view");
     }
