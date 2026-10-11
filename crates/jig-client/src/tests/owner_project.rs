@@ -1,7 +1,7 @@
 #![expect(
     clippy::disallowed_methods,
     clippy::disallowed_types,
-    clippy::disallowed_macros,
+    clippy::match_like_matches_macro,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs inspect original read tokens and whole keyed requests"
 )]
@@ -110,7 +110,13 @@ fn live(number: u32) -> (Domain, Token) {
     value.projects = list(2, [super::pages::project(number, false)]);
     delivered(&mut domain, Time::ZERO, f, value);
     let entered = enter(&mut domain, number);
-    assert!(!entered.iter().any(|r| matches!(r, Request::Open { .. })), "settings does not acquire a Project watch");
+    assert!(
+        !entered.iter().any(|r| match r {
+            Request::Open { .. } => true,
+            _ => false,
+        }),
+        "settings does not acquire a Project watch"
+    );
     let token = read(&entered);
     (domain, token)
 }
@@ -244,7 +250,10 @@ fn owner_project_configured_pool_review_keeps_zero_target_distinct_and_refuses_c
     assert_eq!(domain.project_page().settings.pool_period, Some(0));
     assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
     let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-    assert!(matches!(&sent[..], [Request::Send { ask, .. }] if ask.as_ref()==&chosen));
+    assert!(match &sent[..] {
+        [Request::Send { ask, .. }] if ask.as_ref() == &chosen => true,
+        _ => false,
+    });
     let absent = Ask::SetPool { project: 0, party: 0, budget: 113 };
     assert!(owner_form::supported(&value, &absent));
     assert_eq!(owner_form::baseline(&value, &absent), None);
@@ -279,7 +288,10 @@ fn owner_project_permission_review_preserves_full_width_order_and_distinguishes_
     drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) });
     assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
     let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-    assert!(matches!(&sent[..], [Request::Send { ask, .. }] if ask.as_ref()==&chosen));
+    assert!(match &sent[..] {
+        [Request::Send { ask, .. }] if ask.as_ref() == &chosen => true,
+        _ => false,
+    });
     value.policy.permissions = Some(List::with_capacity(2));
     assert_eq!(owner_form::baseline(&value, &chosen), Some(chosen.clone()));
     value.policy.permissions_cut = true;
@@ -314,7 +326,10 @@ fn owner_project_service_requires_explicit_role_before_name_without_emitting_an_
     let chosen = Ask::MakeService { project: 0, name: Text::new(copy_of(b""), LIMITS.text).unwrap(), role };
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) }).is_empty());
     let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-    assert!(matches!(&sent[..], [Request::Send { ask, .. }] if ask.as_ref()==&chosen));
+    assert!(match &sent[..] {
+        [Request::Send { ask, .. }] if ask.as_ref() == &chosen => true,
+        _ => false,
+    });
 }
 
 #[test]

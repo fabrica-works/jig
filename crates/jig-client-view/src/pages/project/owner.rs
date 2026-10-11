@@ -152,10 +152,10 @@ pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<Proje
     {
         return None;
     }
-    if let Some(permissions) = &value.policy.permissions {
-        if permissions.capacity() > l.rows {
-            return None;
-        }
+    if let Some(permissions) = &value.policy.permissions
+        && permissions.capacity() > l.rows
+    {
+        return None;
     }
     crate::owner_amendment::authority_fits(&value.policy.ceiling, l)?;
     for row in &value.policy.roles {
@@ -282,7 +282,7 @@ fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words) {
         match requirement.guard {
             PolicyGuard::Guarded => words.text(b, JigPhrase::PolicyGuarded, &[]),
             PolicyGuard::Observed { freshness } => {
-                words.text(b, JigPhrase::PolicyObserved, &[Hole::Number(freshness.as_nanos())])
+                words.text(b, JigPhrase::PolicyObserved, &[Hole::Number(freshness.as_nanos())]);
             }
         }
         words.text(
@@ -726,6 +726,20 @@ fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client
 /// Show only complete supplied policy replacements, never absent mappings.
 pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     let state = &client.project_page().settings;
+    policy_fields(b, value, state, words, bindings);
+    policy_lists(b, value, state, words, bindings);
+    pool_forms(b, value, state, words, bindings);
+    holding_forms(b, value, state, words, bindings);
+    service_form(b, value, state, words, bindings);
+    review_form(b, client, state, words, bindings);
+}
+fn policy_fields(
+    b: &mut Builder,
+    value: &OwnerProject,
+    state: &owner_form::Form,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let spend = Ask::ChangePolicy {
         project: value.number,
         edit: PolicyEdit::ProjectSpend { period_spend: value.policy.period_spend },
@@ -764,6 +778,14 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
             }
         }
     }
+}
+fn policy_lists(
+    b: &mut Builder,
+    value: &OwnerProject,
+    state: &owner_form::Form,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let requirements = Ask::ChangePolicy {
         project: value.number,
         edit: PolicyEdit::Requirements { requirements: value.policy.requirements.clone() },
@@ -856,7 +878,14 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
             b.close();
         }
     }
-    pool_forms(b, value, state, words, bindings);
+}
+fn holding_forms(
+    b: &mut Builder,
+    value: &OwnerProject,
+    state: &owner_form::Form,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let mut holdings = skein_lib::List::with_capacity(value.members.capacity());
     for member in &value.members {
         holdings
@@ -906,7 +935,8 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
             }
         }
     }
-    service_form(b, value, state, words, bindings);
+}
+fn review_form(b: &mut Builder, client: &Domain, state: &owner_form::Form, words: &Words, bindings: &mut JigBindings) {
     if let Some(ask) = &state.review {
         region(b, words, P::Review, &[]);
         words.text(b, JigPhrase::Before, &[]);
@@ -933,6 +963,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         words.progress(b, intent.progress);
     }
 }
+
 fn pool_forms(
     b: &mut Builder,
     value: &OwnerProject,

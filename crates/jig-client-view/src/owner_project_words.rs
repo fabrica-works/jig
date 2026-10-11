@@ -114,38 +114,34 @@ impl ProjectPhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Project => Some(HoleKind::Number),
-            Self::Resource => None,
-            Self::Owned => None,
-            Self::Participant => None,
-            Self::Unavailable => None,
-            Self::Context => None,
-            Self::Policy => None,
-            Self::PolicyCut => None,
-            Self::ProjectCut => None,
-            Self::EscalationRole => Some(HoleKind::Number),
-            Self::EscalationAbsent => None,
-            Self::PeriodAbsent => None,
-            Self::Member => Some(HoleKind::Number),
-            Self::Person => None,
-            Self::Service => None,
-            Self::Login => None,
-            Self::Name => None,
-            Self::Spend => None,
-            Self::Spent => Some(HoleKind::Amount),
-            Self::Below => Some(HoleKind::Amount),
-            Self::Reserved => Some(HoleKind::Amount),
-            Self::Budget => Some(HoleKind::Amount),
-            Self::PermissionsAbsent => None,
-            Self::Edit => None,
-            Self::Confirm => None,
-            Self::Review => None,
-            Self::Dismiss => None,
-            Self::Remove => Some(HoleKind::Number),
-            Self::ConfiguredPeriod => Some(HoleKind::Number),
-            Self::PoolAbsent => None,
+            Self::Project | Self::EscalationRole | Self::Member | Self::Remove | Self::ConfiguredPeriod => {
+                Some(HoleKind::Number)
+            }
+            Self::Resource
+            | Self::Owned
+            | Self::Participant
+            | Self::Unavailable
+            | Self::Context
+            | Self::Policy
+            | Self::PolicyCut
+            | Self::ProjectCut
+            | Self::EscalationAbsent
+            | Self::PeriodAbsent
+            | Self::Person
+            | Self::Service
+            | Self::Login
+            | Self::Name
+            | Self::Spend
+            | Self::PermissionsAbsent
+            | Self::Edit
+            | Self::Confirm
+            | Self::Review
+            | Self::Dismiss
+            | Self::PoolAbsent => None,
+            Self::Spent | Self::Below | Self::Reserved | Self::Budget => Some(HoleKind::Amount),
         }
     }
+
     fn label(self) -> &'static [u8] {
         match self {
             Self::Project => b"Project",

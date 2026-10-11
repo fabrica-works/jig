@@ -1,7 +1,7 @@
 #![expect(
     clippy::disallowed_methods,
     clippy::disallowed_types,
-    clippy::disallowed_macros,
+    clippy::match_like_matches_macro,
     clippy::wildcard_enum_match_arm,
     reason = "ordinary public proofs inspect complete accessible trees, raw slots and decoded actions"
 )]
@@ -119,6 +119,7 @@ fn template(number: u64) -> ProposedTask {
         cut: true,
     }
 }
+#[expect(clippy::too_many_lines, reason = "complete whole source fixture or ordered public journey proof")]
 fn source() -> OwnerProject {
     let funders = [
         Funder::Task(u64::MAX),
@@ -260,7 +261,7 @@ fn make_words(selected: bool) -> Words {
                 phrases: crate::owner_words::phrase_count(),
                 holes: 4,
                 segments: 10000,
-                text_bytes: 200000,
+                text_bytes: 200_000,
                 hole_bytes: 32,
             },
         )
@@ -485,6 +486,7 @@ fn native_drive(domain: &mut Domain, event: jig_client::Event) -> Vec<jig_client
     result
 }
 #[test]
+#[expect(clippy::too_many_lines, reason = "complete whole source fixture or ordered public journey proof")]
 fn owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and_reviews_before_after_once() {
     use jig_client::{
         Event, Request,
@@ -640,6 +642,7 @@ fn owner_project_public_baselines_preserve_optional_permissions_configured_targe
     assert!(view::required(&value, &limits(), words(false)).is_none());
 }
 #[test]
+#[expect(clippy::assertions_on_result_states, reason = "assert both independent one-under builder refusals")]
 fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_refuses_one_under_without_clipping() {
     let value = source();
     let w = words(false);
@@ -647,7 +650,7 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     let f = view::required(&value, &limits(), w).unwrap();
     let mut bound = capacity(f);
     bound.nodes = tree.len();
-    bound.text_bytes = tree.nodes().iter().map(|node| node.text_bytes()).sum();
+    bound.text_bytes = tree.nodes().iter().map(crate::Node::text_bytes).sum();
     let render = |bound: crate::Limits| {
         let mut b = Builder::new(&bound);
         let mut bindings = JigBindings::new(f.bindings, 32);
@@ -659,10 +662,10 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     assert_eq!(exact.nodes(), tree.nodes());
     let mut short = bound;
     short.nodes -= 1;
-    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render(short))).is_err());
+    assert!(std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| render(short))).is_err());
     let mut short = bound;
     short.text_bytes -= 1;
-    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render(short))).is_err());
+    assert!(std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| render(short))).is_err());
     assert_eq!(value.resources.capacity(), 4);
 }
 fn native_owner(value: OwnerProject) -> Domain {
@@ -708,8 +711,8 @@ fn owner_page(domain: &Domain) -> (Tree, JigBindings) {
     let w = words(false);
     let f = view::worst_case(&limits(), w).unwrap();
     let mut bound = capacity(f);
-    bound.nodes += 32;
-    bound.text_bytes += 32 * bound.text_per_node;
+    bound.nodes = bound.nodes.checked_add(32).unwrap();
+    bound.text_bytes = bound.text_bytes.checked_add(32_u32.checked_mul(bound.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&bound);
     let mut bindings = JigBindings::new(f.bindings, 32);
     crate::pages::project::project(&mut b, domain, w, &mut bindings);
@@ -758,14 +761,24 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
     let act =
         crate::decode(&mut bindings, name.binding.unwrap().token, crate::Act::Input { value: copy_of(b"") }).unwrap();
     let Act::ProjectSettings { ask } = &act else { panic!("explicit service request") };
-    assert!(
-        matches!(ask.as_ref(),Ask::MakeService{project:4,name,role:HeldRole::Policy{role:u32::MAX}} if name.bytes().is_empty())
-    );
+    assert!(match ask.as_ref() {
+        Ask::MakeService { project: 4, name, role: HeldRole::Policy { role: u32::MAX } } if name.bytes().is_empty() =>
+            true,
+        _ => false,
+    });
     native_drive(&mut domain, Event::Act { act });
     let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
-    assert!(
-        matches!(&sent[..],[Request::Send{ask,..}] if matches!(ask.as_ref(),Ask::MakeService {project:4,role:HeldRole::Policy{role:u32::MAX},name} if name.bytes().is_empty()))
-    );
+    assert!(match &sent[..] {
+        [Request::Send { ask, .. }]
+            if match ask.as_ref() {
+                Ask::MakeService { project: 4, role: HeldRole::Policy { role: u32::MAX }, name }
+                    if name.bytes().is_empty() =>
+                    true,
+                _ => false,
+            } =>
+            true,
+        _ => false,
+    });
     let mut domain = native_owner(value.clone());
     let (tree, mut bindings) = owner_page(&domain);
     let pool = tree
@@ -780,7 +793,10 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
                     crate::Act::Input { value: copy_of(b"18446744073709551615") },
                 ) {
                     Some(Act::ProjectSettings { ask })
-                        if matches!(ask.as_ref(), Ask::SetPool { project: 4, party: 0, budget: u64::MAX }) =>
+                        if match ask.as_ref() {
+                            Ask::SetPool { project: 4, party: 0, budget: u64::MAX } => true,
+                            _ => false,
+                        } =>
                     {
                         Some((node, Act::ProjectSettings { ask }))
                     }
@@ -795,16 +811,39 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
     assert!(domain.project_page().settings.before.is_none());
     assert_eq!(domain.project_page().settings.pool_period, Some(0));
     let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
-    assert!(
-        matches!(&sent[..],[Request::Send{ask,..}] if matches!(ask.as_ref(),Ask::SetPool{project:4,party:0,budget:u64::MAX}))
-    );
+    assert!(match &sent[..] {
+        [Request::Send { ask, .. }]
+            if match ask.as_ref() {
+                Ask::SetPool { project: 4, party: 0, budget: u64::MAX } => true,
+                _ => false,
+            } =>
+            true,
+        _ => false,
+    });
     let domain = native_owner(value.clone());
     let (tree, mut bindings) = owner_page(&domain);
-    let chosen=tree.nodes().iter().filter(|node|node.role==Role::Button).find_map(|node|node.binding.and_then(|binding|{
-        match crate::decode(&mut bindings,binding.token,crate::Act::Press) {
-            Some(Act::ProjectSettings{ask}) if matches!(ask.as_ref(),Ask::SetRoles{holdings,..} if holdings.len()==2 && holdings.get(0).unwrap().role==HeldRole::Observer)=>Some(ask),_=>None
-        }
-    })).unwrap();
+    let chosen = tree
+        .nodes()
+        .iter()
+        .filter(|node| node.role == Role::Button)
+        .find_map(|node| {
+            node.binding.and_then(|binding| match crate::decode(&mut bindings, binding.token, crate::Act::Press) {
+                Some(Act::ProjectSettings { ask })
+                    if match ask.as_ref() {
+                        Ask::SetRoles { holdings, .. }
+                            if holdings.len() == 2 && holdings.get(0).unwrap().role == HeldRole::Observer =>
+                        {
+                            true
+                        }
+                        _ => false,
+                    } =>
+                {
+                    Some(ask)
+                }
+                _ => None,
+            })
+        })
+        .unwrap();
     let Ask::SetRoles { project, holdings } = chosen.as_ref() else { panic!("whole membership request") };
     assert_eq!(*project, 4);
     assert_eq!(holdings.capacity(), value.members.capacity());
@@ -814,6 +853,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
 }
 
 #[test]
+#[expect(clippy::too_many_lines, reason = "complete whole source fixture or ordered public journey proof")]
 fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_proposed_review_before_one_keyed_request() {
     use jig_client::{Event, Request, action::Act, address::ProjectSection, fields::Purpose};
     let mut value = source();
@@ -844,14 +884,13 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     let choice = tree
         .nodes()
         .iter()
-        .filter_map(|node| {
+        .find_map(|node| {
             let act = crate::decode(&mut bindings, node.binding?.token, crate::Act::Press)?;
             match act {
                 Act::GoalForm { form } if form.executor == executor => Some(form),
                 _ => None,
             }
         })
-        .next()
         .expect("supplied procedure choice");
     assert_eq!(choice.project, 4);
     assert_eq!(choice.budget, 17);
@@ -860,7 +899,10 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     let words_field = tree.nodes().iter().find(|node| node.role == Role::TextArea).unwrap().binding.unwrap().token;
     let act =
         crate::decode(&mut bindings, words_field, crate::Act::Input { value: copy_of(&[255, 0, b'/', 254]) }).unwrap();
-    assert!(matches!(&act, Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == [255, 0, b'/', 254]));
+    assert!(match &act {
+        Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == [255, 0, b'/', 254] => true,
+        _ => false,
+    });
     native_drive(&mut domain, Event::Act { act });
     for (field, amount) in [
         (crate::pages::project::goals::Field::Budget, b"23".as_slice()),
@@ -872,7 +914,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         let decoded = tree
             .nodes()
             .iter()
-            .filter_map(|node| {
+            .find_map(|node| {
                 crate::decode(&mut bindings, node.binding?.token, crate::Act::Input { value: copy_of(amount) })
             })
             .find(|act| act == &edited)
@@ -884,7 +926,10 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         .nodes()
         .iter()
         .filter_map(|node| crate::decode(&mut bindings, node.binding?.token, crate::Act::Press))
-        .find(|act| matches!(act, Act::Submit { field: Purpose::NewGoal }))
+        .find(|act| match act {
+            Act::Submit { field: Purpose::NewGoal } => true,
+            _ => false,
+        })
         .unwrap();
     assert!(native_drive(&mut domain, Event::Act { act: submit }).is_empty());
     let review = domain.project_page().form.confirmation.as_ref().unwrap();

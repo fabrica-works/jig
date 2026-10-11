@@ -31,41 +31,7 @@ pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     super::heading(b, words, JigPhrase::ProjectPage, &[]);
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]);
     if let Some(doc) = &client.project_page().owner {
-        b.open(Role::Tabs);
-        b.name(&words.say(JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]));
-        for section in [
-            ProjectSection::Overview,
-            ProjectSection::Goals,
-            ProjectSection::Tasks,
-            ProjectSection::Notes,
-            ProjectSection::Settings,
-        ] {
-            let highlighted = match selected {
-                ProjectSection::Resources
-                | ProjectSection::Policy
-                | ProjectSection::Roles
-                | ProjectSection::Spend
-                | ProjectSection::Recurring => section == ProjectSection::Settings,
-                ProjectSection::Overview
-                | ProjectSection::Goals
-                | ProjectSection::Tasks
-                | ProjectSection::Notes
-                | ProjectSection::Settings => selected == section,
-            };
-            super::work::control(
-                b,
-                words,
-                bindings,
-                phrase(section),
-                Act::Go { address: Address::Project { project: number, section } },
-                highlighted,
-            );
-        }
-        b.close();
-        super::work::section(b, words, phrase(selected));
-        owner::section(b, doc, selected, client, words, bindings);
-        b.close();
-        super::excess(b, client, words);
+        genuine(b, client, doc, number, selected, words, bindings);
         return;
     }
     let Some(doc) = &client.project_page().document else {
@@ -286,4 +252,50 @@ fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
             );
         }
     }
+}
+
+fn genuine(
+    b: &mut Builder,
+    client: &Domain,
+    doc: &jig_client::contract::OwnerProject,
+    number: u32,
+    selected: ProjectSection,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    b.open(Role::Tabs);
+    b.name(&words.say(JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]));
+    for section in [
+        ProjectSection::Overview,
+        ProjectSection::Goals,
+        ProjectSection::Tasks,
+        ProjectSection::Notes,
+        ProjectSection::Settings,
+    ] {
+        let highlighted = match selected {
+            ProjectSection::Resources
+            | ProjectSection::Policy
+            | ProjectSection::Roles
+            | ProjectSection::Spend
+            | ProjectSection::Recurring => section == ProjectSection::Settings,
+            ProjectSection::Overview
+            | ProjectSection::Goals
+            | ProjectSection::Tasks
+            | ProjectSection::Notes
+            | ProjectSection::Settings => selected == section,
+        };
+        super::work::control(
+            b,
+            words,
+            bindings,
+            phrase(section),
+            Act::Go { address: Address::Project { project: number, section } },
+            highlighted,
+        );
+    }
+    b.close();
+    super::work::section(b, words, phrase(selected));
+    owner::section(b, doc, selected, client, words, bindings);
+    b.close();
+    super::excess(b, client, words);
 }

@@ -91,52 +91,7 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
             Some(left) => {
                 words.text(b, JigPhrase::PoolLeft, &[Hole::Amount(left)]);
                 cards::common::field(b, client, Purpose::NewGoal, JigPhrase::GoalWords, words, bindings);
-                match admission {
-                    Admission::Bounded { within: Bounds::Goal { charters, procedures, .. }, .. } => {
-                        for charter in charters {
-                            super::goals::choice(
-                                b,
-                                client,
-                                words,
-                                bindings,
-                                doc.number,
-                                GoalExecutor::Charter(*charter),
-                                left,
-                            );
-                        }
-                        for procedure in procedures {
-                            super::goals::choice(
-                                b,
-                                client,
-                                words,
-                                bindings,
-                                doc.number,
-                                GoalExecutor::Procedure { connector: procedure.connector, code: procedure.code },
-                                left,
-                            );
-                        }
-                    }
-                    Admission::Allowed | Admission::Proposed { .. } => {
-                        if let Some(frame) = &client.frame().document {
-                            for project in &frame.charters {
-                                if project.project == doc.number {
-                                    for charter in &project.goals {
-                                        super::goals::choice(
-                                            b,
-                                            client,
-                                            words,
-                                            bindings,
-                                            doc.number,
-                                            GoalExecutor::Charter(charter.number),
-                                            left,
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Admission::Refused(_) | Admission::Bounded { within: Bounds::Amend { .. }, .. } => {}
-                }
+                choices(b, client, doc, admission, left, words, bindings);
                 inputs(b, client, doc.number, admission, left, words, bindings);
             }
             None => words.text(b, JigPhrase::FramePoolUnopened, &[]),
@@ -157,6 +112,55 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
     }
     if let Some(answer) = &state.answer {
         words.outcome(b, answer);
+    }
+}
+
+fn choices(
+    b: &mut Builder,
+    client: &Domain,
+    doc: &OwnerProject,
+    admission: &Admission,
+    left: u64,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    match admission {
+        Admission::Bounded { within: Bounds::Goal { charters, procedures, .. }, .. } => {
+            for charter in charters {
+                super::goals::choice(b, client, words, bindings, doc.number, GoalExecutor::Charter(*charter), left);
+            }
+            for procedure in procedures {
+                super::goals::choice(
+                    b,
+                    client,
+                    words,
+                    bindings,
+                    doc.number,
+                    GoalExecutor::Procedure { connector: procedure.connector, code: procedure.code },
+                    left,
+                );
+            }
+        }
+        Admission::Allowed | Admission::Proposed { .. } => {
+            if let Some(frame) = &client.frame().document {
+                for project in &frame.charters {
+                    if project.project == doc.number {
+                        for charter in &project.goals {
+                            super::goals::choice(
+                                b,
+                                client,
+                                words,
+                                bindings,
+                                doc.number,
+                                GoalExecutor::Charter(charter.number),
+                                left,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        Admission::Refused(_) | Admission::Bounded { within: Bounds::Amend { .. }, .. } => {}
     }
 }
 
