@@ -64,6 +64,27 @@ fn seven_offers_cross_normal_task_read_and_delivery_whole_with_two_paged_rows() 
         token: Token::new(2),
         event: WatchEvent::Delivered(Delivery::Task(Box::new(value.clone())))
     }));
+    // List equality compares its entries; reserved capacity is a separate fact.
+    let read = outputs
+        .iter()
+        .find_map(|output| match output {
+            Up::Read { token, terminal: ReadResult::Value(ReadValue::Task(document)) } if *token == Token::new(1) => {
+                Some(document)
+            }
+            _ => None,
+        })
+        .unwrap();
+    let delivery = outputs
+        .iter()
+        .find_map(|output| match output {
+            Up::Watch { token, event: WatchEvent::Delivered(Delivery::Task(document)) } if *token == Token::new(2) => {
+                Some(document)
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(read.acts.capacity(), 7);
+    assert_eq!(delivery.acts.capacity(), 7);
     assert_eq!(value, before);
     assert_eq!(value.acts.capacity(), 7);
     assert_eq!(

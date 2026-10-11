@@ -62,7 +62,8 @@ fn every_closed_offer_control_and_whole_refusal_fits_the_public_card_tree_with_t
                     failures
                 },
             };
-            for entry in &mut value.acts {
+            for index in 0..value.acts.len() {
+                let entry = value.acts.get_mut(index).unwrap();
                 entry.admission = Admission::Refused(Refusal::Moved {
                     now: Revision { value: u64::MAX },
                     what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(reason.clone()))) },
