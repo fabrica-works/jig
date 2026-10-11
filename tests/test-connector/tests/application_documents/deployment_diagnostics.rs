@@ -74,7 +74,7 @@ fn deployment_source_keeps_every_outbox_phase_and_true_capacities_with_explicit_
             else {
                 panic!("Deployment remains whole")
             };
-            assert_eq!(outbox.as_slice(), &[original.clone()]);
+            assert_eq!(outbox.as_slice(), std::slice::from_ref(&original));
             assert_eq!(outbox.capacity(), jig_test_connector_world::LIMITS.entries);
             assert_eq!(subject_limit, jig_test_connector_world::LIMITS.values);
             assert_eq!(staged_limit, jig_test_connector_world::LIMITS.staged);
