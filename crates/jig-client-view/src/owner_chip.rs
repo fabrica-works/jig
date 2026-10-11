@@ -440,6 +440,11 @@ pub(crate) fn ending(
 /// A borrowed `Domain` is used only by the existing supplied `ResultValue` fragment.
 pub fn render(b: &mut Builder, value: &OwnerChipDetails, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Region);
+    let name = words
+        .book
+        .say(words.language, P::Project.id(), &[Hole::Number(u64::from(value.project))])
+        .expect("checked chip project and exact supplied number");
+    b.name(&name.text);
     number(b, words, P::Project, u64::from(value.project));
     crate::proposed_task::executor(b, value.executor, words);
     wall(b, words, P::PhaseSince, value.phase_since);
