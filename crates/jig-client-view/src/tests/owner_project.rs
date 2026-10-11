@@ -1019,6 +1019,29 @@ fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects
     assert!(view::required(&value, &limits(), w).is_none());
 }
 
+fn historical_old_spend(before: &Cursor, after: &Cursor) -> SpendPage {
+    SpendPage {
+        rows: list(
+            4,
+            [SpendPeriod {
+                period: 997,
+                budget: Budget {
+                    total: 1061,
+                    own: 1063,
+                    ended: 1067,
+                    reserved: 1069,
+                    left: 1087,
+                    funder: Actor::Task(3),
+                },
+                pools: List::with_capacity(4),
+                tasks: List::with_capacity(4),
+            }],
+        ),
+        before: Some(before.clone()),
+        after: Some(after.clone()),
+        cut: true,
+    }
+}
 fn native_historical_project() -> (Domain, OwnerSpendPage) {
     use jig_client::{
         Event, Request,
@@ -1068,27 +1091,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
         .unwrap();
     let before = Cursor { value: Text::new(copy_of(&[255, 0, 1]), 32).unwrap() };
     let after = Cursor { value: Text::new(copy_of(&[254, 0, 2]), 32).unwrap() };
-    let old = SpendPage {
-        rows: list(
-            4,
-            [SpendPeriod {
-                period: 997,
-                budget: Budget {
-                    total: 1061,
-                    own: 1063,
-                    ended: 1067,
-                    reserved: 1069,
-                    left: 1087,
-                    funder: Actor::Task(3),
-                },
-                pools: List::with_capacity(4),
-                tasks: List::with_capacity(4),
-            }],
-        ),
-        before: Some(before.clone()),
-        after: Some(after.clone()),
-        cut: true,
-    };
+    let old = historical_old_spend(&before, &after);
     native_drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Spend(Box::new(old))) });
     let requests = native_drive(
         &mut domain,
