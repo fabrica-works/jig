@@ -170,7 +170,14 @@ fn settings(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn project_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     let overview = goals(l)?.checked_add(inbox_nodes(l, 0)?)?;
-    overview.max(goals(l)?).max(tasks(l)?).max(notes(l)?).max(settings(l)?).checked_add(24)?.checked_add(slot_nodes)
+    overview
+        .max(goals(l)?)
+        .max(tasks(l)?)
+        .max(notes(l)?)
+        .max(settings(l)?)
+        .max(crate::owner_project::max_nodes(l)?)
+        .checked_add(24)?
+        .checked_add(slot_nodes)
 }
 /// Hosts, accounts, project capacity, refusals and deployment parts.
 #[must_use]

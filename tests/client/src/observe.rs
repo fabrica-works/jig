@@ -140,6 +140,7 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::Spend(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::OwnerSpend(_)
+        | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Deployment(_) => vec![],
     }

@@ -22,6 +22,7 @@ use alloc::boxed::Box;
 use skein_lib::{Env, Id, List, Queue, Token};
 pub mod goals;
 pub mod notes;
+pub mod owner_form;
 /// Selected scope and description search, passed to the notes owner unchanged.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct NoteFilter {
@@ -38,6 +39,8 @@ pub struct ProjectPage {
     pub document: Option<Box<Project>>,
     /// Retained historical funding rows, independent of live project spend.
     pub owner_spend: Option<Box<contract::OwnerSpendPage>>,
+    /// Whole owner facts, with no fabricated earlier document.
+    pub owner: Option<Box<contract::OwnerProject>>,
     pub goals: List<GoalLine>,
     /// The current read window, which may include both live and ended goals.
     pub ended: List<GoalLine>,
@@ -62,12 +65,14 @@ pub struct ProjectPage {
     pub spend_before: Option<Cursor>,
     pub spend_after: Option<Cursor>,
     pub form: goals::FormState,
+    pub settings: owner_form::Form,
 }
 impl ProjectPage {
     pub(crate) fn new(rows: u32) -> Self {
         Self {
             document: None,
             owner_spend: None,
+            owner: None,
             goals: List::with_capacity(rows),
             ended: List::with_capacity(rows),
             listed_goals: List::with_capacity(rows.checked_mul(2).expect("goal source rows fit")),
@@ -89,11 +94,13 @@ impl ProjectPage {
             spend_before: None,
             spend_after: None,
             form: goals::FormState::new(),
+            settings: owner_form::Form::new(),
         }
     }
     pub(crate) fn clear(&mut self) {
         self.document = None;
         self.owner_spend = None;
+        self.owner = None;
         self.goals.clear();
         self.ended.clear();
         self.listed_goals.clear();
@@ -115,6 +122,9 @@ impl ProjectPage {
         self.spend_before = None;
         self.spend_after = None;
         self.form.confirmation = None;
+        self.settings.review = None;
+        self.settings.before = None;
+        self.settings.refused = None;
     }
 }
 /// Number of the currently shown project, never inferred from another page.
@@ -182,6 +192,7 @@ pub(crate) fn document(
         return;
     }
     order_spend(&mut document.spend_lines);
+    domain.project_page.owner = None;
     domain.project_page.document = Some(document);
     goals::sync(domain);
     let section = match domain.address {
@@ -324,7 +335,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     u64::from(limits.rows)
         .checked_mul(limits.document_bytes)?
         .checked_mul(6)?
-        .checked_add(limits.document_bytes.checked_mul(2)?)?
+        .checked_add(limits.document_bytes.checked_mul(4)?)?
         .checked_add(List::<u16>::worst_case(limits.rows)?)?
         .checked_add(List::<GoalLine>::worst_case(limits.rows)?.checked_mul(4)?)?
         .checked_add(List::<TaskLine>::worst_case(limits.rows)?)?
@@ -534,5 +545,15 @@ pub(crate) fn owner_spend(domain: &mut Domain, page: Box<contract::OwnerSpendPag
     domain.project_page.spend_before.clone_from(&page.before);
     domain.project_page.spend_after.clone_from(&page.after);
     domain.project_page.owner_spend = Some(page);
+    domain.changed();
+}
+
+/// Receive only the original project's whole owner value; order stays supplied.
+pub(crate) fn owner_document(domain: &mut Domain, value: Box<contract::OwnerProject>) {
+    if number(domain) != Some(value.number) {
+        return;
+    }
+    domain.project_page.document = None;
+    domain.project_page.owner = Some(value);
     domain.changed();
 }

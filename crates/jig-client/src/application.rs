@@ -172,6 +172,7 @@ pub(crate) fn read_result(
             | ReadValue::Spend(_)
             | ReadValue::OwnerEnded(_)
             | ReadValue::OwnerSpend(_)
+            | ReadValue::OwnerProject(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
             | ReadValue::Deployment(_) => {}

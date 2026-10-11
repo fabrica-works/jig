@@ -456,3 +456,4 @@ pub mod owner_person_task;
 pub mod owner_proposal;
 
 pub mod historical_pages;
+pub mod owner_project;

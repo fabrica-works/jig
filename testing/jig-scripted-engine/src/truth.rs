@@ -13,6 +13,8 @@ pub struct Truth {
     /// Project context for object documents whose client carrier names only a task.
     pub object_projects: BTreeMap<ObjectKey, u32>,
     pub projects: BTreeMap<u32, Project>,
+    /// Whole authentic projects, independent of legacy fixtures.
+    pub owner_projects: BTreeMap<u32, jig_client::contract::OwnerProject>,
     pub deployment: Option<Deployment>,
     pub notes: BTreeMap<u64, Note>,
     pub sources: Vec<Source>,
@@ -98,6 +100,14 @@ impl Truth {
                 return Err(Invalid::Identity);
             }
             Change::Project(Box::new(project.clone())).validate(bounds)?;
+        }
+        for (number, project) in &self.owner_projects {
+            if *number != project.number {
+                return Err(Invalid::Identity);
+            }
+            if !crate::owner_project::fits(project, bounds) {
+                return Err(Invalid::Payload);
+            }
         }
         for (number, note) in &self.notes {
             if *number != note.number {
@@ -266,6 +276,7 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
         | ReadValue::Spend(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::OwnerSpend(_)
+        | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => None,
@@ -294,6 +305,7 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         | ReadValue::Spend(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::OwnerSpend(_)
+        | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
         | ReadValue::Deployment(_) => None,

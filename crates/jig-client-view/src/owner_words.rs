@@ -36,6 +36,8 @@ pub fn phrase_count() -> u32 {
         .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_proposal_words::ALL.len()).expect("proposal phrase count fits"))
         .expect("composed phrase count fits")
+        .checked_add(u32::try_from(crate::owner_project_words::ALL.len()).expect("project phrase count fits"))
+        .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_inbox_words::ALL.len()).expect("Inbox phrase count fits"))
         .expect("composed phrase count fits")
         .checked_add(u32::try_from(crate::owner_person_task_words::ALL.len()).expect("person phrase count fits"))
@@ -101,6 +103,9 @@ pub fn shapes(normal: Box<[PhraseShape]>) -> Box<[PhraseShape]> {
     for shape in crate::historical_pages_words::shapes() {
         result.push(shape).expect("historical shapes fit");
     }
+    for shape in crate::owner_project_words::shapes() {
+        result.push(shape).expect("project shapes fit");
+    }
     result.into_boxed()
 }
 
@@ -161,6 +166,9 @@ pub fn language(normal: Language) -> Language {
     for phrase in crate::historical_pages_words::language().phrases {
         phrases.push(phrase).expect("historical words fit");
     }
+    for phrase in crate::owner_project_words::language().phrases {
+        phrases.push(phrase).expect("project words fit");
+    }
     Language { plural: normal.plural, span_unit: normal.span_unit, wall: normal.wall, phrases: phrases.into_boxed() }
 }
 
@@ -217,6 +225,9 @@ pub fn phrase_bytes(book: &Phrasebook) -> Option<u32> {
         largest = largest.max(book.capacity(phrase.id())?);
     }
     for phrase in crate::historical_pages_words::ALL {
+        largest = largest.max(book.capacity(phrase.id())?);
+    }
+    for phrase in crate::owner_project_words::ALL {
         largest = largest.max(book.capacity(phrase.id())?);
     }
     Some(largest)

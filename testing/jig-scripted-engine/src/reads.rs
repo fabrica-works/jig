@@ -219,6 +219,9 @@ impl<A: crate::Application> Engine<A> {
             Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
             Read::Result { task } => Some(ObjectKey::Result(*task)),
             Read::Project { project } => {
+                if let Some(value) = self.truth.owner_projects.get(project) {
+                    return self.checked_read(Some(ReadValue::OwnerProject(Box::new(value.clone()))));
+                }
                 return self
                     .checked_read(self.truth.projects.get(project).cloned().map(|v| ReadValue::Project(Box::new(v))));
             }

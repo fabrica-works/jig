@@ -10,6 +10,8 @@ use skein_lib::Token;
 /// A person action already decoded from the semantic tree.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Act {
+    /// Review one whole settings replacement against the supplied Project owner.
+    ProjectSettings { ask: Box<crate::contract::Ask> },
     /// Go to a jig page.
     Go { address: Address },
     /// Edit a field.

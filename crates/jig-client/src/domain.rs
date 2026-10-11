@@ -641,6 +641,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
 }
 fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<Request>) {
     match act {
+        Act::ProjectSettings { ask } => crate::pages::project::owner_form::review(domain, ask),
         Act::Go { address } => {
             crate::confirm::close(domain);
             crate::pages::routing::navigate(domain, env, Place::Jig(address), false, out);
@@ -717,7 +718,13 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
         Act::Again { again } => crate::confirm::again(domain, again),
         Act::Dispose { task, take_over } => crate::confirm::dispose(domain, task, take_over),
         Act::Change { change } => crate::confirm::change(domain, *change),
-        Act::Confirm => confirm_act(domain, out),
+        Act::Confirm => {
+            if domain.project_page.settings.review.is_some() {
+                crate::pages::project::owner_form::send(domain, out);
+            } else {
+                confirm_act(domain, out);
+            }
+        }
         Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out),
         Act::Fold { object, open } => crate::pages::task::fold(domain, object, open),
         Act::Submit { .. } => {}
@@ -811,6 +818,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                     | Subject::Run { .. }
                     | Subject::Deployment => return,
                 },
+                Delivery::OwnerProject(_) => return,
                 Delivery::Frame(_)
                 | Delivery::Task(_)
                 | Delivery::OwnerProposal(_)
@@ -836,6 +844,7 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
                 Owner::Frame => match delivery {
                     Delivery::Frame(frame) => frame_delivery(domain, env, *frame, out),
                     Delivery::Task(_)
+                    | Delivery::OwnerProject(_)
                     | Delivery::OwnerProposal(_)
                     | Delivery::Tree(_)
                     | Delivery::OwnerTree(_)
@@ -1182,6 +1191,11 @@ fn confirm_act(domain: &mut Domain, out: &mut Queue<Request>) {
     }
 }
 fn dismiss_act(domain: &mut Domain) {
+    if domain.project_page.settings.review.take().is_some() {
+        domain.project_page.settings.before = None;
+        domain.changed();
+        return;
+    }
     if domain.project_page.form.confirmation.take().is_some() {
         domain.changed();
     } else if domain.confirming.is_some() {

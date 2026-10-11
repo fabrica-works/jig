@@ -275,7 +275,7 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Frame(_) => {}
+        Delivery::Frame(_) | Delivery::OwnerProject(_) => {}
         Delivery::Run(value) => crate::conversation::routing::stream(domain, env, watch, *value, out),
         Delivery::RunState(value) => crate::conversation::routing::run_state(domain, env, watch, *value, out),
         Delivery::OwnerProposal(proposal) => {
@@ -474,6 +474,7 @@ fn read_value(
 ) {
     match value {
         ReadValue::Frame(_) | ReadValue::OwnerInbox(_) | ReadValue::OwnerEnded(_) | ReadValue::OwnerSpend(_) => {}
+        ReadValue::OwnerProject(value) => crate::pages::project::owner_document(domain, value),
         ReadValue::Notes(page) => crate::pages::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
@@ -605,6 +606,7 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
             | ReadValue::Spend(_)
             | ReadValue::OwnerEnded(_)
             | ReadValue::OwnerSpend(_)
+            | ReadValue::OwnerProject(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
             | ReadValue::Deployment(_) => return true,
@@ -670,6 +672,29 @@ fn received_value(
     match value {
         ReadValue::OwnerEnded(page) => super::task::owner_ended(domain, page),
         ReadValue::OwnerSpend(page) => super::project::owner_spend(domain, page),
+        ReadValue::OwnerProject(value) => match query {
+            Read::Project { project } => {
+                if project == value.number {
+                    crate::pages::project::owner_document(domain, value);
+                }
+            }
+            Read::Frame
+            | Read::Task { .. }
+            | Read::Proposal { .. }
+            | Read::Escalation { .. }
+            | Read::Question { .. }
+            | Read::PersonTask { .. }
+            | Read::Result { .. }
+            | Read::Ended { .. }
+            | Read::History { .. }
+            | Read::Activity { .. }
+            | Read::Inbox { .. }
+            | Read::Conversations { .. }
+            | Read::Goals { .. }
+            | Read::Spend { .. }
+            | Read::Notes { .. }
+            | Read::Deployment => {}
+        },
         ReadValue::OwnerInbox(page) => {
             let group = match &query {
                 Read::Inbox { group, .. } => *group,

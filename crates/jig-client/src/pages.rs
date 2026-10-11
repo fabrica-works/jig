@@ -32,6 +32,8 @@ pub enum Page {
 /// The page policy awaiting a durable keyed answer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum IntentPurpose {
+    /// One offered Project settings replacement.
+    ProjectSettings,
     /// A new chat whose task page opens once made.
     StartChat,
     /// A goal made or proposed from the project board.

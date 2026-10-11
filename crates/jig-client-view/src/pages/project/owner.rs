@@ -1,0 +1,456 @@
+//! Whole authentic Project presentation and supported settings forms; pages.md, 6.
+//! Source order, independent loss and optional ledgers remain the owner's facts.
+use crate::{
+    Builder, JigBindings, JigMeaning, Role, Run, cards,
+    owner_project_words::ProjectPhrase as P,
+    phrases::{Hole, jig::JigPhrase},
+    words::Words,
+};
+use alloc::boxed::Box;
+use jig_client::{
+    Domain, Limits,
+    action::Act,
+    contract::{
+        Ask, OwnerProject, OwnerProjectPolicy, OwnerProjectResourceRole, PartyKind, PolicyEdit, PolicyEditRole,
+        PolicyGuard,
+    },
+    pages::project::owner_form,
+};
+
+/// Complete standalone fragment including bindings and connector slots.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProjectFragment {
+    pub nodes: u32,
+    pub text_bytes: u32,
+    pub text_per_node: u32,
+    pub depth: u32,
+    pub bindings: u32,
+    pub slots: u32,
+}
+/// The single edited channel in a whole supplied request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Field {
+    Spend,
+    Requests,
+    Decides,
+    Name,
+}
+/// Decode the edited channel while preserving every other request value.
+#[must_use]
+pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<Act> {
+    let mut ask = before.clone();
+    match &mut ask {
+        Ask::ChangePolicy { edit, .. } => match edit {
+            PolicyEdit::ProjectSpend { period_spend } => match field {
+                Field::Spend => *period_spend = crate::number(&bytes)?,
+                Field::Requests | Field::Decides | Field::Name => return None,
+            },
+            PolicyEdit::Role(role) => match field {
+                Field::Spend => role.period_spend = crate::number(&bytes)?,
+                Field::Requests => role.requests = u16::try_from(crate::number(&bytes)?).ok()?,
+                Field::Decides => role.decides = u8::try_from(crate::number(&bytes)?).ok()?,
+                Field::Name => return None,
+            },
+            PolicyEdit::Requirements { .. } | PolicyEdit::Projections { .. } | PolicyEdit::Permissions { .. } => {
+                return None;
+            }
+        },
+        Ask::SetPool { budget, .. } => match field {
+            Field::Spend => *budget = crate::number(&bytes)?,
+            Field::Requests | Field::Decides | Field::Name => return None,
+        },
+        Ask::MakeService { name, .. } => match field {
+            Field::Name => *name = jig_client::contract::Text::new(bytes, text).ok()?,
+            Field::Spend | Field::Requests | Field::Decides => return None,
+        },
+        Ask::SetRoles { .. }
+        | Ask::StartChat { .. }
+        | Ask::Write { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Take { .. }
+        | Ask::HandBack { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::Release { .. }
+        | Ask::Amend { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Close { .. }
+        | Ask::TakeOver { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Prioritise { .. }
+        | Ask::MarkSeen { .. }
+        | Ask::EditNote { .. }
+        | Ask::DeleteNote { .. } => return None,
+    }
+    Some(owner_form::action(ask))
+}
+/// Finite full-field envelope, derived from bounded rows and lower renderers.
+#[must_use]
+pub fn max_nodes(l: &Limits) -> Option<u32> {
+    let chip = crate::chip_nodes(l)?.max(crate::owner_chip::max_nodes(l)?);
+    let authority = crate::owner_authority::document_nodes(l.rows)?;
+    let policy = authority
+        .checked_add(6)?
+        .checked_add(authority.checked_add(8)?.checked_mul(l.rows)?)?
+        .checked_add(l.rows.checked_add(12)?.checked_mul(l.rows)?.checked_mul(2)?)?;
+    let recurring = crate::sizes::proposed_task_nodes(l)?
+        .checked_mul(l.rows)?
+        .checked_add(chip)?
+        .checked_add(l.rows.checked_mul(2)?)?
+        .checked_add(18)?
+        .checked_mul(l.rows)?;
+    crate::proposed_task::part_nodes(l)?
+        .checked_add(3)?
+        .checked_mul(l.rows)?
+        .checked_add(policy.checked_mul(3)?)?
+        .checked_add(l.rows.checked_mul(18)?)?
+        .checked_add(chip.checked_add(10)?.checked_mul(l.rows)?)?
+        .checked_add(recurring)?
+        .checked_add(l.rows.checked_mul(16)?)?
+        .checked_add(100)
+}
+/// Every loaded saying and escaped source segment contributes to the envelope.
+#[must_use]
+pub fn worst_case(l: &Limits, words: &Words) -> Option<ProjectFragment> {
+    let nodes = max_nodes(l)?;
+    let mut saying = crate::owner_words::phrase_bytes(&words.book)?;
+    for phrase in crate::phrases::jig::ALL {
+        saying = saying.max(words.book.capacity(phrase.id())?);
+    }
+    let text_per_node = saying.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
+    Some(ProjectFragment {
+        nodes,
+        text_bytes: nodes.checked_mul(text_per_node)?,
+        text_per_node,
+        depth: l.rows.checked_add(32)?,
+        bindings: nodes,
+        slots: nodes,
+    })
+}
+/// Check every reserved row, raw path and nested authority/template before allocation.
+#[must_use]
+pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<ProjectFragment> {
+    if value.acts.capacity() > l.rows
+        || value.resources.capacity() > l.rows
+        || value.members.capacity() > l.rows
+        || value.pools.capacity() > l.rows
+        || value.spend.capacity() > l.rows
+        || value.recurring.capacity() > l.rows
+        || value.policy.roles.capacity() > l.rows
+        || value.policy.requirements.capacity() > l.rows
+        || value.policy.projections.capacity() > l.rows
+    {
+        return None;
+    }
+    crate::owner_amendment::authority_fits(&value.policy.ceiling, l)?;
+    for row in &value.policy.roles {
+        crate::owner_amendment::authority_fits(&row.authority, l)?;
+    }
+    for resource in &value.resources {
+        crate::owner_chip::part_fits(&resource.part, l)?;
+    }
+    for grant in &value.policy.projections {
+        pattern_fits(&grant.pattern, l)?;
+    }
+    for requirement in &value.policy.requirements {
+        pattern_fits(&requirement.pattern, l)?;
+    }
+    for member in &value.members {
+        if !member.login.bytes.fits(l.text) || !member.name.bytes.fits(l.text) {
+            return None;
+        }
+    }
+    for row in &value.spend {
+        chip_fits(&row.chip, l, words)?;
+    }
+    for row in &value.recurring {
+        chip_fits(&row.chip, l, words)?;
+        if row.batch.capacity() > l.rows || row.last_batch.capacity() > l.rows {
+            return None;
+        }
+        for task in &row.batch {
+            crate::owner_history::proposed_fits(task, l)?;
+        }
+    }
+    worst_case(l, words)
+}
+fn pattern_fits(value: &jig_client::contract::OwnerPattern, l: &Limits) -> Option<()> {
+    if value.segments.capacity() > l.rows {
+        return None;
+    }
+    for segment in &value.segments {
+        if u32::try_from(segment.len()).ok()? > l.text {
+            return None;
+        }
+    }
+    let last = match &value.last {
+        jig_client::contract::OwnerPatternEnd::Exact(bytes) | jig_client::contract::OwnerPatternEnd::Open(bytes) => {
+            bytes
+        }
+    };
+    if u32::try_from(last.len()).ok()? > l.text {
+        return None;
+    }
+    Some(())
+}
+fn chip_fits(value: &jig_client::contract::Chip, l: &Limits, words: &Words) -> Option<()> {
+    if !value.title.bytes.fits(l.text) {
+        return None;
+    }
+    match value.details.as_ref() {
+        jig_client::contract::ChipPhase::Owner { details, .. } => {
+            crate::owner_chip::required(details, l, words)?;
+        }
+        jig_client::contract::ChipPhase::Active(_)
+        | jig_client::contract::ChipPhase::Waiting { .. }
+        | jig_client::contract::ChipPhase::Idle { .. }
+        | jig_client::contract::ChipPhase::Starting
+        | jig_client::contract::ChipPhase::Running { .. }
+        | jig_client::contract::ChipPhase::WaitingForWords { .. }
+        | jig_client::contract::ChipPhase::BackingOff { .. }
+        | jig_client::contract::ChipPhase::Procedure { .. }
+        | jig_client::contract::ChipPhase::Person { .. }
+        | jig_client::contract::ChipPhase::Closing(_)
+        | jig_client::contract::ChipPhase::Held { .. }
+        | jig_client::contract::ChipPhase::Ended { .. } => {}
+    }
+    Some(())
+}
+fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
+    let text = words.book.say(words.language, phrase.id(), holes).expect("checked project words").text;
+    b.text(Run::Plain, &text);
+}
+fn region(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
+    b.open(Role::Region);
+    let text = words.book.say(words.language, phrase.id(), holes).expect("checked project region").text;
+    b.name(&text);
+}
+fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words) {
+    region(b, words, P::Policy, &[]);
+    crate::owner_authority::document_words(b, &value.ceiling, words);
+    words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(value.period_spend)]);
+    match value.escalation_role {
+        Some(role) => text(b, words, P::EscalationRole, &[Hole::Number(u64::from(role))]),
+        None => text(b, words, P::EscalationAbsent, &[]),
+    }
+    words.text(b, JigPhrase::PolicyProjections, &[]);
+    for grant in &value.projections {
+        effect(b, grant.connector, grant.kind, words);
+        crate::owner_authority::pattern(b, words, &grant.pattern);
+    }
+    for role in &value.roles {
+        words.text(b, JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]);
+        crate::owner_authority::document_words(b, &role.authority, words);
+        words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(role.period_spend)]);
+        words.text(b, JigPhrase::PolicyRequests, &[Hole::Number(u64::from(role.requests))]);
+        words.text(b, JigPhrase::PolicyDecides, &[Hole::Number(u64::from(role.decides))]);
+    }
+    words.text(b, JigPhrase::PolicyRequirements, &[]);
+    for requirement in &value.requirements {
+        effect(b, requirement.connector, requirement.kind, words);
+        crate::owner_authority::pattern(b, words, &requirement.pattern);
+        words.text(
+            b,
+            JigPhrase::PolicyJudge,
+            &[
+                Hole::Number(u64::from(requirement.judge.connector)),
+                Hole::Number(u64::from(requirement.judge.requirement)),
+                Hole::Number(u64::from(requirement.judge.parameters)),
+            ],
+        );
+        match requirement.guard {
+            PolicyGuard::Guarded => words.text(b, JigPhrase::PolicyGuarded, &[]),
+            PolicyGuard::Observed { freshness } => {
+                words.text(b, JigPhrase::PolicyObserved, &[Hole::Number(freshness.as_nanos())])
+            }
+        }
+        words.text(
+            b,
+            if requirement.must_be_guarded { JigPhrase::PolicyMustGuard } else { JigPhrase::PolicyGuardNotRequired },
+            &[],
+        );
+    }
+    text(b, words, P::PermissionsAbsent, &[]);
+    if value.cut {
+        text(b, words, P::PolicyCut, &[]);
+    }
+    b.close();
+}
+fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
+    words.text(b, JigPhrase::PolicyEffect, &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(kind))]);
+}
+/// Render all source facts in order, with connector resource slots left raw.
+pub fn render(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    region(b, words, P::Project, &[Hole::Number(u64::from(value.number))]);
+    for resource in &value.resources {
+        text(b, words, P::Resource, &[]);
+        text(
+            b,
+            words,
+            match resource.role {
+                OwnerProjectResourceRole::Owned => P::Owned,
+                OwnerProjectResourceRole::Participant => P::Participant,
+                OwnerProjectResourceRole::Unavailable => P::Unavailable,
+                OwnerProjectResourceRole::Context => P::Context,
+            },
+            &[],
+        );
+        crate::proposed_task::part(b, &resource.part, words, bindings);
+    }
+    policy(b, &value.policy, words);
+    for member in &value.members {
+        region(b, words, P::Member, &[Hole::Number(member.party)]);
+        text(
+            b,
+            words,
+            match member.kind {
+                PartyKind::Person => P::Person,
+                PartyKind::Service => P::Service,
+            },
+            &[],
+        );
+        words.held_role(b, Some(member.role));
+        text(b, words, P::Login, &[]);
+        crate::literal_segment::render(b, member.login.bytes());
+        crate::document_text::loss(b, &member.login, words);
+        text(b, words, P::Name, &[]);
+        crate::literal_segment::render(b, member.name.bytes());
+        crate::document_text::loss(b, &member.name, words);
+        b.close();
+    }
+    match &value.current_period {
+        Some(ledger) => crate::owner_budget::ledger(b, ledger, words),
+        None => text(b, words, P::PeriodAbsent, &[]),
+    }
+    for ledger in &value.pools {
+        crate::owner_budget::ledger(b, ledger, words);
+    }
+    for spend in &value.spend {
+        region(b, words, P::Spend, &[]);
+        cards::chip::chip(b, client, &spend.chip, words, bindings);
+        crate::proposed_task::funder(b, spend.funder, words);
+        text(b, words, P::Budget, &[Hole::Amount(spend.numbers.budget)]);
+        text(b, words, P::Spent, &[Hole::Amount(spend.numbers.spent)]);
+        text(b, words, P::Below, &[Hole::Amount(spend.numbers.spent_below)]);
+        text(b, words, P::Reserved, &[Hole::Amount(spend.numbers.reserved)]);
+        b.close();
+    }
+    for row in &value.recurring {
+        super::recurring::recurring(b, client, row, words, bindings);
+    }
+    if value.cut {
+        text(b, words, P::ProjectCut, &[]);
+    }
+    b.close();
+}
+fn request_field(b: &mut Builder, ask: &Ask, field: Field, value: u64, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::Textbox);
+    let phrase = match field {
+        Field::Spend => JigPhrase::PolicyPeriodSpend,
+        Field::Requests => JigPhrase::PolicyRequests,
+        Field::Decides => JigPhrase::PolicyDecides,
+        Field::Name => return,
+    };
+    let hole = match field {
+        Field::Spend => Hole::Amount(value),
+        Field::Requests | Field::Decides => Hole::Number(value),
+        Field::Name => return,
+    };
+    b.name(&words.say(phrase, &[hole]));
+    let decimal = skein_lib::Decimal::of(value);
+    b.value(decimal.as_bytes(), 0);
+    b.bind(bindings.insert(JigMeaning::ProjectSetting { ask: Box::new(ask.clone()), field }));
+    b.close();
+}
+fn control(b: &mut Builder, ask: &Ask, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::Button);
+    let label = words.book.say(words.language, P::Edit.id(), &[]).expect("project edit label").text;
+    b.name(&label);
+    b.text(Run::Plain, &label);
+    b.bind(bindings.insert(JigMeaning::Action(owner_form::action(ask.clone()))));
+    b.close();
+}
+/// Show only complete supplied policy replacements, never absent mappings.
+pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    let state = &client.project_page().settings;
+    let spend = Ask::ChangePolicy {
+        project: value.number,
+        edit: PolicyEdit::ProjectSpend { period_spend: value.policy.period_spend },
+    };
+    if owner_form::supported(value, &spend) {
+        request_field(b, &spend, Field::Spend, value.policy.period_spend, words, bindings);
+        control(b, &spend, words, bindings);
+    }
+    for role in &value.policy.roles {
+        if let Some(authority) = role.authority.whole() {
+            let ask = Ask::ChangePolicy {
+                project: value.number,
+                edit: PolicyEdit::Role(PolicyEditRole {
+                    number: role.number,
+                    authority,
+                    period_spend: role.period_spend,
+                    requests: role.requests,
+                    decides: role.decides,
+                }),
+            };
+            if owner_form::supported(value, &ask) {
+                request_field(b, &ask, Field::Spend, role.period_spend, words, bindings);
+                request_field(b, &ask, Field::Requests, u64::from(role.requests), words, bindings);
+                request_field(b, &ask, Field::Decides, u64::from(role.decides), words, bindings);
+                control(b, &ask, words, bindings);
+            }
+        }
+    }
+    if let Some(ask) = &state.review {
+        region(b, words, P::Review, &[]);
+        match ask.as_ref() {
+            Ask::ChangePolicy { edit, .. } => crate::policy_edit::render(b, edit, words),
+            Ask::SetRoles { holdings, .. } => {
+                for row in holdings {
+                    words.actor(b, jig_client::contract::Actor::Party(row.party));
+                    words.held_role(b, Some(row.role));
+                }
+            }
+            Ask::SetPool { party, budget, .. } => {
+                words.actor(b, jig_client::contract::Actor::Party(*party));
+                words.amount(b, *budget);
+            }
+            Ask::MakeService { name, role, .. } => {
+                b.text(Run::Plain, name.bytes());
+                words.held_role(b, Some(*role));
+            }
+            Ask::StartChat { .. }
+            | Ask::Write { .. }
+            | Ask::AnswerQuestion { .. }
+            | Ask::AnswerPerson { .. }
+            | Ask::Take { .. }
+            | Ask::HandBack { .. }
+            | Ask::DecideProposal { .. }
+            | Ask::DecideEscalation { .. }
+            | Ask::Release { .. }
+            | Ask::Amend { .. }
+            | Ask::Stop { .. }
+            | Ask::Cancel { .. }
+            | Ask::Close { .. }
+            | Ask::TakeOver { .. }
+            | Ask::SetGoal { .. }
+            | Ask::Prioritise { .. }
+            | Ask::MarkSeen { .. }
+            | Ask::EditNote { .. }
+            | Ask::DeleteNote { .. } => {}
+        }
+        crate::frame::control(b, words, bindings, Role::Button, JigPhrase::Confirm, &[], Act::Confirm);
+        crate::frame::control(b, words, bindings, Role::Button, JigPhrase::Dismiss, &[], Act::Dismiss);
+        b.close();
+    }
+    if let Some(refused) = &state.refused {
+        words.refusal(b, refused);
+    }
+    if let Some(request) = state.pending {
+        if let Some(intent) = client.intents().get(skein_lib::Id::from_token(request)) {
+            words.progress(b, intent.progress);
+        }
+    }
+}

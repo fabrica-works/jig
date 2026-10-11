@@ -12,6 +12,7 @@ use jig_client::{
 };
 pub mod goals;
 mod notes;
+pub mod owner;
 mod recurring;
 mod tasks;
 /// Show the project document and its selected bounded section.
@@ -28,6 +29,11 @@ pub fn project(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     };
     super::heading(b, words, JigPhrase::ProjectPage, &[]);
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]);
+    if let Some(doc) = &client.project_page().owner {
+        owner::render(b, doc, client, words, bindings);
+        owner::forms(b, doc, client, words, bindings);
+        return;
+    }
     let Some(doc) = &client.project_page().document else {
         words.status(b, JigPhrase::LoadingObject, &[]);
         return;

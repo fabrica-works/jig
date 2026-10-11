@@ -51,6 +51,8 @@ pub fn number(bytes: &[u8]) -> Option<u64> {
 /// A typed meaning belonging to jig's last built tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JigMeaning {
+    /// One typed Project settings field, preserving other whole channels.
+    ProjectSetting { ask: Box<jig_client::contract::Ask>, field: crate::owner_project::Field },
     /// Pressing, submitting or toggling asks this already typed action.
     Action(jig_client::action::Act),
     /// Whole text edits a domain field; submit names that same field.
@@ -119,6 +121,7 @@ impl JigBindings {
                     | JigMeaning::TaskNumber
                     | JigMeaning::Priority
                     | JigMeaning::Amendment { .. }
+                    | JigMeaning::ProjectSetting { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -139,6 +142,7 @@ impl JigBindings {
                     | JigMeaning::TaskNumber
                     | JigMeaning::Priority
                     | JigMeaning::Amendment { .. }
+                    | JigMeaning::ProjectSetting { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -196,6 +200,7 @@ impl JigBindings {
                     | JigMeaning::OwnerPart(_)
                     | JigMeaning::Priority
                     | JigMeaning::Amendment { .. }
+                    | JigMeaning::ProjectSetting { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -212,6 +217,10 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
         if entry.token == token {
             return match &entry.meaning {
                 JigMeaning::Part(_) | JigMeaning::OwnerPart(_) => None,
+                JigMeaning::ProjectSetting { ask, field } => match act {
+                    Act::Input { value } => crate::owner_project::edit(ask, *field, value, view.text_limit),
+                    Act::Press | Act::Submit | Act::Toggle => None,
+                },
                 JigMeaning::GoalField { form, field } => match act {
                     Act::Input { value } => crate::pages::project::goals::edit(*form, *field, &value),
                     Act::Press | Act::Submit | Act::Toggle => None,
