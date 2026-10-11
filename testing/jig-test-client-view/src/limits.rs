@@ -20,15 +20,41 @@ impl Limits {
         if nodes == 0 || slots > nodes {
             return None;
         }
-        let mut limits = Self::of(domain, jig, first)?;
-        if nodes > limits.tree.nodes {
+        let owner = crate::connector_values::requirements(&domain.first.connector, jig)?;
+        let fragment_nodes =
+            family::PART_NODES.max(owner.nodes.checked_add(16)?).max(domain.first.rows.checked_add(2)?);
+        let cards = domain.first.rows.checked_add(1)?;
+        let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(3)?;
+        let mut tree = jig_client_view::Limits::of_words(&domain.jig, jig)?;
+        let jig_nodes = tree.nodes;
+        let jig_cards = u64::from(jig_client_view::card_nodes(&domain.jig)?).checked_mul(u64::from(cards))?;
+        // The complete node ceiling is checked without constructing its storage.
+        // Only the world's declared counts need text and patch capacities in u32.
+        let slot_nodes = u64::from(jig_nodes)
+            .checked_add(jig_cards)?
+            .checked_mul(u64::from(fragment_nodes))?
+            .checked_add(jig_cards)?
+            .checked_add(u64::from(family::NAV_NODES))?;
+        let jig_page = jig_client_view::page_nodes(&domain.jig, 0)?;
+        let full_nodes = u64::from(jig_nodes.checked_sub(jig_page)?)
+            .checked_add(u64::from(jig_page.max(application_nodes)))?
+            .checked_add(slot_nodes)?;
+        if u64::from(nodes) > full_nodes {
             return None;
         }
-        limits.tree.nodes = nodes;
-        limits.tree.bindings = nodes;
-        limits.tree.slots = slots;
-        limits.tree.patches = nodes.checked_mul(5)?;
-        limits.tree.text_bytes = nodes.checked_mul(limits.tree.text_per_node)?;
+        tree.text_per_node = tree
+            .text_per_node
+            .max(first.capacity()?.checked_mul(2)?.checked_add(20)?)
+            .max(owner.text_per_node)
+            .max(jig_client_view::literal_segment::max_bytes(domain.first.text)?);
+        tree.nodes = nodes;
+        tree.depth = tree.depth.checked_add(owner.depth.checked_add(4)?.max(8))?;
+        tree.bindings = nodes;
+        tree.slots = slots;
+        tree.patches = nodes.checked_mul(5)?;
+        tree.text_bytes = nodes.checked_mul(tree.text_per_node)?;
+        tree.drawing_bytes = drawing::BYTES;
+        let limits = Self { tree, text: domain.first.text };
         worst_case(&limits, domain, jig, first)?;
         Some(limits)
     }

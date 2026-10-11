@@ -6,6 +6,7 @@
 )]
 mod connector_values;
 mod family_terminals;
+mod world_limits;
 use crate::{Limits, View, build, decode, words};
 use jig_client::contract::*;
 use jig_client_view::{Act, NodeId, Owner, Patch, Role};
