@@ -1165,6 +1165,7 @@ fn known_deployment_parts_name_actual_capacities_and_deferred_diagnostics_withou
         build(&mut view, &root, &mut patches);
         assert!(contains(&view, b"Loading"));
         assert!(!contains(&view, b"not kept by this connector"));
+        while patches.pop().is_some() {}
         match request {
             Request::Infrastructure(infrastructure::Out::Read { read, subject }) => {
                 assert_eq!(
