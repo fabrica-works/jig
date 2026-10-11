@@ -227,7 +227,7 @@ impl Objects {
     }
     /// Replaces only the facts, preserving one card and its source set.
     pub fn put(&mut self, key: ObjectKey, body: Body) -> bool {
-        if body.key() != key || matches!(&body, Body::Historical(value) if !value.matches(key)) {
+        if !body.matches(key) {
             return false;
         }
         let Some(id) = self.find(key) else {
@@ -235,17 +235,25 @@ impl Objects {
         };
         let object = self.slab.get_mut(id).expect("indexed object exists");
         match &body {
+            Body::Historical(value) => {
+                let project = match &value.value {
+                    crate::contract::OwnerHistoricalValue::Task { document, .. } => Some(document.project),
+                    crate::contract::OwnerHistoricalValue::PersonProposal { proposal, .. } => Some(proposal.project),
+                    crate::contract::OwnerHistoricalValue::Escalation { task, .. } => Some(task.project),
+                    crate::contract::OwnerHistoricalValue::PersonTask { document, .. } => document.project(),
+                    crate::contract::OwnerHistoricalValue::Proposal(_)
+                    | crate::contract::OwnerHistoricalValue::Question { .. } => None,
+                };
+                if let Some(project) = project {
+                    object.project = Some(project);
+                }
+            }
             Body::Task(task) => object.project = Some(task.project),
             Body::OwnerEscalation(value) => object.project = Some(value.task.project),
             Body::Proposal(proposal) => object.project = Some(proposal.project),
             Body::OwnerProposal(proposal) => object.project = Some(proposal.project),
             Body::OwnerPersonTask(task) => object.project = task.project(),
-            Body::Historical(_)
-            | Body::Chip(_)
-            | Body::Escalation(_)
-            | Body::Question(_)
-            | Body::PersonTask(_)
-            | Body::Result(_) => {}
+            Body::Chip(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {}
             Body::Note { project, .. } => object.project = Some(*project),
         }
         match body {
@@ -691,7 +699,7 @@ pub(crate) fn read_card(
     out: &mut skein_lib::Queue<crate::Request>,
 ) {
     use crate::contract::{ReadNone, ReadResult};
-    if let ReadResult::Value(crate::contract::ReadValue::Historical(value)) = &result {
+    if let Some(value) = historical_read(&result) {
         let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
             return;
         };
@@ -755,6 +763,9 @@ pub(crate) fn read_card(
             return;
         }
     }
+    finish_read_card(domain, id, leaving, refreshed);
+}
+fn finish_read_card(domain: &mut crate::Domain, id: Id<Object>, leaving: bool, refreshed: bool) {
     if !leaving {
         let ending = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
             Some(body) => body.terminal(),
@@ -779,9 +790,11 @@ pub(crate) fn read_card(
         domain.changed();
         return;
     }
-    if matches!(domain.objects.get(id).expect("terminal card exists").body.as_ref(),
-        Some(Body::Historical(value)) if !value.is_terminal())
-    {
+    let pending = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
+        Some(body) => body.pending_historical(),
+        None => false,
+    };
+    if pending {
         domain.objects.get_mut(id).expect("terminal card exists").card = Card::Open;
         domain.objects.prune();
         domain.changed();
@@ -798,6 +811,39 @@ pub(crate) fn read_card(
     domain.objects.get_mut(id).expect("terminal card exists").card = Card::Leaving { how, until };
     domain.timers.arm(crate::domain::Timer::Linger(id), until).expect("one linger timer per object fits");
     domain.changed();
+}
+/// The supplied whole historical value, without interpreting any other read.
+pub(crate) fn historical_read(result: &crate::contract::ReadResult) -> Option<&crate::contract::OwnerHistorical> {
+    use crate::contract::{ReadResult, ReadValue};
+    match result {
+        ReadResult::Value(value) => match value {
+            ReadValue::Historical(value) => Some(value),
+            ReadValue::Frame(_)
+            | ReadValue::Task(_)
+            | ReadValue::Proposal(_)
+            | ReadValue::OwnerProposal(_)
+            | ReadValue::Escalation(_)
+            | ReadValue::OwnerEscalation(_)
+            | ReadValue::Question(_)
+            | ReadValue::PersonTask(_)
+            | ReadValue::OwnerPersonTask(_)
+            | ReadValue::Result(_)
+            | ReadValue::Ended(_)
+            | ReadValue::History(_)
+            | ReadValue::Activity(_)
+            | ReadValue::Inbox(_)
+            | ReadValue::OwnerInbox(_)
+            | ReadValue::Conversations(_)
+            | ReadValue::Goals(_)
+            | ReadValue::Spend(_)
+            | ReadValue::OwnerSpend(_)
+            | ReadValue::OwnerEnded(_)
+            | ReadValue::Project(_)
+            | ReadValue::Notes(_)
+            | ReadValue::Deployment(_) => None,
+        },
+        ReadResult::None(_) => None,
+    }
 }
 fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> {
     use crate::contract::ReadValue;
@@ -854,6 +900,39 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
 }
 
 impl Body {
+    fn matches(&self, key: ObjectKey) -> bool {
+        match self {
+            Self::Historical(value) => value.matches(key),
+            Self::Chip(_)
+            | Self::Task(_)
+            | Self::Proposal(_)
+            | Self::OwnerProposal(_)
+            | Self::Escalation(_)
+            | Self::OwnerEscalation(_)
+            | Self::Question(_)
+            | Self::PersonTask(_)
+            | Self::OwnerPersonTask(_)
+            | Self::Result(_)
+            | Self::Note { .. } => self.key() == key,
+        }
+    }
+    fn pending_historical(&self) -> bool {
+        match self {
+            Self::Historical(value) => !value.is_terminal(),
+            Self::Chip(_)
+            | Self::Task(_)
+            | Self::Proposal(_)
+            | Self::OwnerProposal(_)
+            | Self::Escalation(_)
+            | Self::OwnerEscalation(_)
+            | Self::Question(_)
+            | Self::PersonTask(_)
+            | Self::OwnerPersonTask(_)
+            | Self::Result(_)
+            | Self::Note { .. } => false,
+        }
+    }
+
     /// The object named by these facts, validated before replacing a body.
     #[must_use]
     pub fn key(&self) -> ObjectKey {

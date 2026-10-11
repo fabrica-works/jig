@@ -106,7 +106,7 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
         Some(Body::Proposal(value)) => (Some(value.project), Some(value.why.clone())),
         Some(Body::OwnerProposal(value)) => (Some(value.project), Some(value.reason.bytes.clone())),
         Some(Body::Note { project, document }) => (Some(*project), Some(document.description.bytes.clone())),
-        None => (None, None),
+        Some(Body::Historical(_)) | None => (None, None),
     };
     let mut project = project.or(object.project);
     if project.is_none() {

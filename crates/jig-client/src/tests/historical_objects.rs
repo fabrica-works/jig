@@ -141,7 +141,7 @@ fn historical_disappearing_terminal_keeps_each_source_and_ignores_later_compact_
     );
 }
 #[test]
-fn historical_pending_request_and_durable_answer_fences_survive_terminal_read_and_direct_put_rejects_wrong_identity() {
+fn historical_pending_request_and_answered_card_fences_survive_terminal_read_and_direct_put_rejects_wrong_identity() {
     let (mut domain, page) = live();
     let supplied = question(true);
     let key = supplied.key;
@@ -165,4 +165,24 @@ fn historical_pending_request_and_durable_answer_fences_survive_terminal_read_an
     assert!(domain.objects.put(key, Body::Historical(Box::new(supplied))));
     assert_eq!(domain.objects.get(id).unwrap().card, card);
     assert!(domain.objects.named(key, Source::Watch(skein_lib::Id::from_token(page))));
+    // The already durable answered-card fixture is an independent fence.
+    let (mut answered, answered_page) = live();
+    let first = watched(&mut answered, answered_page, &[key]);
+    let read = read_token(&first);
+    let id = answered.objects.find(key).unwrap();
+    let answer = crate::contract::Answer::Done(crate::contract::Outcome::Changed);
+    let card = Card::Leaving {
+        how: Left::Answered { outcome: crate::contract::Outcome::Changed },
+        until: Time::from_nanos(5_000_000_000),
+    };
+    answered.objects.get_mut(id).unwrap().card = card.clone();
+    answered.objects.get_mut(id).unwrap().answer = Some(answer.clone());
+    drive(
+        &mut answered,
+        Time::ZERO,
+        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(question(true)))) },
+    );
+    assert_eq!(answered.objects.get(id).unwrap().card, card);
+    assert_eq!(answered.objects.get(id).unwrap().answer, Some(answer));
+    assert!(answered.objects.get(id).unwrap().body.is_none());
 }

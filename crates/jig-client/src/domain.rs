@@ -626,9 +626,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::ShowObjects { objects } => crate::application::show(domain, env, objects, out),
         Event::ObjectsLeft => crate::application::left(domain, out),
         Event::Read { read, result } => {
-            if matches!(&result, crate::contract::ReadResult::Value(crate::contract::ReadValue::Historical(_)))
-                || crate::objects::is_card_read(domain, read)
-            {
+            if crate::objects::historical_read(&result).is_some() || crate::objects::is_card_read(domain, read) {
                 crate::objects::read_card(domain, read, result, out);
             } else {
                 crate::pages::routing::read_result(domain, env, read, result, out);

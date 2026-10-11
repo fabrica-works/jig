@@ -136,7 +136,8 @@ pub fn reply(
         Some(jig_client::objects::Body::Chip(chip)) => super::chip::chip(b, client, chip, words, bindings),
         Some(jig_client::objects::Body::Task(task)) => super::chip::chip(b, client, &task.chip, words, bindings),
         Some(
-            jig_client::objects::Body::Proposal(_)
+            jig_client::objects::Body::Historical(_)
+            | jig_client::objects::Body::Proposal(_)
             | jig_client::objects::Body::OwnerProposal(_)
             | jig_client::objects::Body::Escalation(_)
             | jig_client::objects::Body::OwnerEscalation(_)
