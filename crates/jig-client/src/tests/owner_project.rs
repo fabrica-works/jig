@@ -9,6 +9,7 @@ use crate::{
     action::Act,
     address::{Address, Place, ProjectSection},
     contract::*,
+    intents::Progress,
     pages::project::owner_form,
 };
 use alloc::vec::Vec;
