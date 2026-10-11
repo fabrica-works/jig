@@ -155,18 +155,15 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
             index = comment_end(bytes, index);
             comment = true;
         } else if names && identifier_byte(bytes[index]) && !bytes[index].is_ascii_digit() {
-            let mut candidate = false;
             while bytes.get(index).is_some_and(|byte| identifier_byte(*byte)) {
-                candidate |= matches!(bytes[index], b't' | b'T')
-                    && bytes.get(index..index + 5).is_some_and(|word| word.eq_ignore_ascii_case(b"typed"));
-                candidate |= matches!(bytes[index], b'l' | b'L')
-                    && bytes.get(index..index + 6).is_some_and(|word| word.eq_ignore_ascii_case(b"legacy"));
-                candidate |= bytes[index] == b'V' && bytes.get(index + 1).is_some_and(u8::is_ascii_digit);
-                candidate |=
-                    bytes.get(index..index + 2) == Some(b"_v") && bytes.get(index + 2).is_some_and(u8::is_ascii_digit);
                 index += 1;
             }
             let name = &source[start..index];
+            let lower = name.to_ascii_lowercase();
+            let stem = name.trim_end_matches(|ch: char| ch.is_ascii_digit());
+            let candidate = lower.contains("typed")
+                || lower.contains("legacy")
+                || (stem.len() < name.len() && (stem.ends_with('V') || stem.ends_with("_v")));
             if candidate && forbidden_name(name) {
                 failures.push(format!("{}:{line}: identifier {name}", path.display()));
             }
@@ -176,8 +173,10 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 index += 1;
             }
         }
-        for (offset, byte) in bytes[start..index].iter().copied().enumerate() {
+        let mut offset = 0;
+        for part in source[start..index].split_inclusive(|ch: char| !ch.is_ascii_alphanumeric()) {
             let at = start + offset;
+            let byte = part.as_bytes()[0];
             if starts[usize::from(byte)] && (at == 0 || !bytes[at - 1].is_ascii_alphanumeric()) {
                 vocabulary_at(path, source, at, words, &mut failures);
             }
@@ -190,9 +189,10 @@ pub(super) fn scan(path: &Path, source: &str, words: &[String], names: bool) -> 
                 let word = &source[at..at + 6];
                 failures.push(format!("{}:{line}: comment {word}", path.display()));
             }
-            if byte == b'\n' {
+            if part.ends_with('\n') {
                 line += 1;
             }
+            offset += part.len();
         }
     }
     failures
