@@ -914,7 +914,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         let decoded = tree
             .nodes()
             .iter()
-            .find_map(|node| {
+            .filter_map(|node| {
                 crate::decode(&mut bindings, node.binding?.token, crate::Act::Input { value: copy_of(amount) })
             })
             .find(|act| act == &edited)
