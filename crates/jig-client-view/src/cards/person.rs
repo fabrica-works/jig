@@ -12,7 +12,7 @@ use jig_client::{
     objects::{Object, person_task::facts},
 };
 use skein_lib::{Id, List};
-/// Build the one person-task form, addressed and taken from committed facts.
+/// Build the person-task card, addressed and taken from committed facts.
 pub fn person_task(
     b: &mut Builder,
     client: &Domain,
@@ -54,7 +54,7 @@ pub fn person_task(
         b.close();
     }
     b.close();
-    contract(b, client, object, &document.contract, words, bindings);
+    contract(b, client, &document.contract, words, bindings);
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
@@ -63,8 +63,18 @@ pub fn person_task(
     super::close(b);
     true
 }
-/// Show the contract's named state or options; active choices belong to the confirmation.
+/// Show the contract's named state or options without a second answer form.
 pub fn contract(
+    b: &mut Builder,
+    client: &Domain,
+    contract: &PersonContract,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    render_contract(b, client, contract, false, words, bindings);
+}
+/// Build the sole editable form in the object's Answer confirmation.
+pub fn form(
     b: &mut Builder,
     client: &Domain,
     object: Id<Object>,
@@ -73,6 +83,16 @@ pub fn contract(
     bindings: &mut JigBindings,
 ) {
     let answering = super::common::answering(client, object);
+    render_contract(b, client, contract, answering, words, bindings);
+}
+fn render_contract(
+    b: &mut Builder,
+    client: &Domain,
+    contract: &PersonContract,
+    answering: bool,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     match contract {
         PersonContract::Choice { options: rows } => options(b, client, rows, answering, words, bindings),
         PersonContract::Approval { state, part } => {
@@ -98,10 +118,10 @@ fn options(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
-    b.open(Role::ChoiceGroup);
+    b.open(if answering { Role::ChoiceGroup } else { Role::List });
     b.name(&words.say(JigPhrase::Options, &[]));
     for option in options {
-        b.open(Role::Choice);
+        b.open(if answering { Role::Choice } else { Role::Item });
         b.name(option.words.bytes());
         b.text(Run::Plain, option.words.bytes());
         if answering && option.fields.is_empty() {
@@ -111,7 +131,7 @@ fn options(
                 b.state(State::Selected);
             }
             b.bind(bindings.insert(JigMeaning::Action(Act::Choose { option: option.number })));
-        } else {
+        } else if answering {
             b.state(State::Disabled);
         }
         b.close();

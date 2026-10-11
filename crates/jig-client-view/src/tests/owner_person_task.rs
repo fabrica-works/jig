@@ -191,6 +191,7 @@ fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_beari
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
     crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, &w, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d, &w, &mut bindings);
     let tree = b.finish();
     for text in [
         b"Choice code: 4294967295".as_slice(),

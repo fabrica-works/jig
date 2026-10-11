@@ -46,7 +46,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 pub fn form_nodes(l: &Limits) -> Option<u32> {
     crate::proposed_task::contract_nodes(l)?.checked_add(controls_nodes(l)?)
 }
-/// Form controls beside a contract already rendered in the card.
+/// The single confirmation form's controls, alongside its contract.
 pub(crate) fn controls_nodes(l: &Limits) -> Option<u32> {
     l.rows.checked_mul(3)?.checked_add(5)
 }
@@ -308,7 +308,7 @@ pub fn card(
         return false;
     }
     render(b, client, value, words, bindings);
-    controls(b, client, object, &value.contract, words, bindings);
+    // The card keeps the whole contract; editable drafts live only in its confirmation.
     crate::cards::common::answer(b, fact, words);
     crate::cards::common::acts(b, &fact.card, &value.acts, object, words, bindings);
     crate::cards::close(b);

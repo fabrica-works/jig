@@ -184,7 +184,7 @@ fn action(
                     crate::markdown::read(doc.words.bytes(), 2, b);
                     common::field(b, client, Purpose::Answer, JigPhrase::AnswerField, words, bindings);
                 }
-                Some(Body::PersonTask(doc)) => person::contract(b, client, open.object, &doc.contract, words, bindings),
+                Some(Body::PersonTask(doc)) => person::form(b, client, open.object, &doc.contract, words, bindings),
                 Some(Body::OwnerPersonTask(doc)) => {
                     crate::owner_person_task::form(b, client, open.object, &doc.contract, words, bindings);
                 }

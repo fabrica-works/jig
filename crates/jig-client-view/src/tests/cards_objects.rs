@@ -199,6 +199,32 @@ pub(super) fn render(d: &Domain, id: Id<Object>, words: &crate::words::Words, bi
     }
     tree
 }
+fn render_with_confirmation(
+    d: &Domain,
+    id: Id<Object>,
+    words: &crate::words::Words,
+    bindings: &mut JigBindings,
+) -> Tree {
+    bindings.begin();
+    let bound = crate::card_nodes(&CLIENT)
+        .unwrap()
+        .checked_add(crate::confirmation_nodes(&CLIENT).unwrap())
+        .unwrap()
+        .checked_add(1)
+        .unwrap();
+    let mut cap = limits();
+    cap.nodes = bound;
+    cap.text_bytes = bound.checked_mul(cap.text_per_node).unwrap();
+    let mut b = Builder::new(&cap);
+    b.open(Role::Page);
+    cards::card(&mut b, d, id, &cards::Place::Elsewhere, words, bindings);
+    crate::confirmation::confirmation(&mut b, d, words, bindings);
+    b.close();
+    let tree = b.finish();
+    super::cards_access::check(&tree);
+    assert!(tree.len() <= bound);
+    tree
+}
 fn press(tree: &Tree, label: &[u8], bindings: &mut JigBindings) -> Action {
     let token = tree
         .nodes()
@@ -235,13 +261,13 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
     ] {
         let (mut d, id) = loaded(key, value);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        let tree = render(&d, id, words, &mut bindings);
+        let tree = render_with_confirmation(&d, id, words, &mut bindings);
         assert!(contains(&tree, whole));
         assert!(contains(&tree, b"Your pool has 12 left; this needs 40"));
         assert!(!tree.nodes().iter().any(|n| n.role == Role::Button && n.name.as_deref() == Some(b"Pass up")));
         let action = press(&tree, label, &mut bindings);
         drive(&mut d, Event::Act { act: action });
-        let tree = render(&d, id, words, &mut bindings);
+        let tree = render_with_confirmation(&d, id, words, &mut bindings);
         assert!(contains(&tree, whole));
         assert!(contains(&tree, b"review the confirmation"));
         if label == b"Answer" {
@@ -266,7 +292,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
                 _ => None,
             })
             .unwrap();
-        let tree = render(&d, id, words, &mut bindings);
+        let tree = render_with_confirmation(&d, id, words, &mut bindings);
         assert!(contains(&tree, b"Being decided"));
         assert!(contains(&tree, whole));
         drive(
@@ -276,7 +302,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
                 answer: Answer::Refused(Refusal::Moved { now: Revision { value: 19 }, what: Moved::PersonTask }),
             },
         );
-        let tree = render(&d, id, words, &mut bindings);
+        let tree = render_with_confirmation(&d, id, words, &mut bindings);
         assert!(contains(&tree, b"19"));
         assert!(contains(&tree, whole));
         let action = press(&tree, label, &mut bindings);
@@ -322,17 +348,25 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
         PersonContract::Approval { state: text(b"Named state"), part: part.clone() },
         PersonContract::Words,
     ] {
+        let is_choice = match &contract {
+            PersonContract::Choice { .. } => true,
+            PersonContract::Approval { .. } | PersonContract::Words => false,
+        };
         let (mut d, id) = loaded(ObjectKey::PersonTask(8), ReadValue::PersonTask(Box::new(person(contract))));
         let mut bindings = JigBindings::new(64, CLIENT.text);
         let before = render(&d, id, words, &mut bindings);
-        for node in before.nodes() {
-            if node.role == Role::Choice {
-                assert!(node.states.as_slice().contains(&State::Disabled));
-            }
+        assert!(!before.nodes().iter().any(|node| node.role == Role::Choice));
+        if is_choice {
+            let option = before
+                .nodes()
+                .iter()
+                .find(|node| node.role == Role::Item && node.name.as_deref() == Some(b"Third choice"))
+                .unwrap();
+            assert!(option.binding.is_none());
         }
         let action = press(&before, b"Answer", &mut bindings);
         drive(&mut d, Event::Act { act: action });
-        let tree = render(&d, id, words, &mut bindings);
+        let tree = render_with_confirmation(&d, id, words, &mut bindings);
         assert!(contains(&tree, b"whole report"));
         assert!(contains(&tree, b"Becomes news for its requester after 4 min"));
         for node in tree.nodes() {

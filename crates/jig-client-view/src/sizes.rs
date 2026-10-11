@@ -172,11 +172,7 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
             .max(proposal_nodes(limits)?)
             .max(question_nodes(limits)?)
             .max(person_task_nodes(limits)?)
-            .max(
-                frame_of_card(limits)?
-                    .checked_add(crate::owner_person_task::max_nodes(limits)?)?
-                    .checked_add(crate::owner_person_task::controls_nodes(limits)?)?,
-            )
+            .max(frame_of_card(limits)?.checked_add(crate::owner_person_task::max_nodes(limits)?)?)
             .max(result_nodes(limits)?)
             .max(reply_nodes(limits)?)
             .max(escalation_nodes(limits)?)
