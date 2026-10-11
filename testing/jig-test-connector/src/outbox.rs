@@ -31,7 +31,7 @@ pub(crate) struct Runtime {
 #[derive(Debug)]
 pub(crate) struct Outbox {
     staged: Map<Token, Effect>,
-    pub(crate) proposals: Map<u64, (u64, Effect)>,
+    pub(crate) proposals: Map<u64, (u32, u64, Effect)>,
     pub(crate) entries: Map<u64, OutboxEntry>,
     runtime: Map<u64, Runtime>,
     made: Map<Key, Made>,
@@ -121,7 +121,7 @@ pub(crate) fn describe_proposal(
     out: &mut Queue<Request>,
 ) {
     let effect = match domain.outbox.proposals.get(&number) {
-        Some((_, effect)) => effect.clone(),
+        Some((_, _, effect)) => effect.clone(),
         None => {
             out.push(Request::EffectRefused { token });
             return;
@@ -130,13 +130,20 @@ pub(crate) fn describe_proposal(
     describe(domain, env, token, effect, out);
 }
 
-pub(crate) fn keep_proposal(domain: &mut Domain, token: Token, number: u64, task: u64, out: &mut Queue<Request>) {
+pub(crate) fn keep_proposal(
+    domain: &mut Domain,
+    token: Token,
+    number: u64,
+    task: u64,
+    project: u32,
+    out: &mut Queue<Request>,
+) {
     let effect = domain.outbox.staged.remove(&token).expect("described proposal payload");
     assert!(
-        domain.outbox.proposals.insert(number, (task, effect.clone())).is_ok(),
+        domain.outbox.proposals.insert(number, (project, task, effect.clone())).is_ok(),
         "one bounded proposal per live task"
     );
-    out.push(Request::Save { record: Record::Proposal { number, task, effect } });
+    out.push(Request::Save { record: Record::Proposal { number, task, project, effect } });
 }
 
 pub(crate) fn drop_proposal(domain: &mut Domain, number: u64, out: &mut Queue<Request>) {

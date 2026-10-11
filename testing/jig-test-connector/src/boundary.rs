@@ -554,7 +554,7 @@ pub enum Event {
     /// Stage a previously committed proposed effect for a fresh decision.
     DescribeProposal { token: Token, number: u64 },
     /// Keep a proposal payload, with no permission to make it.
-    KeepProposal { token: Token, number: u64, task: u64 },
+    KeepProposal { token: Token, number: u64, task: u64, project: u32 },
     /// Erase a terminal proposal's payload.
     DropProposal { number: u64 },
     /// Drop a staged effect after a refusal.
@@ -632,7 +632,7 @@ pub enum Record {
     /// Retained answer for the people child's durable token.
     ApplicationAnswer { token: Token, until: Wall, outcome: crate::ApplicationOutcome },
     /// A proposed payload is durable, and cannot be made before acceptance.
-    Proposal { number: u64, task: u64, effect: Effect },
+    Proposal { number: u64, task: u64, project: u32, effect: Effect },
     /// Parameters and state of one procedure task.
     Procedure(ProcedureState),
     /// Exact delegate identity retained in the child's creation decision.

@@ -182,7 +182,7 @@ fn every_part_is_owned_scoped_and_read_without_mutating_its_records() {
         state: 5,
     };
     world.event(Event::Describe { token: Token::new(80), effect: effect.clone() });
-    let kept = world.event(Event::KeepProposal { token: Token::new(80), number: 7, task: 4 });
+    let kept = world.event(Event::KeepProposal { token: Token::new(80), number: 7, task: 4, project: 1 });
     assert!(marked(&kept, Token::new(42)), "saving a proposal marks its description");
     world.event(Event::Describe { token: Token::new(81), effect: effect.clone() });
     let kept = world.event(Event::Keep { token: Token::new(81), entry: 1, task: 4, key: world.key(4, 7) });
@@ -383,4 +383,71 @@ fn a_resource_less_procedure_panel_refuses_an_inferred_or_changed_project() {
         world.event(Event::ReadDocument { scope: ClientScope::Project(7), read: panel, party: 1 }).as_slice(),
         [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
     ));
+}
+
+#[test]
+fn a_resource_less_proposals_description_keeps_its_authentic_project_across_restart_and_drop() {
+    let mut world = World::new(86);
+    let effect = connector::Effect {
+        kind: kind(86, 1),
+        resources: Box::new([path(86, 1)]),
+        purpose: 19,
+        condition: None,
+        target: 13,
+        state: 13,
+    };
+    world.event(Event::Describe { token: Token::new(80), effect: effect.clone() });
+    world.event(Event::KeepProposal { token: Token::new(80), number: 7, task: 4, project: 1 });
+    assert_eq!(
+        world.records.get(&connector::RecordKey::Proposal(7)),
+        Some(&connector::Record::Proposal { number: 7, task: 4, project: 1, effect: effect.clone() })
+    );
+    assert!(!world.records.contains_key(&connector::RecordKey::Task(4)));
+    assert!(!world.records.contains_key(&connector::RecordKey::Procedure(4)));
+    assert!(!world.records.keys().any(|key| matches!(key, connector::RecordKey::Outbox(_))));
+    let mut first = None;
+    for restored in [false, true] {
+        if restored {
+            world.cold_restart();
+        }
+        let before = world.records.clone();
+        let token = prepare(&mut world, 1, ClientSubject::Effect { project: 1, proposal: 7 });
+        let requests = world.event(Event::ReadDocument { scope: ClientScope::Project(1), read: token, party: 1 });
+        let [Request::ReadAnswered { answer: Ok(value), .. }] = requests.as_slice() else {
+            panic!("the retained proposal supplies its own scope without task names")
+        };
+        let ClientDocument::Effect { proposal, task, effect: actual, description } = value else {
+            panic!("a complete effect description")
+        };
+        assert_eq!((*proposal, *task), (7, 4));
+        assert_eq!(actual, &effect);
+        assert_eq!(description.kind, effect.kind);
+        assert_eq!(description.resources, effect.resources);
+        assert_eq!(description.purpose, 19);
+        assert_eq!(description.state, 13);
+        assert_eq!(description.price, Some(3));
+        if let Some(expected) = &first {
+            assert_eq!(value, expected, "cold restoration preserves the whole document");
+        } else {
+            first = Some(value.clone());
+        }
+        for (number, project, scope) in [(2, 2, ClientScope::Project(2)), (3, 1, ClientScope::Project(2))] {
+            let token = prepare(&mut world, number, ClientSubject::Effect { project, proposal: 7 });
+            let requests = world.event(Event::ReadDocument { scope, read: token, party: 1 });
+            assert!(matches!(
+                requests.as_slice(),
+                [Request::ReadAnswered { answer: Err(connector::DocumentMissing::Unknown), .. }]
+            ));
+        }
+        let watched = prepare(&mut world, 1, ClientSubject::Effect { project: 1, proposal: 7 });
+        assert_eq!(document(&mut world, watched), Ok(value.clone()), "reads and watches show the same whole facts");
+        assert_eq!(world.records, before, "reads neither persist nor authorize an effect");
+    }
+    let ended = world.event(Event::DropProposal { number: 7 });
+    assert!(marked(&ended, Token::new(1)));
+    assert!(!world.records.contains_key(&connector::RecordKey::Proposal(7)));
+    assert_eq!(document(&mut world, Token::new(1)), Err(connector::DocumentMissing::Unknown));
+    world.cold_restart();
+    let token = prepare(&mut world, 1, ClientSubject::Effect { project: 1, proposal: 7 });
+    assert_eq!(document(&mut world, token), Err(connector::DocumentMissing::Unknown));
 }

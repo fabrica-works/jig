@@ -220,8 +220,9 @@ fn make(
         }
         ClientSubject::Effect { project, proposal } => {
             scoped(scope, *project)?;
-            let (number, effect) = domain.outbox.proposals.get(proposal).ok_or(DocumentMissing::Unknown)?;
-            task(domain, *project, *number)?;
+            let (owner_project, number, effect) =
+                domain.outbox.proposals.get(proposal).ok_or(DocumentMissing::Unknown)?;
+            scoped(scope, *owner_project)?;
             let description = description(domain, effect)?;
             Ok(ClientDocument::Effect { proposal: *proposal, task: *number, effect: effect.clone(), description })
         }

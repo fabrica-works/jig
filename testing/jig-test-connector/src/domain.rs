@@ -216,7 +216,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Unsubscribe { task, topic } => unsubscribe(domain, task, topic, out),
         Event::Describe { token, effect } => crate::outbox::describe(domain, env, token, effect, out),
         Event::DescribeProposal { token, number } => crate::outbox::describe_proposal(domain, env, token, number, out),
-        Event::KeepProposal { token, number, task } => crate::outbox::keep_proposal(domain, token, number, task, out),
+        Event::KeepProposal { token, number, task, project } => {
+            crate::outbox::keep_proposal(domain, token, number, task, project, out);
+        }
         Event::DropProposal { number } => crate::outbox::drop_proposal(domain, number, out),
         Event::Keep { token, entry, task, key } => crate::outbox::keep(domain, env, token, entry, task, key, out),
         Event::Drop { token } => {
@@ -487,8 +489,11 @@ fn restore(domain: &mut Domain, record: Record, out: &mut Queue<Request>) {
         Record::Pool { path, slots } => {
             domain.pools.insert(path, slots).expect("restored pool fits");
         }
-        Record::Proposal { number, task, effect } => {
-            assert!(domain.outbox.proposals.insert(number, (task, effect)).is_ok(), "restored proposal capacity");
+        Record::Proposal { number, task, project, effect } => {
+            assert!(
+                domain.outbox.proposals.insert(number, (project, task, effect)).is_ok(),
+                "restored proposal capacity"
+            );
         }
         Record::Outbox(entry) => crate::outbox::restore_entry(domain, entry),
         Record::Made { key, resources, state } => crate::outbox::restore_made(domain, key, resources, state),

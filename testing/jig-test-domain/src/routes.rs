@@ -779,8 +779,8 @@ fn route_effect_ask(domain: &mut Domain, number: u16, ask: core::connector::Ask,
         core::connector::Ask::DescribeProposal { owner, proposal } => {
             connector::Event::DescribeProposal { token: owner, number: proposal }
         }
-        core::connector::Ask::KeepProposal { owner, proposal, task } => {
-            connector::Event::KeepProposal { token: owner, number: proposal, task }
+        core::connector::Ask::KeepProposal { owner, proposal, task, project } => {
+            connector::Event::KeepProposal { token: owner, number: proposal, task, project }
         }
         core::connector::Ask::DropProposal { proposal } => connector::Event::DropProposal { number: proposal },
         core::connector::Ask::Keep { owner, entry, task, key } => {

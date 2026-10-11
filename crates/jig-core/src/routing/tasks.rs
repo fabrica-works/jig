@@ -543,6 +543,7 @@ pub(super) fn tag_tasks(
                                         owner,
                                         proposal,
                                         task: key.task,
+                                        project: core.tasks.task(key.task).expect("proposing task exists").project,
                                     }),
                                 });
                             }

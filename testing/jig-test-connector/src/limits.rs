@@ -99,7 +99,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<Token, crate::values::Payload>::worst_case(limits.values)?)?
         .checked_add(u64::from(limits.values).checked_mul(u64::from(limits.value_bytes))?)?
         .checked_add(Map::<Token, crate::Effect>::worst_case(limits.staged)?)?
-        .checked_add(Map::<u64, (u64, crate::Effect)>::worst_case(limits.tasks)?)?
+        .checked_add(Map::<u64, (u32, u64, crate::Effect)>::worst_case(limits.tasks)?)?
         .checked_add(
             u64::from(limits.tasks).checked_mul(u64::from(limits.resources_per_effect))?.checked_mul(path_bytes)?,
         )?

@@ -31,7 +31,7 @@ fn task(domain: &Domain, subject: &Subject, number: u64) -> bool {
     match subject {
         Subject::Panel { task, .. } | Subject::Result { task, .. } | Subject::Hold { task, .. } => *task == number,
         Subject::Effect { proposal, .. } => match domain.outbox.proposals.get(proposal) {
-            Some((task, _)) => *task == number,
+            Some((_, task, _)) => *task == number,
             None => false,
         },
         Subject::Object { .. } | Subject::Project { .. } | Subject::Deployment => false,

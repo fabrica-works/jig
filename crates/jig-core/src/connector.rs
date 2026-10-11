@@ -230,6 +230,7 @@ pub enum Ask {
         owner: Token,
         proposal: u64,
         task: u64,
+        project: u32,
     },
     /// Remove the connector payload of a terminal proposal.
     DropProposal {
