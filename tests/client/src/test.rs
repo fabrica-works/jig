@@ -101,6 +101,18 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
         })
         .clone()
 }
+/// Constructs the test application's root and view with one declared bound.
+#[must_use]
+pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View) {
+    let (words, family) = phrasebooks(limits);
+    let bounds = view::Limits::for_world(limits, &words, &family, 1024, 256).expect("view bounds fit");
+    let mut root = domain::new(limits, seed);
+    domain::provider(&mut root, jig_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
+        .expect("provider fits");
+    domain::provider(&mut root, jig_client::signin::Provider { number: 2, name: crate::stories::text(b"Other") })
+        .expect("second provider fits");
+    (root, view::View::new(&bounds, limits, words, family, first::Address { project: 1, item: 1 }))
+}
 impl App for Test {
     type Root = domain::Domain;
     type View = view::View;
@@ -114,15 +126,7 @@ impl App for Test {
         limits()
     }
     fn new(seed: u64) -> (Self::Root, Self::View) {
-        let limits = limits();
-        let (words, family) = phrasebooks(&limits);
-        let bounds = view::Limits::for_world(&limits, &words, &family, 1024, 256).expect("view bounds fit");
-        let mut root = domain::new(&limits, seed);
-        domain::provider(&mut root, jig_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
-            .expect("provider fits");
-        domain::provider(&mut root, jig_client::signin::Provider { number: 2, name: crate::stories::text(b"Other") })
-            .expect("second provider fits");
-        (root, view::View::new(&bounds, &limits, words, family, first::Address { project: 1, item: 1 }))
+        new(&limits(), seed)
     }
     fn start(address: Address, kept: Vec<Self::Record>, offset: i32) -> Event {
         Event::Start { address, kept: list(kept), offset: Offset { minutes: offset } }

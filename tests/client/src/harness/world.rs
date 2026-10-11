@@ -11,6 +11,8 @@ use skein_world::domain::{Referee, Schedule, Span, Trace, Verdict};
 /// One tab or device in this world.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ClientId(pub usize);
+/// Constructs one application's root and view from the world's next seed.
+pub type ClientConstructor<A> = fn(u64) -> (<A as App>::Root, <A as App>::View);
 /// One scripted or random person.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PersonId(pub usize);
@@ -75,6 +77,9 @@ pub struct Outcome {
     pub heap_bound: u64,
 }
 struct Client<A: App> {
+    constructor: ClientConstructor<A>,
+    limits: A::Limits,
+    heap_bound: u64,
     root: A::Root,
     view: A::View,
     model: Model,
@@ -123,7 +128,7 @@ pub struct World<A: App, F: Front<A>> {
     quota_failure: bool,
     meter: Option<skein_world::domain::heap::Meter>,
     heap_peak: u64,
-    heap_bound: u64,
+    default_heap_bound: u64,
 }
 impl<A: App, F: Front<A>> World<A, F> {
     /// Creates one seeded loop in front of the supplied engine boundary.
@@ -133,7 +138,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         let meter = if settings.memory { Some(skein_world::domain::heap::Meter::new()) } else { None };
         Self {
             meter,
-            heap_bound,
+            default_heap_bound: heap_bound,
             heap_peak: 0,
             rng: Rng::new(settings.seed),
             referee: Referee::new(super::referee::Rules::new(
@@ -171,16 +176,39 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     /// Starts a device with an empty small store.
     pub fn client(&mut self, party: u64, address: A::Address) -> ClientId {
-        self.make_client(party, address, Vec::new())
+        self.make_client(party, address, Vec::new(), A::limits(), A::new, self.default_heap_bound)
     }
-    fn make_client(&mut self, party: u64, address: A::Address, kept: Vec<A::Record>) -> ClientId {
+    /// Starts a device with supplied receiving bounds and a root/view fixture.
+    /// The constructor must use the same bounds; tabs and reloads retain both.
+    pub fn client_with(
+        &mut self,
+        party: u64,
+        address: A::Address,
+        limits: A::Limits,
+        constructor: ClientConstructor<A>,
+    ) -> ClientId {
+        let heap_bound = A::worst_case(&limits).min(self.settings.heap_bytes_per_client);
+        self.make_client(party, address, Vec::new(), limits, constructor, heap_bound)
+    }
+    fn make_client(
+        &mut self,
+        party: u64,
+        address: A::Address,
+        kept: Vec<A::Record>,
+        limits: A::Limits,
+        constructor: ClientConstructor<A>,
+        heap_bound: u64,
+    ) -> ClientId {
         if let Some(meter) = &self.meter {
             meter.start();
         }
-        let (root, view) = A::new(self.rng.next_u64());
+        let (root, view) = constructor(self.rng.next_u64());
         let id = ClientId(self.clients.len());
         let patches = Queue::with_capacity(A::patch_limit(&view));
         self.clients.push(Client {
+            constructor,
+            limits,
+            heap_bound,
             patches,
             root,
             view,
@@ -203,7 +231,14 @@ impl<A: App, F: Front<A>> World<A, F> {
     /// Starts another tab with this tab’s address and kept records.
     pub fn tab(&mut self, of: ClientId) -> ClientId {
         let c = &self.clients[of.0];
-        self.make_client(c.party, c.history[c.at].clone(), c.kept.clone())
+        self.make_client(
+            c.party,
+            c.history[c.at].clone(),
+            c.kept.clone(),
+            c.limits.clone(),
+            c.constructor,
+            c.heap_bound,
+        )
     }
     /// Adds a person whose script acts only through the visible tree.
     pub fn person(&mut self, client: ClientId, steps: Vec<Step<A::Address>>) -> PersonId {
@@ -238,7 +273,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         let c = &mut self.clients[id.0];
         c.epoch += 1;
         c.acted_card = None;
-        let (root, view) = A::new(self.rng.next_u64());
+        let (root, view) = (c.constructor)(self.rng.next_u64());
         c.root = root;
         c.view = view;
         c.model = Model::default();
@@ -469,10 +504,13 @@ impl<A: App, F: Front<A>> World<A, F> {
                 self.observe(Observation::Delivered { client: id, receipt });
             }
         }
-        let env =
-            Env { now: self.now, wall: Wall::from_nanos(1_000_000_000_000 + self.now.as_nanos()), limits: A::limits() };
-        let mut out = Queue::with_capacity(A::max_out(&env.limits));
         let c = &mut self.clients[id.0];
+        let env = Env {
+            now: self.now,
+            wall: Wall::from_nanos(1_000_000_000_000 + self.now.as_nanos()),
+            limits: c.limits.clone(),
+        };
+        let mut out = Queue::with_capacity(A::max_out(&env.limits));
         match event {
             Some(event) => A::step(&mut c.root, &env, event, &mut out),
             None => A::fire(&mut c.root, &env, &mut out),
@@ -572,15 +610,18 @@ impl<A: App, F: Front<A>> World<A, F> {
     fn check_heap(&mut self) {
         if let Some(meter) = &self.meter {
             let measured = meter.end();
-            let bound = self
-                .heap_bound
-                .checked_mul(u64::try_from(self.clients.len()).expect("client count fits"))
-                .expect("world heap bound fits");
+            let bound = self.heap_bound();
             // Measure owned bytes here; the observation-based referee owns the
             // bounded rule and its failure, including its negative proofs.
             self.heap_peak = self.heap_peak.max(meter.check(measured, u64::MAX, &"client world iteration"));
             self.observe(Observation::Bounded { heap: self.heap_peak, bound });
         }
+    }
+    fn heap_bound(&self) -> u64 {
+        self.clients
+            .iter()
+            .try_fold(0_u64, |sum, client| sum.checked_add(client.heap_bound))
+            .expect("world heap bound fits")
     }
     fn walk_people(&mut self) -> bool {
         let mut progress = false;
@@ -761,7 +802,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             dropped: self.dropped,
             trace: self.trace.lines().to_vec(),
             heap_peak: self.heap_peak,
-            heap_bound: self.heap_bound * u64::try_from(self.clients.len()).expect("client count fits"),
+            heap_bound: self.heap_bound(),
         }
     }
 }
