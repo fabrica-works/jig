@@ -1045,7 +1045,8 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
             | ReadValue::OwnerSpend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
-            | ReadValue::Deployment(_),
+            | ReadValue::Deployment(_)
+            | ReadValue::OwnerDeployment(_),
         )
         | ReadResult::None(_) => return true,
     };
