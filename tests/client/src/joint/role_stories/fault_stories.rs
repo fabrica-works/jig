@@ -138,6 +138,7 @@ fn an_inbox_acceptance_updates_the_same_proposal_still_shown_in_the_chat() {
     world.person(
         member,
         vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Read earlier") },
             Step::See { find: Find::text(b"decide this goal"), within },
             Step::See { find: Find::text(b"Proposal"), within },
         ],
