@@ -231,7 +231,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
     }
     assert!(owner.store.rows.values().any(|row| matches!(row,
         root::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
-        if matches!(outcome, people::Outcome::EscalationDecided { .. }))));
+        if matches!(outcome, people::Outcome::Released { task } if *task == child))));
     let attempts: std::collections::BTreeSet<_> = owner.peers.as_ref().expect("actual worker").workers[0]
         .seen
         .iter()
