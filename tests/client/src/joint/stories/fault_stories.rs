@@ -59,7 +59,10 @@ fn a_draft_kept_across_a_reload_stays_unsent_on_the_actual_engine() {
 }
 
 fn stop_ready() -> (World<Test, Joint>, crate::ClientId) {
-    let mut world = super::world(super::turn());
+    stop_ready_in(super::world(super::turn()))
+}
+
+fn stop_ready_in(mut world: World<Test, Joint>) -> (World<Test, Joint>, crate::ClientId) {
     let client = world.client(1, crate::stories::conversation());
     let within = Duration::from_secs(1);
     let mut script = start();
@@ -170,7 +173,14 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
 
 #[test]
 fn a_reload_with_a_stop_pending_recovers_its_lost_committed_answer_by_the_original_key() {
-    let (mut world, client) = stop_ready();
+    let (mut world, client) = stop_ready_in(super::bounded_world(
+        super::turn(),
+        |_| {},
+        |limits| {
+            // Old untaken flights remain owned until terminal; reload needs distinct new watches.
+            limits.core.views.watchers = 12;
+        },
+    ));
     let submitted = world.front().session.driver.world.store.applied.checked_add(1).expect("next transaction");
     world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
     world.person(
@@ -194,11 +204,6 @@ fn a_reload_with_a_stop_pending_recovers_its_lost_committed_answer_by_the_origin
     world.fault(crate::FrontFault::NoAnswer);
     world.front().session.driver.release_commits();
     world.fault(crate::Fault::Reload { client });
-    let diagnostic_boundary = world.now().saturating_add(Duration::from_millis(250));
-    let diagnostic = world.run(Until::Time(diagnostic_boundary));
-    eprintln!("PENDING_RELOAD_OUTCOME {diagnostic:?}");
-    eprintln!("PENDING_RELOAD_CORE {:?}", world.front().session.driver.world.trace);
-    eprintln!("PENDING_RELOAD_TREE {:?}", world.tree(client).nodes());
     world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(1) }]);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");

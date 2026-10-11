@@ -47,7 +47,16 @@ fn world(body: Box<[u8]>) -> World<Test, Joint> {
 }
 
 fn configured_world(body: Box<[u8]>, configure: fn(&mut Joint)) -> World<Test, Joint> {
+    bounded_world(body, configure, |_| {})
+}
+
+fn bounded_world(
+    body: Box<[u8]>,
+    configure: fn(&mut Joint),
+    bounds: fn(&mut jig_test_domain::Limits),
+) -> World<Test, Joint> {
     let mut owner = jig_core_world::world::limits();
+    bounds(&mut owner);
     owner.core.documents.rows = 2;
     owner.core.documents.lines = 2;
     owner.core.documents.chips = 2;
