@@ -306,29 +306,34 @@ fn full_value(l: &jig_client::Limits) -> OwnerPersonTask {
 }
 #[test]
 fn person_owner_selected_words_and_all_view_storage_dimensions_refuse_one_under_whole_requirements() {
-    person_storage_dimension(0);
+    person_storage_dimension(None);
+}
+
+#[test]
+fn person_owner_selected_words_and_nodes_refuse_one_under_whole_requirements() {
+    person_storage_dimension(Some(0));
 }
 
 #[test]
 fn person_owner_selected_words_and_depth_refuse_one_under_whole_requirements() {
-    person_storage_dimension(1);
+    person_storage_dimension(Some(1));
 }
 
 #[test]
 fn person_owner_selected_words_and_per_node_text_refuse_one_under_whole_requirements() {
-    person_storage_dimension(2);
+    person_storage_dimension(Some(2));
 }
 
 #[test]
 fn person_owner_selected_words_and_total_text_refuse_one_under_whole_requirements() {
-    person_storage_dimension(3);
+    person_storage_dimension(Some(3));
 }
 
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "ordinary test entry retains the original fixture and one-under dimension arithmetic"
 )]
-fn person_storage_dimension(selected_dimension: usize) {
+fn person_storage_dimension(selected_dimension: Option<usize>) {
     let phrase_limits = PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
@@ -357,11 +362,15 @@ fn person_storage_dimension(selected_dimension: usize) {
     let l = client_limits();
     let value = full_value(&l);
     let untouched = value.clone();
-    assert!(view::required(&value, &l, &w).is_some());
+    if selected_dimension.is_none() {
+        assert!(view::required(&value, &l, &w).is_some());
+    }
     let maximum = limits(&w);
     let tree = build(&value, &w, maximum);
-    assert!(contains(&tree, b"selected 4294967295"));
-    assert!(!contains(&tree, b"Taker not supplied"));
+    if selected_dimension.is_none() {
+        assert!(contains(&tree, b"selected 4294967295"));
+        assert!(!contains(&tree, b"Taker not supplied"));
+    }
     let nodes = tree.len();
     // A preorder node's size gives the end of its subtree. Keep only the
     // ancestors whose subtrees include this node, matching the independent
@@ -397,7 +406,9 @@ fn person_storage_dimension(selected_dimension: usize) {
         text_bytes: u32::try_from(total).unwrap(),
         ..maximum
     };
-    assert_eq!(build(&value, &w, exact).len(), nodes);
+    if selected_dimension.is_none() {
+        assert_eq!(build(&value, &w, exact).len(), nodes);
+    }
     for (index, below) in [
         Limits { nodes: nodes - 1, ..exact },
         Limits { depth: depth - 1, ..exact },
@@ -407,23 +418,25 @@ fn person_storage_dimension(selected_dimension: usize) {
     .into_iter()
     .enumerate()
     {
-        if index != selected_dimension {
+        if selected_dimension != Some(index) {
             continue;
         }
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| build(&value, &w, below)))
             .expect_err("one-under storage rejects the whole view");
     }
-    assert_eq!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..client_limits() }), None);
-    let mut over = value.clone();
-    over.results = List::with_capacity(9);
-    assert!(view::required(&over, &client_limits(), &w).is_none());
-    assert_eq!(value, untouched);
-    let mut bad = owner_person_task_words::language();
-    bad.phrases[1].forms[0].segments = Box::new([Segment::Text(copy_of(b"missing number"))]);
-    assert_eq!(
-        Phrasebook::load(owner_person_task_words::shapes(), Box::new([bad]), &phrase_limits).err(),
-        Some(Invalid::Holes { id: PersonPhrase::Party.id() })
-    );
+    if selected_dimension.is_none() {
+        assert_eq!(view::max_nodes(&jig_client::Limits { rows: u32::MAX, ..client_limits() }), None);
+        let mut over = value.clone();
+        over.results = List::with_capacity(9);
+        assert!(view::required(&over, &client_limits(), &w).is_none());
+        assert_eq!(value, untouched);
+        let mut bad = owner_person_task_words::language();
+        bad.phrases[1].forms[0].segments = Box::new([Segment::Text(copy_of(b"missing number"))]);
+        assert_eq!(
+            Phrasebook::load(owner_person_task_words::shapes(), Box::new([bad]), &phrase_limits).err(),
+            Some(Invalid::Holes { id: PersonPhrase::Party.id() })
+        );
+    }
 }
 
 #[test]
