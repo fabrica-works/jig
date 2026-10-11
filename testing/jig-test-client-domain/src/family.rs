@@ -203,6 +203,7 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
 
 /// The explicit held-task account only (root.md, section 6; QUESTIONS.md, 47).
 /// A resource origin is a distinct reference and cannot supply this identity.
+#[must_use]
 pub fn owner_hold(part: &OwnerPart) -> Option<Part> {
     match part.kind {
         OwnerPartKind::Hold => match part.key {
