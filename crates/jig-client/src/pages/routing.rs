@@ -481,9 +481,7 @@ fn read_value(
         ReadValue::Notes(page) => crate::pages::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::pages::project::spend(domain, *page),
         ReadValue::Task(task) => task_read(domain, env, task, out),
-        ReadValue::Historical(value) => {
-            read_body(domain, value.key, Body::Historical(value));
-        }
+        ReadValue::Historical(value) => read_body(domain, value.key, Body::Historical(value)),
         ReadValue::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::OwnerProposal(proposal));
@@ -597,6 +595,7 @@ fn owner_project_read_valid(domain: &Domain, token: Token, result: &ReadResult) 
         ReadResult::Value(value) => match value {
             ReadValue::OwnerProject(value) => value,
             ReadValue::Frame(_)
+            | ReadValue::Historical(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
             | ReadValue::OwnerProposal(_)

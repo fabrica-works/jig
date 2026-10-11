@@ -838,6 +838,7 @@ pub(crate) fn historical_read(result: &crate::contract::ReadResult) -> Option<&c
             | ReadValue::Spend(_)
             | ReadValue::OwnerSpend(_)
             | ReadValue::OwnerEnded(_)
+            | ReadValue::OwnerProject(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
             | ReadValue::Deployment(_) => None,
