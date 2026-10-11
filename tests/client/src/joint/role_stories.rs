@@ -233,6 +233,18 @@ fn a_person_answers_a_choice_between_two_reports() {
             Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
             Step::See { find: Find::text(b"first report or second report"), within },
             Step::See { find: Find::exactly_named(Role::Button, b"Take it"), within },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let keys = world.front().session.card_offer_keys(maintainer);
+    let person: Vec<_> = keys.into_iter().filter(|key| matches!(key, client::ObjectKey::PersonTask(_))).collect();
+    assert_eq!(person.len(), 1);
+    super::offered_acts::card(&mut world, maintainer, person[0], b"Person task");
+    world.person(
+        maintainer,
+        vec![
             Step::Press { find: Find::exactly_named(Role::Button, b"Take it") },
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
             Step::See { find: Find::exactly_named(Role::Button, b"Answer"), within },
@@ -291,7 +303,6 @@ fn two_parties_decide_one_proposal_and_the_second_is_told_who() {
                 Step::Press { find: Find::exactly_named(Role::Button, b"Sign in with Test") },
                 Step::See { find: Find::text(b"decide this goal"), within },
                 Step::See { find: Find::exactly_named(Role::Button, b"Accept"), within },
-                Step::Press { find: Find::exactly_named(Role::Button, b"Accept") },
             ],
         );
     }
@@ -304,6 +315,14 @@ fn two_parties_decide_one_proposal_and_the_second_is_told_who() {
         assert_eq!(proposals.len(), 1, "one supplied pending proposal");
         super::offered_acts::card(&mut world, party, proposals[0], b"Proposal");
     }
+    // Check the open cards before opening either confirmation. The same two
+    // ready confirmations still submit together below, before either reply.
+    for party in [owner, maintainer] {
+        world.person(party, vec![Step::Press { find: Find::exactly_named(Role::Button, b"Accept") }]);
+    }
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
     let first_person = world.front().session.driver.world.peers.as_ref().expect("actual parties").parties[0]
         .person
         .expect("actual owner");
