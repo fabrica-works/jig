@@ -200,7 +200,7 @@ fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_
             })
             .unwrap();
         let tree = round_trip(value);
-        assert!(contains(&tree, b"Stop bound:"));
+        assert!(contains(&tree, b"Hello stop bound:"));
     }
 }
 #[test]
@@ -218,8 +218,8 @@ fn deployment_view_opaque_history_keys_source_order_and_full_width_requester_pro
         ),
     ]);
     let tree = round_trip(value);
-    assert!(contains(&tree, b"Task proposer: 18446744073709551615"));
-    assert!(contains(&tree, b"Party proposer: 18446744073709551615"));
+    assert!(contains(&tree, b"Task maker: 18446744073709551615"));
+    assert!(contains(&tree, b"Party maker: 18446744073709551615"));
     let histories: Vec<_> = tree.nodes().iter().filter_map(|n| n.key.filter(|k| k.kind == 99)).collect();
     assert_eq!(histories.iter().map(|k| k.a).collect::<Vec<_>>(), vec![0, 1]);
     assert!(histories.iter().all(|k| k.b == 0));
