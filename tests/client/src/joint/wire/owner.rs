@@ -816,6 +816,7 @@ pub(super) mod tests {
             kind: jig_core_people::Kind::Service,
             login: documents::Text { bytes: Box::from([255, b'/']), cut: true },
             name: documents::Text { bytes: Box::new([]), cut: false },
+            deployment_role: None,
             projects,
             needs: 123,
             need_counts: jig_core_people::Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: u32::MAX },

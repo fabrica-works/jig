@@ -722,6 +722,7 @@ pub(crate) mod tests {
             kind: jig_core_people::Kind::Person,
             login: documents::Text { bytes: Box::from([255, 0]), cut: true },
             name: documents::Text { bytes: Box::new([]), cut: false },
+            deployment_role: None,
             projects: List::with_capacity(2),
             needs: 17,
             need_counts: jig_core_people::Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: 4 },
