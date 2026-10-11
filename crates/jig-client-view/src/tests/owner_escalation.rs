@@ -4,7 +4,7 @@ fn escalation() -> OwnerEscalation {
     let mut task = task_doc(&[ActKind::Stop]);
     task.context = None;
     task.person_revision = Some(Revision { value: 23 });
-    task.taken_by = Some(TakenBy { number: u64::MAX, name: None });
+    task.taken_by = Some(u64::MAX);
     task.chip.executor = Executor::Agent { charter: 1 };
     let held = OwnerChipHold {
         source: None,

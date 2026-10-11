@@ -281,6 +281,7 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
             | ReadValue::OwnerPersonTask(_)
             | ReadValue::Frame(_)
             | ReadValue::Task(_)
+            | ReadValue::OwnerEscalation(_)
             | ReadValue::Ended(_)
             | ReadValue::OwnerEnded(_)
             | ReadValue::History(_)

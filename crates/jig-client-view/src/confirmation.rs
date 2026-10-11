@@ -303,7 +303,7 @@ fn held(object: &Object) -> bool {
     match &object.body {
         Some(Body::Task(doc)) => doc.hold.is_some(),
         Some(Body::OwnerEscalation(doc)) => doc.task.hold.is_some(),
-        Some(Body::Escalation(_) | Body::OwnerEscalation(_)) => true,
+        Some(Body::Escalation(_)) => true,
         Some(
             Body::Chip(_)
             | Body::Proposal(_)

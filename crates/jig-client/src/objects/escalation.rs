@@ -11,6 +11,7 @@ pub fn facts(object: &Object) -> Option<&crate::contract::Escalation> {
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)

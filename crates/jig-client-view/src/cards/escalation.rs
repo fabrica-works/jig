@@ -29,6 +29,7 @@ pub fn escalation(
             | Body::Task(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)

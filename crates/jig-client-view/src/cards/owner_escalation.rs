@@ -1,6 +1,10 @@
 //! An escalation shows the task owner’s facts and independent offered decisions
 //! (client/domain/objects.md, 5; contract.md, 5.1–5.3).
-use crate::{Builder, JigBindings, phrases::jig::JigPhrase, words::Words};
+use crate::{
+    Builder, JigBindings,
+    phrases::{Hole, jig::JigPhrase},
+    words::Words,
+};
 use jig_client::{
     Domain,
     objects::{Body, Object},
@@ -38,7 +42,7 @@ pub fn card(
     }
     super::chip::chip(b, client, &document.task.chip, words, bindings);
     if let Some(taker) = &document.task.taken_by {
-        super::common::taken_by(b, taker, words);
+        words.text(b, JigPhrase::TakenByNumber, &[Hole::Number(*taker)]);
     }
     crate::pages::task::overview(b, client, &document.task, words, bindings);
     crate::pages::task::budget(b, &document.task, words, bindings);

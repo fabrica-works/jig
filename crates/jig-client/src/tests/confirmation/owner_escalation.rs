@@ -4,9 +4,9 @@ fn row(act: ActKind, reason: HoldCategory) -> OwnerEscalation {
     let mut task = task();
     task.context = None;
     task.person_revision = Some(Revision { value: 23 });
-    task.taken_by = Some(TakenBy { number: u64::MAX, name: None });
+    task.taken_by = Some(u64::MAX);
     task.dependencies = List::with_capacity(2);
-    task.dependencies.push(OwnerTaskLink::Stored { number: 99, project: 1 }).unwrap();
+    task.dependencies.push(OwnerTaskLink::Stored { number: 99, status: None }).unwrap();
     let held = OwnerChipHold {
         source: None,
         reason,
@@ -56,7 +56,7 @@ fn owner_escalation_original_reads_keep_whole_task_and_independent_offers_and_re
     assert_eq!(original.task.context, None);
     assert_eq!(original.task.person_revision, Some(Revision { value: 23 }));
     assert_eq!(original.task.dependencies.capacity(), 2);
-    assert_eq!(original.task.taken_by.as_ref().unwrap().number, u64::MAX);
+    assert_eq!(original.task.taken_by.unwrap(), u64::MAX);
 }
 
 #[test]
