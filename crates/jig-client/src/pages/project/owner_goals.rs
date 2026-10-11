@@ -18,8 +18,15 @@ pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<
         }
     }
     let offer = offer?;
-    if let Admission::Bounded { within: Bounds::Goal { pool_left, .. }, .. } = offer {
-        return Some((crate::contract::admission::goal(offer, form.executor, form.budget, form.deadline), *pool_left));
+    let bounded_pool = match offer {
+        Admission::Bounded { within, .. } => match within {
+            Bounds::Goal { pool_left, .. } => Some(*pool_left),
+            Bounds::Amend { .. } => None,
+        },
+        Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => None,
+    };
+    if let Some(pool_left) = bounded_pool {
+        return Some((crate::contract::admission::goal(offer, form.executor, form.budget, form.deadline), pool_left));
     }
     let mut pool = None;
     let mut listed = false;

@@ -77,12 +77,16 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
             Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { within: Bounds::Amend { .. }, .. },
         ) => {}
     }
-    if let Some(
-        admission @ (Admission::Allowed
-        | Admission::Proposed { .. }
-        | Admission::Bounded { within: Bounds::Goal { .. }, .. }),
-    ) = offer
-    {
+    let eligible = match offer {
+        Some(admission) => match admission {
+            Admission::Allowed
+            | Admission::Proposed { .. }
+            | Admission::Bounded { within: Bounds::Goal { .. }, .. } => Some(admission),
+            Admission::Refused(_) | Admission::Bounded { within: Bounds::Amend { .. }, .. } => None,
+        },
+        None => None,
+    };
+    if let Some(admission) = eligible {
         match pool {
             Some(left) => {
                 words.text(b, JigPhrase::PoolLeft, &[Hole::Amount(left)]);

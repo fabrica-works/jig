@@ -585,8 +585,31 @@ fn task_read(domain: &mut Domain, env: &Env<crate::Limits>, task: Box<contract::
 
 // The new carrier must match its original read before retiring the obligation.
 fn owner_project_read_valid(domain: &Domain, token: Token, result: &ReadResult) -> bool {
-    let ReadResult::Value(ReadValue::OwnerProject(value)) = result else {
-        return true;
+    let value = match result {
+        ReadResult::Value(value) => match value {
+            ReadValue::OwnerProject(value) => value,
+            ReadValue::Frame(_)
+            | ReadValue::Task(_)
+            | ReadValue::Proposal(_)
+            | ReadValue::OwnerProposal(_)
+            | ReadValue::Escalation(_)
+            | ReadValue::Question(_)
+            | ReadValue::PersonTask(_)
+            | ReadValue::OwnerPersonTask(_)
+            | ReadValue::Result(_)
+            | ReadValue::Ended(_)
+            | ReadValue::History(_)
+            | ReadValue::Activity(_)
+            | ReadValue::Inbox(_)
+            | ReadValue::OwnerInbox(_)
+            | ReadValue::Conversations(_)
+            | ReadValue::Goals(_)
+            | ReadValue::Spend(_)
+            | ReadValue::Project(_)
+            | ReadValue::Notes(_)
+            | ReadValue::Deployment(_) => return true,
+        },
+        ReadResult::None(_) => return true,
     };
     let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
         return true;

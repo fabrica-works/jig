@@ -569,6 +569,160 @@ fn control(b: &mut Builder, ask: &Ask, words: &Words, bindings: &mut JigBindings
     b.bind(bindings.insert(JigMeaning::Action(owner_form::action(ask.clone()))));
     b.close();
 }
+// Extract only complete typed source requests with exhaustive contract matches.
+fn policy_request(ask: &Ask) -> Option<&PolicyEdit> {
+    match ask {
+        Ask::ChangePolicy { edit, .. } => Some(edit),
+        Ask::StartChat { .. }
+        | Ask::Write { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Take { .. }
+        | Ask::HandBack { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::Release { .. }
+        | Ask::Amend { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Close { .. }
+        | Ask::TakeOver { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Prioritise { .. }
+        | Ask::MarkSeen { .. }
+        | Ask::EditNote { .. }
+        | Ask::DeleteNote { .. }
+        | Ask::SetRoles { .. }
+        | Ask::MakeService { .. }
+        | Ask::SetPool { .. } => None,
+    }
+}
+fn role_request(ask: &Ask) -> Option<&PolicyEditRole> {
+    match policy_request(ask)? {
+        PolicyEdit::Role(role) => Some(role),
+        PolicyEdit::ProjectSpend { .. }
+        | PolicyEdit::Requirements { .. }
+        | PolicyEdit::Projections { .. }
+        | PolicyEdit::Permissions { .. } => None,
+    }
+}
+fn spend_request(ask: &Ask) -> Option<u64> {
+    match policy_request(ask)? {
+        PolicyEdit::ProjectSpend { period_spend } => Some(*period_spend),
+        PolicyEdit::Role(_)
+        | PolicyEdit::Requirements { .. }
+        | PolicyEdit::Projections { .. }
+        | PolicyEdit::Permissions { .. } => None,
+    }
+}
+fn requirements_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::PolicyRequirement>> {
+    match policy_request(ask)? {
+        PolicyEdit::Requirements { requirements } => Some(requirements),
+        PolicyEdit::ProjectSpend { .. }
+        | PolicyEdit::Role(_)
+        | PolicyEdit::Projections { .. }
+        | PolicyEdit::Permissions { .. } => None,
+    }
+}
+fn projections_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::OwnerGrant>> {
+    match policy_request(ask)? {
+        PolicyEdit::Projections { grants } => Some(grants),
+        PolicyEdit::ProjectSpend { .. }
+        | PolicyEdit::Role(_)
+        | PolicyEdit::Requirements { .. }
+        | PolicyEdit::Permissions { .. } => None,
+    }
+}
+fn permissions_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::PolicyPermission>> {
+    match policy_request(ask)? {
+        PolicyEdit::Permissions { mappings } => Some(mappings),
+        PolicyEdit::ProjectSpend { .. }
+        | PolicyEdit::Role(_)
+        | PolicyEdit::Requirements { .. }
+        | PolicyEdit::Projections { .. } => None,
+    }
+}
+fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::Holding>> {
+    match ask {
+        Ask::SetRoles { holdings, .. } => Some(holdings),
+        Ask::StartChat { .. }
+        | Ask::Write { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Take { .. }
+        | Ask::HandBack { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::Release { .. }
+        | Ask::Amend { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Close { .. }
+        | Ask::TakeOver { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Prioritise { .. }
+        | Ask::MarkSeen { .. }
+        | Ask::EditNote { .. }
+        | Ask::DeleteNote { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::MakeService { .. }
+        | Ask::SetPool { .. } => None,
+    }
+}
+fn pool_request(ask: &Ask) -> bool {
+    match ask {
+        Ask::SetPool { .. } => true,
+        Ask::StartChat { .. }
+        | Ask::Write { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Take { .. }
+        | Ask::HandBack { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::Release { .. }
+        | Ask::Amend { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Close { .. }
+        | Ask::TakeOver { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Prioritise { .. }
+        | Ask::MarkSeen { .. }
+        | Ask::EditNote { .. }
+        | Ask::DeleteNote { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetRoles { .. }
+        | Ask::MakeService { .. } => false,
+    }
+}
+fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client::contract::HeldRole)> {
+    match ask {
+        Ask::MakeService { name, role, .. } => Some((name, *role)),
+        Ask::StartChat { .. }
+        | Ask::Write { .. }
+        | Ask::AnswerQuestion { .. }
+        | Ask::AnswerPerson { .. }
+        | Ask::Take { .. }
+        | Ask::HandBack { .. }
+        | Ask::DecideProposal { .. }
+        | Ask::DecideEscalation { .. }
+        | Ask::Release { .. }
+        | Ask::Amend { .. }
+        | Ask::Stop { .. }
+        | Ask::Cancel { .. }
+        | Ask::Close { .. }
+        | Ask::TakeOver { .. }
+        | Ask::SetGoal { .. }
+        | Ask::Prioritise { .. }
+        | Ask::MarkSeen { .. }
+        | Ask::EditNote { .. }
+        | Ask::DeleteNote { .. }
+        | Ask::ChangePolicy { .. }
+        | Ask::SetRoles { .. }
+        | Ask::SetPool { .. } => None,
+    }
+}
 /// Show only complete supplied policy replacements, never absent mappings.
 pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     let state = &client.project_page().settings;
@@ -579,8 +733,8 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
     if owner_form::supported(value, &spend) {
         named_region(b, words, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(value.policy.period_spend)]);
         let spend = owner_form::draft(state, &spend);
-        if let Ask::ChangePolicy { edit: PolicyEdit::ProjectSpend { period_spend }, .. } = &spend {
-            request_field(b, &spend, Field::Spend, *period_spend, words, bindings);
+        if let Some(period_spend) = spend_request(&spend) {
+            request_field(b, &spend, Field::Spend, period_spend, words, bindings);
         }
         control(b, &spend, words, bindings);
         b.close();
@@ -600,7 +754,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
             if owner_form::supported(value, &ask) {
                 named_region(b, words, JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]);
                 let ask = owner_form::draft(state, &ask);
-                if let Ask::ChangePolicy { edit: PolicyEdit::Role(chosen), .. } = &ask {
+                if let Some(chosen) = role_request(&ask) {
                     request_field(b, &ask, Field::Spend, chosen.period_spend, words, bindings);
                     request_field(b, &ask, Field::Requests, u64::from(chosen.requests), words, bindings);
                     request_field(b, &ask, Field::Decides, u64::from(chosen.decides), words, bindings);
@@ -617,7 +771,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
     if owner_form::supported(value, &requirements) {
         named_region(b, words, JigPhrase::PolicyRequirements, &[]);
         let draft = owner_form::draft(state, &requirements);
-        if let Ask::ChangePolicy { edit: PolicyEdit::Requirements { requirements }, .. } = &draft {
+        if let Some(requirements) = requirements_request(&draft) {
             for remove in 0..requirements.len() {
                 let mut remaining = skein_lib::List::with_capacity(requirements.capacity());
                 for index in 0..requirements.len() {
@@ -648,7 +802,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
     if owner_form::supported(value, &projections) {
         named_region(b, words, JigPhrase::PolicyProjections, &[]);
         let draft = owner_form::draft(state, &projections);
-        if let Ask::ChangePolicy { edit: PolicyEdit::Projections { grants }, .. } = &draft {
+        if let Some(grants) = projections_request(&draft) {
             for remove in 0..grants.len() {
                 let mut remaining = skein_lib::List::with_capacity(grants.capacity());
                 for index in 0..grants.len() {
@@ -675,7 +829,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         if owner_form::supported(value, &before) {
             named_region(b, words, JigPhrase::PolicyPermissions, &[]);
             let draft = owner_form::draft(state, &before);
-            if let Ask::ChangePolicy { edit: PolicyEdit::Permissions { mappings }, .. } = &draft {
+            if let Some(mappings) = permissions_request(&draft) {
                 for remove in 0..mappings.len() {
                     let mut remaining = skein_lib::List::with_capacity(mappings.capacity());
                     for index in 0..mappings.len() {
@@ -712,7 +866,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
     let roles = Ask::SetRoles { project: value.number, holdings };
     if owner_form::supported(value, &roles) {
         let draft = owner_form::draft(state, &roles);
-        if let Ask::SetRoles { holdings, .. } = &draft {
+        if let Some(holdings) = holdings_request(&draft) {
             for remove in 0..holdings.len() {
                 let member = holdings.get(remove).expect("bounded holding");
                 region(b, words, P::Member, &[Hole::Number(member.party)]);
@@ -758,7 +912,7 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         words.text(b, JigPhrase::Before, &[]);
         if let Some(before) = &state.before {
             render_request(b, before, words);
-        } else if let Ask::SetPool { .. } = ask.as_ref() {
+        } else if pool_request(ask) {
             text(b, words, P::PoolAbsent, &[]);
         }
         if let Some(period) = state.pool_period {
@@ -910,8 +1064,8 @@ fn service_form(
         let name = words.book.say(words.language, P::Name.id(), &[]).expect("checked service name").text;
         b.name(&name);
         if let Some(ask) = &state.review {
-            if let Ask::MakeService { name, role: chosen, .. } = ask.as_ref() {
-                if *chosen == role {
+            if let Some((name, chosen)) = service_request(ask) {
+                if chosen == role {
                     b.value(name.bytes(), 0);
                 }
             }
