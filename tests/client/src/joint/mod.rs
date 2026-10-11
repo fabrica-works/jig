@@ -3,7 +3,9 @@
 //! the complete document carriers; no scripted truth stands in for core facts.
 pub mod archive;
 pub mod engine;
+mod fixture;
 pub mod front;
+pub mod random;
 pub use front::Joint;
 mod offered_packets;
 pub mod packets;
