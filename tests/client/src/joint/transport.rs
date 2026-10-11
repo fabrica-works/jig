@@ -186,7 +186,11 @@ impl Transport {
     }
 
     pub fn open(&mut self, client: ClientId, native: Token, subject: Watched) -> Token {
-        assert!(self.watch_token(client, native).is_none(), "one live native watch per tab");
+        assert!(
+            self.watch_token(client, native).is_none(),
+            "one live native watch per tab: client={client:?}, native={native:?}, new={subject:?}, existing={:?}",
+            self.watches
+        );
         let token = self.token();
         assert!(self.watches.insert(token, Watch { client, native, subject }).is_none(), "fresh watch token");
         token
