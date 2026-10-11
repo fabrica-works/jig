@@ -153,12 +153,23 @@ fn budget_and_shared_funder_sayings_borrow_selected_normal_words_and_person_offs
     }
     let languages: Box<[_]> = Box::new([crate::phrases::english::language(), translated]);
     let mut segments = 0_u32;
+    let mut text_bytes = 0_u32;
     for language in &languages {
         for phrase in &language.phrases {
             for form in &phrase.forms {
                 segments = segments
                     .checked_add(u32::try_from(form.segments.len()).expect("form segment count fits"))
                     .expect("both complete languages' segment count fits");
+                for segment in &form.segments {
+                    match segment {
+                        Segment::Text(bytes) => {
+                            text_bytes = text_bytes
+                                .checked_add(u32::try_from(bytes.len()).expect("literal byte count fits"))
+                                .expect("both complete languages' literal byte count fits");
+                        }
+                        Segment::Hole { .. } => {}
+                    }
+                }
             }
         }
     }
@@ -167,7 +178,7 @@ fn budget_and_shared_funder_sayings_borrow_selected_normal_words_and_person_offs
         phrases: crate::owner_words::phrase_count(),
         holes: 4,
         segments,
-        text_bytes: 40000,
+        text_bytes,
         hole_bytes: 256,
     };
     let book = Phrasebook::load(crate::phrases::jig::shapes(256), languages, &limits)
