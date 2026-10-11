@@ -479,7 +479,7 @@ fn historical_task_result_and_person_presence_keeps_both_whole_sources_within_bo
     presence(3);
 }
 #[test]
-fn historical_task_proposal_presence_keeps_typed_kept_projection_within_bound() {
+fn historical_task_proposal_presence_keeps_supplied_kept_projection_within_bound() {
     presence(4);
 }
 #[test]
@@ -491,7 +491,7 @@ fn historical_task_person_and_proposal_presence_keeps_independent_sources_within
     presence(6);
 }
 #[test]
-fn historical_task_all_three_typed_presences_keep_repetition_and_whole_sources_within_bound() {
+fn historical_task_all_three_supplied_presences_keep_repetition_and_whole_sources_within_bound() {
     presence(7);
 }
 #[test]
