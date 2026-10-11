@@ -939,7 +939,7 @@ fn observability_project_lists_are_admitted_and_priced_whole() {
         services,
         effects: List::with_capacity(2),
         watches: None,
-        request_limit: None,
+        read_limit: None,
         incident_limit: None,
     };
     assert!(Document::Part(Box::new(part.clone())).fits(&limits().observability));
@@ -978,7 +978,7 @@ fn an_outbox_description_can_be_absent_without_becoming_a_proposal() {
         pools: List::with_capacity(2),
         backend: None,
         made: None,
-        request_limit: None,
+        proposal_limit: None,
         staged_limit: None,
     };
     assert!(Document::Part(Box::new(part)).fits(&limits().infrastructure));

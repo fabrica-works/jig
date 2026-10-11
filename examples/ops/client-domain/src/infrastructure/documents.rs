@@ -233,7 +233,7 @@ pub struct PartDocument {
     pub pools: List<Pool>,
     pub backend: Option<Backend>,
     pub made: Option<u32>,
-    pub request_limit: Option<u32>,
+    pub proposal_limit: Option<u32>,
     pub staged_limit: Option<u32>,
 }
 /// One whole owner document, admitted without partial truncation.

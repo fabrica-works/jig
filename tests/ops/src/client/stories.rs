@@ -341,7 +341,7 @@ fn part(subject: infra::Subject) -> infra::documents::PartDocument {
         pools: list([]),
         backend: None,
         made: None,
-        request_limit: None,
+        proposal_limit: None,
         staged_limit: None,
     }
 }

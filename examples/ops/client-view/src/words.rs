@@ -203,8 +203,8 @@ pub enum Word {
     BackendNoIds,
     /// Made.
     Made,
-    /// Request limit.
-    RequestLimit,
+    /// Proposal table capacity.
+    ProposalLimit,
     /// Staged limit.
     StagedLimit,
     /// Watches.
@@ -227,8 +227,14 @@ pub enum Word {
     Conflict,
     /// Invalid.
     Invalid,
+    /// System request budget recording is deferred.
+    SystemRequestBudgetNotKept,
+    /// Last system response recording is deferred.
+    LastSystemResponseNotKept,
+    /// Read table capacity.
+    ReadLimit,
 }
-const ALL: [Word; 108] = [
+const ALL: [Word; 111] = [
     Word::Incidents,
     Word::Environments,
     Word::Incident,
@@ -325,7 +331,7 @@ const ALL: [Word; 108] = [
     Word::BackendIds,
     Word::BackendNoIds,
     Word::Made,
-    Word::RequestLimit,
+    Word::ProposalLimit,
     Word::StagedLimit,
     Word::Watches,
     Word::IncidentLimit,
@@ -337,6 +343,9 @@ const ALL: [Word; 108] = [
     Word::NotAllowed,
     Word::Conflict,
     Word::Invalid,
+    Word::SystemRequestBudgetNotKept,
+    Word::LastSystemResponseNotKept,
+    Word::ReadLimit,
 ];
 impl Word {
     #[must_use]
@@ -439,7 +448,7 @@ impl Word {
             Self::BackendIds => 93,
             Self::BackendNoIds => 94,
             Self::Made => 95,
-            Self::RequestLimit => 96,
+            Self::ProposalLimit => 96,
             Self::StagedLimit => 97,
             Self::Watches => 98,
             Self::IncidentLimit => 99,
@@ -451,6 +460,9 @@ impl Word {
             Self::NotAllowed => 105,
             Self::Conflict => 106,
             Self::Invalid => 107,
+            Self::SystemRequestBudgetNotKept => 108,
+            Self::LastSystemResponseNotKept => 109,
+            Self::ReadLimit => 110,
         };
         PhraseId { owner: Owner::Side { connector }, number }
     }
@@ -464,8 +476,8 @@ pub struct Words {
 impl Words {
     #[expect(clippy::too_many_lines, reason = "closed English phrase data is matched exhaustively")]
     pub fn english(connector: u16, text: u32) -> Result<Self, Invalid> {
-        let mut shapes = List::with_capacity(108);
-        let mut phrases = List::with_capacity(108);
+        let mut shapes = List::with_capacity(111);
+        let mut phrases = List::with_capacity(111);
         for word in ALL {
             let (literal, hole) = match word {
                 Word::Incidents => (b"Incidents".as_slice(), None),
@@ -563,7 +575,7 @@ impl Words {
                 Word::BackendIds => (b"Backend supports operation IDs".as_slice(), None),
                 Word::BackendNoIds => (b"Backend has no operation IDs".as_slice(), None),
                 Word::Made => (b"Environments made: ".as_slice(), Some(HoleKind::Number)),
-                Word::RequestLimit => (b"Request limit: ".as_slice(), Some(HoleKind::Number)),
+                Word::ProposalLimit => (b"Proposal capacity: ".as_slice(), Some(HoleKind::Number)),
                 Word::StagedLimit => (b"Staged limit: ".as_slice(), Some(HoleKind::Number)),
                 Word::Watches => (b"Standing watches: ".as_slice(), Some(HoleKind::Number)),
                 Word::IncidentLimit => (b"Incident limit: ".as_slice(), Some(HoleKind::Number)),
@@ -575,6 +587,13 @@ impl Words {
                 Word::NotAllowed => (b"This request is not allowed".as_slice(), None),
                 Word::Conflict => (b"The environment facts conflict".as_slice(), None),
                 Word::Invalid => (b"The request is invalid".as_slice(), None),
+                Word::SystemRequestBudgetNotKept => {
+                    (b"System request budget: not kept by this connector".as_slice(), None)
+                }
+                Word::LastSystemResponseNotKept => {
+                    (b"What the system last said: not kept by this connector".as_slice(), None)
+                }
+                Word::ReadLimit => (b"Read capacity: ".as_slice(), Some(HoleKind::Number)),
             };
             let (holes, segments): (Box<[HoleShape]>, Box<[Segment]>) = match hole {
                 Some(kind) => (
@@ -625,5 +644,5 @@ impl Words {
 }
 #[must_use]
 pub const fn phrase_limits(text: u32) -> PhraseLimits {
-    PhraseLimits { languages: 1, phrases: 108, holes: 1, segments: 216, text_bytes: 8192, hole_bytes: text }
+    PhraseLimits { languages: 1, phrases: 111, holes: 1, segments: 222, text_bytes: 8192, hole_bytes: text }
 }

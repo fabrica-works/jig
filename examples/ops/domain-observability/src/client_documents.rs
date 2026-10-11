@@ -38,7 +38,7 @@ pub enum ClientDocument {
     Alert { alert: crate::Alert, raised: Wall, state: IncidentState, fact: Option<crate::Fact> },
     Outbox { entry: crate::Entry },
     Project { project: u32, services: List<ClientService>, incidents: List<Incident> },
-    Deployment { watches: u32, effects: List<crate::Entry>, request_limit: u32, incident_limit: u32 },
+    Deployment { watches: u32, effects: List<crate::Entry>, read_limit: u32, incident_limit: u32 },
 }
 
 pub(crate) fn prepare(domain: &mut Domain, limits: &Limits, token: Token, subject: ClientSubject) {
@@ -152,7 +152,7 @@ fn make(
             Ok(ClientDocument::Deployment {
                 watches: domain.watches.len(),
                 effects,
-                request_limit: limits.reads,
+                read_limit: limits.reads,
                 incident_limit: crate::incidents::capacity(limits).expect("incident bound"),
             })
         }

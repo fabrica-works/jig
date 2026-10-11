@@ -16,11 +16,12 @@ impl Limits {
     ) -> Option<Self> {
         let rows = domain.observability.rows.max(domain.infrastructure.rows);
         // Each nested row contributes at most eighty fact, heading, form or fallback nodes.
+        // The fixed part reserve includes both deferred Deployment diagnostics.
         let part = rows
             .checked_add(1)?
             .checked_mul(rows.checked_add(1)?)?
             .checked_mul(80)?
-            .checked_add(32)?
+            .checked_add(34)?
             .checked_add(jig_client_view::refusal_nodes(&domain.jig)?)?;
         let application_nodes = part.checked_mul(rows.checked_add(1)?)?;
         // A full connector document is reached through a chip phase, runtime,

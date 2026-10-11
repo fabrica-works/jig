@@ -91,7 +91,7 @@ pub struct PartDocument {
     pub services: List<ServiceState>,
     pub effects: List<Effect>,
     pub watches: Option<u32>,
-    pub request_limit: Option<u32>,
+    pub read_limit: Option<u32>,
     pub incident_limit: Option<u32>,
 }
 /// Recovery state of an observed silence effect.

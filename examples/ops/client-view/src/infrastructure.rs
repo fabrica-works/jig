@@ -354,6 +354,44 @@ fn show_resource(builder: &mut Builder, resource: &Resource, words: &Words) {
         }
     }
 }
+// Deferred connector facts are shown only after receiving its actual Deployment document.
+fn deployment_diagnostics(builder: &mut Builder, subject: Subject, words: &Words) {
+    match subject.kind {
+        Kind::Deployment => {
+            words.text(builder, Word::SystemRequestBudgetNotKept, &[]);
+            words.text(builder, Word::LastSystemResponseNotKept, &[]);
+        }
+        Kind::Environments { .. }
+        | Kind::Environment(_)
+        | Kind::Panel(_)
+        | Kind::Result(_)
+        | Kind::Effect(_)
+        | Kind::Outbox(_)
+        | Kind::Hold(_)
+        | Kind::Project(_) => {}
+    }
+}
+fn deployment_capacities(builder: &mut Builder, part: &infrastructure::documents::PartDocument, words: &Words) {
+    if let Some(view) = part.backend {
+        words.status(
+            builder,
+            match view {
+                Backend::OperationIds => Word::BackendIds,
+                Backend::NoOperationIds => Word::BackendNoIds,
+            },
+            &[],
+        );
+    }
+    if let Some(view) = part.made {
+        words.text(builder, Word::Made, &[Hole::Number(u64::from(view))]);
+    }
+    if let Some(view) = part.proposal_limit {
+        words.text(builder, Word::ProposalLimit, &[Hole::Number(u64::from(view))]);
+    }
+    if let Some(view) = part.staged_limit {
+        words.text(builder, Word::StagedLimit, &[Hole::Number(u64::from(view))]);
+    }
+}
 fn document_view(builder: &mut Builder, document: &Document, words: &Words, bindings: &mut Bindings) {
     match document {
         Document::Environment(entry) => show_environment(builder, entry, words),
@@ -374,6 +412,7 @@ fn document_view(builder: &mut Builder, document: &Document, words: &Words, bind
             }
         }
         Document::Part(part) => {
+            deployment_diagnostics(builder, part.subject, words);
             if let Some(view) = &part.panel {
                 show_panel(builder, view, words);
             }
@@ -432,25 +471,7 @@ fn document_view(builder: &mut Builder, document: &Document, words: &Words, bind
             for view in &part.pools {
                 show_pool(builder, view, words);
             }
-            if let Some(view) = part.backend {
-                words.status(
-                    builder,
-                    match view {
-                        Backend::OperationIds => Word::BackendIds,
-                        Backend::NoOperationIds => Word::BackendNoIds,
-                    },
-                    &[],
-                );
-            }
-            if let Some(view) = part.made {
-                words.text(builder, Word::Made, &[Hole::Number(u64::from(view))]);
-            }
-            if let Some(view) = part.request_limit {
-                words.text(builder, Word::RequestLimit, &[Hole::Number(u64::from(view))]);
-            }
-            if let Some(view) = part.staged_limit {
-                words.text(builder, Word::StagedLimit, &[Hole::Number(u64::from(view))]);
-            }
+            deployment_capacities(builder, part, words);
         }
     }
 }

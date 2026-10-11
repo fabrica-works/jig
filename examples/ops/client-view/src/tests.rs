@@ -575,7 +575,7 @@ fn an_incident_with_a_proposal_and_an_infrastructure_panel_fills_both_slot_passe
                         pools: List::with_capacity(2),
                         backend: None,
                         made: None,
-                        request_limit: None,
+                        proposal_limit: None,
                         staged_limit: None,
                     };
                     drive(
@@ -962,7 +962,7 @@ fn outbox_document(subject: infrastructure::Subject) -> infrastructure::Document
         pools: List::with_capacity(0),
         backend: None,
         made: None,
-        request_limit: None,
+        proposal_limit: None,
         staged_limit: None,
     }))
 }
@@ -1075,4 +1075,197 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     }
     jig_bindings.begin();
     assert!(slots.iter().all(|slot| jig_bindings.part(slot.reference.token).is_none()));
+}
+
+fn deployment_read(root: &mut Domain, connector: u16) -> Request {
+    let rows = drive(
+        root,
+        Event::Went { place: root::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+    );
+    let watch = rows
+        .iter()
+        .find_map(|request| match request {
+            Request::Jig(JigOut::Open { watch, subject: Subject::Deployment }) => Some(*watch),
+            _ => None,
+        })
+        .unwrap();
+    let rows = drive(
+        root,
+        Event::Jig(jig_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                hosts: list([]),
+                accounts: list([]),
+                capacity: list([]),
+                proposals: 0,
+                refusals: list([]),
+                parts: list([Part::Deployment { connector }]),
+            }))),
+        }),
+    );
+    rows.into_iter()
+        .find(|request| match request {
+            Request::Infrastructure(infrastructure::Out::Read { .. })
+            | Request::Observability(observability::Out::Read { .. }) => true,
+            _ => false,
+        })
+        .unwrap()
+}
+
+fn infrastructure_deployment(subject: infrastructure::Subject) -> infrastructure::Document {
+    let infrastructure::Document::Part(mut document) = outbox_document(subject) else { panic!("whole fixture part") };
+    let mut uncertain = document.effects.as_slice()[0].clone();
+    uncertain.entry = 18;
+    uncertain.state = infrastructure::documents::EffectState::Uncertain;
+    document.effects = list([document.effects.as_slice()[0].clone(), uncertain]);
+    document.proposal_limit = Some(u32::MAX);
+    document.staged_limit = Some(7);
+    infrastructure::Document::Part(document)
+}
+
+fn observability_deployment(subject: observability::Subject) -> observability::Document {
+    use infrastructure::documents::{Creation, Purpose};
+    use observability::documents::{Effect, EffectState, PartDocument};
+    let entry = Effect {
+        entry: 17,
+        task: 29,
+        project: Some(91),
+        alert: 31,
+        until: Wall::EPOCH,
+        state: EffectState::Sent,
+        attempt: 2,
+        deadline: Wall::EPOCH,
+        origin: Creation { deployment: [4; 16], task: 29, origin: Purpose::Procedure { purpose: 2 }, purpose: 2 },
+    };
+    let mut uncertain = entry.clone();
+    uncertain.entry = 18;
+    uncertain.state = EffectState::Uncertain;
+    observability::Document::Part(Box::new(PartDocument {
+        subject,
+        revision: Revision { value: 7 },
+        service: None,
+        health: None,
+        incident: None,
+        incidents: list([]),
+        services: list([]),
+        effects: list([entry, uncertain]),
+        watches: Some(3),
+        read_limit: Some(u32::MAX),
+        incident_limit: Some(7),
+    }))
+}
+
+#[test]
+fn known_deployment_parts_name_actual_capacities_and_deferred_diagnostics_without_changing_outbox_facts() {
+    for connector in [1, 2] {
+        let mut root = ready();
+        let request = deployment_read(&mut root, connector);
+        let mut view = view();
+        let mut patches = Queue::with_capacity(view.limits().tree.patches);
+        build(&mut view, &root, &mut patches);
+        assert!(contains(&view, b"Loading"));
+        assert!(!contains(&view, b"not kept by this connector"));
+        match request {
+            Request::Infrastructure(infrastructure::Out::Read { read, subject }) => {
+                assert_eq!(
+                    subject,
+                    infrastructure::Subject {
+                        scope: infrastructure::Scope::Deployment,
+                        kind: infrastructure::Kind::Deployment
+                    }
+                );
+                let document = infrastructure_deployment(subject);
+                drive(
+                    &mut root,
+                    Event::Infrastructure(infrastructure::Event::Read {
+                        read,
+                        result: infrastructure::ReadResult::Value(Box::new(document.clone())),
+                    }),
+                );
+                let object = root.infrastructure().find(subject).unwrap();
+                assert_eq!(
+                    root.infrastructure().object(object).unwrap().value,
+                    infrastructure::Value::Known(Box::new(document))
+                );
+            }
+            Request::Observability(observability::Out::Read { read, subject }) => {
+                assert_eq!(
+                    subject,
+                    observability::Subject {
+                        scope: observability::Scope::Deployment,
+                        kind: observability::Kind::Deployment
+                    }
+                );
+                let document = observability_deployment(subject);
+                drive(
+                    &mut root,
+                    Event::Observability(observability::Event::Read {
+                        read,
+                        result: observability::ReadResult::Value(Box::new(document.clone())),
+                    }),
+                );
+                let object = root.observability().find(subject).unwrap();
+                assert_eq!(
+                    root.observability().object(object).unwrap().value,
+                    observability::Value::Known(Box::new(document))
+                );
+            }
+            _ => panic!("connector Deployment read"),
+        }
+        build(&mut view, &root, &mut patches);
+        assert!(contains(&view, b"System request budget: not kept by this connector"));
+        assert!(contains(&view, b"What the system last said: not kept by this connector"));
+        assert!(contains(
+            &view,
+            if connector == 1 { b"Read capacity: 4294967295" } else { b"Proposal capacity: 4294967295" }
+        ));
+        assert!(!contains(&view, b"Request limit:"));
+        assert!(contains(&view, b"Outbox entry 17"));
+        assert!(contains(&view, b"Outbox entry 18"));
+        assert!(contains(&view, b"Sent"));
+        assert!(contains(&view, b"Uncertain"));
+        assert!(view.tree().len() <= view.limits().tree.nodes);
+        assert!(view.tree().nodes().iter().all(|node| {
+            node.text.iter().all(|run| run.text.len() <= usize::try_from(view.limits().tree.text_per_node).unwrap())
+        }));
+    }
+}
+
+#[test]
+fn unknown_deployment_parts_keep_missing_owner_facts_without_not_kept_captions() {
+    for connector in [1, 2] {
+        let mut root = ready();
+        match deployment_read(&mut root, connector) {
+            Request::Infrastructure(infrastructure::Out::Read { read, subject }) => {
+                drive(
+                    &mut root,
+                    Event::Infrastructure(infrastructure::Event::Read {
+                        read,
+                        result: infrastructure::ReadResult::Unknown,
+                    }),
+                );
+                let object = root.infrastructure().find(subject).unwrap();
+                assert_eq!(root.infrastructure().object(object).unwrap().value, infrastructure::Value::Unknown);
+            }
+            Request::Observability(observability::Out::Read { read, subject }) => {
+                drive(
+                    &mut root,
+                    Event::Observability(observability::Event::Read {
+                        read,
+                        result: observability::ReadResult::Unknown,
+                    }),
+                );
+                let object = root.observability().find(subject).unwrap();
+                assert_eq!(root.observability().object(object).unwrap().value, observability::Value::Unknown);
+            }
+            _ => panic!("connector Deployment read"),
+        }
+        let mut view = view();
+        let mut patches = Queue::with_capacity(view.limits().tree.patches);
+        build(&mut view, &root, &mut patches);
+        assert!(contains(&view, b"Unknown"));
+        assert!(!contains(&view, b"not kept by this connector"));
+        assert!(!contains(&view, b"capacity:"));
+        assert!(view.tree().len() <= view.limits().tree.nodes);
+    }
 }

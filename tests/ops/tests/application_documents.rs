@@ -449,3 +449,42 @@ fn open_incident_from_triage(world: &mut jig_ops_world::World, service: &obs::Se
         }]),
     });
 }
+
+#[test]
+fn deployment_documents_supply_actual_proposal_and_read_capacities_without_writes_or_system_calls() {
+    let mut infrastructure = jig_ops_world::InfrastructureWorld::new(0, infra::Backend::OperationIds);
+    let mut observability = jig_ops_world::World::new(0);
+    for cold in [false, true] {
+        if cold {
+            infrastructure.restart();
+            observability.restart();
+        }
+        let infra::ClientDocument::Deployment { effects, proposal_limit, staged_limit, .. } =
+            infrastructure_read(&mut infrastructure, infra::ClientScope::Deployment, infra::ClientSubject::Deployment)
+                .expect("bounded Deployment fixture")
+        else {
+            panic!("whole infrastructure Deployment")
+        };
+        assert_eq!(proposal_limit, jig_ops_world::infrastructure_limits().proposals);
+        assert_eq!(staged_limit, jig_ops_world::infrastructure_limits().staged);
+        assert!(effects.is_empty());
+        assert_eq!(effects.capacity(), jig_ops_world::infrastructure_limits().effects);
+        let obs::ClientDocument::Deployment { effects, read_limit, incident_limit, watches } =
+            observability_read(&mut observability, obs::ClientScope::Deployment, obs::ClientSubject::Deployment)
+                .expect("bounded Deployment fixture")
+        else {
+            panic!("whole observability Deployment")
+        };
+        assert_eq!(read_limit, jig_ops_world::limits().reads);
+        assert_eq!(
+            incident_limit,
+            jig_ops_world::limits()
+                .watches
+                .checked_mul(jig_ops_world::limits().alerts_per_batch)
+                .expect("bounded Deployment fixture")
+        );
+        assert_eq!(watches, 0);
+        assert!(effects.is_empty());
+        assert_eq!(effects.capacity(), jig_ops_world::limits().effects);
+    }
+}

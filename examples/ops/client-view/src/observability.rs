@@ -119,6 +119,23 @@ fn health_view(builder: &mut Builder, health: observability::documents::Health, 
     builder.text(Run::Plain, b" %");
     words.text(builder, Word::Observed, &[Hole::Wall(health.observed)]);
 }
+// Deferred connector facts are shown only after receiving its actual Deployment document.
+fn deployment_diagnostics(builder: &mut Builder, subject: Subject, words: &Words) {
+    match subject.kind {
+        Kind::Deployment => {
+            words.text(builder, Word::SystemRequestBudgetNotKept, &[]);
+            words.text(builder, Word::LastSystemResponseNotKept, &[]);
+        }
+        Kind::Incidents { .. }
+        | Kind::Incident(_)
+        | Kind::Panel(_)
+        | Kind::Result(_)
+        | Kind::Effect(_)
+        | Kind::Outbox(_)
+        | Kind::Hold(_)
+        | Kind::Project(_) => {}
+    }
+}
 fn document_view(builder: &mut Builder, document: &Document, words: &Words, bindings: &mut Bindings) {
     match document {
         Document::Incident(incident) => show_incident(builder, incident, words, bindings, true),
@@ -144,6 +161,7 @@ fn document_view(builder: &mut Builder, document: &Document, words: &Words, bind
             builder.close();
         }
         Document::Part(part) => {
+            deployment_diagnostics(builder, part.subject, words);
             if let Some(service) = &part.service {
                 show_service(builder, service, words);
             }
@@ -183,8 +201,8 @@ fn document_view(builder: &mut Builder, document: &Document, words: &Words, bind
             if let Some(view) = part.watches {
                 words.text(builder, Word::Watches, &[Hole::Number(u64::from(view))]);
             }
-            if let Some(view) = part.request_limit {
-                words.text(builder, Word::RequestLimit, &[Hole::Number(u64::from(view))]);
+            if let Some(view) = part.read_limit {
+                words.text(builder, Word::ReadLimit, &[Hole::Number(u64::from(view))]);
             }
             if let Some(view) = part.incident_limit {
                 words.text(builder, Word::IncidentLimit, &[Hole::Number(u64::from(view))]);

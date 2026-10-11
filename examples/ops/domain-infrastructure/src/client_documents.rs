@@ -99,7 +99,7 @@ pub enum ClientDocument {
         backend: crate::Backend,
         effects: List<crate::Entry>,
         made: u32,
-        request_limit: u32,
+        proposal_limit: u32,
         staged_limit: u32,
     },
 }
@@ -346,7 +346,7 @@ fn make(
                 backend: domain.backend,
                 effects: effects(domain, limits, None),
                 made: domain.made.len(),
-                request_limit: limits.proposals,
+                proposal_limit: limits.proposals,
                 staged_limit: limits.staged,
             })
         }
