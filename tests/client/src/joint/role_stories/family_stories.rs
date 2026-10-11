@@ -158,8 +158,8 @@ fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card()
             Step::See { find: Find::text(b"ask the holder"), within },
             Step::See { find: Find::text(b"Proposed effect"), within },
             Step::See { find: Find::text(b"Effect description"), within },
-            Step::See { find: Find::text(b"Kind: 5"), within },
-            Step::See { find: Find::text(b"Purpose: 19"), within },
+            Step::See { find: Find::text(b"Effect kind: 5"), within },
+            Step::See { find: Find::text(b"Effect purpose: 19"), within },
         ],
     );
     let outcome = world.run(Until::Done);

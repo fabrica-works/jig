@@ -147,27 +147,6 @@ fn an_inbox_acceptance_updates_the_same_proposal_still_shown_in_the_chat() {
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
     assert!(outcome.judged.0 > 0);
-    let received = world.front().session.task_offers(member, 1).expect("actual chat Task packet");
-    eprintln!(
-        "actual proposal lists source {:?} native {:?}",
-        received.source_task.proposals, received.native_task.proposals
-    );
-    eprintln!(
-        "actual immutable activity {:?}",
-        world
-            .front()
-            .session
-            .driver
-            .world
-            .store
-            .rows
-            .values()
-            .filter(|row| matches!(
-                row,
-                jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Activity(_)))
-            ))
-            .collect::<Vec<_>>()
-    );
     world.person(
         member,
         vec![
