@@ -1,6 +1,9 @@
 //! Project policy and notes (`client/domain/pages.md`, sections 6.1, 6.4, 6.5).
 //! Notes' bodies are loaded on demand by their child; this module builds a
 //! document from that loaded entry without adding a mutable cache.
+//! Pool edits target the configured period independently of the observed
+//! period. Permission mappings come from the core's retained policy entry;
+//! an absent entry remains absent, and each new list states its own loss.
 use super::{AuthorityLine, Chip, GrantLine, Missing, NoteScope, Part, PartKind, PatternEnd, ProposedTask, Text};
 use crate::{Core, Limits};
 use alloc::boxed::Box;
@@ -50,6 +53,8 @@ pub struct Policy {
     pub projections: List<GrantLine>,
     pub roles: List<PolicyRole>,
     pub requirements: List<Requirement>,
+    pub permissions: Option<List<people::PermissionRole>>,
+    pub permissions_cut: bool,
     pub cut: bool,
 }
 /// A retained party's membership; services carry the same role facts.
@@ -105,6 +110,9 @@ pub struct Project {
     pub members: List<Member>,
     pub current_period: Option<Ledger>,
     pub pools: List<Ledger>,
+    pub configured_period: u64,
+    pub configured_pools: List<Ledger>,
+    pub configured_pools_cut: bool,
     pub spend: List<SpendLine>,
     pub recurring: List<Recurring>,
     pub cut: bool,
@@ -202,7 +210,11 @@ fn authority_line(limits: &Limits, value: &authority::Authority) -> Result<Autho
             || value.note_resources.len() > bound(limits),
     })
 }
-fn policy(limits: &Limits, value: &authority::Policy) -> Result<Policy, Missing> {
+fn policy(
+    limits: &Limits,
+    value: &authority::Policy,
+    mappings: Option<&[people::PermissionRole]>,
+) -> Result<Policy, Missing> {
     let mut roles = List::with_capacity(limits.documents.lines);
     for value in value.roles.iter().take(bound(limits)) {
         roles
@@ -235,6 +247,18 @@ fn policy(limits: &Limits, value: &authority::Policy) -> Result<Policy, Missing>
     for value in value.projections.iter().take(bound(limits)) {
         projections.push(grant(limits, value)?).expect("bounded projection grants");
     }
+    let mut permissions_cut = false;
+    let permissions = match mappings {
+        Some(mappings) => {
+            let mut permissions = List::with_capacity(limits.documents.lines);
+            for mapping in mappings.iter().take(bound(limits)) {
+                permissions.push(*mapping).expect("bounded permission mappings");
+            }
+            permissions_cut = mappings.len() > bound(limits);
+            Some(permissions)
+        }
+        None => None,
+    };
     Ok(Policy {
         ceiling: authority_line(limits, &value.ceiling)?,
         period_spend: value.period_spend,
@@ -242,9 +266,12 @@ fn policy(limits: &Limits, value: &authority::Policy) -> Result<Policy, Missing>
         projections,
         roles,
         requirements,
+        permissions,
+        permissions_cut,
         cut: value.roles.len() > bound(limits)
             || value.requirements.len() > bound(limits)
-            || value.projections.len() > bound(limits),
+            || value.projections.len() > bound(limits)
+            || permissions_cut,
     })
 }
 #[expect(clippy::manual_map, reason = "step code matches options without closures")]
@@ -342,6 +369,24 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
             | tasks::Funder::Recurring { .. } => {}
         }
     }
+    let mut configured_pools = List::with_capacity(limits.documents.lines);
+    let mut configured_pools_cut = false;
+    for (source, value) in core.tasks.funding_records() {
+        match source {
+            tasks::Funder::Pool { project, period, .. } if *project == number && *period == core.settings.period => {
+                if configured_pools.room() > 0 {
+                    configured_pools.push(ledger(value)).expect("bounded configured pools");
+                } else {
+                    configured_pools_cut = true;
+                }
+            }
+            tasks::Funder::Task(_)
+            | tasks::Funder::Pool { .. }
+            | tasks::Funder::Period { .. }
+            | tasks::Funder::Recurring { .. } => {}
+        }
+    }
+    cut |= configured_pools_cut;
     let rows = core.tasks.view_tasks();
     let mut ordered = Map::with_capacity(limits.tasks.tasks);
     let mut recurring = List::with_capacity(limits.documents.lines);
@@ -418,10 +463,20 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
         acts: super::offers::subject(core, limits, party, &super::Subject::Project { project: number })?,
         number,
         resources,
-        policy: policy(limits, value)?,
+        policy: policy(
+            limits,
+            value,
+            match core.permission_roles.get(&number) {
+                Some(mappings) => Some(mappings.as_ref()),
+                None => None,
+            },
+        )?,
         members,
         current_period,
         pools,
+        configured_period: core.settings.period,
+        configured_pools,
+        configured_pools_cut,
         spend,
         recurring,
         cut,
@@ -505,5 +560,7 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     super::task_tree::overview_worst_case(limits)?
         .checked_mul(carriers)?
         .checked_add(super::offers::heap_worst_case(limits)?)?
+        .checked_add(List::<people::PermissionRole>::worst_case(limits.lines)?)?
+        .checked_add(List::<Ledger>::worst_case(limits.lines)?)?
         .checked_add(u64::try_from(size_of::<Project>()).ok()?)
 }

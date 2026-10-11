@@ -2825,6 +2825,7 @@ mod periods;
 mod project_tasks;
 
 mod frame_facts;
+mod project_baselines;
 
 #[test]
 fn approval_documents_keep_opaque_state_whole_and_refuse_a_smaller_bound() {
