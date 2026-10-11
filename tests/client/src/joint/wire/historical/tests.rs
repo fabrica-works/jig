@@ -394,7 +394,7 @@ fn historical_person_proposal_states_keep_the_independent_whole_decision_and_cre
             assert_eq!(proposal.goal.numbers.reserved, 7);
             match &state {
                 tasks::PersonProposalState::Pending { since } => {
-                    assert_eq!(proposal.state, client::OwnerPersonProposalState::Pending { since: *since })
+                    assert_eq!(proposal.state, client::OwnerPersonProposalState::Pending { since: *since });
                 }
                 tasks::PersonProposalState::Accepted { .. } => assert_eq!(
                     proposal.state,
@@ -476,7 +476,7 @@ fn historical_raw_goal_contracts_keep_opaque_state_closed_machine_fields_and_cha
                 assert_eq!(field.max, u32::MAX);
             }
             client::TaskContractDocument::Change { connector, kind, words } => {
-                assert_eq!((connector, kind, words), (u16::MAX, 0, u32::MAX))
+                assert_eq!((connector, kind, words), (u16::MAX, 0, u32::MAX));
             }
         }
     }
