@@ -343,7 +343,10 @@ mod tests {
         assert!(front.watch_token(ClientId(0), native).is_none());
         assert_eq!(front.watch_token(ClientId(1), native), Some(other));
         assert_eq!(front.watches(), vec![other]);
-        assert_eq!(front.watch(owner).unwrap().subject, Watched::Jig(subject.clone()));
+        assert_eq!(
+            front.watch(owner).expect("closing retains the original route").subject,
+            Watched::Jig(subject.clone())
+        );
         assert!(front.delivered(owner, Pace::Document));
         assert!(front.delivered(owner, Pace::Stream));
         assert!(front.delivered(other, Pace::Document));
@@ -352,8 +355,8 @@ mod tests {
         ] if *a == owner && *b == owner));
         assert!(front.closed_flights(owner).is_empty(), "each real terminal occurs once");
         assert!(matches!(front.taken(ClientId(1), native), Some(Event::Delivered { watcher }) if watcher == other));
-        assert!(front.continued(ClientId(0), native, subject).unwrap().is_none());
-        assert_eq!(front.end_watch(owner).unwrap().native, native);
+        assert!(front.continued(ClientId(0), native, subject).expect("closed original continuation").is_none());
+        assert_eq!(front.end_watch(owner).expect("actual original terminal").native, native);
         assert!(front.watch(owner).is_none());
         assert!(!front.delivered(owner, Pace::Document));
         assert!(!front.is_closing(owner));
