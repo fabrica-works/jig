@@ -457,3 +457,48 @@ fn historical_task_person_and_proposal_presence_keeps_independent_sources_within
 fn historical_task_all_three_typed_presences_keep_repetition_and_whole_sources_within_bound() {
     presence(7);
 }
+#[test]
+fn historical_selected_language_uses_checked_native_captions_and_preserves_opaque_goal_values() {
+    use crate::phrases::{PhraseLimits, Phrasebook, Segment};
+    let english = crate::phrases::english::language();
+    let mut selected = english.clone();
+    for phrase in &mut selected.phrases {
+        if phrase.id == crate::owner_historical_words::HistoricalPhrase::Historical.id() {
+            for form in &mut phrase.forms {
+                for segment in &mut form.segments {
+                    if let Segment::Text(bytes) = segment {
+                        *bytes = Box::from(b"Selected historical source".as_slice());
+                    }
+                }
+            }
+        }
+    }
+    let words = crate::words::Words {
+        book: Phrasebook::load(
+            crate::phrases::jig::shapes(CLIENT.text),
+            Box::new([english, selected]),
+            &PhraseLimits {
+                languages: 2,
+                phrases: crate::owner_words::phrase_count(),
+                holes: 4,
+                segments: 9000,
+                text_bytes: 200000,
+                hole_bytes: CLIENT.text,
+            },
+        )
+        .unwrap(),
+        language: 1,
+        offset_minutes: 0,
+    };
+    let value = person();
+    let (tree, _) = build(&value, &words);
+    assert_eq!(tree.nodes().first().unwrap().name.as_deref(), Some(b"Selected historical source".as_slice()));
+    assert!(contains(&tree, b"\\xFF\\x00"));
+    assert!(contains(&tree, b"Reserved: 18446744073709551615"));
+    let f = view::required(&value, &CLIENT, &words).unwrap();
+    assert!(tree.len() <= f.nodes);
+    assert!(tree.text_bytes() <= f.text_bytes);
+    for phrase in crate::owner_historical_words::ALL {
+        assert!(words.book.capacity(phrase.id()).is_some());
+    }
+}
