@@ -146,7 +146,7 @@ fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card()
             key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion: 1, position: 0 },
             number: 1,
             effect: jig_core_world::effects::World::effect(),
-            deadline: clock(now).saturating_add(Duration::from_secs(1)),
+            deadline: skein_lib::Wall::from_nanos(clock(now).as_nanos() + 1_000_000_000),
             proposal: Some(b"ask the holder".as_slice().into()),
         },
     );
@@ -168,6 +168,12 @@ fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card()
     let engine = &world.front().session.driver.world;
     assert_eq!(engine.answers.len(), 1);
     assert!(matches!(engine.answers[0].2, jig_core::CallPart::Proposed { .. }));
-    assert!(engine.outbox.is_empty(), "a description does not make the proposed effect");
-    assert!(engine.systems[0].observed.is_empty());
+    assert!(
+        !engine.store.rows.values().any(|row| matches!(
+            row,
+            jig_test_domain::Record::Connector { record: jig_test_connector::Record::Outbox(_), .. }
+        )),
+        "a description does not make the proposed effect"
+    );
+    assert!(engine.systems[0].observed().is_empty());
 }
