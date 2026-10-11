@@ -202,7 +202,7 @@ fn deployment_keeps_host_placement_and_secret_free_account_flags_without_derivin
     assert_eq!(account.spent_until, Some(Wall::EPOCH));
     assert_eq!((account.runs.capacity(), account.waiting.capacity()), (2, 3));
     let expected = chips::chip(&chips::tests::source_chip(), &limits()).expect("supplied fixture value");
-    assert_eq!(account.runs.as_slice(), &[expected.clone()]);
+    assert_eq!(account.runs.as_slice(), std::slice::from_ref(&expected));
     assert_eq!(account.waiting.as_slice(), &[expected]);
 }
 

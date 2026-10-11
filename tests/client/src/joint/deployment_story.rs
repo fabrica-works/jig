@@ -108,7 +108,9 @@ fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from
         .filter_map(|node| node.slot)
         .map(|slot| match slot.owner {
             jig_client_view::Owner::Side { connector } => connector,
-            other => panic!("connector catalogue slot has its actual side owner: {other:?}"),
+            other @ (jig_client_view::Owner::Jig | jig_client_view::Owner::Other { .. }) => {
+                panic!("connector catalogue slot has its actual side owner: {other:?}")
+            }
         })
         .collect();
     assert_eq!(connectors, [1, 2], "both configured connectors retain their source order");
