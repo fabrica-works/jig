@@ -5,7 +5,7 @@
 use crate::{
     Builder, JigBindings, Limits, Tree, owner_result as view,
     owner_result_words::{self as result_words, ResultPhrase},
-    phrases::{Invalid, PhraseLimits, Phrasebook, Segment, WallFormat},
+    phrases::{Invalid, Language, PhraseLimits, Phrasebook, Segment, WallFormat},
     words::Words,
 };
 use jig_client::{
@@ -21,12 +21,22 @@ use skein_lib::{List, Wall, bytes::copy_of};
 fn client_limits() -> jig_client::Limits {
     jig_client::Limits { rows: 8, ..super::cards::CLIENT }
 }
-fn phrase_limits() -> PhraseLimits {
+fn phrase_limits(languages: &[Language]) -> PhraseLimits {
+    let mut segments = 0_u32;
+    for language in languages {
+        for phrase in &language.phrases {
+            for form in &phrase.forms {
+                segments = segments
+                    .checked_add(u32::try_from(form.segments.len()).expect("fixture segment count fits u32"))
+                    .expect("whole fixture segment count fits u32");
+            }
+        }
+    }
     PhraseLimits {
         languages: 2,
         phrases: crate::owner_words::phrase_count(),
         holes: 4,
-        segments: 4096,
+        segments,
         text_bytes: 100_000,
         hole_bytes: 128,
     }
@@ -175,7 +185,6 @@ fn result_metadata_reuses_whole_contract_opaque_parts_and_owner_executor() {
 }
 #[test]
 fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capacity() {
-    let limits = phrase_limits();
     let normal = crate::phrases::english::language();
     let mut translated = crate::phrases::english::language();
     translated.wall = WallFormat::Clock;
@@ -189,7 +198,9 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
             }
         }
     }
-    let book = Phrasebook::load(crate::phrases::jig::shapes(128), Box::new([normal, translated]), &limits).unwrap();
+    let languages = Box::new([normal, translated]);
+    let limits = phrase_limits(languages.as_slice());
+    let book = Phrasebook::load(crate::phrases::jig::shapes(128), languages, &limits).unwrap();
     let words = Words { book, language: 1, offset_minutes: 0 };
     let tree = build(&details(), &words);
     assert!(has(&tree, b"selected 4294967295"));
