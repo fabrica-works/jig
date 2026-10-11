@@ -512,6 +512,16 @@ impl World {
                         busy: false,
                     }));
                 }
+                root::Request::Now(core::Now::HistoricalProposal { request, person, project, proposer, proposal }) => {
+                    self.events.push_back(crate::historical::proposal(
+                        &self.store,
+                        request,
+                        person,
+                        project,
+                        proposer,
+                        proposal,
+                    ));
+                }
                 root::Request::Now(_) => {}
                 root::Request::Restart(_) => panic!("walking fixture uses restored markers"),
                 root::Request::Stop => panic!("testing root stopped: {:?}", self.trace),

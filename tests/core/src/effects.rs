@@ -575,6 +575,22 @@ impl World {
                             busy: false,
                         }));
                     }
+                    root::Request::Now(core::Now::HistoricalProposal {
+                        request,
+                        person,
+                        project,
+                        proposer,
+                        proposal,
+                    }) => {
+                        self.events.push_back(crate::historical::proposal(
+                            &self.store,
+                            request,
+                            person,
+                            project,
+                            proposer,
+                            proposal,
+                        ));
+                    }
                     root::Request::Now(now) => {
                         if let Some(peer) = &mut self.client_peer
                             && crate::client_peer::ClientPeer::immediate(&now)
