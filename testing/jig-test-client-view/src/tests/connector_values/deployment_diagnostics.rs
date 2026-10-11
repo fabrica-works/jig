@@ -103,14 +103,18 @@ fn deployment_diagnostic_captions_select_the_checked_language_and_require_both_n
         assert!(word.shape().holes.is_empty());
         let mut language = words::language(phrases::english::language());
         language.phrases = language.phrases.into_vec().into_iter().filter(|phrase| phrase.id != word.id()).collect();
-        assert!(Phrasebook::load(words::shapes(phrases::jig::shapes(64)), Box::new([language]), &bounds).is_err());
+        let Err(_) = Phrasebook::load(words::shapes(phrases::jig::shapes(64)), Box::new([language]), &bounds) else {
+            panic!("missing diagnostic caption is rejected")
+        };
         let mut language = words::language(phrases::english::language());
         let phrase = language.phrases.iter_mut().find(|phrase| phrase.id == word.id()).unwrap();
         phrase.forms = Box::new([PhraseForm {
             class: PluralClass::Other,
             segments: Box::new([Segment::Hole { index: 0, kind: HoleKind::Number }]),
         }]);
-        assert!(Phrasebook::load(words::shapes(phrases::jig::shapes(64)), Box::new([language]), &bounds).is_err());
+        let Err(_) = Phrasebook::load(words::shapes(phrases::jig::shapes(64)), Box::new([language]), &bounds) else {
+            panic!("a diagnostic hole is rejected")
+        };
     }
 }
 
@@ -120,13 +124,14 @@ fn deployment_diagnostic_nodes_fit_the_existing_whole_envelope_with_empty_and_fu
     for rows in [list(3, []), list(3, [entry(), entry(), entry()])] {
         let tree = document(value(rows), Scope::Deployment, &words);
         let bounds = render::requirements(&limits(), &words).unwrap();
+        let text_per_node = usize::try_from(bounds.text_per_node).unwrap();
         assert!(tree.len() <= bounds.nodes);
         for node in tree.nodes() {
             if let Some(name) = &node.name {
-                assert!(name.len() <= bounds.text_per_node as usize);
+                assert!(name.len() <= text_per_node);
             }
             for run in &node.text {
-                assert!(run.text.len() <= bounds.text_per_node as usize);
+                assert!(run.text.len() <= text_per_node);
             }
         }
         assert!(render::worst_case(&limits(), &words).unwrap() >= jig_client_view::worst_case(&bounds).unwrap());
