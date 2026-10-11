@@ -219,6 +219,7 @@ pub fn card(
                         Act::Go { address: jig_client::address::Address::task(*task) },
                     );
                 }
+                common::answer(b, facts, words);
                 common::acts(b, &facts.card, &document.acts, object, words, bindings);
                 close(b);
             }
