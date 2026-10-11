@@ -37,7 +37,10 @@ fn the_worlds_original_storage_counts_construct_a_finite_view() {
     let mut builder = Builder::new(&limits.tree);
     builder.open(Role::Page);
     for _ in 0..256 {
-        builder.slot(SlotRef { owner: Owner::Connector(1), token: Token::new(1) }, b"loading");
+        builder.slot(
+            SlotRef { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, token: Token::new(1) },
+            b"loading",
+        );
     }
     for _ in 0..511 {
         builder.open(Role::Text);
@@ -130,5 +133,8 @@ fn a_world_fixture_beyond_its_slot_bound_is_rejected() {
     let limits = Limits::for_world(&world_domain(), &super::words(), &super::family_words(), 8, 0).unwrap();
     let mut builder = Builder::new(&limits.tree);
     builder.open(Role::Page);
-    builder.slot(SlotRef { owner: Owner::Connector(1), token: Token::new(1) }, b"loading");
+    builder.slot(
+        SlotRef { owner: Owner::Side { connector: jig_test_client_domain::FIRST }, token: Token::new(1) },
+        b"loading",
+    );
 }
