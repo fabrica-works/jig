@@ -174,12 +174,7 @@ fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card()
             Step::See { find: Find::text(b"Effect purpose: 19"), within },
         ],
     );
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| world.run(Until::Done)));
-    eprintln!("EFFECT ACTUAL STORE: {:#?}", world.front().session.driver.world.store.rows);
-    let outcome = match result {
-        Ok(outcome) => outcome,
-        Err(payload) => std::panic::resume_unwind(payload),
-    };
+    let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert!(outcome.judged.0 > 0);
     let engine = &world.front().session.driver.world;
