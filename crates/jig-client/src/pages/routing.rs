@@ -374,7 +374,10 @@ pub(crate) fn read_result(
     result: ReadResult,
     out: &mut Queue<Request>,
 ) {
-    if !owner_inbox_read_valid(domain, env, token, &result) || !historical_read_valid(domain, env, token, &result) {
+    if !owner_escalation_read_valid(domain, token, &result)
+        || !owner_inbox_read_valid(domain, env, token, &result)
+        || !historical_read_valid(domain, env, token, &result)
+    {
         refuse(domain, Limit::Reads);
         return;
     }
@@ -482,6 +485,10 @@ fn read_value(
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::Proposal(proposal));
         }
+        ReadValue::OwnerEscalation(value) => {
+            let key = ObjectKey::Escalation(value.task.chip.task);
+            read_body(domain, key, Body::OwnerEscalation(value));
+        }
         ReadValue::Escalation(escalation) => {
             let key = ObjectKey::Escalation(escalation.task.task);
             read_body(domain, key, Body::Escalation(escalation));
@@ -584,6 +591,7 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
             | ReadValue::Proposal(_)
             | ReadValue::OwnerProposal(_)
             | ReadValue::Escalation(_)
+            | ReadValue::OwnerEscalation(_)
             | ReadValue::Question(_)
             | ReadValue::PersonTask(_)
             | ReadValue::OwnerPersonTask(_)
@@ -692,6 +700,7 @@ fn received_value(
         | ReadValue::Proposal(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::Escalation(_)
+        | ReadValue::OwnerEscalation(_)
         | ReadValue::Question(_)
         | ReadValue::PersonTask(_)
         | ReadValue::OwnerPersonTask(_)
@@ -765,6 +774,7 @@ fn owner_tree_delivery(
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)
@@ -906,4 +916,70 @@ fn historical_edges_fit(before: Option<&contract::Cursor>, after: Option<&contra
         return false;
     }
     true
+}
+
+// Check the original read and supplied scope before consuming its one terminal.
+fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResult) -> bool {
+    let document = match result {
+        ReadResult::Value(ReadValue::OwnerEscalation(document)) => document,
+        ReadResult::Value(
+            ReadValue::Frame(_)
+            | ReadValue::Task(_)
+            | ReadValue::Proposal(_)
+            | ReadValue::Escalation(_)
+            | ReadValue::Question(_)
+            | ReadValue::PersonTask(_)
+            | ReadValue::Result(_)
+            | ReadValue::Ended(_)
+            | ReadValue::History(_)
+            | ReadValue::Activity(_)
+            | ReadValue::Inbox(_)
+            | ReadValue::OwnerInbox(_)
+            | ReadValue::Conversations(_)
+            | ReadValue::Goals(_)
+            | ReadValue::Spend(_)
+            | ReadValue::Project(_)
+            | ReadValue::Notes(_)
+            | ReadValue::Deployment(_),
+        )
+        | ReadResult::None(_) => return true,
+    };
+    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+        return true;
+    };
+    if read.abandoned || read.terminal || read.generation != domain.generation {
+        return true;
+    }
+    let task = match read.what {
+        Read::Escalation { task } => task,
+        Read::Frame
+        | Read::Task { .. }
+        | Read::Proposal { .. }
+        | Read::Question { .. }
+        | Read::PersonTask { .. }
+        | Read::Result { .. }
+        | Read::Ended { .. }
+        | Read::History { .. }
+        | Read::Activity { .. }
+        | Read::Inbox { .. }
+        | Read::Conversations { .. }
+        | Read::Goals { .. }
+        | Read::Spend { .. }
+        | Read::Project { .. }
+        | Read::Notes { .. }
+        | Read::Deployment => return false,
+    };
+    if task != document.task.chip.task {
+        return false;
+    }
+    let Some(id) = domain.objects.find(ObjectKey::Escalation(task)) else {
+        return true;
+    };
+    match domain.objects.get(id) {
+        Some(object) => match object.project {
+            Some(project) => project == document.task.project,
+            None => true,
+        },
+        None => true,
+    }
 }

@@ -383,6 +383,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)

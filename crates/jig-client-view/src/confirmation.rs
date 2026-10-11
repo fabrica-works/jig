@@ -102,6 +102,7 @@ fn context(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bin
         Some(Body::Task(task)) => crate::cards::chip::chip(b, client, &task.chip, words, bindings),
         Some(Body::Chip(chip)) => crate::cards::chip::chip(b, client, chip, words, bindings),
         Some(Body::Escalation(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
+        Some(Body::OwnerEscalation(doc)) => crate::cards::chip::chip(b, client, &doc.task.chip, words, bindings),
         Some(Body::Question(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::PersonTask(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
         Some(Body::OwnerPersonTask(doc)) => crate::cards::chip::chip(b, client, &doc.task, words, bindings),
@@ -136,6 +137,7 @@ fn action(
                     Body::Task(_)
                     | Body::Chip(_)
                     | Body::Escalation(_)
+                    | Body::OwnerEscalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
                     | Body::OwnerPersonTask(_)
@@ -183,6 +185,7 @@ fn action(
                     | Body::Proposal(_)
                     | Body::OwnerProposal(_)
                     | Body::Escalation(_)
+                    | Body::OwnerEscalation(_)
                     | Body::Result(_)
                     | Body::Note { .. },
                 )
@@ -299,7 +302,8 @@ fn action(
 fn held(object: &Object) -> bool {
     match &object.body {
         Some(Body::Task(doc)) => doc.hold.is_some(),
-        Some(Body::Escalation(_)) => true,
+        Some(Body::OwnerEscalation(doc)) => doc.task.hold.is_some(),
+        Some(Body::Escalation(_) | Body::OwnerEscalation(_)) => true,
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
@@ -321,6 +325,11 @@ fn release_object(b: &mut Builder, client: &Domain, object: &Object, words: &Wor
             None => {}
         },
         Some(Body::Escalation(doc)) => release(b, client, &doc.hold, words, bindings),
+        Some(Body::OwnerEscalation(doc)) => match &doc.task.hold {
+            Some(TaskHold::Document(hold)) => release(b, client, hold, words, bindings),
+            Some(TaskHold::Owner(hold)) => release_owner(b, hold, words, bindings),
+            None => {}
+        },
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
@@ -368,6 +377,7 @@ fn impact(object: &Object) -> Option<&Impact> {
             None => None,
         },
         Some(Body::Escalation(doc)) => Some(&doc.impact),
+        Some(Body::OwnerEscalation(doc)) => Some(&doc.task.context.as_ref()?.impact),
         Some(
             Body::Chip(_)
             | Body::Proposal(_)
@@ -473,6 +483,7 @@ fn delegates(
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)

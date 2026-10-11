@@ -96,6 +96,7 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
     };
     let (project, title) = match &object.body {
         Some(Body::Task(task)) => (Some(task.project), Some(task.chip.title.bytes.clone())),
+        Some(Body::OwnerEscalation(value)) => (Some(value.task.project), Some(value.task.chip.title.bytes.clone())),
         Some(Body::Chip(chip)) => (None, Some(chip.title.bytes.clone())),
         Some(Body::Escalation(value)) => (None, Some(value.task.title.bytes.clone())),
         Some(Body::Question(value)) => (None, Some(value.task.title.bytes.clone())),

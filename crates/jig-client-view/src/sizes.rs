@@ -180,6 +180,7 @@ pub fn card_nodes(limits: &Limits) -> Option<u32> {
             .max(result_nodes(limits)?)
             .max(reply_nodes(limits)?)
             .max(escalation_nodes(limits)?)
+            .max(owner_escalation_nodes(limits)?)
             .max(refusal_nodes(limits)?)
             .max(
                 frame_of_card(limits)?
@@ -231,3 +232,26 @@ pub use pages::{
     conversation_nodes, conversations_nodes, deployment_nodes, inbox_nodes, not_the_work_nodes, page_nodes,
     project_nodes, task_nodes,
 };
+
+/// Whole held-task escalation, including bounded input-result and person cards.
+#[must_use]
+pub fn owner_escalation_nodes(l: &Limits) -> Option<u32> {
+    let nested = result_nodes(l)?.max(person_task_nodes(l)?);
+    frame_of_card(l)?
+        .checked_add(chip_nodes(l)?)?
+        .checked_add(crate::owner_chip::max_nodes(l)?)?
+        .checked_add(l.rows.checked_add(20)?.checked_mul(l.rows)?)?
+        .checked_add(crate::task_result::nodes(l)?)?
+        .checked_add(crate::specification::nodes(l)?)?
+        .checked_add(crate::instructions::nodes(l)?)?
+        .checked_add(crate::proposed_task::contract_nodes(l)?)?
+        .checked_add(crate::owner_wake::policy_nodes())?
+        .checked_add(crate::owner_wake::subscription_nodes(l.rows)?)?
+        .checked_add(chip_nodes(l)?.checked_add(4)?.checked_mul(l.rows)?.checked_mul(3)?)?
+        .checked_add(nested.checked_mul(l.rows.checked_add(2)?)?)?
+        .checked_add(l.rows.checked_mul(36)?)?
+        .checked_add(crate::owner_authority::document_nodes(l.rows)?)?
+        .checked_add(crate::owner_budget::budget_nodes())?
+        .checked_add(l.rows.checked_mul(4)?)?
+        .checked_add(28)
+}

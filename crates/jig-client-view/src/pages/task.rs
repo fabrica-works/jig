@@ -41,6 +41,7 @@ pub fn task(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)
@@ -140,7 +141,7 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
         TaskSection::Activity | TaskSection::Plan | TaskSection::History | TaskSection::Budget => {}
     }
 }
-fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
     if let jig_client::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {
         crate::owner_chip::render(b, details, client, words, bindings);
     }
@@ -257,7 +258,7 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
         }
     }
 }
-fn budget(b: &mut Builder, doc: &Task, words: &Words, _bindings: &mut JigBindings) {
+pub(crate) fn budget(b: &mut Builder, doc: &Task, words: &Words, _bindings: &mut JigBindings) {
     crate::owner_budget::render(b, &doc.budget, words);
     if let Some(context) = &doc.context {
         for spend in &context.spend {

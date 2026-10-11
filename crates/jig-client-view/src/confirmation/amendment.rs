@@ -189,6 +189,7 @@ pub fn form(
     // Funding is kept with the document and may change independently of its spec revision.
     match &object.body {
         Some(Body::Task(doc)) => crate::proposed_task::funder(b, doc.budget.funder, words),
+        Some(Body::OwnerEscalation(doc)) => crate::proposed_task::funder(b, doc.task.budget.funder, words),
         Some(Body::Escalation(doc)) => words.actor(b, doc.steering.budget.funder),
         Some(
             Body::Chip(_)
@@ -206,6 +207,7 @@ pub fn form(
 fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
     let document = match &object.body {
         Some(Body::Task(doc)) => Some(&doc.authority),
+        Some(Body::OwnerEscalation(doc)) => Some(&doc.task.authority),
         Some(Body::Escalation(doc)) => Some(&doc.steering.authority),
         Some(
             Body::Chip(_)
@@ -228,12 +230,14 @@ fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
 fn task_loss(b: &mut Builder, object: &Object, words: &Words) {
     match &object.body {
         Some(Body::Task(doc)) if doc.cut => words.text(b, JigPhrase::TaskListsCut, &[]),
+        Some(Body::OwnerEscalation(doc)) if doc.task.cut => words.text(b, JigPhrase::TaskListsCut, &[]),
         Some(
             Body::Task(_)
             | Body::Chip(_)
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)
@@ -246,6 +250,7 @@ fn task_loss(b: &mut Builder, object: &Object, words: &Words) {
 fn loss(b: &mut Builder, object: &Object, words: &Words) {
     match &object.body {
         Some(Body::Task(doc)) => crate::instructions::before(b, doc.instructions.as_ref(), words),
+        Some(Body::OwnerEscalation(doc)) => crate::instructions::before(b, doc.task.instructions.as_ref(), words),
         Some(Body::Escalation(doc)) => crate::instructions::before(b, doc.steering.instructions.as_ref(), words),
         Some(
             Body::Chip(_)
@@ -261,6 +266,7 @@ fn loss(b: &mut Builder, object: &Object, words: &Words) {
     }
     let doc = match &object.body {
         Some(Body::Task(doc)) => Some(&doc.spec),
+        Some(Body::OwnerEscalation(doc)) => Some(&doc.task.spec),
         Some(Body::Escalation(doc)) => Some(&doc.steering.spec),
         Some(
             Body::Chip(_)
@@ -351,14 +357,8 @@ fn input(
 
 fn before(object: &Object) -> Option<Amendment> {
     Some(match &object.body {
-        Some(Body::Task(doc)) => Amendment {
-            addressed: task_address(doc),
-            spec: doc.spec.whole(),
-            instructions: crate::instructions::whole(doc.instructions.as_ref()),
-            wake: Some(doc.wake),
-            dependencies: if doc.cut { None } else { Some(numbers(&doc.dependencies)) },
-            authority: doc.authority.whole(),
-        },
+        Some(Body::Task(doc)) => task_before(doc),
+        Some(Body::OwnerEscalation(doc)) => task_before(&doc.task),
         Some(Body::Escalation(doc)) => Amendment {
             addressed: recipient_address(doc.steering.person_revision, doc.steering.addressed.as_ref(), object.project),
             spec: doc.steering.spec.whole(),
@@ -403,4 +403,15 @@ fn recipient_address(
         Recipient::Role { .. } | Recipient::Task(_) | Recipient::Roles { .. } => return None,
     };
     Some(AddressChange { revision, address })
+}
+
+fn task_before(doc: &Task) -> Amendment {
+    Amendment {
+        addressed: task_address(doc),
+        spec: doc.spec.whole(),
+        instructions: crate::instructions::whole(doc.instructions.as_ref()),
+        wake: Some(doc.wake),
+        dependencies: if doc.cut { None } else { Some(numbers(&doc.dependencies)) },
+        authority: doc.authority.whole(),
+    }
 }

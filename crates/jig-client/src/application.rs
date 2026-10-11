@@ -156,6 +156,7 @@ pub(crate) fn read_result(
             ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out),
             ReadValue::OwnerProposal(document) => put(domain, env, key, Body::OwnerProposal(document), out),
             ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out),
+            ReadValue::OwnerEscalation(document) => put(domain, env, key, Body::OwnerEscalation(document), out),
             ReadValue::Question(document) => put(domain, env, key, Body::Question(document), out),
             ReadValue::PersonTask(document) => put(domain, env, key, Body::PersonTask(document), out),
             ReadValue::OwnerPersonTask(document) => put(domain, env, key, Body::OwnerPersonTask(document), out),
@@ -205,6 +206,7 @@ fn put(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, body: Body
     }
     let project = match &body {
         Body::Task(task) => Some(task.project),
+        Body::OwnerEscalation(value) => Some(value.task.project),
         Body::Proposal(proposal) => Some(proposal.project),
         Body::OwnerProposal(proposal) => Some(proposal.project),
         Body::OwnerPersonTask(person) => person.project(),
@@ -244,6 +246,13 @@ fn parts(body: &Body, limit: u32) -> Parts {
             if let Some(context) = &task.context {
                 append(&mut parts, context.parts.as_slice());
             }
+        }
+        Body::OwnerEscalation(value) => {
+            chip_parts(&mut parts, &value.task.chip);
+            append(
+                &mut parts,
+                crate::pages::task::parts(&value.task, crate::address::TaskSection::Overview, limit).as_slice(),
+            );
         }
         Body::Proposal(proposal) => match &proposal.action {
             contract::ProposalAction::Effect { part } => push(&mut parts, part.clone()),

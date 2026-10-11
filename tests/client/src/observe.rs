@@ -100,6 +100,13 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
             key: key(ObjectKey::Escalation(e.task.task)),
             revisions: vec![(1, e.steering.revision.value), (2, e.hold.revision.value)],
         }],
+        ReadValue::OwnerEscalation(e) => {
+            let mut revisions = vec![(1, e.task.spec_revision.value)];
+            if let Some(hold) = &e.task.hold {
+                revisions.push((2, hold.revision().value));
+            }
+            vec![Receipt::Card { key: key(ObjectKey::Escalation(e.task.chip.task)), revisions }]
+        }
         ReadValue::PersonTask(p) => {
             vec![Receipt::Card { key: key(ObjectKey::PersonTask(p.task.task)), revisions: vec![(3, p.revision.value)] }]
         }

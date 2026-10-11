@@ -174,6 +174,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)
@@ -307,6 +308,7 @@ fn answer_field(open: &Confirmation, object: &Object) -> Result<Option<Purpose>,
                 | Body::Proposal(_)
                 | Body::OwnerProposal(_)
                 | Body::Escalation(_)
+                | Body::OwnerEscalation(_)
                 | Body::Result(_)
                 | Body::Note { .. },
             )
@@ -324,6 +326,7 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
         | Body::Proposal(_)
         | Body::OwnerProposal(_)
         | Body::Escalation(_)
+        | Body::OwnerEscalation(_)
         | Body::Question(_)
         | Body::PersonTask(_)
         | Body::OwnerPersonTask(_)
@@ -354,6 +357,12 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
     let uncertain = match &object.body {
         Some(Body::Task(document)) => {
             let Some(hold) = &document.hold else {
+                return Some(Missing::Refused { why: Refusal::NotOffered });
+            };
+            Some(hold.uncertain())
+        }
+        Some(Body::OwnerEscalation(document)) => {
+            let Some(hold) = &document.task.hold else {
                 return Some(Missing::Refused { why: Refusal::NotOffered });
             };
             Some(hold.uncertain())
@@ -402,6 +411,7 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
         ActKind::Amend | ActKind::AmendRelease => {
             let before = match &object.body {
                 Some(Body::Task(document)) => &document.authority,
+                Some(Body::OwnerEscalation(document)) => &document.task.authority,
                 Some(Body::Escalation(document)) => &document.steering.authority,
                 Some(
                     Body::Chip(_)

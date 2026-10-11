@@ -13,7 +13,7 @@ mod deployment;
 mod inbox;
 mod not_the_work;
 pub mod project;
-mod task;
+pub(crate) mod task;
 mod work;
 pub use conversations::conversations;
 pub use deployment::deployment;

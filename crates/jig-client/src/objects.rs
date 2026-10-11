@@ -227,6 +227,7 @@ impl Objects {
         let object = self.slab.get_mut(id).expect("indexed object exists");
         match &body {
             Body::Task(task) => object.project = Some(task.project),
+            Body::OwnerEscalation(value) => object.project = Some(value.task.project),
             Body::Proposal(proposal) => object.project = Some(proposal.project),
             Body::OwnerProposal(proposal) => object.project = Some(proposal.project),
             Body::OwnerPersonTask(task) => object.project = task.project(),
@@ -241,6 +242,7 @@ impl Objects {
                     | Body::Proposal(_)
                     | Body::OwnerProposal(_)
                     | Body::Escalation(_)
+                    | Body::OwnerEscalation(_)
                     | Body::Question(_)
                     | Body::PersonTask(_)
                     | Body::OwnerPersonTask(_)
@@ -253,6 +255,7 @@ impl Objects {
             | Body::Proposal(_)
             | Body::OwnerProposal(_)
             | Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | Body::Question(_)
             | Body::PersonTask(_)
             | Body::OwnerPersonTask(_)
@@ -742,6 +745,7 @@ fn read_body(key: ObjectKey, value: crate::contract::ReadValue) -> Option<Body> 
         ReadValue::Proposal(proposal) => Some(Body::Proposal(proposal)),
         ReadValue::OwnerProposal(proposal) => Some(Body::OwnerProposal(proposal)),
         ReadValue::Escalation(escalation) => Some(Body::Escalation(escalation)),
+        ReadValue::OwnerEscalation(value) => Some(Body::OwnerEscalation(value)),
         ReadValue::Question(question) => Some(Body::Question(question)),
         ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
         ReadValue::OwnerPersonTask(task) => Some(Body::OwnerPersonTask(task)),
@@ -789,6 +793,7 @@ impl Body {
             Self::Proposal(proposal) => ObjectKey::Proposal(proposal.key),
             Self::OwnerProposal(proposal) => ObjectKey::Proposal(proposal.key),
             Self::Escalation(escalation) => ObjectKey::Escalation(escalation.task.task),
+            Self::OwnerEscalation(value) => ObjectKey::Escalation(value.task.chip.task),
             Self::Question(question) => ObjectKey::Question { task: question.task.task, message: question.message },
             Self::PersonTask(task) => ObjectKey::PersonTask(task.task.task),
             Self::OwnerPersonTask(task) => ObjectKey::PersonTask(task.task.task),
@@ -805,6 +810,7 @@ impl Body {
                 Some(crate::contract::TaskResult::Document(result)) => Some(Left::Ended { how: result.ending.clone() }),
                 None => None,
             },
+            Self::OwnerEscalation(_) => None,
             Self::Chip(_)
             | Self::Proposal(_)
             | Self::OwnerProposal(_)
@@ -832,7 +838,7 @@ impl Body {
             Self::PersonTask(task) => task.ending.as_ref(),
             Self::Result(result) => Some(&result.ending),
             Self::Escalation(escalation) => escalation.ending.as_ref(),
-            Self::Chip(_) | Self::OwnerProposal(_) | Self::OwnerPersonTask(_) | Self::Note { .. } => None,
+            Self::Chip(_) | Self::OwnerProposal(_) | Self::OwnerPersonTask(_) | Self::OwnerEscalation(_) | Self::Note { .. } => None,
         }
     }
 }

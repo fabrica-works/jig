@@ -139,6 +139,7 @@ pub fn reply(
             jig_client::objects::Body::Proposal(_)
             | jig_client::objects::Body::OwnerProposal(_)
             | jig_client::objects::Body::Escalation(_)
+            | Body::OwnerEscalation(_)
             | jig_client::objects::Body::Question(_)
             | jig_client::objects::Body::PersonTask(_)
             | jig_client::objects::Body::OwnerPersonTask(_)

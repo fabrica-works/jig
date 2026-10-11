@@ -118,6 +118,7 @@ pub(super) fn reread(domain: &mut Domain, body: Body, what: Read) {
     let read = domain.reads.ask(0, Source::Window { generation: 0, number: 4 }, what, &mut out).unwrap();
     let value = match body {
         Body::Escalation(document) => ReadValue::Escalation(document),
+        Body::OwnerEscalation(document) => ReadValue::OwnerEscalation(document),
         Body::Task(document) => ReadValue::Task(document),
         Body::PersonTask(document) => ReadValue::PersonTask(document),
         Body::OwnerPersonTask(document) => ReadValue::OwnerPersonTask(document),
@@ -796,3 +797,5 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
 mod amendment_reason;
 
 mod task_hold;
+
+mod owner_escalation;

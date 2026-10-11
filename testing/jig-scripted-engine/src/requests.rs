@@ -109,6 +109,10 @@ impl<A: crate::Application> Engine<A> {
             if let Some((seen, what)) = revision {
                 let current = match (value, &what) {
                     (ReadValue::Task(value), Moved::Spec) => Some(value.spec_revision),
+                    (ReadValue::OwnerEscalation(value), Moved::Spec) => Some(value.task.spec_revision),
+                    (ReadValue::OwnerEscalation(value), Moved::Hold { .. }) => {
+                        value.task.hold.as_ref().map(TaskHold::revision)
+                    }
                     (ReadValue::Task(value), Moved::Hold { .. }) => value.hold.as_ref().map(TaskHold::revision),
                     (ReadValue::Escalation(value), Moved::Hold { .. }) => Some(value.hold.revision),
                     (ReadValue::PersonTask(value), Moved::PersonTask) => Some(value.revision),
@@ -119,6 +123,7 @@ impl<A: crate::Application> Engine<A> {
                         | ReadValue::Proposal(_)
                         | ReadValue::OwnerProposal(_)
                         | ReadValue::Escalation(_)
+                        | ReadValue::OwnerEscalation(_)
                         | ReadValue::Question(_)
                         | ReadValue::PersonTask(_)
                         | ReadValue::OwnerPersonTask(_)
@@ -145,6 +150,7 @@ impl<A: crate::Application> Engine<A> {
                             Moved::Hold { .. } => {
                                 let reason = match value {
                                     ReadValue::Task(task) => task.hold.as_ref().map(task_hold_reason),
+                                    ReadValue::OwnerEscalation(value) => value.task.hold.as_ref().map(task_hold_reason),
                                     ReadValue::Escalation(escalation) => {
                                         Some(CurrentHold::Document(Box::new(escalation.hold.reason.clone())))
                                     }
@@ -196,6 +202,7 @@ impl<A: crate::Application> Engine<A> {
                 ReadValue::Proposal(value) => Some(&value.waiting),
                 ReadValue::Escalation(value) => Some(&value.waiting),
                 ReadValue::OwnerProposal(_)
+                | ReadValue::OwnerEscalation(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Task(_)
                 | ReadValue::Question(_)
@@ -268,6 +275,9 @@ impl<A: crate::Application> Engine<A> {
                         jig_client::contract::admission::amendment(offer, change, &before.authority)
                     }
                     _ => match self.truth.objects.get(&ObjectKey::Escalation(*task)) {
+                        Some(ReadValue::OwnerEscalation(before)) => {
+                            jig_client::contract::admission::amendment(offer, change, &before.task.authority)
+                        }
                         Some(ReadValue::Escalation(before)) => {
                             jig_client::contract::admission::amendment(offer, change, &before.steering.authority)
                         }
@@ -396,6 +406,7 @@ impl<A: crate::Application> Engine<A> {
                     *v.chip.details = ChipPhase::Starting;
                 }
                 ReadValue::OwnerProposal(_)
+                | ReadValue::OwnerEscalation(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)
@@ -450,6 +461,7 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         ReadValue::Proposal(v) => Some(&v.acts),
         ReadValue::OwnerProposal(v) => Some(&v.acts),
         ReadValue::Escalation(v) => Some(&v.acts),
+        ReadValue::OwnerEscalation(v) => Some(&v.acts),
         ReadValue::Question(v) => Some(&v.acts),
         ReadValue::PersonTask(v) => Some(&v.acts),
         ReadValue::OwnerPersonTask(v) => Some(&v.acts),
@@ -484,6 +496,7 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         },
         ReadValue::Proposal(v) => v.ending.clone(),
         ReadValue::Escalation(v) => v.ending.clone(),
+        ReadValue::OwnerEscalation(_) => None,
         ReadValue::Question(v) => v.ending.clone(),
         ReadValue::PersonTask(v) => v.ending.clone(),
         ReadValue::Result(v) => Some(v.ending.clone()),

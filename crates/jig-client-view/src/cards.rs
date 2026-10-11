@@ -180,6 +180,9 @@ pub fn card(
                 close(b);
             }
         }
+        Some(jig_client::objects::Body::OwnerEscalation(_)) => {
+            owner_escalation::card(b, client, object, place, words, bindings);
+        }
         Some(jig_client::objects::Body::Escalation(_)) => {
             escalation::escalation(b, client, object, place, words, bindings);
         }
@@ -235,3 +238,5 @@ pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: 
     words.refusal(b, refusal);
     b.close();
 }
+
+pub mod owner_escalation;

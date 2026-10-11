@@ -971,6 +971,7 @@ impl Payload for ReadValue {
             Self::Proposal(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerProposal(value0) => sum(&[value0.heap(bounds)]),
             Self::Escalation(value0) => sum(&[value0.heap(bounds)]),
+            Self::OwnerEscalation(value0) => sum(&[value0.heap(bounds)]),
             Self::Question(value0) => sum(&[value0.heap(bounds)]),
             Self::PersonTask(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerPersonTask(value) => value.heap(bounds),
@@ -1320,3 +1321,5 @@ impl Payload for TaskHold {
         }
     }
 }
+
+fields!(jig_client::contract::OwnerEscalation { acts, task });
