@@ -55,6 +55,7 @@ pub(super) fn details() -> OwnerChipDetails {
 }
 fn hold() -> OwnerChipHold {
     OwnerChipHold {
+        account: None,
         source: None,
         reason: HoldCategory::Budget,
         revision: u64::MAX,
@@ -726,6 +727,37 @@ fn owner_retry_borrows_selected_checked_six_class_words_and_both_count_holes() {
             assert!(has(&tree, label));
             assert!(has(&tree, b"chosen count 0 versus 4294967295"));
             assert!(!contains(&tree, b"Failure count"));
+        }
+    }
+}
+
+#[test]
+fn supplied_hold_account_and_origin_keep_distinct_public_slots_and_absence() {
+    let account = OwnerPart { connector: 7, kind: OwnerPartKind::Hold, key: OwnerPartKey::Number(u64::MAX) };
+    let origin = part();
+    for supplied in [None, Some(account.clone())] {
+        for source in [None, Some(origin.clone())] {
+            let mut held = hold();
+            held.account = supplied.clone();
+            held.source = source.clone();
+            held.reason = HoldCategory::Drift;
+            let mut value = details();
+            value.hold = Some(held);
+            let (tree, bindings, envelope) = build(&value, words());
+            let parts: Vec<_> = tree
+                .nodes()
+                .iter()
+                .filter_map(|node| {
+                    node.slot.map(|slot| bindings.owner_part(slot.token).expect("exact owner part").clone())
+                })
+                .collect();
+            let expected: Vec<_> = supplied.iter().chain(source.iter()).cloned().collect();
+            assert_eq!(parts, expected);
+            assert_eq!(contains(&tree, b"Hold account reference"), supplied.is_some());
+            assert_eq!(contains(&tree, b"\\xFF\\x00"), source.is_some());
+            assert!(tree.len() <= envelope.nodes);
+            assert_eq!(value.hold.as_ref().unwrap().account, supplied);
+            assert_eq!(value.hold.as_ref().unwrap().source, source);
         }
     }
 }

@@ -137,6 +137,7 @@ pub(crate) mod tests {
             budget: chip.details.budget,
             authority: state.authority,
             hold: Some(documents::HoldLine {
+                account: None,
                 source: None,
                 reason: tasks::Hold::Uncertain { entry: u64::MAX },
                 revision: 17,

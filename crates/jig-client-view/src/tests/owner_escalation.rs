@@ -10,6 +10,7 @@ fn escalation() -> OwnerEscalation {
     ))))));
     task.chip.executor = Executor::Agent { charter: 1 };
     let held = OwnerChipHold {
+        account: None,
         source: None,
         reason: HoldCategory::Budget,
         revision: u64::MAX,

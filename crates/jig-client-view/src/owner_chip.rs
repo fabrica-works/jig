@@ -32,6 +32,7 @@ pub struct ChipFragment {
 #[must_use]
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
     120_u32
+        .checked_add(crate::proposed_task::part_nodes(limits)?)?
         .checked_add(limits.rows.checked_add(20)?.checked_mul(limits.rows)?)?
         .checked_add(limits.rows.checked_add(6)?.checked_mul(2)?)?
         .checked_add(limits.rows)?
@@ -144,6 +145,9 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
         part_fits(part, limits)?;
     }
     if let Some(hold) = &value.hold {
+        if let Some(part) = &hold.account {
+            part_fits(part, limits)?;
+        }
         if let Some(part) = &hold.source {
             part_fits(part, limits)?;
         }
@@ -334,6 +338,9 @@ fn escalation(b: &mut Builder, value: &OwnerHoldEscalation, words: &Words) {
     }
 }
 pub(crate) fn hold(b: &mut Builder, value: &OwnerChipHold, words: &Words, bindings: &mut JigBindings) {
+    if let Some(account) = &value.account {
+        crate::proposed_task::part(b, account, words, bindings);
+    }
     if let Some(source) = &value.source {
         crate::proposed_task::part(b, source, words, bindings);
     }

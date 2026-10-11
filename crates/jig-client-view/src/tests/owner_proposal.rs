@@ -84,6 +84,7 @@ fn state(words: &[u8], cut: bool) -> OwnerAmendmentState {
 }
 fn hold() -> OwnerChipHold {
     OwnerChipHold {
+        account: None,
         source: Some(part()),
         reason: HoldCategory::Uncertain { entry: u64::MAX },
         revision: u64::MAX,

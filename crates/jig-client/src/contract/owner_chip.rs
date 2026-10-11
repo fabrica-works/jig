@@ -61,6 +61,8 @@ pub struct OwnerPersonStallNotice {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerChipHold {
+    /// Separate account supplied by the core; never inferred from the origin.
+    pub account: Option<OwnerPart>,
     pub source: Option<OwnerPart>,
     pub reason: HoldCategory,
     pub revision: u64,

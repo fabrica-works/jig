@@ -105,6 +105,7 @@ pub fn phase(value: &documents::PhaseLine, limits: &Limits) -> Result<client::Ow
 /// Refuses inconsistent executor facts or any whole nested chip allocation above the receiving bounds.
 pub fn held(value: &documents::HoldLine, limits: &Limits) -> Result<client::OwnerChipHold, owner::Invalid> {
     Ok(client::OwnerChipHold {
+        account: value.account.as_ref().map(|value| owner::part(value, limits)).transpose()?,
         source: value.source.as_ref().map(|value| owner::part(value, limits)).transpose()?,
         reason: hold(value.reason),
         revision: value.revision,
@@ -333,6 +334,51 @@ pub(super) mod tests {
     }
 
     #[test]
+    fn supplied_hold_account_and_resource_or_outbox_origin_survive_independently() {
+        let limits = Limits { rows: 2, text: 4, ..crate::test::limits().jig };
+        let account =
+            tasks::Part { connector: u16::MAX, kind: tasks::PartKind::Hold, key: tasks::PartKey::Number(u64::MAX) };
+        let mut path = List::with_capacity(2);
+        path.push(Box::from(&b"a/b"[..])).unwrap();
+        path.push(Box::from(&[255_u8, 0][..])).unwrap();
+        for origin in [
+            None,
+            Some(tasks::Part { connector: 7, kind: tasks::PartKind::Resource, key: tasks::PartKey::Path(path) }),
+            Some(tasks::Part { connector: 9, kind: tasks::PartKind::Outbox, key: tasks::PartKey::Number(8) }),
+        ] {
+            for supplied in [None, Some(account.clone())] {
+                let source = documents::HoldLine {
+                    account: supplied.clone(),
+                    source: origin.clone(),
+                    reason: tasks::Hold::Drift,
+                    revision: 29,
+                    before: documents::PriorPhase::Active(tasks::Active::Running { attempt: 31 }),
+                    escalation: None,
+                    tries: tasks::Tries::ZERO,
+                    hold_wait_since: Some(Wall::from_nanos(37)),
+                };
+                let native = held(&source, &limits).expect("whole supplied hold");
+                assert_eq!(
+                    native.account,
+                    supplied.as_ref().map(|_| client::OwnerPart {
+                        connector: u16::MAX,
+                        kind: client::OwnerPartKind::Hold,
+                        key: client::OwnerPartKey::Number(u64::MAX),
+                    })
+                );
+                assert_eq!(native.source, origin.as_ref().map(|part| owner::part(part, &limits).unwrap()));
+                assert_eq!(native.revision, 29);
+                assert_eq!(native.before, client::OwnerPriorPhase::Active(client::RunStage::Running { attempt: 31 }));
+                assert_eq!(native.hold_wait_since, Some(Wall::from_nanos(37)));
+                let mut chip = source_chip();
+                chip.details.hold = Some(source);
+                let (_, metadata) = one(&chip, &Limits { rows: 4, text: 4, ..limits }).unwrap();
+                assert_eq!(metadata.hold, Some(native));
+            }
+        }
+    }
+
+    #[test]
     fn whole_chip_keeps_mandatory_metadata_unknown_ending_title_loss_and_sparse_observation_independent() {
         let mut source = source_chip();
         let limits = Limits { rows: 4, text: 3, ..crate::test::limits().jig };
@@ -453,6 +499,7 @@ pub(super) mod tests {
             Ok(client::OwnerChipPhase::Closing(client::ClosingStage::Run { attempt: u64::MAX }))
         );
         let source = documents::HoldLine {
+            account: None,
             source: None,
             reason: tasks::Hold::PoolLost { pool: u64::MAX },
             revision: u64::MAX,

@@ -80,6 +80,7 @@ pub fn part(b: &mut Builder, value: &OwnerPart, words: &Words, bindings: &mut Ji
         OwnerPartKind::Procedure => ProposedPhrase::PartProcedure,
         OwnerPartKind::Effect => ProposedPhrase::PartEffect,
         OwnerPartKind::Outbox => ProposedPhrase::PartOutbox,
+        OwnerPartKind::Hold => ProposedPhrase::PartHold,
     };
     let name = words.book.say(words.language, kind.id(), &[]).expect("exact part kind words were checked");
     b.name(&name.text);

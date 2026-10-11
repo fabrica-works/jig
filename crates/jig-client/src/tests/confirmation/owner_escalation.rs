@@ -23,6 +23,7 @@ fn row(act: ActKind, reason: HoldCategory) -> OwnerEscalation {
         b"supplied retained task failure",
     ))))));
     let held = OwnerChipHold {
+        account: None,
         source: None,
         reason,
         revision: u64::MAX,

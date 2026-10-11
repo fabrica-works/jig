@@ -45,6 +45,7 @@ fn value() -> OwnerChipDetails {
             notice: Some(OwnerPersonStallNotice { message: u64::MAX, at: Wall::from_nanos(4), activity: u64::MAX }),
         }),
         hold: Some(OwnerChipHold {
+            account: None,
             source: Some(part()),
             reason: HoldCategory::Failures { class: HoldFailure::Invalid },
             revision: u64::MAX,

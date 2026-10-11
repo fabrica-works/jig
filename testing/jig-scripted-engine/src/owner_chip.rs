@@ -39,7 +39,11 @@ impl Payload for OwnerChipHold {
             Some(OwnerHoldEscalation::Rejected { reason, .. }) => reason.heap(bounds)?,
             Some(OwnerHoldEscalation::Routing | OwnerHoldEscalation::Waiting { .. }) | None => 0,
         };
-        self.source.heap(bounds)?.checked_add(self.reason.heap(bounds)?)?.checked_add(escalation)
+        self.account
+            .heap(bounds)?
+            .checked_add(self.source.heap(bounds)?)?
+            .checked_add(self.reason.heap(bounds)?)?
+            .checked_add(escalation)
     }
 }
 impl Payload for OwnerChipEnding {

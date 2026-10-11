@@ -15,6 +15,7 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                 OwnerPriorPhase::Closing(ClosingStage::Effects),
             ] {
                 let held = OwnerChipHold {
+                    account: None,
                     source: Some(reference.clone()),
                     reason: if uncertain {
                         HoldCategory::Uncertain { entry: u64::MAX }

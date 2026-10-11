@@ -5,6 +5,7 @@ fn owner(reason: HoldCategory) -> OwnerChipHold {
     segments.push(Box::<[u8]>::from(*b"a/b")).unwrap();
     segments.push(Box::<[u8]>::from([255_u8, 0])).unwrap();
     OwnerChipHold {
+        account: None,
         source: Some(OwnerPart {
             connector: u16::MAX,
             kind: OwnerPartKind::Resource,

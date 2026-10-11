@@ -25,6 +25,8 @@ pub enum OwnerPartKind {
     Procedure,
     Effect,
     Outbox,
+    /// The supplied connector account for the numbered held task.
+    Hold,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

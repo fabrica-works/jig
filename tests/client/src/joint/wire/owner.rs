@@ -189,6 +189,7 @@ pub fn part(value: &tasks::Part, limits: &Limits) -> Result<client::OwnerPart, I
             tasks::PartKind::Procedure => client::OwnerPartKind::Procedure,
             tasks::PartKind::Effect => client::OwnerPartKind::Effect,
             tasks::PartKind::Outbox => client::OwnerPartKind::Outbox,
+            tasks::PartKind::Hold => client::OwnerPartKind::Hold,
         },
         key: match &value.key {
             tasks::PartKey::Number(number) => client::OwnerPartKey::Number(*number),

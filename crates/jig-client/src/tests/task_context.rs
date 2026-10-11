@@ -121,6 +121,7 @@ fn finished(phase: Option<OwnerChipPhase>, prior: Option<OwnerPriorPhase>) -> bo
         details.executor = OwnerExecutor::Agent { charter: 1 };
         if let Some(before) = prior {
             details.hold = Some(OwnerChipHold {
+                account: None,
                 source: None,
                 reason: HoldCategory::Budget,
                 revision: u64::MAX,

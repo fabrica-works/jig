@@ -11,6 +11,7 @@ fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at
     let mut path = List::with_capacity(2);
     path.push(Box::<[u8]>::from([255_u8; 32])).unwrap();
     let held = OwnerChipHold {
+        account: None,
         source: Some(OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path) }),
         reason: HoldCategory::Uncertain { entry: u64::MAX },
         revision: u64::MAX,
@@ -55,6 +56,7 @@ fn scripted_owner_hold_moves_return_exact_category_for_release_and_atomic_amend_
         let mut row = task();
         let reason = HoldCategory::Failures { class: HoldFailure::Agent };
         row.hold = Some(TaskHold::Owner(Box::new(OwnerChipHold {
+            account: None,
             source: None,
             reason,
             revision: 7,

@@ -1,5 +1,5 @@
 //! Checked words for exact batch member facts (client/domain/view.md, 7).
-//! IDs 5000–5023 are reserved for this closed vocabulary.
+//! IDs 5000–5024 are reserved for this closed vocabulary.
 use crate::{
     Owner,
     phrases::{
@@ -35,8 +35,9 @@ pub enum ProposedPhrase {
     PartProcedure,
     PartEffect,
     PartOutbox,
+    PartHold,
 }
-pub const ALL: [ProposedPhrase; 24] = [
+pub const ALL: [ProposedPhrase; 25] = [
     ProposedPhrase::ExecutorCharter,
     ProposedPhrase::ExecutorProcedure,
     ProposedPhrase::ExecutorParty,
@@ -61,6 +62,7 @@ pub const ALL: [ProposedPhrase; 24] = [
     ProposedPhrase::PartProcedure,
     ProposedPhrase::PartEffect,
     ProposedPhrase::PartOutbox,
+    ProposedPhrase::PartHold,
 ];
 impl ProposedPhrase {
     #[must_use]
@@ -90,6 +92,7 @@ impl ProposedPhrase {
             Self::PartProcedure => 5021,
             Self::PartEffect => 5022,
             Self::PartOutbox => 5023,
+            Self::PartHold => 5024,
         };
         PhraseId { owner: Owner::Jig, number }
     }
@@ -115,7 +118,8 @@ impl ProposedPhrase {
             | Self::PartResult
             | Self::PartProcedure
             | Self::PartEffect
-            | Self::PartOutbox => 0,
+            | Self::PartOutbox
+            | Self::PartHold => 0,
         };
         let mut holes = List::with_capacity(count);
         for _ in 0..count {
@@ -219,6 +223,7 @@ pub fn language() -> Language {
             ProposedPhrase::PartProcedure => Box::new([Segment::Text(copy_of(b"Procedure reference"))]),
             ProposedPhrase::PartEffect => Box::new([Segment::Text(copy_of(b"Effect reference"))]),
             ProposedPhrase::PartOutbox => Box::new([Segment::Text(copy_of(b"Outbox reference"))]),
+            ProposedPhrase::PartHold => Box::new([Segment::Text(copy_of(b"Hold account reference"))]),
         };
         rows.push(Phrase { id: phrase.id(), forms: Box::new([Form { class: PluralClass::Other, segments }]) })
             .expect("all phrases fit");
