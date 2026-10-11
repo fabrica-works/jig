@@ -913,6 +913,7 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 // The real joint world joins the core and pure test connector
                 // (client/domain/testing.md, 5); client step crates stay separate.
                 "jig-core",
+                "jig-core-authority",
                 "jig-core-people",
                 "jig-core-fleet",
                 "jig-core-tasks",
