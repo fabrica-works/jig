@@ -100,3 +100,43 @@ fn a_chat_proposing_a_goal_its_member_cannot_fund_is_accepted_by_a_maintainer() 
         if task.tracked == Some(7) && task.requester == jig_core_tasks::Party::Person(actual)
         && task.numbers.budget == 150)));
 }
+
+#[test]
+fn a_person_answers_a_choice_between_two_reports() {
+    let mut world = world(8514, vec![Box::new([
+        Script::Call(Call::Choose { role: 1, first: b"first report".as_slice().into(),
+            second: b"second report".as_slice().into() }),
+        Script::Wait, Script::Finish { report: b"choice received".as_slice().into() },
+    ])]);
+    let member = world.client(3, crate::stories::conversation());
+    world.person(member, start(b"ask a maintainer"));
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let maintainer = world.client(2, crate::stories::inbox());
+    let within = Duration::from_secs(1);
+    world.person(maintainer, vec![
+        Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
+        Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
+        Step::See { find: Find::text(b"first report or second report"), within },
+        Step::See { find: Find::exactly_named(Role::Button, b"Take it"), within },
+        Step::Press { find: Find::exactly_named(Role::Button, b"Take it") },
+        Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+        Step::See { find: Find::exactly_named(Role::Button, b"Answer"), within },
+        Step::Press { find: Find::exactly_named(Role::Button, b"Answer") },
+        Step::See { find: Find::exactly_named(Role::Choice, b"Choice code: 2"), within },
+        Step::Press { find: Find::exactly_named(Role::Choice, b"Choice code: 2") },
+        Step::Type { find: Find::named(Role::TextArea, b"Your reason"), words: b"second report".as_slice().into() },
+        Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
+    ]);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
+    assert!(outcome.judged.0 > 0);
+    let owner = &world.front().session.driver.world;
+    assert!(owner.store.rows.values().any(|row| matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
+        if matches!(&task.phase, jig_core_tasks::Phase::Ended(jig_core_tasks::Ending::Done(
+            jig_core_tasks::TaskResult::Verdict { code: 2, words, .. })) if words.as_ref() == b"second report"))));
+    assert!(owner.peers.as_ref().expect("actual worker").workers[0].messages.iter()
+        .any(|(_, _, _, words)| words.as_ref() == b"second report"));
+}
