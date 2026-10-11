@@ -176,14 +176,8 @@ impl Conversation {
         self.page_cut |= page.cut;
         self.words.observe(&page);
         for row in &page.rows {
-            match &row.event {
-                Activity::Turn { name, .. } => self.committed(*name),
-                Activity::Words { .. }
-                | Activity::RunBegan { .. }
-                | Activity::RunEnded { .. }
-                | Activity::Result { .. }
-                | Activity::News { .. }
-                | Activity::Decision { .. } => {}
+            if let Some(name) = row.event.committed_turn() {
+                self.committed(name);
             }
         }
         let edges = page_edges(page.after, page.before);
@@ -462,7 +456,8 @@ impl Conversation {
         let mut parts = List::with_capacity(capacity);
         for line in &self.lines.rows {
             match &line.event {
-                Activity::Turn { turn, .. } => {
+                Activity::Turn { turn, .. }
+                | Activity::Owner { decoded: Some(crate::contract::ArchivedTurn { turn, .. }), .. } => {
                     for message in &turn.messages {
                         for block in &message.blocks {
                             match block {
@@ -496,7 +491,8 @@ impl Conversation {
                         }
                     }
                 }
-                Activity::Words { .. }
+                Activity::Owner { decoded: None, .. }
+                | Activity::Words { .. }
                 | Activity::RunBegan { .. }
                 | Activity::RunEnded { .. }
                 | Activity::Decision { .. } => {}
@@ -635,7 +631,8 @@ impl Conversation {
         let mut names = List::with_capacity(capacity);
         for line in &self.lines.rows {
             match &line.event {
-                Activity::Turn { turn, .. } => {
+                Activity::Turn { turn, .. }
+                | Activity::Owner { decoded: Some(crate::contract::ArchivedTurn { turn, .. }), .. } => {
                     for message in &turn.messages {
                         for block in &message.blocks {
                             match block {
@@ -651,7 +648,8 @@ impl Conversation {
                 }
                 Activity::Result { result } => add_name(&mut names, ObjectKey::Result(result.task.task)),
                 Activity::Decision { object, .. } => add_name(&mut names, *object),
-                Activity::Words { .. }
+                Activity::Owner { decoded: None, .. }
+                | Activity::Words { .. }
                 | Activity::RunBegan { .. }
                 | Activity::RunEnded { .. }
                 | Activity::News { .. } => {}
@@ -711,29 +709,22 @@ fn order(rows: &mut List<ActivityLine>) {
 }
 fn has_call(rows: &List<ActivityLine>, name: CallName) -> bool {
     for row in rows {
-        match &row.event {
-            Activity::Turn { name: TurnName { attempt, number }, turn } => {
-                if *attempt == name.attempt && *number == name.turn {
-                    for message in &turn.messages {
-                        for block in &message.blocks {
-                            match block {
-                                Block::Call(call) => {
-                                    if call.number == name.call {
-                                        return true;
-                                    }
-                                }
-                                Block::Text(_) | Block::Result { .. } | Block::Opaque { .. } => {}
+        if let Some((turn_name, turn)) = row.event.decoded_turn()
+            && turn_name.attempt == name.attempt
+            && turn_name.number == name.turn
+        {
+            for message in &turn.messages {
+                for block in &message.blocks {
+                    match block {
+                        Block::Call(call) => {
+                            if call.number == name.call {
+                                return true;
                             }
                         }
+                        Block::Text(_) | Block::Result { .. } | Block::Opaque { .. } => {}
                     }
                 }
             }
-            Activity::Words { .. }
-            | Activity::RunBegan { .. }
-            | Activity::RunEnded { .. }
-            | Activity::Result { .. }
-            | Activity::News { .. }
-            | Activity::Decision { .. } => {}
         }
     }
     false

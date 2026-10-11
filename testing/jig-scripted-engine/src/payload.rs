@@ -843,10 +843,30 @@ impl Payload for HistoryChange {
         }
     }
 }
-fields!(ActivityLine { position, at, event });
+impl Payload for ActivityLine {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        if let Activity::Owner { source, .. } = &self.event
+            && (source.position != self.position || source.at != self.at)
+        {
+            return None;
+        }
+        self.event.heap(bounds)
+    }
+}
 impl Payload for Activity {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Owner { source, decoded } => {
+                if let Some(archive) = decoded {
+                    let jig_client::contract::OwnerActivity::Turn { attempt, turn, .. } = source.line else {
+                        return None;
+                    };
+                    if archive.task != source.task || archive.name != (TurnName { attempt, number: turn }) {
+                        return None;
+                    }
+                }
+                sum(&[source.heap(bounds), decoded.heap(bounds)])
+            }
             Self::Words { by, message, words } => sum(&[by.heap(bounds), message.heap(bounds), words.heap(bounds)]),
             Self::RunBegan { attempt, how, why } => sum(&[attempt.heap(bounds), how.heap(bounds), why.heap(bounds)]),
             Self::RunEnded { attempt, how, spent } => {
@@ -1048,6 +1068,7 @@ impl Payload for Refusal {
     }
 }
 fields!(Turn { messages, used, spent, read_through, cut });
+fields!(jig_client::contract::ArchivedTurn { task, name, cumulative, read, at, turn });
 fields!(Usage { input, output, cached, cache_written });
 fields!(Message { speaker, blocks });
 impl Payload for Speaker {

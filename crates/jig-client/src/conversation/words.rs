@@ -190,18 +190,8 @@ impl KeptWords {
     /// in the activity window and obtain their state from `state`.
     pub fn observe(&mut self, page: &ActivityPage) {
         for row in &page.rows {
-            match &row.event {
-                Activity::Turn { turn, .. } => {
-                    if let Some(through) = turn.read_through {
-                        self.read(through);
-                    }
-                }
-                Activity::Words { .. }
-                | Activity::RunBegan { .. }
-                | Activity::RunEnded { .. }
-                | Activity::Result { .. }
-                | Activity::News { .. }
-                | Activity::Decision { .. } => {}
+            if let Some(through) = row.event.read_position() {
+                self.read(through);
             }
         }
         for row in &page.rows {
@@ -209,7 +199,8 @@ impl KeptWords {
                 Activity::Words { by, message, words } => match self.restore(by.clone(), *message, words.clone()) {
                     true | false => {}
                 },
-                Activity::Turn { .. }
+                Activity::Owner { .. }
+                | Activity::Turn { .. }
                 | Activity::RunBegan { .. }
                 | Activity::RunEnded { .. }
                 | Activity::Result { .. }

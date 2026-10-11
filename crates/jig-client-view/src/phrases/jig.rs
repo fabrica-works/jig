@@ -17,6 +17,10 @@ pub enum JigPhrase {
 
     /// A source page is incomplete; no particular row or continuation is inferred.
     PageCut,
+    ArchiveCumulativeSpend,
+    ArchiveAcceptedAt,
+    ArchiveReadThrough,
+    ArchiveReadAbsent,
     /// The stored party writer of a note.
     NoteWriterParty,
     /// The stored task and attempt writer of a note.
@@ -1444,6 +1448,10 @@ impl JigPhrase {
             Self::NoteBody => 269,
             Self::DocumentTextCut => 3500,
             Self::PersonAddressRevision => 3600,
+            Self::ArchiveCumulativeSpend => 7400,
+            Self::ArchiveAcceptedAt => 7401,
+            Self::ArchiveReadThrough => 7402,
+            Self::ArchiveReadAbsent => 7403,
             Self::ResultTimeUnknown => 3700,
             Self::ChangeResultKind => 3701,
             Self::NoteReferencesCut => 3300,
@@ -2086,6 +2094,7 @@ impl JigPhrase {
             | Self::NoteDescription
             | Self::NoteBody
             | Self::DocumentTextCut
+            | Self::ArchiveReadAbsent
             | Self::ResultTimeUnknown
             | Self::NoteReferencesCut
             | Self::Notice
@@ -2220,6 +2229,7 @@ impl JigPhrase {
             | Self::AmendTask
             | Self::Verdict
             | Self::PersonAddressRevision
+            | Self::ArchiveReadThrough
             | Self::ChangeResultKind
             | Self::FirstUnread
             | Self::Topic
@@ -2280,6 +2290,7 @@ impl JigPhrase {
             | Self::PeriodBegan
             | Self::Grace
             | Self::PassesUp
+            | Self::ArchiveAcceptedAt
             | Self::At
             | Self::Since
             | Self::Deadline
@@ -2305,6 +2316,7 @@ impl JigPhrase {
             | Self::PoolLeft
             | Self::Allotment
             | Self::PolicySpend
+            | Self::ArchiveCumulativeSpend
             | Self::TurnSpent
             | Self::OwnSpend
             | Self::DelegateSpend
@@ -2350,7 +2362,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 610] = [
+pub const ALL: [JigPhrase; 614] = [
     JigPhrase::OwnerHoldRelease,
     JigPhrase::QuestionFromTask,
     JigPhrase::QuestionFromPerson,
@@ -2715,6 +2727,10 @@ pub const ALL: [JigPhrase; 610] = [
     JigPhrase::NoteBody,
     JigPhrase::DocumentTextCut,
     JigPhrase::PersonAddressRevision,
+    JigPhrase::ArchiveCumulativeSpend,
+    JigPhrase::ArchiveAcceptedAt,
+    JigPhrase::ArchiveReadThrough,
+    JigPhrase::ArchiveReadAbsent,
     JigPhrase::ResultTimeUnknown,
     JigPhrase::ChangeResultKind,
     JigPhrase::NoteReferencesCut,

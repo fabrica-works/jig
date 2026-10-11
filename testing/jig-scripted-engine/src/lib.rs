@@ -11,11 +11,13 @@
 //! | retained key | different ask | unchanged | key conflict |
 //! The story supplies wall times separately from the scheduling clock.
 #![forbid(unsafe_code)]
+mod admission;
 mod application;
 mod faults;
 pub mod offered;
 pub mod owner_wake;
 mod payload;
+pub use admission::{admit_activity_line, admit_answer, admit_delivery, admit_frame, admit_read_value};
 pub mod policy_edit;
 pub use application::{
     Application, ApplicationCommit, ApplicationScope, ApplicationValue, Decision, Never, NoApplication,
@@ -343,7 +345,15 @@ impl<A: Application> Engine<A> {
                     rows: Rows::Activity(rows),
                     ..
                 }) = change
-                    && self.runs.get(task).is_some_and(|run| match run { watches::Run::Text(run) => rows.iter().any(|line| matches!(line.event, jig_client::contract::Activity::Turn { name, .. } if name == run.turn.turn())), watches::Run::State(_) => false }) { self.runs.remove(task); }
+                    && self.runs.get(task).is_some_and(|run| match run {
+                        watches::Run::Text(run) => {
+                            rows.iter().any(|line| line.event.committed_turn() == Some(run.turn.turn()))
+                        }
+                        watches::Run::State(_) => false,
+                    })
+                {
+                    self.runs.remove(task);
+                }
             }
             if let (Some(party), Some(key)) = (pending.commit.party, pending.commit.key) {
                 let retention = self.durable_truth.frames.get(&party).expect("keyed party has a frame").retention;

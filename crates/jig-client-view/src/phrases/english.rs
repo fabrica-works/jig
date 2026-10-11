@@ -1385,6 +1385,19 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b"Person-task revision ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
             ]),
+            JigPhrase::ArchiveCumulativeSpend => Box::new([
+                Segment::Text(copy_of(b"Archive cumulative spend: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Amount },
+            ]),
+            JigPhrase::ArchiveAcceptedAt => Box::new([
+                Segment::Text(copy_of(b"Archive accepted at: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Wall },
+            ]),
+            JigPhrase::ArchiveReadThrough => Box::new([
+                Segment::Text(copy_of(b"Archive read through: ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::ArchiveReadAbsent => Box::new([Segment::Text(copy_of(b"Archive read position not supplied"))]),
             JigPhrase::ResultTimeUnknown => Box::new([Segment::Text(copy_of(b"Completion time not supplied"))]),
             JigPhrase::ChangeResultKind => Box::new([
                 Segment::Text(copy_of(b"Change result kind ")),

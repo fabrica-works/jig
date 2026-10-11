@@ -863,3 +863,73 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
     assert_eq!(d.conversation().live.get(0).unwrap().text.bytes(), b"new retry bytes");
     assert_eq!(d.conversation().offset(), 15);
 }
+
+#[test]
+fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_separate_spend_facts_in_the_public_log()
+{
+    let (mut domain, _, _, read) = ready();
+    let words = words();
+    let source = |position, line, decoded| ActivityLine {
+        position,
+        at: Wall::EPOCH,
+        event: Activity::Owner {
+            source: Box::new(OwnerActivityLine { task: 8, position, at: Wall::EPOCH, line }),
+            decoded,
+        },
+    };
+    drive(
+        &mut domain,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
+                cut: false,
+                rows: list([
+                    source(
+                        2,
+                        OwnerActivity::Turn { reply: u64::MAX, attempt: 2, turn: 1, read: Some(0) },
+                        Some(ArchivedTurn {
+                            task: 8,
+                            name: TurnName { attempt: 2, number: 1 },
+                            cumulative: 19,
+                            read: None,
+                            at: Wall::from_nanos(42),
+                            turn: turn(),
+                        }),
+                    ),
+                    source(
+                        1,
+                        OwnerActivity::Words {
+                            message: 11,
+                            by: OwnerRequester::Task(7),
+                            kind: OwnerMessageKind::Proposal {
+                                proposer: u64::MAX,
+                                proposal: 0,
+                                kind: OwnerMessageProposalKind::Amend,
+                            },
+                            words: text(b"raw owner words"),
+                        },
+                        None,
+                    ),
+                ]),
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    let (tree, _) = build(&domain, 3, &words);
+    for label in [
+        b"raw owner words".as_slice(),
+        b"Task: ",
+        b"18446744073709551615",
+        b"Archive cumulative spend:",
+        b"Archive accepted at:",
+        b"Archive read position not supplied",
+        b"Turn spent:",
+        b"committed",
+        b"Read",
+    ] {
+        assert!(contains(&tree, label), "missing {label:?}");
+    }
+    let limits = crate::Limits::of_words(&super::cards::CLIENT, &words).unwrap();
+    assert!(tree.nodes.len() <= limits.nodes);
+}

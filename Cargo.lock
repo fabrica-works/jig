@@ -133,14 +133,23 @@ name = "jig-client-world"
 version = "0.0.0"
 dependencies = [
  "jig-client",
+ "jig-client-transcript",
  "jig-client-view",
+ "jig-core",
+ "jig-core-notes",
+ "jig-core-people",
+ "jig-core-tasks",
+ "jig-core-views",
  "jig-fake-person",
  "jig-scripted-engine",
  "jig-test-client-domain",
+ "jig-test-client-kit",
  "jig-test-client-view",
+ "jig-test-connector",
  "sha2",
  "skein-lib",
  "skein-world",
+ "smith-transcript",
 ]
 
 [[package]]

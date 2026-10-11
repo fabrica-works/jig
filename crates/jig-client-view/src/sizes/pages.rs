@@ -45,7 +45,12 @@ fn turn(l: &Limits) -> Option<u32> {
 /// Committed log, pending words, all provisional turns, one independent current call and both edges.
 #[must_use]
 pub fn conversation_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
-    let rows = turn(l)?.checked_add(card_nodes(l)?.checked_mul(2)?)?.checked_add(16)?.checked_mul(l.rows)?;
+    let owner = 100_u32.checked_add(l.rows.checked_mul(4)?)?;
+    let rows = turn(l)?
+        .checked_add(owner)?
+        .checked_add(card_nodes(l)?.checked_mul(2)?)?
+        .checked_add(20)?
+        .checked_mul(l.rows)?;
     let live = call(l)?.max(10).checked_add(markdown(l)?)?.checked_add(8)?.checked_mul(l.rows)?;
     rows.checked_add(live)?.checked_add(l.conversation_words.checked_mul(9)?)?.checked_add(34)?.checked_add(slot_nodes)
 }

@@ -929,6 +929,8 @@ pub struct ActivityLine {
 /// A task activity event, turns decoded below this domain.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Activity {
+    /// Whole owner activity; decoded content is supplied only by an archive fetch.
+    Owner { source: Box<super::OwnerActivityLine>, decoded: Option<ArchivedTurn> },
     /// Words as the party wrote them.
     Words { by: Party, message: u64, words: Text },
     /// A run began.
@@ -943,6 +945,102 @@ pub enum Activity {
     News { topic: u16, summary: Text, part: Option<Part> },
     /// A recorded decision.
     Decision { object: ObjectKey, by: Actor, how: Decision },
+}
+/// Metadata from the fetched immutable archive, distinct from per-turn codec facts.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ArchivedTurn {
+    pub task: u64,
+    pub name: TurnName,
+    pub cumulative: u64,
+    pub read: Option<u64>,
+    pub at: Wall,
+    pub turn: Turn,
+}
+impl Activity {
+    /// A committed archive identity, independent of whether its bytes are available.
+    #[must_use]
+    pub fn committed_turn(&self) -> Option<TurnName> {
+        match self {
+            Self::Turn { name, .. } => Some(*name),
+            Self::Owner { source, .. } => match source.line {
+                super::OwnerActivity::Turn { attempt, turn, .. } => Some(TurnName { attempt, number: turn }),
+                super::OwnerActivity::Words { .. }
+                | super::OwnerActivity::Heard(_)
+                | super::OwnerActivity::Notified { .. }
+                | super::OwnerActivity::RunBegan { .. }
+                | super::OwnerActivity::RunEnded { .. }
+                | super::OwnerActivity::Decided { .. }
+                | super::OwnerActivity::Milestone { .. } => None,
+            },
+            Self::Words { .. }
+            | Self::RunBegan { .. }
+            | Self::RunEnded { .. }
+            | Self::Result { .. }
+            | Self::News { .. }
+            | Self::Decision { .. } => None,
+        }
+    }
+    /// Actual decoded content, paired with its supplied committed identity.
+    #[must_use]
+    pub fn decoded_turn(&self) -> Option<(TurnName, &Turn)> {
+        match self {
+            Self::Turn { name, turn } => Some((*name, turn)),
+            Self::Owner { decoded: Some(turn), .. } => Some((self.committed_turn()?, &turn.turn)),
+            Self::Owner { decoded: None, .. }
+            | Self::Words { .. }
+            | Self::RunBegan { .. }
+            | Self::RunEnded { .. }
+            | Self::Result { .. }
+            | Self::News { .. }
+            | Self::Decision { .. } => None,
+        }
+    }
+    /// The immutable inbox message named by a words activity line.
+    #[must_use]
+    pub fn word_message(&self) -> Option<(u64, &Text)> {
+        match self {
+            Self::Words { message, words, .. } => Some((*message, words)),
+            Self::Owner { source, .. } => match &source.line {
+                super::OwnerActivity::Words { message, words, .. } => Some((*message, words)),
+                super::OwnerActivity::Heard(_)
+                | super::OwnerActivity::Notified { .. }
+                | super::OwnerActivity::RunBegan { .. }
+                | super::OwnerActivity::RunEnded { .. }
+                | super::OwnerActivity::Turn { .. }
+                | super::OwnerActivity::Decided { .. }
+                | super::OwnerActivity::Milestone { .. } => None,
+            },
+            Self::Turn { .. }
+            | Self::RunBegan { .. }
+            | Self::RunEnded { .. }
+            | Self::Result { .. }
+            | Self::News { .. }
+            | Self::Decision { .. } => None,
+        }
+    }
+    /// Supplied committed read-through; missing and zero remain distinct.
+    #[must_use]
+    pub fn read_position(&self) -> Option<u64> {
+        match self {
+            Self::Turn { turn, .. } => turn.read_through,
+            Self::Owner { source, .. } => match source.line {
+                super::OwnerActivity::Turn { read, .. } => read,
+                super::OwnerActivity::Words { .. }
+                | super::OwnerActivity::Heard(_)
+                | super::OwnerActivity::Notified { .. }
+                | super::OwnerActivity::RunBegan { .. }
+                | super::OwnerActivity::RunEnded { .. }
+                | super::OwnerActivity::Decided { .. }
+                | super::OwnerActivity::Milestone { .. } => None,
+            },
+            Self::Words { .. }
+            | Self::RunBegan { .. }
+            | Self::RunEnded { .. }
+            | Self::Result { .. }
+            | Self::News { .. }
+            | Self::Decision { .. } => None,
+        }
+    }
 }
 
 /// How an agent run begins.

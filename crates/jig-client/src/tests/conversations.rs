@@ -1130,3 +1130,42 @@ fn reopened_current_retry_preserves_other_uncommitted_turns_and_fences_stale_ret
     assert_eq!(c.current, Some(current.turn));
     assert_eq!(c.offset(), 2);
 }
+
+#[test]
+fn owner_archive_reference_keeps_committed_read_and_local_author_separate_from_raw_sender() {
+    use crate::contract::{OwnerActivity, OwnerActivityLine, OwnerMessageKind, OwnerRequester};
+    use crate::conversation::words::{KeptWords, Words};
+    use skein_lib::Token;
+    let mut kept = KeptWords::new(2);
+    let request = Token::new(77);
+    assert!(kept.begin(request, Some(super::spine::party(7)), text(b"local")));
+    assert!(kept.sent(request, 0));
+    let line = |position, source| ActivityLine {
+        position,
+        at: Wall::EPOCH,
+        event: Activity::Owner {
+            source: Box::new(OwnerActivityLine { task: 8, position, at: Wall::EPOCH, line: source }),
+            decoded: None,
+        },
+    };
+    let mut rows = List::with_capacity(2);
+    rows.push(line(2, OwnerActivity::Turn { reply: 9, attempt: 3, turn: 4, read: Some(0) })).unwrap();
+    rows.push(line(
+        1,
+        OwnerActivity::Words {
+            message: 0,
+            by: OwnerRequester::Task(7),
+            kind: OwnerMessageKind::Question,
+            words: text(b"task words"),
+        },
+    ))
+    .unwrap();
+    let page = ActivityPage { rows, before: None, after: None, cut: false };
+    kept.observe(&page);
+    assert_eq!(kept.rows.len(), 1);
+    assert_eq!(kept.rows.get(0).unwrap().state, Words::Read { message: 0 });
+    assert_eq!(kept.rows.get(0).unwrap().by.as_ref().unwrap().name.bytes(), b"Pat");
+    assert_eq!(page.rows.get(1).unwrap().event.word_message().unwrap().1.bytes(), b"task words");
+    assert!(page.rows.get(0).unwrap().event.decoded_turn().is_none());
+    assert_eq!(page.rows.get(0).unwrap().event.committed_turn(), Some(TurnName { attempt: 3, number: 4 }));
+}

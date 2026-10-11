@@ -1,6 +1,7 @@
 //! Client domain world and reusable shell harness (client/domain/testing.md, 4).
 #![forbid(unsafe_code)]
 pub mod harness;
+pub mod joint;
 pub mod model;
 pub mod random;
 pub mod scripted;

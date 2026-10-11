@@ -5,7 +5,7 @@
 use crate::{Builder, JigBindings, Key, Owner, Role, Run, phrases::jig::JigPhrase, words::Words};
 use jig_client::{
     Domain,
-    contract::{Activity, LiveCall, Party, TurnName},
+    contract::{LiveCall, Party, TurnName},
     conversation::{Conversation, Words as WordState},
 };
 mod activity;
@@ -33,14 +33,10 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
             .checked_sub(offset)
             .expect("reverse line exists");
         let line = state.lines.rows.get(index).expect("retained line exists");
-        let key = match &line.event {
-            Activity::Turn { name, .. } => turn_key(*name),
-            Activity::Words { message, .. } => word_key(state, *message),
-            Activity::RunBegan { .. }
-            | Activity::RunEnded { .. }
-            | Activity::Result { .. }
-            | Activity::News { .. }
-            | Activity::Decision { .. } => Key { owner: Owner::Jig, kind: 27, a: state.task, b: line.position },
+        let key = match (line.event.committed_turn(), line.event.word_message()) {
+            (Some(name), _) => turn_key(name),
+            (None, Some((message, _))) => word_key(state, message),
+            (None, None) => Key { owner: Owner::Jig, kind: 27, a: state.task, b: line.position },
         };
         b.open(Role::Item);
         b.key(key);
@@ -103,18 +99,10 @@ fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
         };
         let mut in_activity = false;
         for line in &state.lines.rows {
-            match line.event {
-                Activity::Words { message: seen, .. } => {
-                    if message == Some(seen) {
-                        in_activity = true;
-                    }
-                }
-                Activity::RunBegan { .. }
-                | Activity::RunEnded { .. }
-                | Activity::Turn { .. }
-                | Activity::Result { .. }
-                | Activity::News { .. }
-                | Activity::Decision { .. } => {}
+            if let Some((seen, _)) = line.event.word_message()
+                && message == Some(seen)
+            {
+                in_activity = true;
             }
         }
         if in_activity {

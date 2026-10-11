@@ -902,11 +902,30 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "skein-lib",
                 "skein-world",
                 "jig-client",
+                // Whole committed turns use the existing below-domain codec.
+                "jig-client-transcript",
+                "smith-transcript",
                 "jig-client-view",
                 "jig-test-client-domain",
                 "jig-test-client-view",
                 "jig-fake-person",
                 "jig-scripted-engine",
+                // The real joint world joins the core and pure test connector
+                // (client/domain/testing.md, 5); client step crates stay separate.
+                "jig-core",
+                "jig-core-people",
+                "jig-core-fleet",
+                "jig-core-tasks",
+                "jig-core-views",
+                "jig-core-notes",
+                // Reuse the actual root/store/workers/systems and referee, not a harness copy.
+                "jig-core-world",
+                // Scripted parties remain beside the real joint protocol peer.
+                "jig-fake-parties",
+                "jig-fake-workers",
+                "jig-test-domain",
+                "jig-test-connector",
+                "jig-test-client-kit",
                 "sha2"
             ]
             .contains(&d.as_str())),

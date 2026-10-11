@@ -10,6 +10,23 @@ use jig_client::{
 };
 pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words: &Words, bindings: &mut JigBindings) {
     match value {
+        Activity::Owner { source, decoded } => {
+            crate::owner_activity::render(b, source, words);
+            if let Some(archive) = decoded {
+                words.text(b, JigPhrase::ArchiveCumulativeSpend, &[Hole::Amount(archive.cumulative)]);
+                words.text(b, JigPhrase::ArchiveAcceptedAt, &[Hole::Wall(words.adjusted_wall(archive.at))]);
+                match archive.read {
+                    Some(read) => words.text(b, JigPhrase::ArchiveReadThrough, &[Hole::Number(read)]),
+                    None => words.text(b, JigPhrase::ArchiveReadAbsent, &[]),
+                }
+            }
+            if let Some((name, turn)) = value.decoded_turn() {
+                super::turn::turn(b, client, name, turn, words, bindings);
+            }
+            if let Some((message, _)) = value.word_message() {
+                super::word_state(b, client.conversation().words.state(message), words);
+            }
+        }
         Activity::Words { by, message, words: value } => {
             super::party(b, by, words);
             b.text(Run::Plain, value.bytes());

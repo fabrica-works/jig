@@ -582,28 +582,15 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
         engine::Change::Source(source) => {
             if let (Read::Activity { task, .. }, engine::Rows::Activity(rows)) = (&source.read, &source.rows) {
                 for row in rows {
-                    if let Activity::Words { message, words, .. } = &row.event {
-                        seen.push(Observed::Kept {
-                            task: *task,
-                            message: *message,
-                            words: words.bytes().to_vec(),
-                            commit,
-                        });
+                    if let Some((message, words)) = row.event.word_message() {
+                        seen.push(Observed::Kept { task: *task, message, words: words.bytes().to_vec(), commit });
                     }
                 }
                 seen.push(Observed::Retained {
                     task: *task,
                     messages: rows
                         .iter()
-                        .filter_map(|row| match &row.event {
-                            Activity::Words { message, .. } => Some(*message),
-                            Activity::RunBegan { .. }
-                            | Activity::RunEnded { .. }
-                            | Activity::Turn { .. }
-                            | Activity::Result { .. }
-                            | Activity::News { .. }
-                            | Activity::Decision { .. } => None,
-                        })
+                        .filter_map(|row| row.event.word_message().map(|(message, _)| message))
                         .collect(),
                     commit,
                 });
