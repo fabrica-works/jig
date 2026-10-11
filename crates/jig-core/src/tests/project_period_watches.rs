@@ -42,7 +42,7 @@ fn period_core(configured: u64) -> (Core, Limits) {
             budget: 1000,
         }),
     );
-    assert!(opened.iter().any(|request| matches!(request, Request::Write(_))));
+    assert!(has_write(&opened));
     let carved = watch_outputs(
         &mut core,
         &limits,
@@ -54,22 +54,31 @@ fn period_core(configured: u64) -> (Core, Limits) {
             budget: 177,
         }),
     );
-    assert!(carved.iter().any(|request| matches!(request, Request::Write(_))));
+    assert!(has_write(&carved));
     assert_eq!(finish_watch_outputs(&mut core, &limits).len(), 1);
     (core, limits)
+}
+
+fn has_write(out: &[Request]) -> bool {
+    for request in out {
+        match request {
+            Request::Write(_) => return true,
+            Request::Held(_) | Request::Now(_) | Request::Decided | Request::Ask { .. } => {}
+        }
+    }
+    false
 }
 
 fn project_delivery(out: &[Request], watcher: Token) -> Option<Project> {
     let mut delivered = None;
     for request in out {
-        if let Request::Held(held) = request {
-            if let Held::Delivery { watcher: actual, document } = held.as_ref() {
-                if *actual == watcher {
-                    let Document::Project(project) = document.as_ref() else { panic!("watched project") };
-                    assert!(delivered.is_none(), "one whole delivery per watcher");
-                    delivered = Some(project.as_ref().clone());
-                }
-            }
+        if let Request::Held(held) = request
+            && let Held::Delivery { watcher: actual, document } = held.as_ref()
+            && *actual == watcher
+        {
+            let Document::Project(project) = document.as_ref() else { panic!("watched project") };
+            assert!(delivered.is_none(), "one whole delivery per watcher");
+            delivered = Some(project.as_ref().clone());
         }
     }
     delivered
@@ -87,7 +96,8 @@ fn open_project(core: &mut Core, limits: &Limits, watcher: Token) -> Project {
 fn period_outputs(core: &mut Core, limits: &Limits, project: u32, period: u64, budget: u64) -> Box<[Request]> {
     let first = watch_outputs(core, limits, Event::Period { project, period, budget, next: None });
     let finished = finish_watch_outputs(core, limits);
-    let mut out = List::with_capacity(u32::try_from(first.len() + finished.len()).unwrap());
+    let count = first.len().checked_add(finished.len()).expect("bounded period outputs");
+    let mut out = List::with_capacity(u32::try_from(count).unwrap());
     for request in first.into_iter().chain(finished) {
         out.push(request).unwrap();
     }
@@ -121,14 +131,14 @@ fn a_period_in_another_project_refreshes_the_watched_configured_target_after_dur
     assert_eq!(before.configured_pools, before.pools);
     assert!(project_delivery(&watch_outputs(&mut core, &limits, Event::Delivered { watcher }), watcher).is_none());
     let out = period_outputs(&mut core, &limits, 2, 2, 1000);
-    let mut funding_writes = 0;
+    let mut funding_writes = 0_u32;
     for request in &out {
         if let Request::Write(Write::Save(Record::Tasks(record))) = request {
             let tasks::Stored::Ledger(row) = record else { panic!("no task in the period fixture") };
             let tasks::Funder::Period { project, period } = row.funder else { panic!("no local pool mutation") };
             assert_eq!(project, 2, "the watched project emitted no funding write");
             assert_eq!(period, 2);
-            funding_writes += 1;
+            funding_writes = funding_writes.checked_add(1).expect("bounded period outputs");
         }
     }
     assert!(funding_writes > 0);
@@ -145,12 +155,12 @@ fn a_period_in_another_project_refreshes_the_watched_configured_target_after_dur
         release: room.held,
     });
     let mut decision = journal.decision(&skein_lib::JournalRoom { writes: room.writes, held: room.held }).unwrap();
-    let mut writes = 0;
+    let mut writes = 0_u32;
     for request in out {
         match request {
             Request::Write(write) => {
                 decision.write(write).unwrap();
-                writes += 1;
+                writes = writes.checked_add(1).expect("bounded period outputs");
             }
             Request::Held(held) => decision.hold(held).unwrap(),
             Request::Now(_) | Request::Decided => {}
@@ -165,12 +175,12 @@ fn a_period_in_another_project_refreshes_the_watched_configured_target_after_dur
     assert!(released.is_empty());
     journal.committed(commit.number);
     assert_eq!(journal.release(&mut released), skein_lib::Released::Some);
-    let mut observed = 0;
+    let mut observed = 0_u32;
     while let Some(held) = released.pop() {
         if let Held::Delivery { watcher: actual, document } = held.as_ref() {
             assert_eq!(*actual, watcher);
             assert_eq!(document.as_ref(), &Document::Project(Box::new(after.clone())));
-            observed += 1;
+            observed = observed.checked_add(1).expect("bounded period outputs");
         }
     }
     assert_eq!(observed, 1);
