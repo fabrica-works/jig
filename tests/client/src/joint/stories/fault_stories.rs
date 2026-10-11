@@ -148,7 +148,7 @@ fn a_failed_commit_stops_the_engine_and_the_person_sees_offline_before_keyed_rec
             Step::See { find: Find::text(b"Offline"), within: Duration::from_secs(1) },
         ],
     );
-    if std::env::var_os("JIG45_FAILED_COMMIT_DIAGNOSTIC").is_some() {
+    {
         let early = world.now().saturating_add(Duration::from_millis(30));
         let observed = world.run(Until::Time(early));
         eprintln!("FAILED_COMMIT_EARLY {observed:?}");
