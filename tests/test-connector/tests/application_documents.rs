@@ -290,4 +290,5 @@ fn an_outbox_part_uses_the_retained_entry_and_marks_its_removal() {
     assert_eq!(document(&mut world, subject), Err(connector::DocumentMissing::Unknown));
 }
 
+#[path = "application_documents/deployment_diagnostics.rs"]
 mod deployment_diagnostics;

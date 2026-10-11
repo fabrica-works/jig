@@ -277,4 +277,5 @@ fn connector_values_the_full_panel_attains_the_priced_structural_worst_case() {
     assert!(document_worst_case(&overflow).is_none());
 }
 
+#[path = "connector_values/deployment_diagnostics.rs"]
 mod deployment_diagnostics;
