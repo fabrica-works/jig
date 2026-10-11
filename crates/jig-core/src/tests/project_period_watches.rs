@@ -67,7 +67,7 @@ fn project_delivery(out: &[Request], watcher: Token) -> Option<Project> {
                 if *actual == watcher {
                     let Document::Project(project) = document.as_ref() else { panic!("watched project") };
                     assert!(delivered.is_none(), "one whole delivery per watcher");
-                    delivered = Some(project.clone());
+                    delivered = Some(project.as_ref().clone());
                 }
             }
         }
@@ -169,7 +169,7 @@ fn a_period_in_another_project_refreshes_the_watched_configured_target_after_dur
     while let Some(held) = released.pop() {
         if let Held::Delivery { watcher: actual, document } = held.as_ref() {
             assert_eq!(*actual, watcher);
-            assert_eq!(document.as_ref(), &Document::Project(after.clone()));
+            assert_eq!(document.as_ref(), &Document::Project(Box::new(after.clone())));
             observed += 1;
         }
     }
@@ -207,7 +207,7 @@ fn an_equal_period_in_another_project_keeps_the_watched_configured_target_unchan
     let Document::Project(after) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap() else {
         panic!("project read");
     };
-    assert_eq!(after, before);
+    assert_eq!(after.as_ref(), &before);
 }
 
 #[test]
@@ -223,7 +223,7 @@ fn zero_older_over_budget_and_unknown_project_periods_do_not_refresh_a_project_w
         else {
             panic!("unchanged project read");
         };
-        assert_eq!(after, before);
+        assert_eq!(after.as_ref(), &before);
     }
 }
 
