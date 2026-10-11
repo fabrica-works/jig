@@ -391,13 +391,20 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     assert!(contains(&tree, b"repeated whole verdict"));
     assert_eq!(contains(&tree, b"reachable stored dependency"), loaded);
     if loaded && present[2] {
-        assert!(
-            tree.nodes()
-                .iter()
-                .filter(|node| node.text.iter().any(|run| skein_lib::bytes::find(&run.text, b"whole reason").is_some()))
-                .count()
-                >= 4
-        );
+        let repetitions = tree
+            .nodes()
+            .iter()
+            .filter(|node| node.text.iter().any(|run| skein_lib::bytes::find(&run.text, b"whole reason").is_some()))
+            .count();
+        let expected = 2_usize
+            .checked_add(if present[0] { usize::try_from(CLIENT.rows).unwrap() } else { 0 })
+            .unwrap()
+            .checked_add(if present[1] { usize::try_from(CLIENT.rows).unwrap() } else { 0 })
+            .unwrap();
+        assert_eq!(repetitions, expected);
+        if present[0] || present[1] {
+            assert!(repetitions >= 4);
+        }
     }
     assert_eq!(domain.objects().get(id).unwrap().body, Some(jig_client::objects::Body::OwnerEscalation(Box::new(row))));
 }
