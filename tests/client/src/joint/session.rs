@@ -52,6 +52,7 @@ pub struct Session {
     delayed: Vec<(ClientId, Event)>,
     delay_until: Option<Time>,
     lost_answers: BTreeSet<(ClientId, skein_lib::Token)>,
+    lost_final_answers: u64,
     offline_until: Option<Time>,
     source_events: Vec<root::Event>,
     scheduled_sources: Vec<(Time, root::Event)>,
@@ -80,6 +81,7 @@ impl Session {
             delayed: Vec::new(),
             delay_until: None,
             lost_answers: BTreeSet::new(),
+            lost_final_answers: 0,
             offline_until: None,
             source_events: Vec::new(),
             scheduled_sources: Vec::new(),
@@ -90,6 +92,12 @@ impl Session {
             stream_heartbeat: None,
             stream_due: BTreeMap::new(),
         }
+    }
+
+    /// Actual final callbacks removed at the lost connection door, not scheduled faults.
+    #[must_use]
+    pub fn lost_final_answers(&self) -> u64 {
+        self.lost_final_answers
     }
 
     /// Capture only card offers when a story asserts no whole Task offer packet.
@@ -442,6 +450,7 @@ impl Session {
                 if let Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, .. } = &event
                     && self.lost_answers.remove(&(client, *attempt))
                 {
+                    self.lost_final_answers += 1;
                     return Ok(());
                 }
                 if self.delay_until.is_some_and(|until| now < until) {

@@ -157,6 +157,65 @@ fn pending(
     submitted
 }
 
+fn lost_words(world: &mut World<Test, Joint>, client: crate::ClientId, seed: u64, slack: Duration) {
+    let words = format!("kept {seed}").into_bytes();
+    let within = Duration::from_secs(1);
+    world.person(
+        client,
+        vec![
+            Step::Press { find: Find::exactly_named(Role::Button, b"Write") },
+            Step::Type { find: Find::named(Role::TextArea, b"Your answer"), words: words.clone().into_boxed_slice() },
+        ],
+    );
+    let ready = world.run(Until::Done);
+    assert_eq!(ready.verdict, Verdict::Passed, "ready words {seed}: {ready:?}");
+    let prior_answers = answers(world);
+    let submitted = world.front().session.driver.world.store.applied + 1;
+    world.front().session.driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(submitted));
+    world.person(
+        client,
+        vec![Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") }, Step::Pause { span: slack }],
+    );
+    let boundary = world.now().saturating_add(slack);
+    let pending = world.run(Until::Time(boundary));
+    assert!(matches!(pending.verdict, Verdict::Open { .. }));
+    assert_eq!(
+        world.front().session.driver.world.reached_cut,
+        Some(jig_core_world::effects::Cut::Submitted(submitted))
+    );
+    assert_eq!(answers(world), prior_answers);
+    assert!(world.front().session.driver.withhold_completion().expect("real words commit").is_none());
+    assert_eq!(answers(world), prior_answers + 1);
+    let lost = world.front().session.lost_final_answers();
+    world.fault(FrontFault::NoAnswer);
+    world.front().session.driver.release_commits();
+    let boundary = world.now().saturating_add(Duration::from_millis(10));
+    let unanswered = world.run(Until::Time(boundary));
+    assert!(matches!(unanswered.verdict, Verdict::Open { .. }));
+    assert_eq!(world.front().session.lost_final_answers(), lost + 1, "the real final answer was dropped");
+    // Recovery is a person's actual reload; a discarded reply alone cannot invent a reconnection.
+    world.fault(Fault::Reload { client });
+    world.person(client, vec![Step::See { find: Find::text(&words), within }]);
+    let replayed = world.run(Until::Done);
+    assert_eq!(replayed.verdict, Verdict::Passed, "replayed words {seed}: {replayed:?}");
+    assert_eq!(answers(world), prior_answers + 1, "the original key is not made again");
+    let matching = world
+        .front()
+        .session
+        .driver
+        .world
+        .store
+        .rows
+        .values()
+        .filter(|row| {
+            matches!(row,
+        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Activity(line)))
+        if matches!(&line.line, jig_core_tasks::Line::Words { words: bytes, .. } if bytes.as_ref() == words.as_slice()))
+        })
+        .count();
+    assert_eq!(matching, 1, "the exact sent words remain once in actual durable activity");
+}
+
 /// One seed keeps its original engine, worker, schedule, person and fault draws.
 #[must_use]
 pub fn world(seed: u64) -> (Outcome, Reach) {
@@ -165,9 +224,6 @@ pub fn world(seed: u64) -> (Outcome, Reach) {
     let slack = Duration::from_millis(rng.between(40, 60));
     let (mut world, client) = ready(seed);
     let submitted = pending(&mut world, client, engine, client_fault, slack);
-    if client_fault == ClientFault::NoAnswer {
-        world.fault(FrontFault::NoAnswer);
-    }
     if client_fault == ClientFault::Reload {
         world.fault(Fault::Reload { client });
     }
@@ -180,6 +236,9 @@ pub fn world(seed: u64) -> (Outcome, Reach) {
     world.person(client, vec![Step::See { find: Find::text(b"Held stopped"), within: Duration::from_secs(2) }]);
     let settled = world.run(Until::Done);
     assert_eq!(settled.verdict, Verdict::Passed, "recovered seed {seed}: {settled:?}");
+    if client_fault == ClientFault::NoAnswer {
+        lost_words(&mut world, client, seed, slack);
+    }
     if client_fault == ClientFault::DropWatch {
         world.fault(FrontFault::DropWatch);
     }
@@ -201,9 +260,10 @@ mod tests {
     use super::*;
     #[test]
     fn random_people_and_both_actual_fault_doors_keep_the_store_and_protocol_referees() {
-        let (outcome, reach) = world(4500);
+        // Seed 4505 found a lost-answer schedule without genuine connection recovery.
+        let (outcome, reach) = world(4505);
         assert_eq!(outcome.verdict, Verdict::Passed, "{outcome:?}");
         assert!(outcome.judged.0 > 0 && reach.acknowledged > 0);
-        assert_eq!((reach.engine, reach.client), assigned(4500));
+        assert_eq!((reach.engine, reach.client), assigned(4505));
     }
 }

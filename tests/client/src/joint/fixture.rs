@@ -58,6 +58,7 @@ pub(super) fn bounded_world(
     seeded_world(8510, body, configure, bounds)
 }
 
+#[cfg(test)]
 pub(super) fn seeded_world(
     seed: u64,
     body: Box<[u8]>,
