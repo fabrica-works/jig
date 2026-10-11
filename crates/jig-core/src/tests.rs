@@ -2828,6 +2828,8 @@ mod frame_deployment_role;
 mod frame_facts;
 mod project_baselines;
 
+mod deployment_connectors;
+
 #[test]
 fn approval_documents_keep_opaque_state_whole_and_refuse_a_smaller_bound() {
     let (mut core, limits) = make_tree();

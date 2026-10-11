@@ -136,6 +136,8 @@ pub struct ProjectCapacity {
 /// Connected hosts and all tracked attempts (including adrift), account status,
 /// and authentic finite capacities. Refusal history and connector panels are
 /// owned by their facts/store and application subjects, not a new cache here.
+/// Deployment facts and configured connector references; connector values remain
+/// their owners' documents (`client/domain/pages.md`, 7; `client/domain/root.md`, 6).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Deployment {
     pub hosts: List<Host>,
@@ -158,6 +160,8 @@ pub struct Deployment {
     pub person_answer_retention: Duration,
     pub task_room_refusals: List<tasks::CapacityRefusal>,
     pub task_room_refusals_forgotten: u64,
+    pub connectors: List<u16>,
+    pub connectors_cut: bool,
     pub cut: bool,
 }
 /// Recent refused hello facts, without protocol rights or advertised workstream payloads.
@@ -703,6 +707,12 @@ pub(super) fn deployment(
     }
     cut |= usize::try_from(refused_tasks.len()).expect("refusal count fits") > line_bound(limits);
     cut |= core.tasks.capacity_refusals_lost() != 0;
+    let mut connectors = List::with_capacity(limits.documents.lines);
+    for connector in core.connectors.iter().take(line_bound(limits)) {
+        connectors.push(*connector).expect("bounded configured connector references");
+    }
+    let connectors_cut = core.connectors.len() > line_bound(limits);
+    cut |= connectors_cut;
     Ok(Deployment {
         hosts,
         attempts,
@@ -732,6 +742,8 @@ pub(super) fn deployment(
         person_answer_retention: limits.people.request_retention,
         task_room_refusals,
         task_room_refusals_forgotten: core.tasks.capacity_refusals_lost(),
+        connectors,
+        connectors_cut,
         cut,
     })
 }
@@ -785,6 +797,7 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(List::<HelloRefusalLine>::worst_case(limits.lines)?)?
         .checked_add(List::<people::CapacityRefusal>::worst_case(limits.lines)?)?
         .checked_add(List::<tasks::CapacityRefusal>::worst_case(limits.lines)?)?
+        .checked_add(List::<u16>::worst_case(limits.lines)?)?
         .checked_add(u64::try_from(size_of::<Deployment>()).ok()?)
 }
 
