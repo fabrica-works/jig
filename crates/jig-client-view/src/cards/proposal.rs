@@ -155,6 +155,7 @@ pub fn owner_proposal(
             | jig_client::objects::Body::Task(_)
             | jig_client::objects::Body::Proposal(_)
             | jig_client::objects::Body::Escalation(_)
+            | jig_client::objects::Body::OwnerEscalation(_)
             | jig_client::objects::Body::Question(_)
             | jig_client::objects::Body::PersonTask(_)
             | jig_client::objects::Body::OwnerPersonTask(_)

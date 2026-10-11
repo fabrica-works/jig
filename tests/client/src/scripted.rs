@@ -601,13 +601,13 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
             let terminal = match value {
                 ReadValue::Proposal(p) => p.ending.is_some(),
                 ReadValue::Escalation(e) => e.ending.is_some(),
-                ReadValue::OwnerEscalation(_) => false,
                 ReadValue::Question(q) => q.ending.is_some(),
                 ReadValue::PersonTask(p) => p.ending.is_some(),
                 ReadValue::Task(t) => t.result.is_some(),
                 ReadValue::Result(_) => true,
                 ReadValue::OwnerPersonTask(_)
                 | ReadValue::OwnerProposal(_)
+                | ReadValue::OwnerEscalation(_)
                 | ReadValue::Frame(_)
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)

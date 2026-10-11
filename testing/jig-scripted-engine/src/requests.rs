@@ -496,12 +496,12 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         },
         ReadValue::Proposal(v) => v.ending.clone(),
         ReadValue::Escalation(v) => v.ending.clone(),
-        ReadValue::OwnerEscalation(_) => None,
         ReadValue::Question(v) => v.ending.clone(),
         ReadValue::PersonTask(v) => v.ending.clone(),
         ReadValue::Result(v) => Some(v.ending.clone()),
         ReadValue::OwnerPersonTask(_)
         | ReadValue::OwnerProposal(_)
+        | ReadValue::OwnerEscalation(_)
         | ReadValue::Frame(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)

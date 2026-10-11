@@ -155,7 +155,28 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
                 revision: Revision { value: u64::MAX },
                 decision: Decision::PassedUp,
             },
-            _ => unreachable!(),
+            ActKind::Write
+            | ActKind::Answer
+            | ActKind::Take
+            | ActKind::HandBack
+            | ActKind::Accept
+            | ActKind::Reject
+            | ActKind::Amend
+            | ActKind::AmendRelease
+            | ActKind::Stop
+            | ActKind::Cancel
+            | ActKind::Close
+            | ActKind::TakeOver
+            | ActKind::SetGoal
+            | ActKind::Prioritise
+            | ActKind::MarkSeen
+            | ActKind::EditNote
+            | ActKind::DeleteNote
+            | ActKind::Adopt
+            | ActKind::ChangePolicy
+            | ActKind::SetRoles
+            | ActKind::MakeService
+            | ActKind::SetPool => unreachable!(),
         };
         assert_eq!(sent(&output), &expected);
         assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original))));
