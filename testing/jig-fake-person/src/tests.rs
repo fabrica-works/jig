@@ -436,3 +436,60 @@ fn a_subtree_face_distinguishes_repeated_regions_and_never_escapes() {
         "whole-tree Find retains first-match behavior"
     );
 }
+
+#[test]
+fn exact_names_distinguish_release_from_amend_and_release_without_escaping_subtrees_or_losing_fallbacks() {
+    let view = build(|b| {
+        b.open(Role::Page);
+        b.open(Role::Region);
+        b.name(b"Task");
+        b.open(Role::Button);
+        b.name(b"Amend and release");
+        b.bind(binding(1));
+        b.close();
+        b.open(Role::Button);
+        b.name(b"Release");
+        b.bind(binding(2));
+        b.close();
+        b.close();
+        b.open(Role::Region);
+        b.name(b"Other");
+        b.open(Role::Button);
+        b.name(b"Release");
+        b.bind(binding(3));
+        b.close();
+        b.open(Role::Button);
+        b.bind(binding(4));
+        b.text(Run::Plain, b"Con");
+        b.open(Role::Text);
+        b.run(Run::Strong, b"tinue");
+        b.close();
+        b.close();
+        b.close();
+        b.close();
+    });
+    let nodes = view.tree().nodes();
+    let amend = nodes.iter().find(|n| n.name.as_deref() == Some(b"Amend and release")).expect("amend button").id;
+    let release = nodes.iter().find(|n| n.name.as_deref() == Some(b"Release")).expect("release button").id;
+    let other = nodes.iter().find(|n| n.name.as_deref() == Some(b"Other")).expect("other subtree").id;
+    let mut face = TreeFace::new(view.tree());
+    assert_eq!(face.find(&Find::named(Role::Button, b"release")), Found::Node(amend));
+    let exact = Find::exactly_named(Role::Button, b"Release").within(Box::from([region(b"Task")]));
+    assert_eq!(face.find(&exact), Found::Node(release));
+    assert_eq!(face.find(&Find::exactly_named(Role::Button, b"release")), Found::Absent);
+    assert_eq!(face.find(&Find::exactly_named(Role::Link, b"Release")), Found::Absent);
+    assert_eq!(face.find(&Find::exactly_named(Role::Button, b"Amend")), Found::Absent);
+    assert_eq!(
+        face.find(&Find::exactly_named(Role::Button, b"Continue").within(Box::from([region(b"Task")]))),
+        Found::Absent
+    );
+    let mut outside = TreeFace::subtree(view.tree(), other).expect("other subtree");
+    let outside_release = outside.find(&Find::exactly_named(Role::Button, b"Release"));
+    assert!(matches!(outside_release, Found::Node(id) if id != release));
+    assert_ne!(outside.find(&exact), Found::Node(release));
+    let fallback = outside.find(&Find::exactly_named(Role::Button, b"Continue"));
+    assert!(matches!(fallback, Found::Node(_)));
+    assert_eq!(outside.find(&Find::named(Role::Button, b"CONTINUE")), fallback);
+    assert_eq!(outside.find(&Find::exactly_named(Role::Button, b"Con")), Found::Absent);
+    assert_eq!(format!("{}", Find::exactly_named(Role::Button, b"Release")), "button named exactly Release");
+}

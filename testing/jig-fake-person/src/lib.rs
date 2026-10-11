@@ -40,6 +40,11 @@ impl Find {
     pub fn named(role: Role, name: &[u8]) -> Self {
         Self { within: Box::new([]), target: Target::Role { role, name: Box::from(name) } }
     }
+    /// Find a role whose whole accessible name equals these bytes, including case.
+    #[must_use]
+    pub fn exactly_named(role: Role, name: &[u8]) -> Self {
+        Self { within: Box::new([]), target: Target::ExactRole { role, name: Box::from(name) } }
+    }
     /// Find visible text containing these words.
     #[must_use]
     pub fn text(text: &[u8]) -> Self {
@@ -53,11 +58,13 @@ impl Find {
     }
 }
 
-/// Words in an accessible name or visible text; matching ignores case.
+/// An accessible-name or visible-text target, with its declared matching rule.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Target {
     /// A semantic role and words in its name.
     Role { role: Role, name: Box<[u8]> },
+    /// A semantic role and its whole accessible name, compared byte for byte.
+    ExactRole { role: Role, name: Box<[u8]> },
     /// Words in visible text, including a drawing's ordinary fallback.
     Text { text: Box<[u8]> },
 }
@@ -259,6 +266,9 @@ impl fmt::Display for Target {
         match self {
             Self::Role { role, name } => {
                 write!(f, "{} named {}", tree::role_name(*role), alloc::string::String::from_utf8_lossy(name))
+            }
+            Self::ExactRole { role, name } => {
+                write!(f, "{} named exactly {}", tree::role_name(*role), alloc::string::String::from_utf8_lossy(name))
             }
             Self::Text { text } => write!(f, "text containing {}", alloc::string::String::from_utf8_lossy(text)),
         }
