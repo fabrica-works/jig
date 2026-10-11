@@ -487,10 +487,7 @@ fn read_value(
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::Proposal(proposal));
         }
-        ReadValue::OwnerEscalation(value) => {
-            let key = ObjectKey::Escalation(value.task.chip.task);
-            read_body(domain, key, Body::OwnerEscalation(value));
-        }
+        ReadValue::OwnerEscalation(value) => owner_escalation_read(domain, value),
         ReadValue::Escalation(escalation) => {
             let key = ObjectKey::Escalation(escalation.task.task);
             read_body(domain, key, Body::Escalation(escalation));
@@ -574,6 +571,11 @@ fn read_value(
         ReadValue::Project(project) => crate::pages::project::document(domain, env, project, out),
         ReadValue::Deployment(deployment) => crate::pages::deployment::document(domain, env, deployment, out),
     }
+}
+
+fn owner_escalation_read(domain: &mut Domain, value: Box<contract::OwnerEscalation>) {
+    let key = ObjectKey::Escalation(value.task.chip.task);
+    read_body(domain, key, Body::OwnerEscalation(value));
 }
 
 fn task_read(domain: &mut Domain, env: &Env<crate::Limits>, task: Box<contract::Task>, out: &mut Queue<Request>) {
