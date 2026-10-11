@@ -110,8 +110,9 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(recurring)?
         .checked_add(l.rows.checked_mul(16)?)?
         .checked_add(l.rows.checked_add(4)?.checked_mul(l.rows.checked_add(1)?)?.checked_mul(2)?)?
-        .checked_add(l.rows.checked_mul(2)?)?
-        .checked_add(110)
+        .checked_add(l.rows.checked_mul(10)?)?
+        .checked_add(l.rows.checked_mul(3)?)?
+        .checked_add(113)
 }
 /// Every loaded saying and escaped source segment contributes to the envelope.
 #[must_use]
@@ -156,7 +157,9 @@ pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<Proje
     for row in &value.policy.roles {
         crate::owner_amendment::authority_fits(&row.authority, l)?;
     }
+    b.open(Role::List);
     for resource in &value.resources {
+        b.open(Role::Item);
         crate::owner_chip::part_fits(&resource.part, l)?;
     }
     for grant in &value.policy.projections {
@@ -339,13 +342,17 @@ fn resources(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Wo
             &[],
         );
         crate::proposed_task::part(b, &resource.part, words, bindings);
+        b.close();
     }
+    b.close();
 }
 fn policy_section(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, _bindings: &mut JigBindings) {
     policy(b, &value.policy, words);
 }
 fn members(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, _bindings: &mut JigBindings) {
+    b.open(Role::List);
     for member in &value.members {
+        b.open(Role::Item);
         region(b, words, P::Member, &[Hole::Number(member.party)]);
         text(
             b,
@@ -364,7 +371,9 @@ fn members(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Word
         crate::literal_segment::render(b, member.name.bytes());
         crate::document_text::loss(b, &member.name, words);
         b.close();
+        b.close();
     }
+    b.close();
 }
 fn ledgers(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, _bindings: &mut JigBindings) {
     match &value.current_period {
@@ -376,7 +385,9 @@ fn ledgers(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Word
     }
 }
 fn spend(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    b.open(Role::List);
     for spend in &value.spend {
+        b.open(Role::Item);
         region(b, words, P::Spend, &[]);
         cards::chip::chip(b, client, &spend.chip, words, bindings);
         crate::proposed_task::funder(b, spend.funder, words);
@@ -385,12 +396,73 @@ fn spend(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, 
         text(b, words, P::Below, &[Hole::Amount(spend.numbers.spent_below)]);
         text(b, words, P::Reserved, &[Hole::Amount(spend.numbers.reserved)]);
         b.close();
+        b.close();
     }
+    b.close();
 }
 fn recurring(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     for row in &value.recurring {
-        super::recurring::recurring(b, client, row, words, bindings);
+        whole_recurring(b, client, row, words, bindings);
     }
+}
+// A new whole owner row uses its supplied numeric identity even with an empty title.
+fn whole_recurring(
+    b: &mut Builder,
+    client: &Domain,
+    row: &jig_client::contract::Recurring,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    named_region(b, words, JigPhrase::RecurringKey, &[Hole::Number(u64::from(row.key))]);
+    cards::chip::chip(b, client, &row.chip, words, bindings);
+    words.text(b, JigPhrase::RecurringKey, &[Hole::Number(u64::from(row.key))]);
+    b.open(Role::List);
+    for task in &row.batch {
+        cards::proposal::proposed_task(b, task, words, bindings);
+    }
+    b.close();
+    words.text(b, JigPhrase::Budget, &[Hole::Amount(row.budget)]);
+    words.text(
+        b,
+        match row.overlap {
+            jig_client::contract::RecurringOverlap::Skip => JigPhrase::RecurringSkip,
+            jig_client::contract::RecurringOverlap::Wait => JigPhrase::RecurringWait,
+        },
+        &[],
+    );
+    words.text(b, JigPhrase::CurrentPeriod, &[Hole::Number(row.current_period)]);
+    if let Some(began) = row.began {
+        b.open(Role::Time);
+        words.text(b, JigPhrase::PeriodBegan, &[Hole::Wall(words.adjusted_wall(began))]);
+        b.close();
+    }
+    match row.next {
+        Some(next) => {
+            b.open(Role::Time);
+            words.text(b, JigPhrase::NextRun, &[Hole::Wall(words.adjusted_wall(next))]);
+            b.close();
+        }
+        None => words.text(b, JigPhrase::NextPeriod, &[]),
+    }
+    words.text(b, JigPhrase::RecurringLastPeriod, &[Hole::Number(row.last_period)]);
+    if let Some(period) = row.pending_period {
+        words.text(b, JigPhrase::RecurringPendingPeriod, &[Hole::Number(period)]);
+    }
+    for task in &row.last_batch {
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Link,
+            JigPhrase::TaskPage,
+            &[Hole::Number(*task)],
+            Act::Go { address: jig_client::address::Address::task(*task) },
+        );
+    }
+    if row.cut {
+        words.status(b, JigPhrase::RecurringCut, &[]);
+    }
+    b.close();
 }
 /// Compose the selected genuine Project section from supplied facts.
 pub(super) fn section(
@@ -585,6 +657,40 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         }
         b.close();
     }
+    if let Some(mappings) = &value.policy.permissions {
+        let before =
+            Ask::ChangePolicy { project: value.number, edit: PolicyEdit::Permissions { mappings: mappings.clone() } };
+        if owner_form::supported(value, &before) {
+            named_region(b, words, JigPhrase::PolicyPermissions, &[]);
+            let draft = owner_form::draft(state, &before);
+            if let Ask::ChangePolicy { edit: PolicyEdit::Permissions { mappings }, .. } = &draft {
+                for remove in 0..mappings.len() {
+                    let mut remaining = skein_lib::List::with_capacity(mappings.capacity());
+                    for index in 0..mappings.len() {
+                        if index != remove {
+                            remaining
+                                .push(*mappings.get(index).expect("bounded permission"))
+                                .expect("whole mapping capacity");
+                        }
+                    }
+                    remove_control(
+                        b,
+                        &Ask::ChangePolicy {
+                            project: value.number,
+                            edit: PolicyEdit::Permissions { mappings: remaining },
+                        },
+                        remove,
+                        words,
+                        bindings,
+                    );
+                }
+                // Even a supplied empty list remains an explicit complete baseline.
+                control(b, &draft, words, bindings);
+            }
+            b.close();
+        }
+    }
+    pool_forms(b, value, state, words, bindings);
     let mut holdings = skein_lib::List::with_capacity(value.members.capacity());
     for member in &value.members {
         holdings
@@ -640,6 +746,11 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         words.text(b, JigPhrase::Before, &[]);
         if let Some(before) = &state.before {
             render_request(b, before, words);
+        } else if let Ask::SetPool { .. } = ask.as_ref() {
+            text(b, words, P::PoolAbsent, &[]);
+        }
+        if let Some(period) = state.pool_period {
+            text(b, words, P::ConfiguredPeriod, &[Hole::Number(period)]);
         }
         words.text(b, JigPhrase::After, &[]);
         render_request(b, ask, words);
@@ -654,6 +765,66 @@ pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, word
         if let Some(intent) = client.intents().get(skein_lib::Id::from_token(request)) {
             words.progress(b, intent.progress);
         }
+    }
+}
+fn pool_forms(
+    b: &mut Builder,
+    value: &OwnerProject,
+    state: &owner_form::Form,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    for member in &value.members {
+        let mut budget = None;
+        for pool in &value.configured_pools {
+            match pool.source {
+                jig_client::contract::Funder::Pool { project, person, period }
+                    if project == value.number && person == member.party && period == value.configured_period =>
+                {
+                    budget = Some(pool.numbers.budget);
+                    break;
+                }
+                jig_client::contract::Funder::Pool { .. }
+                | jig_client::contract::Funder::Task(_)
+                | jig_client::contract::Funder::Period { .. }
+                | jig_client::contract::Funder::Recurring { .. } => {}
+            }
+        }
+        let mut offered = false;
+        for offer in &value.acts {
+            if offer.act == jig_client::contract::ActKind::SetPool {
+                offered = match &offer.admission {
+                    jig_client::contract::Admission::Allowed | jig_client::contract::Admission::Proposed { .. } => true,
+                    jig_client::contract::Admission::Refused(_) | jig_client::contract::Admission::Bounded { .. } => {
+                        false
+                    }
+                };
+                break;
+            }
+        }
+        if !offered || value.configured_pools_cut {
+            continue;
+        }
+        region(b, words, P::Member, &[Hole::Number(member.party)]);
+        text(b, words, P::ConfiguredPeriod, &[Hole::Number(value.configured_period)]);
+        if budget.is_none() {
+            text(b, words, P::PoolAbsent, &[]);
+        }
+        b.open(Role::TextField);
+        b.name(&words.say(JigPhrase::GoalBudget, &[]));
+        let reviewed = match state.review.as_deref() {
+            Some(Ask::SetPool { project, party, budget }) if *project == value.number && *party == member.party => {
+                Some(*budget)
+            }
+            Some(_) | None => budget,
+        };
+        if let Some(budget) = reviewed {
+            let digits = skein_lib::Decimal::of(budget);
+            b.value(digits.as_bytes(), 0);
+        }
+        b.bind(bindings.insert(JigMeaning::ProjectPoolBudget { project: value.number, party: member.party }));
+        b.close();
+        b.close();
     }
 }
 fn named_region(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole]) {

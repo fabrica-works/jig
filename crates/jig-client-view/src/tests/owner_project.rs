@@ -351,6 +351,15 @@ fn owner_project_optional_ledger_distinguishes_none_supplied_empty_epoch_and_all
     for n in [b"101".as_slice(), b"103", b"107", b"109", b"113", b"18446744073709551615"] {
         assert!(has(&tree, n));
     }
+    let supplied = value.current_period.as_ref().unwrap();
+    assert_eq!(supplied.began, Some(Wall::EPOCH));
+    let mut empty = supplied.clone();
+    empty.numbers = OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 };
+    empty.left = 0;
+    value.current_period = Some(empty);
+    let (empty_tree, _) = build(&value, words(false));
+    assert!(!has(&empty_tree, b"Current period not supplied"));
+    assert_eq!(value.current_period.as_ref().unwrap().numbers.budget, 0);
     assert_eq!(value.current_period.as_ref().unwrap().began, Some(Wall::EPOCH));
     assert_eq!(value.current_period.as_ref().unwrap().next, None);
     assert!(value.current_period.as_ref().unwrap().closed);
@@ -377,6 +386,24 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
     ] {
         assert!(has(&tree, n), "missing {n:?}");
     }
+    let (_, bindings) = build(&value, words(false));
+    let displayed: Vec<_> = tree
+        .nodes()
+        .iter()
+        .enumerate()
+        .filter(|(_, node)| node.role == Role::Region && node.name.as_deref() == Some(b"Spend".as_slice()))
+        .map(|(index, node)| {
+            tree.nodes()[index..index + usize::try_from(node.size).unwrap()]
+                .iter()
+                .find_map(|child| child.binding.and_then(|binding| bindings.address(binding.token)))
+                .expect("source expense has its named task link")
+        })
+        .map(|address| match address {
+            jig_client::address::Address::Task { task, .. } => task,
+            _ => panic!("expense task link"),
+        })
+        .collect();
+    assert_eq!(displayed, [9, 0, u64::MAX, 9]);
     assert_eq!(value.spend.iter().map(|s| s.chip.task).collect::<Vec<_>>(), [9, 0, u64::MAX, 9]);
     assert_eq!(value.recurring.get(0).unwrap().batch.iter().map(|t| t.number).collect::<Vec<_>>(), [u64::MAX, 0]);
     assert_eq!(value.recurring.get(0).unwrap().last_batch.as_slice(), [u64::MAX, 0, u64::MAX]);
@@ -545,4 +572,67 @@ fn owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and
     assert_eq!(role.authority, value.policy.roles.get(0).unwrap().authority.authority);
     assert_eq!(role.period_spend, u64::MAX);
     assert!(native_drive(&mut d, Event::Act { act: Act::Confirm }).is_empty());
+}
+#[test]
+fn owner_project_public_baselines_preserve_optional_permissions_configured_targets_and_empty_recurring_titles() {
+    let mut value = source();
+    value.configured_period = 0;
+    value.configured_pools.push(ledger(Funder::Pool { project: u32::MAX, person: 0, period: 0 })).unwrap();
+    value.policy.permissions = Some(list(
+        4,
+        [
+            PolicyPermission { connector: u16::MAX, permission: u16::MAX, role: u32::MAX },
+            PolicyPermission { connector: 0, permission: 0, role: 0 },
+        ],
+    ));
+    value.policy.permissions_cut = true;
+    value.recurring.get_mut(0).unwrap().chip.title = doc(b"", true);
+    let before = value.clone();
+    let (tree, _) = build(&value, words(false));
+    assert!(has(&tree, b"Configured pool period: 0"));
+    assert!(!has(&tree, b"Permission mappings not supplied"));
+    assert!(has(&tree, b"65535"));
+    assert!(has(&tree, b"4294967295"));
+    assert!(
+        tree.nodes().iter().any(|node| node.role == Role::Region
+            && node.name.as_ref().is_some_and(|name| find(name, b"4294967295").is_some()))
+    );
+    assert_eq!(value, before);
+    value.policy.permissions = Some(List::with_capacity(4));
+    let (tree, _) = build(&value, words(false));
+    assert!(!has(&tree, b"Permission mappings not supplied"));
+    value.policy.permissions = None;
+    let (tree, _) = build(&value, words(false));
+    assert!(has(&tree, b"Permission mappings not supplied"));
+    value.configured_pools = List::with_capacity(5);
+    assert!(view::required(&value, &limits(), words(false)).is_none());
+    value.configured_pools = List::with_capacity(4);
+    value.policy.permissions = Some(List::with_capacity(5));
+    assert!(view::required(&value, &limits(), words(false)).is_none());
+}
+#[test]
+fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_refuses_one_under_without_clipping() {
+    let value = source();
+    let w = words(false);
+    let (tree, _) = build(&value, w);
+    let f = view::required(&value, &limits(), w).unwrap();
+    let mut bound = capacity(f);
+    bound.nodes = tree.len();
+    bound.text_bytes = tree.nodes().iter().map(|node| node.text_bytes()).sum();
+    let render = |bound: crate::Limits| {
+        let mut b = Builder::new(&bound);
+        let mut bindings = JigBindings::new(f.bindings, 32);
+        view::render(&mut b, &value, &Domain::new(&limits(), 9151), w, &mut bindings);
+        b.finish()
+    };
+    let exact = render(bound);
+    assert_eq!(exact.len(), tree.len());
+    assert_eq!(exact.nodes(), tree.nodes());
+    let mut short = bound;
+    short.nodes -= 1;
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render(short))).is_err());
+    let mut short = bound;
+    short.text_bytes -= 1;
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render(short))).is_err());
+    assert_eq!(value.resources.capacity(), 4);
 }

@@ -55,6 +55,8 @@ pub enum JigMeaning {
     ProjectSetting { ask: Box<jig_client::contract::Ask>, field: crate::owner_project::Field },
     /// A new service name, after an explicit supplied role choice.
     ProjectServiceName { project: u32, role: jig_client::contract::HeldRole },
+    /// An explicit budget for one supplied party in the configured target.
+    ProjectPoolBudget { project: u32, party: u64 },
     /// Pressing, submitting or toggling asks this already typed action.
     Action(jig_client::action::Act),
     /// Whole text edits a domain field; submit names that same field.
@@ -125,6 +127,7 @@ impl JigBindings {
                     | JigMeaning::Amendment { .. }
                     | JigMeaning::ProjectSetting { .. }
                     | JigMeaning::ProjectServiceName { .. }
+                    | JigMeaning::ProjectPoolBudget { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -147,6 +150,7 @@ impl JigBindings {
                     | JigMeaning::Amendment { .. }
                     | JigMeaning::ProjectSetting { .. }
                     | JigMeaning::ProjectServiceName { .. }
+                    | JigMeaning::ProjectPoolBudget { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -208,6 +212,7 @@ impl JigBindings {
                     | JigMeaning::Amendment { .. }
                     | JigMeaning::ProjectSetting { .. }
                     | JigMeaning::ProjectServiceName { .. }
+                    | JigMeaning::ProjectPoolBudget { .. }
                     | JigMeaning::GoalField { .. }
                     | JigMeaning::NoteSearch { .. } => return None,
                 }
@@ -224,6 +229,16 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_clie
         if entry.token == token {
             return match &entry.meaning {
                 JigMeaning::Part(_) | JigMeaning::OwnerPart(_) => None,
+                JigMeaning::ProjectPoolBudget { project, party } => match act {
+                    Act::Input { value } => {
+                        Some(jig_client::pages::project::owner_form::action(jig_client::contract::Ask::SetPool {
+                            project: *project,
+                            party: *party,
+                            budget: number(&value)?,
+                        }))
+                    }
+                    Act::Press | Act::Submit | Act::Toggle => None,
+                },
                 JigMeaning::ProjectServiceName { project, role } => match act {
                     Act::Input { value } => {
                         Some(jig_client::pages::project::owner_form::action(jig_client::contract::Ask::MakeService {

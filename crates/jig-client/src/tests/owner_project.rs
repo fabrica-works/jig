@@ -206,3 +206,109 @@ fn owner_project_policy_scalar_and_complete_lists_are_offered_without_inferred_p
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(absent) }).is_empty());
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
 }
+#[test]
+fn owner_project_configured_pool_review_keeps_zero_target_distinct_and_refuses_changed_period_or_cut_absence() {
+    let mut value = source(0);
+    value.acts = list(2, [Offered { act: ActKind::SetPool, admission: Admission::Allowed }]);
+    let numbers = OwnerNumbers { budget: 11, spent: 2, spent_below: 3, reserved: 4 };
+    let observed = PoolLedger {
+        source: Funder::Pool { project: 0, person: u64::MAX, period: 9 },
+        parent: Some(Funder::Period { project: 0, period: 9 }),
+        numbers,
+        left: 2,
+        closed: false,
+        began: Some(skein_lib::Wall::EPOCH),
+        next: None,
+    };
+    value.pools.push(observed.clone()).unwrap();
+    value
+        .configured_pools
+        .push(PoolLedger {
+            source: Funder::Pool { project: 0, person: u64::MAX, period: 0 },
+            parent: Some(Funder::Period { project: 0, period: 0 }),
+            numbers: OwnerNumbers { budget: 71, ..numbers },
+            closed: true,
+            ..observed
+        })
+        .unwrap();
+    let chosen = Ask::SetPool { project: 0, party: u64::MAX, budget: u64::MAX };
+    let before = Ask::SetPool { project: 0, party: u64::MAX, budget: 71 };
+    assert_eq!(owner_form::baseline(&value, &chosen), Some(before.clone()));
+    let (mut domain, token) = live(0);
+    install(&mut domain, token, value.clone());
+    drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) });
+    assert_eq!(domain.project_page().settings.pool_period, Some(0));
+    assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert!(matches!(&sent[..], [Request::Send { ask, .. }] if ask.as_ref()==&chosen));
+    let absent = Ask::SetPool { project: 0, party: 0, budget: 113 };
+    assert!(owner_form::supported(&value, &absent));
+    assert_eq!(owner_form::baseline(&value, &absent), None);
+    let (mut domain, token) = live(0);
+    install(&mut domain, token, value.clone());
+    drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(absent.clone()) });
+    domain.project_page.owner.as_mut().unwrap().configured_period = u64::MAX;
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    value.configured_pools_cut = true;
+    assert!(!owner_form::supported(&value, &absent));
+    assert_eq!(value.pools.get(0).unwrap().numbers.budget, 11);
+    assert_eq!(value.configured_pools.get(0).unwrap().numbers.budget, 71);
+}
+#[test]
+fn owner_project_permission_review_preserves_full_width_order_and_distinguishes_absent_empty_and_cut() {
+    let mut value = source(u32::MAX);
+    let mappings = list(
+        2,
+        [
+            PolicyPermission { connector: u16::MAX, permission: u16::MAX, role: u32::MAX },
+            PolicyPermission { connector: 0, permission: 0, role: 0 },
+        ],
+    );
+    let chosen =
+        Ask::ChangePolicy { project: value.number, edit: PolicyEdit::Permissions { mappings: List::with_capacity(2) } };
+    assert!(!owner_form::supported(&value, &chosen));
+    value.policy.permissions = Some(mappings.clone());
+    let before = Ask::ChangePolicy { project: value.number, edit: PolicyEdit::Permissions { mappings } };
+    assert_eq!(owner_form::baseline(&value, &chosen), Some(before.clone()));
+    let (mut domain, token) = live(value.number);
+    install(&mut domain, token, value.clone());
+    drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) });
+    assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert!(matches!(&sent[..], [Request::Send { ask, .. }] if ask.as_ref()==&chosen));
+    value.policy.permissions = Some(List::with_capacity(2));
+    assert_eq!(owner_form::baseline(&value, &chosen), Some(chosen.clone()));
+    value.policy.permissions_cut = true;
+    assert!(!owner_form::supported(&value, &chosen));
+    value.policy.permissions_cut = false;
+    value.policy.cut = true;
+    assert!(!owner_form::supported(&value, &chosen));
+    value.policy.cut = false;
+    value.cut = true;
+    assert!(!owner_form::supported(&value, &chosen));
+}
+#[test]
+fn owner_project_service_requires_explicit_role_before_name_without_emitting_an_implicit_request() {
+    let mut value = source(0);
+    value.acts = list(2, [Offered { act: ActKind::MakeService, admission: Admission::Allowed }]);
+    let (mut domain, token) = live(0);
+    install(&mut domain, token, value.clone());
+    assert!(domain.project_page().settings.service_role.is_none());
+    assert!(
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Act { act: Act::ProjectServiceRole { role: HeldRole::Policy { role: 17 } } }
+        )
+        .is_empty()
+    );
+    assert!(domain.project_page().settings.service_role.is_none());
+    let role = HeldRole::Policy { role: u32::MAX };
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::ProjectServiceRole { role } }).is_empty());
+    assert_eq!(domain.project_page().settings.service_role, Some(role));
+    assert!(domain.project_page().settings.review.is_none());
+    let chosen = Ask::MakeService { project: 0, name: Text::new(copy_of(b""), LIMITS.text).unwrap(), role };
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) }).is_empty());
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert!(matches!(&sent[..], [Request::Send { ask, .. }] if ask.as_ref()==&chosen));
+}
