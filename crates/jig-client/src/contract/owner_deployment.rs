@@ -198,11 +198,11 @@ pub enum OwnerAccountState {
 /// The supplied closed hellorefusal vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerHelloRefusal {
-    /// ReservedChannel as supplied by its owner.
+    /// `ReservedChannel` as supplied by its owner.
     ReservedChannel,
     /// Workers as supplied by its owner.
     Workers { limit: u32 },
-    /// StopBound as supplied by its owner.
+    /// `StopBound` as supplied by its owner.
     StopBound { grace: Duration },
 }
 
@@ -243,11 +243,11 @@ pub enum OwnerPersonCapacityAction {
     Amend { task: u64 },
     /// Move as supplied by its owner.
     Move { task: u64 },
-    /// TakePerson as supplied by its owner.
+    /// `TakePerson` as supplied by its owner.
     TakePerson { task: u64 },
-    /// HandBackPerson as supplied by its owner.
+    /// `HandBackPerson` as supplied by its owner.
     HandBackPerson { task: u64 },
-    /// AnswerPerson as supplied by its owner.
+    /// `AnswerPerson` as supplied by its owner.
     AnswerPerson { task: u64 },
     /// Stop as supplied by its owner.
     Stop { task: u64 },
@@ -255,7 +255,7 @@ pub enum OwnerPersonCapacityAction {
     Cancel { task: u64 },
     /// Release as supplied by its owner.
     Release { task: u64 },
-    /// MarkSeen as supplied by its owner.
+    /// `MarkSeen` as supplied by its owner.
     MarkSeen { seen: Seen },
 }
 
@@ -279,7 +279,7 @@ pub enum OwnerTaskCapacityAction {
     Batch { first: Option<u64>, members: u32 },
     /// Proposal as supplied by its owner.
     Proposal { number: u64 },
-    /// PersonProposal as supplied by its owner.
+    /// `PersonProposal` as supplied by its owner.
     PersonProposal { number: u64 },
     /// Message as supplied by its owner.
     Message { task: u64, number: u64 },
@@ -304,11 +304,11 @@ pub enum OwnerTaskCapacityAction {
 pub enum OwnerTaskCapacityCause {
     /// Tasks as supplied by its owner.
     Tasks { limit: u32 },
-    /// CreationFlights as supplied by its owner.
+    /// `CreationFlights` as supplied by its owner.
     CreationFlights { limit: u32 },
-    /// ResourceReports as supplied by its owner.
+    /// `ResourceReports` as supplied by its owner.
     ResourceReports { limit: u32 },
-    /// ProjectTasks as supplied by its owner.
+    /// `ProjectTasks` as supplied by its owner.
     ProjectTasks { limit: u32 },
     /// Tree as supplied by its owner.
     Tree { limit: u32 },
@@ -318,7 +318,7 @@ pub enum OwnerTaskCapacityCause {
     Inbox { task: u64, messages: u32, bytes: u32 },
     /// Holdings as supplied by its owner.
     Holdings { limit: u32 },
-    /// HoldWaiters as supplied by its owner.
+    /// `HoldWaiters` as supplied by its owner.
     HoldWaiters { limit: u32 },
     /// Proposals as supplied by its owner.
     Proposals { limit: u32 },
