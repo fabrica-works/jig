@@ -283,7 +283,7 @@ overridden member by member, each scalar member named by its dotted path
 the test's list names each.
 Don't: accept an override by position, or of a whole compound limit at
 once.
-Size: at most 350 lines of production code.
+Size: at most 600 lines of production code (ruling 161).
 Removes: nothing.
 
 ### 20.4 The engine's protocol part
