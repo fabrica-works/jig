@@ -20,6 +20,7 @@ mod assemble;
 mod boundary;
 mod client_documents;
 mod domain;
+mod host_activity;
 mod limits;
 mod restart;
 mod route;

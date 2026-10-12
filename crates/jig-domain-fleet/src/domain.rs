@@ -359,7 +359,6 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Observe { channel, run, attempt, report } => {
             crate::progress::received(domain, env, channel, run, attempt, report, out);
         }
-        Event::Told { channel, run, attempt, fact } => call::told(domain, channel, run, attempt, fact, out),
     }
 }
 

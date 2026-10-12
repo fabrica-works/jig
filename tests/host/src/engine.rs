@@ -188,6 +188,7 @@ impl Engine {
     /// Takes the host's request `request`, which is for the engine.
     pub fn take(&mut self, request: Request) -> Vec<Act> {
         match request {
+            Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => Vec::new(),
             Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
                 assert_eq!(reply_to, ReplyTo::new(run), "an answer goes to its assignment");
                 if self.open.contains_key(&(run, attempt)) {

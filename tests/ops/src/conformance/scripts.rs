@@ -244,6 +244,7 @@ impl Agents {
                 agent.said += 1;
                 agent.turns += 1;
                 agent.spent += 1;
+                out.extend(completion_activity(owner, agent.turns));
                 for content in stream(owner, agent, &step) {
                     out.push(root::Event::AgentContent { owner, content });
                 }
@@ -636,4 +637,16 @@ pub fn lead() -> Box<[u8]> {
     )
     .into_bytes()
     .into()
+}
+
+fn completion_activity(owner: Token, turns: u32) -> Vec<root::Event> {
+    let mut reports = Vec::new();
+    for activity in [
+        host::Activity::Long { operation: host::Operation::Completion, span: Duration::from_secs(1) },
+        host::Activity::Count { kind: host::CountKind::LlmFinished, elapsed: Duration::ZERO, count: u64::from(turns) },
+        host::Activity::LongDone,
+    ] {
+        reports.push(root::Event::Agent(host::FromAgent::Activity { owner, activity }));
+    }
+    reports
 }

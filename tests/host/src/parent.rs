@@ -280,7 +280,14 @@ impl Parent {
             Request::Save { owner, workspace } => self.save(owner, workspace),
             Request::Release { workspace } => self.release(workspace),
             Request::Grant { .. } => Vec::new(),
-            Request::Up(LinkUp::Turn { .. } | LinkUp::Answer { .. } | LinkUp::Call { .. })
+            Request::Up(
+                LinkUp::Activity { .. }
+                | LinkUp::Rejected { .. }
+                | LinkUp::Exhausted { .. }
+                | LinkUp::Turn { .. }
+                | LinkUp::Answer { .. }
+                | LinkUp::Call { .. },
+            )
             | Request::AcknowledgeAgentTurn { .. }
             | Request::CancelRelay { .. }
             | Request::Hello { .. } => {

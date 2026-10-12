@@ -14,6 +14,7 @@
 
 extern crate alloc;
 
+mod activity;
 mod answers;
 mod assignment;
 mod boundary;
@@ -28,13 +29,14 @@ mod refusals;
 mod tests;
 mod turns;
 
+pub use activity::{Activity, CountKind, Operation};
 pub use boundary::{
     AgentFailure, Answer, AnsweredCall, Ask, Assignment, Delivery, DeliveryOutcome, Ending, Event, Failure, Finish,
     FromAgent, Grant, GrantTable, Hosting, Invalid, MessageRefusal, Phase, Preparation, Reason, Refusal, Refused,
     Reply, Request, RunAssignment, RunFailure, SettledAnswer, Start, StartMessage, ToAgent, Turn, Work, Workspace,
 };
 pub use domain::{Domain, max_out, resume, step};
-pub use facts::{Fact, Told};
+pub use facts::Fact;
 pub use limits::{Limits, worst_case};
 
 pub use link::{Bounds, Hello, LinkDown, LinkUp, ModelBound, Relayed};

@@ -18,7 +18,7 @@ use crate::boundary::{
 };
 use crate::call::{self, Call};
 use crate::domain::Domain;
-use crate::facts::{Fact, Facts, Told};
+use crate::facts::{Fact, Facts};
 use crate::limits::Limits;
 
 #[derive(Debug)]
@@ -41,6 +41,7 @@ pub(crate) struct Hosted {
     delivery: Option<Id<Call>>,
     runtime: Runtime,
     state: State,
+    observed: Option<Phase>,
 }
 
 #[derive(Debug)]
@@ -234,11 +235,13 @@ fn assign_runtime(
         delivery: None,
         runtime,
         state: State::Preparing { reply_to, charter, held },
+        observed: Some(Phase::Preparing),
     };
     let id = hosted.insert(entry).expect("checked for room above");
     let named = names.insert(run, id).expect("a name for every slot");
     assert!(named.is_none(), "checked the run is not hosted above");
     facts.push(Fact::Admitted { run, attempt });
+    facts.activity(LinkUp::Activity { run, attempt, activity: crate::Activity::Phase(Phase::Preparing) });
     match workspace {
         Some(workspace) => out.push(Request::Prepare { owner: id.token(), workspace }),
         None => start_prepared(domain, id.token(), None, out),
@@ -906,6 +909,7 @@ fn drain_stopping(domain: &mut Domain, env: &Env<Limits>, id: Id<Hosted>, out: &
 fn conclude(domain: &mut Domain, id: Id<Hosted>, out: &mut Queue<Request>) {
     let Domain { hosted, names, ready, facts, answers, refusals_lost, .. } = domain;
     let entry = hosted.get_mut(id).expect("a run lives until it is retired");
+    facts.phase(entry.run, entry.attempt, &mut entry.observed, phase(&entry.state));
     *refusals_lost = refusals_lost.saturating_add(entry.refusals.lost);
     entry.refusals.lost = 0;
     let settled = match &entry.state {
@@ -935,6 +939,7 @@ fn conclude(domain: &mut Domain, id: Id<Hosted>, out: &mut Queue<Request>) {
             | State::Closed => unreachable!("only a stopping run settles"),
         };
     }
+    facts.phase(entry.run, entry.attempt, &mut entry.observed, phase(&entry.state));
     let closed = match &entry.state {
         State::Closed => true,
         State::Preparing { .. }
@@ -1222,7 +1227,7 @@ fn phase(state: &State) -> Phase {
         State::Cancelling { .. } | State::Unwanted { .. } | State::Stopping { .. } | State::Saving { .. } => {
             Phase::Ending
         }
-        State::Closed => unreachable!("a closed run has left the names"),
+        State::Closed => Phase::Answered,
     }
 }
 
@@ -1343,14 +1348,6 @@ pub(crate) fn acknowledge_turn(
 ) {
     domain.turns.acknowledge(run, attempt, turn);
     domain.turns.admit(run, attempt, false, &env.limits, out);
-}
-
-/// Keep a live agent fact for the engine, dropping it when bounded room is full.
-pub(crate) fn told(domain: &mut Domain, env: &Env<Limits>, owner: Token, fact: Box<[u8]>) {
-    let Some(hosting) = domain.hosting(owner) else {
-        return;
-    };
-    domain.told.push(Told { run: hosting.run, attempt: hosting.attempt, fact }, env.limits.fact_bytes);
 }
 
 #[expect(clippy::too_many_arguments, reason = "one last word carries its fence and accounting")]

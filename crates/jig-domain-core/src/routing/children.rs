@@ -274,10 +274,15 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 let _pending = core.relaying.remove(&run.raw());
                 Request::Now(Box::new(Now::Undelivered { run, attempt, message }))
             }
-            fleet::Request::Grant { .. }
-            | fleet::Request::Rejected { .. }
-            | fleet::Request::Exhausted { .. }
-            | fleet::Request::Told { .. } => unreachable!("account and diagnostic host routes are handled separately"),
+            fleet::Request::Rejected { account, generation, .. } => {
+                append_account(core, env, accounts::Event::Rejected { account, generation }, &mut out);
+                continue;
+            }
+            fleet::Request::Exhausted { account, retry_after, .. } => {
+                append_account(core, env, accounts::Event::Exhausted { account, retry_after }, &mut out);
+                continue;
+            }
+            fleet::Request::Grant { .. } => unreachable!("account host grants are handled separately"),
             fleet::Request::Turned { run, attempt, turn, body } if core.stopping => {
                 let mut follow = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
                 fleet::step(
@@ -309,6 +314,18 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
     }
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+fn append_account(core: &mut Core, env: &Env<Limits>, event: accounts::Event, out: &mut Queue<Request>) {
+    let Requests::Out(mut routed) = route_account(core, env, event);
+    for _ in 0..routed.len() {
+        match routed.pop().expect("account route count") {
+            Request::Decided => {}
+            request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+                out.push(request);
+            }
+        }
+    }
 }
 
 pub(super) fn tag_account(mut child: Queue<accounts::Request>) -> Requests {
@@ -372,7 +389,6 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, event: fleet::Even
         | fleet::Event::Turn { .. }
         | fleet::Event::TurnKept { .. }
         | fleet::Event::TurnBusy { .. }
-        | fleet::Event::Told { .. }
         | fleet::Event::Observe { .. } => false,
     };
     if touched {

@@ -626,7 +626,7 @@ fn a_cancelled_attempt_is_fenced_but_its_answer_ends_its_call() {
         &*h.step(Event::Relay { channel: C1, run: R1, attempt: A1, call: host_call(Token::new(7), payload(6)) }),
         &[Request::DropCall { call: host_call(Token::new(7), payload(6)) }]
     );
-    assert_eq!(&*h.step(Event::Told { channel: C1, run: R1, attempt: A1, fact: payload(7) }), &[drop(7)]);
+    assert_eq!(&*active_report(&mut h, C1), &[]);
     assert_eq!(&*h.answer(C1, R1, A1, Answer::Failed, 8), &[answered(A1, R1, Answer::Failed, 8)]);
     // Answered: a cancel changes nothing.
     assert!(h.step(Event::Cancel { run: R1, attempt: A1 }).is_empty());
@@ -731,7 +731,7 @@ fn unowned_worker_inputs(h: &mut Harness, channel: Token) {
         &*h.step(Event::Relay { channel, run: R1, attempt: A1, call: host_call(Token::new(8), payload(8)) }),
         &[Request::DropCall { call: host_call(Token::new(8), payload(8)) }]
     );
-    assert_eq!(&*h.step(Event::Told { channel, run: R1, attempt: A1, fact: payload(9) }), &[drop(9)]);
+    assert_eq!(&*active_report(h, channel), &[]);
     assert!(h.step(Event::Rejected { channel, run: R1, attempt: A1, account: 7, generation: 4 }).is_empty());
     assert!(
         h.step(Event::Exhausted { channel, run: R1, attempt: A1, account: 7, retry_after: Duration::from_secs(5) })
@@ -740,10 +740,7 @@ fn unowned_worker_inputs(h: &mut Harness, channel: Token) {
 }
 
 fn owned_worker_notices(h: &mut Harness, channel: Token) {
-    assert_eq!(
-        &*h.step(Event::Told { channel, run: R1, attempt: A1, fact: payload(9) }),
-        &[Request::Told { run: R1, attempt: A1, fact: payload(9) }]
-    );
+    assert_eq!(&*active_report(h, channel), &[Request::Observed { run: R1, attempt: A1 }]);
     assert_eq!(
         &*h.step(Event::Rejected { channel, run: R1, attempt: A1, account: 7, generation: 4 }),
         &[Request::Rejected { run: R1, attempt: A1, account: 7, generation: 4 }]
@@ -802,10 +799,7 @@ fn inbound_events_and_facts_pass_while_the_claim_is_live() {
         &*h.step(Event::Inbound { run: R1, attempt: A1, message: message(event) }),
         &[Request::Inbound { channel: C1, run: R1, attempt: A1, message: message(event) }]
     );
-    assert_eq!(
-        &*h.step(Event::Told { channel: C1, run: R1, attempt: A1, fact: payload(2) }),
-        &[Request::Told { run: R1, attempt: A1, fact: payload(2) }]
-    );
+    assert_eq!(&*active_report(&mut h, C1), &[Request::Observed { run: R1, attempt: A1 }]);
     h.step(Event::Lost { channel: C1 });
     assert_eq!(
         &*h.step(Event::Inbound { run: R1, attempt: A1, message: message(event) }),
@@ -1263,6 +1257,10 @@ fn host_call(name: Token, body: Token) -> Call {
 mod progress;
 
 mod fixtures;
+
+fn active_report(h: &mut Harness, channel: Token) -> Box<[Request]> {
+    h.step(Event::Observe { channel, run: R1, attempt: A1, report: crate::Report::Activity(crate::Activity::Active) })
+}
 
 #[test]
 fn free_kind_follows_the_placement_rule() {

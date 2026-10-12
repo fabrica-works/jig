@@ -509,3 +509,29 @@ fn a_stale_claim_keeps_its_effect_deadline_until_the_due_right_is_consumed_witho
             .is_empty()
     );
 }
+
+#[test]
+fn a_rejected_grant_reaches_the_accounts_child() {
+    use jig_domain_fleet as fleet;
+    use skein_lib::Token;
+    let (config, limits) = jig_core_world::world::two_charters(151);
+    let mut world = World::configured(151, false, config, limits);
+    let before = assignment(&world).grant;
+    assert_eq!(before.generation, 1);
+    let current = assignment(&world);
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Rejected {
+        channel: Token::new(7),
+        run: Token::new(current.task),
+        attempt: Token::new(current.attempt),
+        account: before.account,
+        generation: before.generation,
+    })));
+    world.delegate_agent(1, b"use the refreshed account");
+    assert_eq!(world.assignments.len(), 2, "the notice is observed through a fresh assignment");
+    let grant = assignment(&world).grant;
+    assert_eq!((grant.account, grant.generation), (before.account, 2));
+}
+
+fn assignment(world: &World) -> &root::Assignment {
+    world.assigned.as_ref().expect("live assignment")
+}

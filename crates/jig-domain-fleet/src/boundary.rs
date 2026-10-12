@@ -17,7 +17,7 @@
 //!   keeps nothing. [`Request::Inbound`], [`Request::Cancel`] and
 //!   [`Request::Relayed`] are notices to the worker hosting an attempt;
 //!   [`Event::Relay`] is a call of the run's, which the fleet passes up and
-//!   whose answer it passes down, at most once; [`Event::Told`] are notices. [`Request::Refuse`] turns a worker away
+//!   whose answer it passes down, at most once. [`Request::Refuse`] turns a worker away
 //!   at its hello, when the fleet has no room for another: its channel is
 //!   to be closed. An answer from a channel not in contact is dropped, and
 //!   not acknowledged. Everything a worker sends names a run and an attempt,
@@ -278,13 +278,6 @@ pub enum Event {
         attempt: Token,
         report: crate::Report,
     },
-    /// From a worker: a fact the run told, best effort.
-    Told {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        fact: Token,
-    },
 }
 
 /// fleet -> parent
@@ -457,12 +450,6 @@ pub enum Request {
         attempt: Token,
         message: Message,
         undelivered: Undelivered,
-    },
-    /// To the parent: a fact the run told.
-    Told {
-        run: Token,
-        attempt: Token,
-        fact: Token,
     },
     /// To the parent: forget `payload`, which goes no further: it was for an
     /// attempt fenced off or gone, a duplicate, or a call the fleet had no

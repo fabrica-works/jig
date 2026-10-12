@@ -220,3 +220,58 @@ fn chip_closing_names_the_connectors_waited_on_without_counting_their_effects() 
     short.documents.lines = 0;
     assert_eq!(chip_from_row_with_core(&core, &short, row), Err(Missing::TooLarge));
 }
+
+fn long_operation_work(operation: fleet::Operation) -> ChipWork {
+    let (mut core, mut limits) = make_tree();
+    limits.fleet.engine_slots = 1;
+    core.fleet = fleet::Domain::new(&limits.fleet);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet };
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &env,
+        fleet::Event::Start {
+            grants: Box::new([]),
+            reply_to: ReplyTo::new(Token::new(1)),
+            run: Token::new(2),
+            attempt: Token::new(7),
+            workstream: 1,
+            kinds: fleet::Kinds::Engine,
+            assignment: fleet::Assignment { turns: Token::new(0), answered: Token::new(0) },
+        },
+        &mut out,
+    );
+    while out.pop().is_some() {}
+    fleet::resume(&mut core.fleet, &env, &mut out);
+    while out.pop().is_some() {}
+    fleet::step(
+        &mut core.fleet,
+        &env,
+        fleet::Event::Observe {
+            channel: Token::new(0),
+            run: Token::new(2),
+            attempt: Token::new(7),
+            report: fleet::Report::Activity(fleet::Activity::Long { operation, span: Duration::from_secs(37) }),
+        },
+        &mut out,
+    );
+    let mut row = core.tasks.task(2).unwrap().clone();
+    row.phase = tasks::Phase::Active(tasks::Active::Running { attempt: 7 });
+    row.attempt = 7;
+    chip_from_row_with_core(&core, &limits, &row).unwrap().details.observation.unwrap().work
+}
+
+#[test]
+fn a_long_completion_shows_the_run_as_writing() {
+    assert_eq!(long_operation_work(fleet::Operation::Completion), ChipWork::Writing);
+}
+
+#[test]
+fn long_checks_shows_the_run_as_active() {
+    assert_eq!(long_operation_work(fleet::Operation::Checks), ChipWork::Active);
+}
+
+#[test]
+fn a_long_command_shows_the_run_as_active() {
+    assert_eq!(long_operation_work(fleet::Operation::Command), ChipWork::Active);
+}

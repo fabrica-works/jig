@@ -306,7 +306,12 @@ fn every_entry_point_stays_within_the_worst_case() {
         message: jig_domain_fleet::Message { name: Token::new(4), sender: Token::new(4), words: Token::new(4) },
     });
 
-    fleet.step(Event::Told { channel: placed[0].0, run: r3, attempt: a3, fact: Token::new(5) });
+    fleet.step(Event::Observe {
+        channel: placed[0].0,
+        run: r3,
+        attempt: a3,
+        report: jig_domain_fleet::Report::Activity(jig_domain_fleet::Activity::Active),
+    });
     fleet.step(Event::Cancel { run: r1, attempt: a1 });
     // A busy refusal, placed again.
     let (channel_of, ..) = placed[0];

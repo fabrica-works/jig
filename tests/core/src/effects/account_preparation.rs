@@ -41,10 +41,13 @@ impl World {
             accounts::ToComponent::Want { account: 1 } if !self.hold_accounts => {
                 Some(accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) })
             }
+            accounts::ToComponent::Rejected { account, generation } => Some(accounts::FromComponent::Granted {
+                account,
+                generation: generation.checked_add(1).expect("fixture generation has a successor"),
+                valid: Duration::from_secs(60),
+            }),
             accounts::ToComponent::Close => Some(accounts::FromComponent::Closed),
-            accounts::ToComponent::Want { .. }
-            | accounts::ToComponent::Release { .. }
-            | accounts::ToComponent::Rejected { .. } => None,
+            accounts::ToComponent::Want { .. } | accounts::ToComponent::Release { .. } => None,
         };
         if let Some(response) = response {
             self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(response))));

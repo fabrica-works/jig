@@ -88,6 +88,7 @@ fn progress_names_are_whole_bounded_and_dropped_reports_do_not_replace_the_last_
         | Activity::Active
         | Activity::Writing
         | Activity::Waiting
+        | Activity::Long { .. }
         | Activity::Ending => panic!("whole tool observation"),
     }
     h.step(Event::Start {
@@ -101,4 +102,49 @@ fn progress_names_are_whole_bounded_and_dropped_reports_do_not_replace_the_last_
     });
     assert!(h.domain.observation(R1, A1).is_none(), "replacement fences the previous observation");
     assert!(h.domain.observation(R1, A2).is_none(), "new attempt has no inherited fact");
+}
+
+fn live_progress() -> Harness {
+    let mut harness = Harness::new(LIMITS);
+    harness.hello(C1, 1, &[], &[]);
+    assert_eq!(harness.place(R1, A1, 1), C1);
+    harness
+}
+
+fn report_progress(harness: &mut Harness, report: crate::Report) {
+    assert_eq!(
+        harness.step(Event::Observe { channel: C1, run: R1, attempt: A1, report }).as_ref(),
+        &[Request::Observed { run: R1, attempt: A1 }]
+    );
+}
+
+#[test]
+fn a_long_completion_is_observed_as_its_kind_and_span() {
+    let mut harness = live_progress();
+    let activity = crate::Activity::Long { operation: crate::Operation::Completion, span: Duration::from_secs(37) };
+    report_progress(&mut harness, crate::Report::Activity(activity.clone()));
+    assert_eq!(observation(&harness).activity, activity);
+}
+
+#[test]
+fn a_count_refreshes_the_report_time_only() {
+    let mut harness = live_progress();
+    harness.env.wall = Wall::from_nanos(10);
+    report_progress(&mut harness, crate::Report::Started);
+    let before = observation(&harness).clone();
+    harness.env.wall = Wall::from_nanos(20);
+    report_progress(
+        &mut harness,
+        crate::Report::Count { kind: crate::CountKind::LlmFinished, elapsed: Duration::from_nanos(17), count: 3 },
+    );
+    let after = observation(&harness);
+    assert_eq!(after.reported_at, Wall::from_nanos(20));
+    assert_eq!(after.activity, before.activity);
+    assert_eq!(after.since, before.since);
+    assert_eq!(after.started, before.started);
+    assert_eq!(after.channel, before.channel);
+}
+
+fn observation(harness: &Harness) -> &crate::Observation {
+    harness.domain.observation(R1, A1).unwrap()
 }

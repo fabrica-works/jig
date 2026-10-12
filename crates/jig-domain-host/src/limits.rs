@@ -1,9 +1,9 @@
 use skein_lib::{Id, Map, Queue, Set, Slab, Token};
 
+use crate::LinkUp;
 use crate::boundary::{Delivery, Reason};
 use crate::call::Call;
 use crate::facts::Fact;
-use crate::facts::Told;
 use crate::hosted::{Hosted, NamedEvent};
 use crate::turns::{Name, Pending};
 
@@ -44,10 +44,8 @@ pub struct Limits {
     /// Facts kept until the parent drains them. Beyond them, facts are
     /// dropped and counted.
     pub facts: u32,
-    /// Agent facts kept for the core while the link cannot take them.
+    /// Typed activity kept for the core while the link cannot take it.
     pub told: u32,
-    /// The most bytes in one agent fact.
-    pub fact_bytes: u64,
     /// Normal retained turns per attempt. One additional agent window of
     /// this size is reserved for turns sent before stopping.
     pub turns: u32,
@@ -91,8 +89,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let calls =
         Slab::<Call>::worst_case(call_count)?.checked_add(u64::from(call_count).checked_mul(limits.event_bytes)?)?;
     let facts = Queue::<Fact>::worst_case(limits.facts)?;
-    let told =
-        Queue::<Told>::worst_case(limits.told)?.checked_add(u64::from(limits.told).checked_mul(limits.fact_bytes)?)?;
+    let told = Queue::<LinkUp>::worst_case(limits.told)?;
     let capacity = limits.slots.checked_mul(limits.turns)?.checked_mul(2)?;
     let refusal_bytes = u64::from(limits.inbox).checked_mul(u64::try_from(size_of::<crate::Refused>()).ok()?)?;
     let turns = Map::<Name, Pending>::worst_case(capacity)?

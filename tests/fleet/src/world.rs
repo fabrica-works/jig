@@ -246,14 +246,14 @@ pub struct Stats {
     pub adoptions: u32,
     pub endings: BTreeMap<&'static str, u32>,
     /// Assignments made, runs admitted, relayed calls and their answers,
-    /// inbound events sent and delivered, facts told.
+    /// inbound events sent and delivered, activity observed.
     pub assigned: u32,
     pub admitted: u32,
     pub calls: u32,
     pub replies: u32,
     pub inbound: u32,
     pub delivered: u32,
-    pub told: u32,
+    pub observed: u32,
     /// Attempts presumed lost that a worker had admitted.
     pub lost_hosted: u32,
     /// Hellos said, workers turned away, channels dropped, restarts.
@@ -362,7 +362,7 @@ pub(crate) enum Up {
     Hello { slots: u32, workstreams: Vec<u64>, hosting: Vec<(u64, u64, Phase)> },
     Answer { run: u64, attempt: u64, said: Said },
     Relay { run: u64, attempt: u64, call: u64 },
-    Told { run: u64, attempt: u64 },
+    Activity { run: u64, attempt: u64 },
 }
 
 /// What the fleet says down a worker's channel.
@@ -389,7 +389,6 @@ pub(crate) enum Payload {
     Inbound,
     Body { call: u64 },
     Reply,
-    Fact,
 }
 
 /// A channel, as the network keeps it: whose it is, whether it is open, the
@@ -908,10 +907,12 @@ impl World {
                 }
             }
 
-            Up::Told { run, attempt } => {
-                let fact = self.payload(Payload::Fact);
-                Event::Told { channel: token, run: Token::new(run), attempt: Token::new(attempt), fact }
-            }
+            Up::Activity { run, attempt } => Event::Observe {
+                channel: token,
+                run: Token::new(run),
+                attempt: Token::new(attempt),
+                report: fleet::Report::Activity(fleet::Activity::Active),
+            },
         };
         self.stage.push(event);
     }
@@ -981,7 +982,7 @@ impl World {
             Request::Answered { to, run, attempt, answer: _, payload } => {
                 let said = match self.payloads.end(payload.raw()) {
                     Payload::Answer(said) => said,
-                    Payload::Inbound | Payload::Body { .. } | Payload::Reply | Payload::Fact => {
+                    Payload::Inbound | Payload::Body { .. } | Payload::Reply => {
                         panic!("seed {}: an answer's payload is the worker's answer", self.settings.seed)
                     }
                 };
@@ -1004,7 +1005,7 @@ impl World {
             Request::Relay { reply_to, call, .. } => {
                 match self.payloads.end(skein_lib::Reader::new(&call.input).u64().expect("body token")) {
                     Payload::Body { .. } => {}
-                    Payload::Answer(_) | Payload::Inbound | Payload::Reply | Payload::Fact => {
+                    Payload::Answer(_) | Payload::Inbound | Payload::Reply => {
                         panic!("seed {}: a relayed call's payload is its body", self.settings.seed)
                     }
                 }
@@ -1014,16 +1015,15 @@ impl World {
                 let epoch = self.epoch;
                 self.after(self.settings.serve, Delivery::Reply { epoch, reply_to: ReplyTo::new(token) });
             }
-            Request::Observed { .. } => self.end("observed"),
+            Request::Observed { .. } => {
+                self.end("observed");
+                self.stats.observed += 1;
+            }
             Request::Undelivered { message, undelivered, .. } => {
                 assert_eq!(self.payloads.end(message.words.raw()), Payload::Inbound, "an undelivered event comes back");
                 match undelivered {
                     Undelivered::Unplaced | Undelivered::Adrift | Undelivered::Gone => self.end("undelivered"),
                 }
-            }
-            Request::Told { run: _, attempt: _, fact } => {
-                assert_eq!(self.payloads.end(fact.raw()), Payload::Fact, "a fact goes up as it is");
-                self.stats.told += 1;
             }
             Request::Drop { payload } => {
                 self.payloads.end(payload.raw());
@@ -1309,7 +1309,6 @@ fn describe(event: &Event) -> String {
         | Event::Lost { .. }
         | Event::Answer { .. }
         | Event::Relay { .. }
-        | Event::Told { .. }
         | Event::Observe { .. }
         | Event::Acknowledge { .. }
         | Event::Loaded => format!("{event:?}"),

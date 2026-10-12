@@ -28,7 +28,6 @@ const LIMITS: Limits = Limits {
     run_calls: 2,
     facts: 16,
     told: 2,
-    fact_bytes: 256,
     turns: 0,
     turn_queue_bytes: 0,
 };
@@ -98,6 +97,7 @@ impl Measured {
         let mut cancelled = Vec::new();
         while let Some(request) = self.out.pop() {
             asked.push(match request {
+                Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => continue,
                 Request::Up(LinkUp::Turn { .. }) => Asked::Turn,
                 Request::Deliver { owner, .. } => Asked::Delivery { owner },
                 Request::Up(LinkUp::Call { delivery, .. }) => Asked::Relay { call: delivery },

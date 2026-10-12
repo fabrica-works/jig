@@ -181,7 +181,12 @@ pub(super) fn observe(
             fleet::Activity::Preparing => ChipWork::Preparing,
             fleet::Activity::Starting => ChipWork::Starting,
             fleet::Activity::Active => ChipWork::Active,
-            fleet::Activity::Writing => ChipWork::Writing,
+            fleet::Activity::Writing | fleet::Activity::Long { operation: fleet::Operation::Completion, .. } => {
+                ChipWork::Writing
+            }
+            fleet::Activity::Long { operation: fleet::Operation::Checks | fleet::Operation::Command, .. } => {
+                ChipWork::Active
+            }
             fleet::Activity::Waiting => ChipWork::Waiting,
             fleet::Activity::Ending => ChipWork::Ending,
             fleet::Activity::Tool { call, tool } => {

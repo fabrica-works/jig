@@ -129,9 +129,9 @@ fn shutdown_and_best_effort_facts_leave_no_live_run() {
     let mut world = World::new();
     world.assign(true);
     world.lose_contact();
-    world.fact(b"one");
-    world.fact(b"two");
-    world.fact(b"three");
+    world.activity(count(1));
+    world.activity(count(2));
+    world.activity(count(3));
     assert_eq!(world.lost_facts(), 1, "the full fact queue drops and counts");
     world.shutdown();
     world.reconnect();
@@ -372,6 +372,102 @@ fn refusals_beyond_the_inbox_are_dropped_and_counted() {
     assert_eq!(world.lost_refusals(), 1);
     world.acknowledge_answer();
     assert_eq!(world.lost_refusals(), 1);
+}
+
+fn live_world() -> World {
+    let mut world = World::new();
+    world.assign(false);
+    world.reports.clear();
+    world
+}
+
+fn count(count: u64) -> jig_domain_host::Activity {
+    jig_domain_host::Activity::Count {
+        kind: jig_domain_host::CountKind::TextArrived,
+        elapsed: Duration::from_nanos(17),
+        count,
+    }
+}
+
+#[test]
+fn a_rejected_grant_reaches_the_link_for_a_live_run() {
+    let mut world = live_world();
+    world.reject();
+    assert_eq!(
+        world.reports,
+        [jig_domain_host::LinkUp::Rejected {
+            run: Token::new(31),
+            attempt: Token::new(932),
+            account: 7,
+            generation: 4,
+        }]
+    );
+}
+
+#[test]
+fn an_exhausted_account_reaches_the_link_with_its_wait() {
+    let mut world = live_world();
+    world.exhaust();
+    assert_eq!(
+        world.reports,
+        [jig_domain_host::LinkUp::Exhausted {
+            run: Token::new(31),
+            attempt: Token::new(932),
+            account: 7,
+            retry_after: Duration::from_secs(5),
+        }]
+    );
+}
+
+#[test]
+fn a_notice_of_a_fenced_attempt_is_dropped() {
+    let mut world = live_world();
+    let owner = world.owner();
+    world.hold_stop();
+    world.shutdown();
+    world.reports.clear();
+    world.agent_report(jig_domain_host::FromAgent::Rejected { owner, account: 7, generation: 4 });
+    world.agent_report(jig_domain_host::FromAgent::Exhausted {
+        owner,
+        account: 7,
+        retry_after: Duration::from_secs(5),
+    });
+    assert!(world.reports.is_empty());
+    world.gone();
+    world.acknowledge_answer();
+    world.assert_settled();
+}
+
+#[test]
+fn a_long_operation_reaches_the_link() {
+    let mut world = live_world();
+    let activity = jig_domain_host::Activity::Long {
+        operation: jig_domain_host::Operation::Completion,
+        span: Duration::from_secs(37),
+    };
+    world.activity(activity);
+    assert_eq!(
+        world.reports,
+        [jig_domain_host::LinkUp::Activity { run: Token::new(31), attempt: Token::new(932), activity }]
+    );
+}
+
+#[test]
+fn activity_past_the_queue_is_dropped_and_counted() {
+    let mut world = live_world();
+    world.lose_contact();
+    for number in 1..=3 {
+        world.activity(count(number));
+    }
+    assert_eq!(world.lost_facts(), 1);
+    world.reconnect();
+    assert_eq!(
+        world.reports,
+        [
+            jig_domain_host::LinkUp::Activity { run: Token::new(31), attempt: Token::new(932), activity: count(1) },
+            jig_domain_host::LinkUp::Activity { run: Token::new(31), attempt: Token::new(932), activity: count(2) },
+        ]
+    );
 }
 
 #[test]

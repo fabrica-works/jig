@@ -70,7 +70,6 @@ impl Settings {
                 run_calls: 2,
                 facts: 64,
                 told: 8,
-                fact_bytes: 64,
                 turns: 0,
                 turn_queue_bytes: 0,
             },
@@ -642,7 +641,9 @@ impl World {
                 | LinkDown::Relayed { .. }
                 | LinkDown::TurnKept { .. },
             )
-            | Event::Facts { .. }
+            | Event::Activity { .. }
+            | Event::Rejected { .. }
+            | Event::Exhausted { .. }
             | Event::RelayCancelled { .. }
             | Event::Withdrawn { .. }
             | Event::Refused { .. }
@@ -742,7 +743,13 @@ impl World {
                 assert!(self.hosted.insert(*owner, entry).is_none(), "a hosted run's token is its own");
                 assert!(self.admitted.insert((run, attempt), *owner).is_none(), "an attempt is admitted once");
             }
-            Request::Up(LinkUp::Call { .. } | LinkUp::Turn { .. })
+            Request::Up(
+                LinkUp::Activity { .. }
+                | LinkUp::Rejected { .. }
+                | LinkUp::Exhausted { .. }
+                | LinkUp::Call { .. }
+                | LinkUp::Turn { .. },
+            )
             | Request::CancelRelay { .. }
             | Request::Grant { .. }
             | Request::Hello { .. }
@@ -763,6 +770,9 @@ impl World {
         self.refusals.request(&request);
         self.trace.log(self.now, format_args!("host -> {request:?}"));
         match request {
+            Request::Up(LinkUp::Activity { .. } | LinkUp::Rejected { .. } | LinkUp::Exhausted { .. }) => {
+                self.send_engine(request);
+            }
             Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
                 if let Some(owner) = self.admitted.get(&(run, attempt)).copied() {
                     assert!(self.parent.settled(owner), "a run answers once all of it has settled and is released");

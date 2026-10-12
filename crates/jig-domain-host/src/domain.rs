@@ -5,7 +5,7 @@ use skein_lib::{Env, Id, Map, Queue, Slab, Token};
 
 use crate::boundary::{Event, Hosting, Reason, Request};
 use crate::call::{self, Call};
-use crate::facts::{AgentFacts, Fact, Facts, Told};
+use crate::facts::{Fact, Facts};
 use crate::hosted::{self, Hosted};
 use crate::limits::{self, Limits};
 use crate::turns::Turns;
@@ -35,7 +35,6 @@ pub struct Domain {
     /// Runs to cancel, each for its reason, one per resume.
     pub(crate) ready: Map<Id<Hosted>, Reason>,
     pub(crate) facts: Facts,
-    pub(crate) told: AgentFacts,
     pub(crate) turns: Turns,
     pub(crate) answers: Map<(Token, Token), Id<Hosted>>,
     /// The root is shutting down: it admits no more runs.
@@ -53,8 +52,7 @@ impl Domain {
             names: Map::with_capacity(limits.slots),
             calls: Slab::with_capacity(calls),
             ready: Map::with_capacity(limits.slots),
-            facts: Facts::with_capacity(limits.facts),
-            told: AgentFacts::with_capacity(limits.told),
+            facts: Facts::with_capacity(limits.facts, limits.told),
             turns: Turns::new(limits),
             answers: Map::with_capacity(limits.slots),
             shut: false,
@@ -153,15 +151,15 @@ impl Domain {
         self.facts.lost()
     }
 
-    /// The oldest agent fact waiting for the engine.
-    pub fn pop_told(&mut self) -> Option<Told> {
-        self.told.pop()
+    /// The oldest typed activity waiting for the engine.
+    pub fn pop_activity(&mut self) -> Option<LinkUp> {
+        self.facts.pop_activity()
     }
 
-    /// Agent facts dropped for lack of room or excess bytes.
+    /// Activity dropped for lack of room.
     #[must_use]
-    pub const fn told_lost(&self) -> u64 {
-        self.told.lost()
+    pub const fn activity_lost(&self) -> u64 {
+        self.facts.activity_lost()
     }
 
     /// Turns retained until the engine commits them.
@@ -235,7 +233,13 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Called { owner, call, ask } => hosted::called(domain, env, owner, call, ask, out),
         Event::Withdrawn { owner, call } => hosted::withdrawn(domain, owner, call, out),
         Event::Turn { owner, turn } => hosted::turned(domain, env, owner, turn, out),
-        Event::Facts { owner, fact } => hosted::told(domain, env, owner, fact),
+        Event::Activity { owner, activity } => crate::activity::reported(domain, owner, activity),
+        Event::Rejected { owner, account, generation } => {
+            crate::activity::rejected(domain, owner, account, generation, out);
+        }
+        Event::Exhausted { owner, account, retry_after } => {
+            crate::activity::exhausted(domain, owner, account, retry_after, out);
+        }
         Event::Finished { owner, turns, spent, read, finish } => {
             hosted::finished(domain, env, owner, turns, spent, finish, read, out);
         }

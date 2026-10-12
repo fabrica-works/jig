@@ -4,7 +4,28 @@
 use crate::facts::Fact;
 use crate::{Domain, Limits, Request};
 use alloc::boxed::Box;
-use skein_lib::{Env, Queue, Token, Wall};
+use skein_lib::{Duration, Env, Queue, Token, Wall};
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Operation {
+    Checks,
+    Completion,
+    Command,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum CountKind {
+    Admitted,
+    Ended,
+    LlmStarted,
+    LlmRetried,
+    LlmFinished,
+    ToolStarted,
+    ToolFinished,
+    CheckStarted,
+    CheckFinished,
+    TextArrived,
+}
 
 /// What the host last reported, independent of assignment/adoption time.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -13,6 +34,10 @@ pub enum Activity {
     Starting,
     Active,
     Writing,
+    Long {
+        operation: Operation,
+        span: Duration,
+    },
     /// Whole opaque call identity and whole declared tool name, never truncated.
     Tool {
         call: Box<[u8]>,
@@ -29,6 +54,11 @@ pub enum Report {
     /// The agent actually started; receipt time is not the host's start clock.
     Started,
     Activity(Activity),
+    Count {
+        kind: CountKind,
+        elapsed: Duration,
+        count: u64,
+    },
 }
 
 /// A volatile report retained beside its attempt. These are engine receipt
@@ -74,6 +104,7 @@ pub(crate) fn received(
                     }
                     Activity::Active
                     | Activity::Writing
+                    | Activity::Long { .. }
                     | Activity::Tool { .. }
                     | Activity::Waiting
                     | Activity::Ending => {}
@@ -85,6 +116,16 @@ pub(crate) fn received(
             (Activity::Active, true)
         }
         Report::Activity(activity) => (activity, false),
+        Report::Count { .. } => {
+            let entry = domain.attempts.get_mut(id).expect("current owned claim");
+            if let Some(previous) = &mut entry.progress
+                && previous.channel == channel
+            {
+                previous.reported_at = env.wall;
+                out.push(Request::Observed { run, attempt });
+            }
+            return;
+        }
     };
     let fits = match &activity {
         Activity::Tool { call, tool } => {
@@ -96,6 +137,7 @@ pub(crate) fn received(
         | Activity::Starting
         | Activity::Active
         | Activity::Writing
+        | Activity::Long { .. }
         | Activity::Waiting
         | Activity::Ending => true,
     };

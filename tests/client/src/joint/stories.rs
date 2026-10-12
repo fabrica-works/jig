@@ -184,7 +184,7 @@ fn signing_in_and_starting_a_chat_on_the_engine() {
         .clone();
     report(&mut world, &assignment, jig_domain_fleet::Activity::Starting);
     world.run(Until::Time(Time::from_nanos(80_000_000)));
-    report(&mut world, &assignment, jig_domain_fleet::Activity::Writing);
+    report(&mut world, &assignment, completion());
     world.run(Until::Time(Time::from_nanos(180_000_000)));
     let offers = world.front().session.task_offers(client, assignment.task).expect("admitted actual Task packet");
     assert_eq!(offers.source.capacity(), 7);
@@ -327,3 +327,10 @@ mod offered_acts;
 mod fault_stories;
 
 mod referee_stories;
+
+fn completion() -> jig_domain_fleet::Activity {
+    jig_domain_fleet::Activity::Long {
+        operation: jig_domain_fleet::Operation::Completion,
+        span: Duration::from_secs(1),
+    }
+}

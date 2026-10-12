@@ -71,7 +71,6 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             run_calls: 4,
             facts: 2,
             told: 2,
-            fact_bytes: 128,
             turns: 32,
             turn_queue_bytes: 32768,
         },

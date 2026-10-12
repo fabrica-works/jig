@@ -160,24 +160,6 @@ pub(crate) fn inbound(domain: &mut Domain, run: Token, attempt: Token, message: 
     out.push(Request::Undelivered { run, attempt, message, undelivered });
 }
 
-/// A fact a run told, from its worker: up to the parent, if its attempt is
-/// the live claim.
-pub(crate) fn told(
-    domain: &mut Domain,
-    channel: Token,
-    run: Token,
-    attempt: Token,
-    fact: Token,
-    out: &mut Queue<Request>,
-) {
-    if owned(domain, channel, run, attempt).is_some() {
-        out.push(Request::Told { run, attempt, fact });
-    } else {
-        domain.facts.push(Fact::Dropped);
-        out.push(Request::Drop { payload: fact });
-    }
-}
-
 /// Credential notices require the live claim's current hosting channel.
 pub(crate) fn credential_notice(
     domain: &mut Domain,

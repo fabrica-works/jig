@@ -16,6 +16,23 @@ pub enum LinkDown {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum LinkUp {
+    Activity {
+        run: Token,
+        attempt: Token,
+        activity: crate::Activity,
+    },
+    Rejected {
+        run: Token,
+        attempt: Token,
+        account: u32,
+        generation: u64,
+    },
+    Exhausted {
+        run: Token,
+        attempt: Token,
+        account: u32,
+        retry_after: Duration,
+    },
     Turn {
         run: Token,
         attempt: Token,

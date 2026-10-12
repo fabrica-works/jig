@@ -36,7 +36,6 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
             run_calls: 2,
             facts: 2,
             told: 2,
-            fact_bytes: 128,
             turns: 2,
             turn_queue_bytes: 2048,
         },

@@ -161,7 +161,7 @@ impl World {
             let at = self.now.saturating_add(self.settings.call_wait);
             self.send(at, Delivery::Withdraw { worker, run, attempt, call });
             if self.rng.chance(self.settings.facts) {
-                self.say(channel, Up::Told { run, attempt });
+                self.say(channel, Up::Activity { run, attempt });
             }
         }
         self.after(self.settings.call_gap, Delivery::Call { worker, run, attempt });

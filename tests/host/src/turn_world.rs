@@ -92,6 +92,7 @@ pub struct World {
     prepare_waits: bool,
     last_read: Option<Token>,
     refusals: crate::refusals::Referee,
+    pub reports: Vec<host::LinkUp>,
     pub link_words: Vec<&'static str>,
 }
 
@@ -138,6 +139,7 @@ impl World {
             next_relay: None,
             received_grant: None,
             link_words: Vec::new(),
+            reports: Vec::new(),
             prepare_waits: false,
             last_read: None,
             refusals: crate::refusals::Referee::default(),
@@ -161,7 +163,7 @@ impl World {
 
     #[must_use]
     pub fn lost_facts(&self) -> u64 {
-        self.host.told_lost()
+        self.host.activity_lost()
     }
 
     #[must_use]
@@ -360,8 +362,25 @@ impl World {
     pub fn lost_refusals(&self) -> u64 {
         self.host.refusals_lost()
     }
-    pub fn fact(&mut self, text: &[u8]) {
-        self.send(Event::Facts { owner: self.owner.expect("assigned"), fact: Box::from(text) });
+    pub fn activity(&mut self, activity: host::Activity) {
+        self.agent_report(host::FromAgent::Activity { owner: self.owner.expect("assigned"), activity });
+    }
+    pub fn agent_report(&mut self, report: host::FromAgent) {
+        self.send(Event::from_agent(report));
+    }
+    #[must_use]
+    pub fn owner(&self) -> Token {
+        self.owner.expect("assigned")
+    }
+    pub fn reject(&mut self) {
+        self.agent_report(host::FromAgent::Rejected { owner: self.owner(), account: 7, generation: 4 });
+    }
+    pub fn exhaust(&mut self) {
+        self.agent_report(host::FromAgent::Exhausted {
+            owner: self.owner(),
+            account: 7,
+            retry_after: Duration::from_secs(5),
+        });
     }
 
     pub fn deliver(&mut self) {
@@ -519,6 +538,7 @@ impl World {
             while let Some(request) = self.out.pop() {
                 self.route(request);
             }
+            self.drain_facts();
         }
         panic!("the peer hand-offs did not settle");
     }
@@ -540,6 +560,9 @@ impl World {
     fn route(&mut self, request: Request) {
         self.refusals.request(&request);
         match request {
+            Request::Up(record @ (LinkUp::Rejected { .. } | LinkUp::Exhausted { .. } | LinkUp::Activity { .. })) => {
+                self.receive_report(record);
+            }
             Request::Up(LinkUp::Call { run, attempt, call, delivery, tool, writes, input, deadline }) => {
                 assert_eq!((run, attempt), (RUN, ATTEMPT));
                 self.relayed_call = Some(RelayedCall { name: call, tool, writes, input, deadline });
@@ -673,6 +696,12 @@ impl World {
         self.stats.transmissions += 1;
     }
 
+    fn receive_report(&mut self, record: host::LinkUp) {
+        if self.connected {
+            self.reports.push(record);
+        }
+    }
+
     fn receive_answer(&mut self, answer: &Answer) {
         self.link_words.push("answer");
         assert_eq!(usize::try_from(answer.turns).expect("bounded"), self.seen.len(), "turns precede their answer");
@@ -690,8 +719,11 @@ impl World {
 
     fn drain_facts(&mut self) {
         if self.connected {
-            while self.host.pop_told().is_some() {
-                self.stats.facts += 1;
+            while let Some(record) = self.host.pop_activity() {
+                if !matches!(record, LinkUp::Activity { activity: host::Activity::Phase(_), .. }) {
+                    self.stats.facts += 1;
+                }
+                self.reports.push(record);
             }
         }
         while self.host.pop_fact().is_some() {}

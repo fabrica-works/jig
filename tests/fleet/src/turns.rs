@@ -262,8 +262,7 @@ impl World {
                 | Request::Lost { .. }
                 | Request::Withdrawn { .. }
                 | Request::Refused { .. }
-                | Request::Observed { .. }
-                | Request::Told { .. } => panic!("unexpected turn-world request: {request:?}"),
+                | Request::Observed { .. } => panic!("unexpected turn-world request: {request:?}"),
             }
         }
         self.domain.reclaim();

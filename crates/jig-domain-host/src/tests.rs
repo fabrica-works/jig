@@ -6,7 +6,7 @@ use skein_lib::{Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 use crate::{
     Delivery, DeliveryOutcome, Domain, Event, Failure, Finish, Invalid, Limits, MessageRefusal, Preparation, Reason,
-    Refusal, Refused, Reply, Request, RunAssignment, Told, Work, Workspace, max_out, step,
+    Refusal, Refused, Reply, Request, RunAssignment, Work, Workspace, max_out, step,
 };
 
 const LIMITS: Limits = Limits {
@@ -24,7 +24,6 @@ const LIMITS: Limits = Limits {
     run_calls: 2,
     facts: 64,
     told: 2,
-    fact_bytes: 16,
     turns: 2,
     turn_queue_bytes: 128,
 };
@@ -303,19 +302,37 @@ fn stopping_waits_for_a_delivery_even_after_the_agent_is_gone() {
 fn live_agent_facts_wait_within_the_hosts_bound_and_drop_when_full() {
     let mut h = Harness::new();
     let (owner, _, _) = h.live(1);
-    assert!(h.step(Event::Facts { owner, fact: Box::from(&b"one"[..]) }).is_empty());
-    assert!(h.step(Event::Facts { owner, fact: Box::from(&b"two"[..]) }).is_empty());
-    assert!(h.step(Event::Facts { owner, fact: Box::from(&b"three"[..]) }).is_empty());
-    assert_eq!(h.domain.told_lost(), 1);
-    assert_eq!(
-        h.domain.pop_told(),
-        Some(Told { run: Token::new(1), attempt: Token::new(1001), fact: Box::from(&b"one"[..]) })
-    );
-    assert_eq!(
-        h.domain.pop_told(),
-        Some(Told { run: Token::new(1), attempt: Token::new(1001), fact: Box::from(&b"two"[..]) })
-    );
-    assert_eq!(h.domain.pop_told(), None);
+    while h.domain.pop_activity().is_some() {}
+    let lost = h.domain.activity_lost();
+    for count in 1..=3 {
+        assert!(
+            h.step(Event::Activity {
+                owner,
+                activity: crate::Activity::Count {
+                    kind: crate::CountKind::TextArrived,
+                    elapsed: skein_lib::Duration::ZERO,
+                    count
+                }
+            })
+            .is_empty()
+        );
+    }
+    assert_eq!(h.domain.activity_lost(), lost + 1);
+    for count in 1..=2 {
+        assert_eq!(
+            h.domain.pop_activity(),
+            Some(LinkUp::Activity {
+                run: Token::new(1),
+                attempt: Token::new(1001),
+                activity: crate::Activity::Count {
+                    kind: crate::CountKind::TextArrived,
+                    elapsed: skein_lib::Duration::ZERO,
+                    count
+                }
+            })
+        );
+    }
+    assert_eq!(h.domain.pop_activity(), None);
 }
 
 #[test]

@@ -72,7 +72,7 @@ pub use domain::{Domain, fire, max_out, resume, step};
 pub use facts::Fact;
 pub use history::{HelloRefusal, HelloRefusalRecord};
 pub use limits::{Limits, worst_case};
-pub use progress::{Activity, Observation, Report};
+pub use progress::{Activity, CountKind, Observation, Operation, Report};
 
 mod bounds;
 pub use bounds::{Bounds, ModelBound};

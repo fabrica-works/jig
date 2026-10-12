@@ -26,10 +26,20 @@ pub enum Event {
         owner: Token,
         call: Box<[u8]>,
     },
-    /// A live agent fact, kept best effort for the engine.
-    Facts {
+    /// Typed agent activity, kept best effort for the engine.
+    Activity {
         owner: Token,
-        fact: Box<[u8]>,
+        activity: crate::Activity,
+    },
+    Rejected {
+        owner: Token,
+        account: u32,
+        generation: u64,
+    },
+    Exhausted {
+        owner: Token,
+        account: u32,
+        retry_after: Duration,
     },
     /// Last word, with cumulative accounting.
     Finished {
@@ -242,9 +252,19 @@ pub enum FromAgent {
         owner: Token,
         turn: Turn,
     },
-    Facts {
+    Activity {
         owner: Token,
-        fact: Box<[u8]>,
+        activity: crate::Activity,
+    },
+    Rejected {
+        owner: Token,
+        account: u32,
+        generation: u64,
+    },
+    Exhausted {
+        owner: Token,
+        account: u32,
+        retry_after: Duration,
     },
     Finished {
         owner: Token,
@@ -283,7 +303,9 @@ impl Event {
             FromAgent::Called { owner, call, ask } => Event::Called { owner, call, ask },
             FromAgent::Withdrawn { owner, call } => Event::Withdrawn { owner, call },
             FromAgent::Turn { owner, turn } => Event::Turn { owner, turn },
-            FromAgent::Facts { owner, fact } => Event::Facts { owner, fact },
+            FromAgent::Activity { owner, activity } => Event::Activity { owner, activity },
+            FromAgent::Rejected { owner, account, generation } => Event::Rejected { owner, account, generation },
+            FromAgent::Exhausted { owner, account, retry_after } => Event::Exhausted { owner, account, retry_after },
             FromAgent::Finished { owner, turns, spent, read, finish } => {
                 Event::Finished { owner, turns, spent, read, finish }
             }

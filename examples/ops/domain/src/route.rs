@@ -1391,7 +1391,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
 #[expect(clippy::too_many_lines, reason = "one exhaustive dispatcher translates the complete hub boundary")]
 fn host_out(
     domain: &mut Domain,
-    _env: &Env<Limits>,
+    env: &Env<Limits>,
     decision: &mut Decision<Write, Output>,
     out: &mut Queue<host::Request>,
     work: &mut Queue<Work>,
@@ -1466,6 +1466,25 @@ fn host_out(
                         payload,
                     })));
                 }
+                host::Request::Up(host::LinkUp::Rejected { run, attempt, account, generation }) => {
+                    work.push(Work::Core(core::Event::Fleet(fleet::Event::Rejected {
+                        channel: Token::new(0),
+                        run,
+                        attempt,
+                        account,
+                        generation,
+                    })));
+                }
+                host::Request::Up(host::LinkUp::Exhausted { run, attempt, account, retry_after }) => {
+                    work.push(Work::Core(core::Event::Fleet(fleet::Event::Exhausted {
+                        channel: Token::new(0),
+                        run,
+                        attempt,
+                        account,
+                        retry_after,
+                    })));
+                }
+                host::Request::Up(host::LinkUp::Activity { .. }) => unreachable!("activity is drained separately"),
                 host::Request::CancelRelay { call } => {
                     let mut name = None;
                     for (candidate, binding) in &domain.host_calls {
@@ -1499,6 +1518,7 @@ fn host_out(
             },
         }
     }
+    crate::host_activity::drain(&mut domain.host, env.limits.host.told, work);
 }
 
 /// A run's live content goes to the core under its hub's hosting; text is
