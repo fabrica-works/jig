@@ -750,7 +750,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "skein-channel"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-lib",
 ]
@@ -758,7 +758,7 @@ dependencies = [
 [[package]]
 name = "skein-codec"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-lib",
 ]
@@ -766,17 +766,17 @@ dependencies = [
 [[package]]
 name = "skein-codegen"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 
 [[package]]
 name = "skein-heap"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 
 [[package]]
 name = "skein-http"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-lib",
 ]
@@ -784,7 +784,7 @@ dependencies = [
 [[package]]
 name = "skein-io"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-lib",
 ]
@@ -792,7 +792,7 @@ dependencies = [
 [[package]]
 name = "skein-json"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-lib",
 ]
@@ -800,7 +800,7 @@ dependencies = [
 [[package]]
 name = "skein-kv"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-io",
  "skein-lib",
@@ -809,12 +809,12 @@ dependencies = [
 [[package]]
 name = "skein-lib"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 
 [[package]]
 name = "skein-oauth"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-json",
  "skein-lib",
@@ -823,7 +823,7 @@ dependencies = [
 [[package]]
 name = "skein-oauth-accounts"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-http",
  "skein-io",
@@ -835,7 +835,7 @@ dependencies = [
 [[package]]
 name = "skein-shell"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "io-uring",
  "libc",
@@ -846,7 +846,7 @@ dependencies = [
 [[package]]
 name = "skein-sim"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-io",
  "skein-lib",
@@ -855,7 +855,7 @@ dependencies = [
 [[package]]
 name = "skein-tls"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "rustls",
  "skein-lib",
@@ -864,7 +864,7 @@ dependencies = [
 [[package]]
 name = "skein-world"
 version = "0.0.0"
-source = "git+https://github.com/forgetic/skein.git#e723e1db22f140502471072750a0818a3c1a913b"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 dependencies = [
  "skein-heap",
  "skein-io",
