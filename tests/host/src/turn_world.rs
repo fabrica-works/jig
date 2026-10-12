@@ -3,6 +3,7 @@
 //! fake store commits turns before acknowledging them. The link may lose
 //! contact and replays the host's retained turns before its held answer.
 
+use jig_domain_host::{LinkDown, LinkUp};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use jig_domain_host::{
@@ -82,6 +83,10 @@ pub struct World {
     relayed_call: Option<RelayedCall>,
     answered_call: Option<Box<[u8]>>,
     received_message: Option<ReceivedMessage>,
+    hello: Option<host::Hello>,
+    reply: Option<host::Reply>,
+    next_relay: Option<host::Relayed>,
+    pub link_words: Vec<&'static str>,
 }
 
 impl World {
@@ -122,6 +127,10 @@ impl World {
             relayed_call: None,
             answered_call: None,
             received_message: None,
+            hello: None,
+            reply: None,
+            next_relay: None,
+            link_words: Vec::new(),
         }
     }
 
@@ -145,11 +154,54 @@ impl World {
         self.host.told_lost()
     }
 
+    #[must_use]
+    pub fn hello(&self) -> Option<&host::Hello> {
+        self.hello.as_ref()
+    }
+
+    #[must_use]
+    pub fn reply(&self) -> Option<&host::Reply> {
+        self.reply.as_ref()
+    }
+
+    pub fn relay_answer(&mut self, answer: host::Relayed) {
+        self.next_relay = Some(answer);
+        self.call(false);
+    }
+
+    #[must_use]
+    pub fn slots_taken(&self) -> u32 {
+        self.host.hosted()
+    }
+
+    pub fn another_assignment(&mut self) -> host::Refusal {
+        let assignment = RunAssignment {
+            run: Token::new(32),
+            attempt: Token::new(933),
+            workspace: None,
+            save: false,
+            charter: Box::from(&b"charter"[..]),
+            grants: Box::new([]),
+        };
+        host::step(
+            &mut self.host,
+            &self.env,
+            crate::fixtures::assign(ReplyTo::new(assignment.run), assignment),
+            &mut self.out,
+        );
+        let Some(Request::Up(LinkUp::Answer { answer: Answer { ending: Ending::Refused(refusal), .. }, .. })) =
+            self.out.pop()
+        else {
+            panic!("assignment should be refused")
+        };
+        refusal
+    }
+
     /// Assigns one attempt. Its workspace prepares and its agent starts
     /// through the parent's immediate scripted terminals.
     pub fn assign(&mut self, workspace: bool) {
         self.has_workspace = workspace;
-        self.send(Event::Unacknowledged { answers: u32::from(self.answer.is_some() && !self.answer_acked) });
+
         let workspace = if workspace { Some(Workspace { workstream: 3, items: Token::new(4) }) } else { None };
         let assignment = RunAssignment {
             run: RUN,
@@ -159,20 +211,19 @@ impl World {
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
-        self.send(Event::Assign {
+        self.send(Event::Down(LinkDown::Assign {
             reply_to: ReplyTo::new(RUN),
             assignment: Assignment {
                 assignment,
                 turns: vec![Box::from(&b"prior turn"[..])].into_boxed_slice(),
                 answered: Box::new([]),
             },
-        });
+        }));
         assert!(self.owner.is_some() && self.agent_live && self.reading);
     }
 
     /// Assign a resumed run with each turn and its settled call tail intact.
     pub fn assign_conversation(&mut self, turns: Box<[Box<[u8]>]>, answered: Box<[AnsweredCall]>) {
-        self.send(Event::Unacknowledged { answers: 0 });
         let assignment = RunAssignment {
             run: RUN,
             attempt: ATTEMPT,
@@ -181,10 +232,10 @@ impl World {
             charter: Box::from(&b"charter"[..]),
             grants: Box::new([]),
         };
-        self.send(Event::Assign {
+        self.send(Event::Down(LinkDown::Assign {
             reply_to: ReplyTo::new(RUN),
             assignment: Assignment { assignment, turns, answered },
-        });
+        }));
         assert!(self.owner.is_some() && self.agent_live && self.reading);
     }
 
@@ -255,13 +306,13 @@ impl World {
 
     /// The engine sends a named message with its label and words.
     pub fn message_from(&mut self) {
-        self.send(Event::Inbound {
+        self.send(Event::Down(LinkDown::Message {
             run: RUN,
             attempt: ATTEMPT,
             name: Token::new(17),
             sender: Box::from(&b"requester"[..]),
             words: Box::from(&b"please check"[..]),
-        });
+        }));
     }
 
     pub fn finish(&mut self, turns: u32, parked: bool) {
@@ -304,15 +355,19 @@ impl World {
     /// Hello reports the run; the link then sends turns before the answer.
     pub fn reconnect(&mut self) {
         self.connected = true;
-        self.send(Event::Report);
+        self.send(crate::fixtures::opened());
         for index in 0..self.host.retained_turns() {
-            let (run, attempt, turn) = self.host.turn_at(index).expect("retained position");
+            let LinkUp::Turn { run, attempt, turn } = self.host.turn_at(index).expect("retained position") else {
+                panic!("turn")
+            };
             assert_eq!((run, attempt), (RUN, ATTEMPT));
             self.receive_turn(turn);
         }
-        if let Some(answer) = self.answer.take() {
-            self.receive_answer(&answer);
-            self.answer = Some(answer);
+        for index in 0..self.host.kept_answers() {
+            let answer = self.host.answer_at(index).expect("kept answer");
+            if let LinkUp::Answer { answer, .. } = answer {
+                self.receive_answer(&answer);
+            }
         }
         self.drain_facts();
     }
@@ -333,7 +388,7 @@ impl World {
         self.stats.commits += 1;
         assert!(self.acked.insert(number), "one ACK per committed turn");
         self.stats.turn_acks += 1;
-        self.send(Event::AcknowledgeTurn { run: RUN, attempt: ATTEMPT, turn: number });
+        self.send(Event::Down(LinkDown::TurnKept { run: RUN, attempt: ATTEMPT, turn: number }));
     }
 
     pub fn acknowledge_answer(&mut self) {
@@ -342,7 +397,7 @@ impl World {
         assert!(!self.answer_acked, "one answer ACK");
         self.answer_acked = true;
         self.stats.answer_acks += 1;
-        self.send(Event::Unacknowledged { answers: 0 });
+        self.send(Event::Down(LinkDown::Acknowledge { run: RUN, attempt: ATTEMPT }));
     }
 
     /// The external referee: one commit and ACK per observed turn, one
@@ -392,20 +447,24 @@ impl World {
 
     fn route(&mut self, request: Request) {
         match request {
-            Request::Relay { run, attempt, call, delivery, tool, writes, input, deadline } => {
+            Request::Up(LinkUp::Call { run, attempt, call, delivery, tool, writes, input, deadline }) => {
                 assert_eq!((run, attempt), (RUN, ATTEMPT));
                 self.relayed_call = Some(RelayedCall { name: call, tool, writes, input, deadline });
                 self.stats.relays += 1;
-                self.events.push_back(Event::Relayed {
+                self.events.push_back(Event::Down(LinkDown::Relayed {
                     run,
                     attempt,
                     call: delivery,
-                    answer: Box::from(&b"reply"[..]),
-                });
+                    answer: self
+                        .next_relay
+                        .take()
+                        .unwrap_or(host::Relayed::Answer { error: false, text: Box::from(&b"reply"[..]) }),
+                }));
             }
-            Request::Reply { agent, call, reply: _ } => {
+            Request::Reply { agent, call, reply } => {
                 assert_eq!(agent, AGENT);
 
+                self.reply = Some(reply);
                 self.answered_call = Some(call);
                 self.stats.replies += 1;
             }
@@ -422,7 +481,7 @@ impl World {
                 self.events.push_back(Event::Prepared { owner, workspace: SPACE });
             }
 
-            Request::Turn { run, attempt, turn, .. } => {
+            Request::Up(LinkUp::Turn { run, attempt, turn, .. }) => {
                 assert_eq!((run, attempt), (RUN, ATTEMPT));
                 if self.connected {
                     self.receive_turn(turn);
@@ -461,8 +520,8 @@ impl World {
                 self.space_live = false;
                 self.stats.releases += 1;
             }
-            Request::Answer { to, run, attempt, answer } => {
-                assert_eq!((to, run, attempt), (ReplyTo::new(RUN), RUN, ATTEMPT));
+            Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
+                assert_eq!((reply_to, run, attempt), (ReplyTo::new(RUN), RUN, ATTEMPT));
                 assert!(!self.agent_live && !self.space_live);
                 assert!(self.answer.is_none(), "one answer");
                 if self.connected {
@@ -470,8 +529,13 @@ impl World {
                 }
                 self.answer = Some(answer);
             }
-            Request::Hosting { runs } => {
-                assert_eq!(runs.len(), usize::from(self.agent_live));
+            Request::Hello { hello } => {
+                self.link_words.push("hello");
+                assert_eq!(
+                    hello.hosting.len(),
+                    usize::from(self.agent_live || (self.answer.is_some() && !self.answer_acked))
+                );
+                self.hello = Some(hello);
             }
             Request::CancelRelay { .. } | Request::Bounced { .. } | Request::Grant { .. } | Request::Abort { .. } => {
                 panic!("unscripted request: {request:?}")
@@ -501,6 +565,7 @@ impl World {
     }
 
     fn receive_turn(&mut self, turn: Turn) {
+        self.link_words.push("turn");
         if let Some(previous) = self.seen.get(&turn.turn) {
             assert_eq!(previous, &turn, "replay preserves the whole turn");
         } else {
@@ -511,6 +576,7 @@ impl World {
     }
 
     fn receive_answer(&mut self, answer: &Answer) {
+        self.link_words.push("answer");
         assert_eq!(usize::try_from(answer.turns).expect("bounded"), self.seen.len(), "turns precede their answer");
         match &answer.ending {
             Ending::Ended { .. } | Ending::Parked { .. } | Ending::Failed { .. } | Ending::Refused(_) => {}

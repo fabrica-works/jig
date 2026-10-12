@@ -110,7 +110,7 @@ impl Turns {
             };
             let pending = self.pending.get_mut(&name).expect("staged turn exists");
             pending.admitted = true;
-            out.push(crate::Request::Turn { agent: pending.agent, run, attempt, turn: copy(&pending.turn) });
+            out.push(crate::Request::Up(crate::LinkUp::Turn { run, attempt, turn: copy(&pending.turn) }));
             out.push(crate::Request::AcknowledgeAgentTurn { agent: pending.agent, turn: name.turn });
         }
     }

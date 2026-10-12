@@ -59,6 +59,7 @@ impl Peers {
                 root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
                     channel: Token::new(channel),
                     hello: fleet::Hello {
+                        bounds: crate::fixtures::bounds(),
                         slots,
                         stop_bound,
                         workstreams: Box::new([]),

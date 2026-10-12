@@ -53,6 +53,7 @@ fn a_restart_restores_a_task_on_the_second_charter() {
     world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
         channel: skein_lib::Token::new(7),
         hello: jig_domain_fleet::Hello {
+            bounds: jig_core_world::fixtures::bounds(),
             stop_bound: skein_lib::Duration::from_millis(100),
             slots: 2,
             workstreams: Box::new([]),

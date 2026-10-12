@@ -227,16 +227,9 @@ pub(crate) fn sender(value: tasks::Party) -> Box<[u8]> {
         tasks::Party::Deployment { .. } => Box::from(&b"deployment"[..]),
     }
 }
-pub(crate) fn host_answer(value: core::SettledAnswer) -> Box<[u8]> {
+pub(crate) fn host_answer(value: core::SettledAnswer) -> host::Relayed {
     match value {
-        core::SettledAnswer::Host { error, body } => {
-            // The hub carries opaque bytes; keep the result mark inside that
-            // envelope so the live answer agrees with its restored call row.
-            let mut writer = Writer::new(body.len().checked_add(1).expect("reply envelope"));
-            writer.put(&[u8::from(error)]).expect("reply mark");
-            writer.put(&body).expect("bounded reply");
-            writer.finish()
-        }
+        core::SettledAnswer::Host { error, body } => host::Relayed::Answer { error, text: body },
         core::SettledAnswer::Delivery { .. } => unreachable!("engine charter has no delivery tool"),
     }
 }
@@ -504,12 +497,12 @@ pub(crate) fn relayed(
     };
     let binding = domain.host_calls.remove(&call)?;
     assert!(binding.run == run && binding.attempt == attempt, "hub relay fence");
-    Some(crate::Released::Host(host::Event::Relayed {
+    Some(crate::Released::Host(host::Event::Down(host::LinkDown::Relayed {
         run,
         attempt,
         call: binding.delivery,
         answer: host_answer(value.answer),
-    }))
+    })))
 }
 
 pub(crate) fn read_answer(

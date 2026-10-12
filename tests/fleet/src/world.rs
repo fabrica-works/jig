@@ -875,7 +875,13 @@ impl World {
                     .collect();
                 Event::Hello {
                     channel: token,
-                    hello: Hello { slots, workstreams, hosting, stop_bound: Duration::from_secs(0) },
+                    hello: Hello {
+                        bounds: crate::fixtures::bounds(),
+                        slots,
+                        workstreams,
+                        hosting,
+                        stop_bound: Duration::from_secs(0),
+                    },
                 }
             }
             Up::Answer { run, attempt, said } => {

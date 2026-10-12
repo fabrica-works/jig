@@ -40,3 +40,5 @@ pub use skein_world::domain::Span;
 pub use world::{ENDINGS, LIMITS, Settings, Stats, World};
 
 pub mod turns;
+
+pub mod fixtures;

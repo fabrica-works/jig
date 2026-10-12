@@ -1,3 +1,4 @@
+use jig_domain_host::{LinkDown, LinkUp};
 use std::collections::{BTreeMap, BTreeSet};
 
 use jig_domain_host::{self as host, AgentFailure, Event, Fact, Failure, Limits, Reason, Reply, Request, RunFailure};
@@ -248,6 +249,7 @@ enum Lane {
 #[derive(Clone, Copy, Debug)]
 enum Taken {
     Assign { run: Token, attempt: Token },
+    Acknowledged { run: Token, attempt: Token },
     Stale,
     Duplicate,
     Prepared { owner: Token, prepared: bool },
@@ -489,7 +491,8 @@ impl World {
                     self.assigned(run, attempt, &request);
                     self.route(request);
                 }
-                Taken::Started { .. }
+                Taken::Acknowledged { .. }
+                | Taken::Started { .. }
                 | Taken::Called { .. }
                 | Taken::Gone { .. }
                 | Taken::Delivered { .. }
@@ -539,7 +542,7 @@ impl World {
         }
         self.host.reclaim();
         let hosted = u32::try_from(self.admitted.len()).expect("fits");
-        assert_eq!(self.host.hosted(), hosted, "a slot is taken from admission until its run has answered");
+        assert_eq!(self.host.hosted(), hosted, "a slot is taken from admission until its answer is acknowledged");
         self.stats.peak = self.stats.peak.max(hosted);
         // The engine sends the assignment of a run hosted again: it is the
         // next thing the host takes, so the run is still hosted then.
@@ -569,7 +572,10 @@ impl World {
         assert!(
             matches!(
                 request,
-                Request::Answer { answer: host::Answer { ending: host::Ending::Refused(host::Refusal::Busy), .. }, .. }
+                Request::Up(LinkUp::Answer {
+                    answer: host::Answer { ending: host::Ending::Refused(host::Refusal::Busy), .. },
+                    ..
+                })
             ),
             "a duplicate call is refused without changing its hosted attempt: {request:?}"
         );
@@ -581,7 +587,8 @@ impl World {
             return Taken::Stale;
         }
         match event {
-            Event::Assign { reply_to: _, assignment } => {
+            Event::Down(LinkDown::Acknowledge { run, attempt }) => Taken::Acknowledged { run: *run, attempt: *attempt },
+            Event::Down(LinkDown::Assign { reply_to: _, assignment }) => {
                 Taken::Assign { run: assignment.assignment.run, attempt: assignment.assignment.attempt }
             }
             Event::Started { owner, agent } => Taken::Started { owner: *owner, agent: *agent },
@@ -617,22 +624,23 @@ impl World {
                     Reason::Engine | Reason::Contact => Taken::Other,
                 }
             }
-            Event::Report => {
+            Event::Opened { .. } => {
                 self.stats.reports += 1;
                 Taken::Other
             }
-            Event::Inbound { .. }
+            Event::Down(
+                LinkDown::Message { .. }
+                | LinkDown::Grant { .. }
+                | LinkDown::Cancel { .. }
+                | LinkDown::Relayed { .. }
+                | LinkDown::TurnKept { .. },
+            )
             | Event::Facts { .. }
-            | Event::Grant { .. }
-            | Event::Cancel { .. }
-            | Event::Unacknowledged { .. }
-            | Event::Relayed { .. }
             | Event::RelayCancelled { .. }
             | Event::Withdrawn { .. }
             | Event::Bounced { .. }
             | Event::Yielded { .. }
             | Event::Turn { .. }
-            | Event::AcknowledgeTurn { .. }
             | Event::Faulted { .. } => Taken::Other,
         }
     }
@@ -654,6 +662,9 @@ impl World {
     /// run it makes leave live, if it does.
     fn note(&mut self, taken: Taken) -> Option<Token> {
         match taken {
+            Taken::Acknowledged { run, attempt } => {
+                self.admitted.remove(&(run, attempt));
+            }
             Taken::Started { owner, agent } => {
                 self.hosted.get_mut(&owner).expect("a start is of a hosted run").agent = Some(agent);
                 self.agents.insert(agent, owner);
@@ -702,7 +713,7 @@ impl World {
     /// `run`'s attempt `attempt`: a refusal, or a prepare that admits it.
     fn assigned(&mut self, run: Token, attempt: Token, request: &Request) {
         match request {
-            Request::Answer { to: _, run: answered, attempt: of, answer } => {
+            Request::Up(LinkUp::Answer { reply_to: _, run: answered, attempt: of, answer }) => {
                 assert_eq!((*answered, *of), (run, attempt), "an assignment is answered as itself");
                 match &answer.ending {
                     host::Ending::Refused(_) => {}
@@ -723,11 +734,11 @@ impl World {
                 assert!(self.hosted.insert(*owner, entry).is_none(), "a hosted run's token is its own");
                 assert!(self.admitted.insert((run, attempt), *owner).is_none(), "an attempt is admitted once");
             }
-            Request::Relay { .. }
+            Request::Up(LinkUp::Call { .. } | LinkUp::Turn { .. })
             | Request::CancelRelay { .. }
             | Request::Bounced { .. }
             | Request::Grant { .. }
-            | Request::Hosting { .. }
+            | Request::Hello { .. }
             | Request::Abort { .. }
             | Request::Start { .. }
             | Request::Message { .. }
@@ -735,7 +746,6 @@ impl World {
             | Request::Stop { .. }
             | Request::Deliver { .. }
             | Request::Save { .. }
-            | Request::Turn { .. }
             | Request::AcknowledgeAgentTurn { .. }
             | Request::Release { .. } => panic!("an assignment is refused or prepared: {request:?}"),
         }
@@ -745,8 +755,8 @@ impl World {
     fn route(&mut self, request: Request) {
         self.trace.log(self.now, format_args!("host -> {request:?}"));
         match request {
-            Request::Answer { to, run, attempt, answer } => {
-                if let Some(owner) = self.admitted.remove(&(run, attempt)) {
+            Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
+                if let Some(owner) = self.admitted.get(&(run, attempt)).copied() {
                     assert!(self.parent.settled(owner), "a run answers once all of it has settled and is released");
                     let hosted = self.hosted.get(&owner).expect("admitted runs are hosted");
                     if let Some(agent) = hosted.agent {
@@ -757,13 +767,15 @@ impl World {
                         self.path(path);
                     }
                 }
-                self.send_engine(Request::Answer { to, run, attempt, answer });
+                self.send_engine(Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }));
             }
-            Request::Relay { run, attempt, delivery: call, .. } => {
+            Request::Up(LinkUp::Call { run, attempt, delivery: call, .. }) => {
                 assert!(self.relays.insert(call, (run, attempt)).is_none(), "a relay starts once");
                 self.send_engine(request);
             }
-            Request::Turn { .. } | Request::AcknowledgeAgentTurn { .. } => panic!("turns are exercised by turn_world"),
+            Request::Up(LinkUp::Turn { .. }) | Request::AcknowledgeAgentTurn { .. } => {
+                panic!("turns are exercised by turn_world")
+            }
             Request::CancelRelay { call } => {
                 if self.relays.remove(&call).is_some() {
                     let event = Event::RelayCancelled { call };
@@ -771,15 +783,18 @@ impl World {
                 }
             }
             Request::Bounced { .. } => self.send_engine(request),
-            Request::Hosting { runs } => {
+            Request::Hello { hello } => {
                 let mut hosting = BTreeSet::new();
-                for entry in &runs {
+                for entry in &hello.hosting {
                     hosting.insert((entry.run, entry.attempt));
                 }
                 let admitted: BTreeSet<(Token, Token)> = self.admitted.keys().copied().collect();
-                assert_eq!(hosting, admitted, "the report lists every run admitted and not answered");
-                let acts = self.engine.reconnected(&runs);
+                assert_eq!(hosting, admitted, "the hello lists every run whose answer is not acknowledged");
+                let acts = self.engine.reconnected(&hello.hosting);
                 self.acts(acts);
+                for index in 0..self.host.kept_answers() {
+                    self.send_engine(Request::Up(self.host.answer_at(index).expect("kept answer")));
+                }
             }
             Request::Message { agent, ref words, .. } => {
                 let owner = *self.agents.get(&agent).expect("a delivery is to a started agent");
@@ -880,7 +895,7 @@ impl World {
         while let Some(delivery) = self.wire.next(self.now) {
             match delivery {
                 Delivery::Host { event, stale } => {
-                    if let Event::Relayed { run, attempt, call, .. } = &event {
+                    if let Event::Down(LinkDown::Relayed { run, attempt, call, .. }) = &event {
                         if stale || self.relays.get(call) != Some(&(*run, *attempt)) {
                             continue;
                         }
@@ -889,7 +904,7 @@ impl World {
                     self.stage.push(Arrival { event, stale, duplicate: false });
                 }
                 Delivery::Engine(request) => {
-                    if let Request::Relay { delivery: call, .. } = &request
+                    if let Request::Up(LinkUp::Call { delivery: call, .. }) = &request
                         && !self.relays.contains_key(call)
                     {
                         continue;
@@ -905,7 +920,9 @@ impl World {
                     let outs = self.parent.wake(agent, wake);
                     self.outs(outs);
                 }
-                Delivery::Back => self.stage.push(Arrival { event: Event::Report, stale: false, duplicate: false }),
+                Delivery::Back => {
+                    self.stage.push(Arrival { event: crate::fixtures::opened(), stale: false, duplicate: false });
+                }
                 Delivery::Shutdown => {
                     let event = Event::CancelAll { reason: Reason::Shutdown };
                     self.stage.push(Arrival { event, stale: false, duplicate: false });

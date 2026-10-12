@@ -332,7 +332,11 @@ impl Application for Ops {
                 Vec::new()
             }
             root::Output::ToChild(child) => {
-                if let root::Released::Host(jig_domain_host::Event::Assign { assignment, .. }) = &child {
+                if let root::Released::Host(jig_domain_host::Event::Down(jig_domain_host::LinkDown::Assign {
+                    assignment,
+                    ..
+                })) = &child
+                {
                     let task = assignment.assignment.run.raw();
                     let attempt = assignment.assignment.attempt.raw();
                     let budget = observations::snapshot(store).tasks[&task].run_reserved;

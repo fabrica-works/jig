@@ -103,6 +103,7 @@ impl Measured {
         self.step(Event::Hello {
             channel,
             hello: Hello {
+                bounds: jig_fleet_world::fixtures::bounds(),
                 stop_bound: Duration::from_secs(0),
                 slots: limits.slots,
                 workstreams,

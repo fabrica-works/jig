@@ -1603,6 +1603,7 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
         fleet::Event::Hello {
             channel: Token::new(10),
             hello: fleet::Hello {
+                bounds: fixtures::bounds(),
                 stop_bound: Duration::from_secs(1),
                 slots: 1,
                 workstreams: Box::new([]),
@@ -1632,6 +1633,7 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
         fleet::Event::Hello {
             channel: Token::new(11),
             hello: fleet::Hello {
+                bounds: fixtures::bounds(),
                 stop_bound: Duration::ZERO,
                 slots: 2,
                 workstreams: Box::new([]),
@@ -2941,6 +2943,7 @@ mod restore_admission;
 
 mod project_period_watches;
 
+mod fixtures;
 mod reserve;
 
 mod charters;

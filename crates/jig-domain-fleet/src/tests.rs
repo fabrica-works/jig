@@ -123,6 +123,7 @@ impl Harness {
             keys.push(*key).unwrap();
         }
         let hello = Hello {
+            bounds: fixtures::bounds(),
             stop_bound: Duration::from_secs(0),
             slots,
             workstreams: keys.into_boxed(),
@@ -410,6 +411,7 @@ fn retained_host_and_hello_history_is_bounded_and_independent_of_diagnostics() {
         &*h.step(Event::Hello {
             channel: C3,
             hello: Hello {
+                bounds: fixtures::bounds(),
                 stop_bound: LIMITS.grace,
                 slots: u32::MAX,
                 workstreams: Box::new([]),
@@ -1237,7 +1239,13 @@ fn declared_stop_bounds_must_be_strictly_below_the_engine_grace() {
         (Duration::from_secs(11), false),
     ] {
         let mut h = Harness::new(LIMITS);
-        let hello = Hello { stop_bound, slots: 2, workstreams: Box::default(), hosting: Box::default() };
+        let hello = Hello {
+            bounds: fixtures::bounds(),
+            stop_bound,
+            slots: 2,
+            workstreams: Box::default(),
+            hosting: Box::default(),
+        };
         let out = h.step(Event::Hello { channel: C1, hello });
         if accepted {
             assert!(out.is_empty());
@@ -1266,3 +1274,5 @@ fn host_call(name: Token, body: Token) -> Call {
 }
 
 mod progress;
+
+mod fixtures;

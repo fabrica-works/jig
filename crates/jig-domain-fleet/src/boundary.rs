@@ -473,6 +473,7 @@ pub enum Request {
 /// What a worker says first on every channel (domain/engine.md, section 8).
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Hello {
+    pub bounds: crate::Bounds,
     /// The worker's longest stop time after losing contact. It must be
     /// strictly below the engine's grace.
     pub stop_bound: Duration,

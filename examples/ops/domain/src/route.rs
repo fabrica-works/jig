@@ -256,7 +256,10 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             assert!(assignment.attempt == attempt.raw(), "assignment fence");
             child(
                 decision,
-                Released::Host(host::Event::Assign { reply_to: ReplyTo::new(run), assignment: assignment.value }),
+                Released::Host(host::Event::Down(host::LinkDown::Assign {
+                    reply_to: ReplyTo::new(run),
+                    assignment: assignment.value,
+                })),
             );
             offered_inbox(decision, run, attempt, assignment.inbox);
         }
@@ -280,13 +283,13 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             };
             child(
                 decision,
-                Released::Host(host::Event::Inbound {
+                Released::Host(host::Event::Down(host::LinkDown::Message {
                     run,
                     attempt,
                     name: message.name,
                     sender: crate::assemble::sender(message_word.from),
                     words: crate::assemble::inbox_words(&message_word),
-                }),
+                })),
             );
         }
         core::Held::Relay { task, attempt, word, .. } => {
@@ -308,16 +311,18 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             );
         }
         core::Held::AcknowledgeTurn { run, attempt, turn, .. } => {
-            child(decision, Released::Host(host::Event::AcknowledgeTurn { run, attempt, turn }));
+            child(decision, Released::Host(host::Event::Down(host::LinkDown::TurnKept { run, attempt, turn })));
         }
         core::Held::Cancel { run, attempt, .. } => {
-            child(decision, Released::Host(host::Event::Cancel { run, attempt }));
+            child(decision, Released::Host(host::Event::Down(host::LinkDown::Cancel { run, attempt })));
         }
         core::Held::StopRun { task, attempt } => child(
             decision,
             Released::Fleet(fleet::Event::Cancel { run: Token::new(task), attempt: Token::new(attempt) }),
         ),
-        core::Held::Acknowledge { .. } => child(decision, Released::Host(host::Event::Unacknowledged { answers: 0 })),
+        core::Held::Acknowledge { run, attempt, .. } => {
+            child(decision, Released::Host(host::Event::Down(host::LinkDown::Acknowledge { run, attempt })));
+        }
         core::Held::TaskTerminalAcknowledged { task, attempt } => child(
             decision,
             Released::Fleet(fleet::Event::Acknowledge { run: Token::new(task), attempt: Token::new(attempt) }),
@@ -348,13 +353,13 @@ fn offered_inbox(decision: &mut Decision<Write, Output>, run: Token, attempt: To
     for word in inbox {
         child(
             decision,
-            Released::Host(host::Event::Inbound {
+            Released::Host(host::Event::Down(host::LinkDown::Message {
                 run,
                 attempt,
                 name: Token::new(word.number),
                 sender: crate::assemble::sender(word.from),
                 words: crate::assemble::inbox_words(&word),
-            }),
+            })),
         );
     }
 }
@@ -1380,7 +1385,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
             if let Some(binding) = domain.host_calls.remove(&call.name) {
                 now(
                     domain,
-                    Output::ToChild(Released::Host(host::Event::Relayed {
+                    Output::ToChild(Released::Host(host::Event::Down(host::LinkDown::Relayed {
                         run: binding.run,
                         attempt: binding.attempt,
                         call: binding.delivery,
@@ -1388,7 +1393,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                             error: true,
                             body: Box::from(&b"unavailable"[..]),
                         }),
-                    })),
+                    }))),
                 );
             }
         }
@@ -1427,7 +1432,16 @@ fn host_out(
         match request.to_agent() {
             Ok(request) => held(decision, Output::Agent(request)),
             Err(request) => match request {
-                host::Request::Relay { run, attempt, call, delivery, tool, writes, input, deadline } => {
+                host::Request::Up(host::LinkUp::Call {
+                    run,
+                    attempt,
+                    call,
+                    delivery,
+                    tool,
+                    writes,
+                    input,
+                    deadline,
+                }) => {
                     domain
                         .host_calls
                         .insert(call.clone(), crate::domain::HostCall { run, attempt, delivery })
@@ -1439,7 +1453,7 @@ fn host_out(
                         call: fleet::Call { name: call, tool, writes, input, deadline },
                     })));
                 }
-                host::Request::Turn { run, attempt, turn, .. } => {
+                host::Request::Up(host::LinkUp::Turn { run, attempt, turn, .. }) => {
                     let body = domain.payload(Payload::Turn {
                         task: run.raw(),
                         attempt: attempt.raw(),
@@ -1464,7 +1478,7 @@ fn host_out(
                         body,
                     })));
                 }
-                host::Request::Answer { run, attempt, answer, .. } => {
+                host::Request::Up(host::LinkUp::Answer { run, attempt, answer, .. }) => {
                     let end = crate::assemble::ending(answer.ending);
                     let payload = domain.payload(Payload::Answer {
                         task: run.raw(),
@@ -1506,7 +1520,7 @@ fn host_out(
                         },
                     })));
                 }
-                host::Request::Hosting { .. } => {}
+                host::Request::Hello { .. } => {}
                 host::Request::Prepare { owner, .. } => work.push(Work::Host(host::Event::Unprepared {
                     owner,
                     failure: host::Preparation::Permanent { resource: None },

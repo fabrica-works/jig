@@ -137,7 +137,7 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
         out.push(Request::Refuse { channel });
         return;
     }
-    let Hello { slots, workstreams, hosting, stop_bound: _ } = hello;
+    let Hello { slots, workstreams, hosting, stop_bound: _, bounds: _ } = hello;
     let mut worker = Channel {
         kind: HostKind::Worker,
         token: channel,

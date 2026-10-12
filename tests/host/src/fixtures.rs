@@ -1,14 +1,18 @@
 //! Host records used by the lifecycle scripts. Callback tokens are encoded
 //! as opaque names; names are opaque bytes.
+use jig_domain_host::LinkDown;
 use jig_domain_host::{Ask, Assignment, Event, Finish, RunAssignment};
 use skein_lib::{Duration, Reader, ReplyTo, Token};
 #[must_use]
 pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {
-    Event::Assign { reply_to, assignment: Assignment { assignment, turns: Box::new([]), answered: Box::new([]) } }
+    Event::Down(LinkDown::Assign {
+        reply_to,
+        assignment: Assignment { assignment, turns: Box::new([]), answered: Box::new([]) },
+    })
 }
 #[must_use]
 pub fn inbound(run: Token, attempt: Token, name: Token, words: Box<[u8]>) -> Event {
-    Event::Inbound { run, attempt, name, sender: Box::new([]), words }
+    Event::Down(LinkDown::Message { run, attempt, name, sender: Box::new([]), words })
 }
 #[must_use]
 pub fn called(owner: Token, call: Token, ask: Ask) -> Event {
@@ -33,4 +37,23 @@ pub fn relay(input: Box<[u8]>) -> Ask {
 #[must_use]
 pub fn callback(name: &[u8]) -> Token {
     Token::new(Reader::new(name).u64().expect("encoded callback"))
+}
+
+#[must_use]
+pub fn bounds() -> jig_domain_host::Bounds {
+    jig_domain_host::Bounds {
+        models: Box::new([]),
+        turns: 8,
+        spend: 100,
+        time: Duration::from_secs(60),
+        waiting: Duration::from_secs(10),
+        checks: Duration::from_secs(5),
+        message_bytes: 64,
+        inbox: 4,
+        unacknowledged: 2,
+    }
+}
+#[must_use]
+pub fn opened() -> Event {
+    Event::Opened { stop_bound: Duration::from_secs(2), workstreams: Box::new([3]), bounds: bounds() }
 }

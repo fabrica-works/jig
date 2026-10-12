@@ -128,6 +128,7 @@ fn a_charter_for_workers_only_waits_while_only_engine_slots_are_free() {
             Event::Hello {
                 channel: Token::new(5),
                 hello: Hello {
+                    bounds: jig_fleet_world::fixtures::bounds(),
                     slots: 1,
                     stop_bound: Duration::from_secs(1),
                     workstreams: Box::new([]),
@@ -166,6 +167,7 @@ fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
             Event::Hello {
                 channel: Token::new(11),
                 hello: Hello {
+                    bounds: jig_fleet_world::fixtures::bounds(),
                     slots: 1,
                     stop_bound: Duration::from_secs(1),
                     workstreams: Box::new([9]),

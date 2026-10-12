@@ -1,5 +1,6 @@
 //! Exercise hosted runs through the public boundary (domain/hosts.md, section 6).
 
+use crate::{LinkDown, LinkUp};
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, ReplyTo, Time, Token, Wall};
 
@@ -120,12 +121,12 @@ fn an_itemless_run_starts_and_ends_without_a_workspace() {
     );
     let requests = h.step(Event::Gone { owner, detail: Box::new([]) });
     let [
-        Request::Answer {
+        Request::Up(LinkUp::Answer {
             run: answered,
             attempt: answered_attempt,
             answer: crate::Answer { ending: crate::Ending::Ended { work, .. }, .. },
             ..
-        },
+        }),
     ] = &*requests
     else {
         panic!("the itemless run answers without workspace requests: {requests:?}")
@@ -139,10 +140,10 @@ fn turns_stay_in_the_host_until_their_own_ack_and_credit_returns() {
     let mut assignment = assignment(1);
     assignment.workspace = None;
     let (run, attempt) = (assignment.run, assignment.attempt);
-    let requests = h.step(Event::Assign {
+    let requests = h.step(Event::Down(LinkDown::Assign {
         reply_to: ReplyTo::new(run),
         assignment: crate::Assignment { assignment, turns: Box::new([]), answered: Box::new([]) },
-    });
+    }));
     let [Request::Start { owner, workspace: None, .. }] = &*requests else {
         panic!("an itemless run starts: {requests:?}");
     };
@@ -153,8 +154,10 @@ fn turns_stay_in_the_host_until_their_own_ack_and_credit_returns() {
         let usage = u64::from(number == 1);
         let turn = crate::Turn { turn: number, spent: usage, read: None, body: Box::from([7_u8; 64]) };
         let requests = h.step(Event::Turn { owner, turn });
-        let [Request::Turn { turn: sent, .. }, Request::AcknowledgeAgentTurn { agent: credited, turn: ack }] =
-            &*requests
+        let [
+            Request::Up(LinkUp::Turn { turn: sent, .. }),
+            Request::AcknowledgeAgentTurn { agent: credited, turn: ack },
+        ] = &*requests
         else {
             panic!("a turn is sent with the next credit: {requests:?}");
         };
@@ -163,12 +166,12 @@ fn turns_stay_in_the_host_until_their_own_ack_and_credit_returns() {
         assert_eq!(sent.spent, usage, "spend passes through without a host decision");
     }
     assert_eq!(h.domain.retained_turns(), 2);
-    assert!(h.step(Event::AcknowledgeTurn { run, attempt: Token::new(999), turn: 1 }).is_empty());
-    assert!(h.step(Event::AcknowledgeTurn { run, attempt, turn: 3 }).is_empty());
+    assert!(h.step(Event::Down(LinkDown::TurnKept { run, attempt: Token::new(999), turn: 1 })).is_empty());
+    assert!(h.step(Event::Down(LinkDown::TurnKept { run, attempt, turn: 3 })).is_empty());
     assert_eq!(h.domain.retained_turns(), 2);
-    assert!(h.step(Event::AcknowledgeTurn { run, attempt, turn: 1 }).is_empty());
+    assert!(h.step(Event::Down(LinkDown::TurnKept { run, attempt, turn: 1 })).is_empty());
     assert_eq!(h.domain.retained_turns(), 1);
-    assert!(h.step(Event::AcknowledgeTurn { run, attempt, turn: 1 }).is_empty());
+    assert!(h.step(Event::Down(LinkDown::TurnKept { run, attempt, turn: 1 })).is_empty());
     assert_eq!(h.domain.turn(run, attempt, 2).expect("second turn remains").body, Box::from([7_u8; 64]));
 }
 
@@ -184,10 +187,10 @@ fn a_bad_charter_is_refused_before_a_workspace_is_touched() {
     assignment.charter = Box::from([0_u8; 65]);
     let requests = h.step(fixtures::assign(ReplyTo::new(assignment.run), assignment));
     let [
-        Request::Answer {
+        Request::Up(LinkUp::Answer {
             answer: crate::Answer { ending: crate::Ending::Refused(Refusal::Invalid(Invalid::Charter)), .. },
             ..
-        },
+        }),
     ] = &*requests
     else {
         panic!("expected invalid refusal: {requests:?}")
@@ -204,7 +207,7 @@ fn a_preparation_failure_answers_without_starting_an_agent() {
         detail: Box::new([]),
     });
     let [
-        Request::Answer {
+        Request::Up(LinkUp::Answer {
             answer:
                 crate::Answer {
                     ending:
@@ -215,7 +218,7 @@ fn a_preparation_failure_answers_without_starting_an_agent() {
                     ..
                 },
             ..
-        },
+        }),
     ] = &*requests
     else {
         panic!("expected preparation failure: {requests:?}")
@@ -245,7 +248,7 @@ fn a_delivery_is_answered_after_the_workspace_reports_what_it_left() {
     let requests = h.step(Event::Gone { owner, detail: Box::new([]) });
     let [
         Request::Release { workspace: released },
-        Request::Answer { answer: crate::Answer { ending: crate::Ending::Ended { work, .. }, .. }, .. },
+        Request::Up(LinkUp::Answer { answer: crate::Answer { ending: crate::Ending::Ended { work, .. }, .. }, .. }),
     ] = &*requests
     else {
         panic!("expected release and answer: {requests:?}")
@@ -271,7 +274,7 @@ fn stopping_waits_for_a_delivery_even_after_the_agent_is_gone() {
     let [
         Request::Reply { agent: answered_agent, call: answered_call, reply: Reply::Delivered(outcome) },
         Request::Release { workspace: released },
-        Request::Answer { answer: crate::Answer { ending: crate::Ending::Ended { work, .. }, .. }, .. },
+        Request::Up(LinkUp::Answer { answer: crate::Answer { ending: crate::Ending::Ended { work, .. }, .. }, .. }),
     ] = &*requests
     else {
         panic!("the delivery settles before release and answer: {requests:?}")
@@ -303,15 +306,15 @@ fn live_agent_facts_wait_within_the_hosts_bound_and_drop_when_full() {
 fn cancelling_a_preparing_run_waits_for_the_workspace_terminal() {
     let mut h = Harness::new();
     let (owner, _) = h.assign(1);
-    let requests = h.step(Event::Cancel { run: Token::new(1), attempt: Token::new(1001) });
+    let requests = h.step(Event::Down(LinkDown::Cancel { run: Token::new(1), attempt: Token::new(1001) }));
     assert_eq!(&*requests, [Request::Abort { owner }]);
     let requests = h.step(Event::Unprepared { owner, failure: Preparation::Transient, detail: Box::new([]) });
     let [
-        Request::Answer {
+        Request::Up(LinkUp::Answer {
             answer:
                 crate::Answer { ending: crate::Ending::Failed { failure: Failure::Cancelled(Reason::Engine), .. }, .. },
             ..
-        },
+        }),
     ] = &*requests
     else {
         panic!("expected cancelled answer: {requests:?}")
@@ -331,8 +334,8 @@ fn messages_held_during_a_failed_prepare_are_returned_by_name() {
         &*requests,
         [
             Request::Bounced { run, attempt, name, bounce: Bounce::Ending },
-            Request::Answer {
-                to: ReplyTo::new(run),
+            Request::Up(LinkUp::Answer {
+                reply_to: ReplyTo::new(run),
                 run,
                 attempt,
                 answer: crate::Answer {
@@ -344,7 +347,7 @@ fn messages_held_during_a_failed_prepare_are_returned_by_name() {
                         work: Work { left: None, saved: None },
                     }
                 },
-            },
+            }),
         ]
     );
 }
@@ -360,7 +363,7 @@ fn cancellation_returns_messages_held_before_the_agent_starts() {
     let [Request::Start { .. }] = &*requests else { panic!("the agent starts: {requests:?}") };
     assert!(h.step(fixtures::inbound(run, attempt, name, Box::from(&b"question"[..]))).is_empty());
     assert_eq!(
-        &*h.step(Event::Cancel { run, attempt }),
+        &*h.step(Event::Down(LinkDown::Cancel { run, attempt })),
         [Request::Bounced { run, attempt, name, bounce: Bounce::Ending }]
     );
     let agent = Token::new(301);
@@ -370,7 +373,9 @@ fn cancellation_returns_messages_held_before_the_agent_starts() {
     let requests = h.step(Event::Saved { owner, at: None });
     let [
         Request::Release { workspace: released },
-        Request::Answer { answer: crate::Answer { ending: crate::Ending::Failed { failure, .. }, .. }, .. },
+        Request::Up(LinkUp::Answer {
+            answer: crate::Answer { ending: crate::Ending::Failed { failure, .. }, .. }, ..
+        }),
     ] = &*requests
     else {
         panic!("the run releases and answers after save: {requests:?}")
@@ -381,13 +386,16 @@ fn cancellation_returns_messages_held_before_the_agent_starts() {
 mod fixtures {
     // Host records used by the lifecycle scripts. Callback tokens are encoded
     // as opaque names; names are opaque bytes.
-    use crate::{Ask, Assignment, Event, Finish, RunAssignment};
+    use crate::{Ask, Assignment, Event, Finish, LinkDown, RunAssignment};
     use skein_lib::{Reader, ReplyTo, Token};
     pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {
-        Event::Assign { reply_to, assignment: Assignment { assignment, turns: Box::new([]), answered: Box::new([]) } }
+        Event::Down(LinkDown::Assign {
+            reply_to,
+            assignment: Assignment { assignment, turns: Box::new([]), answered: Box::new([]) },
+        })
     }
     pub fn inbound(run: Token, attempt: Token, name: Token, words: Box<[u8]>) -> Event {
-        Event::Inbound { run, attempt, name, sender: Box::new([]), words }
+        Event::Down(LinkDown::Message { run, attempt, name, sender: Box::new([]), words })
     }
     pub fn called(owner: Token, call: Token, ask: Ask) -> Event {
         Event::Called { owner, call: Box::from(call.raw().to_be_bytes()), ask }

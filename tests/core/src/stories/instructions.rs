@@ -51,6 +51,7 @@ pub fn sign_in(w: &mut World) {
     w.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
         channel: Token::new(7),
         hello: jig_domain_fleet::Hello {
+            bounds: crate::fixtures::bounds(),
             stop_bound: skein_lib::Duration::from_millis(100),
             slots: 2,
             workstreams: Box::new([]),

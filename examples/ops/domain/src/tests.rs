@@ -476,9 +476,12 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
     let mut answered = false;
     for output in outputs {
         match output {
-            Output::ToChild(Released::Host(host::Event::Relayed { answer, .. })) => {
-                assert_eq!(answer.first(), Some(&0));
-                assert_eq!(answer.get(1..).unwrap(), br#"{"status":"subscribed","number":1}"#);
+            Output::ToChild(Released::Host(host::Event::Down(host::LinkDown::Relayed {
+                answer: host::Relayed::Answer { error, text },
+                ..
+            }))) => {
+                assert!(!error);
+                assert_eq!(text.as_ref(), br#"{"status":"subscribed","number":1}"#);
                 answered = true;
             }
             Output::Commit { .. }

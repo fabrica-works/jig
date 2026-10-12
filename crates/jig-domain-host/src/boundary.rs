@@ -5,18 +5,15 @@
 
 use alloc::boxed::Box;
 
-use skein_lib::{Duration, ReplyTo, Token};
+use skein_lib::{Duration, Token};
 
 /// parent -> host
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
-    /// A named message with its sender label and words.
-    Inbound {
-        run: Token,
-        attempt: Token,
-        name: Token,
-        sender: Box<[u8]>,
-        words: Box<[u8]>,
+    /// One completed conversation turn from the agent.
+    Turn {
+        owner: Token,
+        turn: Turn,
     },
     /// A host or delivery call named in the run's own bytes.
     Called {
@@ -29,26 +26,10 @@ pub enum Event {
         owner: Token,
         call: Box<[u8]>,
     },
-    /// An assignment with ordered turn bodies and calls settled after them.
-    Assign {
-        reply_to: ReplyTo,
-        assignment: Assignment,
-    },
-    /// One completed conversation turn, from its started agent.
-    Turn {
-        owner: Token,
-        turn: Turn,
-    },
     /// A live agent fact, kept best effort for the engine.
     Facts {
         owner: Token,
         fact: Box<[u8]>,
-    },
-    /// The engine committed this turn; release it and grant agent read room.
-    AcknowledgeTurn {
-        run: Token,
-        attempt: Token,
-        turn: u32,
     },
     /// Last word, with cumulative accounting.
     Finished {
@@ -56,24 +37,6 @@ pub enum Event {
         turns: u32,
         spent: u64,
         finish: Finish,
-    },
-    /// From the engine: cancel the run `run`'s attempt `attempt`.
-    Cancel {
-        run: Token,
-        attempt: Token,
-    },
-    Grant {
-        run: Token,
-        attempt: Token,
-        grant: Grant,
-    },
-    /// From the engine: the answer to the relayed call `call` of the run
-    /// `run`'s attempt `attempt`.
-    Relayed {
-        run: Token,
-        attempt: Token,
-        call: Token,
-        answer: Box<[u8]>,
     },
     /// Terminal for a cancelled relay: its local delivery and wait have ended.
     RelayCancelled {
@@ -86,16 +49,13 @@ pub enum Event {
     CancelAll {
         reason: Reason,
     },
-    /// From the top level: say what the host hosts, for the engine to keep or
-    /// cancel on reconnecting.
-    Report,
-    /// From the top level: `answers` the host made have yet to be
-    /// acknowledged by the engine. Each keeps its run's slot until it is, so
-    /// that the engine, which frees a slot once it has the answer, never finds
-    /// a host with more runs than slots.
-    Unacknowledged {
-        answers: u32,
+    /// The link opened; the root supplies the hello's configuration.
+    Opened {
+        stop_bound: Duration,
+        workstreams: Box<[u64]>,
+        bounds: crate::Bounds,
     },
+    Down(crate::LinkDown),
     /// Terminal for `Prepare`: the workspace is ready, and `workspace` names it
     /// from now on.
     Prepared {
@@ -150,16 +110,9 @@ pub enum Event {
 /// host -> parent
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
-    /// Relay a named host tool call with its effect classification and input.
-    Relay {
-        run: Token,
-        attempt: Token,
-        call: Box<[u8]>,
-        delivery: Token,
-        tool: Box<[u8]>,
-        writes: bool,
-        input: Box<[u8]>,
-        deadline: Duration,
+    Up(crate::LinkUp),
+    Hello {
+        hello: crate::Hello,
     },
     /// Pass a named message to the agent.
     Message {
@@ -184,19 +137,7 @@ pub enum Request {
         answered: Box<[AnsweredCall]>,
         grants: Box<[Grant]>,
     },
-    Answer {
-        to: ReplyTo,
-        run: Token,
-        attempt: Token,
-        answer: Answer,
-    },
-    /// A transmission copy of a turn retained until engine acknowledgement.
-    Turn {
-        agent: Token,
-        run: Token,
-        attempt: Token,
-        turn: Turn,
-    },
+
     /// The hub has taken this turn and now owns its retention.
     AcknowledgeAgentTurn {
         agent: Token,
@@ -221,11 +162,6 @@ pub enum Request {
         attempt: Token,
         name: Token,
         bounce: Bounce,
-    },
-    /// To the top level, the answer to `Report`: every run hosted, in the
-    /// order of the engine's names for them.
-    Hosting {
-        runs: Box<[Hosting]>,
     },
     /// Prepare `workspace` for the hosted run `owner`.
     Prepare {
@@ -386,13 +322,11 @@ impl Request {
             Request::Grant { agent, grant } => Ok(ToAgent::Grant { agent, grant }),
             Request::AcknowledgeAgentTurn { agent, turn } => Ok(ToAgent::Acknowledge { agent, turn }),
             Request::Stop { agent } => Ok(ToAgent::Cancel { agent }),
-            other @ (Request::Relay { .. }
-            | Request::Answer { .. }
-            | Request::Turn { .. }
+            other @ (Request::Up(..)
             | Request::Deliver { .. }
             | Request::CancelRelay { .. }
             | Request::Bounced { .. }
-            | Request::Hosting { .. }
+            | Request::Hello { .. }
             | Request::Prepare { .. }
             | Request::Abort { .. }
             | Request::Save { .. }
@@ -461,14 +395,14 @@ pub enum Finish {
     Failed { failure: RunFailure },
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Answer {
     pub turns: u32,
     pub spent: u64,
     pub ending: Ending,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ending {
     Refused(Refusal),
     Ended { outcome: Box<[u8]>, work: Work },
@@ -505,7 +439,7 @@ pub enum Ask {
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Reply {
     /// The engine's answer to a relayed call, as it is.
-    Relayed { answer: Box<[u8]> },
+    Relayed { error: bool, text: Box<[u8]> },
     /// How the delivery went.
     Delivered(Delivery),
     /// The run is cancelled or ending: nothing was done. A delivery in flight as
@@ -562,6 +496,7 @@ pub struct Hosting {
 /// Where a hosted run is in its lifecycle (hosts.md, section 6).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Phase {
+    Answered,
     Preparing,
     Starting,
     /// Its agent is at work.
@@ -574,7 +509,7 @@ pub enum Phase {
 }
 
 /// The root's tokens for what a run delivered and saved on its workspace.
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Work {
     pub left: Option<Token>,
     pub saved: Option<Token>,

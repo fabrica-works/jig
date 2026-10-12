@@ -14,6 +14,7 @@
 
 extern crate alloc;
 
+mod answers;
 mod assignment;
 mod boundary;
 mod call;
@@ -21,6 +22,7 @@ mod domain;
 mod facts;
 mod hosted;
 mod limits;
+mod link;
 #[cfg(test)]
 mod tests;
 mod turns;
@@ -33,3 +35,5 @@ pub use boundary::{
 pub use domain::{Domain, max_out, resume, step};
 pub use facts::{Fact, Told};
 pub use limits::{Limits, worst_case};
+
+pub use link::{Bounds, Hello, LinkDown, LinkUp, ModelBound, Relayed};

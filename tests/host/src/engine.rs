@@ -19,6 +19,7 @@
 //! the refusal it expects for one beyond the limits and none other, and that
 //! what an answer says landed or saved names the workspace's items.
 
+use jig_domain_host::{LinkDown, LinkUp};
 use std::collections::{BTreeMap, BTreeSet};
 
 use jig_domain_host::{
@@ -178,7 +179,7 @@ impl Engine {
                 let event = Box::from(&b"stale"[..]);
                 vec![
                     Self::host(crate::fixtures::inbound(run, attempt, Token::new(1), event), true),
-                    Self::host(Event::Cancel { run, attempt }, true),
+                    Self::host(Event::Down(LinkDown::Cancel { run, attempt }), true),
                 ]
             }
         }
@@ -187,12 +188,14 @@ impl Engine {
     /// Takes the host's request `request`, which is for the engine.
     pub fn take(&mut self, request: Request) -> Vec<Act> {
         match request {
-            Request::Answer { to, run, attempt, answer } => {
-                assert_eq!(to, ReplyTo::new(run), "an answer goes to its assignment");
-                self.answered(run, attempt, &answer.ending);
-                Vec::new()
+            Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
+                assert_eq!(reply_to, ReplyTo::new(run), "an answer goes to its assignment");
+                if self.open.contains_key(&(run, attempt)) {
+                    self.answered(run, attempt, &answer.ending);
+                }
+                vec![Self::host(Event::Down(LinkDown::Acknowledge { run, attempt }), false)]
             }
-            Request::Relay { run, attempt, delivery: call, .. } => self.relay(run, attempt, call),
+            Request::Up(LinkUp::Call { run, attempt, delivery: call, .. }) => self.relay(run, attempt, call),
             Request::Bounced { name: _, run: _, attempt: _, bounce } => {
                 match bounce {
                     Bounce::TooLarge => self.tally.too_large += 1,
@@ -201,10 +204,10 @@ impl Engine {
                 }
                 Vec::new()
             }
-            Request::Turn { .. } | Request::AcknowledgeAgentTurn { .. } => {
+            Request::Up(LinkUp::Turn { .. }) | Request::AcknowledgeAgentTurn { .. } => {
                 unreachable!("turns are exercised by turn_world")
             }
-            Request::Hosting { .. }
+            Request::Hello { .. }
             | Request::CancelRelay { .. }
             | Request::Prepare { .. }
             | Request::Abort { .. }
@@ -253,7 +256,7 @@ impl Engine {
         let (assignment, invalid) = self.draw(run, attempt);
         let assigned = Assigned { invalid, next: 0, cancelled: false };
         assert!(self.open.insert((run, attempt), assigned).is_none(), "an attempt is assigned once");
-        acts.push(Self::host(Event::Assign { reply_to: ReplyTo::new(run), assignment }, false));
+        acts.push(Self::host(Event::Down(LinkDown::Assign { reply_to: ReplyTo::new(run), assignment }), false));
         // What it sends the run while it is in flight.
         let events = self.rng.below(u64::from(self.script.events) + 1);
         let mut at = Duration::ZERO;
@@ -333,7 +336,7 @@ impl Engine {
         }
         assigned.cancelled = true;
         self.tally.cancels += 1;
-        vec![Self::host(Event::Cancel { run, attempt }, false)]
+        vec![Self::host(Event::Down(LinkDown::Cancel { run, attempt }), false)]
     }
 
     fn relay(&mut self, run: Token, attempt: Token, call: Token) -> Vec<Act> {
@@ -346,12 +349,26 @@ impl Engine {
         let mut acts = Vec::new();
         if self.rng.chance(self.script.stale) {
             let stale = self.name();
-            let event = Event::Relayed { run, attempt: stale, call, answer: Box::from(&b"stale"[..]) };
+            let event = Event::Down(LinkDown::Relayed {
+                run,
+                attempt: stale,
+                call,
+                answer: jig_domain_host::Relayed::Answer { error: false, text: Box::from(&b"stale"[..]) },
+            });
             acts.push(Self::host(event, true));
         }
         let after = self.script.relay.draw(&mut self.rng);
         let answer = Box::from(&b"the requested record"[..]);
-        acts.push(Act::Host { after, event: Event::Relayed { run, attempt, call, answer }, stale: false });
+        acts.push(Act::Host {
+            after,
+            event: Event::Down(LinkDown::Relayed {
+                run,
+                attempt,
+                call,
+                answer: jig_domain_host::Relayed::Answer { error: false, text: answer },
+            }),
+            stale: false,
+        });
         acts
     }
 

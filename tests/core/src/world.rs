@@ -431,6 +431,7 @@ impl World {
         events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
             channel: Token::new(7),
             hello: fleet::Hello {
+                bounds: crate::fixtures::bounds(),
                 stop_bound: Duration::from_millis(100),
                 slots: 1,
                 workstreams: Box::new([]),

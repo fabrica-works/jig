@@ -39,3 +39,5 @@ pub mod watches;
 pub mod reads;
 
 pub mod stories;
+
+pub mod fixtures;

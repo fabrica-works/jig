@@ -1,5 +1,6 @@
 //! The host child domain's state and its entry points (section 3).
 
+use crate::{LinkDown, LinkUp};
 use skein_lib::{Env, Id, Map, Queue, Slab, Token};
 
 use crate::boundary::{Event, Hosting, Reason, Request};
@@ -36,11 +37,9 @@ pub struct Domain {
     pub(crate) facts: Facts,
     pub(crate) told: AgentFacts,
     pub(crate) turns: Turns,
+    pub(crate) answers: Map<(Token, Token), Id<Hosted>>,
     /// The root is shutting down: it admits no more runs.
     pub(crate) shut: bool,
-    /// Answers the engine has yet to acknowledge, as the parent last said:
-    /// each keeps its run's slot.
-    pub(crate) unacknowledged: u32,
 }
 
 impl Domain {
@@ -56,8 +55,8 @@ impl Domain {
             facts: Facts::with_capacity(limits.facts),
             told: AgentFacts::with_capacity(limits.told),
             turns: Turns::new(limits),
+            answers: Map::with_capacity(limits.slots),
             shut: false,
-            unacknowledged: 0,
         }
     }
 
@@ -189,8 +188,19 @@ impl Domain {
 
     /// A transmission copy of a retained turn by position, for reconnecting.
     #[must_use]
-    pub fn turn_at(&self, index: u32) -> Option<(Token, Token, crate::Turn)> {
-        self.turns.nth(index)
+    pub fn turn_at(&self, index: u32) -> Option<LinkUp> {
+        let (run, attempt, turn) = self.turns.nth(index)?;
+        Some(LinkUp::Turn { run, attempt, turn })
+    }
+
+    #[must_use]
+    pub fn kept_answers(&self) -> u32 {
+        crate::answers::kept(self)
+    }
+
+    #[must_use]
+    pub fn answer_at(&self, index: u32) -> Option<LinkUp> {
+        crate::answers::at(self, index)
     }
 
     /// Turns abandoned after shutdown past the contact grace.
@@ -214,25 +224,18 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Inbound { run, attempt, name, sender, words } => {
-            hosted::inbound(domain, env, run, attempt, name, sender, words, out);
-        }
         Event::Called { owner, call, ask } => hosted::called(domain, env, owner, call, ask, out),
         Event::Withdrawn { owner, call } => hosted::withdrawn(domain, owner, call, out),
-        Event::Assign { reply_to, assignment } => hosted::assign(domain, env, reply_to, assignment, out),
         Event::Turn { owner, turn } => hosted::turned(domain, env, owner, turn, out),
         Event::Facts { owner, fact } => hosted::told(domain, env, owner, fact),
-        Event::AcknowledgeTurn { run, attempt, turn } => hosted::acknowledge_turn(domain, env, run, attempt, turn, out),
         Event::Finished { owner, turns, spent, finish } => {
             hosted::finished(domain, env, owner, turns, spent, finish, out);
         }
-        Event::Grant { run, attempt, grant } => hosted::grant(domain, run, attempt, grant, out),
-        Event::Cancel { run, attempt } => hosted::cancel(domain, env, run, attempt, out),
-        Event::Relayed { run, attempt, call, answer } => hosted::relayed(domain, run, attempt, call, answer, out),
         Event::RelayCancelled { call } => hosted::relay_cancelled(domain, call, out),
         Event::CancelAll { reason } => hosted::cancel_all(domain, reason),
-        Event::Report => hosted::report(domain, out),
-        Event::Unacknowledged { answers } => domain.unacknowledged = answers,
+        Event::Opened { stop_bound, workstreams, bounds } => {
+            crate::answers::opened(domain, env.limits.slots, stop_bound, workstreams, bounds, out);
+        }
         Event::Prepared { owner, workspace } => hosted::prepared(domain, owner, workspace, out),
         Event::Unprepared { owner, failure, detail } => hosted::unprepared(domain, env, owner, failure, detail, out),
         Event::Started { owner, agent } => hosted::started(domain, env, owner, agent, out),
@@ -242,6 +245,19 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Gone { owner, detail } => hosted::gone(domain, env, owner, detail, out),
         Event::Delivered { owner, delivery } => hosted::delivered(domain, owner, delivery, out),
         Event::Saved { owner, at } => hosted::saved(domain, owner, at, out),
+        Event::Down(down) => match down {
+            LinkDown::Message { run, attempt, name, sender, words } => {
+                hosted::inbound(domain, env, run, attempt, name, sender, words, out);
+            }
+            LinkDown::Assign { reply_to, assignment } => hosted::assign(domain, env, reply_to, assignment, out),
+            LinkDown::TurnKept { run, attempt, turn } => hosted::acknowledge_turn(domain, env, run, attempt, turn, out),
+            LinkDown::Grant { run, attempt, grant } => hosted::grant(domain, run, attempt, grant, out),
+            LinkDown::Cancel { run, attempt } => hosted::cancel(domain, env, run, attempt, out),
+            LinkDown::Relayed { run, attempt, call, answer } => {
+                hosted::relayed(domain, run, attempt, call, answer, out);
+            }
+            LinkDown::Acknowledge { run, attempt } => crate::answers::acknowledge(domain, run, attempt),
+        },
     }
 }
 

@@ -28,6 +28,7 @@
 //! workspace with no agent yet, and nothing saved or released while the
 //! workspace's agent may still be running or a delivery or save is in flight.
 
+use jig_domain_host::LinkUp;
 use std::collections::{BTreeMap, BTreeSet};
 
 use jig_domain_host::{
@@ -279,13 +280,11 @@ impl Parent {
             Request::Save { owner, workspace } => self.save(owner, workspace),
             Request::Release { workspace } => self.release(workspace),
             Request::Grant { .. } => Vec::new(),
-            Request::Turn { .. }
+            Request::Up(LinkUp::Turn { .. } | LinkUp::Answer { .. } | LinkUp::Call { .. })
             | Request::AcknowledgeAgentTurn { .. }
-            | Request::Answer { .. }
-            | Request::Relay { .. }
             | Request::CancelRelay { .. }
             | Request::Bounced { .. }
-            | Request::Hosting { .. } => {
+            | Request::Hello { .. } => {
                 unreachable!("for the engine or the top level")
             }
         }

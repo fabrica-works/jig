@@ -139,3 +139,87 @@ fn shutdown_and_best_effort_facts_leave_no_live_run() {
     world.assert_settled();
     assert_eq!(world.stats().facts, 2);
 }
+
+#[test]
+fn the_hello_carries_the_roots_stop_bound_workstreams_and_bounds() {
+    let mut world = World::new();
+    world.reconnect();
+    let hello = world.hello().expect("hello first");
+    assert_eq!(hello.slots, 1);
+    assert_eq!(hello.stop_bound, Duration::from_secs(2));
+    assert_eq!(&*hello.workstreams, &[3]);
+    assert_eq!(hello.bounds, jig_host_world::fixtures::bounds());
+}
+
+#[test]
+fn the_hello_lists_a_run_whose_answer_waits_as_answered() {
+    let mut world = World::new();
+    world.assign(false);
+    world.finish(0, false);
+    world.reconnect();
+    assert_eq!(
+        &*world.hello().expect("the root received the hello").hosting,
+        &[jig_domain_host::Hosting {
+            run: Token::new(31),
+            attempt: Token::new(932),
+            phase: jig_domain_host::Phase::Answered,
+        }]
+    );
+}
+
+#[test]
+fn an_answer_is_sent_again_after_a_hello_until_acknowledged() {
+    let mut world = World::new();
+    world.assign(false);
+    world.lose_contact();
+    world.turn(1, b"kept");
+    world.finish(1, false);
+    assert!(world.link_words.is_empty());
+    world.reconnect();
+    assert_eq!(world.link_words, ["hello", "turn", "answer"]);
+    world.reconnect();
+    assert_eq!(&world.link_words[3..], &["hello", "turn", "answer"]);
+    world.commit_turn(1);
+    world.acknowledge_answer();
+    world.reconnect();
+    assert_eq!(&world.link_words[6..], &["hello"]);
+    world.assert_settled();
+}
+
+#[test]
+fn an_unacknowledged_answer_keeps_its_runs_slot() {
+    let mut world = World::new();
+    world.assign(false);
+    world.finish(0, false);
+    assert_eq!(world.another_assignment(), jig_domain_host::Refusal::Busy);
+    assert_eq!(world.slots_taken(), 1);
+    world.acknowledge_answer();
+    assert_eq!(world.slots_taken(), 0);
+}
+
+#[test]
+fn a_relayed_error_reaches_the_agent_as_an_error() {
+    let mut world = World::new();
+    world.assign(false);
+    world.relay_answer(jig_domain_host::Relayed::Answer { error: true, text: Box::from(&b"denied"[..]) });
+    assert_eq!(world.reply(), Some(&jig_domain_host::Reply::Relayed { error: true, text: Box::from(&b"denied"[..]) }));
+}
+
+#[test]
+fn a_relayed_busy_reaches_the_agent_as_busy() {
+    let mut world = World::new();
+    world.assign(false);
+    world.relay_answer(jig_domain_host::Relayed::Busy);
+    assert_eq!(world.reply(), Some(&jig_domain_host::Reply::Busy));
+}
+
+#[test]
+fn a_hello_before_an_acknowledgement_lists_the_answer_still_waiting() {
+    let settings = jig_host_world::Settings {
+        shutdown: Some(jig_host_world::Span::millis(20_000, 120_000)),
+        ..jig_host_world::Settings::rough(220)
+    };
+    let mut world = jig_host_world::World::with_trace(&settings, false);
+    world.run(200_000);
+    assert!(world.stats().reports > 0);
+}

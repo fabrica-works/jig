@@ -10,7 +10,13 @@ use skein_lib::{Duration, Token};
 fn hello(world: &mut World, hosting: Box<[fleet::Hosted]>) {
     world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
         channel: Token::new(7),
-        hello: fleet::Hello { stop_bound: Duration::from_millis(100), slots: 1, workstreams: Box::new([]), hosting },
+        hello: fleet::Hello {
+            bounds: jig_core_world::fixtures::bounds(),
+            stop_bound: Duration::from_millis(100),
+            slots: 1,
+            workstreams: Box::new([]),
+            hosting,
+        },
     })));
 }
 

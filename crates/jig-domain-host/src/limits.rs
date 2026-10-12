@@ -65,9 +65,9 @@ pub(crate) fn calls(limits: &Limits) -> Option<u32> {
 /// allocator overhead. What the host passes on (a workspace, the bodies of
 /// host calls and their answers, what a save did) is moved into a
 /// request in the step it arrives in, and what it makes for a request (an
-/// answer, a report) is moved out in the step that makes it: either is its
+/// hello) is moved out in the step that makes it: either is its
 /// receiver's to count. One delivery terminal is counted at the step peak,
-/// alongside the runs' retained state.
+/// alongside the runs' retained state, including their kept answers.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.turns > 0 && (limits.turn_bytes == 0 || limits.turn_queue_bytes < limits.turn_bytes) {
@@ -82,6 +82,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     }
     let hosted = Slab::<Hosted>::worst_case(limits.slots)?;
     let names = Map::<Token, Id<Hosted>>::worst_case(limits.slots)?;
+    let answers = Map::<(Token, Token), Id<Hosted>>::worst_case(limits.slots)?;
     let ready = Map::<Id<Hosted>, Reason>::worst_case(limits.slots)?;
     let call_count = calls(limits)?;
     let calls =
@@ -112,11 +113,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     hosted
         .checked_add(names)?
         .checked_add(ready)?
+        .checked_add(answers)?
         .checked_add(calls)?
         .checked_add(facts)?
         .checked_add(told)?
         .checked_add(turns)?
         .checked_add(runs)?
+        .checked_add(ending)?
         .checked_add(delivered)
 }
 

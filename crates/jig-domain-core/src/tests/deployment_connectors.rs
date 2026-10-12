@@ -139,6 +139,7 @@ fn deployment_complete_connector_registry_does_not_hide_original_refusal_history
             fleet::Event::Hello {
                 channel: Token::new(channel),
                 hello: fleet::Hello {
+                    bounds: fixtures::bounds(),
                     stop_bound: limits.fleet.grace,
                     slots: 1,
                     workstreams: Box::new([]),

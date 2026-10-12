@@ -73,3 +73,6 @@ pub use facts::Fact;
 pub use history::{HelloRefusal, HelloRefusalRecord};
 pub use limits::{Limits, worst_case};
 pub use progress::{Activity, Observation, Report};
+
+mod bounds;
+pub use bounds::{Bounds, ModelBound};
