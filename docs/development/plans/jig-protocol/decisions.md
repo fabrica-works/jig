@@ -655,6 +655,20 @@ the file.
      test's name and expected value kept), named in its commit body.
      A fix past 20 lines outside Files, or one that changes an expected
      value, is reported with what the replay found, and nothing lands.
+138. **skein 02.s1 and jig-repin.s1 make generated code pass clippy**
+     (2026-10-12, the coordinator's block "jig 19.3: generated people
+     codec fails workspace clippy", 2026-10-12T20:05:22Z; the designer's
+     answer, skein `482691a7`, jig `bebfb548`). jig 19.3's generated
+     `people_v1.rs` fails `large_enum_variant` (`Ask::Amend`, 432 bytes
+     against 168), `collapsible_if` and `too_many_lines`; skein's
+     `codec.md`, 6 has generated files pass the lints "with no
+     allowances". The designer added `boxed` on a variant to the schema
+     language. Two steps not in the plan follow: skein 02.s1, the
+     generator's `boxed` and output the lints accept
+     (`skein/02-startup-and-secrets.md`); then jig-repin.s1, jig's
+     `skein-codegen` pin alone (README, "Repin"). jig 19.3 needs both. The
+     README's Rules now say how any codec increment meets
+     `large_enum_variant`.
 
 ## For the user
 

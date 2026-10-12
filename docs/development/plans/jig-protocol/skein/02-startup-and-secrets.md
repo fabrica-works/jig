@@ -456,6 +456,45 @@ Don't: erase or rewrite the private file (it is the person's); drop a
 Size: at most 30 lines of production code.
 Removes: nothing.
 
+### 02.s1 The generator's `boxed` variant, and output the lints accept
+
+A step not in the plan (decisions.md, ruling 138), from the designer's
+answer to jig 19.3 (skein `482691a7`, `docs/design/codec.md`, 3, 4, 6).
+Scope: codec.md, 3: "**A variant marked `boxed`** (`report: boxed
+  Report`) holds its record in a `Box`, and its bytes are the record's as
+  they would be"; 6: "the generator writes what the lints accept
+  (functions short enough, no nesting to collapse)".
+Needs: 02.2.
+Files: `testing/skein-codegen/src/*.rs`; `tests/codec/schema/lints-v1.schema`,
+  its generated `tests/codec/src/lints/v1.rs` and goldens;
+  `tests/codec/tests/{drift.rs, wire.rs}`.
+Shape:
+- `boxed` after a variant's colon: the enum holds `Box<Record>`; its
+  constructor, accessor, encoding, decoding and heap worst case (the
+  record "counting its own size", section 4) follow; its bytes equal the
+  unboxed variant's.
+- A bound checked inside an `option` is one `if let ... && ...`
+  condition, as clippy's `collapsible_if` suggests.
+- A generated function that would pass 100 lines (clippy's
+  `too_many_lines`), such as a family's `worst_case_bytes` and
+  `worst_case_heap`, is split into functions of at most 100 lines.
+- Output for a schema whose generated code passes clippy on `main` today
+  is unchanged, byte for byte.
+Test shape: `lints-v1.schema` gains an enumeration with one `boxed`
+  variant and an `option bytes N` field; `wire.rs` gains
+  `a_boxed_variant_encodes_as_its_unboxed_twin`, the bytes a literal; a
+  unit test in `testing/skein-codegen` generates a family of 120 records
+  and finds no function past 100 lines. Each under 20 ms.
+Proof: unit, run once with `heavy cargo nextest run -p skein-codegen -p
+  skein-codec-tests`; and `git diff --stat origin/main --
+  tests/codec/src/generated tests/codec/src/scalars
+  tests/codec/src/secrets tests/codec/golden` prints nothing. The gate's
+  clippy checks the lint fixture.
+Don't: guess a type's size; box a variant not marked; add an allowance
+  to generated code; move golden bytes; change `sample-v1.schema`.
+Size: at most 250 lines of production code; generated files and goldens
+  are not counted.
+
 ## Interface sketches
 
 ```rust

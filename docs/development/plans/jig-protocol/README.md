@@ -253,6 +253,13 @@ ones before it in its session. Dependencies are by capability: "skein
   replaces code-organization.md, section 7's "past N × 1.2, it asks
   before landing" for those increments only; past 2 × N, it still asks.
   Each file stays under 800 lines, and each test function under 40.
+- **A generated enum's large variant is marked `boxed`** (decisions.md,
+  ruling 138; skein's `codec.md`, 3). Once `jig-repin.s1` has landed, a
+  codec increment whose generated code clippy's `large_enum_variant`
+  reports marks that variant `boxed` in its schema, regenerates, and
+  boxes and unboxes it in its translation. It marks no other variant, and
+  adds no allowance to a generated file. Before `jig-repin.s1`, such an
+  increment commits on its branch and waits for it.
 
 ## Live services
 
@@ -282,6 +289,24 @@ behind; its repin is expected to need more than a repin may change (at
 most about 200 lines, no change of design). If it does, the step lands
 nothing, and the gap goes to temper's `docs/design/STATUS.md`, under
 "Not planned", and to this plan's `later.md`, as section 5.7 says.
+
+### jig-repin.s1: jig's `skein-codegen` pin alone
+
+A step not in the plan (decisions.md, ruling 138), after skein 02.s1.
+jig's lock holds `skein-codegen` at its own revision (`30dc6f7d`), apart
+from skein's other packages (`90326012`).
+Scope: `Cargo.lock` moves `skein-codegen` alone to skein 02.s1's commit.
+Shape: `heavy cargo update -p skein-codegen --precise <skein 02.s1's
+  commit>`; `git diff origin/main -- Cargo.lock` changes the
+  `skein-codegen` entry only. Where a drift test
+  (`tests/store-codecs/tests/drift.rs`) then reports generated code
+  changed, the files are written again by the drift test's own
+  environment variable; their golden bytes do not move.
+Proof: gate, `scripts/check.sh`, run by `land`.
+Don't: move another skein or smith package; edit a schema or a generated
+  file by hand. If `cargo update` moves another package, stop and
+  report.
+Size: nothing besides `Cargo.lock` and generated files.
 
 ## Pulse
 
