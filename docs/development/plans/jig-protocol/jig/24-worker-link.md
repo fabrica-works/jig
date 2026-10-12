@@ -528,8 +528,9 @@ pub enum Request {
     Ready,
     /// To the root: a record from the engine for the hub, its parts' bytes under tokens minted here.
     Down { down: host::LinkDown, parts: Box<[Part]> },
-    /// To the layer: a grant's value for the worker's table of `table`, before the record naming it.
-    Value { table: host::GrantTable, account: u32, generation: u64, expires: Time, value: Secret },
+    /// To the layer: a grant's value for the worker's table of `table`, before the record naming it,
+    /// in its parts; the layer puts it in its agent capability's form (llm.md, 5.3).
+    Value { table: host::GrantTable, account: u32, generation: u64, expires: Time, value: Secret, account_id: Secret },
     /// To the root: the relay `call` ended by the hub's cancel; the terminal of `CancelRelay`.
     RelayCancelled { call: Token },
     /// To the root: hand back the hub's retained turn `turn` of this attempt, for a busy resend.

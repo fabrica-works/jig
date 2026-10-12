@@ -141,9 +141,12 @@ the file.
     that makes the service: the client contract's `Made::Service` carries
     it as a secret field, beside its party (`protocol/client.md`,
     section 8).
-37. **An LLM grant's value, as smith takes it,** is smith's envelope of
-    the account's id and its access token (smith's agent service), which
-    the engine's protocol layer builds from the table (decision 26).
+37. **An LLM grant's value, as smith's agent processes take it,** is
+    smith's envelope of the account's id and its access token (smith's
+    agent service). The engine's table and jig's channel keep the two
+    apart, and the worker's layer builds the envelope as it hands the
+    value to smith's host half (decision 26; the designer, 2026-10-12,
+    jig `87195d80`, `protocol/llm.md`, 5.3).
 38. **Sessions split for size:** jig 14 into 14 and 19; jig 25 into 25
     and 27; jig 31 into 31 and 34; jig 32 into 32 and 35. Each second
     half's file names the first's "Read first" and sketches.

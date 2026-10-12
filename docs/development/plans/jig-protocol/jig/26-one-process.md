@@ -395,10 +395,10 @@ pub struct Host { /* jig_test_service::Service, standard output */ }
 
 ## Questions to raise when reached
 
-- **The Codex endpoint and the account id** (26.6): if the provider
-  refuses a grant made of the access token alone, the account id goes in
-  smith's grant envelope (jig 25's question); report what the live proof
-  needed.
+- **The Codex endpoint and the account id** (26.6): the account id
+  travels beside the access token to the worker, which builds smith's
+  envelope of both (jig `87195d80`, llm.md, 5.3; jig 25.5); if the
+  provider still refuses the grant, report what the live proof needed.
 - **The deployment's id on a first start** (`configuration.md`, section
   8: "the shell draws the deployment's id"): `jig-test` draws one at each
   start and the store keeps the first; report if the store's design

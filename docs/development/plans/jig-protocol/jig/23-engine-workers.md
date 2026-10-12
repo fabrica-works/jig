@@ -431,6 +431,14 @@ pub struct Worker {
     pub digest: Digest,
 }
 
+/// A grant's value in its parts, as the record carries them (llm.md, 5.3; channel.md, 8):
+/// the secret, and an LLM account's id, empty for an application's credential or none.
+#[derive(Clone, Debug)]
+pub struct GrantValue {
+    pub value: Secret,
+    pub account_id: Secret,
+}
+
 /// What the engine's protocol layer and root route to the component.
 #[derive(Debug)]
 pub enum Event {
@@ -442,7 +450,7 @@ pub enum Event {
     Gone { connection: Token },
     /// From the root: a record for the worker on `channel`, its parts' bytes, and one value
     /// per grant it names, in order (None: the table no longer holds it; the grant is left out).
-    Down { channel: Token, down: host::LinkDown, parts: Box<[Part]>, values: Box<[Option<Secret>]> },
+    Down { channel: Token, down: host::LinkDown, parts: Box<[Part]>, values: Box<[Option<GrantValue>]> },
     /// From the root: the fleet refused `channel`'s hello; `text` is its reason, at most 256 bytes.
     NotAdmitted { channel: Token, text: Box<[u8]> },
     /// From the root: shutting down; new openings are refused *stopping*.

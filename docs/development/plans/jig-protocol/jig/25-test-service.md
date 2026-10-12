@@ -405,8 +405,9 @@ and from its `skein_channel` lower records; its `Hello`, `Up` and `Lost`
 to the root's link family (25.2) and the root's link outputs to it as
 `Event::Down`, with one value per grant the record names, from the
 accounts' table (jig 21's `Table::value`) or the application's
-(`values.rs`), never through the root; an LLM account's value in
-smith's grant envelope (see Questions); the component aborted on a
+(`values.rs`), never through the root; an LLM account's value as its
+two parts, the token and the account's id, as the table holds them
+(llm.md, 5.3); the component aborted on a
 failed commit. Results: the test root's `Request::ReadResult` read with
 `jig_protocol_charter::result` and answered `Event::ResultRead` with
 `tasks::End::Finished`, or `Failed(Class::Invalid)` when it does not
@@ -457,8 +458,10 @@ Fact}` against the caller's endpoints); each grant's value jig 24's link
 hands out as it decodes a record kept in the worker layer's own
 `jig_protocol_accounts::Table` (jig 21), and smith's host half's start
 and grants filled from that table (`Values` for `Process::send_start`,
-the value for `Process::send_grant`), the value as it crossed (see
-Questions); `stop`, the hub cancelling
+the value for `Process::send_grant`), an LLM account's value put in
+smith's form as it is handed over: the account's id's length in two
+bytes, big-endian, then the id and the token (llm.md, 5.3, "Put in its
+taker's form where it is handed over"); `stop`, the hub cancelling
 each run, the link stopped once the hub has given up what it keeps. The
 `Service`: a worker's layer per worker member, token ranges disjoint;
 `iterate` routes io's events to the layer whose tokens they carry; in
@@ -658,16 +661,14 @@ pub enum PartyOutput { /* the root's held and immediate outputs for parties */ }
 
 ## Questions to raise when reached
 
-- **Which bytes an LLM grant's value is** (25.4, 25.5; jig 21 raises the
-  same): smith's agent takes a grant's value as a two-byte big-endian
-  length, the account's id, then the access token
-  (`smith/crates/smith-agent-service/src/service.rs:759-770`); skein's
-  driver lends the access token alone; jig 20's `HandedIn` carries an
-  `account_id`. Until the designer answers, the default: the engine's
-  routing fills an LLM grant's value as smith's envelope, from the
-  driver's access token and the account's id jig 20 parsed, and the
-  worker hands it to smith's host half as it crossed (the fake LLM's id
-  is `acc`, `smith/tests/agent-process/src/fake.rs:41`).
+- **Which bytes an LLM grant's value is** (25.4, 25.5): settled by the
+  designer (jig `87195d80`; llm.md, 5.3; channel.md, 8). The engine's
+  table and jig's channel keep the token and the account's id apart,
+  both secret; the worker's layer puts them in smith's form as it hands
+  them to smith's host half: the id's length in two bytes, big-endian,
+  then the id and the token, as smith's agent reads it
+  (`smith/crates/smith-agent-service/src/service.rs:846-858`). The fake
+  LLM's id is `acc` (`smith/tests/agent-process/src/fake.rs:41`).
 - **A hub story that cannot pass through bytes** as the hub's world tells
   it: report it with the design text it rests on.
 

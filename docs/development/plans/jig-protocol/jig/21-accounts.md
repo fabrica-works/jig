@@ -207,8 +207,11 @@ Needs: nothing beyond 21.1.
 Files: `crates/jig-protocol-accounts/{src/table.rs, src/lib.rs,
 src/tests/table.rs, src/tests/fixtures.rs}`.
 Shape: as the interface sketch, `jig_protocol_accounts::table`. A value
-past its token bound, or for an account past the table's, is refused
-(`granted` answers `Err(Unfit)`), never stored.
+holds the token and the account's id apart, both `Secret`, the id empty
+where its provider names none (llm.md, 5.3; the designer's answer of
+2026-10-12, jig `87195d80`, replacing ruling 160's envelope). A value
+past its token bound or `ACCOUNT_ID_BYTES`, or for an account past the
+table's, is refused (`granted` answers `Err(Unfit)`), never stored.
 Test shape:
 - `src/tests/table.rs` (new), reference test:
 
@@ -217,16 +220,18 @@ Test shape:
   fn a_third_generation_pushes_out_the_oldest() {
       let mut table = Table::new(2, 32);
       let expires = Time::from_nanos(1_000);
-      table.granted(ACCOUNT_CHAT, 1, Secret::new(bytes::copy_of(TOKEN_FIRST)), expires).expect("fits");
-      table.granted(ACCOUNT_CHAT, 2, Secret::new(bytes::copy_of(TOKEN_SECOND)), expires).expect("fits");
-      table.granted(ACCOUNT_CHAT, 3, Secret::new(bytes::copy_of(b"token-third")), expires).expect("fits");
+      table.granted(ACCOUNT_CHAT, 1, value(TOKEN_FIRST), expires).expect("fits");
+      table.granted(ACCOUNT_CHAT, 2, value(TOKEN_SECOND), expires).expect("fits");
+      table.granted(ACCOUNT_CHAT, 3, value(b"token-third"), expires).expect("fits");
       assert!(table.value(ACCOUNT_CHAT, 1, Time::ZERO).is_none());
       let second = table.value(ACCOUNT_CHAT, 2, Time::ZERO).expect("the second generation");
-      assert_eq!(second.expose(), TOKEN_SECOND);
+      assert_eq!(second.token.expose(), TOKEN_SECOND);
   }
   ```
 
-  (`Secret::new` and `expose` as jig 02 lands them.) Others:
+  (`fixtures::value(token)`: a `Value` of that token and an empty id;
+  `Secret::new` and `expose` as jig 02 lands them.) Others:
+  `an_account_id_past_its_bound_is_refused`,
   `a_value_is_gone_at_its_expiry_and_not_before`,
   `a_stale_generation_reads_as_absent`,
   `a_value_past_the_token_bound_is_refused`,
@@ -414,20 +419,32 @@ pub enum Up {
 // jig_protocol_accounts::table: the access tokens lent (llm.md, 5.3)
 use skein_lib::{Secret, Time};
 
+/// The most bytes of a provider's account id (jig 20's `account_id` bound).
+pub const ACCOUNT_ID_BYTES: u32 = 256;
+
+/// A grant's value in its two parts, as skein's LLM client takes them (llm.md, 5.3):
+/// put in an agent's form only where it is handed to that agent, never here.
+#[derive(Clone, Debug)]
+pub struct Value {
+    pub token: Secret,
+    /// The provider's account id; empty where its provider names none.
+    pub account_id: Secret,
+}
+
 /// The access tokens lent, by account: the two newest generations of each, with their expiry.
 /// Read by the protocol layer's routing alone; its Debug shows counts and lengths.
 #[derive(Debug)]
 pub struct Table;
 
-/// A value the table cannot hold: past its token bound, or for an account past its count.
+/// A value the table cannot hold: past its token or id bound, or for an account past its count.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Unfit;
 
 impl Table {
     pub fn new(accounts: u32, token_bytes: u32) -> Table { todo!() }
-    pub fn granted(&mut self, account: u32, generation: u64, value: Secret, expires: Time) -> Result<(), Unfit> { todo!() }
+    pub fn granted(&mut self, account: u32, generation: u64, value: Value, expires: Time) -> Result<(), Unfit> { todo!() }
     /// A generation still held and unexpired.
-    pub fn value(&self, account: u32, generation: u64, now: Time) -> Option<&Secret> { todo!() }
+    pub fn value(&self, account: u32, generation: u64, now: Time) -> Option<&Value> { todo!() }
     pub fn expire(&mut self, now: Time) { todo!() }
     pub fn next_expiry(&self) -> Option<Time> { todo!() }
 }
@@ -480,8 +497,10 @@ pub fn hand_in(
   credential for the ChatGPT provider carries `account_id` beside the
   token (smith's `crates/smith-protocol-llm/src/framing.rs:47-51`), the
   driver lends `access_token` alone (`component.rs:1084-1086`) and keeps
-  the record's metadata; which bytes a grant's value is, for such a
-  provider, is the designer's (it decides jig 26's live proof).
+  the record's metadata. Settled by the designer (jig `87195d80`;
+  llm.md, 5.3): the table's `Value` keeps the token and the account's id
+  apart, and the worker puts them in smith's form where it hands them to
+  smith's host half (jig 25.5).
 - **The child's backoff** for a failure with no delay, and its retry
   interval for sign in again and unloaded, are the child's limits (jig
   08), numbers of jig 20's profiles, not this crate's.

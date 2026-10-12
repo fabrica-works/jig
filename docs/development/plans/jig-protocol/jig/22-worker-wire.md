@@ -416,7 +416,7 @@ Shape:
   enum SettledAnswer { host: HostAnswer, delivery: DeliveryAnswer }
   record AnsweredCall { name: bytes 64 tool: text 64 answer: SettledAnswer }
   enum GrantTable { accounts, application }
-  record Grant { table: GrantTable account: u32 generation: u64 valid: duration value: secret 8192 }
+  record Grant { table: GrantTable account: u32 generation: u64 valid: duration value: secret 8192 account_id: secret 256 }
   record Assignment {
       task: u64 attempt: u64
       identity: fixed 16
@@ -443,7 +443,9 @@ Shape:
   (05.1: `identity`, `messages`, grants with their `GrantTable`), the
   workspace's items being the application's bytes; `Message` mirrors
   `StartMessage`; `Grant` mirrors the hub's `Grant` and adds the value
-  the protocol layer fills (channel.md, section 8); `Inbound`,
+  the protocol layer fills, in its parts: the secret, and an LLM
+  account's id, empty for an application's credential or a provider
+  that names none (channel.md, section 8; llm.md, 5.3); `Inbound`,
   `TurnKept` (the hub's `AcknowledgeTurn`), `Acknowledge`, `Cancel` and
   `Granted` mirror their `Event`s. `Relayed` carries the design's
   answer, its text and whether it is an error, or busy (channel.md,
