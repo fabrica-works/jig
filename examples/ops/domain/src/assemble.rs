@@ -50,6 +50,7 @@ pub(crate) fn assignment(
     env: &Env<Limits>,
     task: u64,
     attempt: u64,
+    conversation: u64,
     run: core::RunCharter,
     sections: Box<[charter::Section]>,
     transcript: Box<[Box<[u8]>]>,
@@ -97,7 +98,7 @@ pub(crate) fn assignment(
     Some(host::Assignment {
         messages: Box::new([]),
         assignment: host::RunAssignment {
-            identity: [0; 16],
+            identity: charter::run_identity(&domain.deployment, task, conversation),
             run: Token::new(task),
             attempt: Token::new(attempt),
             workspace: None,

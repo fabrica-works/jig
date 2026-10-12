@@ -209,3 +209,25 @@ fn a_verdict_with_items_does_not_decode() {
     value.encode(&mut writer).expect("measured encoding");
     assert_eq!(crate::result(&writer.finish()), Err(crate::Unreadable::Form));
 }
+
+#[test]
+fn a_conversations_attempts_share_one_identity() {
+    let deployment = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    let expected = [0x06, 0x8b, 0xfc, 0xde, 0x3e, 0x7d, 0xde, 0x1c, 0x53, 0xe8, 0x5c, 0x10, 0xf4, 0x7d, 0xef, 0x5d];
+    for _attempt in [3_u64, 4, 9] {
+        assert_eq!(crate::run_identity(&deployment, 7, 3), expected);
+    }
+}
+
+#[test]
+fn two_conversations_of_a_task_have_two_identities() {
+    let deployment = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    assert_eq!(
+        crate::run_identity(&deployment, 7, 3),
+        [0x06, 0x8b, 0xfc, 0xde, 0x3e, 0x7d, 0xde, 0x1c, 0x53, 0xe8, 0x5c, 0x10, 0xf4, 0x7d, 0xef, 0x5d]
+    );
+    assert_eq!(
+        crate::run_identity(&deployment, 7, 4),
+        [0x92, 0xf3, 0x7d, 0x0f, 0x30, 0xe6, 0xf6, 0x6f, 0x8f, 0xee, 0x8a, 0x01, 0x68, 0x18, 0x8f, 0x3a]
+    );
+}

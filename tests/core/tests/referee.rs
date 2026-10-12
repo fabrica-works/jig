@@ -4,6 +4,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use jig_core_world::referee::*;
 use jig_test_system::{Copy, Name as SystemName, Observed as Effect, SystemKey, ValueObserved};
 
+fn assigned(budget: u64) -> Observed {
+    Observed::Assigned { task: 1, attempt: 1, conversation: 1, resumed: false, budget }
+}
+
 fn pattern() -> Pattern {
     Pattern { base: vec![], terminal: b"owned".to_vec(), open: true }
 }
@@ -252,15 +256,15 @@ fn spend_requires_the_maximum_effect_price_in_the_deciding_commit() {
 
 fn spend_requires_a_reservation_before_assignment_and_each_completion() {
     let mut fake = Fake::ready(Recovery::Keyed);
-    fake.caught(Observed::Assigned { task: 1, attempt: 1, budget: 11 }, Promise::Spend);
+    fake.caught(assigned(11), Promise::Spend);
     let mut fake = Fake::ready(Recovery::Keyed);
-    fake.send(Observed::Assigned { task: 1, attempt: 1, budget: 10 }).expect("reserved");
+    fake.send(assigned(10)).expect("reserved");
     fake.caught(Observed::Completion { task: 1, attempt: 1, cumulative: 11 }, Promise::Spend);
 }
 
 fn spend_allows_only_the_lost_unacknowledged_turn_bound_beyond_budget() {
     let mut fake = Fake::ready(Recovery::Keyed);
-    fake.send(Observed::Assigned { task: 1, attempt: 1, budget: 10 }).expect("reserved assignment");
+    fake.send(assigned(10)).expect("reserved assignment");
     fake.send(Observed::LostTurns { task: 1, attempt: 1, turns: 2, spent: 4 }).expect("lost completions observed");
     fake.send(Observed::Spend { task: 1, spent: 104, lost_bound: 4 }).expect("permitted lost spend");
     fake.caught(Observed::Spend { task: 1, spent: 105, lost_bound: 4 }, Promise::Spend);
@@ -322,7 +326,7 @@ fn commit_catches_every_class_of_delivery_before_its_durable_prerequisite() {
     }
     let mut fake = Fake::new(Recovery::Keyed);
     fake.caught(Observed::Effect { connector: 1, effect: effect() }, Promise::Commit);
-    fake.caught(Observed::Assigned { task: 1, attempt: 1, budget: 10 }, Promise::Commit);
+    fake.caught(assigned(10), Promise::Commit);
 }
 
 fn commit_catches_a_store_that_loses_a_previously_observed_receipt() {
@@ -340,7 +344,7 @@ fn order_catches_starting_before_dependencies_are_done_and_closed() {
     rows.tasks.get_mut(&1).expect("task").dependencies = vec![2];
     rows.tasks.insert(2, task(2));
     fake.commit(1, rows).expect("waiting dependency admitted");
-    fake.caught(Observed::Assigned { task: 1, attempt: 1, budget: 10 }, Promise::Order);
+    fake.caught(assigned(10), Promise::Order);
 }
 
 fn order_catches_two_writer_slots_for_the_same_resource() {

@@ -10,6 +10,7 @@ mod boundary;
 mod call;
 mod charter;
 mod encode;
+mod identity;
 mod result;
 #[cfg(test)]
 mod tests;
@@ -21,4 +22,5 @@ pub use boundary::{
 pub use call::{CallKey, call_key};
 pub use charter::charter;
 pub use encode::{EndpointName, encode};
+pub use identity::run_identity;
 pub use result::{Field, RunResult, Unreadable, result};

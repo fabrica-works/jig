@@ -344,7 +344,27 @@ impl Application for Ops {
                     let attempt = assignment.assignment.attempt.raw();
                     let budget = observations::snapshot(store).tasks[&task].run_reserved;
                     peers.assignments.push((task, attempt));
-                    peers.observed.push(r::Observed::Assigned { task, attempt, budget });
+                    let proof = store
+                        .rows
+                        .values()
+                        .find_map(|record| match record {
+                            root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof)))
+                                if proof.task == task =>
+                            {
+                                Some(proof)
+                            }
+                            root::Record::Core(_)
+                            | root::Record::Observability(_)
+                            | root::Record::Infrastructure(_) => None,
+                        })
+                        .expect("durable assignment proof");
+                    peers.observed.push(r::Observed::Assigned {
+                        task,
+                        attempt,
+                        budget,
+                        conversation: proof.conversation,
+                        resumed: !assignment.turns.is_empty(),
+                    });
                 }
                 vec![Input::Event(root::Event::Released(child))]
             }

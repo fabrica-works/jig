@@ -57,6 +57,7 @@ pub(crate) type CallEnvelope = (Box<[u8]>, Box<[u8]>);
 /// No root-owned record or policy is stored (domain/root.md, 2).
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) deployment: [u8; 16],
     pub(crate) core: core::Core,
     pub(crate) observability: observability::Domain,
     pub(crate) infrastructure: infrastructure::Domain,
@@ -101,6 +102,7 @@ impl Domain {
             );
         }
         let host_calls = limits.host.slots.checked_mul(limits.host.run_calls).expect("hub relays");
+        let deployment = config.core.deployment;
         let mut core = core::Core::new(config.core, &limits.core);
         // Connector hold rules are configuration, so a cold root installs
         // the same translated vocabulary before restoring live task rows.
@@ -121,6 +123,7 @@ impl Domain {
             "offered watch inbox fits owner message bound"
         );
         Self {
+            deployment,
             core,
             observability: observability::Domain::with_templates(&limits.observability, config.triage_templates)
                 .with_leads(&limits.observability, config.lead_templates),

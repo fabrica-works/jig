@@ -15,6 +15,7 @@ use std::collections::{BTreeMap, VecDeque};
 /// Identity and independently supplied allowance of an assigned attempt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Assignment {
+    pub conversation: u64,
     pub task: u64,
     pub attempt: u64,
     pub budget: u64,

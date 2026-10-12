@@ -1253,10 +1253,20 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         core::Now::WorkspaceRequest { task, attempt, .. } => {
             work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(Box::new([])) }));
         }
-        core::Now::RunPrepared { task, attempt, run, inbox, transcript, grant, .. } => {
+        core::Now::RunPrepared { task, attempt, conversation, run, inbox, transcript, grant, .. } => {
             let budget = run.budget;
             let sections = domain.briefs.remove(&task).expect("completed brief parts");
-            match crate::assemble::assignment(domain, env, task, attempt, *run, sections, transcript, grant) {
+            match crate::assemble::assignment(
+                domain,
+                env,
+                task,
+                attempt,
+                conversation,
+                *run,
+                sections,
+                transcript,
+                grant,
+            ) {
                 Some(value) => {
                     domain
                         .assignments

@@ -259,6 +259,7 @@ impl Peers {
                 self.worker(channel.raw()).assign(workers::Assignment {
                     task: assignment.task,
                     attempt: assignment.attempt,
+                    conversation: assignment.conversation,
                     budget: assignment.run.budget,
                     transcript: assignment.transcript.clone(),
                 });

@@ -258,6 +258,7 @@ pub enum Now {
     RunPrepared {
         task: u64,
         attempt: u64,
+        conversation: u64,
         charter: u32,
         run: Box<RunCharter>,
         inbox: Box<[tasks::Word]>,

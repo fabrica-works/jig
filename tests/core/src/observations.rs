@@ -839,6 +839,8 @@ impl Observer {
                     r::Observed::Assigned {
                         task: assignment.task,
                         attempt: assignment.attempt,
+                        conversation: assignment.conversation,
+                        resumed: !assignment.transcript.is_empty(),
                         budget: assignment.run.budget,
                     },
                 );

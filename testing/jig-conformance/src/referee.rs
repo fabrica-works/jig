@@ -4,6 +4,7 @@
 //! captured before constructing the root; it is never inferred from its live
 //! state (`domain/core.md`, 11; `domain/testing.md`, 6).
 mod application;
+mod conversations;
 pub use application::{ApplicationAnswer, ApplicationKey};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -272,7 +273,7 @@ pub enum Observed {
     /// A delivery reached a host, party, or system.
     Released { requires: Vec<Receipt> },
     /// A host saw a reserved assignment.
-    Assigned { task: u64, attempt: u64, budget: u64 },
+    Assigned { task: u64, attempt: u64, conversation: u64, resumed: bool, budget: u64 },
     /// An independent host made a priced completion against its reservation.
     Completion { task: u64, attempt: u64, cumulative: u64 },
     /// A vanished worker lost these unacknowledged completions.
@@ -351,6 +352,7 @@ pub struct Referee {
     sent: BTreeMap<(u16, SystemKey), u32>,
     reads: BTreeMap<Name, (Option<u64>, u64)>,
     assigned: BTreeMap<(u64, u64), u64>,
+    conversations: BTreeMap<u64, u64>,
     lost: BTreeMap<(u64, u64), u64>,
     waiting: BTreeMap<Receipt, u64>,
     reached: BTreeSet<Receipt>,
@@ -383,6 +385,7 @@ impl Referee {
             sent: BTreeMap::new(),
             reads: BTreeMap::new(),
             assigned: BTreeMap::new(),
+            conversations: BTreeMap::new(),
             lost: BTreeMap::new(),
             waiting: BTreeMap::new(),
             reached: BTreeSet::new(),
@@ -883,7 +886,7 @@ impl Referee {
                     self.seen.insert(receipt);
                 }
             }
-            Observed::Assigned { task, attempt, budget } => {
+            Observed::Assigned { task, attempt, conversation, resumed, budget } => {
                 let row = self.last.tasks.get(&task);
                 require(
                     row.is_some_and(|row| row.attempt == attempt)
@@ -904,6 +907,7 @@ impl Referee {
                     Promise::Spend,
                     "host assignment has no prior maximum run reservation",
                 )?;
+                conversations::check(&mut self.conversations, task, attempt, conversation, resumed)?;
                 self.seen.insert(Receipt::Claim(task, attempt));
                 self.assigned.insert((task, attempt), budget);
             }

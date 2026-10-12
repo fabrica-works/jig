@@ -132,6 +132,7 @@ pub(super) fn workspace_prepared(
     out.push(Request::Now(Box::new(Now::RunPrepared {
         task,
         attempt,
+        conversation,
         charter: core.charter_of(task).number,
         run: Box::new(run),
         inbox: context.inbox,

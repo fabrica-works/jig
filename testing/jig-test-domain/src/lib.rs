@@ -106,6 +106,8 @@ pub enum Delivery {
 /// The root's assembled, worker assignment.
 #[derive(Debug)]
 pub struct Assignment {
+    /// The conversation's first attempt, shared by its resumes.
+    pub conversation: u64,
     /// Claimed task and activation fence.
     pub task: u64,
     pub attempt: u64,

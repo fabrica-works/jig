@@ -1,7 +1,7 @@
 use super::*;
 
 fn assigned() -> Assignment {
-    Assignment { task: 1, attempt: 1, budget: 10, transcript: Box::new([]) }
+    Assignment { task: 1, attempt: 1, conversation: 1, budget: 10, transcript: Box::new([]) }
 }
 
 #[test]

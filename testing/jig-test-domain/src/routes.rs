@@ -394,7 +394,7 @@ fn route_now(
             assert!(domain.workspace_writes.insert(task, names.into_boxed()).is_ok(), "workspace per task");
             work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(checks.into_boxed()) }));
         }
-        core::Now::RunPrepared { task, attempt, charter, run, inbox, transcript, grant, .. } => {
+        core::Now::RunPrepared { task, attempt, conversation, charter, run, inbox, transcript, grant, .. } => {
             let budget = run.budget;
             assert!(
                 domain
@@ -404,6 +404,7 @@ fn route_now(
                         crate::Assignment {
                             task,
                             attempt,
+                            conversation,
                             charter,
                             run,
                             inbox,

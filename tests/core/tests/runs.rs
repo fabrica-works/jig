@@ -306,3 +306,30 @@ fn a_chat_whose_spend_holds_its_reserve_is_assigned() {
     let world = World::configured(140, false, config, limits);
     assert_eq!(world.assigned.as_ref().expect("chat assigned at floor").run.budget, 20);
 }
+
+#[test]
+fn a_resumed_run_names_its_first_runs_attempt() {
+    let mut world = World::new(110, false);
+    let first = world.assigned.as_ref().expect("first assignment").attempt;
+    for key in [83, 84] {
+        world.turn(1, 1, None, b"conversation turn");
+        world.end(tasks::End::Parked, 1);
+        world.say(key);
+        let assignment = world.assigned.as_ref().expect("resumed assignment");
+        assert_eq!(assignment.conversation, first);
+        assert!(assignment.attempt > first);
+    }
+}
+
+#[test]
+fn a_fresh_start_after_a_transient_failure_names_its_own() {
+    let mut world = World::new(111, false);
+    let first = world.assigned.as_ref().expect("first assignment").attempt;
+    world.turn(1, 1, None, b"old conversation");
+    world.end(tasks::End::Failed(tasks::Class::Transient), 1);
+    world.retry_due();
+    let assignment = world.assigned.as_ref().expect("fresh assignment");
+    assert!(assignment.attempt > first);
+    assert_eq!(assignment.conversation, assignment.attempt);
+    assert!(assignment.transcript.is_empty());
+}
