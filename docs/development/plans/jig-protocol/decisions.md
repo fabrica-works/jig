@@ -1011,6 +1011,20 @@ the file.
      past ruling 114's 20, every expected literal kept, moved into a
      fixture helper. The referee is in 21.4's Files for those three
      predicates.
+167. **jig 30.1 waits for a cheaper focused suite; jig's hold lifts for
+     the rest** (2026-10-12, the coordinator's block "jig 30.1: third
+     focused-suite timeout and Jig hold", 2026-10-12T22:29:02Z). 30.1's
+     three gates stopped at the focused suite's 15 s timeout (3,379 of
+     5,399 tests run at the third) with nothing failing, its drift test
+     at 6.3 to 6.7 s in the gate: its generated family alone takes the
+     focused suite from about 3,900 tests (13.6 s, jig's last passing
+     gates) to 5,399. Infrastructure, as ruling 140 says, across main's
+     moves between attempts. The user asked (22:10Z) that the tests be
+     made cheaper rather than the timeout raised, and the designer has
+     that analysis (question.md, 22:14Z). So 30.1 keeps its commit and
+     lands once the analysis's fixes have made room; jig 30.2 to 30.5 do
+     not start before it; every other jig session goes on, ruling 140's
+     retries applying.
 
 ## For the user
 
