@@ -563,6 +563,22 @@ the file.
      is never reset with `made`; `valid_record` does not bound it by
      `made` or `tree_tasks`. `recurring.rs` and `standing.rs` are not
      changed.
+132. **A codec increment lands past its Size, up to twice it**
+     (2026-10-12, the coordinator's block "jig 19.3: people codecs exceed
+     revised 1200-line guide", 2026-10-12T19:57:25Z). jig 19.3 counts
+     about 1,700 lines against 1,200 (ruling 130): the schema and the
+     exhaustive translations of the 45 types and six rows its Scope
+     names, each file under 800 lines. The second codec increment past
+     its guide in twenty minutes, after jig 14.2 (ruling 130): the plan
+     priced these translations low, and doubling the guides did not
+     cover them. So from now to the run's end, a codec increment (jig
+     14.3, 14.4, 19.1 to 19.5) whose count passes its Size × 1.2 lands
+     without asking, up to twice its Size, when its production code is
+     the schema, the facade and the translations of the types and rows
+     its Scope names, and nothing else; its report gives the count by
+     file. Past twice its Size it asks, as code-organization.md, section
+     7 says. The 800-line file limit and the 40-line test function stay
+     rules. jig 19.3 lands at its count. The README's Rules now say so.
 
 ## For the user
 

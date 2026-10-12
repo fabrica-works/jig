@@ -240,6 +240,14 @@ ones before it in its session. Dependencies are by capability: "skein
   new code to ("new code goes in new modules"), beside that file or under
   it, is part of the increment's Files, at the increment's Size. It is no
   question.
+- **A codec increment lands past its Size, up to twice it**
+  (decisions.md, ruling 132). In jig 14 and jig 19, an increment whose
+  production code is only the schema, the facade and the translations of
+  the types and rows its Scope names lands without asking up to twice its
+  "Size: at most N lines", and its report gives the count by file. This
+  replaces code-organization.md, section 7's "past N × 1.2, it asks
+  before landing" for those increments only; past 2 × N, it still asks.
+  Each file stays under 800 lines, and each test function under 40.
 
 ## Live services
 
