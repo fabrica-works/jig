@@ -127,3 +127,45 @@ pub fn refuse() -> fake::Plan {
         retry_after: Duration::ZERO,
     }
 }
+
+pub const ACCOUNT_HANDED: u32 = 0;
+#[must_use]
+pub fn handed_lapse(story: crate::world::Story) -> Option<Duration> {
+    match story {
+        crate::world::Story::HandedIn { lapses_in } => Some(lapses_in),
+        crate::world::Story::HandedInRejected => Some(Duration::from_secs(60)),
+        crate::world::Story::Granted | crate::world::Story::Refreshed | crate::world::Story::Closed => None,
+    }
+}
+#[must_use]
+pub fn rejects(story: crate::world::Story) -> bool {
+    matches!(story, crate::world::Story::Refreshed | crate::world::Story::HandedInRejected)
+}
+#[must_use]
+pub fn wanted(story: crate::world::Story) -> usize {
+    match story {
+        crate::world::Story::HandedIn { .. } => 3,
+        crate::world::Story::Refreshed | crate::world::Story::HandedInRejected => 2,
+        crate::world::Story::Granted | crate::world::Story::Closed => 1,
+    }
+}
+#[must_use]
+pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
+    use crate::{owner::Heard, world::Story};
+    match story {
+        Story::Refreshed => vec![
+            Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
+            Heard::Granted { account: ACCOUNT_CHAT, generation: 2 },
+        ],
+        Story::HandedIn { .. } => vec![
+            Heard::Granted { account: ACCOUNT_HANDED, generation: 1 },
+            Heard::Expiring { account: ACCOUNT_HANDED, generation: 1 },
+            Heard::Failed { account: ACCOUNT_HANDED, failure: child::Failure::SignInAgain },
+        ],
+        Story::HandedInRejected => vec![
+            Heard::Granted { account: ACCOUNT_HANDED, generation: 1 },
+            Heard::Failed { account: ACCOUNT_HANDED, failure: child::Failure::SignInAgain },
+        ],
+        Story::Granted | Story::Closed => vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }],
+    }
+}

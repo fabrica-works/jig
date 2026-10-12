@@ -12,5 +12,10 @@ skein-oauth.workspace = true
 skein-oauth-accounts.workspace = true
 jig-domain-accounts.workspace = true
 
+[dev-dependencies]
+skein-io.workspace = true
+skein-http.workspace = true
+skein-tls.workspace = true
+
 [lints]
 workspace = true

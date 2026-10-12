@@ -482,9 +482,12 @@ name = "jig-protocol-accounts"
 version = "0.0.0"
 dependencies = [
  "jig-domain-accounts",
+ "skein-http",
+ "skein-io",
  "skein-lib",
  "skein-oauth",
  "skein-oauth-accounts",
+ "skein-tls",
 ]
 
 [[package]]

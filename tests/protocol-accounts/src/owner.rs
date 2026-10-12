@@ -49,6 +49,8 @@ pub struct Owner {
     closed: bool,
     usable: bool,
     now: Time,
+    story: Story,
+    account: u32,
 }
 impl std::fmt::Debug for Owner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -60,13 +62,18 @@ impl std::fmt::Debug for Owner {
     }
 }
 impl Owner {
-    pub(crate) fn new(root: kernel::Fd, _story: Story) -> Self {
+    pub(crate) fn new(root: kernel::Fd, story: Story) -> Self {
         let limits = fixtures::limits();
         let child_limits = fixtures::child_limits();
+        let account = if matches!(story, Story::HandedIn { .. } | Story::HandedInRejected) {
+            fixtures::ACCOUNT_HANDED
+        } else {
+            ACCOUNT_CHAT
+        };
         Self {
             io: io::Io::new(&limits.io),
             component: None,
-            child: child::Domain::new(&child_limits, Box::new([ACCOUNT_CHAT])),
+            child: child::Domain::new(&child_limits, Box::new([account])),
             child_out: Queue::with_capacity(ROOM),
             child_limits,
             table: Table::new(limits.accounts, limits.client.document.token_bytes),
@@ -88,6 +95,8 @@ impl Owner {
             closed: false,
             usable: false,
             now: Time::ZERO,
+            story,
+            account,
         }
     }
     #[must_use]
@@ -125,7 +134,7 @@ impl Owner {
     }
     fn child_event(&mut self, now: Time, wall: Wall, event: child::Event) {
         child::step(&mut self.child, &Env { now, wall, limits: self.child_limits }, event, &mut self.child_out);
-        self.usable |= self.child.usable(ACCOUNT_CHAT);
+        self.usable |= self.child.usable(self.account);
         while let Some(fact) = self.child.pop_fact() {
             self.facts.push(fact);
         }
@@ -134,22 +143,43 @@ impl Owner {
         let mut configured = List::with_capacity(1);
         assert!(
             configured
-                .push(driver::Account::SignIn {
-                    registration: fixtures::registration(),
-                    endpoint: driver::Endpoint {
-                        address: self.address.expect("issuer address"),
-                        transport: driver::Transport::Plaintext
-                    },
-                    keeper: driver::Keeper::Private {
-                        root: self.file_driver.root(),
-                        directory: skein_lib::bytes::copy_of(b"secret"),
-                        file: skein_lib::bytes::copy_of(b"record")
-                    },
+                .push(if matches!(self.story, Story::HandedIn { .. } | Story::HandedInRejected) {
+                    driver::Account::HandedIn
+                } else {
+                    driver::Account::SignIn {
+                        registration: fixtures::registration(),
+                        endpoint: driver::Endpoint {
+                            address: self.address.expect("issuer address"),
+                            transport: driver::Transport::Plaintext,
+                        },
+                        keeper: driver::Keeper::Private {
+                            root: self.file_driver.root(),
+                            directory: skein_lib::bytes::copy_of(b"secret"),
+                            file: skein_lib::bytes::copy_of(b"record"),
+                        },
+                    }
                 })
                 .is_ok()
         );
         let crypto = skein_lib::CryptoRng::new(&skein_world::crypto_seed(17), 0).expect("world crypto seed");
         self.component = Some(driver::Component::new(configured, &self.limits, crypto).expect("configured driver"));
+        if let Some(lapses_in) = fixtures::handed_lapse(self.story) {
+            let request = jig_protocol_accounts::handed_in::hand_in(
+                self.account,
+                Secret::new(skein_lib::bytes::copy_of(fixtures::TOKEN_FIRST)),
+                Wall::from_nanos(env.wall.as_nanos().saturating_add(lapses_in.as_nanos())),
+                None,
+                &self.limits.client.document,
+            )
+            .expect("handed-in fixture");
+            self.component.as_mut().expect("started").down(
+                env,
+                request,
+                &mut self.above,
+                &mut self.requests,
+                &mut self.files,
+            );
+        }
         self.child_event(env.now, env.wall, child::Event::Want);
     }
     fn child_requests(&mut self, env: &Env<driver::Limits>) {
@@ -245,7 +275,7 @@ impl Host for Owner {
             self.child_event(now, wall, child::Event::Close);
         }
         if self.reject_requested.take().is_some() {
-            self.child_event(now, wall, child::Event::Rejected { account: ACCOUNT_CHAT, generation: 1 });
+            self.child_event(now, wall, child::Event::Rejected { account: self.account, generation: 1 });
         }
         self.child_requests(&env);
         self.private_io(&env);

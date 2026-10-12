@@ -1,6 +1,6 @@
 //! Outside grant and settlement checks shared by the stories.
 use crate::{
-    fixtures::ACCOUNT_CHAT,
+    fixtures,
     owner::{Heard, Trace},
     world::{Process, Story},
 };
@@ -25,7 +25,7 @@ impl Judge {
 }
 impl Referee<Process> for Judge {
     fn act(&mut self, now: Time, processes: &mut [Process]) {
-        self.deadline.get_or_insert(now.saturating_add(Duration::from_secs(60)));
+        self.deadline.get_or_insert(now.saturating_add(Duration::from_secs(180)));
         let address = processes.iter().find_map(|process| match process {
             Process::Issuer(peer) => peer.address(),
             Process::Owner(_) => None,
@@ -35,11 +35,11 @@ impl Referee<Process> for Judge {
             match process {
                 Process::Owner(owner) => {
                     owner.address = address;
-                    if self.story == Story::Refreshed && owner.child_heard().len() == 1 && !self.rejected {
+                    if fixtures::rejects(self.story) && owner.child_heard().len() == 1 && !self.rejected {
                         owner.reject();
                         self.rejected = true;
                     }
-                    let wanted = if self.story == Story::Refreshed { 2 } else { 1 };
+                    let wanted = fixtures::wanted(self.story);
                     if owner.child_heard().len() >= wanted && !self.closing {
                         owner.close();
                         self.closing = true;
@@ -62,7 +62,9 @@ impl Referee<Process> for Judge {
             })
             .expect("owner");
         for heard in owner.child_heard() {
-            if let Heard::Granted { account, generation } = heard {
+            if let Heard::Granted { account, generation } = heard
+                && !matches!(owner.child_heard().last(), Some(Heard::Failed { .. }))
+            {
                 assert!(
                     owner.table_value(*account, *generation).is_some(),
                     "every granted generation is readable until expiry"
@@ -72,23 +74,15 @@ impl Referee<Process> for Judge {
         if owner.closed() {
             assert_eq!(owner.trace().last(), Some(&Trace::Closed), "Closed is last");
             assert!(owner.became_usable(), "the real child accepted its grant");
-            let expected = if self.story == Story::Refreshed {
-                vec![
-                    Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
-                    Heard::Granted { account: ACCOUNT_CHAT, generation: 2 },
-                ]
-            } else {
-                vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
-            };
+            let expected = fixtures::expected(self.story);
             assert_eq!(owner.child_heard(), expected);
         }
         self.wake = ((owner.unstarted()
             && processes.iter().any(|process| matches!(process, Process::Issuer(peer) if peer.address().is_some())))
             || (owner.is_empty() && !self.shutdown)
-            || (owner.child_heard().len() == 1 && !self.closing && self.story != Story::Refreshed)
-            || (owner.child_heard().len() == 1 && !self.rejected && self.story == Story::Refreshed)
-            || (owner.child_heard().len() == 2 && !self.closing))
-            .then_some(now);
+            || (owner.child_heard().len() >= fixtures::wanted(self.story) && !self.closing)
+            || (owner.child_heard().len() == 1 && !self.rejected && fixtures::rejects(self.story)))
+        .then_some(now);
         self.passed = (self.shutdown && processes.iter().all(Host::is_empty)).then_some(());
     }
     fn next_deadline(&self) -> Option<Time> {
