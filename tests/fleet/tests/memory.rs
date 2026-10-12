@@ -117,6 +117,7 @@ impl Measured {
         let (run, attempt) = (self.name(), self.name());
         let workstream = run.raw();
         let asked = self.step(Event::Start {
+            grants: Box::new([]),
             reply_to: ReplyTo::new(attempt),
             run,
             attempt,
@@ -205,6 +206,7 @@ fn a_fleet_full_to_its_limits_stays_within_its_worst_case() {
     let (run, attempt) = (fleet.name(), fleet.name());
     let workstream = run.raw();
     let refused = fleet.step(Event::Start {
+        grants: Box::new([]),
         reply_to: ReplyTo::new(attempt),
         run,
         attempt,
@@ -251,17 +253,15 @@ fn every_entry_point_stays_within_the_worst_case() {
     // Hellos: a worker with strays and answers it holds, before the parent
     // has loaded its claims.
     let (r1, a1, r2, a2) = (fleet.name(), fleet.name(), fleet.name(), fleet.name());
-    let hosting = vec![
-        Hosted { run: r1, attempt: a1, phase: Phase::Active },
-        Hosted { run: r2, attempt: a2, phase: Phase::Answered },
-    ];
-    let listed = fleet.hello(channel(0), hosting);
+    let listed = fleet.hello(channel(0), jig_fleet_world::fixtures::hosting_pair(r1, a1, r2, a2));
     assert!(matches!(listed[..], [Request::Listed { .. }, Request::Listed { .. }]), "{listed:?}");
     let answer =
         Event::Answer { channel: channel(0), run: r2, attempt: a2, answer: Answer::Ended, payload: Token::new(1) };
     fleet.step(answer);
     fleet.step(Event::Loaded);
     fleet.step(Event::Adopt {
+        holds: Box::new([]),
+        grants: Box::new([]),
         reply_to: ReplyTo::new(a2),
         run: r2,
         attempt: a2,
@@ -271,6 +271,8 @@ fn every_entry_point_stays_within_the_worst_case() {
     });
     fleet.step(Event::Acknowledge { run: r2, attempt: a2 });
     fleet.step(Event::Adopt {
+        holds: Box::new([]),
+        grants: Box::new([]),
         reply_to: ReplyTo::new(a1),
         run: r1,
         attempt: a1,
@@ -368,6 +370,8 @@ fn held_and_handed_turn_admissions_stay_within_the_worst_case() {
     let refused = fleet.step(Event::Turn { channel: channel(0), run, attempt, turn: 9, body: Token::new(9) });
     assert!(matches!(refused[..], [Request::TurnBusy { .. }, Request::Drop { .. }]));
     fleet.step(Event::Adopt {
+        holds: Box::new([]),
+        grants: Box::new([]),
         reply_to: ReplyTo::new(attempt),
         run,
         attempt,

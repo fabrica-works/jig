@@ -130,12 +130,7 @@ pub enum Request {
     /// Start an agent with its activation and committed conversation state.
     Start {
         owner: Token,
-        workspace: Option<Token>,
-        charter: Box<[u8]>,
-        activation: u64,
-        turns: Box<[Box<[u8]>]>,
-        answered: Box<[AnsweredCall]>,
-        grants: Box<[Grant]>,
+        start: Box<Start>,
     },
 
     /// The hub has taken this turn and now owns its retention.
@@ -217,12 +212,7 @@ pub enum ToAgent {
     /// Start an agent with its activation and committed conversation state.
     Start {
         owner: Token,
-        workspace: Option<Token>,
-        charter: Box<[u8]>,
-        activation: u64,
-        turns: Box<[Box<[u8]>]>,
-        answered: Box<[AnsweredCall]>,
-        grants: Box<[Grant]>,
+        start: Box<Start>,
     },
     /// The hub holds this turn independently of the engine link.
     Acknowledge {
@@ -315,9 +305,7 @@ impl Request {
         match self {
             Request::Message { agent, name, sender, words } => Ok(ToAgent::Message { agent, name, sender, words }),
             Request::Reply { agent, call, reply } => Ok(ToAgent::Answer { agent, call, reply }),
-            Request::Start { owner, workspace, charter, activation, turns, answered, grants } => {
-                Ok(ToAgent::Start { owner, workspace, charter, activation, turns, answered, grants })
-            }
+            Request::Start { owner, start } => Ok(ToAgent::Start { owner, start }),
 
             Request::Grant { agent, grant } => Ok(ToAgent::Grant { agent, grant }),
             Request::AcknowledgeAgentTurn { agent, turn } => Ok(ToAgent::Acknowledge { agent, turn }),
@@ -335,9 +323,38 @@ impl Request {
     }
 }
 
+/// The agent's complete start (hosts.md, sections 2 and 9).
+#[derive(PartialEq, Eq, Debug)]
+pub struct Start {
+    pub workspace: Option<Token>,
+    pub charter: Box<[u8]>,
+    pub activation: u64,
+    pub identity: [u8; 16],
+    pub turns: Box<[Box<[u8]>]>,
+    pub answered: Box<[AnsweredCall]>,
+    pub messages: Box<[StartMessage]>,
+    pub grants: Box<[Grant]>,
+}
+
+/// A start's inbox message, oldest first (hosts.md, section 9).
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct StartMessage {
+    pub name: Token,
+    pub sender: Box<[u8]>,
+    pub words: Box<[u8]>,
+}
+
+/// The protocol layer's table that holds a credential (channel.md, section 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum GrantTable {
+    Accounts,
+    Application,
+}
+
 /// What the core gives the host for one run (domain/hosts.md, section 2).
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct RunAssignment {
+    pub identity: [u8; 16],
     /// The engine's names for the run and for this attempt at it.
     pub run: Token,
     pub attempt: Token,
@@ -353,6 +370,7 @@ pub struct RunAssignment {
 /// An assignment with the conversation state the agent consumes (hosts.md, 2).
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Assignment {
+    pub messages: Box<[StartMessage]>,
     pub assignment: RunAssignment,
     /// Ordered committed turn bodies. An empty list starts a fresh conversation.
     pub turns: Box<[Box<[u8]>]>,
@@ -534,6 +552,7 @@ pub enum Invalid {
     Charter,
     Transcript,
     Grants,
+    Messages,
 }
 
 /// Why a hosted run failed (hosts.md, section 6): what the engine acts on.
@@ -604,6 +623,7 @@ pub enum Reason {
 /// Names of credential grants; their values belong to the protocol layer.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Grant {
+    pub table: GrantTable,
     pub account: u32,
     pub generation: u64,
     pub valid: Duration,

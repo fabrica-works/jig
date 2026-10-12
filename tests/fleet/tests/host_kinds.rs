@@ -38,6 +38,7 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
             &mut domain,
             limits,
             Event::Start {
+                grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
                 attempt,
@@ -70,6 +71,8 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
             &mut restarted,
             limits,
             Event::Adopt {
+                holds: Box::new([]),
+                grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
                 attempt,
@@ -86,6 +89,8 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
             &mut restarted_with_work,
             limits,
             Event::Adopt {
+                holds: Box::new([]),
+                grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
                 attempt,
@@ -109,6 +114,7 @@ fn a_charter_for_workers_only_waits_while_only_engine_slots_are_free() {
             &mut domain,
             limits,
             Event::Start {
+                grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
                 attempt,
@@ -182,6 +188,7 @@ fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
             &mut domain,
             limits,
             Event::Start {
+                grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
                 attempt,

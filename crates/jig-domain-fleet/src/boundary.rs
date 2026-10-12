@@ -93,9 +93,24 @@ impl Kinds {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Grant {
+    pub table: GrantTable,
     pub account: u32,
     pub generation: u64,
     pub valid: Duration,
+}
+
+/// The protocol layer's table that holds a credential (channel.md, section 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum GrantTable {
+    Accounts,
+    Application,
+}
+
+/// A credential's name, independent of its current generation.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct GrantName {
+    pub table: GrantTable,
+    pub account: u32,
 }
 
 /// References to the parent's ordered turn bodies and settled call tail.
@@ -141,6 +156,7 @@ pub enum Event {
         workstream: u64,
         kinds: Kinds,
         assignment: Assignment,
+        grants: Box<[Grant]>,
     },
     /// Pass a named message and its label and words to the live host.
     Inbound {
@@ -167,6 +183,8 @@ pub enum Event {
         kind: HostKind,
         /// Whether a turn or call was committed for this attempt.
         worked: bool,
+        holds: Box<[GrantName]>,
+        grants: Box<[Grant]>,
     },
     /// From the parent: cancel the attempt `attempt` of the run `run`. Its
     /// call is still ended by its answer, unless it was never placed.
@@ -192,8 +210,6 @@ pub enum Event {
     /// for the grace from their listing.
     Loaded,
     Grant {
-        run: Token,
-        attempt: Token,
         grant: Grant,
     },
     Rejected {

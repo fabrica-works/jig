@@ -35,6 +35,8 @@ pub struct Stats {
 
 /// The committed conversation state received by the scripted agent.
 pub struct StartedState {
+    pub identity: [u8; 16],
+    pub messages: Box<[host::StartMessage]>,
     pub activation: u64,
     pub turns: Box<[Box<[u8]>]>,
     pub answered: Box<[AnsweredCall]>,
@@ -176,6 +178,7 @@ impl World {
 
     pub fn another_assignment(&mut self) -> host::Refusal {
         let assignment = RunAssignment {
+            identity: [0; 16],
             run: Token::new(32),
             attempt: Token::new(933),
             workspace: None,
@@ -204,6 +207,7 @@ impl World {
 
         let workspace = if workspace { Some(Workspace { workstream: 3, items: Token::new(4) }) } else { None };
         let assignment = RunAssignment {
+            identity: [0; 16],
             run: RUN,
             attempt: ATTEMPT,
             workspace,
@@ -214,6 +218,7 @@ impl World {
         self.send(Event::Down(LinkDown::Assign {
             reply_to: ReplyTo::new(RUN),
             assignment: Assignment {
+                messages: Box::new([]),
                 assignment,
                 turns: vec![Box::from(&b"prior turn"[..])].into_boxed_slice(),
                 answered: Box::new([]),
@@ -225,6 +230,7 @@ impl World {
     /// Assign a resumed run with each turn and its settled call tail intact.
     pub fn assign_conversation(&mut self, turns: Box<[Box<[u8]>]>, answered: Box<[AnsweredCall]>) {
         let assignment = RunAssignment {
+            identity: [0; 16],
             run: RUN,
             attempt: ATTEMPT,
             workspace: None,
@@ -234,9 +240,23 @@ impl World {
         };
         self.send(Event::Down(LinkDown::Assign {
             reply_to: ReplyTo::new(RUN),
-            assignment: Assignment { assignment, turns, answered },
+            assignment: Assignment { messages: Box::new([]), assignment, turns, answered },
         }));
         assert!(self.owner.is_some() && self.agent_live && self.reading);
+    }
+
+    /// Assign a fresh run with its identity and oldest inbox messages.
+    pub fn assign_start(&mut self, identity: [u8; 16], messages: Box<[host::StartMessage]>) {
+        let assignment = RunAssignment {
+            identity,
+            run: RUN,
+            attempt: ATTEMPT,
+            workspace: None,
+            save: false,
+            charter: Box::from(&b"charter"[..]),
+            grants: Box::new([]),
+        };
+        self.send(crate::fixtures::assign_with(ReplyTo::new(RUN), assignment, messages));
     }
 
     /// The activation and committed state the scripted agent received.
@@ -472,9 +492,7 @@ impl World {
                 assert_eq!(agent, AGENT);
                 self.received_message = Some(ReceivedMessage { name, sender, words });
             }
-            Request::Start { owner, workspace, charter, activation, turns, answered, grants } => {
-                self.start(owner, workspace, &charter, activation, turns, answered, &grants);
-            }
+            Request::Start { owner, start } => self.start(owner, *start),
             Request::Prepare { owner, .. } => {
                 self.owner = Some(owner);
                 self.space_live = true;
@@ -543,24 +561,15 @@ impl World {
         }
     }
 
-    #[expect(clippy::too_many_arguments, reason = "the scripted peer receives the complete start request")]
-    fn start(
-        &mut self,
-        owner: Token,
-        workspace: Option<Token>,
-        charter: &[u8],
-        activation: u64,
-        turns: Box<[Box<[u8]>]>,
-        answered: Box<[AnsweredCall]>,
-        grants: &[host::Grant],
-    ) {
+    fn start(&mut self, owner: Token, start: host::Start) {
+        let host::Start { workspace, charter, activation, identity, turns, answered, messages, grants } = start;
         assert_eq!(workspace, if self.space_live { Some(SPACE) } else { None });
-        assert_eq!(charter, b"charter");
+        assert_eq!(&*charter, b"charter");
         assert!(grants.is_empty());
         self.owner = Some(owner);
         self.agent_live = true;
         self.reading = true;
-        self.started_state = Some(StartedState { activation, turns, answered });
+        self.started_state = Some(StartedState { identity, messages, activation, turns, answered });
         self.events.push_back(Event::Started { owner, agent: AGENT });
     }
 

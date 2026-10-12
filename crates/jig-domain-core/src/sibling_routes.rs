@@ -167,6 +167,8 @@ impl Core {
             }
         }
         self.adopted.push(fleet::Event::Adopt {
+            holds: Box::new([]),
+            grants: Box::new([]),
             kind: self.proofs.get(&task).expect("restored claim has its proof").host,
             worked,
             reply_to: skein_lib::ReplyTo::new(Token::new(task)),

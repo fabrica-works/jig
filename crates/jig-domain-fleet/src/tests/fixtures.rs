@@ -12,3 +12,16 @@ pub fn bounds() -> crate::Bounds {
         unacknowledged: u32::MAX,
     }
 }
+
+pub fn adopt(run: skein_lib::Token, attempt: skein_lib::Token, kept: u32) -> crate::Event {
+    crate::Event::Adopt {
+        reply_to: skein_lib::ReplyTo::new(attempt),
+        run,
+        attempt,
+        kept,
+        kind: crate::HostKind::Worker,
+        worked: false,
+        holds: Box::new([]),
+        grants: Box::new([]),
+    }
+}

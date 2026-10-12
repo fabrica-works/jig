@@ -19,6 +19,7 @@ const LIMITS: Limits = Limits {
     outcome_bytes: 32,
     detail_bytes: 8,
     held: 2,
+    inbox: 4,
     event_bytes: 16,
     run_calls: 2,
     facts: 64,
@@ -66,10 +67,10 @@ impl Harness {
     fn live(&mut self, run: u64) -> (Token, Token, Token) {
         let (owner, workspace) = self.assign(run);
         let requests = self.step(Event::Prepared { owner, workspace });
-        let [Request::Start { owner: started, workspace: prepared, .. }] = &*requests else {
+        let [Request::Start { owner: started, start: prepared }] = &*requests else {
             panic!("expected start: {requests:?}")
         };
-        assert_eq!((*started, *prepared), (owner, Some(workspace)));
+        assert_eq!((*started, prepared.workspace), (owner, Some(workspace)));
         let agent = Token::new(run.checked_add(300).expect("small run"));
         assert!(self.step(Event::Started { owner, agent }).is_empty());
         (owner, workspace, agent)
@@ -78,6 +79,7 @@ impl Harness {
 
 fn assignment(run: u64) -> RunAssignment {
     RunAssignment {
+        identity: [0; 16],
         run: Token::new(run),
         attempt: Token::new(run.checked_add(1000).expect("small run")),
         workspace: Some(Workspace { workstream: run, items: Token::new(run.checked_add(100).expect("small run")) }),
@@ -104,9 +106,10 @@ fn an_itemless_run_starts_and_ends_without_a_workspace() {
     let run = assignment.run;
     let attempt = assignment.attempt;
     let requests = h.step(fixtures::assign(ReplyTo::new(run), assignment));
-    let [Request::Start { owner, workspace: None, .. }] = &*requests else {
+    let [Request::Start { owner, start }] = &*requests else {
         panic!("an itemless run starts without preparation: {requests:?}");
     };
+    assert_eq!(start.workspace, None);
     let owner = *owner;
     let agent = Token::new(301);
     assert!(h.step(Event::Started { owner, agent }).is_empty());
@@ -142,11 +145,17 @@ fn turns_stay_in_the_host_until_their_own_ack_and_credit_returns() {
     let (run, attempt) = (assignment.run, assignment.attempt);
     let requests = h.step(Event::Down(LinkDown::Assign {
         reply_to: ReplyTo::new(run),
-        assignment: crate::Assignment { assignment, turns: Box::new([]), answered: Box::new([]) },
+        assignment: crate::Assignment {
+            messages: Box::new([]),
+            assignment,
+            turns: Box::new([]),
+            answered: Box::new([]),
+        },
     }));
-    let [Request::Start { owner, workspace: None, .. }] = &*requests else {
+    let [Request::Start { owner, start }] = &*requests else {
         panic!("an itemless run starts: {requests:?}");
     };
+    assert_eq!(start.workspace, None);
     let owner = *owner;
     let agent = Token::new(301);
     assert!(h.step(Event::Started { owner, agent }).is_empty());
@@ -391,7 +400,7 @@ mod fixtures {
     pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {
         Event::Down(LinkDown::Assign {
             reply_to,
-            assignment: Assignment { assignment, turns: Box::new([]), answered: Box::new([]) },
+            assignment: Assignment { messages: Box::new([]), assignment, turns: Box::new([]), answered: Box::new([]) },
         })
     }
     pub fn inbound(run: Token, attempt: Token, name: Token, words: Box<[u8]>) -> Event {
@@ -414,3 +423,28 @@ mod fixtures {
 }
 
 mod progress;
+
+#[test]
+fn a_grant_keeps_its_table_through_the_start() {
+    let mut h = Harness::new();
+    let mut assignment = assignment(1);
+    assignment.workspace = None;
+    assignment.grants = Box::new([
+        crate::Grant {
+            table: crate::GrantTable::Accounts,
+            account: 3,
+            generation: 1,
+            valid: skein_lib::Duration::from_secs(30),
+        },
+        crate::Grant {
+            table: crate::GrantTable::Application,
+            account: 3,
+            generation: 2,
+            valid: skein_lib::Duration::from_secs(60),
+        },
+    ]);
+    let requests = h.step(fixtures::assign(ReplyTo::new(assignment.run), assignment));
+    let [Request::Start { start, .. }] = &*requests else { panic!("expected start: {requests:?}") };
+    assert_eq!(start.grants[0].table, crate::GrantTable::Accounts);
+    assert_eq!(start.grants[1].table, crate::GrantTable::Application);
+}

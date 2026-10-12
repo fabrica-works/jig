@@ -33,6 +33,9 @@ pub struct Limits {
     /// Inbound events a run holds until it is live. Beyond them, an event is
     /// bounced.
     pub held: u32,
+    /// Messages a run's inbox takes: the most a start carries, and the most
+    /// refusals a turn or an answer carries.
+    pub inbox: u32,
     /// The most bytes of an inbound event.
     pub event_bytes: u64,
     /// Host calls a run may have in flight at once, its delivery among them. A
@@ -98,7 +101,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // finishes, the outcome or the detail of the failure.
     let held = Queue::<NamedEvent>::worst_case(limits.held)?
         .checked_add(u64::from(limits.held).checked_mul(limits.event_bytes)?)?;
-    let starting = limits.charter_bytes.checked_add(limits.transcript_bytes)?.checked_add(held)?;
+    let messages = u64::from(limits.inbox)
+        .checked_mul(u64::try_from(size_of::<crate::StartMessage>()).ok()?.checked_add(limits.event_bytes)?)?;
+    let starting =
+        limits.charter_bytes.checked_add(limits.transcript_bytes)?.checked_add(held)?.checked_add(messages)?;
     let ending = limits.outcome_bytes.max(u64::from(limits.detail_bytes));
     // Throughout, the opaque workspace handle, grants, and relayed calls in
     // flight (a delivery is held inline).
@@ -109,6 +115,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.accounts).checked_mul(u64::try_from(size_of::<crate::Grant>()).ok()?)?)?;
     let runs = u64::from(limits.slots).checked_mul(run)?;
     // One terminal arrives per step; its fixed payload is included.
+    // A boxed start exists at the step peak before the parent takes it.
     let delivered = u64::try_from(size_of::<Delivery>()).ok()?;
     hosted
         .checked_add(names)?
@@ -120,6 +127,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(turns)?
         .checked_add(runs)?
         .checked_add(ending)?
+        .checked_add(u64::try_from(size_of::<crate::Start>()).ok()?)?
         .checked_add(delivered)
 }
 

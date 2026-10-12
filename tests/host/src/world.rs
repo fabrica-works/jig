@@ -65,6 +65,7 @@ impl Settings {
                 outcome_bytes: 512,
                 detail_bytes: 64,
                 held: 2,
+                inbox: 4,
                 event_bytes: 64,
                 run_calls: 2,
                 facts: 64,
@@ -550,6 +551,7 @@ impl World {
         for (run, attempt) in hosted {
             if self.rng.chance(self.settings.duplicates) {
                 let assignment = host::RunAssignment {
+                    identity: [0; 16],
                     grants: Box::new([]),
                     run,
                     attempt,

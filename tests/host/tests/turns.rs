@@ -223,3 +223,66 @@ fn a_hello_before_an_acknowledgement_lists_the_answer_still_waiting() {
     world.run(200_000);
     assert!(world.stats().reports > 0);
 }
+
+#[test]
+fn a_start_carries_its_messages_before_any_later_message() {
+    let mut world = World::new();
+    let messages = Box::new([
+        jig_domain_host::StartMessage {
+            name: Token::new(5),
+            sender: Box::from(&b"person"[..]),
+            words: Box::from(&b"first"[..]),
+        },
+        jig_domain_host::StartMessage {
+            name: Token::new(6),
+            sender: Box::from(&b"person"[..]),
+            words: Box::from(&b"second"[..]),
+        },
+    ]);
+    world.assign_start([0; 16], messages);
+    let start = world.started_state().expect("agent started");
+    assert_eq!(start.messages[0].name, Token::new(5));
+    assert_eq!(&*start.messages[0].sender, b"person");
+    assert_eq!(&*start.messages[0].words, b"first");
+    assert_eq!(start.messages[1].name, Token::new(6));
+    assert_eq!(&*start.messages[1].words, b"second");
+    assert!(world.received_message().is_none());
+    world.message_from();
+    assert_eq!(world.received_message().expect("later message").name, Token::new(17));
+}
+
+#[test]
+fn a_start_carries_its_identity_unchanged() {
+    let mut world = World::new();
+    let identity = [4, 9, 2, 8, 1, 7, 3, 6, 0, 5, 10, 15, 11, 14, 12, 13];
+    world.assign_start(identity, Box::new([]));
+    assert_eq!(world.started_state().expect("agent started").identity, identity);
+}
+
+#[test]
+fn a_start_beyond_the_inbox_is_refused_as_invalid_messages() {
+    let mut world = World::new();
+    let messages = (1..=5)
+        .map(|name| jig_domain_host::StartMessage { name: Token::new(name), sender: Box::new([]), words: Box::new([]) })
+        .collect();
+    world.assign_start([0; 16], messages);
+    assert!(world.started_state().is_none());
+    assert_eq!(world.slots_taken(), 0);
+    assert_eq!(
+        world.answer().expect("refused").ending,
+        Ending::Refused(jig_domain_host::Refusal::Invalid(jig_domain_host::Invalid::Messages))
+    );
+}
+
+#[test]
+fn a_start_message_beyond_the_byte_bound_is_refused() {
+    let mut world = World::new();
+    let message =
+        jig_domain_host::StartMessage { name: Token::new(5), sender: Box::from([1; 32]), words: Box::from([2; 33]) };
+    world.assign_start([0; 16], Box::new([message]));
+    assert!(world.started_state().is_none());
+    assert_eq!(
+        world.answer().expect("refused").ending,
+        Ending::Refused(jig_domain_host::Refusal::Invalid(jig_domain_host::Invalid::Messages))
+    );
+}

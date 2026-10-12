@@ -1097,6 +1097,7 @@ impl World {
         self.calls.open(attempt, ());
         self.observe(Seen::Started { run, attempt });
         self.stage.push(Event::Start {
+            grants: Box::new([]),
             reply_to: ReplyTo::new(Token::new(attempt)),
             run: Token::new(run),
             attempt: Token::new(attempt),
@@ -1275,6 +1276,8 @@ impl World {
                 self.calls.open(attempt, ());
                 let token = Token::new(attempt);
                 self.stage.push(Event::Adopt {
+                    holds: Box::new([]),
+                    grants: Box::new([]),
                     reply_to: ReplyTo::new(token),
                     run,
                     attempt: token,

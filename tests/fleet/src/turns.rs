@@ -302,6 +302,8 @@ impl World {
 
     fn adopt(&mut self) {
         self.step(Event::Adopt {
+            holds: Box::new([]),
+            grants: Box::new([]),
             reply_to: ReplyTo::new(ATTEMPT),
             run: RUN,
             attempt: ATTEMPT,

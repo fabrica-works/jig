@@ -218,7 +218,9 @@ impl Engine {
             | Request::Deliver { .. }
             | Request::Save { .. }
             | Request::Release { .. }
-            | Request::Grant { .. } => unreachable!("for the top level or the parent"),
+            | Request::Grant { .. } => {
+                unreachable!("for the top level or the parent")
+            }
         }
     }
 
@@ -288,6 +290,7 @@ impl Engine {
             Box::new([])
         };
         let assignment = RunAssignment {
+            identity: [0; 16],
             grants: Box::new([]),
             run,
             attempt,
@@ -295,7 +298,7 @@ impl Engine {
             save: self.rng.chance(self.script.saves),
             charter,
         };
-        let mut assignment = Assignment { assignment, turns, answered: Box::new([]) };
+        let mut assignment = Assignment { messages: Box::new([]), assignment, turns, answered: Box::new([]) };
         if !self.rng.chance(self.script.invalid) {
             return (assignment, None);
         }

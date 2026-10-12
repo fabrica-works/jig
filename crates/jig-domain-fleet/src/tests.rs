@@ -134,6 +134,7 @@ impl Harness {
 
     fn start(&mut self, run: Token, attempt: Token, workstream: u64) -> Box<[Request]> {
         self.step(Event::Start {
+            grants: Box::new([]),
             reply_to: to(attempt),
             run,
             attempt,
@@ -144,7 +145,7 @@ impl Harness {
     }
 
     fn adopt(&mut self, run: Token, attempt: Token) -> Box<[Request]> {
-        self.step(Event::Adopt { reply_to: to(attempt), run, attempt, kept: 0, kind: HostKind::Worker, worked: false })
+        self.step(fixtures::adopt(run, attempt, 0))
     }
 
     /// Starts `run`'s `attempt` and has it placed, on the worker the fleet
@@ -237,6 +238,7 @@ fn a_assignment_keeps_its_turn_and_answer_references_through_placement() {
     let assignment = Assignment { turns: payload(1), answered: payload(2) };
     assert!(
         h.step(Event::Start {
+            grants: Box::new([]),
             reply_to: to(A1),
             run: R1,
             attempt: A1,
@@ -1202,7 +1204,7 @@ fn adoption_restores_the_prefix_before_releasing_stray_turns() {
     assert!(turn(&mut h, C1, 1, 1).is_empty());
     assert!(turn(&mut h, C1, 2, 2).is_empty());
     assert_eq!(&*turn(&mut h, C1, 2, 3), &[drop(3)]);
-    h.step(Event::Adopt { reply_to: to(A1), run: R1, attempt: A1, kept: 1, kind: HostKind::Worker, worked: false });
+    h.step(fixtures::adopt(R1, A1, 1));
     assert_eq!(
         &*h.settle(),
         &[turn_ack(C1, 1), drop(1), Request::Turned { run: R1, attempt: A1, turn: 2, body: payload(2) }]
@@ -1213,7 +1215,7 @@ fn adoption_restores_the_prefix_before_releasing_stray_turns() {
 #[test]
 fn a_turn_sent_again_after_a_restart_is_acknowledged_again_and_dropped() {
     let mut h = Harness::new(Limits { turns: 2, ..LIMITS });
-    h.step(Event::Adopt { reply_to: to(A1), run: R1, attempt: A1, kept: 7, kind: HostKind::Worker, worked: false });
+    h.step(fixtures::adopt(R1, A1, 7));
     h.hello(C1, 2, &[], &[hosted(R1, A1, Phase::Active)]);
     assert_eq!(&*turn(&mut h, C1, 7, 1), &[turn_ack(C1, 7), drop(1)]);
     assert_eq!(&*turn(&mut h, C1, 8, 2), &[Request::Turned { run: R1, attempt: A1, turn: 8, body: payload(2) }]);

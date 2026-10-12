@@ -298,14 +298,14 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start { reply_to, run, attempt, workstream, kinds, assignment } => {
+        Event::Start { reply_to, run, attempt, workstream, kinds, assignment, grants: _ } => {
             attempt::start(domain, env, reply_to, run, attempt, workstream, kinds, assignment, out);
         }
         Event::Inbound { run, attempt, message } => call::inbound(domain, run, attempt, message, out),
         Event::Relay { channel, run, attempt, call } => {
             call::relay(domain, env, channel, run, attempt, call, out);
         }
-        Event::Adopt { reply_to, run, attempt, kept, kind, worked } => match kind {
+        Event::Adopt { reply_to, run, attempt, kept, kind, worked, holds: _, grants: _ } => match kind {
             HostKind::Engine => {
                 if worked {
                     out.push(Request::Lost { to: reply_to, run, attempt });
@@ -318,7 +318,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Cancel { run, attempt } => attempt::cancel(domain, run, attempt, out),
         Event::Relayed { to, answer } => call::relayed(domain, to, answer, out),
         Event::Acknowledge { run, attempt } => attempt::acknowledge(domain, run, attempt, out),
-        Event::Grant { run, attempt, grant } => call::grant(domain, run, attempt, grant, out),
+        Event::Grant { grant: _ } => {}
         Event::Rejected { channel, run, attempt, account, generation } => {
             call::credential_notice(
                 domain,

@@ -91,7 +91,8 @@ impl Agents {
     pub fn answer(&mut self, request: host::ToAgent) -> Vec<Input<root::Event, root::Record>> {
         let mut out = Vec::new();
         match request {
-            host::ToAgent::Start { owner, charter, activation, turns, .. } => {
+            host::ToAgent::Start { owner, start } => {
+                let host::Start { charter, activation, turns, .. } = *start;
                 let mut agent = Agent {
                     role: self.role(&charter),
                     activation,

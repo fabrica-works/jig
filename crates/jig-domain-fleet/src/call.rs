@@ -196,17 +196,6 @@ pub(crate) fn told(
     }
 }
 
-/// A grant follows only the live claimed attempt's worker.
-pub(crate) fn grant(domain: &mut Domain, run: Token, attempt: Token, grant: crate::Grant, out: &mut Queue<Request>) {
-    let Some(id) = named(domain, run, attempt) else {
-        return;
-    };
-    match live(domain, id) {
-        Live::On(channel) => out.push(Request::Grant { channel, run, attempt, grant }),
-        Live::Adrift | Live::Not => {}
-    }
-}
-
 /// Credential notices require the live claim's current hosting channel.
 pub(crate) fn credential_notice(
     domain: &mut Domain,

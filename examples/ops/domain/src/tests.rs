@@ -29,6 +29,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
             outcome_bytes: 512,
             detail_bytes: 64,
             held: 2,
+            inbox: 4,
             event_bytes: 512,
             run_calls: 2,
             facts: 2,

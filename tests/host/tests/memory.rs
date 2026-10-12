@@ -23,6 +23,7 @@ const LIMITS: Limits = Limits {
     outcome_bytes: 768,
     detail_bytes: 128,
     held: 2,
+    inbox: 4,
     event_bytes: 256,
     run_calls: 2,
     facts: 16,
@@ -140,8 +141,14 @@ impl Measured {
 /// names of their limits, as many items as a workspace may list.
 fn assignment(run: u64, limits: &Limits) -> RunAssignment {
     RunAssignment {
+        identity: [0; 16],
         grants: (0..limits.accounts)
-            .map(|account| Grant { account, generation: 7, valid: Duration::from_secs(300) })
+            .map(|account| Grant {
+                table: jig_domain_host::GrantTable::Accounts,
+                account,
+                generation: 7,
+                valid: Duration::from_secs(300),
+            })
             .collect(),
         run: Token::new(run),
         attempt: Token::new(run + 1000),
@@ -162,9 +169,11 @@ fn fill(limits: Limits) {
     let mut host = Measured::new(limits);
     let mut owners = Vec::new();
     for run in 0..u64::from(limits.slots) {
-        let [Asked::Prepare { owner }] =
-            host.step(jig_host_world::fixtures::assign(ReplyTo::new(Token::new(run)), assignment(run, &limits)))[..]
-        else {
+        let [Asked::Prepare { owner }] = host.step(jig_host_world::fixtures::assign_with(
+            ReplyTo::new(Token::new(run)),
+            assignment(run, &limits),
+            jig_host_world::fixtures::messages(&limits),
+        ))[..] else {
             panic!("an assignment of exactly the limits is admitted");
         };
         for _ in 0..limits.held {
@@ -179,7 +188,7 @@ fn fill(limits: Limits) {
         owners.push(owner);
     }
     let held = host.meter.held();
-    let starting = limits.charter_bytes + u64::from(limits.held) * limits.event_bytes;
+    let starting = limits.charter_bytes + u64::from(limits.held + limits.inbox) * limits.event_bytes;
     assert!(held >= u64::from(limits.slots) * starting, "{limits:?}: every slot holds what it may as it prepares");
 
     let mut pending = Vec::new();
@@ -297,6 +306,7 @@ fn paths(limits: Limits) {
         let [Asked::Prepare { owner }] = host.step(Event::Down(LinkDown::Assign {
             reply_to: ReplyTo::new(Token::new(run)),
             assignment: jig_domain_host::Assignment {
+                messages: Box::new([]),
                 assignment: assignment(run, &limits),
                 turns: Box::new([]),
                 answered: Box::new([]),
@@ -372,7 +382,7 @@ fn ordered_transcripts_and_delivery_feedback_fit_the_hosts_bound() {
         let assignment = assignment(run, &limits);
         let overhead = u64::try_from(size_of::<Box<[u8]>>()).expect("bounded");
         let turns = (0..16).map(|_| bytes(limits.turn_bytes - overhead)).collect::<Vec<_>>().into_boxed_slice();
-        let next = Assignment { assignment, turns, answered: Box::new([]) };
+        let next = Assignment { messages: Box::new([]), assignment, turns, answered: Box::new([]) };
         let [Asked::Prepare { owner }] =
             host.step(Event::Down(LinkDown::Assign { reply_to: ReplyTo::new(Token::new(run)), assignment: next }))[..]
         else {

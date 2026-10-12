@@ -60,6 +60,8 @@ fn take_name(call: &mut Call) -> CallName {
 
 #[derive(Debug)]
 struct Conversation {
+    identity: [u8; 16],
+    messages: Box<[crate::StartMessage]>,
     turns: Box<[Box<[u8]>]>,
     answered: Box<[AnsweredCall]>,
 }
@@ -122,13 +124,17 @@ pub(crate) fn assign(
     next: Assignment,
     out: &mut Queue<Request>,
 ) {
-    let Assignment { assignment, turns, answered } = next;
+    let Assignment { assignment, turns, answered, messages } = next;
+    if !assignment::messages_fit(&messages, &env.limits) {
+        refuse(reply_to, &assignment, Refusal::Invalid(crate::Invalid::Messages), out);
+        return;
+    }
     if !conversation_fits(&turns, &answered, &env.limits) {
         let invalid = crate::Invalid::Transcript;
         refuse(reply_to, &assignment, Refusal::Invalid(invalid), out);
         return;
     }
-    let conversation = Conversation { turns, answered };
+    let conversation = Conversation { identity: assignment.identity, messages, turns, answered };
     assign_runtime(domain, env, reply_to, assignment, Runtime { start: Some(conversation), turns: 0, spent: 0 }, out);
 }
 
@@ -203,7 +209,7 @@ fn assign_runtime(
         refused(reply_to, &assignment, Refusal::Busy, &runtime, out);
         return;
     }
-    let RunAssignment { run, attempt, workspace, save, charter, grants } = assignment;
+    let RunAssignment { run, attempt, workspace, save, charter, grants, identity: _ } = assignment;
     let held = Queue::with_capacity(env.limits.held);
     let entry = Hosted {
         run,
@@ -426,12 +432,16 @@ fn start_prepared(domain: &mut Domain, owner: Token, workspace: Option<Token>, o
             let conversation = entry.runtime.start.take().expect("an agent is started once");
             out.push(Request::Start {
                 owner,
-                workspace,
-                charter,
-                activation: entry.attempt.raw(),
-                turns: conversation.turns,
-                answered: conversation.answered,
-                grants: grants.into_boxed(),
+                start: Box::new(crate::Start {
+                    workspace,
+                    charter,
+                    activation: entry.attempt.raw(),
+                    identity: conversation.identity,
+                    turns: conversation.turns,
+                    answered: conversation.answered,
+                    messages: conversation.messages,
+                    grants: grants.into_boxed(),
+                }),
             });
             entry.refreshed = false;
             State::Starting { reply_to, workspace, held }
@@ -1209,7 +1219,7 @@ pub(crate) fn grant(domain: &mut Domain, run: Token, attempt: Token, grant: Gran
     let entry = domain.hosted.get_mut(id).expect("a named run is hosted");
     let mut accepted = false;
     for current in &mut entry.grants {
-        if current.account == grant.account && current.generation <= grant.generation {
+        if current.table == grant.table && current.account == grant.account && current.generation <= grant.generation {
             *current = grant;
             accepted = true;
         }

@@ -66,6 +66,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             outcome_bytes: 512,
             detail_bytes: 64,
             held: 2,
+            inbox: 4,
             event_bytes: 8192,
             run_calls: 4,
             facts: 2,

@@ -260,7 +260,6 @@ impl Parent {
     }
 
     /// Takes the host's request `request`, which is for the parent.
-    #[expect(clippy::needless_pass_by_value, reason = "the world takes ownership of emitted requests")]
     pub fn take(&mut self, request: Request) -> Vec<Out> {
         match request {
             Request::Prepare { owner, workspace } => self.prepare(owner, &workspace),
@@ -270,7 +269,8 @@ impl Parent {
                 self.tally.aborts += 1;
                 Vec::new()
             }
-            Request::Start { owner, workspace, .. } => {
+            Request::Start { owner, start } => {
+                let workspace = start.workspace;
                 self.start(owner, workspace.expect("the scripted assignments have workspace items"))
             }
             Request::Message { agent, .. } => self.deliver(agent),

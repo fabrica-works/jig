@@ -14,7 +14,7 @@ pub(crate) fn check(assignment: &RunAssignment, limits: &Limits) -> Result<(), I
     }
     for (index, grant) in assignment.grants.iter().enumerate() {
         for other in assignment.grants.iter().skip(index.saturating_add(1)) {
-            if grant.account == other.account {
+            if grant.table == other.table && grant.account == other.account {
                 return Err(Invalid::Grants);
             }
         }
@@ -25,4 +25,18 @@ pub(crate) fn check(assignment: &RunAssignment, limits: &Limits) -> Result<(), I
 /// The length of `bytes`.
 pub(crate) fn len(bytes: &[u8]) -> u64 {
     u64::try_from(bytes.len()).expect("a length fits in a u64")
+}
+
+/// A start carries at most one inbox of individually bounded messages.
+pub(crate) fn messages_fit(messages: &[crate::StartMessage], limits: &Limits) -> bool {
+    if u64::try_from(messages.len()).expect("a length fits") > u64::from(limits.inbox) {
+        return false;
+    }
+    for message in messages {
+        match len(&message.sender).checked_add(len(&message.words)) {
+            Some(bytes) if bytes <= limits.event_bytes => {}
+            Some(_) | None => return false,
+        }
+    }
+    true
 }

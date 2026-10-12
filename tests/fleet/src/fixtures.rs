@@ -14,3 +14,15 @@ pub fn bounds() -> jig_domain_fleet::Bounds {
         unacknowledged: u32::MAX,
     }
 }
+
+/// A live run and an answered run named by the memory scenario.
+#[must_use]
+pub fn hosting_pair(
+    r1: skein_lib::Token,
+    a1: skein_lib::Token,
+    r2: skein_lib::Token,
+    a2: skein_lib::Token,
+) -> Vec<jig_domain_fleet::Hosted> {
+    use jig_domain_fleet::{Hosted, Phase};
+    vec![Hosted { run: r1, attempt: a1, phase: Phase::Active }, Hosted { run: r2, attempt: a2, phase: Phase::Answered }]
+}

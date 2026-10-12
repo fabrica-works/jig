@@ -95,13 +95,16 @@ pub(crate) fn assignment(
         answered.push(host::AnsweredCall { name: value.name, tool: value.tool, answer }).ok()?;
     }
     Some(host::Assignment {
+        messages: Box::new([]),
         assignment: host::RunAssignment {
+            identity: [0; 16],
             run: Token::new(task),
             attempt: Token::new(attempt),
             workspace: None,
             save: false,
             charter: encoded,
             grants: Box::new([host::Grant {
+                table: jig_domain_host::GrantTable::Accounts,
                 account: grant.account,
                 generation: grant.generation,
                 valid: grant.valid,
