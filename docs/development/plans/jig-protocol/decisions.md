@@ -967,6 +967,13 @@ the file.
      170 scalar members, ruling 159's dotted compound members among
      them. No macro or generic helper is wanted to shrink it. Its Size
      becomes 600.
+162. **Ruling 160 is reversed by decision 37** (2026-10-12, the designer's
+     answer to question.md's "jig 21.2: which bytes an LLM grant's value
+     is", jig `87195d80`, `b91e5a49`). A grant's value keeps its two
+     parts, token and account id, both secret, in the table and on jig's
+     channel; the worker's layer builds smith's envelope as it hands it
+     to smith's host half. jig 21.2 had not landed on ruling 160's
+     envelope (the ledger had it running), so no step is added.
 
 ## For the user
 
