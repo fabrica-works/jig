@@ -2579,7 +2579,13 @@ fn a_load_completion_rechecks_current_project_visibility() {
     else {
         panic!()
     };
-    restore_document_party(&mut core, &limits, &[]);
+    let mut out = Queue::with_capacity(people::max_out(&limits.people));
+    people::step(
+        &mut core.people,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people },
+        people::Event::Roles { project: 1, holdings: Box::new([]) },
+        &mut out,
+    );
     assert_eq!(
         loaded_answer(
             &mut core,
@@ -2624,13 +2630,15 @@ fn live_reads_use_owner_documents_without_a_key_or_state_change() {
 #[test]
 fn invisible_and_absent_reads_have_the_same_unknown_answer() {
     let (mut core, limits) = watch_core();
-    for (sign_in, read) in
-        [(99, reads::Read::Frame), (10, reads::Read::Project { project: 9 }), (10, reads::Read::Task { task: 99 })]
-    {
+    for (sign_in, read, why) in [
+        (99, reads::Read::Frame, reads::Why::SignedOut),
+        (10, reads::Read::Project { project: 9 }, reads::Why::Unknown),
+        (10, reads::Read::Task { task: 99 }, reads::Why::Unknown),
+    ] {
         let Held::Read { answer, .. } = read_answer(&mut core, &limits, sign_in, read) else {
             panic!("read terminal expected")
         };
-        assert_eq!(answer, reads::Answer::None(reads::Why::Unknown));
+        assert_eq!(answer, reads::Answer::None(why));
     }
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     let mut out = Queue::with_capacity(people::max_out(&limits.people));

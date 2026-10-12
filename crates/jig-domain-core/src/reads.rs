@@ -145,12 +145,12 @@ fn backwards(scope: &Scope) -> bool {
     }
 }
 
-fn refused_application(reply: ReplyTo, read: &Read) -> Requests {
+fn refused_application(reply: ReplyTo, read: &Read, why: Why) -> Requests {
     match read {
         Read::Application { connector, read, .. } => {
             let mut out = Queue::with_capacity(3);
             out.push(Request::Ask { connector: *connector, ask: crate::Ask::DropDocument { subject: *read } });
-            out.push(Request::Held(Box::new(Held::Read { reply, answer: Answer::None(Why::Unknown) })));
+            out.push(Request::Held(Box::new(Held::Read { reply, answer: Answer::None(why) })));
             out.push(Request::Decided);
             Requests::Out(out)
         }
@@ -173,18 +173,19 @@ fn refused_application(reply: ReplyTo, read: &Read) -> Requests {
         | Read::ScopedNotes { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
-        | Read::Deployment => terminal(reply, Answer::None(Why::Unknown)),
+        | Read::Deployment => terminal(reply, Answer::None(why)),
     }
 }
 
 pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, read: Read) -> Requests {
     let Some(party) = core.people.person(sign_in, env.now, env.wall) else {
-        return refused_application(reply, &read);
+        let why = if core.people.ready() { Why::SignedOut } else { Why::Unknown };
+        return refused_application(reply, &read, why);
     };
     match &read {
         Read::Application { scope, connector, read: name } => {
             if core.people.role(party, scope.project()).is_none() || !core.connectors.as_ref().contains(connector) {
-                return refused_application(reply, &read);
+                return refused_application(reply, &read, Why::Unknown);
             }
             let mut out = Queue::with_capacity(2);
             out.push(Request::Ask {
@@ -390,16 +391,16 @@ pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, load: Token, result: Lo
     if pending.reply.is_none() {
         return Requests::Out(Queue::with_capacity(0));
     }
-    let visible = core.people.person(pending.sign_in, env.now, env.wall) == Some(pending.party)
-        && rows::scope_allowed(core, pending.party, &pending.range.scope);
-    let answer = if visible {
+    let answer = if core.people.person(pending.sign_in, env.now, env.wall) != Some(pending.party) {
+        Answer::None(Why::SignedOut)
+    } else if !rows::scope_allowed(core, pending.party, &pending.range.scope) {
+        Answer::None(Why::Unknown)
+    } else {
         match result {
             Loaded::Busy => Answer::None(Why::Busy),
             Loaded::Gone => Answer::None(Why::Gone),
             Loaded::Page { rows, next } => rows::from_store(core, &env.limits, &pending.range, rows, next),
         }
-    } else {
-        Answer::None(Why::Unknown)
     };
     let reply = core.reads.get_mut(name).expect("live read").reply.take().expect("terminal consumes its reply");
     core.reads.retire(name);

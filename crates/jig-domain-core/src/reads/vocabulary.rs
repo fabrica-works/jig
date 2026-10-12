@@ -302,12 +302,14 @@ pub enum Answer {
 /// Refusal facts which reveal no invisible object identity.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Why {
-    /// Missing, signed out, or invisible; these are indistinguishable.
+    /// Missing, or invisible to the party.
     Unknown,
     /// A construction or load bound prevents admission.
     Busy,
     /// Required historical rows are no longer retained.
     Gone,
+    /// The read's sign-in is unknown to a ready engine, ended or expired.
+    SignedOut,
 }
 
 pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {

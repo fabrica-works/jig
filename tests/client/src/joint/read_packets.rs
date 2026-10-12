@@ -39,6 +39,7 @@ pub fn read(
             reads::Why::Unknown => client::ReadNone::Unknown,
             reads::Why::Busy => client::ReadNone::Busy,
             reads::Why::Gone => client::ReadNone::Gone,
+            reads::Why::SignedOut => client::ReadNone::SignedOut,
         }),
         reads::Answer::Page(value) => {
             let value = match what {

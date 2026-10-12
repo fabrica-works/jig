@@ -256,13 +256,13 @@ fn conversation_owner_continuations_are_authenticated_and_cannot_be_reused_for_a
     else {
         panic!("sign-in refusal")
     };
-    assert_eq!(answer, reads::Answer::None(reads::Why::Unknown));
+    assert_eq!(answer, reads::Answer::None(reads::Why::SignedOut));
     let (token, _) = load(&mut core, &limits, start);
     restore_document_party(&mut core, &limits, &[]);
     let rows = Box::new([retained(&core, 9)]);
     assert_eq!(
         loaded_answer(&mut core, &limits, token, reads::Loaded::Page { rows, next: None }),
-        Some(reads::Answer::None(reads::Why::Unknown))
+        Some(reads::Answer::None(reads::Why::SignedOut))
     );
 }
 
@@ -494,7 +494,7 @@ fn conversation_owner_reverse_pages_refuse_row_byte_and_last_examined_overruns_w
     restore_document_party(&mut core, &limits, &[]);
     assert_eq!(
         loaded_answer(&mut core, &limits, token, reads::Loaded::Page { rows, next: None }),
-        Some(reads::Answer::None(reads::Why::Unknown))
+        Some(reads::Answer::None(reads::Why::SignedOut))
     );
 }
 

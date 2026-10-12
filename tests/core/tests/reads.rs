@@ -154,6 +154,8 @@ fn five_independent_read_stories_fit_the_shared_process_budget() {
     a_conversation_reads_whole_from_its_end_after_its_words_were_taken();
     an_inbox_longer_than_the_engine_holds_pages_from_the_store();
     a_read_when_loads_are_full_is_busy();
+    a_read_after_the_sign_in_ended_is_answered_signed_out();
+    a_read_whose_sign_in_ends_while_it_loads_is_signed_out();
     jig_core_world::stories::reads::a_backward_wall_correction_keeps_reply_paging_whole_after_restart();
 }
 
@@ -341,4 +343,29 @@ fn result_position(world: &jig_core_world::effects::World, task: u64) -> u64 {
         panic!("ended chat")
     };
     row.result_position
+}
+
+fn a_read_after_the_sign_in_ended_is_answered_signed_out() {
+    let mut world = world(784);
+    end_sign_in(&mut world);
+    ask(&mut world, 800, reads::Read::Frame);
+    assert_eq!(latest(&world), &reads::Answer::None(reads::Why::SignedOut));
+}
+
+fn a_read_whose_sign_in_ends_while_it_loads_is_signed_out() {
+    let mut world = world(785);
+    world.reads.as_mut().expect("party").hold_loads = true;
+    ask(&mut world, 801, reads::Read::Task { task: 1000 });
+    assert_eq!(world.reads.as_ref().expect("party").loads.len(), 1);
+    end_sign_in(&mut world);
+    complete(&mut world);
+    assert_eq!(latest(&world), &reads::Answer::None(reads::Why::SignedOut));
+    assert!(world.reads.as_ref().expect("party").loads.is_empty());
+}
+
+fn end_sign_in(world: &mut jig_core_world::effects::World) {
+    world.send(root::Event::Core(core::Event::People(people::Event::SignOut {
+        reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(80_000)),
+        sign_in: world.sign_in.expect("original sign-in"),
+    })));
 }
