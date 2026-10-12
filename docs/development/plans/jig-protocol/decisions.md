@@ -308,6 +308,18 @@ the file.
      `jig-domain-authority` (the core's `Answer` and `Finding`, which the
      core does not re-export) is a vocabulary it translates, which
      code-organization.md, section 3 allows.
+110. **A Size counts code, not comments; a generated lock is no edit**
+     (2026-10-12, the coordinator's block "jig 13.1: generated lock
+     entries and boundary size count", 2026-10-12T16:46:00Z). Sessions
+     counted Size three ways (skein 01.1 "nonblank, noncomment ... net",
+     jig 10.2 every line of `src/*.rs`, jig 11.1 added lines), and jig
+     13.1's count crosses its 240 (ruling 103) only if comments and blank
+     lines count: 275 gross, 220 net of them. From now to the run's end,
+     a Size counts nonblank, noncomment lines of production code, net,
+     outside tests and generated code; and the `Cargo.lock` entries a
+     Files-named `Cargo.toml` change generates belong to that change, as
+     long as they move no existing package. code-organization.md,
+     section 7 says both. jig 13.1 lands as it is.
 
 ## For the user
 

@@ -169,3 +169,13 @@ No increment of this plan:
   and how it counted; past N × 1.2, it asks before landing, as a
   question. Nobody restructures code only to meet it. The file and
   test-function limits above stay rules.
+- **What a Size counts** (ruling 110): lines of production code added,
+  less those removed, that are neither blank nor comments (doc comments
+  included), outside tests and generated code; `Cargo.toml` and
+  `Cargo.lock` count for nothing. Count once, with one command, and name
+  it in the report.
+- **`Cargo.lock`** (ruling 110): the entries a Files-named `Cargo.toml`
+  change generates belong to that change, and are no question. They add
+  packages only: `git diff origin/main -- Cargo.lock` shows no existing
+  package's version or source changed, unless the increment's Shape
+  repins it.
