@@ -543,8 +543,10 @@ Removes: `Why::Unknown`'s standing for a signed-out party.
 Scope: a signed-in person's frame offers signing out; choosing it asks
 the client's root to have its shell end the sign-in on the engine; the
 client changes nothing until the shell answers `SignedOut`, then shows
-the sign-in page as when signed out; a service is never offered it
-(client.md, 12; findings/domain.md, 10.5).
+the sign-in page as when signed out; a sign-out the shell reports lost
+leaves the person signed in, the frame saying so and offering it again;
+a service is never offered it (client.md, 12, "A sign-out that does not
+reach the engine"; findings/domain.md, 10.5).
 Needs: nothing.
 Files:
 - `crates/jig-domain-client/src/action.rs` (`Act`, :12),
@@ -585,6 +587,12 @@ Shape:
 - Each client root's `Request::SignOut`, routed to its shell as
   `SignIn` is.
 - The frame shows a button named by `JigPhrase::SignOut` ("Sign out").
+- `jig_domain_client::Event::SignOutLost`, the shell's, doc "The sign-out
+  exchange ended lost (protocol/client.md, 4): the person is still signed
+  in." It changes nothing but a notice of the frame's (client.md, 13),
+  `JigPhrase::SignOutLost` ("Not signed out: the engine was not
+  reached"); `Act::SignOut` stays offered, and asking again sends the
+  sign-out again.
 - The harness's `Duty::SignOut` and `Front::sign_out(&mut self, client:
   ClientId, now: Time, wall: Wall)`: the scripted engine ends the
   sign-in (`Change::SignedOut`,
@@ -616,6 +624,10 @@ Test shape:
 
   with `use jig_fake_person::{Find, Step}; use jig_view::Role;
   use skein_lib::Duration;` added to the file. Under 0.5 s.
+- Also there: `a_lost_sign_out_keeps_the_person_signed_in_and_says_so`:
+  the shell answers the first sign-out `SignOutLost`; the person sees the
+  notice and "Sign out", not the sign-in page; a second press, answered
+  `SignedOut`, shows the sign-in page. Under 0.5 s.
 - The joint world (`tests/client/src/joint/people_stories.rs`):
   `a_person_signs_out_and_a_later_request_is_answered_signed_out`.
   Under 0.5 s.
@@ -625,9 +637,10 @@ Proof: world, `heavy cargo nextest run -p jig-client-world --test shell -E 'test
 once: a person presses "Sign out" and sees the sign-in page; under
 0.5 s. (No process layer exists before jig 33.)
 Don't: let the client domain hold or clear a secret or a cookie; show
-the sign-in page before the shell's `SignedOut`; add a browser or web
-shell path.
-Size: at most 80 lines of production code.
+the sign-in page before the shell's `SignedOut`, or on `SignOutLost`;
+add a browser or web shell path.
+Size: at most 110 lines of production code (the lost sign-out, from the
+designer's answer of 2026-10-12, adds about 30).
 Removes: nothing.
 
 ## Interface sketches
@@ -729,9 +742,13 @@ exchange; the client domain owns only the act and what it shows.
   `later.md` lists "chats forgotten" under retention too. Do not add a
   read position for such a chat: forget what `marked_chats` names, and
   raise it.
-- **A sign-out the shell cannot finish** (the engine out of reach) is
-  not described (client.md, 12; `protocol/client.md`, 8). Keep the frame
-  until the shell says signed out, and raise it.
+- **A sign-out the shell cannot finish** (the engine out of reach):
+  settled by the designer (jig `e8d9aa52`; client.md, 12, "A sign-out
+  that does not reach the engine"). The person stays signed in; the frame
+  says the sign-out did not reach the engine and offers it again, which
+  is safe (`protocol/client.md`, 8). 03.6's `SignOutLost` builds it.
+  Whether a native shell forgets its token on a shared machine is open
+  (client.md, 18; `decisions.md`, "For the user").
 
 ## Done when
 

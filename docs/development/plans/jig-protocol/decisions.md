@@ -542,3 +542,11 @@ the file.
   ships them.
 - **Live text from workers** (decision 14): wanted for the chat web
   interface; a smith design and plan.
+- **Signing out of a shared machine with the engine out of reach**
+  (the designer, 2026-10-12; `client/domain/client.md`, 12 and 18): today
+  the person stays signed in, the frame says the sign-out did not reach
+  the engine, and they may ask again (jig 03.6 builds it). Should a
+  native shell also forget its token there, so the machine is signed out
+  while the sign-in stays live on the engine until it expires; or a
+  client keep the sign-out and send it once the engine is reached? A
+  browser's cookie only the engine can clear. Nothing waits on it.
