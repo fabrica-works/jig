@@ -1134,6 +1134,15 @@ the file.
      too. skein's own gate passed because its codec fixtures take the
      test harnesses' configuration. A step not in the plan, skein 02.s5
      (`tests-cost.md`, 7), then jig-repin.s3 and smith-repin pin it.
+176. **jig 06.s1: a resumed window counts each turn's length** (2026-10-12,
+     the designer's answer to question.md's "jig 22.3: how an assignment
+     carries a resumed window's turns"; jig `e7eb8486`, `22671972`). A
+     window crosses as one piece in smith's form, `transcript: bytes
+     8388608`, bounded by the resume limit with each turn counted with
+     its four-byte length; this replaces ruling 172. jig 06 has landed,
+     so a step not in the plan, jig 06.s1 (`jig/06-*.md`), makes the
+     core's window count so. The same answer settles jig 07.s1: a chat
+     fits under its person's role, the person batch unchanged.
 
 ## For the user
 

@@ -443,6 +443,21 @@ Size: at most 50 lines of production code.
 Removes: `record_host` and its second write of the proof; jig 07.4's
 `Engine` iff the charter's hosts are the engine's alone.
 
+### 06.s1 A window counts each turn with its length
+
+A step not in the plan (decisions.md, ruling 176), from the designer's
+answer on jig 22.3 (jig `e7eb8486`: `domain/engine.md`, 7.2, the resume
+limit counts "each turn ... with the four bytes of its length, as the
+window crosses to a host"); its text is the designer's.
+Shape: `run.rs`'s window, from `begin_transcript` on, counts each kept
+  turn as its length plus 4 against `resume_bytes`, in what it keeps and
+  in when a window past the limit starts fresh.
+Test shape: a core unit test of a window of many one-byte turns that
+  starts fresh one turn earlier than when counted without lengths.
+Proof: the gate.
+Don't: add a turn-count limit.
+Size: at most 40 lines of production code.
+
 ## Interface sketches
 
 ```rust
