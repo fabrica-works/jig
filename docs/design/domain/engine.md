@@ -241,7 +241,14 @@ commit it follows from:
 - **what parties read and watch:** a read's answer and a watch's
   delivery decide nothing, but are made from state that may run ahead of
   the store, so each waits for the last commit made before it, as an
-  output of a decision with no commit of its own (section 11).
+  output of a decision with no commit of its own (section 11);
+- **grants:** a generation sent to an attempt (section 12) decides
+  nothing, but goes to the attempts the fleet keeps, which run ahead of
+  the store: one whose assignment waits for its commit is an attempt a
+  restart would not know of, and its host does not know it yet either.
+  So a grant waits for the last commit made before it, and leaves after
+  its attempt's assignment, since held outputs leave in order
+  (`../README.md`, 6.2).
 
 What decides nothing and shows nothing durable waits for nothing: a
 run's text streamed to watchers as it is written (section 11), and the
@@ -621,7 +628,9 @@ The fleet child domain knows the hosts and the runs they host:
   account or an application's credential goes to every live attempt
   that holds one (section 12), and each attempt the fleet keeps at a
   worker's hello, or adopts, is sent its current grants, so no run
-  outlives its token for want of a resend.
+  outlives its token for want of a resend. A grant never overtakes its
+  attempt's assignment (5.2), so a generation renewed while the
+  assignment waits for its commit reaches the attempt after it.
 - **Every start and adoption ends once:** answered, lost, withdrawn (the
   core cancelled it), or refused (busy, a duplicate, or invalid).
 - **Restarting** (section 6): the fleet adopts the claims the store
