@@ -607,6 +607,26 @@ the file.
      neither encodes `GoalRow` nor `Endings` nor moves the tasks family to
      version 2; jig 14.4 translates them in tasks-v1. The README's rule
      now says so for every family.
+135. **The people codec's limits take the core's** (2026-10-12, the
+     coordinator's block "jig 19.3: people codec needs core policy
+     limits", 2026-10-12T20:03:42Z). A plan defect: 14.1's pattern gives
+     each family `codec::<family>::limits(&<family>::Limits)`, but the
+     people family's `Policy` row is admitted against
+     `core::Limits.policy_bytes` and the authority limits
+     (`crates/jig-domain-core/src/routing/vocabulary.rs`, `Limits`, which
+     holds `policy_bytes`, `authority` and `people`), not
+     `people::Limits.amendment_bytes`. So `codec::people::limits` takes
+     `&core::Limits` and answers `Option<people_v1::Limits>`: a field one
+     kind of row carries takes that row's bound, and a field `Policy` and
+     an ask share takes the larger, as jig 14's Choices say ("each `bytes
+     N` or `list N` takes the domain limit that bounds it (an aggregate
+     where the domain bounds only a sum ...)"). The translations check
+     each field against its ceiling and no sum, as the tasks family's do
+     (`crates/jig-protocol-store/src/codec/tasks.rs`, `limits`, on jig
+     `0b04cf8d`); a full policy's and an ask's sums stay the domain's.
+     No facade `Limits` type is added, and 19.5's `codec::Limits { people:
+     people_v1::Limits, .. }` and `codec::limits(&core::Limits)` are
+     unchanged. 19.3's Shape says so.
 
 ## For the user
 

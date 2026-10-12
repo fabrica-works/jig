@@ -108,7 +108,11 @@ the `Person`, `SignIn`, `Roles`, `Policy`, `ReadResults` and `ReadChat` rows.
 Needs: 14.1's pattern (not the tasks or core families).
 Files: `crates/jig-protocol-store/{schema/people-v1.schema, src/generated/people_v1.rs, golden/people/v1/, src/codec/people.rs, src/codec/people/{policy.rs, asks.rs}}`, `src/tests/{fixtures.rs, codec.rs}`, `tests/store-codecs/tests/{drift.rs, fuzzy_decode.rs}`.
 Shape: as 14.2; this increment's `Row` holds the rows above; 19.4 adds
-`Answer`.
+`Answer`. `codec::people::limits(&core::Limits) -> Option<people_v1::Limits>`
+(ruling 135): a field one kind of row carries takes that row's bound
+(`policy_bytes` and `authority` for the `Policy` row, `people`'s
+`amendment_bytes` for an ask); a field `Policy` and an ask share takes the
+larger. Sums stay the domain's to check, as in the tasks family.
 Test shape:
 - `src/tests/codec.rs`: `a_person_reads_back_with_its_identity`,
   `a_projects_policy_reads_back`, `each_kind_of_ask_reads_back`,
