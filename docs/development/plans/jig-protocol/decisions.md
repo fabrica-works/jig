@@ -331,6 +331,17 @@ the file.
      world, standing in for the protocol layer, copies from the
      `Now::Call`'s authenticated run. No core or fleet lookup is added.
      The design names no such event: it is `ops`'s root's own.
+112. **A new variant's arms elsewhere belong to its increment**
+     (2026-10-12, the coordinator's block "jig 03.3: new refusal needs
+     tools renderer outside Files", 2026-10-12T16:57:50Z). jig 03.3 adds
+     `tasks::Refusal::Unproposable`; jig 10.2's `task_problem`
+     (`crates/jig-protocol-tools/src/render.rs:213`), which landed during
+     03.3, matches every refusal and no longer builds. 03.3 adds the arm,
+     `jig_domain_tasks::Refusal::Unproposable => b"no proposal could be
+     accepted"`, in the words of `domain/tasks.md`, 9 ("saying that no
+     proposal could be accepted"), and one unit test of it, as it
+     proposed. The README's Rules now say so for every new variant: the
+     fourth block in two hours on an edit outside an increment's Files.
 
 ## For the user
 

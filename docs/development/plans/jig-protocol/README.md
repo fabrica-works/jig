@@ -187,6 +187,12 @@ ones before it in its session. Dependencies are by capability: "skein
   loosens a test or an assertion. This replaces development.md, 8.2's "it
   changes no test's expected value or name" for these literals only; any
   other change outside Files stays a question.
+- **A new variant is matched where the build needs it** (decisions.md,
+  ruling 112). An increment that adds a variant adds, in the same
+  increment, the arm each exhaustive match outside its Files then needs,
+  in any session's crate: written as its neighbours are, at most 5 lines
+  per match, named in its commit body. It is no question. Tests for those
+  arms only where the increment's Test shape names them.
 
 ## Live services
 
