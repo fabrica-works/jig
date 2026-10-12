@@ -55,9 +55,9 @@ smith, and builds what section 2's rows name it for.
 
 - **Retention** (`protocol/store.md`, 11.1; `domain/people.md`, section
   6): summaries of ended tasks, transcripts dropped past a horizon,
-  answered keys expired, chats forgotten. The store's mechanisms are
-  jig-protocol's; the domain's timers wait for a deployment whose store
-  nears its budget.
+  answered keys expired, chats forgotten, and forgotten chats' remains
+  collected. The store's mechanisms are jig-protocol's; the domain's
+  timers wait for a deployment whose store nears its budget.
 - **Agents in the engine** (`README.md`, section 9, the second shape;
   `domain/hosts.md`, 5.2; `protocol/llm.md`, sections 1 to 4 and 7 to
   9): `smith-inline-agent` composed by the engine's root, and smith's LLM

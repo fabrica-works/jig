@@ -356,6 +356,16 @@ the records they point at, with keys reversed in time where a page reads
 newest first. Each index is its owner's, tested in its world. Section
 15 lists those the domain owes.
 
+**An owner erased first.** When a task's record is erased before the
+records its index rows name, as a forgotten chat's is
+(`../domain/people.md`, section 6), its decision erases the index rows
+its record names whole: the chat's result's update and its conversation
+rows. Its replies' updates stay, since a chat's replies are unbounded, a
+decision is bounded, and the chat's record names only its newest; they
+go when retention erases the reply lines they name (11.1). Until then a
+page skips a row whose owner is gone, counting it within its bounds, so
+nothing of a forgotten chat shows and no reply read comes back unread.
+
 **Reading backwards:** a family whose positions are dense (activity)
 reads newest first by computing forward intervals from its last
 position, which its owner task's record names; a family read newest
@@ -514,6 +524,10 @@ worlds, with horizons the deployment's configuration gives:
   A live task keeps its transcript, whatever its age.
 - **Answered keys expire** past the people child's retention; **ended
   chats are forgotten** once read (`../domain/people.md`, section 6).
+- **A forgotten chat's remains go** at retention's next pass, whatever
+  their age: its activity, history, terminals and transcript, and its
+  replies' rows in its person's updates (7.4). Nothing reads them, and
+  the person's pages of updates skip those rows until then.
 
 ### 11.2 Fill
 
@@ -609,7 +623,8 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   5. **fill:** with each commit's answer, and new work refused above the
      high-water mark (11.2);
   6. **retention:** summaries of ended tasks, transcripts dropped, answered
-     keys expired, chats forgotten, each on the domain's timer (11.1);
+     keys expired, chats forgotten and their remains collected, each on
+     the domain's timer (11.1);
   7. **keys for single reads:** a question's line and its answer's, an
      escalation's hold, and a task's proposal's row in its proposer's
      history, each named by its position in its task's record, as a
