@@ -231,6 +231,15 @@ impl Application for OpsApplication {
                 return Ops::deliver(&mut peers.conformance, systems, store, clock, other);
             }
         };
+        if let root::Output::CoreLoad(core::Now::LoadEndedChat { task }) = delivery {
+            let key = root::Key::Core(core::Key::Tasks(jig_domain_tasks::Key::Ended(task)));
+            return match store.rows.get(&key) {
+                Some(root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Ended(row)))) => {
+                    vec![Input::Event(root::Event::Core(core::Event::ForgetChat { row: row.clone() }))]
+                }
+                Some(_) | None => Vec::new(),
+            };
+        }
         if let root::Output::CoreLoad(core::Now::SeenChat { request, task }) = delivery {
             let row = store.rows.values().find_map(|record| match record {
                 root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Ended(row))) if row.number == task => {
@@ -335,6 +344,7 @@ impl Application for OpsApplication {
                 | core::Now::Activate { .. }
                 | core::Now::PrepareAgent { .. }
                 | core::Now::StartPreparation { .. }
+                | core::Now::LoadEndedChat { .. }
                 | core::Now::SeenChat { .. }
                 | core::Now::HistoricalProposal { .. }
                 | core::Now::HistoricalPersonTask { .. }

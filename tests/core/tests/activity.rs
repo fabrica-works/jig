@@ -208,7 +208,6 @@ fn all_replies_read_then_ended_survive_restart_and_forgetting(
         62,
         people::Ask::MarkSeen { seen: people::Seen::Results { through: owner.result_position } },
     );
-    world.send(root::Event::Core(core::Event::ForgetChat { row: owner }));
     assert!(!world.store.rows.contains_key(&ended_key));
     assert!(!world.store.rows.contains_key(&read_key));
     assert!(world.commits.iter().any(|writes| writes.contains(&root::Write::Erase(ended_key.clone()))
@@ -216,4 +215,70 @@ fn all_replies_read_then_ended_survive_restart_and_forgetting(
     world.restart_with(jig_core_world::faults::plan_fixture(506).0);
     ask(world, 73, core::reads::Read::Reply { task, activity: reply.position });
     assert_eq!(latest(world), &core::reads::Answer::None(core::reads::Why::Gone));
+}
+
+#[test]
+fn a_chat_ended_with_its_result_unread_keeps_its_read_position() {
+    let mut world = jig_core_world::stories::reads::world(507);
+    let task = world.assigned.as_ref().expect("chat").task;
+    world.turn(1, 1, None, b"reply");
+    mark_chat(&mut world, task);
+    finish_chat(&mut world);
+    let ended_key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
+    let read_key = root::Key::Core(core::Key::People(people::Key::ReadChat { party: 1, task }));
+    assert!(world.store.rows.contains_key(&ended_key));
+    assert!(world.store.rows.contains_key(&read_key));
+    world.restart(507, false);
+    assert!(world.store.rows.contains_key(&ended_key));
+    assert!(world.store.rows.contains_key(&read_key));
+    jig_core_world::reads::ask(&mut world, 81, core::reads::Read::Frame);
+    let core::reads::Answer::Document(frame) = jig_core_world::reads::latest(&world) else { panic!("frame") };
+    let core::documents::Document::Frame(frame) = frame.as_ref() else { panic!("frame") };
+    assert_eq!(frame.updates, core::documents::Count::Known(1));
+}
+
+#[test]
+fn marking_an_ended_chats_replies_after_its_result_forgets_it() {
+    let mut world = jig_core_world::stories::reads::world(508);
+    let task = world.assigned.as_ref().expect("chat").task;
+    world.turn(1, 1, None, b"reply");
+    finish_chat(&mut world);
+    let ended_key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) = &world.store.rows[&ended_key] else {
+        panic!("ended chat")
+    };
+    let through = row.result_position;
+    jig_core_world::stories::reads::request(
+        &mut world,
+        62,
+        people::Ask::MarkSeen { seen: people::Seen::Results { through } },
+    );
+    assert!(world.store.rows.contains_key(&ended_key));
+    mark_chat(&mut world, task);
+    let read_key = root::Key::Core(core::Key::People(people::Key::ReadChat { party: 1, task }));
+    assert!(!world.store.rows.contains_key(&ended_key));
+    assert!(!world.store.rows.contains_key(&read_key));
+    assert!(world.commits.iter().any(|writes| writes.contains(&root::Write::Erase(ended_key.clone()))
+        && writes.contains(&root::Write::Erase(read_key.clone()))));
+    world.restart(508, false);
+    jig_core_world::reads::ask(&mut world, 81, core::reads::Read::Task { task });
+    assert_eq!(jig_core_world::reads::latest(&world), &core::reads::Answer::None(core::reads::Why::Unknown));
+}
+
+fn mark_chat(world: &mut World, task: u64) {
+    jig_core_world::stories::reads::request(
+        world,
+        61,
+        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+    );
+}
+
+fn finish_chat(world: &mut World) {
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        1,
+    );
 }

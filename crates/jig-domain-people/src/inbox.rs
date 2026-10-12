@@ -177,6 +177,21 @@ impl Domain {
         Some(*self.chats_seen.get(&(person, task)).unwrap_or(&0))
     }
 
+    /// This person's bounded chat read positions.
+    #[must_use]
+    pub fn marked_chats(&self, person: u64) -> List<(u64, u64)> {
+        let mut positions = List::with_capacity(self.chat_totals.capacity());
+        for ((party, task), through) in &self.chats_seen {
+            if *party == person {
+                if positions.len() == self.chat_totals.capacity() {
+                    break;
+                }
+                positions.push((*task, *through)).expect("bounded party chat positions");
+            }
+        }
+        positions
+    }
+
     /// Exact reply count of a live chat, capped for its conversation line.
     #[must_use]
     pub fn chat_unread(&self, limits: &Limits, person: u64, task: u64) -> Option<Counts> {

@@ -1590,3 +1590,5 @@ fn a_proposal_makers_kind_is_kept_in_its_key_and_restored_answer() {
         assert_eq!(reply(&test.request(10, 1, other_ask)), Reply::Refused(Refusal::KeyConflict));
     }
 }
+
+mod marked_chats;

@@ -93,7 +93,11 @@ pub(super) fn tag_people(
     mut child: Queue<people::Request>,
     work: &mut Queue<Event>,
 ) -> Requests {
-    let room = people::max_out(&env.limits.people).checked_mul(4).expect("bounded party routes");
+    let room = people::max_out(&env.limits.people)
+        .checked_mul(4)
+        .expect("bounded party routes")
+        .checked_add(env.limits.people.inbox_tasks)
+        .expect("bounded party routes");
     let mut pending = Queue::with_capacity(room);
     for _ in 0..child.len() {
         pending.push(child.pop().expect("party output count"));
@@ -251,10 +255,17 @@ pub(super) fn tag_people(
                         deadline,
                     ),
                     people::Ask::MarkSeen { seen } => match seen {
-                        people::Seen::Results { .. } => work.push(Event::People(people::Event::Decided {
-                            request,
-                            outcome: people::Outcome::MarkedSeen { seen },
-                        })),
+                        people::Seen::Results { .. } => {
+                            work.push(Event::People(people::Event::Decided {
+                                request,
+                                outcome: people::Outcome::MarkedSeen { seen },
+                            }));
+                            for (task, _) in core.people.marked_chats(person).into_boxed() {
+                                if core.tasks.task(task).is_none() {
+                                    out.push(Request::Now(Box::new(Now::LoadEndedChat { task })));
+                                }
+                            }
+                        }
                         people::Seen::Chat { task, .. } => match core.tasks.task(task) {
                             Some(row) => {
                                 if core.chat_requester(row) == Some(person)

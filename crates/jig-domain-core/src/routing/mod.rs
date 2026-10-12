@@ -278,6 +278,7 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
     let brief = brief::gather_max_out(&limits.brief).checked_mul(4)?;
     tasks
         .checked_add(people)?
+        .checked_add(limits.people.inbox_tasks)?
         .checked_add(fleet)?
         .checked_add(brief)?
         .checked_add(limits.people.pending.checked_mul(2)?)?

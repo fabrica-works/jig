@@ -375,7 +375,15 @@ pub(crate) fn seen_chat_loaded(
                 outcome: people::Outcome::Refused(people::Refusal::Role { held: core.people.role(party, row.project) }),
             }
         } else {
-            people::Event::ChatSeen { request, project: row.project, last_reply: row.last_reply }
+            work.push(crate::Event::People(people::Event::ChatSeen {
+                request,
+                project: row.project,
+                last_reply: row.last_reply,
+            }));
+            work.push(crate::Event::ForgetChat { row });
+            let mut out = skein_lib::Queue::with_capacity(1);
+            out.push(crate::Request::Decided);
+            return crate::Requests::Out(out);
         }
     } else {
         people::Event::Decided { request, outcome: people::Outcome::Refused(people::Refusal::Unknown) }

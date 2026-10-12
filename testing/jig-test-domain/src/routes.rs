@@ -496,7 +496,7 @@ fn route_now(
             };
             work.push(Work::Core(core::Event::RefusedPayload { request, problem, payload }));
         }
-        core::Now::SeenChat { .. } | core::Now::CompleteBrief { .. } | core::Now::RestoreRefused => {
+        core::Now::CompleteBrief { .. } | core::Now::RestoreRefused => {
             unreachable!("this route awaits the testing application's scripted peer");
         }
         core::Now::ProcedureDelegateOutcome { task, step, child } => {
@@ -509,7 +509,9 @@ fn route_now(
                 });
             }
         }
-        other @ (core::Now::HistoricalPersonTask { .. }
+        other @ (core::Now::SeenChat { .. }
+        | core::Now::LoadEndedChat { .. }
+        | core::Now::HistoricalPersonTask { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::SettledCallRefused { .. }

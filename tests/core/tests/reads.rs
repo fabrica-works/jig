@@ -211,10 +211,8 @@ fn a_forgotten_chats_result_leaves_the_updates_index() {
         panic!("ended chat")
     };
     let through = ended.result_position;
-    let row = ended.clone();
     let reply = world.store.rows.keys().find(|key| matches!(key, root::Key::Core(core::Key::Tasks(tasks::Key::Update { task: number, object: tasks::UpdateObject::Reply { .. }, .. })) if number.value() == task)).expect("reply index").clone();
     request(&mut world, 70, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
-    world.send(root::Event::Core(core::Event::ForgetChat { row }));
     assert!(!world.store.rows.contains_key(&key));
     assert!(world.store.rows.contains_key(&reply));
     let group = reads::Group::Updates;

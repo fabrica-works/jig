@@ -678,19 +678,6 @@ pub(super) fn tag_tasks(
                 }
                 let record = match record {
                     tasks::Stored::Ended(mut task) => {
-                        if task.last_reply == 0 {
-                            append_people(
-                                core,
-                                env,
-                                people::Event::ForgetChat {
-                                    project: task.project,
-                                    task: task.number,
-                                    party: core.chat_requester(&task),
-                                    last_reply: 0,
-                                },
-                                &mut out,
-                            );
-                        }
                         let position = crate::fresh(&mut core.counters, crate::Family::Message)
                             .expect("ending position preflighted before mutation");
                         task.result_position = position;

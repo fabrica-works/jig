@@ -242,6 +242,8 @@ pub enum Now {
     StartPreparation { task: u64, transcript_waiter: Option<Token> },
     /// Load one proposal decision that has left live task memory.
     SeenChat { request: Token, task: u64 },
+    /// Load an ended chat; answer `ForgetChat` if its row still exists.
+    LoadEndedChat { task: u64 },
     /// Load one proposal decision that has left live task memory.
     HistoricalProposal { request: Token, person: u64, project: u32, proposer: people::Proposer, proposal: u64 },
     /// Load the ended owner row for a person-task act whose live row is gone.
