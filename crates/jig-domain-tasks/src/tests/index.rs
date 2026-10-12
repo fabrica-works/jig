@@ -38,3 +38,10 @@ fn one_partys_updates_sort_before_the_next_partys() {
     let second = Key::Update { party: 8, at: Newest::of(2_000), task: Newest::of(20), object: UpdateObject::Result };
     assert!(first < second);
 }
+
+#[test]
+fn a_newer_conversation_sorts_first_in_the_newest_family() {
+    let older = Key::ConversationNewest { party: 7, task: Newest::of(20) };
+    let newer = Key::ConversationNewest { party: 7, task: Newest::of(30) };
+    assert!(newer < older);
+}

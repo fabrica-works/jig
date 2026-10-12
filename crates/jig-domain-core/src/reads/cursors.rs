@@ -103,14 +103,22 @@ pub(super) fn stored_edges(
     };
     if !range.backwards {
         let before = match next {
-            Some(before) => Some(Cursor::ConversationsBefore { before }),
+            Some(before) => Some(Cursor::ConversationsBefore {
+                before: super::indexed::conversation_position(&before, false).expect("conversation position"),
+            }),
             None => live_tail(core, limits, range.party),
+        };
+        let first = match first {
+            Some(first) => super::indexed::conversation_position(&first, true),
+            None => None,
         };
         return (before, Some(Cursor::Store { scope: Scope::Conversations, after: first }));
     }
     let before = match &range.after {
         Some(_) => match first {
-            Some(before) => Some(Cursor::ConversationsBefore { before }),
+            Some(before) => Some(Cursor::ConversationsBefore {
+                before: super::indexed::conversation_position(&before, false).expect("conversation position"),
+            }),
             None => None,
         },
         None => live_tail(core, limits, range.party),

@@ -416,7 +416,9 @@ pub(super) fn from_store(
         let Some(key) = row_key(row) else {
             return Answer::None(Why::Unknown);
         };
-        if !position_allowed(&range.scope, &key) || !later(previous.as_ref(), &key, range.backwards) {
+        if !position_allowed(&range.scope, &key)
+            || !later(previous.as_ref(), &key, range.backwards && range.scope != Scope::Conversations)
+        {
             return Answer::None(Why::Unknown);
         }
         previous = Some(key);
@@ -425,7 +427,7 @@ pub(super) fn from_store(
         // A continuation names the last examined row, including filtered rows.
         if !position_allowed(&range.scope, next)
             || previous.as_ref() != Some(next)
-            || !later(range.after.as_ref(), next, range.backwards)
+            || !later(range.after.as_ref(), next, range.backwards && range.scope != Scope::Conversations)
         {
             return Answer::None(Why::Unknown);
         }
@@ -628,6 +630,8 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::Stub(_)
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
+                | tasks::Stored::ConversationNewest(_)
+                | tasks::Stored::ConversationOldest(_)
                 | tasks::Stored::Update(_)
                 | tasks::Stored::Pool(_)
                 | tasks::Stored::ClosedLedger(_),
@@ -832,6 +836,8 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::Stub(_)
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
+                    | tasks::Stored::ConversationNewest(_)
+                    | tasks::Stored::ConversationOldest(_)
                     | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::ClosedLedger(_)
@@ -944,24 +950,7 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                 held_below: 0,
             })))
         }
-        Scope::Conversations => {
-            let Some(owner) = row_owner(&row) else {
-                return Ok(None);
-            };
-            if owner.requester != tasks::Party::Person(range.party)
-                || owner.tracked.is_some()
-                || owner.recurring.is_some()
-                || !ended(owner)
-                || core.tasks.task(owner.number).is_some()
-            {
-                return Ok(None);
-            }
-            match owner.executor {
-                tasks::Executor::Agent { .. } => {}
-                tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => return Ok(None),
-            }
-            Ok(Some(PageRow::Conversation(documents::conversation_from_row(core, limits, range.party, owner)?)))
-        }
+        Scope::Conversations => super::indexed::conversation_row(core, limits, range, &row),
         Scope::Inbox { group, filter } => inbox_row(core, limits, range.party, *group, *filter, row),
         Scope::Task { .. }
         | Scope::Proposal { .. }
@@ -1014,6 +1003,8 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_),
@@ -1058,6 +1049,8 @@ fn inbox_row(
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_),
@@ -1297,6 +1290,8 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)
@@ -1320,6 +1315,8 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)
@@ -1386,6 +1383,8 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::Ended(_)
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::DecidedProposal(_),
@@ -1462,7 +1461,8 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     | KeyKind::Ledger(_)
                     | KeyKind::Unsupported => false,
                 },
-                Scope::EndedDelegates { .. } | Scope::Conversations | Scope::Goals { .. } => match kind {
+                Scope::Conversations => super::indexed::conversation_position(position, true).is_some(),
+                Scope::EndedDelegates { .. } | Scope::Goals { .. } => match kind {
                     KeyKind::Ended(_) => true,
                     KeyKind::Live(_)
                     | KeyKind::History(_)
@@ -1519,6 +1519,8 @@ fn key_kind(key: &Key) -> KeyKind {
             | tasks::Key::Stub(_)
             | tasks::Key::Writer(_)
             | tasks::Key::Pool(_)
+            | tasks::Key::ConversationNewest { .. }
+            | tasks::Key::ConversationOldest { .. }
             | tasks::Key::Update { .. } => KeyKind::Unsupported,
         },
         Key::Core(value) => match value {

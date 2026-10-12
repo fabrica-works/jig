@@ -321,6 +321,8 @@ pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)
@@ -359,6 +361,8 @@ pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
             | tasks::Stored::Milestone(_)
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         ) => match row_owner(row) {

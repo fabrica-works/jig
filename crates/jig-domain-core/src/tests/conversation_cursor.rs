@@ -19,7 +19,10 @@ fn retained(core: &Core, number: u64) -> reads::Row {
         result: None,
     });
     owner.ended_at = Some(Wall::from_nanos(number));
-    stored_row(Record::Tasks(tasks::Stored::Ended(Box::new(owner))), None)
+    stored_row(
+        Record::Tasks(tasks::Stored::ConversationNewest(tasks::Conversation { party: 1, task: number })),
+        Some(owner),
+    )
 }
 
 fn load(core: &mut Core, limits: &Limits, from: reads::Cursor) -> (Token, reads::Range) {
@@ -177,10 +180,10 @@ fn conversation_continuations_preserve_filtered_last_examined_positions_and_visi
     limits.documents.rows = 2;
     let start = continuation(&core, &limits, None);
     let mut invisible = retained(&core, 20);
-    let Record::Tasks(tasks::Stored::Ended(owner)) = &mut invisible.value else { panic!("owner") };
+    let owner = invisible.owner.as_mut().expect("owner");
     owner.project = 99;
     let mut foreign = retained(&core, 19);
-    let Record::Tasks(tasks::Stored::Ended(owner)) = &mut foreign.value else { panic!("owner") };
+    let owner = foreign.owner.as_mut().expect("owner");
     owner.requester = tasks::Party::Person(2);
     let next = reads::row_key(&foreign).expect("last examined owner");
     let (token, _) = load(&mut core, &limits, start);
@@ -340,7 +343,7 @@ fn backward_page(core: &mut Core, limits: &Limits, from: reads::Cursor, ids: &[u
     assert_eq!(range.after, Some(before));
     assert_eq!(range.rows, limits.documents.rows);
     assert_eq!(range.bytes, limits.load_bytes);
-    let rows = retained_rows(core, ids);
+    let rows = oldest_rows(core, ids);
     let next = if more { Some(reads::row_key(rows.last().expect("examined row")).expect("owner key")) } else { None };
     let reads::Answer::Page(page) =
         loaded_answer(core, limits, load, reads::Loaded::Page { rows, next }).expect("one terminal")
@@ -355,7 +358,7 @@ fn backward_page(core: &mut Core, limits: &Limits, from: reads::Cursor, ids: &[u
 fn conversation_owner_opposite_store_pages_preserve_order_and_bridge_back_to_all_live_rows() {
     let (mut core, limits) = five_live();
     let before = reads::Cursor::ConversationsBefore {
-        before: reads::row_key(&retained(&core, 5)).expect("current page first examined owner"),
+        before: reads::row_key(&oldest(&core, 5)).expect("current page first examined owner"),
     };
     let middle = backward_page(&mut core, &limits, before, &[6, 7], true);
     assert_eq!(numbers(&middle).as_ref(), [7, 6]);
@@ -386,7 +389,7 @@ fn conversation_owner_opposite_cursors_refuse_foreign_queries_and_keep_empty_pre
     for from in [
         reads::Cursor::ConversationsStart,
         reads::Cursor::ConversationsLiveBefore { before: None },
-        reads::Cursor::ConversationsBefore { before: reads::row_key(&retained(&core, 9)).expect("owner key") },
+        reads::Cursor::ConversationsBefore { before: reads::row_key(&oldest(&core, 9)).expect("owner key") },
     ] {
         let Held::Read { answer, .. } =
             read_start(&mut core, &limits, 10, reads::Read::Goals { project: 1, from: Some(from) })
@@ -405,7 +408,7 @@ fn conversation_owner_opposite_cursors_refuse_foreign_queries_and_keep_empty_pre
 
 fn reverse_load(core: &mut Core, limits: &Limits, number: u64) -> Token {
     core.reclaim();
-    let before = reads::row_key(&retained(core, number)).expect("owner boundary");
+    let before = reads::row_key(&oldest(core, number)).expect("owner boundary");
     let Held::ReadLoad { load, range } = read_start(
         core,
         limits,
@@ -427,14 +430,13 @@ fn conversation_owner_reverse_filtered_pages_use_examined_positions_in_both_dire
     let (mut core, mut limits) = watch_core();
     limits.documents.rows = 2;
     let token = reverse_load(&mut core, &limits, 5);
-    let mut first = retained(&core, 6);
-    let Record::Tasks(tasks::Stored::Ended(owner)) = &mut first.value else { panic!("owner") };
+    let mut first = oldest(&core, 6);
+    let owner = first.owner.as_mut().expect("owner");
     owner.project = 99;
-    let mut last = retained(&core, 7);
-    let Record::Tasks(tasks::Stored::Ended(owner)) = &mut last.value else { panic!("owner") };
+    let mut last = oldest(&core, 7);
+    let owner = last.owner.as_mut().expect("owner");
     owner.requester = tasks::Party::Person(2);
     let head = reads::row_key(&last).expect("last examined");
-    let tail = reads::row_key(&first).expect("first examined");
     let reads::Answer::Page(page) = loaded_answer(
         &mut core,
         &limits,
@@ -447,7 +449,16 @@ fn conversation_owner_reverse_filtered_pages_use_examined_positions_in_both_dire
     assert!(page.rows.is_empty());
     assert!(!page.cut);
     assert_eq!(page.before, Some(reads::Cursor::ConversationsBefore { before: head }));
-    assert_eq!(page.next, Some(reads::Cursor::Store { scope: reads::Scope::Conversations, after: Some(tail) }));
+    assert_eq!(
+        page.next,
+        Some(reads::Cursor::Store {
+            scope: reads::Scope::Conversations,
+            after: Some(reads::Position::Owner(Key::Tasks(tasks::Key::ConversationNewest {
+                party: 1,
+                task: tasks::Newest::of(6)
+            })))
+        })
+    );
     let previous = backward_page(&mut core, &limits, page.before.expect("filtered prefix progresses"), &[8, 9], false);
     assert_eq!(numbers(&previous).as_ref(), [9, 8]);
     assert_eq!(previous.before, Some(reads::Cursor::ConversationsLiveBefore { before: None }));
@@ -458,12 +469,12 @@ fn conversation_owner_reverse_pages_refuse_row_byte_and_last_examined_overruns_w
     let (mut core, mut limits) = watch_core();
     limits.documents.rows = 1;
     let token = reverse_load(&mut core, &limits, 5);
-    let rows = retained_rows(&core, &[6, 7]);
+    let rows = oldest_rows(&core, &[6, 7]);
     assert_eq!(
         loaded_answer(&mut core, &limits, token, reads::Loaded::Page { rows, next: None }),
         Some(reads::Answer::None(reads::Why::Busy))
     );
-    let row = retained(&core, 6);
+    let row = oldest(&core, 6);
     limits.load_bytes = row.owned_bytes().expect("whole owned row").checked_sub(1).expect("nonempty payload");
     let token = reverse_load(&mut core, &limits, 5);
     assert_eq!(
@@ -472,17 +483,62 @@ fn conversation_owner_reverse_pages_refuse_row_byte_and_last_examined_overruns_w
     );
     limits.load_bytes = 1_000_000;
     let token = reverse_load(&mut core, &limits, 5);
-    let wrong = reads::row_key(&retained(&core, 7)).expect("wrong last examined");
-    let rows = retained_rows(&core, &[6]);
+    let wrong = reads::row_key(&oldest(&core, 7)).expect("wrong last examined");
+    let rows = oldest_rows(&core, &[6]);
     assert_eq!(
         loaded_answer(&mut core, &limits, token, reads::Loaded::Page { rows, next: Some(wrong) }),
         Some(reads::Answer::None(reads::Why::Unknown))
     );
     let token = reverse_load(&mut core, &limits, 5);
-    let rows = retained_rows(&core, &[6]);
+    let rows = oldest_rows(&core, &[6]);
     restore_document_party(&mut core, &limits, &[]);
     assert_eq!(
         loaded_answer(&mut core, &limits, token, reads::Loaded::Page { rows, next: None }),
         Some(reads::Answer::None(reads::Why::Unknown))
     );
+}
+
+fn oldest(core: &Core, number: u64) -> reads::Row {
+    let mut row = retained(core, number);
+    row.value = Record::Tasks(tasks::Stored::ConversationOldest(tasks::Conversation { party: 1, task: number }));
+    row
+}
+fn oldest_rows(core: &Core, ids: &[u64]) -> Box<[reads::Row]> {
+    let mut rows = List::with_capacity(u32::try_from(ids.len()).expect("fixture bound"));
+    for number in ids {
+        rows.push(oldest(core, *number)).expect("fixture bound");
+    }
+    rows.into_boxed()
+}
+
+#[test]
+fn a_before_cursor_continues_in_the_oldest_family() {
+    let (mut core, mut limits) = watch_core();
+    limits.documents.rows = 1;
+    let (load, _) = load(
+        &mut core,
+        &limits,
+        reads::Cursor::Store {
+            scope: reads::Scope::Conversations,
+            after: Some(reads::Position::Owner(Key::Tasks(tasks::Key::ConversationNewest {
+                party: 1,
+                task: tasks::Newest::of(10),
+            }))),
+        },
+    );
+    let rows = retained_rows(&core, &[9]);
+    let reads::Answer::Page(page) =
+        loaded_answer(&mut core, &limits, load, reads::Loaded::Page { rows, next: None }).expect("page")
+    else {
+        panic!("page")
+    };
+    let before = page.before.expect("before cursor");
+    assert_eq!(
+        before,
+        reads::Cursor::ConversationsBefore {
+            before: reads::Position::Owner(Key::Tasks(tasks::Key::ConversationOldest { party: 1, task: 9 }))
+        }
+    );
+    let page = backward_page(&mut core, &limits, before, &[10], false);
+    assert_eq!(numbers(&page).as_ref(), [10]);
 }

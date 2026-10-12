@@ -412,6 +412,8 @@ pub fn restore_key(key: &crate::Key) -> bool {
             | tasks::Key::Stub(_)
             | tasks::Key::Ledger(_)
             | tasks::Key::Writer(_)
+            | tasks::Key::ConversationNewest { .. }
+            | tasks::Key::ConversationOldest { .. }
             | tasks::Key::Update { .. }
             | tasks::Key::Pool(_)
             | tasks::Key::ClosedLedger(_)
@@ -488,6 +490,8 @@ impl Core {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)
@@ -507,7 +511,7 @@ pub(crate) fn forget_chat(
     work: &mut skein_lib::Queue<crate::Event>,
     row: &tasks::TaskRecord,
 ) -> crate::Requests {
-    let mut out = skein_lib::Queue::with_capacity(3);
+    let mut out = skein_lib::Queue::with_capacity(5);
     if matches_ended(&row.phase)
         && core.people.ready()
         && valid_header(core, &env.limits, row)
@@ -532,6 +536,12 @@ pub(crate) fn forget_chat(
             object: tasks::UpdateObject::Result,
         };
         out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(update.key()))));
+        for key in [
+            tasks::Key::ConversationNewest { party, task: tasks::Newest::of(row.number) },
+            tasks::Key::ConversationOldest { party, task: row.number },
+        ] {
+            out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(key))));
+        }
     }
     out.push(crate::Request::Decided);
     crate::Requests::Out(out)

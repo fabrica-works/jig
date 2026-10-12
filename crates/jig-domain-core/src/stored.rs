@@ -362,7 +362,9 @@ impl Core {
                 true
             }
             tasks::Stored::Ledger(_) | tasks::Stored::Writer(_) | tasks::Stored::Pool(_) => true,
-            tasks::Stored::Update(_)
+            tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
+            | tasks::Stored::Update(_)
             | tasks::Stored::Ended(_)
             | tasks::Stored::ClosedLedger(_)
             | tasks::Stored::DecidedProposal(_)

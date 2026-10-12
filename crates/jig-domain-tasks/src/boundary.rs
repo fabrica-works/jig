@@ -972,59 +972,7 @@ pub struct TaskRecord {
     pub phase: Phase,
 }
 
-/// Logical store `key` for task state or financial history, with no byte encoding performed
-/// in this child. (domain/tasks.md, section 2).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Key {
-    /// Logical mutable live-task row.
-    Live(u64),
-    /// Working-set pointer retained while a live task names the ending.
-    Stub(u64),
-    /// Logical finite period/pool row.
-    Ledger(Funder),
-    /// One occupied writer slot for a held resource.
-    Writer(u64),
-    /// Last known capacity for a connector pool.
-    Pool(u64),
-    /// A person-origin proposal.
-    PersonProposal(u64),
-    /// Logical historical ended-task row.
-    Ended(u64),
-    /// A closed funding source retained for spend pages.
-    ClosedLedger(Funder),
-    /// A decided person-origin proposal.
-    DecidedProposal(u64),
-    /// Immutable plan change outside the live arena.
-    History { task: u64, revision: u64 },
-    /// One immutable lifecycle milestone in a task's history.
-    Milestone { task: u64, position: u64 },
-    /// One immutable line in the ordered task activity range.
-    Activity { task: u64, position: u64 },
-    /// One party's update in newest-first order.
-    Update { party: u64, at: crate::Newest, task: crate::Newest, object: crate::UpdateObject },
-}
-
-impl Key {
-    /// Whether a restart loads this family (protocol/store.md, 7.2).
-    #[must_use]
-    pub const fn live(&self) -> bool {
-        match self {
-            Self::Live(_)
-            | Self::Stub(_)
-            | Self::Ledger(_)
-            | Self::Writer(_)
-            | Self::Pool(_)
-            | Self::PersonProposal(_) => true,
-            Self::Ended(_)
-            | Self::ClosedLedger(_)
-            | Self::DecidedProposal(_)
-            | Self::History { .. }
-            | Self::Milestone { .. }
-            | Self::Activity { .. }
-            | Self::Update { .. } => false,
-        }
-    }
-}
+pub use crate::index::Key;
 
 /// Tasks-to-root persistence row or root-to-tasks startup restore input; live tasks,
 /// funding, writer slots and pool counts are restored before admission.
@@ -1032,6 +980,8 @@ impl Key {
 pub enum Stored {
     /// One party's durable update index.
     Update(crate::Update),
+    ConversationNewest(crate::Conversation),
+    ConversationOldest(crate::Conversation),
     /// Historical activity loaded on demand, never restored as live state.
     Activity(crate::ActivityLine),
     /// One immutable lifecycle milestone, loaded on demand.
@@ -1076,6 +1026,10 @@ impl Stored {
     pub const fn key(&self) -> Key {
         match self {
             Stored::Update(row) => row.key(),
+            Stored::ConversationNewest(row) => {
+                Key::ConversationNewest { party: row.party, task: crate::Newest::of(row.task) }
+            }
+            Stored::ConversationOldest(row) => Key::ConversationOldest { party: row.party, task: row.task },
             Stored::PersonProposal(row) => Key::PersonProposal(row.number),
             Stored::DecidedProposal(row) => Key::DecidedProposal(row.number),
             Stored::ClosedLedger(row) => Key::ClosedLedger(row.funder),

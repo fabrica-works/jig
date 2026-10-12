@@ -763,6 +763,8 @@ impl World {
                 | Stored::Activity(_)
                 | Stored::Milestone(_)
                 | Stored::History(_)
+                | Stored::ConversationNewest(_)
+                | Stored::ConversationOldest(_)
                 | Stored::Update(_)
                 | Stored::PersonProposal(_) => {}
             }
@@ -788,6 +790,8 @@ impl World {
             Stored::Live(record) => record,
             Stored::Ended(_)
             | Stored::Writer(_)
+            | Stored::ConversationNewest(_)
+            | Stored::ConversationOldest(_)
             | Stored::Update(_)
             | Stored::Pool(_)
             | Stored::ClosedLedger(_)
@@ -826,6 +830,8 @@ impl World {
                 | Key::Milestone { .. }
                 | Key::Activity { .. }
                 | Key::History { .. }
+                | Key::ConversationNewest { .. }
+                | Key::ConversationOldest { .. }
                 | Key::Update { .. }
                 | Key::PersonProposal(_) => None,
             })
@@ -886,6 +892,8 @@ impl World {
                 Stored::Live(record) | Stored::Ended(record) => Some(record.attempt),
                 Stored::Ledger(_)
                 | Stored::Writer(_)
+                | Stored::ConversationNewest(_)
+                | Stored::ConversationOldest(_)
                 | Stored::Update(_)
                 | Stored::Pool(_)
                 | Stored::ClosedLedger(_)
@@ -1154,6 +1162,8 @@ fn live_row(record: &Stored) -> Option<&jig_domain_tasks::TaskRecord> {
         | Stored::History(_)
         | Stored::Milestone(_)
         | Stored::Activity(_)
+        | Stored::ConversationNewest(_)
+        | Stored::ConversationOldest(_)
         | Stored::Update(_)
         | Stored::ClosedLedger(_)
         | Stored::DecidedProposal(_) => None,

@@ -7,6 +7,14 @@ use jig_domain_tasks as tasks;
 /// Continue a live window in the index's physical order.
 #[must_use]
 pub fn index_key(scope: &Scope, party: u64, cursor: documents::Cursor, activity: Option<u64>) -> Option<Key> {
+    if *scope == Scope::Conversations {
+        return match cursor {
+            documents::Cursor::Number { number } => {
+                Some(Key::Tasks(tasks::Key::ConversationNewest { party, task: tasks::Newest::of(number) }))
+            }
+            documents::Cursor::Inbox { .. } => None,
+        };
+    }
     let Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. } = scope else { return None };
     let documents::Cursor::Inbox { task, at: Some(at), object } = cursor else { return None };
     let object = match object {
@@ -111,10 +119,74 @@ pub(super) fn is_update(key: &Key) -> bool {
             | tasks::Key::PersonProposal(_)
             | tasks::Key::History { .. }
             | tasks::Key::Milestone { .. }
-            | tasks::Key::Activity { .. },
+            | tasks::Key::Activity { .. }
+            | tasks::Key::ConversationNewest { .. }
+            | tasks::Key::ConversationOldest { .. },
         )
         | Key::Core(_)
         | Key::People(_)
         | Key::Notes(_) => false,
     }
+}
+
+/// Name the same conversation in the family for its continuation's direction.
+pub(super) fn conversation_position(position: &Position, newest: bool) -> Option<Position> {
+    let (party, task) = match position {
+        Position::Owner(Key::Tasks(tasks::Key::ConversationNewest { party, task })) => (*party, task.value()),
+        Position::Owner(Key::Tasks(tasks::Key::ConversationOldest { party, task })) => (*party, *task),
+        Position::Owner(_) | Position::Inbox { .. } => return None,
+    };
+    let key = if newest {
+        tasks::Key::ConversationNewest { party, task: tasks::Newest::of(task) }
+    } else {
+        tasks::Key::ConversationOldest { party, task }
+    };
+    Some(Position::Owner(Key::Tasks(key)))
+}
+
+pub(super) fn conversation_row(
+    core: &crate::Core,
+    limits: &crate::Limits,
+    range: &super::Range,
+    row: &super::Row,
+) -> Result<Option<super::PageRow>, documents::Missing> {
+    let conversation = match &row.value {
+        crate::Record::Tasks(tasks::Stored::ConversationNewest(row)) if range.backwards => row,
+        crate::Record::Tasks(tasks::Stored::ConversationOldest(row)) if !range.backwards => row,
+        crate::Record::Tasks(
+            tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
+            | tasks::Stored::ClosedLedger(_)
+            | tasks::Stored::DecidedProposal(_)
+            | tasks::Stored::Update(_)
+            | tasks::Stored::Activity(_)
+            | tasks::Stored::Live(_)
+            | tasks::Stored::Ended(_)
+            | tasks::Stored::Stub(_)
+            | tasks::Stored::Ledger(_)
+            | tasks::Stored::Pool(_)
+            | tasks::Stored::Writer(_)
+            | tasks::Stored::History(_)
+            | tasks::Stored::Milestone(_)
+            | tasks::Stored::PersonProposal(_),
+        )
+        | crate::Record::Core(_)
+        | crate::Record::People(_)
+        | crate::Record::Notes(_) => return Ok(None),
+    };
+    let Some(owner) = &row.owner else { return Ok(None) };
+    if conversation.party != range.party
+        || conversation.task != owner.number
+        || core.chat_requester(owner) != Some(range.party)
+    {
+        return Ok(None);
+    }
+    let ended = match &owner.phase {
+        tasks::Phase::Ended(_) => true,
+        tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => false,
+    };
+    if !ended || core.tasks.task(owner.number).is_some() {
+        return Ok(None);
+    }
+    Ok(Some(super::PageRow::Conversation(documents::conversation_from_row(core, limits, range.party, owner)?)))
 }

@@ -252,3 +252,93 @@ fn the_results_group_pages_results_only_from_the_index() {
     let reads::PageRow::Inbox(entry) = value.rows.get(0).expect("result") else { panic!("inbox result") };
     assert!(matches!(entry.object, documents::InboxObject::Result { .. }));
 }
+
+fn ended_chats(world: &mut jig_core_world::effects::World) -> Vec<u64> {
+    let mut chats = Vec::new();
+    for number in 0..3 {
+        if number != 0 {
+            request(world, 80 + number, people::Ask::StartChat { project: 1, words: b"next".as_slice().into() });
+        }
+        chats.push(world.assigned.as_ref().expect("chat").task);
+        world.end(
+            tasks::End::Finished {
+                result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+                cancel_delegates: false,
+            },
+            0,
+        );
+    }
+    chats
+}
+fn conversation_numbers(answer: &reads::Answer) -> Vec<u64> {
+    let reads::Answer::Page(page) = answer else { panic!("conversation page") };
+    page.rows
+        .iter()
+        .map(|row| {
+            let reads::PageRow::Conversation(row) = row else { panic!("conversation") };
+            row.chip.number
+        })
+        .collect()
+}
+#[test]
+fn conversations_page_both_ways_from_the_index() {
+    let mut world = world(783);
+    let chats = ended_chats(&mut world);
+    world.restart(783, false);
+    ask(
+        &mut world,
+        740,
+        reads::Read::Conversations {
+            from: Some(reads::Cursor::Store { scope: reads::Scope::Conversations, after: None }),
+        },
+    );
+    assert_eq!(conversation_numbers(latest(&world)), [chats[2], chats[1]]);
+    let reads::Answer::Page(first) = latest(&world) else { panic!("first page") };
+    let from = first.next.clone();
+    ask(&mut world, 741, reads::Read::Conversations { from });
+    assert_eq!(conversation_numbers(latest(&world)), [chats[0]]);
+    let reads::Answer::Page(last) = latest(&world) else { panic!("last page") };
+    let from = last.before.clone();
+    ask(&mut world, 742, reads::Read::Conversations { from });
+    assert_eq!(conversation_numbers(latest(&world)), [chats[2], chats[1]]);
+}
+#[test]
+fn a_forgotten_chat_leaves_both_conversation_families() {
+    let mut world = world(784);
+    let task = world.assigned.as_ref().expect("chat").task;
+    world.turn(1, 1, None, b"reply");
+    world.end(
+        tasks::End::Finished {
+            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
+            cancel_delegates: false,
+        },
+        1,
+    );
+    let newest =
+        root::Key::Core(core::Key::Tasks(tasks::Key::ConversationNewest { party: 1, task: tasks::Newest::of(task) }));
+    let oldest = root::Key::Core(core::Key::Tasks(tasks::Key::ConversationOldest { party: 1, task }));
+    assert!(world.store.rows.contains_key(&newest));
+    assert!(world.store.rows.contains_key(&oldest));
+    let through = result_position(&world, task);
+    request(&mut world, 91, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, 92, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
+    assert!(!world.store.rows.contains_key(&newest));
+    assert!(!world.store.rows.contains_key(&oldest));
+    ask(
+        &mut world,
+        743,
+        reads::Read::Conversations {
+            from: Some(reads::Cursor::Store { scope: reads::Scope::Conversations, after: None }),
+        },
+    );
+    assert_eq!(conversation_numbers(latest(&world)), []);
+}
+
+fn result_position(world: &jig_core_world::effects::World, task: u64) -> u64 {
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))]
+    else {
+        panic!("ended chat")
+    };
+    row.result_position
+}

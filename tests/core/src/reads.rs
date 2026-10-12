@@ -221,9 +221,18 @@ fn row(store: &Store, value: &core::Record, task: &tasks::TaskRecord) -> reads::
     }
 }
 
-fn conversation_row(store: &Store, value: &core::Record) -> Option<reads::Row> {
-    let core::Record::Tasks(tasks::Stored::Ended(owner)) = value else { return None };
-    Some(row(store, value, owner))
+fn conversation_row(store: &Store, range: &reads::Range, value: &core::Record) -> Option<reads::Row> {
+    let conversation = match value {
+        core::Record::Tasks(tasks::Stored::ConversationNewest(row)) if range.backwards => row,
+        core::Record::Tasks(tasks::Stored::ConversationOldest(row)) if !range.backwards => row,
+        core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
+            return None;
+        }
+    };
+    if conversation.party != range.party {
+        return None;
+    }
+    Some(row(store, value, owner(store, conversation.task)?))
 }
 
 fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Option<reads::Row> {
@@ -294,7 +303,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
                 inbox: None,
             })
         }
-        reads::Scope::Conversations => conversation_row(store, value),
+        reads::Scope::Conversations => conversation_row(store, range, value),
         reads::Scope::Turn { task, attempt, turn } => {
             let core::Record::Core(core::CoreRecord::Turn(line)) = value else { return None };
             if line.task != *task || line.attempt != *attempt || line.turn != *turn {
@@ -325,14 +334,14 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
 #[must_use]
 pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
     let mut ordered = BTreeMap::new();
-    let bounds = update_bounds(range);
+    let bounds = index_bounds(range);
     let bounds = match bounds {
         Some((first, last)) => {
             let first = match &range.after {
-                Some(reads::Position::Owner(core::Key::Tasks(key @ tasks::Key::Update { party, .. })))
-                    if *party == range.party =>
+                Some(reads::Position::Owner(key))
+                    if root::Key::Core(key.clone()) >= first && root::Key::Core(key.clone()) <= last =>
                 {
-                    std::ops::Bound::Excluded(root::Key::Core(core::Key::Tasks(*key)))
+                    std::ops::Bound::Excluded(root::Key::Core(key.clone()))
                 }
                 Some(reads::Position::Owner(_) | reads::Position::Inbox { .. }) | None => {
                     std::ops::Bound::Included(first)
@@ -353,7 +362,7 @@ pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
         .into_iter()
         .filter(|(position, _)| match &range.after {
             Some(after) => {
-                if range.backwards {
+                if range.backwards && range.scope != reads::Scope::Conversations {
                     position < after
                 } else {
                     position > after
@@ -362,7 +371,7 @@ pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
             None => true,
         })
         .collect();
-    if range.backwards {
+    if range.backwards && range.scope != reads::Scope::Conversations {
         candidates.reverse();
     }
     let mut rows = Vec::new();
@@ -421,7 +430,7 @@ pub fn complete(world: &mut World) {
     world.send_all(events);
 }
 
-fn update_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
+fn index_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
     match range.scope {
         reads::Scope::Inbox {
             group: reads::Group::Updates | reads::Group::Results | reads::Group::Replies, ..
@@ -446,6 +455,16 @@ fn update_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
                 ),
             ))
         }
+        reads::Scope::Conversations => {
+            let key = |number| {
+                root::Key::Core(core::Key::Tasks(if range.backwards {
+                    tasks::Key::ConversationNewest { party: range.party, task: tasks::Newest::from_raw(number) }
+                } else {
+                    tasks::Key::ConversationOldest { party: range.party, task: number }
+                }))
+            };
+            Some((key(0), key(u64::MAX)))
+        }
         reads::Scope::Task { .. }
         | reads::Scope::Proposal { .. }
         | reads::Scope::Escalation { .. }
@@ -466,7 +485,6 @@ fn update_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
                 | reads::Group::PersonTasks,
             ..
         }
-        | reads::Scope::Conversations
         | reads::Scope::Goals { .. }
         | reads::Scope::Notes { .. }
         | reads::Scope::ScopedNotes { .. }

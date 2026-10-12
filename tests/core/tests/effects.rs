@@ -205,6 +205,8 @@ fn retained_effect_core(seed: u64) -> (core::Core, core::Limits, core::CallKey) 
         if let root::Record::Core(core::Record::Tasks(
             record @ (tasks::Stored::Live(_)
             | tasks::Stored::Ledger(_)
+            | tasks::Stored::ConversationNewest(_)
+            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)

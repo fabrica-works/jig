@@ -5,15 +5,23 @@ use skein_lib::Queue;
 
 pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>) {
     let update = match record {
-        tasks::Stored::Ended(task) => match task.requester {
-            tasks::Party::Person(party) => Some(tasks::Update {
-                party,
-                at: task.ended_at.expect("ended task has a time"),
-                task: task.number,
-                object: tasks::UpdateObject::Result,
-            }),
-            tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
-        },
+        tasks::Stored::Ended(task) => {
+            if let Some(party) = core.chat_requester(task) {
+                let row = tasks::Conversation { party, task: task.number };
+                for record in [tasks::Stored::ConversationNewest(row), tasks::Stored::ConversationOldest(row)] {
+                    out.push(Request::Write(Write::Save(Record::Tasks(record))));
+                }
+            }
+            match task.requester {
+                tasks::Party::Person(party) => Some(tasks::Update {
+                    party,
+                    at: task.ended_at.expect("ended task has a time"),
+                    task: task.number,
+                    object: tasks::UpdateObject::Result,
+                }),
+                tasks::Party::Task(_) | tasks::Party::Deployment { .. } => None,
+            }
+        }
         tasks::Stored::Activity(line) => {
             let addressed = match &line.line {
                 tasks::Line::Turn { reply, .. } => match core.tasks.task(line.task) {
@@ -43,7 +51,9 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, out: &mut Queue<Request>
                 },
             })
         }
-        tasks::Stored::Update(_)
+        tasks::Stored::ConversationNewest(_)
+        | tasks::Stored::ConversationOldest(_)
+        | tasks::Stored::Update(_)
         | tasks::Stored::Live(_)
         | tasks::Stored::History(_)
         | tasks::Stored::Milestone(_)
