@@ -545,6 +545,24 @@ the file.
      879 (Size 900); the codec increments not yet landed double theirs:
      14.3 and 14.4 to 1,200; 19.1 to 1,200, 19.2 to 900, 19.3 to 1,200,
      19.4 to 1,100. Each stays a guide (ruling 103).
+131. **A task's `ended_below` counts over its life, saturating**
+     (2026-10-12, the coordinator's block "jig 12.4: ended descendant
+     count lifetime across batches and periods", 2026-10-12T19:51:53Z;
+     filed as a design gap, ruled by the supervisor as a reading of the
+     plan). A recurring task resets `made` to 1 at each batch
+     (`crates/jig-domain-tasks/src/recurring.rs:52,67`), and a standing
+     one at each period (`standing.rs:109`), so one task's ended
+     descendants can outnumber `limits.tasks` over its life. 12.4's Shape
+     says "how this task's ended descendants ended, summed as each
+     delegate ends", and decision 9 "an ended goal's index row keeps its
+     subtree's phase counts"; neither resets. The goals row 12.4 replaces
+     counts every ended task below the goal, of every batch and period,
+     with `saturating_add` (`crates/jig-domain-core/src/reads/rows.rs`,
+     Goals arm, on jig `59010f33`). So `ended_below` keeps lifetime
+     counts, each added with `saturating_add` and held at `u32::MAX`; it
+     is never reset with `made`; `valid_record` does not bound it by
+     `made` or `tree_tasks`. `recurring.rs` and `standing.rs` are not
+     changed.
 
 ## For the user
 

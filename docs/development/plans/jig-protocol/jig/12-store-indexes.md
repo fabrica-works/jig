@@ -308,7 +308,8 @@ Files:
 Shape:
 - `tasks::Endings { done: u32, failed: u32, cancelled: u32 }`;
   `TaskRecord.ended_below: Endings`: "how this task's ended descendants
-  ended, summed as each delegate ends".
+  ended, summed as each delegate ends", over the task's life: never reset
+  with `made`, each count added with `saturating_add` (ruling 131).
 - `tasks::Key::Goal { project: u32, task: Newest }`, `tasks::Stored::Goal(GoalRow)`,
   `GoalRow { project: u32, task: u64, endings: Endings }` (the goal's own
   ending included).
