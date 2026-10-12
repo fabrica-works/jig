@@ -527,6 +527,15 @@ the file.
      rows once 14.4 has added them all; 14.2 also declares `Name` and
      `Writer`, which its `writer` and `pool` rows need, and round-trips
      the 26 directly until 14.4.
+129. **Files follow the code** (2026-10-12, the coordinator's block "jig
+     06.5: claim helpers moved to charters.rs outside Files",
+     2026-10-12T19:23:16Z). jig 07.4 moved the host factory and
+     `ClaimDone`'s construction into
+     `crates/jig-domain-core/src/charters.rs:68-92`; 06.5's Files name
+     their old places. Decision 44: "landed code wins where they differ".
+     06.5 changes them in `charters.rs` (`Core::claim_proof`,
+     `Core::claim_done`), its boundary signatures as planned. The README's
+     Rules now say so for any increment.
 
 ## For the user
 

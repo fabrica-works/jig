@@ -229,6 +229,11 @@ ones before it in its session. Dependencies are by capability: "skein
   fields others see (development.md, 8.2): it is no question. It is
   bounded by a limit, priced in its owner's `worst_case`, and named in the
   commit body.
+- **Files follow the code** (decisions.md, ruling 129). Where code an
+  increment's Files or Shape name has moved to another file since the
+  plan was written (decision 44: "landed code wins where they differ"),
+  the file it now lives in is part of the increment's Files, for that
+  code. It is no question; the commit body names the move.
 - **A new module beside a file past 800 lines is inside Files**
   (decisions.md, ruling 116). Where an increment's Files name a file past
   800 lines, the new module that code-organization.md, section 7 sends its
