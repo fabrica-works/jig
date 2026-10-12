@@ -134,19 +134,39 @@ pub fn handed_lapse(story: crate::world::Story) -> Option<Duration> {
     match story {
         crate::world::Story::HandedIn { lapses_in } => Some(lapses_in),
         crate::world::Story::HandedInRejected => Some(Duration::from_secs(60)),
-        crate::world::Story::Granted | crate::world::Story::Refreshed | crate::world::Story::Closed => None,
+        crate::world::Story::Granted
+        | crate::world::Story::Refreshed
+        | crate::world::Story::Closed
+        | crate::world::Story::RateLimitedRefresh
+        | crate::world::Story::RefusedRefresh
+        | crate::world::Story::RejectedClient
+        | crate::world::Story::DamagedRecord
+        | crate::world::Story::ClosedExchange => None,
     }
 }
 #[must_use]
 pub fn rejects(story: crate::world::Story) -> bool {
-    matches!(story, crate::world::Story::Refreshed | crate::world::Story::HandedInRejected)
+    matches!(
+        story,
+        crate::world::Story::Refreshed
+            | crate::world::Story::HandedInRejected
+            | crate::world::Story::RateLimitedRefresh
+            | crate::world::Story::RefusedRefresh
+            | crate::world::Story::RejectedClient
+            | crate::world::Story::ClosedExchange
+    )
 }
 #[must_use]
 pub fn wanted(story: crate::world::Story) -> usize {
     match story {
         crate::world::Story::HandedIn { .. } => 3,
-        crate::world::Story::Refreshed | crate::world::Story::HandedInRejected => 2,
-        crate::world::Story::Granted | crate::world::Story::Closed => 1,
+        crate::world::Story::Granted | crate::world::Story::Closed | crate::world::Story::DamagedRecord => 1,
+        crate::world::Story::Refreshed
+        | crate::world::Story::HandedInRejected
+        | crate::world::Story::RateLimitedRefresh
+        | crate::world::Story::RefusedRefresh
+        | crate::world::Story::RejectedClient
+        | crate::world::Story::ClosedExchange => 2,
     }
 }
 #[must_use]
@@ -166,6 +186,64 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
             Heard::Granted { account: ACCOUNT_HANDED, generation: 1 },
             Heard::Failed { account: ACCOUNT_HANDED, failure: child::Failure::SignInAgain },
         ],
-        Story::Granted | Story::Closed => vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }],
+        Story::RateLimitedRefresh => vec![
+            Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
+            Heard::Failed {
+                account: ACCOUNT_CHAT,
+                failure: child::Failure::Later { after: Some(Duration::from_secs(7)) },
+            },
+        ],
+        Story::RefusedRefresh => vec![
+            Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
+            Heard::Failed { account: ACCOUNT_CHAT, failure: child::Failure::SignInAgain },
+        ],
+        Story::RejectedClient => vec![
+            Heard::Granted { account: ACCOUNT_CHAT, generation: 1 },
+            Heard::Failed { account: ACCOUNT_CHAT, failure: child::Failure::Misconfigured },
+        ],
+        Story::DamagedRecord => vec![Heard::Failed {
+            account: ACCOUNT_CHAT,
+            failure: child::Failure::Unloaded { at: child::Place::File, why: child::Unread::Unreadable },
+        }],
+        Story::Granted | Story::Closed | Story::ClosedExchange => {
+            vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
+        }
+    }
+}
+
+#[must_use]
+pub fn issuer_plans(story: crate::world::Story) -> Vec<fake::Plan> {
+    use crate::world::Story;
+    match story {
+        Story::RateLimitedRefresh => vec![rate_limit(), rate_limit()],
+        Story::RefusedRefresh => vec![refuse()],
+        Story::RejectedClient => vec![client_rejected()],
+        Story::ClosedExchange => {
+            let mut plan = rotate();
+            plan.delay = Duration::from_secs(1);
+            vec![plan]
+        }
+        Story::Granted
+        | Story::Refreshed
+        | Story::Closed
+        | Story::HandedIn { .. }
+        | Story::HandedInRejected
+        | Story::DamagedRecord => vec![rotate()],
+    }
+}
+fn rate_limit() -> fake::Plan {
+    fake::Plan {
+        status: 429,
+        body: fake::Body::Raw(bytes::copy_of(b"{\"error\":\"temporarily_unavailable\"}")),
+        delay: Duration::from_millis(5),
+        retry_after: Duration::from_secs(7),
+    }
+}
+fn client_rejected() -> fake::Plan {
+    fake::Plan {
+        status: 401,
+        body: fake::Body::Raw(bytes::copy_of(b"{\"error\":\"invalid_client\"}")),
+        delay: Duration::from_millis(5),
+        retry_after: Duration::ZERO,
     }
 }

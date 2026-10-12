@@ -15,6 +15,11 @@ pub enum Story {
     Closed,
     HandedIn { lapses_in: skein_lib::Duration },
     HandedInRejected,
+    RateLimitedRefresh,
+    RefusedRefresh,
+    RejectedClient,
+    DamagedRecord,
+    ClosedExchange,
 }
 pub enum Process {
     Owner(Box<Owner>),
@@ -68,9 +73,10 @@ pub struct Files {
     pub writes: usize,
 }
 impl Files {
-    fn new() -> (Self, skein_sim::Handle) {
+    fn new(story: Story) -> (Self, skein_sim::Handle) {
         let encoded =
             skein_oauth::encode_record(&fixtures::kept(), &fixtures::limits().client.document).expect("kept fixture");
+        let encoded = if story == Story::DamagedRecord { bytes::copy_of(b"damaged record") } else { encoded };
         let mut disk = disk::Machine::for_user(1234);
         let root =
             disk.lay(&[Item::directory(b"secret").mode(0o700), Item::file(b"secret/record", &encoded).mode(0o600)]);
@@ -85,7 +91,7 @@ impl Machine for Files {
         disk::step(&mut self.disk, call, answers);
     }
 }
-fn issuer() -> Process {
+fn issuer(story: Story) -> Process {
     let profile = fixtures::limits();
     let mut peer = peer::Peer::new(
         (Ipv4Addr::LOCALHOST, 31000).into(),
@@ -118,16 +124,18 @@ fn issuer() -> Process {
         profile.server,
     )
     .expect("issuer");
-    peer.queue(fixtures::rotate()).expect("rotation plan");
+    for plan in fixtures::issuer_plans(story) {
+        peer.queue(plan).expect("issuer plan");
+    }
     Process::Issuer(Box::new(peer))
 }
 #[must_use]
 pub fn run(seed: u64, story: Story) -> Outcome<Process, Files> {
-    let (files, root) = Files::new();
+    let (files, root) = Files::new(story);
     let mut config = skein_sim::Config::calm();
     config.wall = Wall::EPOCH;
     let mut world = World::new(seed, config, Judge::new(story), Memory::Checked).with_machine(files);
-    world.spawn(issuer);
+    world.spawn(|| issuer(story));
     world.spawn_root(root, |fd| Process::Owner(Box::new(Owner::new(fd, story))));
     let outcome = world.run();
     assert_eq!(outcome.machine.disk.open_handles(), 0, "startup root and private keeper settle");
@@ -143,4 +151,11 @@ pub fn owner(outcome: &Outcome<Process, Files>) -> &Owner {
             Process::Issuer(_) => None,
         })
         .expect("owner process")
+}
+
+pub(crate) fn exchange_seen(processes: &[Process]) -> bool {
+    processes.iter().any(|process| matches!(process, Process::Issuer(peer) if peer.observations().iter().any(|event| matches!(event, peer::Observation::Post { .. }))))
+}
+pub(crate) fn exchange_finished(processes: &[Process]) -> bool {
+    processes.iter().any(|process| matches!(process, Process::Issuer(peer) if peer.observations().iter().any(|event| matches!(event, peer::Observation::Answered { status: 200, .. }))))
 }

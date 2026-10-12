@@ -30,6 +30,7 @@ impl Referee<Process> for Judge {
             Process::Issuer(peer) => peer.address(),
             Process::Owner(_) => None,
         });
+        let close_exchange = self.story == Story::ClosedExchange && crate::world::exchange_seen(processes);
         let settled = processes.iter().any(|process| matches!(process, Process::Owner(owner) if owner.is_empty()));
         for process in processes {
             match process {
@@ -40,7 +41,7 @@ impl Referee<Process> for Judge {
                         self.rejected = true;
                     }
                     let wanted = fixtures::wanted(self.story);
-                    if owner.child_heard().len() >= wanted && !self.closing {
+                    if (owner.child_heard().len() >= wanted || close_exchange) && !self.closing {
                         owner.close();
                         self.closing = true;
                     }
@@ -73,7 +74,14 @@ impl Referee<Process> for Judge {
         }
         if owner.closed() {
             assert_eq!(owner.trace().last(), Some(&Trace::Closed), "Closed is last");
-            assert!(owner.became_usable(), "the real child accepted its grant");
+            assert_eq!(
+                owner.became_usable(),
+                self.story != Story::DamagedRecord,
+                "the real child accepted its grant only with a readable record"
+            );
+            if self.story == Story::ClosedExchange {
+                assert!(crate::world::exchange_finished(processes), "Closed follows the exchange's successful answer");
+            }
             let expected = fixtures::expected(self.story);
             assert_eq!(owner.child_heard(), expected);
         }
@@ -81,6 +89,7 @@ impl Referee<Process> for Judge {
             && processes.iter().any(|process| matches!(process, Process::Issuer(peer) if peer.address().is_some())))
             || (owner.is_empty() && !self.shutdown)
             || (owner.child_heard().len() >= fixtures::wanted(self.story) && !self.closing)
+            || (self.story == Story::ClosedExchange && crate::world::exchange_seen(processes) && !self.closing)
             || (owner.child_heard().len() == 1 && !self.rejected && fixtures::rejects(self.story)))
         .then_some(now);
         self.passed = (self.shutdown && processes.iter().all(Host::is_empty)).then_some(());
