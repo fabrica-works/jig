@@ -1025,6 +1025,17 @@ the file.
      lands once the analysis's fixes have made room; jig 30.2 to 30.5 do
      not start before it; every other jig session goes on, ruling 140's
      retries applying.
+168. **Every codec increment waits for the cheaper focused suite**
+     (2026-10-12, the coordinator's block "jig 19.1: third focused-suite
+     timeout", 2026-10-12T22:32:53Z). jig 19.1's generated core family
+     takes the focused suite to 4,439 tests; its three gates stopped at
+     15 s with nothing failing, as jig 30.1's did (ruling 167). Each
+     codec increment adds hundreds of generated tests, one process each
+     (the designer's analysis under way: the store's 1,760 golden tests
+     take 0.79 s in one process, 17.4 s one per process). So ruling 167
+     extends to them: jig 19.1 keeps its commit and lands once the
+     analysis's fixes have made room; jig 19.2, 19.4, 19.5 and 30.2 to
+     30.5 do not start before; every other session goes on.
 
 ## For the user
 
