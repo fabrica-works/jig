@@ -236,7 +236,7 @@ Don't: link smith; depend on `jig-protocol-charter` (the routing maps a
 `Declaration` to the charter's `Tool`); keep state; let a decoder panic
 on any input (the fuzzy suite's decoder fuzzing is jig 22's for records,
 not here).
-Size: at most 600 lines of production code (about 500 moved).
+Size: at most 1,400 lines of production code (927 moved; ruling 109).
 Removes: nothing (10.4 removes `ops`'s copies).
 
 ### 10.3 Calls decoded and answers rendered by the test application's harness

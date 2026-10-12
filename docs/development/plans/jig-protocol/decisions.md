@@ -295,6 +295,19 @@ the file.
      `tests/host/tests/simulation.rs:175` expects `host -> Answer {`; 05.1
      updates that literal. The README's Rules now say when such a literal
      is no question.
+109. **jig 10.2's Size is 1,400 lines** (2026-10-12, the coordinator's
+     block "jig 10.2: tools extraction exceeds production size guide",
+     2026-10-12T16:07:27Z). A plan defect: 10.2 said "at most 600 lines of
+     production code (about 500 moved)", but the five ranges it moves
+     hold 927 lines on jig's `main` (`git show
+     origin/main:examples/ops/domain/src/translate.rs | sed -n
+     '281,504p;506,825p;1026,1142p;877,1011p' | wc -l` and the same for
+     `assemble.rs` 286-416: 224, 320, 117, 135 and 131 lines, 2026-10-12).
+     The crate measures 1,353 lines with its declarations, problems and
+     renderers; it lands whole, not split. Its dependency on
+     `jig-domain-authority` (the core's `Answer` and `Finding`, which the
+     core does not re-export) is a vocabulary it translates, which
+     code-organization.md, section 3 allows.
 
 ## For the user
 
