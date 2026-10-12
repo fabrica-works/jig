@@ -5,6 +5,7 @@ extern crate alloc;
 pub mod address;
 mod document;
 mod fits;
+pub mod overrides;
 pub mod profile;
 pub use fits::{Share, fits};
 pub use profile::{Limits, Link, Profile, profile};

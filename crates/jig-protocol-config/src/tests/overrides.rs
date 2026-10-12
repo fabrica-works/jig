@@ -1,0 +1,307 @@
+use super::fixtures::{document, path};
+use crate::{Limits, Problems, Profile, What, overrides, profile};
+
+fn small() -> Limits {
+    profile(Profile::Small)
+}
+fn parse(bytes: &[u8]) -> Result<Limits, Problems> {
+    overrides::parse(&document(bytes), 0, &path(&[b"limits"]))
+}
+fn problem(bytes: &[u8], segments: &[&[u8]], what: What) {
+    let errors = parse(bytes).unwrap_err();
+    assert_eq!(errors.problems.len(), 1);
+    assert_eq!(errors.problems.get(0).unwrap().path, path(segments));
+    assert_eq!(errors.problems.get(0).unwrap().what, what);
+}
+
+#[test]
+fn an_override_replaces_one_limit_of_the_profile() {
+    let mut expected = small();
+    expected.core.tasks.inbox_messages = 9;
+    assert_eq!(parse(br#"{"profile":"small","overrides":{"tasks.inbox_messages":9}}"#), Ok(expected));
+}
+#[test]
+fn an_override_of_an_unknown_name_is_refused() {
+    assert_eq!(overrides::apply(&mut small(), b"tasks.absent", 1), Err(What::Override));
+}
+#[test]
+fn an_override_past_its_type_is_refused() {
+    assert_eq!(overrides::apply(&mut small(), b"hub.slots", 4_294_967_296), Err(What::Override));
+}
+#[test]
+fn an_override_that_breaks_a_worst_case_is_refused_naming_it() {
+    problem(
+        br#"{"profile":"small","overrides":{"tasks.tasks":0}}"#,
+        &[b"limits", b"overrides", b"tasks.tasks"],
+        What::Override,
+    );
+}
+#[test]
+fn every_limit_of_the_small_profile_has_a_name() {
+    for &(name, value) in SMALL {
+        let mut limits = small();
+        assert_eq!(overrides::apply(&mut limits, name, value), Ok(()), "{name:?}");
+        assert_eq!(limits, small(), "{name:?}");
+    }
+}
+#[test]
+fn duration_overrides_read_as_milliseconds() {
+    let mut expected = small();
+    expected.link.ping = skein_lib::Duration::from_millis(6_000);
+    assert_eq!(parse(br#"{"profile":"small","overrides":{"link.ping_ms":6000}}"#), Ok(expected));
+}
+#[test]
+fn a_duration_override_past_its_type_is_refused() {
+    assert_eq!(overrides::apply(&mut small(), b"link.ping_ms", u64::MAX), Err(What::Override));
+}
+#[test]
+fn a_limit_with_a_u64_type_keeps_its_width() {
+    let mut limits = small();
+    assert_eq!(overrides::apply(&mut limits, b"core.fill_mark", u64::MAX), Ok(()));
+    assert_eq!(limits.core.fill_mark, u64::MAX);
+}
+#[test]
+fn an_unknown_profile_is_refused_naming_it() {
+    problem(br#"{"profile":"other"}"#, &[b"limits", b"profile"], What::Override);
+}
+#[test]
+fn the_standard_profile_can_be_selected() {
+    assert_eq!(parse(br#"{"profile":"standard"}"#), Ok(profile(Profile::Standard)));
+}
+#[test]
+fn a_missing_profile_is_refused_naming_it() {
+    problem(b"{}", &[b"limits", b"profile"], What::Missing);
+}
+#[test]
+fn an_unknown_limits_member_is_refused_naming_it() {
+    problem(br#"{"profile":"small","absent":1}"#, &[b"limits", b"absent"], What::Unknown);
+}
+#[test]
+fn an_override_named_twice_is_refused_naming_it() {
+    problem(
+        br#"{"profile":"small","overrides":{"hub.slots":2,"hub.slots":3}}"#,
+        &[b"limits", b"overrides", b"hub.slots"],
+        What::Duplicate,
+    );
+}
+#[test]
+fn overrides_are_checked_together() {
+    let mut expected = small();
+    expected.core.tasks.run_inbox = 1;
+    expected.core.tasks.inbox_messages = 1;
+    expected.core.people.inbox_entries = 1;
+    assert_eq!(
+        parse(br#"{"profile":"small","overrides":{"tasks.inbox_messages":1,"tasks.run_inbox":1,"people.inbox_entries":1}}"#),
+        Ok(expected)
+    );
+}
+#[test]
+fn a_non_integer_override_is_refused_naming_it() {
+    problem(
+        br#"{"profile":"small","overrides":{"hub.slots":{}}}"#,
+        &[b"limits", b"overrides", b"hub.slots"],
+        What::Override,
+    );
+}
+
+#[test]
+fn a_whole_compound_limit_is_refused() {
+    assert_eq!(overrides::apply(&mut small(), b"tasks.retries", 1), Err(What::Override));
+}
+#[test]
+fn a_compound_member_override_replaces_only_that_member() {
+    let mut expected = small();
+    expected.core.tasks.retries.transient.retries = 4;
+    assert_eq!(parse(br#"{"profile":"small","overrides":{"tasks.retries.transient.retries":4}}"#), Ok(expected));
+}
+#[test]
+fn an_invalid_compound_member_is_refused_naming_it() {
+    problem(
+        br#"{"profile":"small","overrides":{"documents.versions.minimum":2}}"#,
+        &[b"limits", b"overrides", b"documents.versions.minimum"],
+        What::Override,
+    );
+}
+
+const SMALL: &[(&[u8], u64)] = &[
+    (b"tasks.tasks", 8),
+    (b"tasks.funders", 8),
+    (b"tasks.project_tasks", 8),
+    (b"tasks.tree_tasks", 32),
+    (b"tasks.depth", 8),
+    (b"tasks.delegates", 4),
+    (b"tasks.references", 8),
+    (b"tasks.subscriptions", 4),
+    (b"tasks.batch", 2),
+    (b"tasks.dependencies", 8),
+    (b"tasks.holdings", 4),
+    (b"tasks.hold_kinds", 8),
+    (b"tasks.resource_reports", 128),
+    (b"tasks.pools", 8),
+    (b"tasks.hold_segments", 4),
+    (b"tasks.hold_bytes", 1_024),
+    (b"tasks.hold_waiters", 8),
+    (b"tasks.hold_wait_ms", 120_000),
+    (b"tasks.inputs", 8),
+    (b"tasks.spec_bytes", 4_096),
+    (b"tasks.parameters", 4),
+    (b"tasks.result_bytes", 512),
+    (b"tasks.run_inbox", 8),
+    (b"tasks.inbox_messages", 8),
+    (b"tasks.inbox_bytes", 4_096),
+    (b"tasks.message_bytes", 4_096),
+    (b"tasks.person_stall_ms", 3_600_000),
+    (b"tasks.proposal_stall_ms", 3_600_000),
+    (b"tasks.escalation_stall_ms", 3_600_000),
+    (b"tasks.saved_resources", 4),
+    (b"tasks.contract_choices", 1),
+    (b"tasks.charters", 4),
+    (b"tasks.authority_grants", 4),
+    (b"tasks.authority_segments", 4),
+    (b"tasks.authority_bytes", 2_048),
+    (b"tasks.executor_kinds", 4),
+    (b"tasks.facts", 32),
+    (b"tasks.room_refusals", 8),
+    (b"people.people", 4),
+    (b"people.inbox_entries", 8),
+    (b"people.inbox_tasks", 16),
+    (b"people.inbox_recipients", 32),
+    (b"people.sign_ins", 8),
+    (b"people.projects", 2),
+    (b"people.holdings", 8),
+    (b"people.goals", 16),
+    (b"people.initial_owners", 2),
+    (b"people.requests", 32),
+    (b"people.room_refusals", 8),
+    (b"people.pending", 8),
+    (b"people.waiters", 4),
+    (b"people.identity_bytes", 1_024),
+    (b"people.words", 2_048),
+    (b"people.amendment_bytes", 8_192),
+    (b"people.sign_in_lifetime_ms", 86_400_000),
+    (b"people.request_retention_ms", 86_400_000),
+    (b"people.facts", 32),
+    (b"fleet.workers", 2),
+    (b"fleet.needs_bytes", 65_536),
+    (b"fleet.grants", 8),
+    (b"fleet.engine_slots", 0),
+    (b"fleet.slots", 2),
+    (b"fleet.workstreams", 8),
+    (b"fleet.attempts", 8),
+    (b"fleet.calls", 32),
+    (b"fleet.call_name_bytes", 64),
+    (b"fleet.progress_bytes", 1_024),
+    (b"fleet.turns", 32),
+    (b"fleet.grace_ms", 120_000),
+    (b"fleet.facts", 32),
+    (b"fleet.history", 8),
+    (b"authority.projects", 2),
+    (b"authority.roles", 4),
+    (b"authority.requirements", 4),
+    (b"authority.facts", 16),
+    (b"authority.grants", 4),
+    (b"authority.executors", 4),
+    (b"authority.segments", 4),
+    (b"authority.segment_bytes", 256),
+    (b"authority.implications", 8),
+    (b"authority.batch", 2),
+    (b"authority.accounts", 4),
+    (b"authority.writes", 4),
+    (b"brief.briefs", 4),
+    (b"brief.sections", 4),
+    (b"brief.read_bytes", 8_192),
+    (b"brief.brief_bytes", 16_384),
+    (b"accounts.accounts", 4),
+    (b"accounts.credentials", 3),
+    (b"accounts.backoff_base_ms", 2_000),
+    (b"accounts.backoff_max_ms", 60_000),
+    (b"accounts.retry_ms", 30_000),
+    (b"accounts.spent_attention_ms", 300_000),
+    (b"accounts.facts", 32),
+    (b"views.runs", 4),
+    (b"views.watchers", 4),
+    (b"views.watchers_per_party", 4),
+    (b"views.subjects_per_change", 32),
+    (b"views.text_bytes", 65_536),
+    (b"views.facts", 32),
+    (b"notes.scopes", 8),
+    (b"notes.entries_per_scope", 16),
+    (b"notes.pattern_bytes", 256),
+    (b"notes.description_bytes", 256),
+    (b"notes.body_bytes", 4_096),
+    (b"notes.references", 8),
+    (b"notes.load_rows", 4),
+    (b"notes.lines", 4),
+    (b"notes.recalled", 4),
+    (b"documents.rows", 4),
+    (b"documents.text_bytes", 4_096),
+    (b"documents.chips", 4),
+    (b"documents.lines", 4),
+    (b"core.brief_core_budgets.task", 4_096),
+    (b"core.brief_core_budgets.dependencies", 2_048),
+    (b"core.brief_core_budgets.attempts", 1_024),
+    (b"core.brief_core_budgets.plan", 2_048),
+    (b"core.brief_core_budgets.notes", 2_048),
+    (b"core.fill_mark", 268_435_456),
+    (b"core.connectors", 2),
+    (b"core.resume_bytes", 65_536),
+    (b"core.run_bytes", 16_384),
+    (b"core.policy_bytes", 16_384),
+    (b"core.escalation_reason_bytes", 512),
+    (b"core.load_slots", 4),
+    (b"core.load_bytes", 65_536),
+    (b"core.call_records", 32),
+    (b"core.call_answer_bytes", 32_768),
+    (b"core.brief_parts", 8),
+    (b"hub.slots", 2),
+    (b"hub.accounts", 8),
+    (b"hub.charter_bytes", 65_536),
+    (b"hub.transcript_bytes", 262_144),
+    (b"hub.delivery_evidence_bytes", 4_096),
+    (b"hub.turn_bytes", 65_536),
+    (b"hub.outcome_bytes", 4_096),
+    (b"hub.detail_bytes", 4_096),
+    (b"hub.held", 8),
+    (b"hub.inbox", 8),
+    (b"hub.event_bytes", 65_536),
+    (b"hub.run_calls", 8),
+    (b"hub.facts", 64),
+    (b"hub.told", 64),
+    (b"hub.turns", 8),
+    (b"hub.turn_queue_bytes", 524_288),
+    (b"link.chunk", 16_384),
+    (b"link.name", 32),
+    (b"link.secret", 256),
+    (b"link.opening", 4),
+    (b"link.handshake_ms", 10_000),
+    (b"link.hello_ms", 10_000),
+    (b"link.ping_ms", 5_000),
+    (b"link.silence_ms", 15_000),
+    (b"link.stall_ms", 30_000),
+    (b"link.backoff_ms", 250),
+    (b"link.ceiling_ms", 30_000),
+    (b"link.proved_ms", 60_000),
+    (b"link.busy_ms", 2_000),
+    (b"link.facts", 64),
+    (b"accounts.token", 16_384),
+    (b"tasks.retries.transient.retries", 3),
+    (b"tasks.retries.transient.base_ms", 1_000),
+    (b"tasks.retries.transient.max_ms", 30_000),
+    (b"tasks.retries.permanent.retries", 3),
+    (b"tasks.retries.permanent.base_ms", 1_000),
+    (b"tasks.retries.permanent.max_ms", 30_000),
+    (b"tasks.retries.run.retries", 3),
+    (b"tasks.retries.run.base_ms", 1_000),
+    (b"tasks.retries.run.max_ms", 30_000),
+    (b"tasks.retries.agent.retries", 3),
+    (b"tasks.retries.agent.base_ms", 1_000),
+    (b"tasks.retries.agent.max_ms", 30_000),
+    (b"tasks.retries.lost.retries", 3),
+    (b"tasks.retries.lost.base_ms", 1_000),
+    (b"tasks.retries.lost.max_ms", 30_000),
+    (b"tasks.retries.invalid.retries", 3),
+    (b"tasks.retries.invalid.base_ms", 1_000),
+    (b"tasks.retries.invalid.max_ms", 30_000),
+    (b"documents.versions.minimum", 1),
+    (b"documents.versions.maximum", 1),
+];
