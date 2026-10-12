@@ -669,6 +669,20 @@ the file.
      `skein-codegen` pin alone (README, "Repin"). jig 19.3 needs both. The
      README's Rules now say how any codec increment meets
      `large_enum_variant`.
+139. **The client model keeps what the person typed** (2026-10-12, the
+     coordinator's block "jig 03.6: replay reproduces local-edited value
+     model assertion mismatch", 2026-10-12T20:17:05Z). Ruling 137's
+     replay fails at `tests/client/src/model.rs:101`: the reference
+     model compares a field's text with the view's whatever the person
+     typed, while `client/domain/view.md`, 8 says "a matched field whose
+     write count did not move gets no value patch, whatever its text:
+     what the person is typing stays theirs". A test defect that 03.6's
+     change reaches. 03.6 repairs the model as it proposed: an entry
+     marked edited by `input`, cleared by a `Value` patch; equality
+     checks identity, size, value presence and write count always, and
+     text only when unedited; a `Value` patch at an unchanged write count
+     fails the model. At most 30 lines in `model.rs` and one regression
+     test; no other assertion changes.
 
 ## For the user
 
