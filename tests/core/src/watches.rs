@@ -185,6 +185,7 @@ impl Parties {
                 }
             }
             root::Event::Core(_)
+            | root::Event::Credential { .. }
             | root::Event::ReadApplication { .. }
             | root::Event::Application { .. }
             | root::Event::Turn { .. }

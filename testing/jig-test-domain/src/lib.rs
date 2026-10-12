@@ -188,6 +188,12 @@ pub enum Event {
     Timer(core::Timer),
     /// A party, host, account or other event in jig's vocabulary.
     Core(core::Event),
+    /// A generation named by the application's credential source.
+    Credential {
+        number: u32,
+        generation: u64,
+        valid: skein_lib::Duration,
+    },
     /// One numbered connector's input from its system or a scripted peer.
     Connector {
         number: u16,
@@ -562,6 +568,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         }
         Event::Timer(timer) => decide(domain, env, Work::Timer(timer)),
         Event::Core(event) => decide(domain, env, Work::Core(event)),
+        Event::Credential { number, generation, valid } => decide(
+            domain,
+            env,
+            Work::Core(core::Event::Account(jig_domain_accounts::Event::Credential { number, generation, valid })),
+        ),
         Event::WatchApplication { watcher, sign_in, scope, number, subject, window } => {
             decide(domain, env, Work::WatchApplication { watcher, sign_in, scope, number, subject, window });
         }

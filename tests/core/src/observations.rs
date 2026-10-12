@@ -396,6 +396,7 @@ impl Observer {
             | root::Event::RestartDone(_)
             | root::Event::Timer(_)
             | root::Event::Core(_)
+            | root::Event::Credential { .. }
             | root::Event::Connector { .. }
             | root::Event::ProjectionEffect { .. }
             | root::Event::CallAnswered { .. }

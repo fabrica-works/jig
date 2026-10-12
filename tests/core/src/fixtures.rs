@@ -1,4 +1,6 @@
 //! Shared host bounds for the domain world.
+pub const WORKSPACE_CREDENTIAL: u32 = 7;
+pub const CREDENTIAL_RESOURCE: u64 = 1;
 #[must_use]
 pub fn bounds() -> jig_domain_fleet::Bounds {
     use skein_lib::Duration;

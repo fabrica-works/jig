@@ -62,8 +62,18 @@ pub fn config(seed: u8) -> Config {
         deployment: (u128::from(seed) + 1).to_be_bytes(),
         prefix: path(seed, 0),
         resources: Box::from([
-            ResourceSpec { path: path(seed, 1), hold: Hold::Exclusive { mode: HoldMode::Wait }, writable: true },
-            ResourceSpec { path: path(seed, 2), hold: Hold::Pooled { mode: HoldMode::Wait }, writable: true },
+            ResourceSpec {
+                credential: None,
+                path: path(seed, 1),
+                hold: Hold::Exclusive { mode: HoldMode::Wait },
+                writable: true,
+            },
+            ResourceSpec {
+                credential: None,
+                path: path(seed, 2),
+                hold: Hold::Pooled { mode: HoldMode::Wait },
+                writable: true,
+            },
         ]),
         pools: Box::from([PoolSpec { path: path(seed, 2), slots: 2 }]),
         topics: Box::from([TopicSpec { topic: kind(seed, 1) }]),

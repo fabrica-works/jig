@@ -55,8 +55,8 @@ fn config() -> Config {
         deployment: [9; 16],
         prefix: prefix(),
         resources: Box::from([
-            ResourceSpec { path: path(b"one"), hold: Hold::None, writable: true },
-            ResourceSpec { path: path(b"two"), hold: Hold::None, writable: true },
+            ResourceSpec { credential: None, path: path(b"one"), hold: Hold::None, writable: true },
+            ResourceSpec { credential: None, path: path(b"two"), hold: Hold::None, writable: true },
         ]),
         pools: Box::from([]),
         topics: Box::from([]),

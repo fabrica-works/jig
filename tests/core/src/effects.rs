@@ -1,6 +1,7 @@
 //! A scripted caller and two independent systems exercise the root boundary.
 mod account_preparation;
 mod census;
+mod credentials;
 mod grants;
 use crate::Store;
 use jig_domain_accounts as accounts;

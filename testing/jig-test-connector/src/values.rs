@@ -77,34 +77,45 @@ pub(crate) fn cut(domain: &mut Domain, token: Token, size: u32, out: &mut Queue<
     out.push(Request::Ready { token, size: u32::try_from(length).expect("section was bounded") });
 }
 
+impl Domain {
+    /// The same bounded items gathered by the token-owned handover path.
+    #[must_use]
+    pub fn workspace_items(&self, limits: &Limits, project: u32, resources: &[Path]) -> Box<[Item]> {
+        let mut listed: List<Item> = List::with_capacity(limits.resources_per_task);
+        for resource in resources {
+            let Some(spec) = resource_spec(&self.config, resource) else {
+                continue;
+            };
+            let role = self.adoptions.get(&(project, resource.clone()));
+            let writable = spec.writable
+                && match role {
+                    Some(role) => *role != crate::ResourceRole::Context,
+                    None => false,
+                };
+            let state = match crate::requirements::current(self, resource) {
+                Some(fact) => fact.state,
+                None => None,
+            };
+            listed
+                .push(Item { resource: resource.clone(), writable, state, credential: spec.credential })
+                .expect("task names were bounded");
+        }
+        listed.into_boxed()
+    }
+}
+
 pub(crate) fn items(domain: &mut Domain, env: &Env<Limits>, token: Token, task: u64, out: &mut Queue<Request>) {
-    let Some(Record::Task { resources, project, .. }) = domain.tasks.get(&task) else {
-        out.push(Request::Ready { token, size: 0 });
-        return;
-    };
     if domain.values.len() >= env.limits.values && !domain.values.contains_key(&token) {
         out.push(Request::Ready { token, size: 0 });
         return;
     }
-    let mut listed: List<Item> = List::with_capacity(env.limits.resources_per_task);
-    for resource in resources {
-        let Some(spec) = resource_spec(&domain.config, resource) else {
-            continue;
-        };
-        let role = domain.adoptions.get(&(*project, resource.clone()));
-        let writable = spec.writable
-            && match role {
-                Some(role) => *role != crate::ResourceRole::Context,
-                None => false,
-            };
-        let state = match crate::requirements::current(domain, resource) {
-            Some(fact) => fact.state,
-            None => None,
-        };
-        listed.push(Item { resource: resource.clone(), writable, state }).expect("task names were bounded");
-    }
-    let size = listed.len();
-    domain.values.insert(token, Payload::Items(listed.into_boxed())).expect("value capacity checked");
+    let Some(Record::Task { resources, project, .. }) = domain.tasks.get(&task) else {
+        out.push(Request::Ready { token, size: 0 });
+        return;
+    };
+    let items = domain.workspace_items(&env.limits, *project, resources);
+    let size = u32::try_from(items.len()).expect("bounded workspace items");
+    drop(domain.values.insert(token, Payload::Items(items)).expect("value capacity checked"));
     out.push(Request::Ready { token, size });
 }
 

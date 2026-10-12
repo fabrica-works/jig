@@ -258,6 +258,8 @@ pub enum HoldMode {
 /// A resource and the terms on which the connector may use it.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ResourceSpec {
+    /// Application credential needed to prepare this resource.
+    pub credential: Option<u32>,
     /// The resource's path under the deployment prefix.
     pub path: Path,
     /// How tasks hold it, if they do.
@@ -410,6 +412,7 @@ pub struct Read {
 /// One connector-owned workspace preparation instruction.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Item {
+    pub credential: Option<u32>,
     pub resource: Path,
     pub writable: bool,
     pub state: Option<u64>,

@@ -11,6 +11,8 @@ use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
 use skein_lib::{Decision, Env, List, Queue, ReplyTo, Token};
 
+mod workspace;
+
 use crate::{Delivery, Domain, Key, Limits, Record, Work, Write, hold, write};
 
 pub(super) fn route_core(
@@ -398,12 +400,12 @@ fn route_now(
                 }
             }
             assert!(domain.workspace_writes.insert(task, names.into_boxed()).is_ok(), "workspace per task");
-            work.push(Work::Core(core::Event::WorkspacePrepared {
-                task,
-                attempt,
-                credentials: Box::new([]),
-                writes: Some(checks.into_boxed()),
-            }));
+            let prepared = workspace::credentials(domain, &env.limits, context.project, &context.spec);
+            let (credentials, writes) = match prepared {
+                Some(credentials) => (credentials, Some(checks.into_boxed())),
+                None => (Box::<[u32]>::from([]), None),
+            };
+            work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, credentials, writes }));
         }
         core::Now::RunPrepared { task, attempt, conversation, charter, run, messages, transcript, grants, .. } => {
             let budget = run.budget;

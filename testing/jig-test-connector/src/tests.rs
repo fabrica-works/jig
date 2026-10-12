@@ -60,8 +60,18 @@ fn domain() -> Domain {
         Config {
             prefix: prefix(),
             resources: Box::from([
-                ResourceSpec { path: service(), hold: Hold::Exclusive { mode: HoldMode::Wait }, writable: true },
-                ResourceSpec { path: pool(), hold: Hold::Pooled { mode: HoldMode::Refuse }, writable: true },
+                ResourceSpec {
+                    credential: None,
+                    path: service(),
+                    hold: Hold::Exclusive { mode: HoldMode::Wait },
+                    writable: true,
+                },
+                ResourceSpec {
+                    credential: None,
+                    path: pool(),
+                    hold: Hold::Pooled { mode: HoldMode::Refuse },
+                    writable: true,
+                },
             ]),
             pools: Box::from([PoolSpec { path: pool(), slots: 2 }]),
             topics: Box::from([TopicSpec { topic: 7 }]),
@@ -229,7 +239,7 @@ fn sections_and_workspace_items_have_one_handover_and_drop_with_their_token() {
         run(&mut connector, Event::HandOver { token }),
         Box::from([Request::Workspace {
             token,
-            items: Box::from([crate::Item { resource: service(), writable: true, state: None }]),
+            items: Box::from([crate::Item { credential: None, resource: service(), writable: true, state: None }]),
         }])
     );
     drop(run(&mut connector, Event::Gather { token, task: 4, budget: 8 }));
@@ -331,7 +341,7 @@ fn adoption_and_names_report_roles_and_holds_from_the_connector() {
 fn context_resources_cannot_be_upgraded_to_a_write_role() {
     let mut config = Config {
         prefix: prefix(),
-        resources: Box::from([ResourceSpec { path: service(), hold: Hold::None, writable: false }]),
+        resources: Box::from([ResourceSpec { credential: None, path: service(), hold: Hold::None, writable: false }]),
         pools: Box::from([]),
         topics: Box::from([]),
         deployment: [1; 16],

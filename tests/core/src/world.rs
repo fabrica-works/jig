@@ -832,3 +832,5 @@ impl World {
 }
 
 pub use crate::charters::{research_charter, two_charters};
+mod credentials;
+pub use credentials::with_workspace_credential;
