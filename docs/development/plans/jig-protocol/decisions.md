@@ -342,6 +342,19 @@ the file.
      proposal could be accepted"), and one unit test of it, as it
      proposed. The README's Rules now say so for every new variant: the
      fourth block in two hours on an edit outside an increment's Files.
+113. **jig 13.4's `admits` says which stored rows a scope reads**
+     (2026-10-12, the coordinator's block "jig 13.4: notes positions and
+     stored-row admission mismatch", 2026-10-12T17:08:12Z). A plan
+     defect, not a design gap: 13.4's Shape made `reads::admits` a wrapper
+     of `rows::position_allowed`, but that predicate admits a cursor's
+     position (an entry's key for notes, only `Ended` for a result, any
+     activity of a reply's task), while store.md 4.3 checks intervals
+     against the predicate of the rows a range reads, and 7.3 serves notes
+     from "the notes' lines". `admits` is that predicate, of its own; the
+     core's notes paging and cursors are not changed, as jig 16 already
+     says ("The core's notes paging is not changed"). 13.4 also needs jig
+     11.2's split families for its spend and party-proposal scopes; its
+     Needs line now says so.
 
 ## For the user
 

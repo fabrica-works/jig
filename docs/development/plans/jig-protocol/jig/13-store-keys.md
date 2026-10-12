@@ -254,7 +254,8 @@ a result (`Live` then `Ended`, by key), a reply, a party's proposal
 intervals), spend (`Ledger` and `ClosedLedger` of the project's periods),
 a project's notes (its scopes' lines) and one scope's notes; each checked
 against the domain's predicate (store.md 4.3, 7.2, 7.3).
-Needs: nothing beyond 13.3.
+Needs: 13.3; its spend and party-proposal scopes also need jig 11.2's
+`ClosedLedger` and `DecidedProposal` (ruling 113).
 Files:
 - `crates/jig-protocol-store/src/intervals.rs` (new), `src/tests/intervals.rs` (new);
 - `crates/jig-domain-core/src/reads.rs` (exports `admits`, the predicate over a stored row's key, from `rows::position_allowed` at `reads/rows.rs:1427`).
@@ -266,8 +267,13 @@ Shape:
   indexes; each list ordered as its rows are handed up, at most 4
   intervals.
 - `jig_domain_core::reads::admits(party: u64, scope: &Scope, key: &Key) -> bool`:
-  `position_allowed(scope, &Position::Owner(key))` and the party's own
-  keys, at most 20 lines.
+  whether a stored row's key is one the scope reads (store.md 7.3): a
+  project's or one scope's notes' lines, a result's `Live` and `Ended`
+  rows, a reply's one activity line, and the rest of the fixed scopes as
+  this increment's Scope lists them, with the party's own keys. It is not
+  `position_allowed`, which admits a cursor's position and stays as it
+  is; the core's notes paging and positions, the entries' keys, stay as
+  they are (jig 16). At most 60 lines (ruling 113).
 Test shape:
 - New `src/tests/intervals.rs`. Reference test, written out in full:
 
