@@ -43,7 +43,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         journal: JournalLimits { commits, writes: 20000, held: 20000, now: 128, release: 128 },
         routes: 256,
     };
-    let config = Config {
+    let mut config = Config {
         core: jig_core_world::world::config(17).core,
         triage_templates: Box::new([]),
         lead_templates: Box::new([]),
@@ -55,6 +55,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
             name: Box::from(&b"fake"[..]),
         }]),
     };
+    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
     (Domain::new(config, &limits), Env { now: Time::ZERO, wall: Wall::EPOCH, limits })
 }
 

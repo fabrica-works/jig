@@ -190,7 +190,7 @@ fn route_ask(
             assert!(domain.procedure_steps.insert(context.task, (step, code)).is_ok(), "one procedure step flight");
             hold(decision, Delivery::Procedure { task: context.task, step, connector: number, code, context });
         }
-        core::Ask::ClaimDone { task, attempt } => {
+        core::Ask::ClaimDone { task, attempt, kinds } => {
             if number == 1 {
                 hold(
                     decision,
@@ -201,7 +201,7 @@ fn route_ask(
                         attempt: Token::new(attempt),
                         workstream: task,
                         assignment: fleet::Assignment { turns: Token::new(task), answered: Token::new(task) },
-                        kinds: domain.hosting,
+                        kinds,
                     }),
                 );
             }

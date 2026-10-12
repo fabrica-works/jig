@@ -3,7 +3,7 @@
 
 use super::NoteRoute;
 use super::children::remember_due;
-use crate::{Ask, Core, Event, Limits, Now, Request, Requests, RunCharter, RunProof};
+use crate::{Ask, Core, Event, Limits, Now, Request, Requests, RunCharter};
 use alloc::boxed::Box;
 use jig_domain_authority as authority;
 use jig_domain_brief as brief;
@@ -91,10 +91,8 @@ pub(super) fn workspace_prepared(
         && transcript.bytes <= u64::from(core.settings.resume_bytes);
     let conversation = if resume && transcript.last.is_some() { transcript.from } else { attempt };
     let offered = if context.last_message == 0 { None } else { Some(context.last_message) };
-    let previous = core
-        .proofs
-        .insert(task, RunProof::claimed(task, attempt, conversation, offered))
-        .expect("claim proof reserved before child mutation");
+    let proof = core.claim_proof(task, attempt, conversation, offered);
+    let previous = core.proofs.insert(task, proof).expect("claim proof reserved before child mutation");
     if let Some(previous) = previous {
         assert!(core.replaced.insert(task, previous) == Ok(None), "one pending replacement per task");
     }

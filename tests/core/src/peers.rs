@@ -548,7 +548,7 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     limits.core.call_records = 16;
     limits.journal.writes = 10_000;
     limits.journal.held = 10_000;
-    configuration.hosting = fleet::Kinds::Both;
+    configuration.core.settings.charters[0].hosts = fleet::Kinds::Both;
     let kinds = Box::new([policy::Executor::Charter(1), policy::Executor::Procedure(1), policy::Executor::Role(1)]);
     configuration.core.settings.chat_authority.delegation =
         policy::Delegation { kinds: kinds.clone(), tasks: 3, depth: 2 };

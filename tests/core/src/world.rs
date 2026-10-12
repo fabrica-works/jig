@@ -259,7 +259,6 @@ pub fn config(seed: u64) -> root::Config {
         stall: Duration::from_secs(1),
     }]);
     root::Config {
-        hosting: fleet::Kinds::Workers,
         first,
         second,
         core: core::Config {

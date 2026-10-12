@@ -209,7 +209,10 @@ fn record_key_rows() -> [(CoreRecord, CoreKey); 8] {
             }),
             CoreKey::Call(CallKey { task: 11, attempt: 13, completion: 17, position: 19 }),
         ),
-        (CoreRecord::RunProof(RunProof::claimed(23, 29, 29, None)), CoreKey::RunProof(23)),
+        (
+            CoreRecord::RunProof(RunProof::claimed(23, 29, 29, None, jig_domain_fleet::HostKind::Worker)),
+            CoreKey::RunProof(23),
+        ),
         (
             CoreRecord::Turn(TurnRecord {
                 task: 31,

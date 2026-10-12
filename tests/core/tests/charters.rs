@@ -119,3 +119,69 @@ fn a_goal_naming_an_unoffered_charter_is_refused_not_offered() {
         ))
     );
 }
+
+fn host_world(seed: u64, kinds: jig_domain_fleet::Kinds) -> World {
+    use jig_core_world::peers::{Peers, fixture};
+    use jig_fake_parties::{Act, Ask, Party, Role};
+    use jig_fake_workers::{Script, Worker};
+    let (mut config, limits) = fixture(seed, 1);
+    config.core.settings.charters[0].hosts = kinds;
+    let workers = [0, 7].into_iter().map(|channel| Worker::new(channel, 1, vec![Box::new([Script::Wait])])).collect();
+    let party = Party::new(
+        1,
+        Role::Owner,
+        10_000,
+        Box::new([Act::SignIn { provider: 0, subject: 7_u64.to_be_bytes().into() }]),
+    );
+    let mut world = World::scripted(config, limits, Peers::new(workers, vec![party]));
+    world.peers.as_mut().expect("peers").parties[0]
+        .extend(Box::new([Act::Request { key: [1; 16], ask: Ask::Chat { words: Box::from(&b"hello"[..]) } }]));
+    world.drain();
+    world
+}
+
+#[test]
+fn a_charter_for_workers_never_runs_in_the_engines_slots() {
+    let world = host_world(146, jig_domain_fleet::Kinds::Workers);
+    let peers = world.peers.as_ref().expect("peers");
+    assert!(peers.workers[0].seen.is_empty(), "engine slot stays free");
+    assert_eq!(peers.workers[1].seen.len(), 1, "worker received the assignment");
+}
+
+#[test]
+fn a_charter_for_the_engine_never_runs_on_a_worker() {
+    let world = host_world(147, jig_domain_fleet::Kinds::Engine);
+    let peers = world.peers.as_ref().expect("peers");
+    assert_eq!(peers.workers[0].seen.len(), 1, "engine received the assignment");
+    assert!(peers.workers[1].seen.is_empty(), "worker slot stays free");
+}
+
+#[test]
+fn a_restart_settles_an_engine_charters_claim_at_once() {
+    let (mut config, mut limits) = jig_core_world::effects::fixture(148, false);
+    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
+    limits.core.fleet.engine_slots = 1;
+    let mut world = World::configured(148, false, config, limits);
+    let assignment = world.assigned.as_ref().expect("engine assigned");
+    let task = assignment.task;
+    let attempt = assignment.attempt;
+    world.send(root::Event::Turn {
+        channel: Token::new(0),
+        task,
+        attempt,
+        turn: 1,
+        cumulative: 2,
+        read: None,
+        transcript: b"engine turn".as_slice().into(),
+    });
+    assert!(world.store.rows.values().any(|record| matches!(record,
+        root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof)))
+        if proof.task == task && proof.host == jig_domain_fleet::HostKind::Engine)));
+    let mut config = jig_core_world::effects::fixture(148, false).0;
+    config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
+    world.restart_with(config);
+    assert!(world.domain.ready(), "restart does not wait for a worker hello");
+    assert!(world.store.rows.values().any(|record| matches!(record,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))
+        if row.number == task && row.tries.lost == 1)));
+}

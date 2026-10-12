@@ -269,8 +269,6 @@ pub struct Limits {
 /// The testing application's two numbered connectors.
 #[derive(Debug)]
 pub struct Config {
-    /// Host kinds the test application's charter permits.
-    pub hosting: fleet::Kinds,
     /// The core's configuration.
     pub core: core::Config,
     /// Connector one.
@@ -282,7 +280,6 @@ pub struct Config {
 /// The root's live components and one commit barrier.
 #[derive(Debug)]
 pub struct Domain {
-    hosting: fleet::Kinds,
     core: core::Core,
     first: connector::Domain,
     second: connector::Domain,
@@ -356,7 +353,6 @@ impl Domain {
             "journal admits the whole core and connector route before stepping"
         );
         Domain {
-            hosting: config.hosting,
             core: core::Core::new(config.core, &limits.core),
             first: connector::Domain::new(config.first, &limits.connector),
             second: connector::Domain::new(config.second, &limits.connector),

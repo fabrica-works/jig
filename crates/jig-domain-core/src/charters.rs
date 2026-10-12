@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use jig_domain_fleet as fleet;
 use jig_domain_tasks as tasks;
-use skein_lib::List;
+use skein_lib::{List, Queue};
 
 use crate::{Core, Limits, RunPolicy, Settings, memory, run};
 
@@ -65,6 +65,32 @@ pub(crate) fn numbers(settings: &Settings, limits: &Limits) -> Box<[u32]> {
 }
 
 impl Core {
+    pub(crate) fn claim_proof(
+        &self,
+        task: u64,
+        attempt: u64,
+        conversation: u64,
+        offered: Option<u64>,
+    ) -> crate::RunProof {
+        let host = match self.charter_of(task).hosts {
+            fleet::Kinds::Engine => fleet::HostKind::Engine,
+            fleet::Kinds::Workers | fleet::Kinds::Both => fleet::HostKind::Worker,
+        };
+        crate::RunProof::claimed(task, attempt, conversation, offered, host)
+    }
+
+    pub(crate) fn claim_done(&mut self, task: u64, attempt: u64, out: &mut Queue<crate::Request>) {
+        drop(self.replaced.remove(&task));
+        let proof = self.proofs.get(&task).expect("claim proof pre-reserved");
+        out.push(crate::Request::Write(crate::Write::Save(crate::Record::Core(crate::CoreRecord::RunProof(
+            proof.clone(),
+        )))));
+        let kinds = self.charter_of(task).hosts;
+        for &connector in self.connectors.as_ref() {
+            out.push(crate::Request::Ask { connector, ask: crate::Ask::ClaimDone { task, attempt, kinds } });
+        }
+    }
+
     /// Look up a configured charter by number.
     #[must_use]
     #[expect(clippy::manual_find, reason = "the strict subset iterates without a closure")]

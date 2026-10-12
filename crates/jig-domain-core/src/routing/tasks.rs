@@ -657,12 +657,7 @@ pub(super) fn tag_tasks(
                     continue;
                 }
                 if let Some(attempt) = core.claiming.remove(&token.raw()) {
-                    drop(core.replaced.remove(&token.raw()));
-                    let proof = core.proofs.get(&token.raw()).expect("claim proof pre-reserved");
-                    out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
-                    for &connector in core.connectors.as_ref() {
-                        out.push(Request::Ask { connector, ask: Ask::ClaimDone { task: token.raw(), attempt } });
-                    }
+                    core.claim_done(token.raw(), attempt, &mut out);
                 }
                 continue;
             }

@@ -619,15 +619,13 @@ pub struct ProposalDecisionRecord {
 }
 
 impl RunProof {
-    pub(crate) fn claimed(task: u64, attempt: u64, conversation: u64, offered: Option<u64>) -> Self {
-        Self {
-            task,
-            attempt,
-            conversation,
-            host: jig_domain_fleet::HostKind::Worker,
-            offered,
-            turn: None,
-            terminal: None,
-        }
+    pub(crate) fn claimed(
+        task: u64,
+        attempt: u64,
+        conversation: u64,
+        offered: Option<u64>,
+        host: jig_domain_fleet::HostKind,
+    ) -> Self {
+        Self { task, attempt, conversation, host, offered, turn: None, terminal: None }
     }
 }

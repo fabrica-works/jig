@@ -65,7 +65,7 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
     let first = core.tasks.task(1).unwrap().activity;
     let mut records =
         activity_decision(&mut core, &env, Event::Tasks(tasks::Event::Prepare { reply_to: to(), task: 1 }));
-    core.proofs.insert(1, RunProof::claimed(1, 7, 7, None)).unwrap();
+    core.proofs.insert(1, RunProof::claimed(1, 7, 7, None, jig_domain_fleet::HostKind::Worker)).unwrap();
     core.claiming.insert(1, 7).unwrap();
     records.extend(activity_decision(
         &mut core,
@@ -217,7 +217,7 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         },
     );
     activity_decision(&mut core, &env, Event::Tasks(tasks::Event::Prepare { reply_to: to(), task: 1 }));
-    core.proofs.insert(1, RunProof::claimed(1, 8, 7, Some(3))).unwrap();
+    core.proofs.insert(1, RunProof::claimed(1, 8, 7, Some(3), jig_domain_fleet::HostKind::Worker)).unwrap();
     core.claiming.insert(1, 8).unwrap();
     let resumed = activity_decision(
         &mut core,
