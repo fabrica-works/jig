@@ -510,16 +510,20 @@ Files: `testing/skein-codegen/src/*.rs`; `tests/codec/schema/lints-v1.schema`,
   its generated `tests/codec/src/lints/v1.rs` and goldens.
 Shape: a list whose items need no check writes no check loop; a list of
   fixed-width items measures as its count times the item's width, with no
-  loop. Output for a schema without such a list is unchanged, byte for
-  byte.
-Test shape: `lints-v1.schema` gains a `list 4 u64` field and a `list 4
-  u32` one; the gate's clippy over the fixture is the check.
+  loop. And (ruling 155) a record's generated functions (constructor
+  check, measure, encode, decode) that would pass 100 lines, as jig
+  30.1's 23-field `OwnerChipDetailsFields::encode` (107) does, are split
+  into helpers of at most 100 lines, as 02.s1 split the family's worst
+  cases. Output for a schema with neither is unchanged, byte for byte.
+Test shape: `lints-v1.schema` gains a `list 4 u64` field, a `list 4 u32`
+  one, and a record of 30 `bytes 4` fields; the gate's clippy over the
+  fixture is the check.
 Proof: unit, `heavy cargo nextest run -p skein-codegen -p
   skein-codec-tests` once; `git diff --stat --diff-filter=MD origin/main
   -- tests/codec/src/generated tests/codec/src/scalars
   tests/codec/src/secrets tests/codec/golden` prints nothing.
 Don't: change the bytes of any encoding; add an allowance.
-Size: at most 60 lines of production code.
+Size: at most 120 lines of production code.
 
 ## Interface sketches
 

@@ -889,6 +889,18 @@ the file.
      `a_task_record_at_its_inbox_bound_reads_back` holds `inbox_messages`
      messages, their bytes within `inbox_bytes`, and reads back. The
      README's Rules now say so for every codec family.
+155. **skein 02.s2 also splits a long record's functions** (2026-10-12,
+     the coordinator's block "jig 30.1: generated 23-field encoder
+     exceeds 100 lines", 2026-10-12T21:28:30Z). skein 02.s1's Shape said
+     "A generated function that would pass 100 lines ... is split", but
+     its generator at `e723e1db` split only a family's worst cases: jig
+     30.1's `OwnerChipDetailsFields::encode`, for a 23-field record, is
+     107 lines. skein 02.s2, still running, takes it: a record's
+     generated functions past 100 lines are split into helpers; its
+     fixture gains a 30-field record; Size 120. jig-repin.s2 then brings
+     both fixes to jig. jig 30.1 marks its large variants `boxed`
+     (`Fact.owner_chip_details`, `Ask.amend`), as the README's rule says,
+     and lands after jig-repin.s2.
 
 ## For the user
 
