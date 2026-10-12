@@ -84,3 +84,34 @@ enum Activity { phase: PhaseValue, long: Long, long_done, count: Count }
 record Fact { task: u64 attempt: u64 activity: Activity }
 record Rejected { task: u64 attempt: u64 account: u32 generation: u64 }
 record Exhausted { task: u64 attempt: u64 account: u32 retry_after: duration }
+
+# Engine-to-worker records (protocol/channel.md, 5.2, 7 and 8).
+record Message { name: u64 sender: text 1024 words: text 1048576 }
+record Workspace { workstream: u64 items: bytes 1048576 }
+record HostAnswer { error: bool body: bytes 1048576 }
+enum DeliveryOutcome { delivered, nothing, stale, refused, failed }
+record DeliveryAnswer { outcome: DeliveryOutcome evidence: bytes 1048576 }
+enum SettledAnswer { host: HostAnswer, delivery: DeliveryAnswer }
+record AnsweredCall { name: bytes 64 tool: text 64 answer: SettledAnswer }
+enum GrantTable { accounts, application }
+record Grant { table: GrantTable account: u32 generation: u64 valid: duration value: secret 8192 account_id: secret 256 }
+record Assignment {
+    task: u64 attempt: u64
+    identity: fixed 16
+    workspace: option Workspace
+    save: bool
+    charter: bytes 67108864
+    transcript: bytes 8388608
+    answered: list 1024 AnsweredCall
+    messages: list 1024 Message
+    grants: list 64 Grant
+}
+record Inbound { task: u64 attempt: u64 name: u64 sender: text 1024 words: text 1048576 }
+record RelayText { error: bool text: bytes 1048576 }
+enum RelayAnswer { text: RelayText, busy }
+record Relayed { task: u64 attempt: u64 name: bytes 64 answer: RelayAnswer }
+record TurnKept { task: u64 attempt: u64 number: u32 }
+record TurnBusy { task: u64 attempt: u64 number: u32 }
+record Acknowledge { task: u64 attempt: u64 }
+record Cancel { task: u64 attempt: u64 }
+record Granted { task: u64 attempt: u64 grant: Grant }

@@ -27,6 +27,24 @@ pub const LIMITS: v1::Limits = v1::Limits {
     resource_resource_some: 16,
     failed_detail: 16,
     answer_refused: 2,
+    message_sender: 16,
+    message_words: 32,
+    workspace_items: 32,
+    host_answer_body: 32,
+    delivery_answer_evidence: 32,
+    answered_call_name: 16,
+    answered_call_tool: 16,
+    grant_value: 32,
+    grant_account_id: 16,
+    assignment_charter: 32,
+    assignment_transcript: 32,
+    assignment_answered: 2,
+    assignment_messages: 2,
+    assignment_grants: 2,
+    inbound_sender: 16,
+    inbound_words: 32,
+    relay_text_text: 32,
+    relayed_name: 16,
 };
 
 pub fn encode(hello: &Hello) -> Box<[u8]> {
@@ -179,4 +197,85 @@ pub fn fact_long() -> crate::Fact {
     )
     .expect("long activity");
     fact(crate::Activity::Long(long))
+}
+
+pub const IDENTITY_FIRST: [u8; 16] = [7; 16];
+pub const TOKEN_ONE: &[u8] = b"token-one";
+pub const CREDENTIAL_ONE: &[u8] = b"credential-one";
+pub const ACCOUNT_ONE: &[u8] = b"account-one";
+
+pub fn grant(table: crate::GrantTable, account: u32, generation: u64) -> crate::Grant {
+    let (value, account_id) = match table {
+        crate::GrantTable::Accounts => (TOKEN_ONE, ACCOUNT_ONE),
+        crate::GrantTable::Application => (CREDENTIAL_ONE, b"".as_slice()),
+    };
+    crate::Grant::new(
+        &LIMITS,
+        crate::GrantParts {
+            table,
+            account,
+            generation,
+            valid: Duration::from_secs(60),
+            value: Secret::new(value.into()),
+            account_id: Secret::new(account_id.into()),
+        },
+    )
+    .expect("grant within small limits")
+}
+
+fn start_message(name: u64) -> crate::Message {
+    crate::Message::new(
+        &LIMITS,
+        crate::MessageParts { name, sender: b"person".as_slice().into(), words: b"message".as_slice().into() },
+    )
+    .expect("start message")
+}
+
+fn answered_call() -> crate::AnsweredCall {
+    let answer =
+        crate::HostAnswer::new(&LIMITS, crate::HostAnswerParts { error: true, body: b"host-answer".as_slice().into() })
+            .expect("host answer");
+    crate::AnsweredCall::new(
+        &LIMITS,
+        crate::AnsweredCallParts {
+            name: b"call-one".as_slice().into(),
+            tool: b"tool".as_slice().into(),
+            answer: crate::SettledAnswer::Host(answer),
+        },
+    )
+    .expect("answered call")
+}
+
+pub fn assignment_resumed() -> crate::Assignment {
+    let mut answered = List::with_capacity(2);
+    answered.push(answered_call()).expect("answered call slot");
+    let mut messages = List::with_capacity(2);
+    for name in [MESSAGE_FIRST, MESSAGE_SECOND] {
+        messages.push(start_message(name)).expect("two start message slots");
+    }
+    let mut grants = List::with_capacity(2);
+    for table in [crate::GrantTable::Accounts, crate::GrantTable::Application] {
+        grants.push(grant(table, 5, 9)).expect("two grant slots");
+    }
+    let workspace = crate::Workspace::new(
+        &LIMITS,
+        crate::WorkspaceParts { workstream: 7, items: b"workspace-items".as_slice().into() },
+    )
+    .expect("workspace");
+    crate::Assignment::new(
+        &LIMITS,
+        crate::AssignmentParts {
+            task: 3,
+            attempt: 4,
+            identity: IDENTITY_FIRST,
+            workspace: Some(workspace),
+            save: true,
+            charter: b"opaque-charter".as_slice().into(),
+            transcript: b"\0\0\0\x08turn-one\0\0\0\x08turn-two".as_slice().into(),
+            answered,
+            messages,
+            grants,
+        },
+    )
+    .expect("resumed assignment")
 }

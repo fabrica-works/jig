@@ -11,12 +11,16 @@ macro_rules! check {
     };
 }
 
+fn random_bytes(rng: &mut Rng) -> Vec<u8> {
+    let len = usize::try_from(rng.below(256)).expect("small length");
+    (0..len).map(|_| u8::try_from(rng.below(256)).expect("a byte")).collect()
+}
+
 #[test]
 fn fuzzy_up_decoders_never_panic_and_reencode_what_they_read() {
     let mut rng = Rng::new(0x22_0001);
     for _ in 0..20_000 {
-        let len = usize::try_from(rng.below(256)).expect("small length");
-        let bytes: Vec<u8> = (0..len).map(|_| u8::try_from(rng.below(256)).expect("a byte")).collect();
+        let bytes = random_bytes(&mut rng);
         check!(&bytes, Credential);
         check!(&bytes, Hello);
         check!(&bytes, Turn);
@@ -25,5 +29,21 @@ fn fuzzy_up_decoders_never_panic_and_reencode_what_they_read() {
         check!(&bytes, Fact);
         check!(&bytes, Rejected);
         check!(&bytes, Exhausted);
+    }
+}
+
+#[test]
+fn fuzzy_down_decoders_never_panic_and_reencode_what_they_read() {
+    let mut rng = Rng::new(0x22_0002);
+    for _ in 0..20_000 {
+        let bytes = random_bytes(&mut rng);
+        check!(&bytes, Assignment);
+        check!(&bytes, Inbound);
+        check!(&bytes, Relayed);
+        check!(&bytes, TurnKept);
+        check!(&bytes, TurnBusy);
+        check!(&bytes, Acknowledge);
+        check!(&bytes, Cancel);
+        check!(&bytes, Granted);
     }
 }

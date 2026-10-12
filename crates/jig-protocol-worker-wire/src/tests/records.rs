@@ -1,5 +1,6 @@
 use super::fixtures;
 use crate::{Bounds, Hello, Reason};
+use alloc::boxed::Box;
 use skein_channel::{Direction, Role, Term};
 use skein_lib::{Duration, List, Reader};
 
@@ -13,6 +14,24 @@ fn hello_terms(largest: u32) -> List<Term> {
     // Hand-counted bounds for Turn, Call, Answer, Fact and both notices.
     for (kind, largest) in [(0x0101, 96), (0x0102, 101), (0x0103, 145), (0x0104, 34), (0x0105, 28), (0x0106, 28)] {
         terms.push(Term { kind, largest }).expect("one term per up kind");
+    }
+    terms
+}
+
+fn down_terms() -> List<Term> {
+    let mut terms = List::with_capacity(8);
+    // Independently summed from field widths and the fixture limits.
+    for (kind, largest) in [
+        (0x0180, 600),
+        (0x0181, 80),
+        (0x0182, 74),
+        (0x0183, 20),
+        (0x0184, 20),
+        (0x0185, 16),
+        (0x0186, 16),
+        (0x0187, 93),
+    ] {
+        terms.push(Term { kind, largest }).expect("one term per down kind");
     }
     terms
 }
@@ -114,7 +133,7 @@ fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
     let version = schema.version(1).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
-    assert_eq!(version.kinds.len(), 7);
+    assert_eq!(version.kinds.len(), 15);
     assert_eq!(
         version.kind(0x0100),
         Some(skein_channel::Kind { kind: 0x0100, direction: Direction::FromInitiator, largest: 178 })
@@ -138,7 +157,7 @@ fn terms_without_the_hello_name_the_hello_kind() {
 
 #[test]
 fn the_responder_needs_no_sending_hello_term() {
-    assert_eq!(crate::terms_gap(&hello_schema(), Role::Responder, &no_terms()), None);
+    assert_eq!(crate::terms_gap(&hello_schema(), Role::Responder, &down_terms()), None);
 }
 
 fn answer_through_bytes(answer: &crate::Answer) -> crate::Answer {
@@ -252,9 +271,151 @@ fn the_schema_lists_every_up_kind_from_the_initiator() {
     let schema = hello_schema();
     assert_eq!(schema.versions.len(), 1);
     for version in &schema.versions {
-        assert_eq!(version.kinds.len(), 7);
+        assert_eq!(version.kinds.len(), 15);
         for number in [0x0100, 0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106] {
             assert_eq!(version.kind(number).expect("every up kind").direction, Direction::FromInitiator);
         }
     }
+}
+
+fn assignment_through_bytes(assignment: &crate::Assignment) -> crate::Assignment {
+    let mut writer = skein_lib::Writer::new(usize::try_from(assignment.measure()).expect("small assignment"));
+    assignment.encode(&mut writer).expect("measured room");
+    crate::Assignment::decode(&fixtures::LIMITS, &mut Reader::new(&writer.finish())).expect("assignment within limits")
+}
+
+fn grant_through_bytes(grant: &crate::Grant) -> crate::Grant {
+    let mut writer = skein_lib::Writer::new(usize::try_from(grant.measure()).expect("small grant"));
+    grant.encode(&mut writer).expect("measured room");
+    crate::Grant::decode(&fixtures::LIMITS, &mut Reader::new(&writer.finish())).expect("grant within limits")
+}
+
+#[test]
+fn an_assignment_keeps_its_start_messages_in_order() {
+    let assignment = fixtures::assignment_resumed();
+    let decoded = assignment_through_bytes(&assignment);
+    assert_eq!(decoded.messages().len(), 2);
+    assert_eq!(decoded.messages().get(0).expect("first start message").name(), fixtures::MESSAGE_FIRST);
+    assert_eq!(decoded.messages().get(1).expect("second start message").name(), fixtures::MESSAGE_SECOND);
+    assert_eq!(decoded, assignment);
+}
+
+#[test]
+fn an_assignment_keeps_its_sixteen_byte_identity() {
+    let decoded = assignment_through_bytes(&fixtures::assignment_resumed());
+    assert_eq!(decoded.identity(), &fixtures::IDENTITY_FIRST);
+}
+
+#[test]
+fn a_grant_names_the_table_its_value_comes_from() {
+    for (table, value) in
+        [(crate::GrantTable::Accounts, fixtures::TOKEN_ONE), (crate::GrantTable::Application, fixtures::CREDENTIAL_ONE)]
+    {
+        let grant = fixtures::grant(table.clone(), 5, 9);
+        let decoded = grant_through_bytes(&grant);
+        assert_eq!(decoded.table(), &table);
+        assert_eq!(decoded.value().expose(), value);
+        assert_eq!(decoded, grant);
+    }
+}
+
+#[test]
+fn an_accounts_grant_keeps_its_account_id_separate_from_its_token() {
+    let decoded = grant_through_bytes(&fixtures::grant(crate::GrantTable::Accounts, 5, 9));
+    assert_eq!(decoded.value().expose(), fixtures::TOKEN_ONE);
+    assert_eq!(decoded.account_id().expose(), fixtures::ACCOUNT_ONE);
+}
+
+#[test]
+fn an_applications_grant_carries_an_empty_account_id() {
+    let decoded = grant_through_bytes(&fixtures::grant(crate::GrantTable::Application, 5, 9));
+    assert_eq!(decoded.account_id().expose(), b"");
+}
+
+fn granted_debug() -> Box<[u8]> {
+    let record = crate::Granted::new(
+        &fixtures::LIMITS,
+        crate::GrantedParts { task: 3, attempt: 4, grant: fixtures::grant(crate::GrantTable::Accounts, 5, 9) },
+    )
+    .expect("granted record");
+    alloc::fmt::format(format_args!("{record:?}")).into_bytes().into_boxed_slice()
+}
+
+#[test]
+fn a_granted_record_debug_shows_the_value_length_only() {
+    let debug = granted_debug();
+    assert!(skein_lib::bytes::find(&debug, b"len: 9").is_some());
+    assert_eq!(skein_lib::bytes::find(&debug, fixtures::TOKEN_ONE), None);
+    assert_eq!(skein_lib::bytes::find(&debug, b"116, 111, 107, 101, 110, 45, 111, 110, 101"), None);
+}
+
+#[test]
+fn a_granted_record_debug_shows_the_account_id_length_only() {
+    let debug = granted_debug();
+    assert!(skein_lib::bytes::find(&debug, b"len: 11").is_some());
+    assert_eq!(skein_lib::bytes::find(&debug, fixtures::ACCOUNT_ONE), None);
+    assert_eq!(skein_lib::bytes::find(&debug, b"97, 99, 99, 111, 117, 110, 116, 45, 111, 110, 101"), None);
+}
+
+#[test]
+fn a_relayed_busy_answer_carries_no_text() {
+    let record = crate::Relayed::new(
+        &fixtures::LIMITS,
+        crate::RelayedParts {
+            task: 3,
+            attempt: 4,
+            name: b"call-one".as_slice().into(),
+            answer: crate::RelayAnswer::Busy,
+        },
+    )
+    .expect("busy answer");
+    let mut writer = skein_lib::Writer::new(usize::try_from(record.measure()).expect("small relayed"));
+    record.encode(&mut writer).expect("measured room");
+    let bytes = writer.finish();
+    assert_eq!(bytes.len(), 29);
+    let decoded = crate::Relayed::decode(&fixtures::LIMITS, &mut Reader::new(&bytes)).expect("relayed within limits");
+    assert_eq!(decoded.answer(), &crate::RelayAnswer::Busy);
+}
+
+#[test]
+fn an_assignment_past_its_grant_bound_is_refused() {
+    let mut parts = fixtures::assignment_resumed().into_parts();
+    let mut grants = List::with_capacity(3);
+    for account in [5, 6, 7] {
+        grants.push(fixtures::grant(crate::GrantTable::Accounts, account, 9)).expect("three fixture slots");
+    }
+    parts.grants = grants;
+    assert_eq!(
+        crate::Assignment::new(&fixtures::LIMITS, parts).expect_err("third grant refused").reason,
+        skein_codec::Reason::Bound
+    );
+}
+
+#[test]
+fn the_schema_lists_every_down_kind_from_the_responder() {
+    let schema = hello_schema();
+    let version = schema.version(1).expect("one version");
+    assert_eq!(version.kinds.len(), 15);
+    for term in &down_terms() {
+        assert_eq!(
+            version.kind(term.kind),
+            Some(skein_channel::Kind { kind: term.kind, direction: Direction::FromResponder, largest: term.largest })
+        );
+    }
+}
+
+#[test]
+fn an_accounts_grant_without_a_provider_id_carries_an_empty_account_id() {
+    let mut parts = fixtures::grant(crate::GrantTable::Accounts, 5, 9).into_parts();
+    parts.account_id = skein_lib::Secret::new(b"".as_slice().into());
+    let grant = crate::Grant::new(&fixtures::LIMITS, parts).expect("provider without an account id");
+    let decoded = grant_through_bytes(&grant);
+    assert_eq!(decoded.account_id().expose(), b"");
+    assert_eq!(decoded.value().expose(), fixtures::TOKEN_ONE);
+}
+
+#[test]
+fn an_assignment_keeps_its_transcript_piece_opaque() {
+    let decoded = assignment_through_bytes(&fixtures::assignment_resumed());
+    assert_eq!(decoded.transcript(), b"\0\0\0\x08turn-one\0\0\0\x08turn-two");
 }

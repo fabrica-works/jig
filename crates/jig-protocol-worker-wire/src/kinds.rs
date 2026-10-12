@@ -12,6 +12,14 @@ pub enum Kind {
     Fact,
     Rejected,
     Exhausted,
+    Assignment,
+    Message,
+    Relayed,
+    TurnKept,
+    TurnBusy,
+    Acknowledge,
+    Cancel,
+    Grant,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -31,6 +39,14 @@ pub const KINDS: &[KindRule] = &[
     KindRule { kind: 0x0104, direction: Direction::FromInitiator, body: Kind::Fact },
     KindRule { kind: 0x0105, direction: Direction::FromInitiator, body: Kind::Rejected },
     KindRule { kind: 0x0106, direction: Direction::FromInitiator, body: Kind::Exhausted },
+    KindRule { kind: 0x0180, direction: Direction::FromResponder, body: Kind::Assignment },
+    KindRule { kind: 0x0181, direction: Direction::FromResponder, body: Kind::Message },
+    KindRule { kind: 0x0182, direction: Direction::FromResponder, body: Kind::Relayed },
+    KindRule { kind: 0x0183, direction: Direction::FromResponder, body: Kind::TurnKept },
+    KindRule { kind: 0x0184, direction: Direction::FromResponder, body: Kind::TurnBusy },
+    KindRule { kind: 0x0185, direction: Direction::FromResponder, body: Kind::Acknowledge },
+    KindRule { kind: 0x0186, direction: Direction::FromResponder, body: Kind::Cancel },
+    KindRule { kind: 0x0187, direction: Direction::FromResponder, body: Kind::Grant },
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -50,6 +66,14 @@ pub fn schema(limits: &v1::Limits) -> Result<Schema, Overflow> {
             Kind::Fact => v1::Fact::worst_case_bytes(limits),
             Kind::Rejected => v1::Rejected::worst_case_bytes(limits),
             Kind::Exhausted => v1::Exhausted::worst_case_bytes(limits),
+            Kind::Assignment => v1::Assignment::worst_case_bytes(limits),
+            Kind::Message => v1::Inbound::worst_case_bytes(limits),
+            Kind::Relayed => v1::Relayed::worst_case_bytes(limits),
+            Kind::TurnKept => v1::TurnKept::worst_case_bytes(limits),
+            Kind::TurnBusy => v1::TurnBusy::worst_case_bytes(limits),
+            Kind::Acknowledge => v1::Acknowledge::worst_case_bytes(limits),
+            Kind::Cancel => v1::Cancel::worst_case_bytes(limits),
+            Kind::Grant => v1::Granted::worst_case_bytes(limits),
         };
         let largest = largest.ok_or(Overflow::Body)?;
         let Ok(largest) = u32::try_from(largest) else { return Err(Overflow::Frame) };
