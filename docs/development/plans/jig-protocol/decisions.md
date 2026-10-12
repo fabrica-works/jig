@@ -1121,6 +1121,17 @@ the file.
      test-cost step lands (jig-tests.s1 landed at 22:56Z, skein-tests.s1
      at 22:54Z). No block is written for it. The codec increments still
      wait for jig-repin.s3 (rulings 167, 168). The README's Rules say so.
+175. **skein 02.s5: generated tests in the strict subset** (2026-10-12,
+     the coordinator's block "smith repin: generated table tests violate
+     strict consumer lints", 2026-10-12T23:09:26Z). skein 02.s4's
+     generated table tests (skein `d135339c`) use `Vec`, `String`,
+     `format!`, closures and `slice::join`; smith's channel family alone
+     gives 510 clippy errors, and jig's root `clippy.toml` refuses the
+     same (`disallowed-types` `alloc::vec::Vec`, `disallowed-macros`
+     `alloc::format`, the closure combinators), so jig-repin.s3 fails
+     too. skein's own gate passed because its codec fixtures take the
+     test harnesses' configuration. A step not in the plan, skein 02.s5
+     (`tests-cost.md`, 7), then jig-repin.s3 and smith-repin pin it.
 
 ## For the user
 

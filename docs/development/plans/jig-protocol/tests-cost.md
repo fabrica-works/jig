@@ -94,3 +94,32 @@ merge per push (`testing/skein-heap/src/lib.rs:130,192-213`).
 Test shape: its tests, unchanged; one of a burst of rising peaks.
 Proof: skein's gate; jig's `ops` client stories under 0.3 s each.
 Don't: change what the counting allocator reports.
+
+## 7. skein-02.s5: generated tests in the strict subset
+
+A step not in the plan (decisions.md, ruling 175), after smith's repin
+found it: the table tests skein-02.s4 generates (skein `d135339c`) use
+`Vec`, `String`, `format!`, `Result::map`/`map_err` closures and
+`slice::join`, which smith's and jig's strict configurations refuse in
+the crates that hold generated code (jig's root `clippy.toml`,
+`disallowed-types`, `-macros`, `-methods`).
+Scope: codec.md, 6: generated files "pass the workspace's lints with no
+  allowances".
+Needs: skein-02.s4.
+Files: `testing/skein-codegen/src/emit_tests.rs` and what it calls; a
+  crate or module of skein's that compiles one generated family under
+  skein's root (strict) `clippy.toml`.
+Shape: the generated golden and bound table tests use only what the
+  strict configuration allows: the cases a `const` array; a failing case
+  named by the assertion's message from the case's `&'static str` name,
+  without building a string; matches in place of closure combinators.
+  Everything else of 02.s4 stays: about 64 cases a test, small-limit
+  bounds, the linear generator.
+Test shape: skein's gate's clippy checks one generated family under the
+  root `clippy.toml`; a planted failing case is named in its failure.
+Proof: skein's gate; then, once, `heavy cargo clippy -p
+  jig-protocol-store --all-targets -- -D warnings` on jig's regenerated
+  families and the same on smith's three, both exiting 0.
+Don't: add an allowance; change an encoding, a golden value or a public
+  type.
+Size: at most 120 lines of production code.
