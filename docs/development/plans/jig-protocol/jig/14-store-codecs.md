@@ -282,7 +282,10 @@ Test shape:
 Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
 jig-store-codecs-world` once: ledgers, slots and authorities read back as
 saved, the code matches its schema. Bound: 1 minute.
-Don't: declare a type the tasks rows do not reach.
+Don't: declare a type the tasks family's rows do not reach once 14.4 has
+added them all (ruling 128): the 26 types above are reached by `live`
+(14.4), and `Name` and `Writer` by `writer` and `pool`; until 14.4,
+14.2's tests round-trip them directly.
 Size: at most 450 lines of production code.
 Removes: nothing.
 

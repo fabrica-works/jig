@@ -517,6 +517,16 @@ the file.
      `tasks::Event::PreparationUnread { task }`, as its implementer
      proposed (store.md, 8.3: "the run fails as transient and the next
      starts fresh"); its Shape, Test shape and Size (120) now say so.
+128. **jig 14.2's Don't reads over the whole family** (2026-10-12, the
+     coordinator's block "jig 14.2: scoped codec types contradict row
+     reachability constraint", 2026-10-12T19:18:22Z). 14.2's Scope names
+     26 types its four rows (`ledger`, `closed_ledger`, `writer`, `pool`)
+     do not reach, and its Don't said "declare a type the tasks rows do
+     not reach". The Don't keeps dead types out of the schema; the 26 are
+     reached by `live`, which 14.4 adds. It now reads over the family's
+     rows once 14.4 has added them all; 14.2 also declares `Name` and
+     `Writer`, which its `writer` and `pool` rows need, and round-trips
+     the 26 directly until 14.4.
 
 ## For the user
 
