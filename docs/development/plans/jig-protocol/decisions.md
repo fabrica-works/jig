@@ -495,6 +495,17 @@ the file.
      by `Core::census`, updated by `restore_inbox_row`, priced in `Core`'s
      `worst_case` and emptied when the census ends; every public signature
      stays. The README's Rules now say a private field is no question.
+126. **A merge retires a refused hint's number** (2026-10-12, the
+     coordinator's block "jig 04.3: merged hints retire refused message
+     numbers", 2026-10-12T19:00:04Z; filed as a design gap, ruled by the
+     supervisor as a reading of `domain/tasks.md`, 8.2). A refused
+     message "stays in the inbox, untaken", so it is still waiting, and
+     news, notices, amendments and timers merge with what is "already
+     waiting ... since news is a hint to read afresh". When a merge
+     retires a refused word, the attempt's kept refusals drop its number:
+     `TaskRecord.refused` names only messages still in the inbox, and the
+     newer hint is delivered as any message is (option A). No type
+     changes.
 
 ## For the user
 
