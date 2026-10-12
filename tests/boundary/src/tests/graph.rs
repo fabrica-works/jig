@@ -141,6 +141,7 @@ fn client_step(name: &str) -> bool {
         "jig-domain-client"
             | "jig-view"
             | "jig-protocol-transcript"
+            | "jig-protocol-client-wire"
             | "jig-test-domain-client"
             | "jig-test-view"
             | "jig-ops-domain-connectors"
@@ -555,4 +556,16 @@ fn configuration_links_only_its_vocabulary_and_foundation() {
             "configuration dependency: {dependency}"
         );
     }
+}
+
+#[test]
+fn client_wire_links_only_its_codec_and_foundation() {
+    let wires: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-protocol-client-wire"))
+        .collect();
+    assert_eq!(wires.len(), 1, "one client wire family");
+    let mut dependencies = wires[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(dependencies, ["skein-codec", "skein-lib"]);
 }

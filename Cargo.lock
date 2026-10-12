@@ -123,6 +123,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-client-wire-world"
+version = "0.0.0"
+dependencies = [
+ "jig-protocol-client-wire",
+ "skein-codegen",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-client-world"
 version = "0.0.0"
 dependencies = [
@@ -519,6 +528,14 @@ dependencies = [
  "smith-channel",
  "smith-charter",
  "smith-domain-run",
+]
+
+[[package]]
+name = "jig-protocol-client-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
 ]
 
 [[package]]

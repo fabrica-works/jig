@@ -3,6 +3,8 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/jig-protocol-client-wire",
+    "tests/client-wire",
     "crates/jig-domain-client",
     "crates/jig-protocol-transcript",
     "crates/jig-view",
@@ -79,6 +81,7 @@ skein-oauth = { git = "https://github.com/forgetic/skein.git" }
 skein-oauth-accounts = { git = "https://github.com/forgetic/skein.git" }
 jig-protocol-worker-wire = { path = "crates/jig-protocol-worker-wire" }
 skein-channel = { git = "https://github.com/forgetic/skein.git" }
+jig-protocol-client-wire = { path = "crates/jig-protocol-client-wire" }
 jig-protocol-config = { path = "crates/jig-protocol-config" }
 jig-protocol-store = { path = "crates/jig-protocol-store" }
 jig-protocol-tools = { path = "crates/jig-protocol-tools" }

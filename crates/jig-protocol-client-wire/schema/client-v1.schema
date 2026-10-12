@@ -1,0 +1,534 @@
+family jig-client-wire 1
+
+# Envelopes carry the owner version; each end checks its served range.
+record Family { number: u16 }
+enum Owner { jig, family: Family }
+record Keyed { key: fixed 16 owner: Owner version: u32 request: bytes 1048576 }
+record Owned { owner: Owner version: u32 record: bytes 16777216 }
+enum Answer { final_answer: Owned, busy, not_ready, signed_out }
+record LinkSignIn { secret: bytes 64 }
+# 30.1 keeps the bearer field as bytes; 31.1 changes it to secret.
+record SignedIn { token: bytes 48 party: u64 expires: u64 }
+enum SignInAnswer { signed_in: SignedIn, refused }
+record SignOut {}
+enum SignOutAnswer { signed_out }
+
+# document_text.rs
+# DocumentText.bytes: jig_domain_client::Limits::text
+record DocumentText { bytes: text 65536 cut: bool }
+# common.rs
+record ExecutorAgent { charter: u32 }
+record ExecutorProcedure { connector: u16 kind: u32 }
+record ExecutorParty { party: u64 }
+record ExecutorRole { project: u32 role: u32 }
+enum Executor { agent: ExecutorAgent, procedure: ExecutorProcedure, party: ExecutorParty, role: ExecutorRole }
+# common.rs
+enum Phase { waiting, idle, due, preparing, claimed, running, backing_off, active, closing, held, ended, done, failed, cancelled }
+# run_facts.rs
+record RunStageClaimed { attempt: u64 }
+record RunStageRunning { attempt: u64 }
+record RunStageBackingOff { until: u64 }
+enum RunStage { idle, due, preparing, claimed: RunStageClaimed, running: RunStageRunning, backing_off: RunStageBackingOff }
+# owner_part.rs
+record PersonAddressParty { value: u64 }
+record PersonAddressRole { value: u32 }
+enum PersonAddress { party: PersonAddressParty, role: PersonAddressRole }
+# run_facts.rs
+record ClosingStageRun { attempt: u64 }
+enum ClosingStage { run: ClosingStageRun, delegates, effects, releases, settled }
+# refusals.rs
+enum HoldFailure { transient, permanent, run, agent, lost, invalid }
+# refusals.rs
+record HoldCategoryFailures { class: HoldFailure }
+record HoldCategoryDependency { task: u64 }
+record HoldCategoryStoppedBy { party: u64 }
+record HoldCategoryUncertain { entry: u64 }
+record HoldCategoryPoolLost { pool: u64 }
+enum HoldCategory { failures: HoldCategoryFailures, stalled, dependency: HoldCategoryDependency, stopped, stopped_by: HoldCategoryStoppedBy, drift, effects, effect_failed, uncertain: HoldCategoryUncertain, budget, deadline, holds_waited, resource_unavailable, resource_access, pool_lost: HoldCategoryPoolLost, procedure }
+# chip_phase.rs
+# OwnerChipPhaseWaiting.dependencies: jig_domain_client::Limits::rows
+record OwnerChipPhaseWaiting { dependencies: list 32 u64 more: bool holds: bool }
+record OwnerChipPhaseActive { value: RunStage }
+record OwnerChipPhasePerson { address: PersonAddress taken_by: option u64 since: option u64 }
+record OwnerChipPhaseClosing { value: ClosingStage }
+record OwnerChipPhaseHeld { reason: HoldCategory revision: u64 }
+enum OwnerChipPhase { waiting: OwnerChipPhaseWaiting, active: OwnerChipPhaseActive, person: OwnerChipPhasePerson, closing: OwnerChipPhaseClosing, held: OwnerChipPhaseHeld, ended }
+# documents.rs
+enum FailureClass { host_lost, temporary, permanent, stall }
+# run_facts.rs
+record RetryNoticeOwnerFailed { class: HoldFailure count: u32 allowance: u32 }
+record RetryNoticeFailed { class: FailureClass count: u32 allowance: u32 }
+record RetryNoticeRefused { count: u32 }
+enum RetryNotice { owner_failed: RetryNoticeOwnerFailed, failed: RetryNoticeFailed, refused: RetryNoticeRefused }
+# live_call.rs
+# CallIdentity.id: jig_domain_client::Limits::text
+record CallIdentity { owner: u64 sequence: u32 retry: u32 id: text 65536 }
+# run_facts.rs
+# RunWorkTool.tool: jig_domain_client::Limits::text
+record RunWorkTool { call: CallIdentity tool: text 65536 }
+enum RunWork { preparing, starting, active, writing, tool: RunWorkTool, waiting, ending }
+# run_facts.rs
+record RunObservation { channel: u64 work: RunWork since: u64 reported_at: u64 started: option u64 }
+# run_facts.rs
+record ActiveRun { stage: RunStage phase_since: u64 attempt: option u64 placement: option u64 retry: option RetryNotice observation: option RunObservation }
+# common.rs
+record ProposerTask { value: u64 }
+record ProposerParty { value: u64 }
+enum Proposer { task: ProposerTask, party: ProposerParty }
+# common.rs
+record ProposalKey { proposer: Proposer number: u64 }
+# common.rs
+record PartScopeProject { value: u32 }
+enum PartScope { project: PartScopeProject, deployment }
+# common.rs
+record PartConnector { connector: u16 }
+# PartResource.path: jig_domain_client::Limits::rows
+# PartResource.path: jig_domain_client::Limits::text
+record PartResource { connector: u16 path: list 32 bytes 65536 }
+record PartKind { connector: u16 kind: u16 }
+record PartPanel { connector: u16 task: u64 }
+record PartResult { connector: u16 task: u64 }
+record PartEffect { connector: u16 proposal: ProposalKey }
+record PartOwnerEffect { connector: u16 proposal: u64 }
+record PartOutbox { connector: u16 scope: PartScope entry: u64 }
+record PartHold { connector: u16 task: u64 }
+record PartProject { connector: u16 project: u32 }
+record PartDeployment { connector: u16 }
+enum Part { connector: PartConnector, resource: PartResource, kind: PartKind, panel: PartPanel, result: PartResult, effect: PartEffect, owner_effect: PartOwnerEffect, outbox: PartOutbox, hold: PartHold, project: PartProject, deployment: PartDeployment }
+# asks.rs
+# WakePolicy.topics: jig_domain_client::Limits::rows
+# WakePolicy.subscriptions: jig_domain_client::Limits::rows
+record WakePolicy { words: bool results: bool topics: list 32 u16 subscriptions: list 32 Part }
+# documents.rs
+record RecipientTask { value: u64 }
+record RecipientParty { value: u64 }
+record RecipientRole { project: u32 role: u32 }
+# RecipientRoles.roles: jig_domain_client::Limits::rows
+record RecipientRoles { project: u32 roles: list 32 u32 }
+enum Recipient { task: RecipientTask, party: RecipientParty, role: RecipientRole, roles: RecipientRoles }
+# documents.rs
+# TakenBy.name: jig_domain_client::Limits::text
+record TakenBy { number: u64 name: option text 65536 }
+# common.rs
+record Revision { value: u64 }
+# common.rs
+record ActorParty { value: u64 }
+record ActorTask { value: u64 }
+record ActorProjectDeployment { project: u32 }
+enum Actor { party: ActorParty, task: ActorTask, deployment, project_deployment: ActorProjectDeployment }
+# common.rs
+enum PartyKind { person, service }
+# common.rs
+# Party.name: jig_domain_client::Limits::text
+record Party { number: u64 kind: PartyKind name: text 65536 }
+# common.rs
+# DecisionRejected.reason: jig_domain_client::Limits::text
+record DecisionRejected { reason: text 65536 }
+record DecisionReleased { again: option bool }
+# DecisionLeftHeld.reason: jig_domain_client::Limits::text
+record DecisionLeftHeld { reason: text 65536 }
+enum Decision { accepted, rejected: DecisionRejected, passed_up, released: DecisionReleased, left_held: DecisionLeftHeld }
+# documents.rs
+# AttemptFailure.reason: jig_domain_client::Limits::text
+record AttemptFailure { attempt: u64 class: FailureClass reason: text 65536 at: u64 }
+# owner_part.rs
+record OwnerExecutorAgent { charter: u32 }
+record OwnerExecutorProcedure { connector: u16 code: u32 }
+record OwnerExecutorPerson { value: PersonAddress }
+enum OwnerExecutor { agent: OwnerExecutorAgent, procedure: OwnerExecutorProcedure, person: OwnerExecutorPerson }
+# owner_wake.rs
+record WakeRuleBatch { count: u32 age: duration }
+enum WakeRule { never, immediate, batch: WakeRuleBatch }
+# owner_wake.rs
+enum ResultsWake { never, each, last_or_failure }
+# owner_wake.rs
+record OwnerWakePolicy { words: WakeRule notices: WakeRule news: WakeRule results: ResultsWake questions: bool answers: bool timers: bool }
+# owner_chip.rs
+record OwnerPersonStallNotice { message: u64 at: u64 activity: u64 }
+# owner_chip.rs
+record OwnerPersonWait { since: u64 stall: duration deadline: u64 notice: option OwnerPersonStallNotice }
+# owner_part.rs
+enum OwnerPartKind { resource, pool, result, procedure, effect, outbox, hold }
+# owner_part.rs
+# OwnerPartKeyPath.value: jig_domain_client::Limits::rows
+# OwnerPartKeyPath.value: jig_domain_client::Limits::text
+record OwnerPartKeyPath { value: list 32 bytes 65536 }
+record OwnerPartKeyNumber { value: u64 }
+enum OwnerPartKey { path: OwnerPartKeyPath, number: OwnerPartKeyNumber }
+# owner_part.rs
+record OwnerPart { connector: u16 kind: OwnerPartKind key: OwnerPartKey }
+# owner_chip.rs
+record OwnerPriorPhaseActive { value: RunStage }
+record OwnerPriorPhaseClosing { value: ClosingStage }
+enum OwnerPriorPhase { waiting, active: OwnerPriorPhaseActive, closing: OwnerPriorPhaseClosing }
+# owner_chip.rs
+record OwnerEscalationHolderTask { value: u64 }
+record OwnerEscalationHolderPerson { value: u64 }
+record OwnerEscalationHolderRole { project: u32 role: u32 }
+enum OwnerEscalationHolder { task: OwnerEscalationHolderTask, person: OwnerEscalationHolderPerson, role: OwnerEscalationHolderRole }
+# owner_chip.rs
+record OwnerHoldEscalationWaiting { holder: OwnerEscalationHolder entry: u64 since: u64 }
+record OwnerHoldEscalationRejected { by: u64 reason: DocumentText }
+enum OwnerHoldEscalation { routing, waiting: OwnerHoldEscalationWaiting, rejected: OwnerHoldEscalationRejected }
+# owner_chip.rs
+record OwnerFailureTries { transient: u32 permanent: u32 run: u32 agent: u32 lost: u32 invalid: u32 }
+# owner_chip.rs
+record OwnerChipHold { account: option OwnerPart source: option OwnerPart reason: HoldCategory revision: u64 before: OwnerPriorPhase escalation: option OwnerHoldEscalation tries: OwnerFailureTries hold_wait_since: option u64 }
+# owner_budget.rs
+record OwnerNumbers { budget: u64 spent: u64 spent_below: u64 reserved: u64 }
+# proposed_task.rs
+record FunderTask { value: u64 }
+record FunderPool { project: u32 person: u64 period: u64 }
+record FunderRecurring { project: u32 task: u64 period: u64 }
+record FunderPeriod { project: u32 period: u64 }
+enum Funder { task: FunderTask, pool: FunderPool, recurring: FunderRecurring, period: FunderPeriod }
+# owner_budget.rs
+record OwnerBudget { numbers: OwnerNumbers left: u64 funder: Funder deadline: option u64 }
+# owner_chip.rs
+record OwnerResourceWriterRun { task: u64 attempt: u64 }
+record OwnerResourceWriterEffect { entry: u64 }
+enum OwnerResourceWriter { run: OwnerResourceWriterRun, effect: OwnerResourceWriterEffect }
+# owner_chip.rs
+record OwnerResourceLine { part: OwnerPart kind: u16 taken: bool holder: option u64 writer: option OwnerResourceWriter writer_lost: bool }
+# owner_chip.rs
+record OwnerChipWorkTool { call: bytes 65536 tool: bytes 65536 }
+enum OwnerChipWork { preparing, starting, active, writing, tool: OwnerChipWorkTool, waiting, ending }
+# owner_chip.rs
+record OwnerChipObservation { channel: u64 work: OwnerChipWork since: u64 reported_at: u64 started: option u64 }
+# result_details.rs
+record OwnerRequesterTask { value: u64 }
+record OwnerRequesterPerson { value: u64 }
+record OwnerRequesterDeployment { project: u32 }
+enum OwnerRequester { task: OwnerRequesterTask, person: OwnerRequesterPerson, deployment: OwnerRequesterDeployment }
+# documents.rs
+# ResultField.name: jig_domain_client::Limits::text
+# ResultField.value: jig_domain_client::Limits::text
+record ResultField { name: bytes 65536 value: bytes 65536 }
+# documents.rs
+record ChipFields { task: u64 title: DocumentText executor: Executor phase: Phase details: u32 }
+record ChipRow { parent: option u32 value: ChipFields }
+# documents.rs
+record ChipPhaseOwnerFields { phase: OwnerChipPhase details: u32 }
+record ChipPhaseActiveFields { value: ActiveRun }
+# ChipPhaseWaitingFields.dependencies: jig_domain_client::Limits::rows
+record ChipPhaseWaitingFields { dependencies: list 32 u64 hold: option Part }
+record ChipPhaseIdleFields { wake: WakePolicy }
+# ChipPhaseRunningFields.tool: jig_domain_client::Limits::text
+record ChipPhaseRunningFields { attempt: u64 since: u64 tool: option text 65536 }
+record ChipPhaseWaitingForWordsFields { attempt: u64 since: u64 }
+# ChipPhaseBackingOffFields.reason: jig_domain_client::Limits::text
+record ChipPhaseBackingOffFields { at: u64 attempt: u64 tries: u32 class: FailureClass reason: text 65536 }
+record ChipPhaseProcedureFields { panel: Part }
+record ChipPhasePersonFields { addressed: Recipient taken: option TakenBy since: option u64 }
+record ChipPhaseClosingFields { value: u32 }
+record ChipPhaseHeldFields { reason: u32 since: u64 revision: Revision was: option u32 }
+record ChipPhaseEndedFields { how: u32 at: u64 }
+enum ChipPhaseFields { owner: ChipPhaseOwnerFields, active: ChipPhaseActiveFields, waiting: ChipPhaseWaitingFields, idle: ChipPhaseIdleFields, starting, running: ChipPhaseRunningFields, waiting_for_words: ChipPhaseWaitingForWordsFields, backing_off: ChipPhaseBackingOffFields, procedure: ChipPhaseProcedureFields, person: ChipPhasePersonFields, closing: ChipPhaseClosingFields, held: ChipPhaseHeldFields, ended: ChipPhaseEndedFields }
+record ChipPhaseRow { parent: option u32 value: ChipPhaseFields }
+# documents.rs
+# ClosingFields.connectors: jig_domain_client::Limits::rows
+record ClosingFields { delegates: u32 connectors: option list 32 u16 stage: option ClosingStage ending: option u32 }
+record ClosingRow { parent: option u32 value: ClosingFields }
+# common.rs
+record EndingTaskFields { value: u32 }
+# EndingFailedFields.reason: jig_domain_client::Limits::text
+record EndingFailedFields { reason: option text 65536 }
+# EndingCancelledFields.reason: jig_domain_client::Limits::text
+record EndingCancelledFields { by: Actor reason: option text 65536 at: option u64 }
+# EndingWithdrawnFields.reason: jig_domain_client::Limits::text
+record EndingWithdrawnFields { reason: text 65536 }
+record EndingDecidedFields { by: u64 party: option Party how: option Decision at: u64 }
+enum EndingFields { task: EndingTaskFields, done, failed: EndingFailedFields, cancelled: EndingCancelledFields, withdrawn: EndingWithdrawnFields, decided: EndingDecidedFields, deleted }
+record EndingRow { parent: option u32 value: EndingFields }
+# run_facts.rs
+record HeldRuntimeActiveFields { value: ActiveRun }
+record HeldRuntimeClosingFields { value: u32 }
+enum HeldRuntimeFields { waiting, active: HeldRuntimeActiveFields, closing: HeldRuntimeClosingFields }
+record HeldRuntimeRow { parent: option u32 value: HeldRuntimeFields }
+# documents.rs
+# HoldReasonTriesFields.failures: jig_domain_client::Limits::rows
+record HoldReasonTriesFields { failures: list 32 AttemptFailure }
+# HoldReasonStalledFields.waiting: jig_domain_client::Limits::text
+record HoldReasonStalledFields { since: u64 waiting: text 65536 }
+record HoldReasonDependencyFields { task: u64 how: u32 }
+record HoldReasonDriftFields { part: Part }
+record HoldReasonEffectFailedFields { part: Part }
+record HoldReasonEffectUncertainFields { part: Part }
+record HoldReasonBudgetFields { spent: u64 limit: u64 }
+record HoldReasonDeadlineFields { at: u64 }
+record HoldReasonStoppedFields { by: Party at: u64 }
+record HoldReasonResourceFields { resource: Part holder: Actor }
+record HoldReasonPoolFields { part: Part }
+record HoldReasonProcedureFields { part: Part }
+enum HoldReasonFields { tries: HoldReasonTriesFields, stalled: HoldReasonStalledFields, dependency: HoldReasonDependencyFields, drift: HoldReasonDriftFields, effect_failed: HoldReasonEffectFailedFields, effect_uncertain: HoldReasonEffectUncertainFields, budget: HoldReasonBudgetFields, deadline: HoldReasonDeadlineFields, stopped: HoldReasonStoppedFields, resource: HoldReasonResourceFields, pool: HoldReasonPoolFields, procedure: HoldReasonProcedureFields }
+record HoldReasonRow { parent: option u32 value: HoldReasonFields }
+# owner_chip.rs
+# OwnerChipDetailsFields.resources: jig_domain_client::Limits::rows
+# OwnerChipDetailsFields.closing_connectors: jig_domain_client::Limits::rows
+record OwnerChipDetailsFields { project: u32 executor: OwnerExecutor phase_since: u64 run_since: option u64 attempt: option u64 retry: option RetryNotice wake: OwnerWakePolicy person_wait: option OwnerPersonWait hold: option OwnerChipHold budget: OwnerBudget activity: u64 resources: list 32 OwnerResourceLine resources_cut: bool resources_observed: bool procedure: option OwnerPart live_delegates: u32 closing_connectors: option list 32 u16 ending: option u32 ended_at: option u64 observation: option OwnerChipObservation }
+record OwnerChipDetailsRow { parent: option u32 value: OwnerChipDetailsFields }
+# owner_chip.rs
+record OwnerChipEndingDoneFields { value: u32 }
+record OwnerChipEndingFailedFields { value: DocumentText }
+record OwnerChipEndingCancelledFields { reason: DocumentText result: option u32 by: OwnerRequester at: u64 }
+enum OwnerChipEndingFields { done: OwnerChipEndingDoneFields, failed: OwnerChipEndingFailedFields, cancelled: OwnerChipEndingCancelledFields }
+record OwnerChipEndingRow { parent: option u32 value: OwnerChipEndingFields }
+# documents.rs
+record ResultValueReportFields { value: DocumentText }
+# ResultValueOwnerVerdictFields.fields: jig_domain_client::Limits::rows
+record ResultValueOwnerVerdictFields { verdict: u32 words: DocumentText fields: list 32 ResultField }
+# ResultValueVerdictFields.fields: jig_domain_client::Limits::rows
+# ResultValueVerdictFields.tasks: jig_domain_client::Limits::rows
+record ResultValueVerdictFields { verdict: u32 words: DocumentText fields: list 32 ResultField tasks: list 32 u32 proposal: option ProposalKey }
+record ResultValueConnectorFields { summary: DocumentText part: Part }
+record ResultValueChangeFields { kind: u16 part: OwnerPart words: DocumentText }
+record ResultValueChoiceFields { option: u32 by: Party reason: DocumentText }
+record ResultValueApprovedFields { state: bytes 65536 words: option DocumentText }
+record ResultValueFailureFields { value: DocumentText }
+record ResultValueWordsFields { value: DocumentText }
+enum ResultValueFields { report: ResultValueReportFields, owner_verdict: ResultValueOwnerVerdictFields, verdict: ResultValueVerdictFields, connector: ResultValueConnectorFields, change: ResultValueChangeFields, choice: ResultValueChoiceFields, approved: ResultValueApprovedFields, failure: ResultValueFailureFields, words: ResultValueWordsFields }
+record ResultValueRow { parent: option u32 value: ResultValueFields }
+enum Fact { chip: ChipRow, chip_phase: ChipPhaseRow, closing: ClosingRow, ending: EndingRow, held_runtime: HeldRuntimeRow, hold_reason: HoldReasonRow, owner_chip_details: boxed OwnerChipDetailsRow, owner_chip_ending: OwnerChipEndingRow, result_value: ResultValueRow }
+# Recursive facts share one ordered table. Its first row is the named root.
+# A row parent and every recursive field are indexes in that same table.
+# Parents precede their children; list indexes preserve the supplied order.
+# Unbounded fact row ceiling halved from 256 until its wire worst case fits u32.
+record Chip { rows: list 32 Fact }
+record ChipPhase { rows: list 32 Fact }
+record Closing { rows: list 32 Fact }
+record Ending { rows: list 32 Fact }
+record HeldRuntime { rows: list 32 Fact }
+record HoldReason { rows: list 32 Fact }
+record OwnerChipDetails { rows: list 32 Fact }
+record OwnerChipEnding { rows: list 32 Fact }
+record ResultValue { rows: list 32 Fact }
+# asks.rs
+# PersonAnswerChoice.reason: jig_domain_client::Limits::text
+record PersonAnswerChoice { option: u32 reason: text 65536 }
+# PersonAnswerApproved.words: jig_domain_client::Limits::text
+record PersonAnswerApproved { state: bytes 65536 words: option text 65536 }
+# PersonAnswerWords.value: jig_domain_client::Limits::text
+record PersonAnswerWords { value: text 65536 }
+# PersonAnswerCannot.reason: jig_domain_client::Limits::text
+record PersonAnswerCannot { reason: text 65536 }
+enum PersonAnswer { choice: PersonAnswerChoice, approved: PersonAnswerApproved, words: PersonAnswerWords, cannot: PersonAnswerCannot }
+# asks.rs
+record AddressChange { revision: Revision address: PersonAddress }
+# specification.rs
+record ParameterNumber { name: u32 value: u64 }
+# ParameterBytes.value: jig_domain_client::Limits::text
+record ParameterBytes { name: u32 value: text 65536 }
+record ParameterResource { name: u32 connector: u16 resource: u64 }
+enum Parameter { number: ParameterNumber, bytes: ParameterBytes, resource: ParameterResource }
+# specification.rs
+# Specification.words: jig_domain_client::Limits::text
+# Specification.parameters: jig_domain_client::Limits::rows
+# Specification.inputs: jig_domain_client::Limits::rows
+record Specification { words: text 65536 parameters: list 32 Parameter inputs: list 32 u64 }
+# owner_authority.rs
+# OwnerPatternEndExact.value: jig_domain_client::Limits::text
+record OwnerPatternEndExact { value: bytes 65536 }
+# OwnerPatternEndOpen.value: jig_domain_client::Limits::text
+record OwnerPatternEndOpen { value: bytes 65536 }
+enum OwnerPatternEnd { exact: OwnerPatternEndExact, open: OwnerPatternEndOpen }
+# owner_authority.rs
+# OwnerPattern.segments: jig_domain_client::Limits::rows
+# OwnerPattern.segments: jig_domain_client::Limits::text
+record OwnerPattern { segments: list 32 bytes 65536 last: OwnerPatternEnd }
+# owner_authority.rs
+record OwnerGrant { connector: u16 kind: u16 pattern: OwnerPattern }
+# owner_authority.rs
+record OwnerAuthorityExecutorCharter { value: u32 }
+record OwnerAuthorityExecutorProcedure { value: u32 }
+record OwnerAuthorityExecutorRole { value: u32 }
+enum OwnerAuthorityExecutor { charter: OwnerAuthorityExecutorCharter, procedure: OwnerAuthorityExecutorProcedure, role: OwnerAuthorityExecutorRole }
+# owner_authority.rs
+# OwnerDelegation.kinds: jig_domain_client::Limits::rows
+record OwnerDelegation { kinds: list 32 OwnerAuthorityExecutor tasks: u32 depth: u32 }
+# owner_authority.rs
+record OwnerResourceScope { connector: u16 pattern: OwnerPattern }
+# owner_authority.rs
+# OwnerAuthority.grants: jig_domain_client::Limits::rows
+# OwnerAuthority.note_resources: jig_domain_client::Limits::rows
+record OwnerAuthority { tools: u64 grants: list 32 OwnerGrant delegation: OwnerDelegation spend: u64 deadline: option u64 notes: u8 note_resources: list 32 OwnerResourceScope }
+# asks.rs
+# Amendment.dependencies: jig_domain_client::Limits::rows
+# Amendment.instructions: jig_domain_client::Limits::text
+record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 }
+# asks.rs
+record DisposalCancel { task: u64 }
+record DisposalTakeOver { task: u64 }
+enum Disposal { cancel: DisposalCancel, take_over: DisposalTakeOver }
+# asks.rs
+record GoalExecutorCharter { value: u32 }
+record GoalExecutorProcedure { connector: u16 code: u32 }
+enum GoalExecutor { charter: GoalExecutorCharter, procedure: GoalExecutorProcedure }
+# asks.rs
+record Priority { task: u64 priority: u32 }
+# asks.rs
+record SeenResults { through: u64 }
+record SeenReplies { chat: u64 through: u64 }
+enum Seen { results: SeenResults, replies: SeenReplies }
+# common.rs
+record NoteScopeProject { value: u32 }
+record NoteScopeResource { project: u32 connector: u16 pattern: OwnerPattern }
+record NoteScopeGoal { project: u32 goal: u64 }
+enum NoteScope { deployment, project: NoteScopeProject, resource: NoteScopeResource, goal: NoteScopeGoal }
+# policy_edit.rs
+record PolicyEditRole { number: u32 authority: OwnerAuthority period_spend: u64 requests: u16 decides: u8 }
+# policy_edit.rs
+record PolicyJudge { connector: u16 requirement: u16 parameters: u32 }
+# policy_edit.rs
+record PolicyGuardObserved { freshness: duration }
+enum PolicyGuard { guarded, observed: PolicyGuardObserved }
+# policy_edit.rs
+record PolicyRequirement { connector: u16 kind: u16 pattern: OwnerPattern judge: PolicyJudge guard: PolicyGuard must_be_guarded: bool }
+# policy_edit.rs
+record PolicyPermission { connector: u16 permission: u16 role: u32 }
+# policy_edit.rs
+record PolicyEditProjectSpend { period_spend: u64 }
+record PolicyEditRoleValue { value: PolicyEditRole }
+# PolicyEditRequirements.requirements: jig_domain_client::Limits::rows
+record PolicyEditRequirements { requirements: list 32 PolicyRequirement }
+# PolicyEditProjections.grants: jig_domain_client::Limits::rows
+record PolicyEditProjections { grants: list 32 OwnerGrant }
+# PolicyEditPermissions.mappings: jig_domain_client::Limits::rows
+record PolicyEditPermissions { mappings: list 32 PolicyPermission }
+enum PolicyEdit { project_spend: PolicyEditProjectSpend, role: PolicyEditRoleValue, requirements: PolicyEditRequirements, projections: PolicyEditProjections, permissions: PolicyEditPermissions }
+# refusals.rs
+record HeldRolePolicy { role: u32 }
+enum HeldRole { owner, maintainer, member, observer, policy: HeldRolePolicy }
+# asks.rs
+record Holding { party: u64 role: HeldRole }
+# asks.rs
+# StartChat.words: jig_domain_client::Limits::text
+record StartChat { project: u32 words: text 65536 }
+# Write.words: jig_domain_client::Limits::text
+record Write { project: u32 task: u64 words: text 65536 release: bool }
+# AnswerQuestion.words: jig_domain_client::Limits::text
+record AnswerQuestion { project: u32 task: u64 message: u64 words: text 65536 }
+record AnswerPerson { project: u32 task: u64 revision: Revision answer: PersonAnswer }
+record Take { project: u32 task: u64 }
+record HandBack { project: u32 task: u64 }
+record DecideProposal { project: u32 proposal: ProposalKey decision: Decision }
+record DecideEscalation { project: u32 task: u64 revision: Revision decision: Decision }
+record Release { project: u32 task: u64 revision: Revision again: option bool }
+# Amend.reason: jig_domain_client::Limits::text
+record Amend { project: u32 task: u64 revision: Revision change: Amendment release: option Revision reason: text 65536 }
+record Stop { project: u32 task: u64 }
+# Cancel.reason: jig_domain_client::Limits::text
+record Cancel { project: u32 task: u64 reason: text 65536 }
+# Close.disposals: jig_domain_client::Limits::delegates
+record Close { project: u32 chat: u64 disposals: list 64 Disposal }
+# TakeOver.reason: jig_domain_client::Limits::text
+record TakeOver { project: u32 task: u64 reason: text 65536 }
+# SetGoal.spec: jig_domain_client::Limits::text
+record SetGoal { project: u32 spec: text 65536 executor: GoalExecutor budget: u64 priority: u32 deadline: option u64 }
+# Prioritise.goals: jig_domain_client::Limits::rows
+record Prioritise { project: u32 goals: list 32 Priority }
+record MarkSeen { seen: Seen }
+# EditNote.description: jig_domain_client::Limits::text
+# EditNote.body: jig_domain_client::Limits::text
+# EditNote.references: jig_domain_client::Limits::rows
+record EditNote { project: u32 note: u64 scope: NoteScope revision: Revision description: text 65536 body: text 65536 references: list 32 u64 }
+record DeleteNote { project: u32 note: u64 scope: NoteScope revision: Revision }
+record ChangePolicy { project: u32 edit: PolicyEdit }
+# SetRoles.holdings: jig_domain_client::Limits::rows
+record SetRoles { project: u32 holdings: list 32 Holding }
+# MakeService.name: jig_domain_client::Limits::text
+record MakeService { project: u32 name: text 65536 role: HeldRole }
+record SetPool { project: u32 party: u64 budget: u64 }
+enum Ask { start_chat: StartChat, write: Write, answer_question: AnswerQuestion, answer_person: AnswerPerson, take: Take, hand_back: HandBack, decide_proposal: DecideProposal, decide_escalation: DecideEscalation, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, close: Close, take_over: TakeOver, set_goal: SetGoal, prioritise: Prioritise, mark_seen: MarkSeen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool }
+# owner_outcome.rs
+enum OwnerProposalChoice { accepted, rejected, passed, withdrawn, stale }
+# owner_outcome.rs
+enum OwnerEscalationChoice { released, rejected, passed }
+# owner_outcome.rs
+record OwnerOutcomeClosing { chat: u64 cancelled: u32 kept: u32 }
+record OwnerOutcomeMarkedSeen { seen: Seen }
+record OwnerOutcomeNoteEdited { name: u64 }
+record OwnerOutcomeServiceMade { person: u64 }
+record OwnerOutcomeAdopted { project: u32 }
+record OwnerOutcomeGoalStarted { task: u64 }
+record OwnerOutcomeGoalProposed { proposal: u64 }
+record OwnerOutcomeStopped { task: u64 }
+record OwnerOutcomeCancelled { task: u64 }
+record OwnerOutcomeReleased { task: u64 }
+record OwnerOutcomePersonTaken { task: u64 }
+record OwnerOutcomePersonHandedBack { task: u64 }
+record OwnerOutcomePersonAnswered { task: u64 }
+record OwnerOutcomeMoved { task: u64 }
+record OwnerOutcomeProposalDecided { proposal: ProposalKey by: u64 at: u64 choice: OwnerProposalChoice }
+record OwnerOutcomeSaid { task: u64 message: u64 released: bool }
+record OwnerOutcomeQuestionAnswered { task: u64 question: u64 message: u64 }
+record OwnerOutcomePrioritised { project: u32 }
+record OwnerOutcomeAmended { task: u64 released: bool }
+record OwnerOutcomeAmendProposed { task: u64 proposal: u64 released: bool }
+record OwnerOutcomeRolesSet { project: u32 }
+record OwnerOutcomePolicyChanged { project: u32 }
+record OwnerOutcomePoolSet { project: u32 person: u64 }
+record OwnerOutcomeEscalationDecided { task: u64 revision: Revision by: u64 at: u64 choice: OwnerEscalationChoice }
+record OwnerOutcomeStarted { task: u64 }
+enum OwnerOutcome { closing: OwnerOutcomeClosing, marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, goal_started: OwnerOutcomeGoalStarted, goal_proposed: OwnerOutcomeGoalProposed, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, prioritised: OwnerOutcomePrioritised, amended: OwnerOutcomeAmended, amend_proposed: OwnerOutcomeAmendProposed, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, started: OwnerOutcomeStarted }
+# asks.rs
+record MadeChat { task: u64 }
+record MadeWords { task: u64 message: u64 }
+record MadeGoal { task: u64 }
+# MadeTasks.tasks: jig_domain_client::Limits::rows
+record MadeTasks { tasks: list 32 u64 }
+record MadeService { party: u64 }
+record MadePersonResult { task: u64 }
+record MadeNote { note: u64 scope: NoteScope }
+enum Made { chat: MadeChat, words: MadeWords, goal: MadeGoal, tasks: MadeTasks, service: MadeService, person_result: MadePersonResult, note: MadeNote }
+# asks.rs
+record OutcomeOwner { value: OwnerOutcome }
+record OutcomeMade { what: Made }
+record OutcomeProposed { proposal: ProposalKey }
+record OutcomeDecided { by: Actor how: Decision at: u64 }
+record OutcomeDecidedFirst { by: Party how: Decision at: u64 }
+enum Outcome { owner: OutcomeOwner, made: OutcomeMade, proposed: OutcomeProposed, decided: OutcomeDecided, decided_first: OutcomeDecidedFirst, changed }
+# refusals.rs
+enum DisposalIssue { missing, unknown, repeated }
+# common.rs
+record Grant { connector: u16 kind: u16 pattern: OwnerPattern }
+# refusals.rs
+record LackingBudget { needed: u64 left: u64 }
+record LackingGrant { value: Grant }
+record LackingGrantKind { kind: u16 }
+record LackingAgain { required: bool }
+record LackingRequired { connector: u16 kind: u16 }
+record LackingFailed { connector: u16 kind: u16 }
+record LackingUnguarded { connector: u16 kind: u16 }
+record LackingTaskKind { executor: option Executor }
+record LackingDepth { needed: option u32 allowed: u32 }
+record LackingDeadline { asked: option u64 latest: option u64 }
+record LackingTasks { needed: option u32 left: u32 }
+enum Lacking { approver, budget: LackingBudget, grant: LackingGrant, grant_kind: LackingGrantKind, funding, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackingAgain, account, writer, required: LackingRequired, failed: LackingFailed, unguarded: LackingUnguarded, task_kind: LackingTaskKind, depth: LackingDepth, deadline: LackingDeadline, tasks: LackingTasks }
+# admission_limits.rs
+enum AdmissionLimit { words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
+# refusals.rs
+record LimitAdmission { which: AdmissionLimit }
+record LimitLiveTasks { project: u32 limit: u32 }
+record LimitInbox { task: u64 limit: u32 }
+record LimitWords { limit: u32 }
+record LimitConversationWords { limit: u32 }
+enum Limit { admission: LimitAdmission, live_tasks: LimitLiveTasks, inbox: LimitInbox, words: LimitWords, conversation_words: LimitConversationWords, fields, records, requests, reads, watches, objects }
+# refusals.rs
+record CurrentHoldDocument { value: HoldReason }
+record CurrentHoldReason { value: HoldCategory }
+enum CurrentHold { document: CurrentHoldDocument, reason: CurrentHoldReason }
+# refusals.rs
+record MovedHold { reason: option CurrentHold }
+enum Moved { hold: MovedHold, spec, person_task, note, waiting }
+# refusals.rs
+record RefusalRole { held: option HeldRole }
+record RefusalDisposal { task: u64 issue: DisposalIssue }
+record RefusalTaken { by: u64 }
+record RefusalAuthority { lacking: Lacking proposable: option bool }
+record RefusalLimit { which: Limit }
+record RefusalMoved { now: Revision what: Moved }
+record RefusalEnded { how: Ending }
+enum Refusal { role: RefusalRole, disposal: RefusalDisposal, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict }
+record Done { outcome: Outcome }
+record Refused { refusal: Refusal }
+enum Final { done: Done, refused: Refused }
