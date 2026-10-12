@@ -1247,7 +1247,7 @@ the turn or answer that carries it.
   prints nothing.
 - The core routes notices: `git -C ~/src/rust/jig grep -n -E 'Request::(Rejected|Exhausted|Told)[^;]*unreachable' -- crates/jig-domain-core`
   prints nothing.
-- Activity is typed: `git -C ~/src/rust/jig grep -n -E 'Facts \{|fact_bytes' -- crates/jig-domain-host crates/jig-domain-fleet`
+- Activity is typed: `git -C ~/src/rust/jig grep -n -E 'Facts \{|fact_bytes' -- crates/jig-domain-host crates/jig-domain-fleet ':!*/facts.rs'` (ruling 150)
   prints nothing.
 - The hello replaced the report: `git -C ~/src/rust/jig grep -n -E 'Event::Report|Request::Hosting|Unacknowledged \{' -- crates testing tests examples`
   prints nothing.

@@ -826,6 +826,18 @@ the file.
      jig 31 and 32, not by generated code. So the envelopes stay as
      sketched, and the test becomes
      `an_owned_record_keeps_its_owners_version`.
+150. **jig 05's "Activity is typed" check leaves out the diagnostics'
+     module** (2026-10-12, the coordinator's block "jig 05.6: Done-when
+     regex matches private diagnostic Facts", 2026-10-12T21:09:14Z). The
+     check was meant for the opaque link variants jig 05.4 removed
+     (`Event::Facts { owner, fact }`, `FromAgent::Facts { owner, fact }`
+     in `crates/jig-domain-host/src/boundary.rs`) and `fact_bytes`; its
+     eight matches on jig `db2887df` are the private diagnostic queues,
+     `pub(crate) struct Facts` in `crates/jig-domain-{host,fleet}/src/facts.rs`,
+     which 05.4 kept on purpose ("Keep lifecycle diagnostics and typed
+     activity in separate bounded queues owned by Facts", jig
+     `9ca1be6a`). The check now excludes `*/facts.rs`, and prints nothing
+     on `db2887df`. No renaming increment.
 
 ## For the user
 
