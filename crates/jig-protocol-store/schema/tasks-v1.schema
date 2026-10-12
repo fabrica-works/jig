@@ -1,0 +1,76 @@
+family jig-store-tasks 1
+
+record Number { value: u64 }
+record Person { person: u64 }
+record Project { project: u32 }
+enum Party { task: Number, person: Person, deployment: Project }
+enum Class { transient, permanent, run, agent, lost, invalid }
+record Tries { transient: u32 permanent: u32 run: u32 agent: u32 lost: u32 invalid: u32 }
+enum Why { made, ready, message: Number, released, retry: Tries, narrowed, changed }
+record Role { role: u32 }
+enum PersonAddress { person: Person, role: Role }
+record Agent { charter: u32 }
+record Procedure { connector: u16 code: u32 }
+record PersonExecutor { address: PersonAddress }
+enum Executor { agent: Agent, procedure: Procedure, person: PersonExecutor }
+record NumericParameter { name: u32 value: u64 }
+record BytesParameter { name: u32 value: bytes 65536 }
+record ResourceParameter { name: u32 connector: u16 resource: u64 }
+enum Parameter { number: NumericParameter, bytes: BytesParameter, resource: ResourceParameter }
+record Spec { words: bytes 65536 parameters: list 64 Parameter inputs: list 64 Number }
+enum PartKind { resource, pool, result, procedure, effect, outbox, hold }
+record PartSegment { bytes: bytes 4096 }
+record PartPath { segments: list 64 PartSegment }
+enum PartKey { path: PartPath, number: Number }
+record Part { connector: u16 kind: PartKind key: PartKey }
+record FieldRule { name: bytes 4096 max: u32 }
+record Verdict { code: u32 words: u32 followups: u32 fields: list 256 FieldRule }
+record Approval { state: bytes 65536 part: Part }
+record Report { words: u32 }
+record Choices { choices: list 64 Verdict }
+record ChangeContract { connector: u16 kind: u16 words: u32 }
+enum Contract { approval: Approval, report: Report, verdict: Choices, change: ChangeContract }
+record Tools { bits: u64 }
+record Scopes { bits: u8 }
+record AuthoritySegment { bytes: bytes 4096 }
+enum Last { exact: AuthoritySegment, open: AuthoritySegment }
+record Pattern { segments: list 64 AuthoritySegment last: Last }
+record Grant { connector: u16 kind: u16 pattern: Pattern }
+record ResourceScope { connector: u16 pattern: Pattern }
+record Charter { charter: u32 }
+record Code { code: u32 }
+enum AuthorityExecutor { charter: Charter, procedure: Code, role: Role }
+record Delegation { kinds: list 64 AuthorityExecutor tasks: u32 depth: u32 }
+record Budget { spend: u64 deadline: option u64 }
+record Authority {
+    tools: Tools
+    grants: list 64 Grant
+    delegation: Delegation
+    budget: Budget
+    notes: Scopes
+    note_resources: list 64 ResourceScope
+}
+record Task { task: u64 }
+record Pool { project: u32 person: u64 period: u64 }
+record Recurring { project: u32 task: u64 period: u64 }
+record Period { project: u32 period: u64 }
+enum Funder { task: Task, pool: Pool, recurring: Recurring, period: Period }
+record Numbers { budget: u64 spent: u64 spent_below: u64 reserved: u64 }
+record PeriodTimes { began: u64 next: option u64 }
+record FundingRecord {
+    period: option PeriodTimes
+    funder: Funder
+    parent: option Funder
+    numbers: Numbers
+    made: u32
+    closed: bool
+}
+record Segment { bytes: bytes 4096 }
+record Name { connector: u16 path: list 64 Segment }
+record Run { task: u64 attempt: u64 }
+record Effect { entry: u64 }
+enum Writer { run: Run, effect: Effect }
+record WriterSlot { number: u64 resource: Name writer: Writer lost: bool }
+record PoolSlots { number: u64 pool: Name slots: u32 }
+enum Value { ledger: FundingRecord, closed_ledger: FundingRecord, writer: WriterSlot, pool: PoolSlots }
+versioned record Row { value: Value }

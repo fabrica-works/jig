@@ -78,3 +78,20 @@ fn arbitrary_component_rows_never_panic_and_round_trip_when_they_decode() {
 fn mutated_component_goldens_never_panic() {
     mutated("component", 0x5704_e014, component);
 }
+
+fn tasks(bytes: &[u8]) {
+    use jig_protocol_store::tasks_v1;
+    if let Ok(row) = tasks_v1::Row::decode(&tasks_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+#[test]
+fn arbitrary_tasks_rows_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x5705_e014, tasks);
+}
+#[test]
+fn mutated_tasks_goldens_never_panic() {
+    mutated("tasks", 0x5706_e014, tasks);
+}

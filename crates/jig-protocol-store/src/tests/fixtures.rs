@@ -242,3 +242,138 @@ pub fn note_line() -> jig_domain_notes::Line {
         revision: 4,
     }
 }
+
+pub const TASKS_LIMITS: jig_domain_tasks::Limits = jig_domain_tasks::Limits {
+    tasks: 2,
+    funders: 2,
+    project_tasks: 2,
+    tree_tasks: 2,
+    depth: 2,
+    delegates: 2,
+    references: 2,
+    subscriptions: 2,
+    batch: 2,
+    dependencies: 2,
+    holdings: 2,
+    hold_kinds: 2,
+    resource_reports: 2,
+    pools: 2,
+    hold_segments: 2,
+    hold_bytes: 16,
+    hold_wait: skein_lib::Duration::from_nanos(1),
+    hold_waiters: 2,
+    inputs: 2,
+    spec_bytes: 32,
+    parameters: 3,
+    result_bytes: 32,
+    run_inbox: 2,
+    inbox_messages: 2,
+    inbox_bytes: 32,
+    message_bytes: 16,
+    person_stall: skein_lib::Duration::from_nanos(1),
+    proposal_stall: skein_lib::Duration::from_nanos(1),
+    escalation_stall: skein_lib::Duration::from_nanos(1),
+    saved_resources: 2,
+    contract_choices: 2,
+    charters: 2,
+    authority_grants: 2,
+    authority_segments: 2,
+    authority_bytes: 32,
+    executor_kinds: 3,
+    retries: jig_domain_tasks::Retries {
+        transient: TASK_RETRY,
+        permanent: TASK_RETRY,
+        run: TASK_RETRY,
+        agent: TASK_RETRY,
+        lost: TASK_RETRY,
+        invalid: TASK_RETRY,
+    },
+    facts: 2,
+    room_refusals: 2,
+};
+const TASK_RETRY: jig_domain_tasks::Retry = jig_domain_tasks::Retry {
+    retries: 1,
+    base: skein_lib::Duration::from_nanos(1),
+    max: skein_lib::Duration::from_nanos(2),
+};
+pub fn task_funding() -> jig_domain_tasks::FundingRecord {
+    use jig_domain_tasks::{Funder, FundingRecord, Numbers, PeriodTimes};
+    FundingRecord {
+        period: Some(PeriodTimes {
+            began: skein_lib::Wall::from_nanos(11),
+            next: Some(skein_lib::Wall::from_nanos(29)),
+        }),
+        funder: Funder::Period { project: 3, period: 5 },
+        parent: None,
+        numbers: Numbers { budget: 100, spent: 7, spent_below: 13, reserved: 20 },
+        made: 6,
+        closed: false,
+    }
+}
+pub fn task_name() -> jig_domain_tasks::Name {
+    jig_domain_tasks::Name { connector: 2, path: Box::new([Box::from(b"a\0".as_slice()), Box::from(b"b".as_slice())]) }
+}
+pub fn task_writer() -> jig_domain_tasks::WriterSlot {
+    jig_domain_tasks::WriterSlot {
+        number: 9,
+        resource: task_name(),
+        writer: jig_domain_tasks::Writer::Run { task: 17, attempt: 3 },
+        lost: true,
+    }
+}
+pub fn task_authority() -> jig_domain_tasks::Authority {
+    use jig_domain_tasks::{Authority, AuthorityExecutor, Budget, Delegation, Grant, Last, Pattern, Scopes, Tools};
+    Authority {
+        tools: Tools(u64::MAX),
+        grants: Box::new([
+            Grant {
+                connector: 2,
+                kind: 3,
+                pattern: Pattern {
+                    segments: Box::new([Box::from(b"a".as_slice())]),
+                    last: Last::Exact(Box::from(b"b".as_slice())),
+                },
+            },
+            Grant {
+                connector: 4,
+                kind: 5,
+                pattern: Pattern { segments: Box::new([]), last: Last::Open(Box::from(b"c".as_slice())) },
+            },
+        ]),
+        delegation: Delegation {
+            kinds: Box::new([
+                AuthorityExecutor::Charter(11),
+                AuthorityExecutor::Procedure(13),
+                AuthorityExecutor::Role(17),
+            ]),
+            tasks: 19,
+            depth: 23,
+        },
+        budget: Budget { spend: 29, deadline: Some(skein_lib::Wall::from_nanos(u64::MAX)) },
+        notes: Scopes(7),
+        note_resources: Box::new([]),
+    }
+}
+pub fn task_spec() -> jig_domain_tasks::Spec {
+    use jig_domain_tasks::{Parameter, Spec};
+    Spec {
+        words: Box::from(b"spec".as_slice()),
+        parameters: Box::new([
+            Parameter::Number { name: 1, value: u64::MAX },
+            Parameter::Bytes { name: 2, value: Box::from(b"\0value".as_slice()) },
+            Parameter::Resource { name: 3, connector: u16::MAX, resource: 5 },
+        ]),
+        inputs: Box::new([0, u64::MAX]),
+    }
+}
+pub fn task_contract() -> jig_domain_tasks::Contract {
+    use jig_domain_tasks::{Contract, FieldRule, Verdict};
+    Contract::Verdict {
+        choices: Box::new([Verdict {
+            code: 7,
+            words: 16,
+            followups: 3,
+            fields: Box::new([FieldRule { name: Box::from(b"field".as_slice()), max: 11 }]),
+        }]),
+    }
+}

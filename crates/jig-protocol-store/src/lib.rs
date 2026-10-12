@@ -12,6 +12,9 @@ pub mod component_v1;
 #[rustfmt::skip]
 #[path = "generated/notes_v1.rs"]
 pub mod notes_v1;
+#[rustfmt::skip]
+#[path = "generated/tasks_v1.rs"]
+pub mod tasks_v1;
 pub mod keys;
 pub use boundary::{
     Cursor, Event, Family, Get, Load, OpenRefusal, Request, Restore, Row, SecretOwner, Secrets, TranscriptRead, Write,

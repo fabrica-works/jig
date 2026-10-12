@@ -39,3 +39,8 @@ fn the_notes_familys_code_and_goldens_have_no_drift() {
 fn the_component_familys_code_and_goldens_have_no_drift() {
     check("component");
 }
+
+#[test]
+fn the_tasks_familys_code_and_goldens_have_no_drift() {
+    check("tasks");
+}
