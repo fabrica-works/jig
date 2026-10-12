@@ -378,3 +378,131 @@ pub fn task_contract() -> jig_domain_tasks::Contract {
         }]),
     }
 }
+
+pub fn creation_spec() -> jig_domain_tasks::Spec {
+    let mut spec = task_spec();
+    spec.inputs = Box::new([]);
+    spec
+}
+pub fn task_creation(number: u64) -> jig_domain_tasks::New {
+    use jig_domain_tasks::{Executor, Funder, Holding, New, Numbers};
+    New {
+        number,
+        project: 3,
+        executor: Executor::Agent { charter: 11 },
+        spec: creation_spec(),
+        contract: jig_domain_tasks::Contract::Report { words: TASKS_LIMITS.result_bytes },
+        authority: task_authority(),
+        numbers: Numbers { budget: 29, spent: 0, spent_below: 0, reserved: 0 },
+        funder: Funder::Period { project: 3, period: 5 },
+        dependencies: Box::new([17]),
+        holdings: Box::new([
+            Holding::Write { resource: task_name(), kind: 2 },
+            Holding::Slot { pool: task_name(), kind: 3 },
+        ]),
+        wake: task_wake(),
+        recurring: None,
+        tracked: Some(1),
+    }
+}
+pub fn task_template() -> jig_domain_tasks::RecurringTemplate {
+    let mut first = task_creation(1);
+    first.dependencies = Box::new([]);
+    jig_domain_tasks::RecurringTemplate {
+        key: 41,
+        batch: Box::new([first]),
+        overlap: jig_domain_tasks::RecurringOverlap::Wait,
+    }
+}
+pub fn task_phase() -> jig_domain_tasks::Phase {
+    use jig_domain_tasks::{Active, Hold, HoldSource, Phase, Was};
+    Phase::Held {
+        was: Was::Active(Active::Running { attempt: 3 }),
+        why: Hold::Uncertain { entry: 11 },
+        source: Some(Box::new(HoldSource::Resource(task_name()))),
+    }
+}
+pub fn task_settings() -> jig_domain_tasks::Settings {
+    jig_domain_tasks::Settings {
+        addressed: Some(jig_domain_tasks::PersonAddress::Role(19)),
+        taken_by: Some(31),
+        instructions: Some(Box::from(b"override".as_slice())),
+        spec: creation_spec(),
+        wake: task_wake(),
+        dependencies: Box::new([17]),
+        authority: task_authority(),
+    }
+}
+pub fn task_amendment() -> jig_domain_tasks::Amendment {
+    jig_domain_tasks::Amendment {
+        addressed: Some(jig_domain_tasks::AddressChange {
+            revision: 7,
+            address: jig_domain_tasks::PersonAddress::Person(31),
+        }),
+        instructions: Some(Box::from(b"new override".as_slice())),
+        release: Some(11),
+        spec: Some(creation_spec()),
+        wake: Some(task_wake()),
+        dependencies: Some(Box::new([17])),
+        authority: Some(task_authority()),
+        reason: Box::from(b"amend".as_slice()),
+    }
+}
+pub fn task_proposal() -> jig_domain_tasks::Proposal {
+    use jig_domain_tasks::{Proposal, ProposalAction, ProposalHolder, ProposalKind, ProposalState};
+    Proposal {
+        number: 43,
+        proposer: 17,
+        project: 3,
+        action: ProposalAction::Release { task: 17 },
+        reason: Box::from(b"proposal".as_slice()),
+        as_holder: true,
+        state: ProposalState::Pending {
+            holder: ProposalHolder::Policy { project: 3, kind: ProposalKind::Batch },
+            since: skein_lib::Wall::from_nanos(47),
+        },
+    }
+}
+pub fn task_history() -> jig_domain_tasks::History {
+    use jig_domain_tasks::{AmendmentHistory, Change, History, Party};
+    let before = task_settings();
+    let mut after = task_settings();
+    after.instructions = Some(Box::from(b"new override".as_slice()));
+    after.taken_by = None;
+    after.addressed = Some(jig_domain_tasks::PersonAddress::Person(31));
+    History {
+        task: 17,
+        revision: 3,
+        by: Party::Deployment { project: 3 },
+        change: Change::Amended,
+        reason: Box::from(b"amendment".as_slice()),
+        proposal: Some(Box::new(task_proposal())),
+        at: skein_lib::Wall::from_nanos(53),
+        amendment: Some(Box::new(AmendmentHistory { before, after })),
+    }
+}
+pub fn task_person_proposal() -> jig_domain_tasks::PersonProposal {
+    let mut goal = task_creation(23);
+    goal.funder = jig_domain_tasks::Funder::Pool { project: 3, person: 31, period: 5 };
+    goal.dependencies = Box::new([]);
+    jig_domain_tasks::PersonProposal {
+        number: 43,
+        proposer: 31,
+        project: 3,
+        goal,
+        state: jig_domain_tasks::PersonProposalState::Pending { since: skein_lib::Wall::from_nanos(47) },
+    }
+}
+
+pub fn task_wake() -> jig_domain_tasks::WakePolicy {
+    use jig_domain_tasks::{ResultsWake, WakePolicy, WakeRule};
+    WakePolicy {
+        words: WakeRule::Batch { count: 3, age: skein_lib::Duration::from_nanos(7) },
+        notices: WakeRule::Immediate,
+        news: WakeRule::Never,
+        results: ResultsWake::Each,
+        questions: true,
+        answers: false,
+        timers: true,
+    }
+}
