@@ -195,7 +195,16 @@ shows the committed code and goldens are what the schema generates; the
 layer above (joint) needs jig 31 and 32. Under 1 s.
 Don't: write a translation to or from any domain type; name an
 engine-side crate; write base64.
-Size: at most 450 lines of schema and Rust, generated code excluded.
+Recursive facts (ruling 151): a refusal's facts reach contract types that
+nest themselves (`Refusal::Ended` → `Ending` → `OwnerChipEnding` →
+`ResultValue` → `Chip` → `ChipPhase` → `OwnerChipDetails` → `OwnerChipEnding`;
+`ChipPhase::Held` → `HoldReason::Dependency` → `Ending`). 30.1 applies
+30.3's rule to them ("a record whose contract type nests itself by a
+peer's choice is flattened to a list of rows with parent indexes, and
+the report says how"), and declares the document types they reach,
+which 30.3 and 30.4 reuse and do not declare again.
+Size: at most 900 lines of schema and Rust, generated code excluded
+(ruling 151); the README's rule for codec increments applies.
 Removes: nothing.
 
 ### 30.2 Reads and their pages

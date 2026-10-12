@@ -838,6 +838,21 @@ the file.
      activity in separate bounded queues owned by Facts", jig
      `9ca1be6a`). The check now excludes `*/facts.rs`, and prints nothing
      on `db2887df`. No renaming increment.
+151. **jig 30.1 flattens its refusals' recursive facts** (2026-10-12, the
+     coordinator's block "jig 30.1: recursive refusal facts require flat
+     representation", 2026-10-12T21:12:53Z). A plan defect: 30.1 carries
+     `Refused` "with ... the refusals' facts" field for field, and those
+     reach contract types that nest themselves (`Refusal::Ended` →
+     `Ending` → `OwnerChipEnding` → `ResultValue` → `Chip` → `ChipPhase` →
+     `OwnerChipDetails` → `OwnerChipEnding`, and `ChipPhase::Held` →
+     `HoldReason::Dependency` → `Ending`; 99 types in all), while skein's
+     `codec.md`, 3 has a schema's types form "a tree" that decodes "to a
+     fixed depth". 30.3 already says how ("a record whose contract type
+     nests itself by a peer's choice is flattened to a list of rows with
+     parent indexes, and the report says how"); 30.1 applies it, and
+     declares the document types its refusals reach, which 30.3 and 30.4
+     reuse. 30.1's Size guide becomes 900, and the README's rule "A codec
+     increment lands past its Size, up to twice it" now covers jig 30.
 
 ## For the user
 
