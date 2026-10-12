@@ -474,6 +474,16 @@ the file.
      `Observe(Activity::Active)` behaviour, names and the owned and
      fenced-channel behaviours kept. The README's Rules now say so for
      any increment that removes a mechanism.
+124. **Test ceilings bind the tests an increment writes** (2026-10-12,
+     the coordinator's block "jig 03.5: existing unchanged cursor fixtures
+     exceed unit ceiling", 2026-10-12T18:46:03Z). Two
+     `conversation_cursor.rs` tests, changed by 03.5 only in their
+     expected value (ruling 122), timed 78 and 50 ms in one focused run,
+     where earlier runs timed them at 10 to 18 ms and every cursor test
+     rose alike. development.md, 8.2's "A test above twice its ceiling is
+     made cheaper before it lands" binds the tests an increment adds, or
+     whose inputs or setup it changes; 03.5 lands as it is. The README's
+     Rules now say so.
 
 ## For the user
 

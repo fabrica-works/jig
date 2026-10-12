@@ -219,6 +219,10 @@ ones before it in its session. Dependencies are by capability: "skein
   a replacement; removed otherwise; each named in the commit body. The
   limits of rulings 108, 114 and 122 do not bind them; no other test
   changes under this rule.
+- **Test ceilings bind the tests an increment writes** (decisions.md,
+  ruling 124): those it adds, and those whose inputs or setup it changes.
+  A test changed only in an expected value (rulings 108, 122, 123) is not
+  made cheaper by that increment, whatever one run times it at.
 - **A new module beside a file past 800 lines is inside Files**
   (decisions.md, ruling 116). Where an increment's Files name a file past
   800 lines, the new module that code-organization.md, section 7 sends its
