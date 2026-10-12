@@ -273,7 +273,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   deployment's first owner, and spends the secret. One link is live at a
   time: when a browser reaches the link provider's sign-in route
   without a live link's secret, the engine prints a fresh one, and the
-  page it answers says to find it in the engine's output. It is jig's
+  page it answers says to find it in the engine's output. A native
+  client on the same machine signs in by the same link: it sends the
+  link's secret to the sign-in route in an exchange, and takes back its
+  bearer token in the answer. It is jig's
   one provider, `jig-protocol-engine-clients`' own, which an application
   enables by configuration (`configuration.md`, section 3), and only on
   a loopback listener.

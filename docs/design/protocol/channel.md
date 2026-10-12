@@ -275,7 +275,7 @@ answer, and a **notice** is not answered.
 
 smith's payloads are bytes in the hub and typed in the agent; the root
 that composes the two hands each out to its protocol layer's routing, to
-be decoded or encoded with `smith-protocol-channel`'s functions
+be decoded or encoded with smith's codecs
 (`../domain/hosts.md`, 6.8). jig's channel carries the bytes the hub
 holds, and neither of its components reads them.
 
@@ -600,8 +600,9 @@ tests in the default suite, randomized ones in the fuzzy suite.
 - **The channel's protocol world,** `tests/channel`: the engine's side
   with the core under jig's test root, and the worker's side with the hub
   under the test worker's root, both as the reference service composes
-  them (`service.md`, section 7), with `testing/jig-test-worker`'s smith's
-  scripted agent processes and scripted workspace beneath, joined by in-memory
+  them (`service.md`, section 7), with `testing/jig-test-worker`'s smith's agent
+  processes over skein's fake LLM and scripted workspace beneath, joined
+  by in-memory
   streams cut and rejoined at random; the scripted agents tell real
   turns and results, so smith's payloads cross the hand-out and
   `jig-charter`. It runs the hub's world's stories
@@ -649,7 +650,7 @@ tests in the default suite, randomized ones in the fuzzy suite.
   answers, and the unread fence; activity typed; smith's payloads as the
   hand-out's bytes.
 - **smith gives,** for the first build, what its `main` has (`README.md`,
-  section 11): `smith-protocol-channel`'s functions, which the hand-out
+  section 11): smith's codecs, which the hand-out
   calls, to decode a charter and a transcript against an agent
   configuration's endpoints, and a channel fact, and to encode a turn, a
   call's name and a result; its host domain's long operations and

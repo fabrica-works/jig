@@ -57,7 +57,8 @@ referee in the loop, the heap counted at every iteration
   missing; connectors' sections as sizes and tokens only.
 - **notes, views, accounts:** each its own concern.
 - **the hub,** with agent capabilities of both kinds, smith's: agent
-  processes, `smith-host-domain` over smith's scripted agent processes;
+  processes, `smith-host-domain` over smith's agent processes over skein's
+  fake LLM;
   and, as the in-process kind, `smith-inline-agent`'s runs over skein's
   fake LLM; with turns that open windows, and messages refused and left
   unread: hosts.md, section 11.

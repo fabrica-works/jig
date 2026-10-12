@@ -79,7 +79,7 @@ What is still open is listed in section 9.
 - **smith's payloads, decoded and encoded in the routing:** the root
   hands out each of smith's payloads between its own hub and
   `smith-inline-agent`, and the routing decodes or encodes it with
-  `smith-protocol-channel`'s functions, the charter against the engine's
+  smith's codecs, the charter against the engine's
   endpoints, keeping no state, and hands it back (`../domain/hosts.md`,
   6.8). As it decodes a charter, it keeps the slot's result contract
   beside smith's LLM component (`llm.md`, section 3).
@@ -233,10 +233,10 @@ down:  released and door outputs → components → io submissions
 
 - **The reference service, `jig-test-service`,** among jig's test kits
   but written as step code, so that it can be copied: jig's test
-  application's engine protocol layer (the store's port, the accounts',
-  smith's LLM component for its own slots' `smith-inline-agent`, the host
-  tools' translation, the clients' side, the workers' side, its test
-  connector's system answered in memory) and a test worker's (the link,
+  application's engine protocol layer (the store, the accounts', the
+  host tools' translation, the clients' side, the workers' side, its test
+  connector's system answered in memory); its engine runs no agents of
+  its own and a test worker's (the link,
   smith's host half and its agent processes, the test workspace), each
   with its `iterate`, composed in one process (section 10), with a
   startup function that takes configuration's bytes and returns the
@@ -245,8 +245,8 @@ down:  released and door outputs → components → io submissions
   configuration with skein's startup kit (`configuration.md`), opens the
   store on a directory, and runs the engine and one test worker in one
   process (section 10), the worker's agents smith's real agent
-  processes, run as its own `agent` command (section 6). A browser on
-  loopback signs in by the link it prints (`client.md`, section 8). Its
+  processes, run as its own `agent` command (section 6). A native client
+  on loopback signs in by the link it prints (`client.md`, section 8). Its
   LLM endpoint is its configuration's. It is the template an application
   copies for its own `main`, and the process and live layers of jig's
   proofs (section 8).
@@ -291,7 +291,8 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The protocol world:** the reference service (section 7), every
   component in it, over skein's simulated io (testing-strategy.md, 2.7):
   a store on the simulator's crashing disk, scripted parties'
-  connections, skein's fake LLM peer, smith's scripted agent processes
+  connections, skein's fake LLM peer, smith's agent processes over skein's
+  fake LLM
   spawned on skein's fake machine beneath the test worker (smith's
   `protocol/hosts.md`, section 7), and the application's systems' fakes,
   the process killed and started again at drawn moments, and drained by
@@ -306,8 +307,8 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   restarted, and the work found where it was; it checks integration, as
   skein's real-loop tests do. `ops`'s binary proves its own shape the
   same way.
-- **The live layer:** `jig-test` with a real LLM account as its endpoint
-  and a real browser, a person signing in by the printed link and a
+- **The live layer:** `jig-test` with a real LLM account handed in
+  (`llm.md`, 5.4), a native client signing in by the printed link, and a
   request answered by a real model, within a bound on calls.
 
 ## 9. Open questions
@@ -353,7 +354,8 @@ same parts as between hosts.
   section 6).
 - **Its world** is the protocol world of section 8, with workers: the
   engine's and a test worker's services in one loop, joined by in-process
-  addresses, the test worker's agents smith's scripted agent processes.
+  addresses, the test worker's agents smith's agent processes over skein's
+  fake LLM.
   Joined sockets are io's own and never reach skein's simulator (skein's
   `io.md`, 3.5), so the link's cuts and stalls are the channel's protocol
   world's, over streams cut at random (`channel.md`, section 12).

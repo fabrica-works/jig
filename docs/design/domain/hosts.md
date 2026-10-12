@@ -262,8 +262,8 @@ per shape, buys:
 
 - **one lifecycle:** admission, fencing, relays, turns and answers kept
   until acknowledged, and cancel are written, reviewed and tested once,
-  in one world, with smith's scripted agent processes and with smith's
-  real domain; the open questions of section 12 are answered once for
+  in one world, with smith's agent processes over skein's fake LLM and
+  with smith's real domain; the open questions of section 12 are answered once for
   both shapes;
 - **one root shape:** the engine's root and a worker's compose the same
   three kinds of child: the hub, an agent capability, and a workspace
@@ -506,7 +506,9 @@ reach past the grace.
 - **Translated by hand-out.** The root that composes the hub with an
   agent capability, a worker's or the engine's for its own hub, hands
   each payload out to its protocol layer, whose routing decodes or
-  encodes it with `smith-protocol-channel`'s functions, keeping no state,
+  encodes it with smith's codecs (`smith-protocol-channel`'s functions,
+  and `smith-channel`'s records for a call's name and a fact), keeping
+  no state,
   and hands it back as an event of the root, in the order it went out:
   the path of host tools' calls (`../protocol/channel.md`, 6.3).
   - **Down,** the charter, the transcript and the committed calls'
@@ -683,7 +685,8 @@ and which reads every run's result back by the path of host tools' calls
   relays, cancels and acknowledges once its fake store commits; a link
   that drops for less and for more than the grace, and one that never
   drops, as in the engine; agent capabilities of both kinds, smith's:
-  `smith-host-domain` over smith's scripted agent processes, which
+  `smith-host-domain` over smith's agent processes over skein's fake LLM,
+  which
   progress, call, take turns, some opening a window, wait, park and end,
   refuse messages and leave them unread, but also hang, crash, break
   rules and ignore cancels; and `smith-inline-agent`'s runs, smith's real

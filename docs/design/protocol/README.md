@@ -130,7 +130,7 @@ An application that mixes the last two has both.
   protocol layer, the workers' links joined to the engine's listener by
   skein's in-process addresses (section 10), over the same components,
   codecs and channels, with no TLS, and the workers' agents child
-  processes, as between hosts (`service.md`, section 10). A browser
+  processes, as between hosts (`service.md`, section 10). A client
   reaches the engine over TCP on loopback. It is the first shape built.
 
 ## 5. Components
@@ -172,7 +172,7 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
   client's decoding of turns; `jig-protocol-tools` gives its schemas as
   bytes the charter declares. The application links the rest where it
   composes them: its root, the agent capability; its protocol layer,
-  smith's components and `smith-protocol-channel`'s functions.
+  smith's components and smith's codecs.
 
 ## 6. What an application writes
 
@@ -339,8 +339,9 @@ Each is generic, and says nothing about jig.
   library, `smith-agent-shell` (smith's `protocol/hosts.md`, section 3);
   the parent face (smith's `domain/host.md`, 9.4); `smith-inline-agent`,
   with its LLM component, serving many runs' completions with one table
-  of grants, and its machine component; and `smith-protocol-channel`'s
-  functions between bytes and smith's values (section 13).
+  of grants, and its machine component; and smith's codecs between bytes
+  and smith's values: `smith-protocol-channel`'s functions, and
+  `smith-channel`'s records for a call's name and a fact (section 13).
 - **Not asked: a completion's result contract.** A protocol layer that
   runs `smith-inline-agent` keeps each slot's beside smith's LLM
   component, as smith's own local host does (`llm.md`, section 3).
