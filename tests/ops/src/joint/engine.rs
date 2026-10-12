@@ -316,6 +316,7 @@ impl Application for OpsApplication {
                 | core::Now::EffectAnswer { .. }
                 | core::Now::SettledCallRefused { .. }
                 | core::Now::Call { .. }
+                | core::Now::CallBusy { .. }
                 | core::Now::DropCall { .. }
                 | core::Now::Undelivered { .. }
                 | core::Now::Account(_)

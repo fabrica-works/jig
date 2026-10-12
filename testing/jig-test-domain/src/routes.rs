@@ -51,20 +51,8 @@ pub(super) fn route_core(
                     hold(decision, Delivery::Fleet(fleet::Event::Relayed { to, answer }));
                 }
                 core::Held::Relayed { channel, run, attempt, call: name, answer } => {
-                    let Some(crate::Payload::SettledCall(call)) = domain.payloads.remove(&answer) else {
-                        unreachable!("answer payload")
-                    };
-                    hold(
-                        decision,
-                        Delivery::CallAnswer {
-                            channel,
-                            task: run.raw(),
-                            attempt: attempt.raw(),
-                            name,
-                            call,
-                            writes: true,
-                        },
-                    );
+                    let delivery = crate::stopping::relayed(domain, channel, run, attempt, name, answer, true);
+                    hold(decision, delivery);
                 }
                 core::Held::MakeEffect { connector, entry } => {
                     hold(decision, Delivery::Core(core::Held::MakeEffect { connector, entry }));
@@ -335,24 +323,10 @@ fn route_now(
     work: &mut Queue<Work>,
 ) {
     match now {
+        core::Now::CallBusy { to } => crate::stopping::call(domain, to, work),
         core::Now::Relayed { channel, run, attempt, call: name, answer } => {
-            let Some(crate::Payload::SettledCall(call)) = domain.payloads.remove(&answer) else {
-                unreachable!("read answer payload")
-            };
-            assert!(
-                domain
-                    .journal
-                    .now(Delivery::CallAnswer {
-                        channel,
-                        task: run.raw(),
-                        attempt: attempt.raw(),
-                        name,
-                        call,
-                        writes: false,
-                    })
-                    .is_ok(),
-                "read answer door reserved"
-            );
+            let delivery = crate::stopping::relayed(domain, channel, run, attempt, name, answer, false);
+            assert!(domain.journal.now(delivery).is_ok(), "reserved relay answer room");
         }
         core::Now::Undelivered { message, .. } => {
             drop(domain.payloads.remove(&message.words));
@@ -453,7 +427,10 @@ fn route_now(
             let payload = domain.payloads.get(&body).expect("fleet retained the turn body");
             let (cumulative, read) = match payload {
                 crate::Payload::Turn { cumulative, read, .. } => (*cumulative, *read),
-                crate::Payload::InboxWord(_) | crate::Payload::SettledCall(_) | crate::Payload::Answer { .. } => {
+                crate::Payload::Busy
+                | crate::Payload::InboxWord(_)
+                | crate::Payload::SettledCall(_)
+                | crate::Payload::Answer { .. } => {
                     unreachable!("turn body family")
                 }
             };
@@ -463,7 +440,10 @@ fn route_now(
             let body = domain.payloads.get(&payload).expect("fleet retained the answer body");
             let (cumulative, end) = match body {
                 crate::Payload::Answer { cumulative, end, .. } => (*cumulative, end.clone()),
-                crate::Payload::InboxWord(_) | crate::Payload::SettledCall(_) | crate::Payload::Turn { .. } => {
+                crate::Payload::Busy
+                | crate::Payload::InboxWord(_)
+                | crate::Payload::SettledCall(_)
+                | crate::Payload::Turn { .. } => {
                     unreachable!("answer body family")
                 }
             };
@@ -481,7 +461,10 @@ fn route_now(
             let body = domain.payloads.remove(&payload).expect("accepted turn body");
             let (cumulative, read, transcript) = match body {
                 crate::Payload::Turn { cumulative, read, transcript, .. } => (cumulative, read, transcript),
-                crate::Payload::InboxWord(_) | crate::Payload::SettledCall(_) | crate::Payload::Answer { .. } => {
+                crate::Payload::Busy
+                | crate::Payload::InboxWord(_)
+                | crate::Payload::SettledCall(_)
+                | crate::Payload::Answer { .. } => {
                     unreachable!("accepted turn body family")
                 }
             };
@@ -503,7 +486,7 @@ fn route_now(
                 Some(crate::Payload::Answer { task, attempt, .. }) => {
                     Some(core::PayloadRefusal::Answer { task, attempt })
                 }
-                Some(crate::Payload::InboxWord(_) | crate::Payload::SettledCall(_)) => {
+                Some(crate::Payload::Busy | crate::Payload::InboxWord(_) | crate::Payload::SettledCall(_)) => {
                     unreachable!("answer is not a turn or terminal")
                 }
                 None => None,

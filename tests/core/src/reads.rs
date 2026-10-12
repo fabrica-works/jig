@@ -83,6 +83,7 @@ impl Parties {
             | root::Event::Committed { .. }
             | root::Event::Failed { .. }
             | root::Event::Connector { .. }
+            | root::Event::Stop
             | root::Event::RestartBegin
             | root::Event::RestartDone(_)
             | root::Event::ConnectorTimer { .. }

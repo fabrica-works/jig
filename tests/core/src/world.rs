@@ -528,6 +528,7 @@ impl World {
                 }
                 root::Request::Now(_) => {}
                 root::Request::Restart(_) => panic!("walking fixture uses restored markers"),
+                root::Request::Busy { .. } => panic!("this world does not stop"),
                 root::Request::Stop => panic!("testing root stopped: {:?}", self.trace),
             }
         }
@@ -762,7 +763,8 @@ impl World {
             root::Delivery::ApplicationDocument { .. }
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Core(core::Held::Delivery { .. } | core::Held::WatchEnded { .. }) => {}
-            other @ (root::Delivery::CallAnswer { .. }
+            other @ (root::Delivery::CallBusy { .. }
+            | root::Delivery::CallAnswer { .. }
             | root::Delivery::Core(_)
             | root::Delivery::Fleet(_)
             | root::Delivery::System { .. }

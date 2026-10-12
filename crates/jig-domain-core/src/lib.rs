@@ -44,6 +44,7 @@ mod proposals;
 pub mod reads;
 mod resources;
 mod restart;
+mod stopping;
 pub use restart::{RestartRequest, RestartStep};
 mod revisions;
 mod roles;
@@ -219,6 +220,7 @@ pub(crate) struct WatchedSubject {
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
+    pub(crate) stopping: bool,
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
     pub(crate) application_input: Option<(u16, Token)>,
     pub(crate) task_capacity_mark: u64,
@@ -499,6 +501,7 @@ impl Core {
             );
         }
         Core {
+            stopping: false,
             archived_chats: Map::with_capacity(
                 limits
                     .people

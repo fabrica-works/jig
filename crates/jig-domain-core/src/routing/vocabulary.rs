@@ -182,6 +182,8 @@ pub enum WatchRefusal {
 /// Core output that follows no mutation.
 #[derive(Debug)]
 pub enum Now {
+    /// The root answers this host call with its own busy payload.
+    CallBusy { to: ReplyTo },
     /// The host receives a read answer without waiting for a commit (domain/engine.md, 4.4).
     Relayed { channel: Token, run: Token, attempt: Token, call: Box<[u8]>, answer: Token },
     /// An effect wait or capacity refusal changed no durable state.
@@ -329,6 +331,8 @@ pub struct CoreBriefBudgets {
 /// One event routed to a child of the core.
 #[derive(Debug)]
 pub enum Event {
+    /// Refuse new decisions while the service drains (engine.md, 6.1).
+    Stopping,
     /// A connector's state change names its opaque subjects in this decision.
     Marked { connector: u16, subjects: List<Token> },
     /// Exactly one terminal for a previously admitted read load.

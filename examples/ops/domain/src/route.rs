@@ -1401,7 +1401,8 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 work,
             );
         }
-        other @ (core::Now::SignInRefused { .. }
+        other @ (core::Now::CallBusy { .. }
+        | core::Now::SignInRefused { .. }
         | core::Now::WatchRefused { .. }
         | core::Now::Account(_)
         | core::Now::RunText { .. }

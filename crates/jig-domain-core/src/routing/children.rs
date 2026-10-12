@@ -266,6 +266,9 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 }
                 Request::Held(Box::new(Held::Inbound { channel, run, attempt, message }))
             }
+            fleet::Request::Relay { reply_to, .. } if core.stopping => {
+                Request::Now(Box::new(Now::CallBusy { to: reply_to }))
+            }
             fleet::Request::Relay { reply_to, run, attempt, call } => {
                 Request::Now(Box::new(Now::Call { to: reply_to, run, attempt, call }))
             }
@@ -288,9 +291,25 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
             | fleet::Request::Rejected { .. }
             | fleet::Request::Exhausted { .. }
             | fleet::Request::Told { .. } => unreachable!("account and diagnostic host routes are handled separately"),
+            fleet::Request::Turned { run, attempt, turn, body } if core.stopping => {
+                let mut follow = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
+                fleet::step(
+                    &mut core.fleet,
+                    &Env { now: env.now, wall: env.wall, limits: env.limits.fleet },
+                    fleet::Event::TurnBusy { run, attempt, turn },
+                    &mut follow,
+                );
+                for _ in 0..follow.len() {
+                    pending.push(follow.pop().expect("busy turn outputs"));
+                }
+                Request::Now(Box::new(Now::DropPayload { payload: body }))
+            }
             fleet::Request::Turned { run, attempt, turn, body } => {
                 assert!(core.current_proof(run.raw(), attempt.raw()), "current turn has reserved proof");
                 Request::Now(Box::new(Now::TurnPayload { run, attempt, turn, body }))
+            }
+            fleet::Request::Answered { payload, .. } if core.stopping => {
+                Request::Now(Box::new(Now::DropPayload { payload }))
             }
             fleet::Request::Answered { run, attempt, payload, to, .. } => {
                 let _answered = to.into_token();

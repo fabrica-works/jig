@@ -311,7 +311,8 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
     let room = room_max(limits)?;
     match event {
         Event::Read { .. } | Event::ReadLoaded { .. } => Some(JournalRoom { writes: 0, held: room.held }),
-        Event::Marked { .. }
+        Event::Stopping
+        | Event::Marked { .. }
         | Event::Application { .. }
         | Event::ApplicationPart { .. }
         | Event::ApplicationFinished { .. }
@@ -395,6 +396,9 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
 
 /// Resume the fleet's next held placement or relay through the core's sibling routes.
 pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
+    if core.stopping {
+        return crate::stopping::empty();
+    }
     let mut child = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
     fleet::resume(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, &mut child);
     if !child.is_empty() {
@@ -405,7 +409,12 @@ pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
 
 #[expect(clippy::too_many_lines, reason = "exhaustive event dispatch delegates each concern")]
 fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<Event>) -> Requests {
+    let event = match crate::stopping::gate(core, event) {
+        Ok(event) => event,
+        Err(answer) => return answer,
+    };
     match event {
+        Event::Stopping => crate::stopping::start(core),
         Event::Marked { connector, subjects } => view_routes::marked(core, connector, subjects),
         Event::Application { reply_to, sign_in, key, project, connector, digest, owner } => {
             application_routes::start(core, env, work, reply_to, sign_in, key, project, connector, digest, owner)
@@ -515,6 +524,9 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
 
 /// Fire one due child timer, returning its whole bounded request batch.
 pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
+    if core.stopping && crate::stopping::waits(timer) {
+        return crate::stopping::empty();
+    }
     match timer {
         Timer::People => {
             let mut out = Queue::with_capacity(people::max_out(&env.limits.people));

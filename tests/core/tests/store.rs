@@ -97,6 +97,7 @@ fn a_crash_before_a_turn_is_durable_loses_only_its_uncommitted_turn() {
             other @ (root::Request::Restart(_)
             | root::Request::Deliver(_)
             | root::Request::Now(_)
+            | root::Request::Busy { .. }
             | root::Request::Stop) => panic!("nothing leaves before the turn commit: {other:?}"),
         }
     }

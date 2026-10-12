@@ -428,6 +428,7 @@ impl Application for Testing {
                 root::Request::Restart(step) => Output::Deliver(Delivery::Held(root::Delivery::Restart(step))),
                 root::Request::Deliver(delivery) => Output::Deliver(Delivery::Held(delivery)),
                 root::Request::Now(now) => Output::Deliver(Delivery::Now(now)),
+                root::Request::Busy { .. } => panic!("this world does not stop"),
                 root::Request::Stop => Output::Stop,
             });
         }
@@ -584,6 +585,7 @@ impl Application for Testing {
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Application { .. }
             | root::Delivery::Core(_)
+            | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Message { .. } => Vec::new(),
             root::Delivery::Fleet(_) => panic!("root consumes fleet continuations"),

@@ -707,6 +707,7 @@ impl Session {
             | root::Delivery::Projection { .. }
             | root::Delivery::Message { .. }
             | root::Delivery::Restart(_)
+            | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Assigned { .. }
             | root::Delivery::Fleet(_)
@@ -767,6 +768,7 @@ impl Session {
             | core::Now::EffectAnswer { .. }
             | core::Now::SettledCallRefused { .. }
             | core::Now::Call { .. }
+            | core::Now::CallBusy { .. }
             | core::Now::DropCall { .. }
             | core::Now::Undelivered { .. }
             | core::Now::Account(_)

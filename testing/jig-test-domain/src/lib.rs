@@ -88,6 +88,8 @@ pub enum Write {
 /// What the journal releases after its commit, or through its read door.
 #[derive(Debug)]
 pub enum Delivery {
+    /// The host retries this call after the engine drains.
+    CallBusy { channel: Token, task: u64, attempt: u64, name: Box<[u8]> },
     /// A whole connector-owned document released after every reflected commit.
     ApplicationDocument { watcher: Token, number: u16, document: Box<connector::ClientDocument> },
     /// One connector-owned read terminal, held until durable.
@@ -148,6 +150,8 @@ pub struct Assignment {
 /// What the root asks its surrounding world to do.
 #[derive(Debug)]
 pub enum Request {
+    /// Return a connector input to its owner during the drain.
+    Busy { event: Box<Event> },
     /// First cold load, before the deployment counter is known.
     Restart(core::RestartStep),
     /// Apply one numbered transaction as a whole.
@@ -164,6 +168,8 @@ pub enum Request {
 #[derive(Debug)]
 #[expect(clippy::large_enum_variant, reason = "the testing root moves admitted core events by value")]
 pub enum Event {
+    /// The service begins its drain.
+    Stop,
     /// Prepare and watch the application's typed subject in the client's declared scope.
     WatchApplication {
         watcher: Token,
@@ -309,6 +315,7 @@ pub struct Domain {
     second: connector::Domain,
     journal: Journal<Write, Delivery>,
     now: Queue<core::Now>,
+    busy: Queue<Box<Event>>,
     assignments: Map<u64, Assignment>,
     workspace_writes: Map<u64, Box<[tasks::Name]>>,
     procedure_steps: Map<u64, (u64, u16)>,
@@ -382,6 +389,7 @@ impl Domain {
             second: connector::Domain::new(config.second, &limits.connector),
             journal: Journal::new(&limits.journal),
             now: Queue::with_capacity(limits.journal.now),
+            busy: Queue::with_capacity(limits.routes),
             assignments: Map::with_capacity(limits.core.tasks.tasks),
             workspace_writes: Map::with_capacity(limits.core.tasks.tasks),
             procedure_steps: Map::with_capacity(limits.core.tasks.tasks),
@@ -515,6 +523,7 @@ enum Work {
 
 #[derive(Debug)]
 enum Payload {
+    Busy,
     Turn { task: u64, attempt: u64, turn: u32, cumulative: u64, read: Option<u64>, transcript: Box<[u8]> },
     Answer { task: u64, attempt: u64, cumulative: u64, end: tasks::End },
     SettledCall(core::SettledCall),
@@ -523,7 +532,9 @@ enum Payload {
 
 /// Admit one input and route all synchronous continuations inside one decision.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
+    let Ok(event) = stopping::defer(domain, event) else { return };
     match event {
+        Event::Stop => decide(domain, env, Work::Core(core::Event::Stopping)),
         Event::Application { reply_to, sign_in, key, project, number, digest, value } => {
             decide(domain, env, Work::Application { reply_to, sign_in, key, project, number, digest, value });
         }
@@ -856,6 +867,7 @@ fn numbered(domain: &mut Domain, number: u16) -> &mut connector::Domain {
 
 /// Drain at most one commit and all currently durable outputs.
 pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+    stopping::release(domain, out);
     if let Some(step) = domain.restart_load.take() {
         out.push(Request::Restart(step));
         return;
@@ -920,6 +932,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
             | Delivery::Projection { .. }
             | Delivery::Message { .. }
             | Delivery::Restart(_)
+            | Delivery::CallBusy { .. }
             | Delivery::CallAnswer { .. }
             | Delivery::Core(_)
             | Delivery::Assigned { .. }
@@ -931,6 +944,9 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
     for _ in 0..domain.now.len() {
         let now = domain.now.pop().expect("bounded now count");
         out.push(Request::Now(now));
+    }
+    if domain.stopping() {
+        return;
     }
     if resume_restart_outbox(domain, env) {
         return;
@@ -998,6 +1014,7 @@ fn hold(decision: &mut Decision<Write, Delivery>, value: Delivery) {
 mod application_facts;
 mod client_documents;
 mod routes;
+mod stopping;
 use routes::{route_connector, route_core};
 
 /// Translate one durable row during the requested restart load. The root

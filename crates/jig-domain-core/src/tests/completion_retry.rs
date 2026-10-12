@@ -24,6 +24,7 @@ fn current_stream(out: &[Request]) -> &Request {
                 | Now::EffectAnswer { .. }
                 | Now::SettledCallRefused { .. }
                 | Now::Call { .. }
+                | Now::CallBusy { .. }
                 | Now::DropCall { .. }
                 | Now::Undelivered { .. }
                 | Now::SignInRefused { .. }

@@ -122,6 +122,7 @@ impl Referee {
             | root::Delivery::Message { .. }
             | root::Delivery::Restart(_)
             | root::Delivery::Core(_)
+            | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::Assigned { .. }
             | root::Delivery::Fleet(_)

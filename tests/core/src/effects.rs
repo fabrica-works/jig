@@ -35,6 +35,10 @@ pub struct World {
     pub assigned: Option<root::Assignment>,
     pub assignments: Vec<(u64, u64)>,
     pub cancellations: Vec<(u64, u64)>,
+    pub busy_turns: Vec<(u64, u64, u32)>,
+    pub busy_calls: Vec<Box<[u8]>>,
+    pub busy_events: Vec<root::Event>,
+    pub stop_deliveries: Vec<core::Held>,
     pub commits: Vec<Vec<root::Write>>,
     pub projections: Vec<(usize, u16, core::ProjectionFeed)>,
     pub hold_projection_settlements: bool,
@@ -256,6 +260,10 @@ impl World {
             assigned: None,
             assignments: Vec::new(),
             cancellations: Vec::new(),
+            busy_turns: Vec::new(),
+            busy_calls: Vec::new(),
+            busy_events: Vec::new(),
+            stop_deliveries: Vec::new(),
             commits: Vec::new(),
             projections: Vec::new(),
             hold_projection_settlements: false,
@@ -615,6 +623,7 @@ impl World {
                             watches.now(&now);
                         }
                     }
+                    root::Request::Busy { event } => self.busy_events.push(*event),
                     root::Request::Stop => self.stopped = true,
                 }
             }
@@ -727,6 +736,13 @@ impl World {
                 self.projections.push((self.commits.len(), connector, *feed));
             }
             root::Delivery::Restart(step) => self.restart_step(step),
+            root::Delivery::CallBusy { name, .. } => self.busy_calls.push(name),
+            root::Delivery::Core(core::Held::TurnBusy { run, attempt, turn, .. }) => {
+                self.busy_turns.push((run.raw(), attempt.raw(), turn));
+            }
+            root::Delivery::Core(held @ (core::Held::WatchEnded { .. } | core::Held::Acknowledge { .. })) => {
+                self.stop_deliveries.push(held);
+            }
             root::Delivery::CallAnswer { name, call, .. } => self.host_answers.push((name, call)),
             root::Delivery::Message { word, .. } => self.inbound.push(word),
             root::Delivery::Assigned { assignment, .. } => {
@@ -844,20 +860,17 @@ impl World {
             root::Delivery::ApplicationDocument { .. }
             | root::Delivery::Core(
                 core::Held::Delivery { .. }
-                | core::Held::WatchEnded { .. }
                 | core::Held::SettledCall { .. }
                 | core::Held::Assign { .. }
                 | core::Held::Inbound { .. }
                 | core::Held::Relayed { .. }
                 | core::Held::Relay { .. }
                 | core::Held::Result { .. }
-                | core::Held::Acknowledge { .. }
                 | core::Held::AcknowledgeTurn { .. }
                 | core::Held::TaskTurnKept { .. }
                 | core::Held::TaskTerminalAcknowledged { .. }
                 | core::Held::NotesWritten { .. }
                 | core::Held::NotesDeleted { .. }
-                | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }
                 | core::Held::Refuse { .. }
                 | core::Held::MakeEffect { .. },
@@ -1299,3 +1312,5 @@ impl World {
         });
     }
 }
+
+mod stopping;

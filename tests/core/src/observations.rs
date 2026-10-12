@@ -391,6 +391,7 @@ impl Observer {
             }
             root::Event::WatchApplication { .. }
             | root::Event::ReadApplication { .. }
+            | root::Event::Stop
             | root::Event::RestartBegin
             | root::Event::RestartDone(_)
             | root::Event::Timer(_)
@@ -905,6 +906,7 @@ impl Observer {
             | root::Delivery::ApplicationDocument { .. }
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Projection { .. }
+            | root::Delivery::CallBusy { .. }
             | root::Delivery::System { .. } => {}
         }
         self.observe(now, r::Observed::Released { requires });

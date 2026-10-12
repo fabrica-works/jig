@@ -195,6 +195,7 @@ impl Parties {
             | root::Event::Committed { .. }
             | root::Event::Failed { .. }
             | root::Event::Connector { .. }
+            | root::Event::Stop
             | root::Event::RestartBegin
             | root::Event::RestartDone(_)
             | root::Event::ConnectorTimer { .. }
@@ -359,6 +360,7 @@ impl Parties {
             | root::Delivery::Projection { .. }
             | root::Delivery::Message { .. }
             | root::Delivery::Assigned { .. }
+            | root::Delivery::CallBusy { .. }
             | root::Delivery::CallAnswer { .. }
             | root::Delivery::System { .. }
             | root::Delivery::LostRead { .. }

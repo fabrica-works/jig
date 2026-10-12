@@ -299,6 +299,7 @@ impl Peers {
             | root::Delivery::ApplicationDocument { .. }
             | root::Delivery::ApplicationRead { .. }
             | root::Delivery::Projection { .. }
+            | root::Delivery::CallBusy { .. }
             | root::Delivery::System { .. }
             | root::Delivery::Procedure { .. } => {}
         }
