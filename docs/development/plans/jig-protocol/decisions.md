@@ -683,6 +683,36 @@ the file.
      text only when unedited; a `Value` patch at an unchanged write count
      fails the model. At most 30 lines in `model.rs` and one regression
      test; no other assertion changes.
+140. **A gate that fails only on a timeout lands on the third try**
+     (2026-10-12, the coordinator's block "jig 12.4: same-tree gate
+     timeout after permitted retry", 2026-10-12T20:18:04Z). Both of jig
+     12.4's gates stopped at the focused suite's 15 s global timeout
+     (2,488 and 2,312 tests passed), killing tests in `jig-view` and
+     `jig-scripted-engine`, which 12.4 does not touch, on one code tree,
+     with no assertion or compile failure; the first began at load 16 with
+     a code-graph indexer at 565 % CPU outside the queue. The README's
+     "For the user" item (c) counts about two such failures an hour.
+     From now to the run's end, a gate that fails only on a timeout, in
+     tests outside the session's files, is retried by `land` up to three
+     times in all on the same tree, without asking; a third failure is a
+     block, kind infrastructure. This replaces development.md, 8.5's "a
+     second failure on the same tree is a question" for this plan. The
+     README's Rules now say so; jig 12.4 runs `land` once more.
+141. **jig 05.6's needs take the hub's turns and price their bytes**
+     (2026-10-12, the coordinator's block "jig 05.6: host turn and
+     retained Needs bounds absent from construction",
+     2026-10-12T20:19:39Z). A plan defect: 05.6's Shape builds
+     `Needs::unacknowledged` from "the hub's `Limits::turns`"
+     (`crates/jig-domain-host/src/limits.rs:51`, "Normal retained turns
+     per attempt"), but `Core::new` receives `Config` and `core::Limits`
+     only, and `fleet::Limits::turns` counts turns "across all attempts".
+     engine.md, 8: "fewer turns kept unacknowledged than the hub's bound".
+     So `core::Config` gains `hub_turns: u32`, which each root sets from
+     its hub's `Limits::turns` (05.6's Files name `Config`); and the
+     `Needs` the fleet keeps are bounded by a new `fleet::Limits::needs_bytes:
+     u64`, checked at `Domain::new` and priced in `fleet::worst_case`.
+     Each `Config` or `fleet::Limits` literal outside 05.6's Files gains
+     its one line, named in the commit body, whatever their number.
 
 ## For the user
 

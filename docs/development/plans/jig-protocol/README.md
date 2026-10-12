@@ -260,6 +260,14 @@ ones before it in its session. Dependencies are by capability: "skein
   boxes and unboxes it in its translation. It marks no other variant, and
   adds no allowance to a generated file. Before `jig-repin.s1`, such an
   increment commits on its branch and waits for it.
+- **A gate that fails only on a timeout is retried twice** (decisions.md,
+  ruling 140). When `land`'s gate fails only on a suite's global timeout
+  or a test's wall-clock bound, in tests outside the session's files, the
+  session runs `land` again, up to three attempts in all on the same
+  tree, without asking. A third such failure is a block, kind
+  infrastructure. This replaces development.md, 8.5's "a second failure
+  on the same tree is a question" for this plan; any other failure is as
+  8.5 says.
 
 ## Live services
 
