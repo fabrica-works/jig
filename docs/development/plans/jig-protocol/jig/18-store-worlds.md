@@ -370,7 +370,10 @@ Choices); fixture rows go through the root or `seed`; the fault tests
 test root routes `Now::SeenChat` and `Now::HistoricalEscalation` out as
 it routes the other two historical reads
 (`testing/jig-test-domain/src/routes.rs:513-514`, today `unreachable!`),
-and two stories read them through the store (decision 9). The client's
+and two stories read them through the store (decision 9). jig 03.2 routes
+`Now::HistoricalEscalation` early, to the world's `historical.rs`
+(ruling 107): 18.3 moves it to the store with the other historical
+reads. The client's
 joint world (`tests/client/src/joint/*`) rides `effects::World` and
 moves with it, unchanged but for types.
 Needs: nothing beyond 18.2.

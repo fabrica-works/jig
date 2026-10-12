@@ -271,6 +271,30 @@ the file.
      in order, as one sequence, with today's page size, in
      `tests/core/src/effects.rs` (11.1's Files), and `restore_pages.rs`
      stays as it is.
+107. **jig 03.2 routes the historical escalation in the fake world**
+     (2026-10-12, the coordinator's block "jig 03.2: historical
+     escalation route missing outside Files", 2026-10-12T16:03:18Z). A
+     plan defect: 03.2's Shape answers a stale decision "through
+     `Now::HistoricalEscalation`", and two of its three stories reach it,
+     but the test root sends it to `unreachable!`
+     (`testing/jig-test-domain/src/routes.rs:514`) until jig 18.3, late
+     in the run. The world already answers the other historical reads
+     from its fake store (`tests/core/src/historical.rs`, `proposal`;
+     the root's arm at `routes.rs:529-530`), so 03.2 adds
+     `HistoricalEscalation` beside them: the root's arm, an `escalation`
+     read in `historical.rs` loading `CoreKey::EscalationDecision`, and
+     its dispatch in `tests/core/src/effects.rs`. These test-root and
+     world lines do not count toward 03.2's Size. jig 18.3 moves it to
+     the real store with the others (its session file says so).
+108. **Expected literals a renamed vocabulary changes are updated in
+     place** (2026-10-12, the coordinator's block "jig 05.1: renamed
+     vocabulary trace assertion outside Files", 2026-10-12T16:04:43Z, the
+     third block on a test's expected value outside an increment's
+     Files, after skein 02.3 and jig 11.1). jig 05.1's vocabulary makes
+     the host print `host -> Up(Answer {` where
+     `tests/host/tests/simulation.rs:175` expects `host -> Answer {`; 05.1
+     updates that literal. The README's Rules now say when such a literal
+     is no question.
 
 ## For the user
 

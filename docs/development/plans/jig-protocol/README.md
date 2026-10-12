@@ -178,6 +178,15 @@ ones before it in its session. Dependencies are by capability: "skein
 - **The process proof's script** is written once, by jig 26, as
   `scripts/proof-one-process.sh` in jig, and later increments that prove
   at the process layer run it.
+- **An expected value a renamed vocabulary changes** (decisions.md,
+  ruling 108). An increment whose Shape changes how a value prints (a
+  renamed or re-wrapped variant in a trace or `Debug` text, a moved tag)
+  updates, outside its Files, the expected literals that print it: each
+  replaced by what the new code prints for the same behaviour, at most 10
+  lines in all, named in its commit body. It never renames, deletes or
+  loosens a test or an assertion. This replaces development.md, 8.2's "it
+  changes no test's expected value or name" for these literals only; any
+  other change outside Files stays a question.
 
 ## Live services
 
