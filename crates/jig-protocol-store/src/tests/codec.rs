@@ -614,3 +614,98 @@ fn a_people_row_of_another_version_does_not_decode() {
 }
 
 mod record;
+fn call_limits() -> crate::codec::core::Limits {
+    crate::codec::core::limits(&core_limits()).expect("within core ceilings")
+}
+fn core_round_trip(row: jig_domain_core::CoreRecord) {
+    let limits = call_limits();
+    let bytes = crate::codec::core::encode(&row, &limits).expect("within core bounds");
+    assert_eq!(crate::codec::core::decode(&bytes, &limits), Ok(row));
+}
+#[test]
+fn a_call_record_of_each_part_reads_back() {
+    for part in fixtures::calls::call_parts() {
+        core_round_trip(fixtures::calls::call(part));
+    }
+}
+#[test]
+fn a_refused_delegation_reads_back_with_its_problem() {
+    core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::DelegationRefused(fixtures::calls::problem())));
+}
+#[test]
+fn a_recalled_notes_page_reads_back() {
+    core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::NoteRecalled {
+        entries: Box::new([fixtures::note_entry()]),
+        more: true,
+    }));
+}
+#[test]
+fn a_settled_call_reads_back() {
+    use jig_domain_core as core;
+    for answer in [
+        core::SettledAnswer::Host { error: true, body: Box::from(b"denied".as_slice()) },
+        core::SettledAnswer::Delivery {
+            outcome: core::DeliveryOutcome::Stale,
+            evidence: Box::from(b"receipt".as_slice()),
+        },
+    ] {
+        let core::CoreRecord::Call(mut row) = fixtures::calls::call(core::CallPart::Unavailable) else {
+            panic!("call fixture")
+        };
+        row.settled = Some(core::SettledCall {
+            serial: 1,
+            name: Box::from(b"call".as_slice()),
+            tool: Box::from(b"tool".as_slice()),
+            answer,
+        });
+        core_round_trip(core::CoreRecord::Call(row));
+    }
+}
+#[test]
+fn a_finished_terminal_reads_back_with_its_followup_batch() {
+    use jig_domain_tasks as tasks;
+    let end = tasks::End::FinishedWithFollowups {
+        result: tasks::TaskResult::Report { words: Box::from(b"finished".as_slice()) },
+        followups: tasks::ResultFollowups::Delegates(Box::new([fixtures::task_creation(2)])),
+    };
+    end_round_trip(end);
+}
+
+#[test]
+fn a_finished_terminal_reads_back_with_its_followup_proposal() {
+    use jig_domain_tasks as tasks;
+    let end = tasks::End::FinishedWithFollowups {
+        result: tasks::TaskResult::Report { words: Box::from(b"finished".as_slice()) },
+        followups: tasks::ResultFollowups::Proposal(Box::new(fixtures::task_proposal())),
+    };
+    end_round_trip(end);
+}
+
+#[test]
+fn a_carried_phase_reads_back_as_its_own_family() {
+    let phase = fixtures::task_phase();
+    let limits = call_limits();
+    let bytes = crate::codec::tasks::carried::phase(&phase, &limits.tasks).expect("phase within bounds");
+    assert_eq!(crate::codec::tasks::carried::read_phase(&bytes, &limits.tasks), Ok(phase));
+}
+
+#[test]
+fn a_carried_change_reads_back_as_its_own_family() {
+    let change = jig_domain_tasks::Change::Prioritised { priority: 7 };
+    let limits = call_limits();
+    let bytes = crate::codec::tasks::carried::change(&change, &limits.tasks).expect("change within bounds");
+    assert_eq!(crate::codec::tasks::carried::read_change(&bytes, &limits.tasks), Ok(change));
+}
+
+#[test]
+fn core_limits_past_the_settled_answer_ceiling_are_refused() {
+    let mut domain = core_limits();
+    domain.call_answer_bytes = crate::core_v1::CEILINGS.settled_answer_host_body + 1;
+    assert!(crate::codec::core::limits(&domain).is_none());
+}
+
+fn end_round_trip(end: jig_domain_tasks::End) {
+    let limits = call_limits();
+    let bytes = crate::codec::tasks::carried::end(&end, &limits.tasks).expect("terminal within bounds");
+    assert_eq!(crate::codec::tasks::carried::read_end(&bytes, &limits.tasks), Ok(end));
+}

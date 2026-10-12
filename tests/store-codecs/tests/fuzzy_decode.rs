@@ -112,3 +112,20 @@ fn arbitrary_people_rows_never_panic_and_round_trip_when_they_decode() {
 fn mutated_people_goldens_never_panic() {
     mutated("people", 0x5702_e019, people);
 }
+
+fn core(bytes: &[u8]) {
+    use jig_protocol_store::core_v1;
+    if let Ok(row) = core_v1::Row::decode(&core_v1::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+#[test]
+fn arbitrary_core_rows_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x5703_e019, core);
+}
+#[test]
+fn mutated_core_goldens_never_panic() {
+    mutated("core", 0x5704_e019, core);
+}

@@ -293,3 +293,42 @@ record TaskOutcome {
 record TaskRecord { history: TaskHistory run: TaskRun definition: TaskDefinition interests: TaskInterests outcome: TaskOutcome }
 enum Value { ledger: FundingRecord, closed_ledger: FundingRecord, writer: WriterSlot, pool: PoolSlots, history: boxed History, milestone: Milestone, person_proposal: PersonProposal, decided_proposal: PersonProposal, activity: ActivityLine, live: TaskRecord, ended: TaskRecord, stub: Stub, update: Update, result: ResultRow, conversation_newest: Conversation, conversation_oldest: Conversation, goal: GoalRow, ended_delegate: Edge, delegate: Edge }
 versioned record Row { value: Value }
+record CapacityActionBatch { first: option u64 members: u32 }
+record CapacityActionProposal { number: u64 }
+record CapacityActionPersonProposal { number: u64 }
+record CapacityActionMessage { task: u64 number: u64 }
+record CapacityActionSource { funder: Funder }
+record CapacityActionIntroduce { left: u64 right: u64 }
+record CapacityActionSubscription { number: u64 }
+record CapacityActionEffect { entry: u64 }
+record CapacityActionClaim { attempt: u64 }
+enum CapacityAction { batch: CapacityActionBatch, proposal: CapacityActionProposal, person_proposal: CapacityActionPersonProposal, message: CapacityActionMessage, source: CapacityActionSource, introduce: CapacityActionIntroduce, subscription: CapacityActionSubscription, effect: CapacityActionEffect, claim: CapacityActionClaim, release, move_task }
+record CapacityCauseTasks { limit: u32 }
+record CapacityCauseCreationFlights { limit: u32 }
+record CapacityCauseResourceReports { limit: u32 }
+record CapacityCauseProjectTasks { limit: u32 }
+record CapacityCauseTree { limit: u32 }
+record CapacityCauseDelegates { limit: u32 }
+record CapacityCauseInbox { task: u64 messages: u32 bytes: u32 }
+record CapacityCauseHoldings { limit: u32 }
+record CapacityCauseHoldWaiters { limit: u32 }
+record CapacityCauseProposals { limit: u32 }
+record CapacityCauseReferences { limit: u32 }
+record CapacityCauseSubscriptions { limit: u32 }
+record CapacityCauseFunders { limit: u32 }
+record CapacityCauseWriters { limit: u32 }
+enum CapacityCause { tasks: CapacityCauseTasks, creation_flights: CapacityCauseCreationFlights, resource_reports: CapacityCauseResourceReports, project_tasks: CapacityCauseProjectTasks, tree: CapacityCauseTree, delegates: CapacityCauseDelegates, inbox: CapacityCauseInbox, holdings: CapacityCauseHoldings, hold_waiters: CapacityCauseHoldWaiters, proposals: CapacityCauseProposals, references: CapacityCauseReferences, subscriptions: CapacityCauseSubscriptions, funders: CapacityCauseFunders, writers: CapacityCauseWriters }
+record Capacity { project: option u32 by: Party action: CapacityAction cause: CapacityCause }
+record RefusalPersonRevision { revision: u64 }
+enum Refusal { unproposable, person_revision: RefusalPersonRevision, resource_unavailable, not_ready, unknown, busy, duplicate, empty, batch, live, project, tree, depth, delegates, reference, subscription, dependencies, cycle, executor, spec, contract, authority_shape, inputs, state, attempt, live_delegates, restore, read, turn, funding, hold_kind, hold_taken, holds }
+versioned record TaskProblem { task: option u64 why: Refusal blocked_by: option list 8192 Number capacity: option Capacity }
+record ResultFollowupsDelegates { value: list 4 Creation }
+record ResultFollowupsProposal { value: Proposal }
+enum ResultFollowups { delegates: ResultFollowupsDelegates, proposal: boxed ResultFollowupsProposal }
+record EndFinished { result: TaskResult cancel_delegates: bool }
+record EndFinishedWithFollowups { result: TaskResult followups: ResultFollowups }
+record EndFailed { value: Class }
+enum End { finished: EndFinished, finished_with_followups: boxed EndFinishedWithFollowups, parked, failed: EndFailed, refused }
+versioned record EndRecord { value: End }
+versioned record PhaseRecord { value: Phase }
+versioned record ChangeRecord { value: Change }

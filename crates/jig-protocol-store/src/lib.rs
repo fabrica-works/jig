@@ -18,6 +18,9 @@ pub mod people_v1;
 #[rustfmt::skip]
 #[path = "generated/tasks_v1.rs"]
 pub mod tasks_v1;
+#[rustfmt::skip]
+#[path = "generated/core_v1.rs"]
+pub mod core_v1;
 pub mod keys;
 pub use boundary::{
     Cursor, Event, Family, Get, Load, OpenRefusal, Request, Restore, Row, SecretOwner, Secrets, TranscriptRead, Write,
