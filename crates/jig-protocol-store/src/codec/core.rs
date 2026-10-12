@@ -9,6 +9,8 @@ use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Reader, Wall, Writer};
 mod calls;
+mod projections;
+mod runs;
 /// Family bounds used by the core and its carried task and note values.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
@@ -21,6 +23,16 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
     let tasks = crate::codec::tasks::limits(&domain.tasks)?;
     let notes = crate::codec::notes::limits(&domain.notes)?;
     let core = wire::Limits {
+        phase_bytes_value: u32::try_from(crate::tasks_v1::PhaseRecord::worst_case_bytes(&tasks)?).ok()?,
+        change_bytes_value: u32::try_from(crate::tasks_v1::ChangeRecord::worst_case_bytes(&tasks)?).ok()?,
+        end_bytes_value: u32::try_from(crate::tasks_v1::EndRecord::worst_case_bytes(&tasks)?).ok()?,
+        projection_goal_words: domain.tasks.spec_bytes,
+        projection_task_words: domain.tasks.spec_bytes,
+        projection_milestone_words: domain.tasks.message_bytes.max(domain.tasks.result_bytes),
+        projection_goal_row_pending: domain.connectors,
+        run_proof_credentials: domain.accounts.credentials,
+        turn_record_transcript: wire::CEILINGS.turn_record_transcript,
+
         escalation_decision_reject_reason: domain.escalation_reason_bytes.max(domain.people.words),
         settled_answer_host_body: domain.call_answer_bytes,
         settled_answer_delivery_evidence: domain.call_answer_bytes,
@@ -70,18 +82,52 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
     if core.note_bytes_value > wire::CEILINGS.note_bytes_value {
         return None;
     }
+    if core.phase_bytes_value > wire::CEILINGS.phase_bytes_value {
+        return None;
+    }
+    if core.change_bytes_value > wire::CEILINGS.change_bytes_value {
+        return None;
+    }
+    if core.end_bytes_value > wire::CEILINGS.end_bytes_value {
+        return None;
+    }
+    if core.projection_goal_words > wire::CEILINGS.projection_goal_words {
+        return None;
+    }
+    if core.projection_task_words > wire::CEILINGS.projection_task_words {
+        return None;
+    }
+    if core.projection_milestone_words > wire::CEILINGS.projection_milestone_words {
+        return None;
+    }
+    if core.projection_goal_row_pending > wire::CEILINGS.projection_goal_row_pending {
+        return None;
+    }
+    if core.run_proof_credentials > wire::CEILINGS.run_proof_credentials {
+        return None;
+    }
+    if core.turn_record_transcript > wire::CEILINGS.turn_record_transcript {
+        return None;
+    }
     Some(Limits { core, tasks, notes })
 }
 pub fn encode(row: &domain::CoreRecord, limits: &Limits) -> Result<Box<[u8]>, wire::Problem> {
     let value = match row {
         domain::CoreRecord::Call(call) => wire::Value::Call(calls::encode_call_record(call, limits)?),
-        domain::CoreRecord::Deployment(_)
-        | domain::CoreRecord::Projection(_)
-        | domain::CoreRecord::RunProof(_)
-        | domain::CoreRecord::Turn(_)
-        | domain::CoreRecord::Terminal(_)
-        | domain::CoreRecord::ProposalDecision(_)
-        | domain::CoreRecord::EscalationDecision(_) => return Err(problem(skein_codec::Reason::Tag)),
+        domain::CoreRecord::Deployment(value) => wire::Value::Deployment(runs::encode_deployment(value, limits)?),
+        domain::CoreRecord::Projection(value) => wire::Value::Projection(wire::ProjectionValue::new(
+            &limits.core,
+            wire::ProjectionValueParts { value: projections::encode_projection_record(value, limits)? },
+        )?),
+        domain::CoreRecord::RunProof(value) => wire::Value::RunProof(runs::encode_run_proof(value, limits)?),
+        domain::CoreRecord::Turn(value) => wire::Value::Turn(runs::encode_turn_record(value, limits)?),
+        domain::CoreRecord::Terminal(value) => wire::Value::Terminal(runs::encode_terminal_record(value, limits)?),
+        domain::CoreRecord::ProposalDecision(value) => {
+            wire::Value::ProposalDecision(runs::encode_proposal_decision_record(value, limits)?)
+        }
+        domain::CoreRecord::EscalationDecision(value) => {
+            wire::Value::EscalationDecision(runs::encode_escalation_decision_record(value, limits)?)
+        }
     };
     let row = wire::Row::new(&limits.core, wire::RowParts { value })?;
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
@@ -92,6 +138,19 @@ pub fn decode(bytes: &[u8], limits: &Limits) -> Result<domain::CoreRecord, wire:
     let wire::RowParts { value } = wire::Row::decode(&limits.core, &mut Reader::new(bytes))?.into_parts();
     Ok(match value {
         wire::Value::Call(value) => domain::CoreRecord::Call(calls::decode_call_record(value, limits)?),
+        wire::Value::Deployment(value) => domain::CoreRecord::Deployment(runs::decode_deployment(value, limits)),
+        wire::Value::Projection(value) => {
+            domain::CoreRecord::Projection(projections::decode_projection_record(value.into_parts().value, limits)?)
+        }
+        wire::Value::RunProof(value) => domain::CoreRecord::RunProof(runs::decode_run_proof(value, limits)?),
+        wire::Value::Turn(value) => domain::CoreRecord::Turn(runs::decode_turn_record(value, limits)),
+        wire::Value::Terminal(value) => domain::CoreRecord::Terminal(runs::decode_terminal_record(value, limits)?),
+        wire::Value::ProposalDecision(value) => {
+            domain::CoreRecord::ProposalDecision(runs::decode_proposal_decision_record(value, limits))
+        }
+        wire::Value::EscalationDecision(value) => {
+            domain::CoreRecord::EscalationDecision(runs::decode_escalation_decision_record(value, limits))
+        }
     })
 }
 fn problem(reason: skein_codec::Reason) -> wire::Problem {
@@ -507,4 +566,16 @@ pub fn decode_delivery_outcome(value: wire::DeliveryOutcome, _limits: &Limits) -
         wire::DeliveryOutcome::Invalid => domain::DeliveryOutcome::Invalid,
         wire::DeliveryOutcome::Failed => domain::DeliveryOutcome::Failed,
     }
+}
+
+/// The versioned body stored in a transcript frame (protocol/store.md, 8.3).
+pub fn turn(value: &domain::TurnRecord, limits: &Limits) -> Result<Box<[u8]>, wire::Problem> {
+    let value = runs::encode_turn_record(value, limits)?;
+    let mut writer = Writer::new(usize::try_from(value.measure()).expect("measured length"));
+    value.encode(&mut writer).expect("measured room");
+    Ok(writer.finish())
+}
+/// Decode a transcript frame's versioned core turn.
+pub fn read_turn(bytes: &[u8], limits: &Limits) -> Result<domain::TurnRecord, wire::Problem> {
+    Ok(runs::decode_turn_record(wire::TurnRecord::decode(&limits.core, &mut Reader::new(bytes))?, limits))
 }

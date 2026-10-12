@@ -62,5 +62,34 @@ enum NoteRefusal { busy, oversized, full, exists, missing, moved: NoteRefusalMov
 record CallPartNoteRefused { value: NoteRefusal }
 enum CallPart { effect: CallPartEffect, connector: CallPartConnector, effect_denied: CallPartEffectDenied, tool_denied: CallPartToolDenied, escalation_decided: CallPartEscalationDecided, escalation_refused: CallPartEscalationRefused, proposed: CallPartProposed, proposal_decided: CallPartProposalDecided, proposal_refused: CallPartProposalRefused, controlled, control_refused: CallPartControlRefused, control_denied: CallPartControlDenied, sent: CallPartSent, introduced, message_refused: CallPartMessageRefused, subscribed: CallPartSubscribed, unsubscribed, subscription_refused: CallPartSubscriptionRefused, delegated: CallPartDelegated, delegation_denied: CallPartDelegationDenied, delegation_refused: CallPartDelegationRefused, note_written: CallPartNoteWritten, note_recalled: CallPartNoteRecalled, note_refused: CallPartNoteRefused, unavailable }
 record CallRecord { key: CallKey part: CallPart settled: option SettledCall }
-enum Value { call: CallRecord }
+record Deployment { id: fixed 16 tasks: u64 people: u64 sign_ins: u64 messages: u64 runs: u64 calls: u64 connector_rows: u64 applications: u64 commits: u64 }
+record PhaseBytes { value: bytes 134217728 }
+record ChangeBytes { value: bytes 268435456 }
+record EndBytes { value: bytes 1073741824 }
+record PartyTask { value: u64 }
+record PartyPerson { value: u64 }
+record PartyDeployment { project: u32 }
+enum Party { task: PartyTask, person: PartyPerson, deployment: PartyDeployment }
+record ProjectionGoal { number: u64 project: u32 priority: u32 words: bytes 65536 phase: PhaseBytes }
+record ProjectionTask { number: u64 requester: Party words: bytes 65536 phase: PhaseBytes }
+record MilestoneLifecycle { task: u64 position: u64 }
+record MilestoneRevision { task: u64 revision: u64 }
+enum MilestoneId { lifecycle: MilestoneLifecycle, revision: MilestoneRevision }
+record ProjectionMilestone { identity: MilestoneId phase: option PhaseBytes change: option ChangeBytes words: bytes 65536 }
+record Connector { value: u16 }
+record ProjectionGoalRow { goal: ProjectionGoal pending: list 1024 Connector changed: bool fed_at: option u64 }
+record ProjectionTaskRow { goal: u64 task: ProjectionTask }
+record ProjectionMilestoneRow { goal: u64 milestone: ProjectionMilestone }
+enum ProjectionRecord { goal: ProjectionGoalRow, task: ProjectionTaskRow, milestone: ProjectionMilestoneRow }
+record TerminalRecord { task: u64 attempt: u64 cumulative: u64 end: EndBytes }
+record TurnProof { turn: u32 cumulative: u64 read: option u64 }
+record Window { attempt: u64 turn: u32 }
+record Credential { value: u32 }
+record RunProof { task: u64 attempt: u64 conversation: u64 credentials: list 1024 Credential window: option Window host: HostKind offered: option u64 turn: option TurnProof terminal: option TerminalRecord }
+versioned record TurnRecord { opens_window: bool task: u64 attempt: u64 turn: u32 spent: u64 read: option u64 at: u64 transcript: bytes 8388608 }
+record Created { first: u64 last: u64 }
+record ProposalDecisionRecord { project: u32 proposer: Proposer proposal: u64 kind: ProposalKind by: u64 at: u64 choice: ProposalChoice created: option Created }
+record EscalationDecisionRecord { project: u32 requester: u64 task: u64 revision: u64 by: u64 at: u64 decision: EscalationDecision }
+record ProjectionValue { value: ProjectionRecord }
+enum Value { call: CallRecord, deployment: Deployment, projection: ProjectionValue, run_proof: RunProof, turn: TurnRecord, terminal: TerminalRecord, proposal_decision: ProposalDecisionRecord, escalation_decision: EscalationDecisionRecord }
 versioned record Row { value: Value }

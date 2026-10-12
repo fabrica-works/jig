@@ -776,3 +776,5 @@ const fn core_fleet_limits() -> jig_domain_fleet::Limits {
 mod record;
 pub use record::{task_record, task_word};
 pub mod calls;
+
+pub mod core_rows;

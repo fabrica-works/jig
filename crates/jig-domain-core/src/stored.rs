@@ -528,7 +528,7 @@ pub struct TurnRecord {
     /// Injected wall time when the root accepted the turn; it survives restart without depending on
     /// the process clock.
     pub at: Wall,
-    /// Owned transcript bytes, bounded by journal `transcript_bytes` before writing and by load
+    /// Owned transcript bytes, bounded by the worker channel's 8 MiB turn body before writing and by load
     /// page budgets when read.
     pub transcript: Box<[u8]>,
 }

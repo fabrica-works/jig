@@ -709,3 +709,5 @@ fn end_round_trip(end: jig_domain_tasks::End) {
     let bytes = crate::codec::tasks::carried::end(&end, &limits.tasks).expect("terminal within bounds");
     assert_eq!(crate::codec::tasks::carried::read_end(&bytes, &limits.tasks), Ok(end));
 }
+
+mod core_rows;
