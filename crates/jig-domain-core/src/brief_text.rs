@@ -386,8 +386,10 @@ fn dependency_read(results: &[HistoricalResult], bytes: u32) -> BriefRead {
 }
 
 fn tail_read(transcript: &Transcript, bytes: u32) -> BriefRead {
-    let kept = u64::from(bytes).min(transcript.kept);
-    let skip = transcript.kept.checked_sub(kept).expect("tail within kept bytes");
+    let lengths = u64::from(transcript.turns.len()).checked_mul(4).expect("bounded retained lengths");
+    let bodies = transcript.kept.checked_sub(lengths).expect("retained lengths were counted");
+    let kept = u64::from(bytes).min(bodies);
+    let skip = bodies.checked_sub(kept).expect("tail within kept bodies");
     let mut writer = Writer::new(usize::try_from(kept).expect("u32 bound fits usize"));
     let mut passed = 0_u64;
     for turn in &transcript.turns {

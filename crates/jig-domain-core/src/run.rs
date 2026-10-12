@@ -20,7 +20,7 @@ pub enum RunAdmission {
 }
 
 /// Bounded recent opaque conversation while a due task's store pages are read.
-/// Empty turn bodies need no slot: they add nothing to a resumed conversation.
+/// Each retained turn counts its four-byte length beside its opaque body.
 #[derive(Debug)]
 pub struct Transcript {
     pub window: Option<(u64, u32)>,
@@ -190,7 +190,9 @@ impl Core {
                         from,
                         bytes: 0,
                         kept: 0,
-                        turns: Queue::with_capacity(self.settings.resume_bytes),
+                        turns: Queue::with_capacity(
+                            self.settings.resume_bytes.checked_div(4).expect("nonzero length size")
+                        ),
                     },
                 )
                 .is_ok(),
@@ -218,24 +220,27 @@ impl Core {
             return false;
         }
         let length = u64::try_from(turn.transcript.len()).expect("stored turn size fits u64");
-        let Some(total) = transcript.bytes.checked_add(length) else { return false };
+        let Some(framed) = length.checked_add(4) else { return false };
+        let Some(total) = transcript.bytes.checked_add(framed) else { return false };
         transcript.bytes = total;
         transcript.last = Some((turn.attempt, turn.turn));
-        if length == 0 {
+        let bound = u64::from(self.settings.resume_bytes);
+        if bound < 4 {
             return true;
         }
-        let bound = u64::from(self.settings.resume_bytes);
-        let body = if length > bound {
+        let body_bound = bound.checked_sub(4).expect("room for one length");
+        let body = if length > body_bound {
             let start = turn
                 .transcript
                 .len()
-                .checked_sub(usize::try_from(bound).expect("u32 bound fits usize"))
+                .checked_sub(usize::try_from(body_bound).expect("u32 bound fits usize"))
                 .expect("oversize turn has tail");
             Box::<[u8]>::from(turn.transcript.get(start..).expect("tail starts inside stored turn"))
         } else {
             turn.transcript
         };
-        let body_len = u64::try_from(body.len()).expect("bounded turn fits u64");
+        let body_len =
+            u64::try_from(body.len()).expect("bounded turn fits u64").checked_add(4).expect("bounded framed turn");
         for _ in 0..transcript.turns.len() {
             if transcript.kept.checked_add(body_len).expect("two bounded tails") <= bound {
                 break;
@@ -243,7 +248,9 @@ impl Core {
             let old = transcript.turns.pop().expect("overfull transcript has an older turn");
             transcript.kept = transcript
                 .kept
-                .checked_sub(u64::try_from(old.len()).expect("bounded old turn"))
+                .checked_sub(
+                    u64::try_from(old.len()).expect("bounded old turn").checked_add(4).expect("bounded old frame"),
+                )
                 .expect("old turn was counted");
         }
         transcript.turns.push(body);

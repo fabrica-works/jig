@@ -140,7 +140,7 @@ fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
     assert!(core.append_transcript(1, stored_turn(2, 2, b"turn")));
     assert!(!core.append_transcript(1, stored_turn(2, 2, b"turn")));
     assert!(!core.append_transcript(1, stored_turn(1, 2, b"old")));
-    assert_eq!(core.transcripts.get(&1).expect("loaded transcript").bytes, 4);
+    assert_eq!(core.transcripts.get(&1).expect("loaded transcript").bytes, 8);
 }
 
 fn a_chat_resumed_after_a_compaction_is_sent_only_its_window() {
@@ -180,7 +180,7 @@ fn a_window_past_the_resume_limit_starts_fresh_with_its_tail() {
         core::BriefPart::TranscriptTail,
     )
     .expect("window tail");
-    assert_eq!(tail.as_ref(), [b"[200 bytes cut]\n".as_slice(), &[b'c'; 100]].concat());
+    assert_eq!(tail.as_ref(), [b"[208 bytes cut]\n".as_slice(), &[b'c'; 100]].concat());
 }
 
 fn an_unusable_transcript_fails_transient_and_the_next_conversation_starts_fresh() {
