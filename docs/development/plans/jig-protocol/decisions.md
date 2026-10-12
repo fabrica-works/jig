@@ -1053,6 +1053,18 @@ the file.
      168). Ruling 165's 200 ms ceiling ends at jig-repin.s3: a generated
      table test then has 100 ms; ruling 153's drift ceilings go back to
      the world's.
+170. **jig 07.s1: the core's settings come from the root and the policy**
+     (2026-10-12, the designer's answer to question.md's "jig 20.5:
+     configuration's sources for the core's Settings, and projects'
+     resources and homes"; jig `2f7b8800`, `e9d8dd7f`, `e41d51b7`).
+     configuration.md, 3 now names a source for each value; five of
+     `Settings`' fields (`period`, `period_budget`, `person_budget`,
+     `chat_authority`, `recurring_connector`) are not configuration, and
+     the code holds them deployment-wide where the design has them per
+     project, per role or the core's own. A step not in the plan, jig
+     07.s1 (`jig/07-charters-and-budgets.md`), moves them before jig 20.5
+     lands; resources and homes come by adoption after the first start,
+     and homes wait (`later.md`).
 
 ## For the user
 

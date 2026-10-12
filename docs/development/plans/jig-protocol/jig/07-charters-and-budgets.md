@@ -354,6 +354,31 @@ Size: at most 60 lines of production code.
 Removes: `jig_test_domain::Config::hosting`; ops's hard-coded
 `Kinds::Engine` in `route.rs`.
 
+### 07.s1 The core's settings from the root and the policy
+
+A step not in the plan (decisions.md, ruling 170), from the designer's
+answer on jig 20.5 (jig `2f7b8800`, `e9d8dd7f`, `e41d51b7`); its text is
+the designer's. Before jig 20.5 lands.
+Shape: `Settings` loses `period`, `period_budget`, `person_budget`,
+`chat_authority` and `recurring_connector`. The core keeps each
+project's current period as `route_period` records it (from the root's
+`Event::Period`), restored with the funders' records; each use of
+`settings.period` reads the project's. A period's budget is the
+event's, within the policy's `period_spend`. A pool's budget is the
+role's `period_spend`, and a chat's authority the role's authority.
+The recurring procedure's executor uses `core::RECURRING`, a constant
+the core reserves (`u16::MAX`). `ToolFamilies` gets jig's constant
+numbering, `ToolFamilies::JIG`. The roots' worlds say each project's
+first period at a first start (`tests/core/src/world.rs:219-345`'s
+fixture drops the five fields).
+Test shape: `two_projects_with_different_spends_fund_their_own_periods`,
+`a_chat_takes_its_persons_role_authority`,
+`a_policy_change_reaches_the_next_pool_budget` (core world); the
+existing stories unchanged in their expectations.
+Proof: the gate.
+Don't: add a configuration member for any of the five; keep a
+deployment-wide copy of a policy's number.
+
 ## Interface sketches
 
 ```rust
