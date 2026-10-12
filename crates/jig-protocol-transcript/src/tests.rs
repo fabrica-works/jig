@@ -170,11 +170,8 @@ fn outcomes_summarize_successes_command_endings_and_tool_refusals() {
         ),
         (
             smith::Outcome::Found(
-                smith::Found::new(
-                    &CEILINGS,
-                    smith::FoundParts { hits: List::with_capacity(0), more: 3, timed_out: true },
-                )
-                .unwrap(),
+                smith::Found::new(&CEILINGS, smith::FoundParts { hits: Box::from([]), more: 3, timed_out: true })
+                    .unwrap(),
             ),
             b"Found 0 hits; more 3; search timed out",
             false,

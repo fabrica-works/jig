@@ -2,8 +2,87 @@
 //! Provider text results remain verbatim; opaque payloads never enter a summary.
 use alloc::boxed::Box;
 use skein_lib::stream::Read;
-use skein_lib::{Decimal, Intake};
+use skein_lib::{Decimal, Intake, Reader};
 use smith_transcript::v3 as smith;
+
+use crate::Undecodable;
+
+// Found's byte piece contains successive generated Hit records. As in Smith's
+// transcript reader, validate each record before interpreting the piece.
+fn hit_count(limits: &smith::Limits, piece: &[u8]) -> Result<u64, Undecodable> {
+    let mut reader = Reader::new(piece);
+    let mut count = 0_u64;
+    for _ in 0..=piece.len().checked_div(12).expect("nonzero hit framing length") {
+        if reader.is_empty() {
+            return Ok(count);
+        }
+        let path = reader.u32().ok_or(Undecodable::Malformed)?;
+        if path > limits.hit_path {
+            return Err(Undecodable::TooLarge);
+        }
+        reader.bytes(path).ok_or(Undecodable::Malformed)?;
+        reader.u32().ok_or(Undecodable::Malformed)?;
+        let text = reader.u32().ok_or(Undecodable::Malformed)?;
+        if text > limits.hit_text {
+            return Err(Undecodable::TooLarge);
+        }
+        reader.bytes(text).ok_or(Undecodable::Malformed)?;
+        count = count.checked_add(1).expect("piece bounds its hit count");
+    }
+    Err(Undecodable::Malformed)
+}
+
+pub(super) fn validate(limits: &smith::Limits, source: &smith::Turn) -> Result<(), Undecodable> {
+    for message in source.messages() {
+        for block in message.blocks() {
+            match block {
+                smith::Block::Result(result) => {
+                    validate_returned(limits, result.returned())?;
+                }
+                smith::Block::Text(_) | smith::Block::Refusal(_) | smith::Block::Call(_) | smith::Block::Opaque(_) => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_returned(limits: &smith::Limits, returned: &smith::Returned) -> Result<(), Undecodable> {
+    match returned {
+        smith::Returned::Outcome(outcome) => match outcome.value() {
+            smith::Outcome::Found(found) => {
+                hit_count(limits, found.hits())?;
+            }
+            smith::Outcome::Read(_)
+            | smith::Outcome::Listed(_)
+            | smith::Outcome::Written(_)
+            | smith::Outcome::Edited(_)
+            | smith::Outcome::Exited(_)
+            | smith::Outcome::NotGranted
+            | smith::Outcome::Outside(_)
+            | smith::Outcome::ReadOnly(_)
+            | smith::Outcome::TooLong
+            | smith::Outcome::NotFound(_)
+            | smith::Outcome::NotFile
+            | smith::Outcome::Linked
+            | smith::Outcome::Protected
+            | smith::Outcome::NotDirectory(_)
+            | smith::Outcome::TooLarge(_)
+            | smith::Outcome::NotRead
+            | smith::Outcome::Stale
+            | smith::Outcome::EditFailed(_)
+            | smith::Outcome::Failed(_)
+            | smith::Outcome::TimedOut
+            | smith::Outcome::Cancelled
+            | smith::Outcome::Busy
+            | smith::Outcome::NulByte => {}
+        },
+        smith::Returned::Said(_)
+        | smith::Returned::Invalid(_)
+        | smith::Returned::NotRun
+        | smith::Returned::Withdrawn => {}
+    }
+    Ok(())
+}
 
 #[derive(Debug)]
 pub(super) struct Summary {
@@ -100,7 +179,7 @@ impl Builder {
             smith::Outcome::Found(found) => {
                 self.failed = false;
                 self.put(b"Found ");
-                self.number(u64::from(found.hits().len()));
+                self.number(hit_count(&smith::CEILINGS, found.hits()).expect("hit piece validated before translation"));
                 self.put(b" hits; more ");
                 self.number(found.more());
                 if found.timed_out() {

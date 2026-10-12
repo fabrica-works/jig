@@ -54,6 +54,7 @@ pub fn decode(limits: &Limits, bytes: &[u8]) -> Result<Turn, Undecodable> {
         Ok(turn) => turn,
         Err(problem) => return Err(classify(problem)),
     };
+    summary::validate(&limits.smith, &source)?;
     Ok(translate(limits.turn, &source))
 }
 
