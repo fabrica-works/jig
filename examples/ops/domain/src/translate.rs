@@ -1,9 +1,9 @@
 //! Application vocabulary in small total functions. Copy the core/host pairs;
 //! replace resource paths, effect kinds and tool declarations (domain/root.md, 6).
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_core_tasks as tasks;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{List, Wall};
@@ -508,8 +508,8 @@ pub(crate) mod nested {
     //! and tasks still check these values against current durable facts.
 
     use alloc::boxed::Box;
-    use jig_core as engine;
-    use jig_core_tasks as tasks;
+    use jig_domain_core as engine;
+    use jig_domain_tasks as tasks;
     use skein_lib::{Duration, List, Wall};
 
     use super::{Problem, json::Value};
@@ -1027,7 +1027,7 @@ mod notes {
     //! Smith's JSON shapes for jig's scoped note and recall tools.
     //! The root checks bounds and authority before any value becomes durable.
 
-    use jig_core_notes as notes;
+    use jig_domain_notes as notes;
     use skein_lib::List;
 
     use super::{Problem, json::Value};

@@ -1,9 +1,9 @@
-use jig_core_people as people;
-use jig_core_tasks as tasks;
 use jig_core_world::{
     effects::fixture,
     stories::{instructions as story, reads::request},
 };
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 
 #[test]
 fn an_instruction_amendment_reaches_the_live_run_after_its_commit_and_future_runs_after_restart() {

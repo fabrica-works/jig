@@ -9,7 +9,7 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 skein-world.workspace = true
-jig-core-tasks.workspace = true
+jig-domain-tasks.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"

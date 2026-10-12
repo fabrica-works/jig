@@ -3,8 +3,8 @@
 //! cursor. Receiving admission prices the complete envelope before it is fed.
 use super::{chips, cursor, inbox, offers, owner, results, rows, watches};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
-use jig_core_views as views;
+use jig_domain_core::documents;
+use jig_domain_views as views;
 use jig_scripted_engine as admission;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -129,7 +129,7 @@ pub fn conversations_delivery(value: &documents::Conversations, limits: &Limits)
     let value = client::Delivery::Conversations(Box::new(client::Conversations {
         rows: owner::list(&value.lines, limits, |value| rows::conversation(value, limits)).map_err(Invalid::Owner)?,
         more: value.next.is_some(),
-        after: cursor::encode(&jig_core::reads::conversations_cursor(value), limits.text)
+        after: cursor::encode(&jig_domain_core::reads::conversations_cursor(value), limits.text)
             .map_err(|_| Invalid::Cursor)?,
     }));
     admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
@@ -486,16 +486,16 @@ pub(crate) mod tests {
 
     pub(crate) fn question_source() -> documents::Question {
         let mut acts = List::with_capacity(4);
-        acts.push(jig_core::acts::Offered {
-            act: jig_core::acts::Act::Answer,
-            admission: jig_core::acts::Admission::Allowed,
+        acts.push(jig_domain_core::acts::Offered {
+            act: jig_domain_core::acts::Act::Answer,
+            admission: jig_domain_core::acts::Admission::Allowed,
         })
         .expect("source offer");
         documents::Question {
             acts,
             task: chips::tests::source_chip(),
             message: u64::MAX,
-            from: jig_core_tasks::Party::Task(0),
+            from: jig_domain_tasks::Party::Task(0),
             at: Wall::EPOCH,
             words: Box::from([255, 0]),
         }
@@ -505,9 +505,9 @@ pub(crate) mod tests {
         let mut source = question_source();
         let limits = rows::tests::limits();
         for sender in [
-            jig_core_tasks::Party::Task(u64::MAX),
-            jig_core_tasks::Party::Person(0),
-            jig_core_tasks::Party::Deployment { project: u32::MAX },
+            jig_domain_tasks::Party::Task(u64::MAX),
+            jig_domain_tasks::Party::Person(0),
+            jig_domain_tasks::Party::Deployment { project: u32::MAX },
         ] {
             source.from = sender;
             let original = source.clone();
@@ -557,7 +557,10 @@ pub(crate) mod tests {
             panic!("conversations")
         };
         assert!(value.more);
-        assert_eq!(cursor::decode(&value.after, limits.text), Some(jig_core::reads::conversations_cursor(&source)));
+        assert_eq!(
+            cursor::decode(&value.after, limits.text),
+            Some(jig_domain_core::reads::conversations_cursor(&source))
+        );
         assert_eq!(value.rows.capacity(), 3);
         assert_eq!(value.rows.get(0).expect("row").runtime, None);
         assert_eq!(value.rows.get(0).expect("row").changed, None);
@@ -597,7 +600,10 @@ pub(crate) mod tests {
         assert_eq!(value.rows.capacity(), 3);
         assert_eq!(
             cursor::decode(&value.after, limits.text),
-            Some(jig_core::reads::Cursor::Store { scope: jig_core::reads::Scope::Conversations, after: None })
+            Some(jig_domain_core::reads::Cursor::Store {
+                scope: jig_domain_core::reads::Scope::Conversations,
+                after: None
+            })
         );
         let exact = u32::try_from(value.after.value.bytes().len()).expect("bounded opaque bytes");
         assert!(conversations_delivery(&source, &Limits { text: exact, ..limits }).is_ok());
@@ -619,7 +625,7 @@ pub(crate) mod tests {
         rows.push(documents::TaskLine {
             chip: chips::tests::source_chip(),
             goal: Some(0),
-            requester: jig_core_tasks::Party::Deployment { project: u32::MAX },
+            requester: jig_domain_tasks::Party::Deployment { project: u32::MAX },
             asked_by_me: false,
             changed: Wall::EPOCH,
         })
@@ -681,7 +687,7 @@ pub(crate) mod tests {
             documents::Ending::Cancelled {
                 reason: documents::Text { bytes: Box::new([]), cut: true },
                 result: Some(documents::ResultValue::Approved { state: Box::from([255, 0]), words: None }),
-                by: jig_core_tasks::Party::Deployment { project: u32::MAX },
+                by: jig_domain_tasks::Party::Deployment { project: u32::MAX },
                 at: Wall::EPOCH,
             },
         ] {
@@ -692,9 +698,9 @@ pub(crate) mod tests {
                 source.followups = Some(List::with_capacity(4));
                 source
                     .acts
-                    .push(jig_core::acts::Offered {
-                        act: jig_core::acts::Act::Write,
-                        admission: jig_core::acts::Admission::Allowed,
+                    .push(jig_domain_core::acts::Offered {
+                        act: jig_domain_core::acts::Act::Write,
+                        admission: jig_domain_core::acts::Admission::Allowed,
                     })
                     .expect("original offer");
                 let before = source.clone();
@@ -739,13 +745,13 @@ pub(crate) mod tests {
     fn frame() -> documents::Frame {
         documents::Frame {
             party: u64::MAX,
-            kind: jig_core_people::Kind::Person,
+            kind: jig_domain_people::Kind::Person,
             login: documents::Text { bytes: Box::from([255, 0]), cut: true },
             name: documents::Text { bytes: Box::new([]), cut: false },
             deployment_role: None,
             projects: List::with_capacity(2),
             needs: 17,
-            need_counts: jig_core_people::Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: 4 },
+            need_counts: jig_domain_people::Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: 4 },
             updates: documents::Count::Known(0),
             results_seen: u64::MAX,
             retention: Duration::from_secs(7),

@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     Active, Cause, Class, Contract, End, Ending, Event, Funder, Hold, Key, Party, Phase, Proposal, ProposalAction,
     ProposalDecision, ProposalHolder, ProposalState, Refusal, ResultFollowups, Stage, TaskResult, Was,
 };
@@ -27,7 +27,7 @@ fn result_followup_proposal(w: &World) -> Proposal {
 fn start_result_followup(w: &mut World) {
     let mut first = task(1, &[]);
     first.contract = Contract::Verdict {
-        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 1 }]),
+        choices: Box::new([jig_domain_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 1 }]),
     };
     assert_eq!(w.make(Party::Person(1), vec![first, task(3, &[1])]), Reply::Made(vec![1, 3]));
     w.claim_budget(1, 1, 10);
@@ -41,9 +41,9 @@ fn start_result_followup(w: &mut World) {
             },
             Cause::Priced { cumulative: 0 },
         ),
-        Reply::Acknowledged(jig_core_tasks::Accepted::New)
+        Reply::Acknowledged(jig_domain_tasks::Accepted::New)
     );
-    assert!(matches!(w.record(1).phase, Phase::Closing(jig_core_tasks::Closing { stage: Stage::Delegates, .. })));
+    assert!(matches!(w.record(1).phase, Phase::Closing(jig_domain_tasks::Closing { stage: Stage::Delegates, .. })));
     assert!(w.results.is_empty());
     assert!(!w.activations.contains(&3));
 }
@@ -88,7 +88,7 @@ fn a_verdicts_proposal_is_accepted_and_its_followups_run_before_result_delivery(
     assert_eq!(w.record(1).result_followups.as_ref(), [2]);
     w.settle(1);
     assert!(w.results.contains_key(&1));
-    let jig_core_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
+    let jig_domain_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
     assert_eq!(row.result_followups.as_ref(), [2]);
     assert!(w.activations.contains(&3));
 }
@@ -111,7 +111,7 @@ fn a_verdicts_proposal_is_rejected_and_its_result_is_delivered() {
     assert!(!w.activations.contains(&2));
     assert!(w.record(1).result_followups.is_empty());
     w.settle(1);
-    let jig_core_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
+    let jig_domain_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
     assert!(row.result_followups.is_empty());
     assert!(matches!(w.results.get(&1), Some(Ending::Done(TaskResult::Verdict { code: 7, .. }))));
     assert!(w.activations.contains(&3));
@@ -126,7 +126,7 @@ fn cancelling_a_closing_result_withdraws_its_pending_followup_proposal() {
         reply_to: to,
         by: Party::Person(1),
         task: 1,
-        control: jig_core_tasks::Control::Cancel { reason: Box::new([9]) },
+        control: jig_domain_tasks::Control::Cancel { reason: Box::new([9]) },
     });
     assert!(w.record(1).proposal.is_none());
     assert!(!w.record(1).result_proposal);
@@ -140,7 +140,7 @@ fn an_authorized_verdict_makes_followups_in_its_result_commit_and_waits_for_them
     let mut w = World::new(203, LIMITS);
     let mut first = task(1, &[]);
     first.contract = Contract::Verdict {
-        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 1 }]),
+        choices: Box::new([jig_domain_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 1 }]),
     };
     assert_eq!(w.make(Party::Person(1), vec![first, task(3, &[1])]), Reply::Made(vec![1, 3]));
     w.claim(1, 1);
@@ -157,7 +157,7 @@ fn an_authorized_verdict_makes_followups_in_its_result_commit_and_waits_for_them
             },
             Cause::Priced { cumulative: 0 },
         ),
-        Reply::Acknowledged(jig_core_tasks::Accepted::New)
+        Reply::Acknowledged(jig_domain_tasks::Accepted::New)
     );
     assert_eq!(w.record(1).delegates.as_ref(), [2]);
     assert!(w.record(2).created_at == w.record(1).created_at);
@@ -172,7 +172,7 @@ fn an_authorized_verdict_makes_followups_in_its_result_commit_and_waits_for_them
     w.settle(1);
     assert!(w.results.contains_key(&1) && w.activations.contains(&3));
     w.restart();
-    let jig_core_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
+    let jig_domain_tasks::Stored::Ended(row) = &w.records[&Key::Ended(1)] else { panic!() };
     assert_eq!(row.result_followups.as_ref(), [2]);
 }
 
@@ -181,7 +181,7 @@ fn a_verdict_cannot_make_followups_its_contract_did_not_allow() {
     let mut w = World::new(205, LIMITS);
     let mut first = task(1, &[]);
     first.contract = Contract::Verdict {
-        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 0 }]),
+        choices: Box::new([jig_domain_tasks::Verdict { fields: Box::new([]), code: 7, words: 32, followups: 0 }]),
     };
     w.make(Party::Person(1), vec![first]);
     w.claim(1, 1);
@@ -198,10 +198,10 @@ fn a_verdict_cannot_make_followups_its_contract_did_not_allow() {
             },
             Cause::Priced { cumulative: 0 },
         ),
-        Reply::Acknowledged(jig_core_tasks::Accepted::New)
+        Reply::Acknowledged(jig_domain_tasks::Accepted::New)
     );
     assert!(!w.records.contains_key(&Key::Live(2)));
-    assert_eq!(w.record(1).invalid_result, Some(jig_core_tasks::InvalidResult::Followups));
+    assert_eq!(w.record(1).invalid_result, Some(jig_domain_tasks::InvalidResult::Followups));
     assert_eq!(w.record(1).tries.invalid, 1);
 }
 
@@ -211,10 +211,10 @@ fn a_plan_of_reports_a_choice_and_procedure_tasks_runs_in_dependency_order() {
     let first = task(1, &[]);
     let mut choice = task(2, &[1]);
     choice.contract = Contract::Verdict {
-        choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 1, words: 32, followups: 0 }]),
+        choices: Box::new([jig_domain_tasks::Verdict { fields: Box::new([]), code: 1, words: 32, followups: 0 }]),
     };
     let mut procedure = task(3, &[2]);
-    procedure.executor = jig_core_tasks::Executor::Procedure { connector: 1, code: 1 };
+    procedure.executor = jig_domain_tasks::Executor::Procedure { connector: 1, code: 1 };
     let last = task(4, &[3]);
     assert_eq!(w.make(Party::Person(1), vec![first, choice, procedure, last]), Reply::Made(vec![1, 2, 3, 4]));
     assert!(w.activations.contains(&1));
@@ -240,7 +240,7 @@ fn a_plan_of_reports_a_choice_and_procedure_tasks_runs_in_dependency_order() {
         task: 3,
         step: 1,
         read: None,
-        decision: jig_core_tasks::ProcedureDecision::Result(TaskResult::Report { words: Box::new([8]) }),
+        decision: jig_domain_tasks::ProcedureDecision::Result(TaskResult::Report { words: Box::new([8]) }),
     });
     assert_eq!(w.replies[&key], Reply::Done);
     w.settle(3);
@@ -254,9 +254,9 @@ fn a_plan_of_reports_a_choice_and_procedure_tasks_runs_in_dependency_order() {
 #[test]
 fn batch_is_atomic_and_cycles_and_limits_refuse_at_entrance() {
     for (limits, why) in [
-        (jig_core_tasks::Limits { batch: 1, ..LIMITS }, Refusal::Batch),
-        (jig_core_tasks::Limits { tasks: 1, ..LIMITS }, Refusal::Live),
-        (jig_core_tasks::Limits { project_tasks: 1, ..LIMITS }, Refusal::Project),
+        (jig_domain_tasks::Limits { batch: 1, ..LIMITS }, Refusal::Batch),
+        (jig_domain_tasks::Limits { tasks: 1, ..LIMITS }, Refusal::Live),
+        (jig_domain_tasks::Limits { project_tasks: 1, ..LIMITS }, Refusal::Project),
     ] {
         let mut w = World::new(1, limits);
         let before = w.records.clone();
@@ -287,7 +287,7 @@ fn batch_is_atomic_and_cycles_and_limits_refuse_at_entrance() {
         (
             {
                 let mut n = task(2, &[]);
-                n.executor = jig_core_tasks::Executor::Agent { charter: 99 };
+                n.executor = jig_domain_tasks::Executor::Agent { charter: 99 };
                 n
             },
             Refusal::Executor,
@@ -296,7 +296,7 @@ fn batch_is_atomic_and_cycles_and_limits_refuse_at_entrance() {
         (
             {
                 let mut n = task(2, &[]);
-                n.authority.delegation.kinds = vec![jig_core_tasks::AuthorityExecutor::Role(1); 4].into_boxed_slice();
+                n.authority.delegation.kinds = vec![jig_domain_tasks::AuthorityExecutor::Role(1); 4].into_boxed_slice();
                 n
             },
             Refusal::AuthorityShape,
@@ -348,9 +348,9 @@ fn a_dependency_on_an_introduced_sibling_is_accepted_and_a_cross_subtree_wait_cy
 #[test]
 fn tree_depth_and_delegate_limits_are_atomic() {
     for (limits, why) in [
-        (jig_core_tasks::Limits { tree_tasks: 1, ..LIMITS }, Refusal::Tree),
-        (jig_core_tasks::Limits { depth: 0, ..LIMITS }, Refusal::Depth),
-        (jig_core_tasks::Limits { delegates: 0, ..LIMITS }, Refusal::Delegates),
+        (jig_domain_tasks::Limits { tree_tasks: 1, ..LIMITS }, Refusal::Tree),
+        (jig_domain_tasks::Limits { depth: 0, ..LIMITS }, Refusal::Depth),
+        (jig_domain_tasks::Limits { delegates: 0, ..LIMITS }, Refusal::Delegates),
     ] {
         let mut w = World::new(2, limits);
         w.make(Party::Person(1), vec![task(1, &[])]);
@@ -366,7 +366,7 @@ fn dependency_order_negative_verdict_starts_but_failure_holds() {
         let mut w = World::new(3, LIMITS);
         let mut first = task(1, &[]);
         first.contract = Contract::Verdict {
-            choices: Box::new([jig_core_tasks::Verdict { fields: Box::new([]), code: 0, words: 32, followups: 0 }]),
+            choices: Box::new([jig_domain_tasks::Verdict { fields: Box::new([]), code: 0, words: 32, followups: 0 }]),
         };
         w.make(Party::Person(1), vec![first, task(2, &[1])]);
         assert!(!w.activations.contains(&2));
@@ -401,7 +401,7 @@ fn ended_dependency_keeps_a_bounded_stub_until_its_last_live_reader_ends() {
     w.settle(1);
     assert!(!w.records.contains_key(&Key::Live(1)));
     assert!(
-        matches!(w.records.get(&Key::Stub(1)), Some(jig_core_tasks::Stored::Stub(stub)) if stub.task == 1 && stub.result.raw() == 1)
+        matches!(w.records.get(&Key::Stub(1)), Some(jig_domain_tasks::Stored::Stub(stub)) if stub.task == 1 && stub.result.raw() == 1)
     );
     w.restart();
     assert!(w.records.contains_key(&Key::Stub(1)));
@@ -480,10 +480,10 @@ fn a_delegate_failing_past_its_tries_is_held_and_released_finishes() {
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         by: Party::Task(1),
         task: 2,
-        control: jig_core_tasks::Control::Release { again: None, message: None },
+        control: jig_domain_tasks::Control::Release { again: None, message: None },
     });
     assert_eq!(w.replies[&call], Reply::Done);
-    assert_eq!(w.record(2).tries, jig_core_tasks::Tries::NONE);
+    assert_eq!(w.record(2).tries, jig_domain_tasks::Tries::NONE);
     w.claim(2, 4);
     w.finish(2);
     w.settle(2);
@@ -517,7 +517,7 @@ fn hold_reasons_survive_restart_and_release_without_losing_task_state() {
             reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
             by: Party::Person(1),
             task: 1,
-            control: jig_core_tasks::Control::Release {
+            control: jig_domain_tasks::Control::Release {
                 again: if matches!(reason, Hold::Uncertain { .. }) { Some(true) } else { None },
                 message: None,
             },
@@ -542,10 +542,10 @@ fn releasing_a_held_closing_task_retries_its_unsettled_effects() {
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(call)),
         by: Party::Person(1),
         task: 1,
-        control: jig_core_tasks::Control::Release { again: None, message: None },
+        control: jig_domain_tasks::Control::Release { again: None, message: None },
     });
     assert_eq!(w.replies[&call], Reply::Done);
-    assert!(matches!(w.record(1).phase, Phase::Closing(jig_core_tasks::Closing { stage: Stage::Effects, .. })));
+    assert!(matches!(w.record(1).phase, Phase::Closing(jig_domain_tasks::Closing { stage: Stage::Effects, .. })));
     assert!(w.closing.contains(&1), "the close obligation is reissued after release");
     w.settle(1);
     assert!(matches!(w.results.get(&1), Some(Ending::Done(_))));
@@ -564,7 +564,7 @@ fn refusals_and_preparation_failure_do_not_spend_tries() {
         w.claim(1, attempt);
         w.terminal(1, End::Refused);
         w.advance();
-        assert_eq!(w.record(1).tries, jig_core_tasks::Tries::NONE);
+        assert_eq!(w.record(1).tries, jig_domain_tasks::Tries::NONE);
     }
     w.claim(1, 6);
     w.finish(1);
@@ -589,7 +589,7 @@ fn held_running_task_waits_for_terminal_and_retains_its_hold() {
     assert!(matches!(
         w.record(1).phase,
         Phase::Held {
-            was: Was::Closing(jig_core_tasks::Closing { stage: Stage::Delegates, .. }),
+            was: Was::Closing(jig_domain_tasks::Closing { stage: Stage::Delegates, .. }),
             why: Hold::Stopped,
             ..
         }
@@ -674,7 +674,7 @@ fn a_dependent_starts_only_after_its_dependency_has_closed_and_its_effects_settl
 
 #[test]
 fn lifetime_tree_limit_survives_delegate_ending() {
-    let mut w = World::new(8, jig_core_tasks::Limits { tree_tasks: 2, ..LIMITS });
+    let mut w = World::new(8, jig_domain_tasks::Limits { tree_tasks: 2, ..LIMITS });
     w.make(Party::Person(1), vec![task(1, &[])]);
     w.make(Party::Task(1), vec![task(2, &[])]);
     w.claim(2, 1);
@@ -697,10 +697,10 @@ fn invalid_results_spend_invalid_tries_and_refused_held_closing_make_is_atomic()
         },
     );
     assert_eq!(w.record(1).tries.invalid, 1);
-    assert_eq!(w.record(1).invalid_result, Some(jig_core_tasks::InvalidResult::Form));
+    assert_eq!(w.record(1).invalid_result, Some(jig_domain_tasks::InvalidResult::Form));
     w.restart();
     w.advance();
-    assert_eq!(w.contexts[&1].invalid_result, Some(jig_core_tasks::InvalidResult::Form));
+    assert_eq!(w.contexts[&1].invalid_result, Some(jig_domain_tasks::InvalidResult::Form));
     w.claim(1, 2);
     assert_eq!(w.record(1).invalid_result, None);
     w.finish(1);
@@ -759,14 +759,14 @@ fn lifecycle_history_has_independent_positions_and_restore_does_not_repeat_a_pha
         reply_to,
         by: Party::Person(1),
         task: 1,
-        control: jig_core_tasks::Control::Release { again: None, message: None },
+        control: jig_domain_tasks::Control::Release { again: None, message: None },
     });
     assert_eq!(world.record(1).milestone, held + 1);
     assert_eq!(world.record(1).revision, revision + 1, "release also has its semantic history row");
     assert!(
-        matches!(world.records.get(&Key::Milestone { task: 1, position: held }), Some(jig_core_tasks::Stored::Milestone(row)) if matches!(row.phase, Phase::Held { why: Hold::Effects, .. }))
+        matches!(world.records.get(&Key::Milestone { task: 1, position: held }), Some(jig_domain_tasks::Stored::Milestone(row)) if matches!(row.phase, Phase::Held { why: Hold::Effects, .. }))
     );
     assert!(
-        matches!(world.records.get(&Key::Milestone { task: 1, position: held + 1 }), Some(jig_core_tasks::Stored::Milestone(row)) if row.phase == world.record(1).phase)
+        matches!(world.records.get(&Key::Milestone { task: 1, position: held + 1 }), Some(jig_domain_tasks::Stored::Milestone(row)) if row.phase == world.record(1).phase)
     );
 }

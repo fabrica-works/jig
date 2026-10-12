@@ -1,6 +1,6 @@
 //! Wrap each owner's rows and addresses without inspecting its values.
 //! A new application replaces the two connector arms (domain/root.md, 6).
-use jig_core as core;
+use jig_domain_core as core;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 
@@ -76,9 +76,9 @@ fn core_key(row: &core::Record) -> core::Key {
         core::Record::Tasks(row) => core::Key::Tasks(row.key()),
         core::Record::People(row) => core::Key::People(row.key()),
         core::Record::Notes(row) => core::Key::Notes(match row {
-            jig_core_notes::Record::Entry(entry) => jig_core_notes::Key::Entry { name: entry.name },
-            jig_core_notes::Record::Line(line) => {
-                jig_core_notes::Key::Line { scope: line.scope.clone(), name: line.name }
+            jig_domain_notes::Record::Entry(entry) => jig_domain_notes::Key::Entry { name: entry.name },
+            jig_domain_notes::Record::Line(line) => {
+                jig_domain_notes::Key::Line { scope: line.scope.clone(), name: line.name }
             }
         }),
     }

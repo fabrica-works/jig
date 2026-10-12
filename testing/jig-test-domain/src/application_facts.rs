@@ -1,5 +1,5 @@
 //! Root translations preserve the party's core refusal facts (domain/connectors.md, 5.5).
-use jig_core_people as people;
+use jig_domain_people as people;
 use jig_test_connector::application_core as application;
 
 #[expect(clippy::manual_map, reason = "step code translates optional role numbers by matching")]

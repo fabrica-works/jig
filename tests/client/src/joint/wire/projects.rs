@@ -3,10 +3,10 @@
 //! infers a project name nor admits a public Project watch.
 use super::{chips, history, offers, owner};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
-use jig_core_authority as authority;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_authority as authority;
+use jig_domain_core::documents;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 
 /// # Errors
 /// Refuses inconsistent owner facts or any whole reserved allocation above bounds.

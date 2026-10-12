@@ -1,6 +1,6 @@
 //! The engine's local slots and worker-only charters at the fleet boundary.
 
-use jig_core_fleet::{self as fleet, Answer, Domain, Event, Hello, HostKind, Kinds, Limits, Request};
+use jig_domain_fleet::{self as fleet, Answer, Domain, Event, Hello, HostKind, Kinds, Limits, Request};
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 
 fn step(domain: &mut Domain, limits: Limits, event: Event) -> Vec<Request> {
@@ -234,6 +234,6 @@ fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
     );
 }
 
-fn refs() -> jig_core_fleet::Assignment {
-    jig_core_fleet::Assignment { turns: Token::new(0), answered: Token::new(0) }
+fn refs() -> jig_domain_fleet::Assignment {
+    jig_domain_fleet::Assignment { turns: Token::new(0), answered: Token::new(0) }
 }

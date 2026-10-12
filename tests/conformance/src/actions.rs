@@ -21,7 +21,7 @@ pub fn effect(world: &mut World, completion: u32) {
         Box::new([jig_test_connector_world::path(1, u8::try_from(completion).expect("tiny call number"))]);
     world.send(jig_test_domain::Event::EffectCall {
         to: ReplyTo::new(Token::new(77 + u64::from(completion))),
-        key: jig_core::CallKey { task, attempt, completion, position: 0 },
+        key: jig_domain_core::CallKey { task, attempt, completion, position: 0 },
         number: 1,
         effect,
         deadline: Wall::from_nanos(world.clock().now + 1_000_000_000),

@@ -1,9 +1,9 @@
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_core_notes as notes;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
 use jig_core_world::effects::{World, fixture};
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_notes as notes;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
 use jig_test_domain as root;
 use skein_lib::{List, Queue, ReplyTo, Token};
@@ -653,7 +653,7 @@ fn a_lost_writer_is_read_afresh_only_after_its_loss_is_committed() {
     let run = running(&world, child);
     let reads = world.systems[0].reads().len();
     world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
-    world.send(root::Event::Core(core::Event::Fleet(jig_core_fleet::Event::Lost { channel: Token::new(7) })));
+    world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Lost { channel: Token::new(7) })));
     world.advance(skein_lib::Duration::from_secs(6));
     assert_eq!(world.systems[0].reads().len(), reads, "fresh reads wait for the loss commit's completion");
     world.release_commits();
@@ -1325,7 +1325,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
         people::Ask::SetGoal {
             project: 1,
             spec: b"finish before the deadline".as_slice().into(),
-            executor: jig_core_people::GoalExecutor::Charter(1),
+            executor: jig_domain_people::GoalExecutor::Charter(1),
             budget: 600,
             priority: 0,
             deadline: Some(deadline),
@@ -1403,7 +1403,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     );
     assert_eq!(live_row(&world, goal).authority.budget.deadline, Some(deadline));
     world.advance(skein_lib::Duration::from_secs(2));
-    world.send(root::Event::Core(core::Event::Account(jig_core_accounts::Event::Add {
+    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
         account: 1,
         generation: 1,
         valid: Some(skein_lib::Duration::from_secs(60)),

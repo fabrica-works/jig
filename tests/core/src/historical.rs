@@ -2,8 +2,8 @@
 //! (`domain/people.md`, section 5.1; `client/domain/contract.md`, section 4).
 
 use crate::Store;
-use jig_core as core;
-use jig_core_people::Proposer;
+use jig_domain_core as core;
+use jig_domain_people::Proposer;
 use jig_test_domain as root;
 use skein_lib::Token;
 

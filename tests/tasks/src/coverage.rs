@@ -1,6 +1,6 @@
 //! Semantic lifecycle reach, independent of diagnostic spelling.
 use crate::referee::Seen;
-use jig_core_tasks::{Cause, End, Event, Phase, Status};
+use jig_domain_tasks::{Cause, End, Event, Phase, Status};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

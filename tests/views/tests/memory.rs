@@ -1,4 +1,4 @@
-use jig_core_views::{self as views, Call, Domain, Event, Follow, Made, TurnName, Window};
+use jig_domain_views::{self as views, Call, Domain, Event, Follow, Made, TurnName, Window};
 use jig_views_world::LIMITS;
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
@@ -41,7 +41,7 @@ fn full_watches_runs_calls_and_retired_slots_fit_the_declared_worst_case() {
                         offset,
                         text: vec![1; usize::try_from(LIMITS.text_bytes).expect("text bound")].into_boxed_slice(),
                         call: Some(Call {
-                            identity: jig_core_views::CallIdentity {
+                            identity: jig_domain_views::CallIdentity {
                                 owner: Token::new(1),
                                 sequence: 1,
                                 retry: 0,

@@ -174,13 +174,13 @@ fn a_restart_waiting_for_p_is_withdrawn_when_the_service_was_restarted_by_hand()
 }
 
 fn assert_durable_withdrawal(engine: &jig_conformance::Harness<jig_ops_world::joint::engine::OpsApplication>) {
-    use jig_core_tasks as tasks;
+    use jig_domain_tasks as tasks;
     let history: Vec<_> = engine
         .store
         .rows
         .values()
         .filter_map(|row| match row {
-            jig_ops_domain::Record::Core(jig_core::Record::Tasks(tasks::Stored::History(history)))
+            jig_ops_domain::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::History(history)))
                 if history.task == 6 && history.change == tasks::Change::ProposalWithdrawn =>
             {
                 Some(history)
@@ -201,7 +201,9 @@ fn assert_durable_withdrawal(engine: &jig_conformance::Harness<jig_ops_world::jo
         .rows
         .values()
         .find_map(|row| match row {
-            jig_ops_domain::Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(task))) if task.number == 6 => {
+            jig_ops_domain::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(task)))
+                if task.number == 6 =>
+            {
                 Some(task)
             }
             jig_ops_domain::Record::Core(_)
@@ -224,24 +226,23 @@ fn assert_durable_restart(engine: &jig_conformance::Harness<jig_ops_world::joint
         applied: true,
     };
     assert_eq!(engine.systems.production.observed().iter().filter(|event| **event == restart).count(), 1);
-    let accepted: Vec<_> =
-        engine
-            .store
-            .rows
-            .values()
-            .filter_map(|row| match row {
-                jig_ops_domain::Record::Core(jig_core::Record::Core(jig_core::CoreRecord::ProposalDecision(
-                    decision,
-                ))) if decision.proposer == jig_core_people::Proposer::Task(6) => Some(decision),
-                jig_ops_domain::Record::Core(_)
-                | jig_ops_domain::Record::Observability(_)
-                | jig_ops_domain::Record::Infrastructure(_) => None,
-            })
-            .collect();
+    let accepted: Vec<_> = engine
+        .store
+        .rows
+        .values()
+        .filter_map(|row| match row {
+            jig_ops_domain::Record::Core(jig_domain_core::Record::Core(
+                jig_domain_core::CoreRecord::ProposalDecision(decision),
+            )) if decision.proposer == jig_domain_people::Proposer::Task(6) => Some(decision),
+            jig_ops_domain::Record::Core(_)
+            | jig_ops_domain::Record::Observability(_)
+            | jig_ops_domain::Record::Infrastructure(_) => None,
+        })
+        .collect();
     assert_eq!(accepted.len(), 1);
     assert_eq!(accepted[0].by, 1);
-    assert_eq!(accepted[0].choice, jig_core_people::ProposalChoice::Accepted);
-    assert_eq!(accepted[0].kind, jig_core_tasks::ProposalKind::Effect);
+    assert_eq!(accepted[0].choice, jig_domain_people::ProposalChoice::Accepted);
+    assert_eq!(accepted[0].kind, jig_domain_tasks::ProposalKind::Effect);
     assert!(accepted[0].created.is_none(), "acceptance funds the original effect, not a new task");
     let native = &engine.peers.conformance.documents;
     assert!(native.iter().all(|(commit, _)| *commit <= engine.store.applied));
@@ -380,7 +381,7 @@ fn move_end(world: &mut StoryWorld, q: ClientId, reload: bool) {
 }
 
 fn assert_durable_environment(front: &jig_ops_world::joint::front::Joint) {
-    use jig_core_tasks as tasks;
+    use jig_domain_tasks as tasks;
     use jig_ops_domain as root;
     use jig_ops_domain_infrastructure as infra;
     use jig_ops_fake_production as production;
@@ -411,11 +412,9 @@ fn assert_durable_environment(front: &jig_ops_world::joint::front::Joint) {
         .rows
         .values()
         .filter_map(|row| match row {
-            root::Record::Core(jig_core::Record::Core(jig_core::CoreRecord::ProposalDecision(decision)))
-                if decision.proposer == jig_core_people::Proposer::Task(1) =>
-            {
-                Some(decision)
-            }
+            root::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::ProposalDecision(
+                decision,
+            ))) if decision.proposer == jig_domain_people::Proposer::Task(1) => Some(decision),
             jig_ops_domain::Record::Core(_)
             | jig_ops_domain::Record::Infrastructure(_)
             | jig_ops_domain::Record::Observability(_) => None,
@@ -424,7 +423,7 @@ fn assert_durable_environment(front: &jig_ops_world::joint::front::Joint) {
     assert_eq!(decisions.len(), 1);
     assert_eq!(decisions[0].by, 1);
     assert_eq!(decisions[0].kind, tasks::ProposalKind::Batch);
-    assert_eq!(decisions[0].choice, jig_core_people::ProposalChoice::Accepted);
+    assert_eq!(decisions[0].choice, jig_domain_people::ProposalChoice::Accepted);
     let (first, last) = decisions[0].created.expect("the accepted chat proposal created E");
     assert_eq!(first, last);
     assert_eq!(creations[0].1.task, first);
@@ -433,7 +432,7 @@ fn assert_durable_environment(front: &jig_ops_world::joint::front::Joint) {
         .rows
         .values()
         .find_map(|row| match row {
-            root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(task))) if task.number == first => {
+            root::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(task))) if task.number == first => {
                 Some(task)
             }
             jig_ops_domain::Record::Core(_)
@@ -504,10 +503,10 @@ fn assert_durable_end(
         .rows
         .values()
         .filter_map(|row| match row {
-            root::Record::Core(jig_core::Record::People(jig_core_people::Stored::Answer {
+            root::Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Answer {
                 key,
                 ask,
-                outcome: jig_core_people::Outcome::Applied { connector: 2, token },
+                outcome: jig_domain_people::Outcome::Applied { connector: 2, token },
                 ..
             })) => Some((key, ask, token)),
             jig_ops_domain::Record::Core(_)
@@ -531,7 +530,7 @@ fn assert_durable_end(
         })
         .expect("the protocol hash includes all supplied owner facts, independent of the local view handle");
     assert_eq!(request.revision, 0, "Q named the owner's seen end revision");
-    assert_eq!(markers[0].1.as_ref(), &jig_core_people::Ask::Application { project: 1, connector: 2, digest });
+    assert_eq!(markers[0].1.as_ref(), &jig_domain_people::Ask::Application { project: 1, connector: 2, digest });
     assert!(front.environment_documents.iter().any(|document| matches!(document,
         infra::ClientDocument::Environment {
             environment: found, fact, end_revision: 0, end: None, ..
@@ -616,7 +615,7 @@ fn assert_recovered(world: &mut StoryWorld, commit: u64) {
 }
 
 fn assert_acceptance_key(world: &mut StoryWorld, replayed: bool) {
-    use jig_core_people as people;
+    use jig_domain_people as people;
     let front = world.front();
     let requests: Vec<_> = front
         .engine
@@ -646,7 +645,7 @@ fn assert_acceptance_key(world: &mut StoryWorld, replayed: bool) {
         .rows
         .values()
         .filter_map(|row| match row {
-            jig_ops_domain::Record::Core(jig_core::Record::People(people::Stored::Answer {
+            jig_ops_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
                 key: found,
                 ask: made_ask,
                 outcome,
@@ -679,8 +678,8 @@ fn assert_native_retries(world: &mut StoryWorld) {
     let key = requests[0].1;
     assert!(
         front.engine.store.rows.values().any(|row| matches!(row,
-        jig_ops_domain::Record::Core(jig_core::Record::People(jig_core_people::Stored::Answer {
-            key: found, outcome: jig_core_people::Outcome::Applied { connector: 2, .. }, ..
+        jig_ops_domain::Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Answer {
+            key: found, outcome: jig_domain_people::Outcome::Applied { connector: 2, .. }, ..
         })) if found.key == key)),
         "the actual keyed answer survived the reload"
     );

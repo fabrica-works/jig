@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use jig_host::Limits;
+use jig_domain_host::Limits;
 use jig_host_world::engine::ENDINGS;
 use jig_host_world::{Settings, Span, World};
 

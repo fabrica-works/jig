@@ -64,8 +64,8 @@ fn a_person_reads_the_whole_historical_task_and_result_after_the_engine_finishes
         .expect("actual assigned chat")
         .task;
     assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(value)))
-        if value.number==task && matches!(value.phase,jig_core_tasks::Phase::Ended(_))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(value)))
+        if value.number==task && matches!(value.phase,jig_domain_tasks::Phase::Ended(_))
     )));
     world.person(
         client,
@@ -89,7 +89,7 @@ fn a_person_reads_the_whole_historical_task_and_result_after_the_engine_finishes
         rows.values()
             .filter(|row| matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         1
@@ -122,8 +122,8 @@ fn a_person_revisits_the_whole_historical_task_and_result_by_its_fresh_public_ad
         .expect("actual assigned chat")
         .task;
     assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(value)))
-        if value.number==task && matches!(value.phase,jig_core_tasks::Phase::Ended(_))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(value)))
+        if value.number==task && matches!(value.phase,jig_domain_tasks::Phase::Ended(_))
     )));
     world.person(
         client,
@@ -148,7 +148,7 @@ fn a_person_revisits_the_whole_historical_task_and_result_by_its_fresh_public_ad
         rows.values()
             .filter(|row| matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         1

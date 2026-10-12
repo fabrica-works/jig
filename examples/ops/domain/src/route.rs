@@ -5,11 +5,11 @@ use crate::domain::{Work, child, held, now, write};
 use crate::translate;
 use crate::{Domain, Event, Key, Limits, Output, Record, Released, Write};
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_tasks as tasks;
-use jig_host as host;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_host as host;
+use jig_domain_tasks as tasks;
 use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
@@ -792,8 +792,8 @@ pub(crate) fn infrastructure_out(
                 let document = match document {
                     Ok(document) => Ok(crate::ClientDocument::Infrastructure(Box::new(document))),
                     Err(why) => Err(match why {
-                        infrastructure::DocumentMissing::Unknown => jig_core_views::End::Gone,
-                        infrastructure::DocumentMissing::NotAllowed => jig_core_views::End::NotAllowed,
+                        infrastructure::DocumentMissing::Unknown => jig_domain_views::End::Gone,
+                        infrastructure::DocumentMissing::NotAllowed => jig_domain_views::End::NotAllowed,
                     }),
                 };
                 crate::client_documents::document(
@@ -822,7 +822,7 @@ pub(crate) fn infrastructure_out(
             infrastructure::Request::ApplicationBusy { request } => {
                 work.push(Work::Core(core::Event::ApplicationFinished {
                     request,
-                    outcome: Err(jig_core_people::Again::Busy),
+                    outcome: Err(jig_domain_people::Again::Busy),
                 }));
             }
             infrastructure::Request::Closed { task } => {
@@ -997,8 +997,8 @@ pub(crate) fn observability_out(
                 let document = match document {
                     Ok(document) => Ok(crate::ClientDocument::Observability(Box::new(document))),
                     Err(why) => Err(match why {
-                        observability::DocumentMissing::Unknown => jig_core_views::End::Gone,
-                        observability::DocumentMissing::NotAllowed => jig_core_views::End::NotAllowed,
+                        observability::DocumentMissing::Unknown => jig_domain_views::End::Gone,
+                        observability::DocumentMissing::NotAllowed => jig_domain_views::End::NotAllowed,
                     }),
                 };
                 crate::client_documents::document(
@@ -1227,7 +1227,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
             now(domain, Output::CoreLoad(value));
         }
         core::Now::BriefCorePlanned { task, sections, .. } => {
-            work.push(Work::Core(core::Event::Brief(jig_core_brief::GatherEvent::Plan {
+            work.push(Work::Core(core::Event::Brief(jig_domain_brief::GatherEvent::Plan {
                 brief: Token::new(task),
                 budget: env.limits.core.brief.brief_bytes,
                 deadline: env.now.saturating_add(skein_lib::Duration::from_secs(30)),

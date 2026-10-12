@@ -1,8 +1,8 @@
 //! Entry-point checks for the reference journal and routes.
 use crate::{Config, Domain, Event, Limits, Output, Released, Store, release, step};
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_host as host;
+use jig_domain_core as core;
+use jig_domain_host as host;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Duration, Env, JournalLimits, List, Queue, Time, Token, Wall};
@@ -277,9 +277,9 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
                 Output::Core(core::Held::NotesLoad { owner, .. }) => step(
                     domain,
                     env,
-                    Event::Core(core::Event::Notes(jig_core_notes::Event::Loaded {
+                    Event::Core(core::Event::Notes(jig_domain_notes::Event::Loaded {
                         owner,
-                        rows: jig_core_notes::Rows { records: List::with_capacity(env.limits.core.notes.load_rows) },
+                        rows: jig_domain_notes::Rows { records: List::with_capacity(env.limits.core.notes.load_rows) },
                         more: false,
                     })),
                 ),
@@ -304,10 +304,10 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
 }
 
 fn started_chat() -> (Domain, Env<Limits>, Token) {
-    use jig_core_accounts as accounts;
-    use jig_core_fleet as fleet;
-    use jig_core_people as people;
-    use jig_core_tasks as tasks;
+    use jig_domain_accounts as accounts;
+    use jig_domain_fleet as fleet;
+    use jig_domain_people as people;
+    use jig_domain_tasks as tasks;
     let (mut domain, env) = fixture();
     for event in [
         core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) }),
@@ -503,7 +503,7 @@ fn a_tool_mutation_and_its_rendered_reply_share_one_commit() {
 #[test]
 #[expect(clippy::too_many_lines, reason = "a complete journal scenario also checks admitted wrong-scope refusal")]
 fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
-    use jig_core_people as people;
+    use jig_domain_people as people;
     use skein_lib::ReplyTo;
     let (mut domain, env) = fixture_with_commits(2);
     let identity = people::Identity {
@@ -633,7 +633,7 @@ fn connector_documents_and_reads_share_the_last_connector_commit_barrier() {
     for output in refused {
         if let Output::Core(core::Held::WatchEnded { watcher, why }) = output {
             assert_eq!(watcher, Token::new(503));
-            assert_eq!(why, jig_core_views::End::Gone);
+            assert_eq!(why, jig_domain_views::End::Gone);
             ended = true;
         } else if let Output::ApplicationDocument { .. } = output {
             panic!("the wrong subject scope produces no document");
@@ -662,12 +662,12 @@ fn an_unknown_connector_refuses_the_restart_without_loading_a_child() {
     }
 }
 
-fn triage_fields(alerts: &[u8]) -> Box<[jig_core_tasks::ResultField]> {
+fn triage_fields(alerts: &[u8]) -> Box<[jig_domain_tasks::ResultField]> {
     Box::new([
-        jig_core_tasks::ResultField { name: Box::from(&b"alerts"[..]), value: Box::from(alerts) },
-        jig_core_tasks::ResultField { name: Box::from(&b"environment"[..]), value: Box::from(&b"production"[..]) },
-        jig_core_tasks::ResultField { name: Box::from(&b"service"[..]), value: Box::from(&b"checkout"[..]) },
-        jig_core_tasks::ResultField { name: Box::from(&b"severity"[..]), value: Box::from(&b"3"[..]) },
+        jig_domain_tasks::ResultField { name: Box::from(&b"alerts"[..]), value: Box::from(alerts) },
+        jig_domain_tasks::ResultField { name: Box::from(&b"environment"[..]), value: Box::from(&b"production"[..]) },
+        jig_domain_tasks::ResultField { name: Box::from(&b"service"[..]), value: Box::from(&b"checkout"[..]) },
+        jig_domain_tasks::ResultField { name: Box::from(&b"severity"[..]), value: Box::from(&b"3"[..]) },
     ])
 }
 
@@ -678,7 +678,7 @@ fn a_closed_verdict_translates_only_explicit_machine_fields_to_the_watch() {
     assert_eq!(
         crate::translate::watch_result(
             100,
-            &jig_core_tasks::ResultKind::Verdict { code: 1, fields: Box::new([]) },
+            &jig_domain_tasks::ResultKind::Verdict { code: 1, fields: Box::new([]) },
             limits
         ),
         observability::WatchMessage::Triage { child: 100, verdict: observability::TriageVerdict::Noise }
@@ -686,7 +686,7 @@ fn a_closed_verdict_translates_only_explicit_machine_fields_to_the_watch() {
     assert_eq!(
         crate::translate::watch_result(
             100,
-            &jig_core_tasks::ResultKind::Verdict { code: 2, fields: triage_fields(b"12 13") },
+            &jig_domain_tasks::ResultKind::Verdict { code: 2, fields: triage_fields(b"12 13") },
             limits
         ),
         observability::WatchMessage::Triage {
@@ -708,7 +708,7 @@ fn malformed_machine_fields_are_refused_without_reading_an_explanation() {
         assert_eq!(
             crate::translate::watch_result(
                 100,
-                &jig_core_tasks::ResultKind::Verdict { code: 2, fields: triage_fields(alerts) },
+                &jig_domain_tasks::ResultKind::Verdict { code: 2, fields: triage_fields(alerts) },
                 limits
             ),
             observability::WatchMessage::InvalidTriage { child: 100 }
@@ -717,22 +717,22 @@ fn malformed_machine_fields_are_refused_without_reading_an_explanation() {
     let mut fields = triage_fields(b"12");
     fields[1].name = Box::from(&b"alerts"[..]);
     assert_eq!(
-        crate::translate::watch_result(100, &jig_core_tasks::ResultKind::Verdict { code: 2, fields }, limits),
+        crate::translate::watch_result(100, &jig_domain_tasks::ResultKind::Verdict { code: 2, fields }, limits),
         observability::WatchMessage::InvalidTriage { child: 100 }
     );
     assert_eq!(
         crate::translate::watch_result(
             100,
-            &jig_core_tasks::ResultKind::Verdict { code: 2, fields: Box::new([]) },
+            &jig_domain_tasks::ResultKind::Verdict { code: 2, fields: Box::new([]) },
             limits
         ),
         observability::WatchMessage::InvalidTriage { child: 100 }
     );
 }
 
-fn environment_spec() -> jig_core_tasks::Spec {
-    use jig_core_tasks::Parameter;
-    jig_core_tasks::Spec {
+fn environment_spec() -> jig_domain_tasks::Spec {
+    use jig_domain_tasks::Parameter;
+    jig_domain_tasks::Spec {
         words: Box::from(b"staging for payments, a week".as_slice()),
         parameters: Box::new([
             Parameter::Bytes { name: 1, value: Box::from(b"staging".as_slice()) },
@@ -747,7 +747,7 @@ fn environment_spec() -> jig_core_tasks::Spec {
 
 #[test]
 fn provision_preserves_opaque_environment_parameters_and_distinct_pool_hold() {
-    use jig_core_tasks::{Executor, HoldKind, Holding, Name, Taken};
+    use jig_domain_tasks::{Executor, HoldKind, Holding, Name, Taken};
     let mut spec = environment_spec();
     let environment =
         infrastructure::Environment::new(Box::from(b"staging".as_slice()), Box::from(b"payments".as_slice()));
@@ -785,9 +785,9 @@ fn provision_preserves_opaque_environment_parameters_and_distinct_pool_hold() {
     assert_eq!(
         kinds.as_ref(),
         &[
-            jig_core_tasks::Kind { connector: 2, kind: 1, hold: HoldKind::Exclusive { taken: Taken::Waits } },
-            jig_core_tasks::Kind { connector: 2, kind: 2, hold: HoldKind::Exclusive { taken: Taken::Waits } },
-            jig_core_tasks::Kind { connector: 2, kind: 3, hold: HoldKind::Pooled { taken: Taken::Waits } },
+            jig_domain_tasks::Kind { connector: 2, kind: 1, hold: HoldKind::Exclusive { taken: Taken::Waits } },
+            jig_domain_tasks::Kind { connector: 2, kind: 2, hold: HoldKind::Exclusive { taken: Taken::Waits } },
+            jig_domain_tasks::Kind { connector: 2, kind: 3, hold: HoldKind::Pooled { taken: Taken::Waits } },
         ]
     );
     spec.parameters = spec.parameters[..4].into();
@@ -796,7 +796,7 @@ fn provision_preserves_opaque_environment_parameters_and_distinct_pool_hold() {
         None,
         "a missing deadline is not manufactured"
     );
-    spec.parameters[1] = jig_core_tasks::Parameter::Number { name: 2, value: 99 };
+    spec.parameters[1] = jig_domain_tasks::Parameter::Number { name: 2, value: 99 };
     assert_eq!(
         crate::translate::holdings(
             2,
@@ -810,7 +810,7 @@ fn provision_preserves_opaque_environment_parameters_and_distinct_pool_hold() {
 
 #[test]
 fn adding_provision_preserves_scale_and_remediate_codes_and_service_hold() {
-    use jig_core_tasks::{Executor, Holding, Name};
+    use jig_domain_tasks::{Executor, Holding, Name};
     let mut spec = environment_spec();
     spec.parameters = spec.parameters[..4].into();
     let service = infrastructure::Service::new(Box::from(b"staging".as_slice()), Box::from(b"payments".as_slice()));

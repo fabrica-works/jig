@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     Event, Funder, MessageKind, Party, Proposal, ProposalAction, ProposalDecision, ProposalHolder, ProposalKind,
     ProposalState,
 };

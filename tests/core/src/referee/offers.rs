@@ -2,12 +2,12 @@
 //! This observer receives only boundary events, durable commit numbers and
 //! documents/replies. It never reads a domain or calls an admission judge.
 mod facts;
-use jig_core::{
+use jig_domain_core::{
     self as core,
     acts::{Act, Admission, Offered},
     documents::{Document, Subject, Task},
 };
-use jig_core_people as people;
+use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::List;
 use std::collections::{BTreeMap, VecDeque};

@@ -76,7 +76,7 @@ fn deployment_watch_keeps_original_subject_and_ack_until_whole_delivery_admissio
     assert_eq!(*value, wire::deployment::document(&source, &limits).expect("whole owner facts"));
     assert!(transport.watch(wrong).is_some() && transport.watch(watcher).is_some());
     assert!(
-        matches!(transport.taken(ClientId(0), native), Some(jig_core::Event::Delivered { watcher: actual }) if actual == watcher)
+        matches!(transport.taken(ClientId(0), native), Some(jig_domain_core::Event::Delivered { watcher: actual }) if actual == watcher)
     );
     assert!(transport.taken(ClientId(0), native).is_none());
     assert!(transport.taken(ClientId(0), Token::new(1)).is_none());

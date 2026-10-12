@@ -2,7 +2,7 @@
 //! Whole supplied fields preserve independent revisions and optional edits.
 use super::request_arguments;
 use jig_client::contract as client;
-use jig_core_people as people;
+use jig_domain_people as people;
 use skein_lib::List;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -3,8 +3,8 @@
 //! They do not inspect engine tasks, choose outcomes, or own request durability.
 use crate::harness::ClientId;
 use jig_client::contract::{Read, Subject, VersionRange};
-use jig_core::{Event, documents::ApplicationScope};
-use jig_core_people as people;
+use jig_domain_core::{Event, documents::ApplicationScope};
+use jig_domain_people as people;
 use jig_test_client_domain::family;
 use skein_lib::{ReplyTo, Token};
 use std::collections::{BTreeMap, BTreeSet};
@@ -430,7 +430,7 @@ mod tests {
         assert!(front.continued(ClientId(0), native, exact.clone()).expect("duplicate callback").is_none());
         let resumed = crate::joint::wire::watches::watch(Token::new(77), 23, 7, &exact, 2).expect("exact resume");
         assert!(
-            matches!(resumed, Event::WatchRun { watcher, sign_in: 23, task: u64::MAX, turn: Some(jig_core_views::TurnName { attempt: u64::MAX, turn: u32::MAX, retry: u32::MAX }), offset: u32::MAX } if watcher == Token::new(77))
+            matches!(resumed, Event::WatchRun { watcher, sign_in: 23, task: u64::MAX, turn: Some(jig_domain_views::TurnName { attempt: u64::MAX, turn: u32::MAX, retry: u32::MAX }), offset: u32::MAX } if watcher == Token::new(77))
         );
         assert!(matches!(front.taken(ClientId(1), native), Some(Event::Delivered { watcher }) if watcher == other));
     }

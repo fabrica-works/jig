@@ -1,6 +1,6 @@
 //! The host in its world: scenarios, replay, and a sweep of random worlds.
 
-use jig_host::Limits;
+use jig_domain_host::Limits;
 use jig_host_world::{Outage, Settings, Span, Stats, World};
 use skein_lib::Duration;
 

@@ -1,8 +1,8 @@
 //! Whole note owner facts and literal scopes (contract.md, 5.2; objects.md, 10).
 use super::{offers, owner};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
-use jig_core_notes as notes;
+use jig_domain_core::documents;
+use jig_domain_notes as notes;
 
 /// # Errors
 /// Refuses any supplied text, pattern or reference allocation above the receiving bounds.
@@ -42,8 +42,8 @@ pub fn note(value: &documents::Note, limits: &Limits) -> Result<client::Note, ow
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_core::acts;
-    use jig_core_people as people;
+    use jig_domain_core::acts;
+    use jig_domain_people as people;
     use skein_lib::{List, Wall};
 
     fn document() -> documents::Note {

@@ -3,7 +3,7 @@
 //! referee still receives only independent peer observations and durable rows.
 use crate::{Config, Delivery, Testing, env};
 use jig_conformance::{Application, Clock, Input, Output};
-use jig_core as core;
+use jig_domain_core as core;
 use jig_fake_store::Write;
 use jig_test_connector as connector;
 use jig_test_domain as root;
@@ -144,7 +144,7 @@ pub(crate) fn released(
             matches!(
                 write,
                 Write::Save {
-                    row: root::Record::Core(core::Record::People(jig_core_people::Stored::SignIn { .. })),
+                    row: root::Record::Core(core::Record::People(jig_domain_people::Stored::SignIn { .. })),
                     ..
                 }
             )

@@ -1,6 +1,6 @@
 //! Complete boundary diagnostics, enabled for focused/failing-seed replay only.
 use crate::{coverage::Coverage, referee::Seen};
-use jig_core_tasks::Event;
+use jig_domain_tasks::Event;
 use skein_lib::Time;
 use std::sync::OnceLock;
 

@@ -1,4 +1,4 @@
-use jig_core_people::{RequestKey, Role};
+use jig_domain_people::{RequestKey, Role};
 use jig_people_world::referee::{People, RouteKind, Seen};
 use skein_lib::Time;
 use skein_world::domain::{Referee, Verdict};
@@ -57,7 +57,7 @@ fn a_missing_reply_fails_its_deadline() {
 
 #[test]
 fn rejects_refusals_with_inconsistent_or_unnamed_facts() {
-    use jig_core_people::{Ending, Lack, Moved, Party, Refusal};
+    use jig_domain_people::{Ending, Lack, Moved, Party, Refusal};
     for why in [
         Refusal::Authority { proposable: None, lacking: Lack::Budget { needs: 3, left: 4 } },
         Refusal::Role { held: Some(Role::Policy { role: 1 }) },

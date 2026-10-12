@@ -1,7 +1,7 @@
 //! A full inventory fits the child's declared worst case.
 
 use jig_brief_world::LIMITS;
-use jig_core_brief::{Core, GatherDomain, GatherEvent, Planned, gather_max_out, gather_step, gather_worst_case};
+use jig_domain_brief::{Core, GatherDomain, GatherEvent, Planned, gather_max_out, gather_step, gather_worst_case};
 use skein_lib::{Env, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
 

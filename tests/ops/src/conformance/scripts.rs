@@ -28,7 +28,7 @@
 //! Messages that come once its run has finished, before the stop, are not
 //! read: smith's inline agent heard the stop in the same step.
 use jig_conformance::{Clock, Input};
-use jig_host as host;
+use jig_domain_host as host;
 use jig_ops_domain as root;
 use skein_lib::{Duration, List, Token, Writer};
 use smith_transcript::v3 as transcript;
@@ -372,8 +372,8 @@ fn name(activation: u64, completion: u32) -> Box<[u8]> {
 fn stream(owner: Token, agent: &Agent, step: &Step) -> Vec<root::AgentContent> {
     let start = root::AgentContent::Text { turn: agent.turns, retry: 0, offset: 0, text: Box::new([]) };
     let call = |tool: &str, input: &[u8]| {
-        root::AgentContent::Call(jig_core_views::Call {
-            identity: jig_core_views::CallIdentity {
+        root::AgentContent::Call(jig_domain_views::Call {
+            identity: jig_domain_views::CallIdentity {
                 owner,
                 sequence: agent.turns,
                 retry: 0,

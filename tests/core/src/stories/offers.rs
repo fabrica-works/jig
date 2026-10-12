@@ -1,8 +1,8 @@
 //! Starting facts shared by the delivered-offer stories.
 use crate::effects::{World, fixture};
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_core_people as people;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{Queue, ReplyTo, Token};
 
@@ -92,7 +92,7 @@ pub fn goal(budget: u64) -> people::Ask {
     people::Ask::SetGoal {
         project: 1,
         spec: b"offered goal".as_slice().into(),
-        executor: jig_core_people::GoalExecutor::Charter(1),
+        executor: jig_domain_people::GoalExecutor::Charter(1),
         budget,
         priority: 1,
         deadline: None,

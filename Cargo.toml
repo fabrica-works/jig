@@ -6,7 +6,8 @@ members = [
     "crates/jig-client",
     "crates/jig-client-transcript",
     "crates/jig-client-view",
-    "crates/jig-core-accounts",
+    "crates/jig-domain-core",
+    "crates/jig-domain-accounts",
     "testing/jig-test-connector",
     "testing/jig-test-domain",
     "testing/jig-test-client-domain",
@@ -31,14 +32,14 @@ members = [
     "tests/ops",
     "tests/test-connector",
     "tests/core",
-    "crates/jig-core-authority",
-    "crates/jig-core-brief",
-    "crates/jig-core-fleet",
-    "crates/jig-core-notes",
-    "crates/jig-core-people",
-    "crates/jig-core-tasks",
-    "crates/jig-core-views",
-    "crates/jig-host",
+    "crates/jig-domain-authority",
+    "crates/jig-domain-brief",
+    "crates/jig-domain-fleet",
+    "crates/jig-domain-notes",
+    "crates/jig-domain-people",
+    "crates/jig-domain-tasks",
+    "crates/jig-domain-views",
+    "crates/jig-domain-host",
     "crates/jig-charter",
     "tests/accounts",
     "tests/brief",
@@ -71,7 +72,7 @@ smith-domain-run = { git = "https://github.com/forgetic/smith.git" }
 smith-charter = { git = "https://github.com/forgetic/smith.git" }
 smith-transcript = { git = "https://github.com/forgetic/smith.git" }
 sha2 = { version = "=0.10.9", default-features = false }
-jig-core-accounts = { path = "crates/jig-core-accounts" }
+jig-domain-accounts = { path = "crates/jig-domain-accounts" }
 jig-test-connector = { path = "testing/jig-test-connector" }
 jig-test-domain = { path = "testing/jig-test-domain" }
 jig-test-client-domain = { path = "testing/jig-test-client-domain" }
@@ -89,15 +90,15 @@ jig-ops-connectors = { path = "examples/ops/connectors" }
 jig-ops-domain = { path = "examples/ops/domain" }
 jig-ops-domain-observability = { path = "examples/ops/domain-observability" }
 jig-ops-domain-infrastructure = { path = "examples/ops/domain-infrastructure" }
-jig-core-authority = { path = "crates/jig-core-authority" }
-jig-core = { path = "crates/jig-core" }
-jig-core-notes = { path = "crates/jig-core-notes" }
-jig-core-people = { path = "crates/jig-core-people" }
-jig-core-tasks = { path = "crates/jig-core-tasks" }
-jig-core-brief = { path = "crates/jig-core-brief" }
-jig-core-fleet = { path = "crates/jig-core-fleet" }
-jig-core-views = { path = "crates/jig-core-views" }
-jig-host = { path = "crates/jig-host" }
+jig-domain-authority = { path = "crates/jig-domain-authority" }
+jig-domain-core = { path = "crates/jig-domain-core" }
+jig-domain-notes = { path = "crates/jig-domain-notes" }
+jig-domain-people = { path = "crates/jig-domain-people" }
+jig-domain-tasks = { path = "crates/jig-domain-tasks" }
+jig-domain-brief = { path = "crates/jig-domain-brief" }
+jig-domain-fleet = { path = "crates/jig-domain-fleet" }
+jig-domain-views = { path = "crates/jig-domain-views" }
+jig-domain-host = { path = "crates/jig-domain-host" }
 jig-charter = { path = "crates/jig-charter" }
 
 # Panics are fail-stop and overflow traps, in every profile. (The test harness

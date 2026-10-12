@@ -2,10 +2,10 @@
 //! workers and parties retain their own observations; this world reads only
 //! released root outputs and durable store rows (`domain/testing.md`, 4, 7).
 use crate::Store;
-use jig_core as core;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_fake_parties as parties;
 use jig_fake_workers as workers;
 use jig_test_domain as root;
@@ -189,7 +189,7 @@ impl Peers {
                     parties::Ask::Goal { words, budget, priority, deadline } => people::Ask::SetGoal {
                         project,
                         spec: words,
-                        executor: jig_core_people::GoalExecutor::Charter(1),
+                        executor: jig_domain_people::GoalExecutor::Charter(1),
                         budget,
                         priority,
                         deadline,
@@ -516,7 +516,7 @@ fn end_value(end: workers::End) -> tasks::End {
 /// Tiny limits with enough roles, hosts and person verdicts for the peer stories.
 #[must_use]
 pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
-    use jig_core_authority as policy;
+    use jig_domain_authority as policy;
     let (mut configuration, mut limits) = crate::effects::fixture(seed, false);
     limits.core.tasks.tasks = 5;
     limits.core.tasks.project_tasks = 5;

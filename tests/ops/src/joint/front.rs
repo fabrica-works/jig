@@ -12,8 +12,8 @@ use jig_client_world::{
     },
 };
 use jig_conformance::Harness;
-use jig_core as core;
-use jig_core_people as people;
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_ops_client_domain::{self as client, infrastructure as infra, observability as obs};
 use jig_ops_domain as root;
 use skein_lib::{Duration, ReplyTo, Time, Token, Wall};
@@ -660,7 +660,7 @@ impl Joint {
             }
             root::Output::Now(core::Now::RunText { watcher, turn, from, to, text, cut, call }) => {
                 if self.engine.peers.transport.watch(watcher).is_some() {
-                    let writing = jig_core_views::Writing { turn, from, to, text, cut, call };
+                    let writing = jig_domain_views::Writing { turn, from, to, text, cut, call };
                     let packet = packets::stream(&mut self.engine.peers.transport, watcher, &writing, &self.limits.jig)
                         .expect("whole run stream uses 45 wire");
                     self.jig_packet(watcher, packet);
@@ -766,7 +766,7 @@ impl Joint {
             | root::Output::Stop => panic!("non-client output escaped Ops peers"),
         }
     }
-    fn application_end(&mut self, watcher: Token, connector: u16, why: jig_core_views::End) {
+    fn application_end(&mut self, watcher: Token, connector: u16, why: jig_domain_views::End) {
         let Some(route) = self.watches.remove(&watcher) else {
             return;
         };
@@ -775,21 +775,21 @@ impl Joint {
             Subject::Infrastructure(_) => client::Event::Infrastructure(infra::Event::Ended {
                 watch: route.native,
                 end: match why {
-                    jig_core_views::End::Unwatched => infra::WatchEnd::Closed,
-                    jig_core_views::End::Gone => infra::WatchEnd::SubjectEnded,
-                    jig_core_views::End::NotAllowed => infra::WatchEnd::NotAllowed,
-                    jig_core_views::End::SignedOut => infra::WatchEnd::SignedOut,
-                    jig_core_views::End::Stopping => infra::WatchEnd::Stopping,
+                    jig_domain_views::End::Unwatched => infra::WatchEnd::Closed,
+                    jig_domain_views::End::Gone => infra::WatchEnd::SubjectEnded,
+                    jig_domain_views::End::NotAllowed => infra::WatchEnd::NotAllowed,
+                    jig_domain_views::End::SignedOut => infra::WatchEnd::SignedOut,
+                    jig_domain_views::End::Stopping => infra::WatchEnd::Stopping,
                 },
             }),
             Subject::Observability(_) => client::Event::Observability(obs::Event::Ended {
                 watch: route.native,
                 end: match why {
-                    jig_core_views::End::Unwatched => obs::WatchEnd::Closed,
-                    jig_core_views::End::Gone => obs::WatchEnd::SubjectEnded,
-                    jig_core_views::End::NotAllowed => obs::WatchEnd::NotAllowed,
-                    jig_core_views::End::SignedOut => obs::WatchEnd::SignedOut,
-                    jig_core_views::End::Stopping => obs::WatchEnd::Stopping,
+                    jig_domain_views::End::Unwatched => obs::WatchEnd::Closed,
+                    jig_domain_views::End::Gone => obs::WatchEnd::SubjectEnded,
+                    jig_domain_views::End::NotAllowed => obs::WatchEnd::NotAllowed,
+                    jig_domain_views::End::SignedOut => obs::WatchEnd::SignedOut,
+                    jig_domain_views::End::Stopping => obs::WatchEnd::Stopping,
                 },
             }),
         };

@@ -47,7 +47,7 @@ fn a_person_s_words_reach_a_running_run() {
             .values()
             .filter(|row| matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         2
@@ -101,7 +101,7 @@ fn a_person_stops_a_run_and_releases_it() {
             .values()
             .filter(|row| matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         3
@@ -156,7 +156,7 @@ fn a_request_sent_twice_is_made_once_across_an_engine_restart() {
             .values()
             .filter(|row| matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         2
@@ -192,9 +192,9 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
     let mut world = super::configured_world(super::turn(), |front| {
         front.session.sources_at(vec![(
             Time::from_nanos(650_000_000),
-            jig_test_domain::Event::Core(jig_core::Event::Tasks(jig_core_tasks::Event::Hold {
+            jig_test_domain::Event::Core(jig_domain_core::Event::Tasks(jig_domain_tasks::Event::Hold {
                 task: 1,
-                why: jig_core_tasks::Hold::Budget,
+                why: jig_domain_tasks::Hold::Budget,
             })),
         )]);
     });
@@ -242,9 +242,9 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
     assert_eq!(owner.peers.as_ref().expect("actual worker").workers[0].seen[0].task, 1);
     assert_eq!(owner.peers.as_ref().expect("actual worker").workers[0].seen.len(), 1);
     assert!(owner.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(task)))
         if task.number == 1 && task.revisions.hold == 2 && matches!(task.phase,
-            jig_core_tasks::Phase::Held { why: jig_core_tasks::Hold::Budget, .. }))));
+            jig_domain_tasks::Phase::Held { why: jig_domain_tasks::Hold::Budget, .. }))));
     assert_eq!(
         owner
             .store
@@ -252,7 +252,7 @@ fn a_hold_moved_under_the_open_confirmation_is_refused_in_place() {
             .values()
             .filter(|row| matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         2
@@ -287,9 +287,9 @@ fn a_hold_moved_in_the_engine_is_refused_as_moved_and_shown_current() {
     let moved_at = world.now().saturating_add(Duration::from_millis(20));
     world.front().session.sources_at(vec![(
         moved_at,
-        jig_test_domain::Event::Core(jig_core::Event::Tasks(jig_core_tasks::Event::Hold {
+        jig_test_domain::Event::Core(jig_domain_core::Event::Tasks(jig_domain_tasks::Event::Hold {
             task: 1,
-            why: jig_core_tasks::Hold::Budget,
+            why: jig_domain_tasks::Hold::Budget,
         })),
     )]);
     // Hold back deliveries, preserving the person's old revision while the
@@ -311,9 +311,9 @@ fn a_hold_moved_in_the_engine_is_refused_as_moved_and_shown_current() {
     let owner = &world.front().session.driver.world;
     assert_eq!(owner.peers.as_ref().expect("actual worker").workers[0].seen.len(), 1);
     assert!(owner.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(task)))
         if task.number == 1 && task.revisions.hold == 2 && matches!(task.phase,
-            jig_core_tasks::Phase::Held { why: jig_core_tasks::Hold::Budget, .. }))));
+            jig_domain_tasks::Phase::Held { why: jig_domain_tasks::Hold::Budget, .. }))));
     assert_eq!(
         owner
             .store
@@ -321,13 +321,13 @@ fn a_hold_moved_in_the_engine_is_refused_as_moved_and_shown_current() {
             .values()
             .filter(|row| matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         3
     );
     assert!(owner.store.rows.values().any(|row| matches!(row,
-    jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+    jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. }))
     if matches!(outcome, people::Outcome::Refused(people::Refusal::Moved {
         now: people::Moved::Hold { revision: 2, reason: people::HoldReason::Budget },
     })))));

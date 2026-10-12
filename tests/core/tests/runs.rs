@@ -1,6 +1,6 @@
-use jig_core as core;
-use jig_core_tasks as tasks;
 use jig_core_world::effects::World;
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
 
@@ -82,16 +82,16 @@ fn settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it
     assert_ne!(saved.serial, 0);
     world.end(tasks::End::Parked, 1);
     world.restart(103, false);
-    world.send(root::Event::Core(core::Event::Fleet(jig_core_fleet::Event::Hello {
+    world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
         channel: Token::new(7),
-        hello: jig_core_fleet::Hello {
+        hello: jig_domain_fleet::Hello {
             stop_bound: skein_lib::Duration::from_millis(100),
             slots: 1,
             workstreams: Box::new([]),
             hosting: Box::new([]),
         },
     })));
-    world.send(root::Event::Core(core::Event::Account(jig_core_accounts::Event::Add {
+    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
         account: 1,
         generation: 1,
         valid: Some(skein_lib::Duration::from_secs(60)),
@@ -218,12 +218,12 @@ fn a_bounced_message_stays_unread_for_a_later_read() {
     let assignment = world.assigned.as_ref().expect("assigned chat");
     let (task, attempt) = (assignment.task, assignment.attempt);
     let rows = world.store.rows.clone();
-    world.send(root::Event::Core(core::Event::Fleet(jig_core_fleet::Event::Bounced {
+    world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Bounced {
         channel: Token::new(7),
         run: Token::new(task),
         attempt: Token::new(attempt),
         name: Token::new(message),
-        bounce: jig_core_fleet::Bounce::Ending,
+        bounce: jig_domain_fleet::Bounce::Ending,
     })));
     assert_eq!(world.store.rows, rows, "a bounce changes nothing durable");
     world.turn(1, 1, Some(message), b"reads the bounced words");

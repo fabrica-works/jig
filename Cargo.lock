@@ -77,7 +77,7 @@ dependencies = [
 name = "jig-accounts-world"
 version = "0.0.0"
 dependencies = [
- "jig-core-accounts",
+ "jig-domain-accounts",
  "skein-lib",
  "skein-world",
 ]
@@ -90,7 +90,7 @@ version = "0.0.0"
 name = "jig-brief-world"
 version = "0.0.0"
 dependencies = [
- "jig-core-brief",
+ "jig-domain-brief",
  "skein-lib",
  "skein-world",
 ]
@@ -135,15 +135,15 @@ dependencies = [
  "jig-client",
  "jig-client-transcript",
  "jig-client-view",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
  "jig-core-world",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-fake-parties",
  "jig-fake-person",
  "jig-fake-workers",
@@ -174,14 +174,14 @@ name = "jig-conformance-world"
 version = "0.0.0"
 dependencies = [
  "jig-conformance",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
  "jig-core-world",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
  "jig-fake-parties",
  "jig-fake-store",
  "jig-fake-workers",
@@ -195,90 +195,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-core"
-version = "0.0.0"
-dependencies = [
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-accounts"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-authority"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-brief"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-fleet"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-notes"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-people"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-tasks"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-core-views"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
 name = "jig-core-world"
 version = "0.0.0"
 dependencies = [
  "jig-conformance",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-fake-parties",
  "jig-fake-store",
  "jig-fake-workers",
@@ -288,6 +217,84 @@ dependencies = [
  "jig-test-system",
  "skein-lib",
  "skein-world",
+]
+
+[[package]]
+name = "jig-domain-accounts"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-authority"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-brief"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-core"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-fleet"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-host"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-notes"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-people"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-tasks"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-domain-views"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
 ]
 
 [[package]]
@@ -320,23 +327,16 @@ dependencies = [
 name = "jig-fleet-world"
 version = "0.0.0"
 dependencies = [
- "jig-core-fleet",
+ "jig-domain-fleet",
  "skein-lib",
  "skein-world",
-]
-
-[[package]]
-name = "jig-host"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
 ]
 
 [[package]]
 name = "jig-host-world"
 version = "0.0.0"
 dependencies = [
- "jig-host",
+ "jig-domain-host",
  "skein-lib",
  "skein-world",
 ]
@@ -345,7 +345,7 @@ dependencies = [
 name = "jig-notes-world"
 version = "0.0.0"
 dependencies = [
- "jig-core-notes",
+ "jig-domain-notes",
  "skein-lib",
  "skein-world",
 ]
@@ -382,17 +382,17 @@ name = "jig-ops-domain"
 version = "0.0.0"
 dependencies = [
  "jig-charter",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-brief",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
  "jig-core-world",
- "jig-host",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-brief",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-ops-connectors",
  "jig-ops-domain-infrastructure",
  "jig-ops-domain-observability",
@@ -430,18 +430,18 @@ dependencies = [
  "jig-client-view",
  "jig-client-world",
  "jig-conformance",
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
  "jig-core-world",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-host",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-fake-person",
  "jig-fake-store",
- "jig-host",
  "jig-ops-client-domain",
  "jig-ops-client-view",
  "jig-ops-connectors",
@@ -464,7 +464,7 @@ dependencies = [
 name = "jig-people-world"
 version = "0.0.0"
 dependencies = [
- "jig-core-people",
+ "jig-domain-people",
  "sha2",
  "skein-lib",
  "skein-world",
@@ -482,7 +482,7 @@ dependencies = [
 name = "jig-tasks-world"
 version = "0.0.0"
 dependencies = [
- "jig-core-tasks",
+ "jig-domain-tasks",
  "skein-lib",
  "skein-world",
 ]
@@ -536,14 +536,14 @@ dependencies = [
 name = "jig-test-domain"
 version = "0.0.0"
 dependencies = [
- "jig-core",
- "jig-core-accounts",
- "jig-core-authority",
- "jig-core-fleet",
- "jig-core-notes",
- "jig-core-people",
- "jig-core-tasks",
- "jig-core-views",
+ "jig-domain-accounts",
+ "jig-domain-authority",
+ "jig-domain-core",
+ "jig-domain-fleet",
+ "jig-domain-notes",
+ "jig-domain-people",
+ "jig-domain-tasks",
+ "jig-domain-views",
  "jig-test-connector",
  "skein-lib",
 ]
@@ -560,7 +560,7 @@ dependencies = [
 name = "jig-views-world"
 version = "0.0.0"
 dependencies = [
- "jig-core-views",
+ "jig-domain-views",
  "skein-lib",
  "skein-world",
 ]

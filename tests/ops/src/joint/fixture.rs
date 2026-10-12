@@ -5,8 +5,8 @@ use crate::{
     conformance::{Config, Story},
 };
 use jig_client_world::{Settings, World};
-use jig_core as core;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
 use jig_ops_client_domain as client;
 use jig_ops_client_view as view;
 use jig_ops_domain as root;

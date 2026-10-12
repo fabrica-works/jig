@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use jig_core_notes::{
+use jig_domain_notes::{
     self as notes, Change, Entry, Event, Key, Limits, Line, Range, Recall, Record, Refusal, Request, Rows, Scope,
 };
 use skein_lib::{Env, List, Queue, Time, Token, Wall};

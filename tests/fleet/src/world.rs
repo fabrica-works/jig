@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use jig_core_fleet::{
+use jig_domain_fleet::{
     self as fleet, Answer, Domain, Event, Fact, Hello, Hosted, Limits, Phase, Request, Undelivered, Withdrawal,
 };
 use skein_lib::{Duration, ReplyTo, Rng, Time, Token};
@@ -909,7 +909,7 @@ impl World {
                 name: Token::new(0),
                 run: Token::new(run),
                 attempt: Token::new(attempt),
-                bounce: jig_core_fleet::Bounce::Full,
+                bounce: jig_domain_fleet::Bounce::Full,
             },
             Up::Told { run, attempt } => {
                 let fact = self.payload(Payload::Fact);

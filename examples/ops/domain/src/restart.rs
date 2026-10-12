@@ -2,10 +2,10 @@
 //! reads or settlement; the root never advances it by guessing (domain/root.md, 8).
 use crate::domain::{Work, held};
 use crate::{Domain, Limits, Output, Range, Record, Store, Write};
-use jig_core as core;
-use jig_core_notes as notes;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_notes as notes;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;

@@ -1,6 +1,3 @@
-use jig_core as core;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
 use jig_core_world::{
     client_peer::ClientPeer,
     effects::World,
@@ -8,6 +5,9 @@ use jig_core_world::{
     peers::{Peers, fixture},
     referee::{Observed, Receipt},
 };
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_fake_parties::{self as parties, Act, Party, Role};
 use jig_fake_store::Fault;
 use jig_fake_workers::{Script, Worker};

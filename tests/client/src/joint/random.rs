@@ -68,7 +68,9 @@ fn answers(world: &mut World<Test, Joint>) -> usize {
         .filter(|row| {
             matches!(
                 row,
-                jig_test_domain::Record::Core(jig_core::Record::People(jig_core_people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(
+                    jig_domain_people::Stored::Answer { .. }
+                ))
             )
         })
         .count()
@@ -209,8 +211,8 @@ fn lost_words(world: &mut World<Test, Joint>, client: crate::ClientId, seed: u64
         .values()
         .filter(|row| {
             matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Activity(line)))
-        if matches!(&line.line, jig_core_tasks::Line::Words { words: bytes, .. } if bytes.as_ref() == words.as_slice()))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Activity(line)))
+        if matches!(&line.line, jig_domain_tasks::Line::Words { words: bytes, .. } if bytes.as_ref() == words.as_slice()))
         })
         .count();
     assert_eq!(matching, 1, "the exact sent words remain once in actual durable activity");

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use jig_core_notes::{Author, Change, Entry, Event, Key, Limits, Record, Scope};
+use jig_domain_notes::{Author, Change, Entry, Event, Key, Limits, Record, Scope};
 use skein_lib::Token;
 
 use crate::world::key_of;

@@ -3,9 +3,9 @@ use crate::{
     effects::World,
     reads::{Parties, ask, latest},
 };
-use jig_core::{self as core, documents, reads};
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core::{self as core, documents, reads};
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{Duration, ReplyTo, Token};
 
@@ -129,7 +129,7 @@ pub fn a_backward_wall_correction_keeps_reply_paging_whole_after_restart() {
 
 /// The fake store begins with retained owner entries, not cached note bodies.
 pub fn scoped_description_search_pages_durable_notes_after_restart() {
-    use jig_core_notes as notes;
+    use jig_domain_notes as notes;
     use skein_lib::{List, Wall};
     let mut world = world(767);
     let scope = notes::Scope::Goal { project: 1, goal: 99 };

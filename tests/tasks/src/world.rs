@@ -3,7 +3,7 @@
 use crate::referee::{Seen, Stimulus, Tasks};
 use crate::stories::{ChildResult, Restart, RetryEnd, Story, TurnState};
 use crate::trace::Trace;
-use jig_core_tasks::{
+use jig_domain_tasks::{
     self as tasks, Accepted, Authority, Budget, Cause, Contract, Delegation, Domain, End, Ending, Event, Executor,
     Fact, Funder, Key, Limits, MessageKind, New, Numbers, Party, Problem, Request, ResultKind, Retries, Retry,
     RunContext, Scopes, Spec, Stored, TaskResult, Tools, Word,

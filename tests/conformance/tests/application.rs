@@ -1,6 +1,6 @@
-use jig_core as core;
-use jig_core_people as people;
 use jig_core_world::effects::{Cut, World};
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_test_connector as connector;
 use jig_test_domain as root;
 use sha2::{Digest, Sha256};

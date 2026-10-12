@@ -3,7 +3,7 @@
 //! `TaskContext`. Repeated specification facts must agree before admission.
 use super::{chips, documents::Invalid, offers, owner, results};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
+use jig_domain_core::documents;
 
 /// # Errors
 /// Rejects inconsistent repeated owner facts or any whole nested allocation
@@ -78,7 +78,7 @@ fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use jig_core_tasks as tasks;
+    use jig_domain_tasks as tasks;
     use skein_lib::{List, Wall};
 
     pub(crate) fn source() -> documents::Task {

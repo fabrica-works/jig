@@ -20,34 +20,39 @@ fn a_real_engine_question_offers_exactly_its_admitted_answer_act() {
         .world
         .store
         .rows
-        .get(&jig_test_domain::Key::Core(jig_core::Key::Tasks(jig_core_tasks::Key::Live(assignment.task))))
+        .get(&jig_test_domain::Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Live(assignment.task))))
     {
-        Some(jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))) => {
+        Some(jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(task)))) => {
             task.authority.clone()
         }
         other => panic!("actual parent: {other:?}"),
     };
     authority.budget.spend = 20;
-    authority.delegation = jig_core_tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
+    authority.delegation = jig_domain_tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
     let now = world.now();
     world.front().session.driver.send(
         now,
         clock(now),
-        jig_test_domain::Event::Core(jig_core::Event::DelegateValidated {
+        jig_test_domain::Event::Core(jig_domain_core::Event::DelegateValidated {
             to: skein_lib::ReplyTo::new(Token::new(9850)),
-            key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion: 1, position: 0 },
-            batch: Box::new([jig_core::Delegate {
-                executor: jig_core_tasks::Executor::Agent { charter: 1 },
-                spec: jig_core_tasks::Spec {
+            key: jig_domain_core::CallKey {
+                task: assignment.task,
+                attempt: assignment.attempt,
+                completion: 1,
+                position: 0,
+            },
+            batch: Box::new([jig_domain_core::Delegate {
+                executor: jig_domain_tasks::Executor::Agent { charter: 1 },
+                spec: jig_domain_tasks::Spec {
                     words: b"ask its parent".as_slice().into(),
                     parameters: Box::new([]),
                     inputs: Box::new([]),
                 },
-                contract: jig_core_tasks::Contract::Report { words: 128 },
+                contract: jig_domain_tasks::Contract::Report { words: 128 },
                 authority,
                 symbolic_grants: Box::new([]),
                 dependencies: Box::new([]),
-                wake: jig_core_tasks::WakePolicy::DEFAULT,
+                wake: jig_domain_tasks::WakePolicy::DEFAULT,
             }]),
             stubs: Box::new([]),
         }),
@@ -61,9 +66,9 @@ fn a_real_engine_question_offers_exactly_its_admitted_answer_act() {
         &mut world,
         &child,
         1,
-        jig_core::NamedAction::Message {
+        jig_domain_core::NamedAction::Message {
             target: assignment.task,
-            kind: jig_core_tasks::MessageKind::Question,
+            kind: jig_domain_tasks::MessageKind::Question,
             words: b"which report should I use?".as_slice().into(),
         },
     );
@@ -89,9 +94,9 @@ fn a_real_engine_question_offers_exactly_its_admitted_answer_act() {
     assert_eq!(questions.len(), 1);
     super::super::offered_acts::card(&mut world, member, questions[0], b"Question");
     assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(task)))
         if task.number == assignment.task && task.inbox.iter().any(|word|
-            word.kind == jig_core_tasks::MessageKind::Question && word.words.as_ref() == b"which report should I use?"))));
+            word.kind == jig_domain_tasks::MessageKind::Question && word.words.as_ref() == b"which report should I use?"))));
 }
 
 #[test]
@@ -133,7 +138,7 @@ fn a_real_completed_chat_result_offers_exactly_its_admitted_mark_read_act() {
     assert_eq!(results.len(), 1);
     super::super::offered_acts::card(&mut world, member, results[0], b"Result");
     assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
-        if matches!(&task.phase, jig_core_tasks::Phase::Ended(jig_core_tasks::Ending::Done(
-            jig_core_tasks::TaskResult::Report { words })) if words.as_ref() == b"the complete result"))));
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(task)))
+        if matches!(&task.phase, jig_domain_tasks::Phase::Ended(jig_domain_tasks::Ending::Done(
+            jig_domain_tasks::TaskResult::Report { words })) if words.as_ref() == b"the complete result"))));
 }

@@ -1,6 +1,6 @@
 //! Host records used by the lifecycle scripts. Callback tokens are encoded
 //! as opaque names; names are opaque bytes.
-use jig_host::{Ask, Assignment, Event, Finish, RunAssignment};
+use jig_domain_host::{Ask, Assignment, Event, Finish, RunAssignment};
 use skein_lib::{Duration, Reader, ReplyTo, Token};
 #[must_use]
 pub fn assign(reply_to: ReplyTo, assignment: RunAssignment) -> Event {

@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     Contract, Ending, Holding, Last, Limits, Name as ResourceName, Parameter, Party, Phase, PoolSlots, Status,
     TaskRecord, TaskResult, Was, WriterSlot,
 };

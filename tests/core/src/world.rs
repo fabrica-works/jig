@@ -1,12 +1,12 @@
 //! Seeded fixtures and scripts for the testing application.
 
 use crate::Store;
-use jig_core as core;
-use jig_core_accounts as accounts;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{Duration, Env, JournalLimits, Queue, ReplyTo, Time, Token, Wall};
 use std::collections::VecDeque;
@@ -129,7 +129,7 @@ pub fn limits() -> root::Limits {
             authority: authority_limits(),
             people,
             fleet,
-            brief: jig_core_brief::Limits { briefs: 2, sections: 3, read_bytes: 256, brief_bytes: 384 },
+            brief: jig_domain_brief::Limits { briefs: 2, sections: 3, read_bytes: 256, brief_bytes: 384 },
             brief_parts: 2,
             brief_core_budgets: core::CoreBriefBudgets {
                 task: 128,
@@ -147,7 +147,7 @@ pub fn limits() -> root::Limits {
                 spent_attention: Duration::from_secs(1),
                 facts: 2,
             },
-            views: jig_core_views::Limits {
+            views: jig_domain_views::Limits {
                 runs: 2,
                 watchers: 4,
                 watchers_per_party: 8,
@@ -155,7 +155,7 @@ pub fn limits() -> root::Limits {
                 text_bytes: 64,
                 facts: 8,
             },
-            notes: jig_core_notes::Limits {
+            notes: jig_domain_notes::Limits {
                 scopes: 4,
                 entries_per_scope: 1,
                 pattern_bytes: 64,
@@ -572,10 +572,10 @@ impl World {
                 for record in self.store.rows.values() {
                     let root::Record::Core(core::Record::Notes(record)) = record else { continue };
                     let matches = match (&range, record) {
-                        (jig_core_notes::Range::Entry { name }, jig_core_notes::Record::Entry(entry)) => {
+                        (jig_domain_notes::Range::Entry { name }, jig_domain_notes::Record::Entry(entry)) => {
                             *name == entry.name
                         }
-                        (jig_core_notes::Range::Lines { scope, after }, jig_core_notes::Record::Line(line)) => {
+                        (jig_domain_notes::Range::Lines { scope, after }, jig_domain_notes::Record::Line(line)) => {
                             *scope == line.scope && after.is_none_or(|cursor| line.name > cursor)
                         }
                         _ => false,
@@ -584,9 +584,9 @@ impl World {
                         more = true;
                     }
                 }
-                self.events.push_back(root::Event::Core(core::Event::Notes(jig_core_notes::Event::Loaded {
+                self.events.push_back(root::Event::Core(core::Event::Notes(jig_domain_notes::Event::Loaded {
                     owner,
-                    rows: jig_core_notes::Rows { records: rows },
+                    rows: jig_domain_notes::Rows { records: rows },
                     more,
                 })));
             }
@@ -601,7 +601,7 @@ impl World {
                     Scenario::Goal | Scenario::Batch => people::Ask::SetGoal {
                         project: 1,
                         spec: b"complete procedure".as_slice().into(),
-                        executor: jig_core_people::GoalExecutor::Charter(1),
+                        executor: jig_domain_people::GoalExecutor::Charter(1),
                         budget: 100,
                         priority: 1,
                         deadline: None,

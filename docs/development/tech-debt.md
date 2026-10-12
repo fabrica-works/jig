@@ -140,12 +140,12 @@ to see the story the test tells.
 ## 7. Signals in the step code
 
 - **218 `unreachable!` arms in `crates/`,** clustered in
-  `jig-host/src/hosted.rs` (21), `jig-core-fleet/src/attempt.rs` (17),
-  `jig-core/src/routing/tasks.rs` and `effects.rs` (11 each), and
-  `jig-core-notes/src/read.rs` (10). Most are honest invariants of state
+  `jig-domain-host/src/hosted.rs` (21), `jig-domain-fleet/src/attempt.rs` (17),
+  `jig-domain-core/src/routing/tasks.rs` and `effects.rs` (11 each), and
+  `jig-domain-notes/src/read.rs` (10). Most are honest invariants of state
   machines. Some come from matching two values whose pairing the types
   do not encode, such as a read and the document answering it
-  (`jig-core/src/reads/rows.rs`, `live_page`). Those are candidates for
+  (`jig-domain-core/src/reads/rows.rs`, `live_page`). Those are candidates for
   types that carry the pairing.
 - **147 functions are excused from `too_many_lines` or
   `too_many_arguments`** in `crates/` and `examples/`. Several are
@@ -153,10 +153,10 @@ to see the story the test tells.
   for a split.
 - **Large files:**
   - `jig-client-view/src/phrases/jig.rs`: 2,821 lines;
-  - `jig-core-people/src/domain.rs`: 1,873;
+  - `jig-domain-people/src/domain.rs`: 1,873;
   - `examples/ops/domain/src/route.rs`: 1,777;
-  - `jig-core-tasks/src/boundary.rs`: 1,776;
-  - `jig-core/src/reads/rows.rs`: 1,643.
+  - `jig-domain-tasks/src/boundary.rs`: 1,776;
+  - `jig-domain-core/src/reads/rows.rs`: 1,643.
 
   Size alone is not debt. These files are worth a look in the deeper
   pass.

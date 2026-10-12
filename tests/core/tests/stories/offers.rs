@@ -30,7 +30,7 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
     let goal = people::Ask::SetGoal {
         project: 1,
         spec: b"beyond my pool".as_slice().into(),
-        executor: jig_core_people::GoalExecutor::Charter(1),
+        executor: jig_domain_people::GoalExecutor::Charter(1),
         budget: 600,
         priority: 1,
         deadline: None,
@@ -65,7 +65,7 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
 
 #[test]
 fn a_member_is_offered_a_goal_past_their_allotment_as_proposed() {
-    use jig_core::{
+    use jig_domain_core::{
         acts::{Act, Admission, Beyond, Bounds, Recipient},
         documents::Document,
     };
@@ -98,7 +98,7 @@ fn a_member_is_offered_a_goal_past_their_allotment_as_proposed() {
 
 #[test]
 fn an_observer_is_offered_nothing_and_told_why() {
-    use jig_core::{
+    use jig_domain_core::{
         acts::{Act, Admission},
         documents::Document,
     };
@@ -135,7 +135,7 @@ fn an_observer_is_offered_nothing_and_told_why() {
 
 #[test]
 fn a_policy_narrowed_withdraws_an_offer_in_the_next_delivery() {
-    use jig_core::{
+    use jig_domain_core::{
         acts::{Act, Admission},
         documents::{Document, Subject},
     };

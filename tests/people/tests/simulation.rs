@@ -1,4 +1,4 @@
-use jig_core_people::{
+use jig_domain_people::{
     Again, Ask, Entry, EntryKind, Holding, IdentityKey, InitialOwner, Outcome, ProposalChoice, ProposalDecision,
     Proposer, Refusal, Reply, Role, Seed, Whom,
 };
@@ -91,7 +91,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
         Ask::SetGoal {
             project: 1,
             spec: b"goal".to_vec().into_boxed_slice(),
-            executor: jig_core_people::GoalExecutor::Charter(1),
+            executor: jig_domain_people::GoalExecutor::Charter(1),
             budget: 1,
             priority: 1,
             deadline: None,
@@ -132,7 +132,7 @@ fn a_service_sets_a_goal_its_role_allows_and_is_refused_a_chat() {
         Ask::SetGoal {
             project: 1,
             spec: b"goal".to_vec().into_boxed_slice(),
-            executor: jig_core_people::GoalExecutor::Charter(1),
+            executor: jig_domain_people::GoalExecutor::Charter(1),
             budget: 1,
             priority: 1,
             deadline: None,
@@ -287,7 +287,7 @@ fn an_answer_to_a_person_task_another_holder_took_is_refused_and_told_who() {
         project: 1,
         task: 99,
         revision: 0,
-        result: jig_core_people::PersonResult::Report { words: b"answer".as_slice().into() },
+        result: jig_domain_people::PersonResult::Report { words: b"answer".as_slice().into() },
     };
     let other = world.request(11, [4; 16], answer.clone());
     assert_eq!(world.reply(take), None);
@@ -309,7 +309,7 @@ fn an_answer_to_a_person_task_another_holder_took_is_refused_and_told_who() {
     assert_eq!(
         world.reply(late),
         Some(Reply::Outcome(Outcome::Refused(Refusal::Ended {
-            how: jig_core_people::Ending::Decided { by: first, at }
+            how: jig_domain_people::Ending::Decided { by: first, at }
         })))
     );
     world.assert_settled();
@@ -404,7 +404,7 @@ fn facts_change_nothing_and_a_seed_replays() {
     };
     assert_replays(3, 4, run);
     let mut none = World::new(Settings {
-        limits: jig_core_people::Limits { facts: 0, ..jig_people_world::LIMITS },
+        limits: jig_domain_people::Limits { facts: 0, ..jig_people_world::LIMITS },
         ..Settings::calm(3)
     });
     none.run();
@@ -417,16 +417,16 @@ fn facts_change_nothing_and_a_seed_replays() {
 fn a_release_naming_an_old_hold_is_refused_as_moved_saying_what_holds_it_now() {
     let mut world = World::new(Settings::calm(90));
     member(&mut world);
-    world.held_task(7, 2, jig_core_people::HoldReason::Budget);
+    world.held_task(7, 2, jig_domain_people::HoldReason::Budget);
     let ask = Ask::Release { project: 1, task: 7, revision: 1, again: None };
     let call = world.request(10, [7; 16], ask.clone());
     assert!(world.reply(call).is_none());
     world.commit_all();
     let expected = Some(Reply::Outcome(Outcome::Refused(Refusal::Moved {
-        now: jig_core_people::Moved::Hold { revision: 2, reason: jig_core_people::HoldReason::Budget },
+        now: jig_domain_people::Moved::Hold { revision: 2, reason: jig_domain_people::HoldReason::Budget },
     })));
     assert_eq!(world.reply(call), expected);
-    world.held_task(7, 3, jig_core_people::HoldReason::Deadline);
+    world.held_task(7, 3, jig_domain_people::HoldReason::Deadline);
     world.restart();
     let routes = world.stats().routes;
     let replay = world.request(10, [7; 16], ask);
@@ -445,10 +445,10 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
         project: 1,
         task: 7,
         revision: 1,
-        amendment: jig_core_people::Amendment {
+        amendment: jig_domain_people::Amendment {
             addressed: None,
             instructions: None,
-            spec: Some(jig_core_people::Spec {
+            spec: Some(jig_domain_people::Spec {
                 words: b"new words".as_slice().into(),
                 parameters: Box::new([]),
                 inputs: Box::new([]),
@@ -462,7 +462,7 @@ fn an_amendment_on_a_spec_amended_meanwhile_is_refused_with_its_revision() {
     let call = world.request(10, [8; 16], ask.clone());
     world.commit_all();
     let expected =
-        Some(Reply::Outcome(Outcome::Refused(Refusal::Moved { now: jig_core_people::Moved::Spec { revision: 2 } })));
+        Some(Reply::Outcome(Outcome::Refused(Refusal::Moved { now: jig_domain_people::Moved::Spec { revision: 2 } })));
     assert_eq!(world.reply(call), expected);
     world.amended_task(7, 3);
     world.restart();
@@ -515,7 +515,7 @@ fn an_application_request_under_a_used_key_with_another_digest_is_a_conflict() {
 fn words_to_a_stopped_chat_release_it_in_one_request() {
     let mut world = World::new(Settings::calm(93));
     let person = member(&mut world);
-    world.held_task(7, 1, jig_core_people::HoldReason::StoppedBy { party: person });
+    world.held_task(7, 1, jig_domain_people::HoldReason::StoppedBy { party: person });
     let ask = Ask::Say { project: 1, task: 7, words: b"continue".as_slice().into(), release: true };
     let call = world.request(10, [2; 16], ask.clone());
     assert!(world.reply(call).is_none());
@@ -535,7 +535,7 @@ fn words_to_a_stopped_chat_release_it_in_one_request() {
 fn an_uncertain_release_keeps_the_missing_choice_facts_on_replay() {
     let mut world = World::new(Settings::calm(94));
     member(&mut world);
-    world.held_task(7, 1, jig_core_people::HoldReason::Uncertain { entry: 9 });
+    world.held_task(7, 1, jig_domain_people::HoldReason::Uncertain { entry: 9 });
     let ask = Ask::Release { project: 1, task: 7, revision: 1, again: None };
     let call = world.request(10, [3; 16], ask.clone());
     world.commit_all();
@@ -543,10 +543,10 @@ fn an_uncertain_release_keeps_the_missing_choice_facts_on_replay() {
         world.reply(call),
         Some(Reply::Outcome(Outcome::Refused(Refusal::Authority {
             proposable: None,
-            lacking: jig_core_people::Lack::Again { required: true }
+            lacking: jig_domain_people::Lack::Again { required: true }
         })))
     );
-    world.held_task(7, 2, jig_core_people::HoldReason::Budget);
+    world.held_task(7, 2, jig_domain_people::HoldReason::Budget);
     world.restart();
     let replay = world.request(10, [3; 16], ask);
     assert_eq!(world.reply(replay), world.reply(call));
@@ -556,7 +556,7 @@ fn an_uncertain_release_keeps_the_missing_choice_facts_on_replay() {
 fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
     let mut world = World::new(Settings::calm(95));
     member(&mut world);
-    world.held_task(7, 1, jig_core_people::HoldReason::Uncertain { entry: 9 });
+    world.held_task(7, 1, jig_domain_people::HoldReason::Uncertain { entry: 9 });
     let ask = Ask::Release { project: 1, task: 7, revision: 1, again: Some(false) };
     let call = world.request(10, [4; 16], ask.clone());
     assert!(world.reply(call).is_none());
@@ -570,11 +570,11 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
     assert_eq!(world.executor_outcomes, [(9, false)]);
 }
 
-fn edit() -> jig_core_people::Amendment {
-    jig_core_people::Amendment {
+fn edit() -> jig_domain_people::Amendment {
+    jig_domain_people::Amendment {
         addressed: None,
         instructions: None,
-        spec: Some(jig_core_people::Spec {
+        spec: Some(jig_domain_people::Spec {
             words: b"changed".as_slice().into(),
             parameters: Box::new([]),
             inputs: Box::new([]),
@@ -591,7 +591,7 @@ fn an_amendment_and_a_release_are_one_decision() {
     let mut world = World::new(Settings::calm(97));
     member(&mut world);
     world.amended_task(7, 1);
-    world.held_task(7, 2, jig_core_people::HoldReason::Stopped);
+    world.held_task(7, 2, jig_domain_people::HoldReason::Stopped);
     let ask = Ask::Amend { project: 1, task: 7, revision: 1, amendment: edit(), release: Some(2) };
     let call = world.request(10, [1; 16], ask.clone());
     assert!(world.reply(call).is_none());
@@ -616,12 +616,12 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance() {
     let mut world = World::new(Settings { authority_refuses: true, ..Settings::calm(98) });
     member(&mut world);
     world.amended_task(7, 1);
-    world.held_task(7, 2, jig_core_people::HoldReason::Stopped);
+    world.held_task(7, 2, jig_domain_people::HoldReason::Stopped);
     let mut amendment = edit();
-    amendment.authority = Some(jig_core_people::Authority {
+    amendment.authority = Some(jig_domain_people::Authority {
         tools: 0,
         grants: Box::new([]),
-        delegation: jig_core_people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+        delegation: jig_domain_people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
         spend: 1,
         deadline: None,
         notes: 0,
@@ -663,7 +663,7 @@ fn reading_the_inbox_moves_no_position_until_the_party_marks_it_seen() {
     assert_eq!(world.counts(person).unread, 1);
     assert!(world.inbox(person).is_empty());
     assert_eq!(world.results_seen(person), 0);
-    let seen = jig_core_people::Seen::Results { through: 40 };
+    let seen = jig_domain_people::Seen::Results { through: 40 };
     let first = world.request(10, [1; 16], Ask::MarkSeen { seen });
     let duplicate = world.request(10, [1; 16], Ask::MarkSeen { seen });
     assert!(world.reply(first).is_none() && world.reply(duplicate).is_none());
@@ -702,7 +702,7 @@ fn a_chat_marked_seen_leaves_other_chats_unread() {
         );
     }
     assert_eq!(world.counts(person).unread, 2);
-    let seen = jig_core_people::Seen::Chat { task: chats[0], through: 1 };
+    let seen = jig_domain_people::Seen::Chat { task: chats[0], through: 1 };
     let call = world.request(10, [3; 16], Ask::MarkSeen { seen });
     assert!(world.reply(call).is_none());
     world.commit_all();
@@ -727,7 +727,7 @@ fn a_chat_marked_seen_leaves_other_chats_unread() {
     world.forget_chat(chats[0]);
     world.commit_all();
     assert_eq!(world.chat_seen(person, chats[0]), 0);
-    assert!(!world.records().contains_key(&jig_core_people::Key::ReadChat { party: person, task: chats[0] }));
+    assert!(!world.records().contains_key(&jig_domain_people::Key::ReadChat { party: person, task: chats[0] }));
     world.assert_settled();
 }
 
@@ -739,10 +739,10 @@ fn unread_updates_past_the_limit_are_said_as_more() {
     for position in 1..=u64::from(limit) + 2 {
         world.remember_result(person, position, position);
     }
-    assert_eq!(world.counts(person), jig_core_people::Counts { needs: 0, unread: limit, more_unread: true });
-    let seen = jig_core_people::Seen::Results { through: 2 };
+    assert_eq!(world.counts(person), jig_domain_people::Counts { needs: 0, unread: limit, more_unread: true });
+    let seen = jig_domain_people::Seen::Results { through: 2 };
     world.request(10, [1; 16], Ask::MarkSeen { seen });
     world.commit_all();
-    assert_eq!(world.counts(person), jig_core_people::Counts { needs: 0, unread: limit, more_unread: false });
+    assert_eq!(world.counts(person), jig_domain_people::Counts { needs: 0, unread: limit, more_unread: false });
     world.assert_settled();
 }

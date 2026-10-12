@@ -1,6 +1,6 @@
-use jig_core as core;
-use jig_core_tasks as tasks;
 use jig_core_world::effects::World;
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
 use jig_fake_store::Fault;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
@@ -134,11 +134,11 @@ fn parties_run_ahead_of_held_completions_but_every_answer_waits() {
     let answers = world.people_answers.len();
     world.store.fault(Fault::Hold { commits: 1 });
     for request in [70, 71] {
-        world.send(root::Event::Core(core::Event::People(jig_core_people::Event::Ask {
+        world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Ask {
             reply_to: ReplyTo::new(Token::new(u64::from(request))),
             sign_in: world.sign_in.expect("signed in"),
             key: [request; 16],
-            ask: jig_core_people::Ask::Say { project: 1, task, words: Box::from([request]), release: false },
+            ask: jig_domain_people::Ask::Say { project: 1, task, words: Box::from([request]), release: false },
         })));
     }
     assert!(world.store.held.len() >= 2);

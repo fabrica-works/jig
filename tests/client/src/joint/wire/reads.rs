@@ -2,9 +2,9 @@
 //! (client/domain/contract.md, 6). The engine owns cursor/query admission.
 //! Note selectors preserve explicit project scope and whole literal patterns.
 use jig_client::contract as client;
-use jig_core::reads;
-use jig_core_notes as notes;
-use jig_core_people as people;
+use jig_domain_core::reads;
+use jig_domain_notes as notes;
+use jig_domain_people as people;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
@@ -222,7 +222,7 @@ mod tests {
                     scope: supplied_scope.clone(),
                     description: Some(Box::from([255, 0])),
                 },
-                after: Some(reads::Position::Owner(jig_core::Key::Notes(notes::Key::Line {
+                after: Some(reads::Position::Owner(jig_domain_core::Key::Notes(notes::Key::Line {
                     scope: supplied_scope,
                     name: u64::MAX,
                 }))),

@@ -1,4 +1,4 @@
-use jig_core_views::{End, Event, Refusal, Request};
+use jig_domain_views::{End, Event, Refusal, Request};
 use jig_views_world::World;
 use skein_lib::Token;
 #[test]
@@ -64,7 +64,7 @@ fn a_slow_watcher_sees_fewer_deliveries_and_never_a_gap() {
 }
 #[test]
 fn a_run_s_text_is_read_from_each_watcher_s_offset() {
-    use jig_core_views::{Follow, TurnName};
+    use jig_domain_views::{Follow, TurnName};
     let mut world = World::default();
     let turn = TurnName { attempt: 1, turn: 1, retry: 0 };
     world.watch_from(1, 7, Some(Follow { run: Token::new(7), turn: Some(turn), offset: 0 }));
@@ -78,7 +78,7 @@ fn a_run_s_text_is_read_from_each_watcher_s_offset() {
 }
 #[test]
 fn a_new_turn_s_text_never_resets_an_earlier_one() {
-    use jig_core_views::{Follow, TurnName};
+    use jig_domain_views::{Follow, TurnName};
     let mut world = World::default();
     world.watch_from(1, 7, Some(Follow { run: Token::new(7), turn: None, offset: 0 }));
     world.text(7, TurnName { attempt: 1, turn: 1, retry: 0 }, b"earlier", None);
@@ -92,7 +92,7 @@ fn a_new_turn_s_text_never_resets_an_earlier_one() {
 }
 #[test]
 fn bounded_stream_text_says_which_prefix_was_cut() {
-    use jig_core_views::{Follow, TurnName};
+    use jig_domain_views::{Follow, TurnName};
     let mut world = World::default();
     let turn = TurnName { attempt: 1, turn: 1, retry: 0 };
     world.watch_from(1, 7, Some(Follow { run: Token::new(7), turn: None, offset: 0 }));

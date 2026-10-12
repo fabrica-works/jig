@@ -1,5 +1,5 @@
 //! Independent allocator accounting of the whole recursive selection payload.
-use jig_core::documents::{Cursor, InboxObject, InboxSelection, inbox_selection_worst_case};
+use jig_domain_core::documents::{Cursor, InboxObject, InboxSelection, inbox_selection_worst_case};
 use skein_lib::List;
 use skein_world::domain::heap::{self, Meter};
 

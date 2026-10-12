@@ -1,5 +1,5 @@
 use jig_accounts_world::World;
-use jig_core_accounts::{Event, Failure, Request};
+use jig_domain_accounts::{Event, Failure, Request};
 use skein_lib::{Duration, Rng};
 
 fn respond(world: &mut World, rng: &mut Rng, requests: Vec<Request>, trace: &mut Vec<Request>) {

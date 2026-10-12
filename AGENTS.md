@@ -36,7 +36,7 @@
   into smith's terms, the client's decoding of turns, below its domain,
   and an application's roots that compose smith's agent capability, with
   their protocol layers, which decode and encode smith's payloads, do.
-  The hub, `jig-host`, carries smith's payloads as bytes it never reads;
+  The hub, `jig-domain-host`, carries smith's payloads as bytes it never reads;
   it, the core and its children, and the client's domain and view link
   no smith crate. An application without agents never links smith
   (`README.md`, section 9; `domain/hosts.md`, 6.8).

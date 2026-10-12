@@ -1,9 +1,9 @@
-use jig_core_notes::{Event, Scope};
+use jig_domain_notes::{Event, Scope};
 use jig_notes_world::{World, one_scope, task_entry};
 use skein_lib::{Rng, Token};
 use skein_world::domain::assert_replays;
 
-fn run(seed: u64) -> (Vec<String>, std::collections::BTreeMap<jig_core_notes::Key, jig_core_notes::Record>) {
+fn run(seed: u64) -> (Vec<String>, std::collections::BTreeMap<jig_domain_notes::Key, jig_domain_notes::Record>) {
     let mut rng = Rng::new(seed);
     let mut world = World::default();
     for turn in 0..12u64 {

@@ -25,7 +25,10 @@ fn full_live_task_and_host_slots_fit_with_a_decision_held_in_the_journal() {
         .rows
         .values()
         .filter(|row| {
-            matches!(row, jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(_))))
+            matches!(
+                row,
+                jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(_)))
+            )
         })
         .count();
     assert_eq!(live, 5, "the fixture's complete live task capacity is occupied");

@@ -2,8 +2,8 @@
 //! Parties know the last submitted commit and the fake store's durable number.
 //! They never inspect the core or the journal. Their receipts survive a crash.
 use crate::{Store, effects::World};
-use jig_core::{self as core, documents, reads};
-use jig_core_tasks as tasks;
+use jig_domain_core::{self as core, documents, reads};
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
 use std::collections::{BTreeMap, VecDeque};
@@ -289,7 +289,7 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
             Some(value)
         }
         reads::Scope::Notes { .. } | reads::Scope::ScopedNotes { .. } => {
-            let core::Record::Notes(jig_core_notes::Record::Entry(_)) = value else { return None };
+            let core::Record::Notes(jig_domain_notes::Record::Entry(_)) = value else { return None };
             Some(reads::Row {
                 value: value.clone(),
                 owner: None,
@@ -384,7 +384,7 @@ pub fn ask(world: &mut World, number: u64, read: reads::Read) {
 pub fn application(
     world: &mut World,
     number: u64,
-    scope: jig_core::documents::ApplicationScope,
+    scope: jig_domain_core::documents::ApplicationScope,
     connector: u16,
     subject: jig_test_connector::ClientSubject,
 ) {

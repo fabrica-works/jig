@@ -2,7 +2,7 @@
 //! Shown links and optional complete results remain independent source facts.
 use super::{chips, offers, owner, results};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
+use jig_domain_core::documents;
 
 /// # Errors
 /// Refuses any complete nested allocation above the receiving bounds.
@@ -36,7 +36,7 @@ pub fn document(source: &documents::PersonTask, limits: &Limits) -> Result<clien
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use jig_core_tasks as tasks;
+    use jig_domain_tasks as tasks;
     use skein_lib::{Duration, List, Wall};
 
     pub(crate) fn source() -> documents::PersonTask {

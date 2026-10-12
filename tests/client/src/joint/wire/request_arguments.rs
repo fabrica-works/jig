@@ -1,7 +1,7 @@
 //! Closed request fields translate from their supplied owner vocabulary
 //! (client/domain/contract.md, 3), preserving absent words and numeric widths.
 use jig_client::contract as client;
-use jig_core_people as people;
+use jig_domain_people as people;
 
 #[must_use]
 pub fn wake(value: client::OwnerWakePolicy) -> people::WakePolicy {

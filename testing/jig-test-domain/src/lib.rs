@@ -14,9 +14,9 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_core_fleet as fleet;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
 use skein_lib::{Decision, Env, Journal, JournalLimits, JournalRoom, Map, Queue, ReplyTo, Time, Token, Wall};
 
@@ -68,9 +68,9 @@ fn core_key(row: &core::Record) -> core::Key {
         core::Record::Tasks(row) => core::Key::Tasks(row.key()),
         core::Record::People(row) => core::Key::People(row.key()),
         core::Record::Notes(row) => core::Key::Notes(match row {
-            jig_core_notes::Record::Entry(entry) => jig_core_notes::Key::Entry { name: entry.name },
-            jig_core_notes::Record::Line(line) => {
-                jig_core_notes::Key::Line { scope: line.scope.clone(), name: line.name }
+            jig_domain_notes::Record::Entry(entry) => jig_domain_notes::Key::Entry { name: entry.name },
+            jig_domain_notes::Record::Line(line) => {
+                jig_domain_notes::Key::Line { scope: line.scope.clone(), name: line.name }
             }
         }),
     }
@@ -142,7 +142,7 @@ pub struct Assignment {
     pub transcript: Box<[Box<[u8]>]>,
     pub answered: Box<[core::SettledCall]>,
     /// The selected account grant.
-    pub grant: jig_core_accounts::Grant,
+    pub grant: jig_domain_accounts::Grant,
 }
 
 /// What the root asks its surrounding world to do.
@@ -315,7 +315,7 @@ pub struct Domain {
     effects: Map<Token, connector::Effect>,
     effect_procedures: Map<Token, u64>,
     outbox_procedures: Map<u64, u16>,
-    judges: Map<Token, (Token, jig_core_authority::Judge, [u8; 32])>,
+    judges: Map<Token, (Token, jig_domain_authority::Judge, [u8; 32])>,
     outbox_tasks: Map<u64, u64>,
     payloads: Map<Token, Payload>,
     next_payload: u64,
@@ -882,7 +882,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
                 step(
                     domain,
                     env,
-                    Event::Core(core::Event::Fleet(jig_core_fleet::Event::TurnKept {
+                    Event::Core(core::Event::Fleet(jig_domain_fleet::Event::TurnKept {
                         run: Token::new(task),
                         attempt: Token::new(attempt),
                         turn,
@@ -893,7 +893,7 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
                 step(
                     domain,
                     env,
-                    Event::Core(core::Event::Fleet(jig_core_fleet::Event::Acknowledge {
+                    Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Acknowledge {
                         run: Token::new(task),
                         attempt: Token::new(attempt),
                     })),
@@ -1033,18 +1033,18 @@ pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) ->
             );
             out.is_empty()
         }
-        Record::Core(core::Record::People(jig_core_people::Stored::Policy { project, value })) => {
+        Record::Core(core::Record::People(jig_domain_people::Stored::Policy { project, value })) => {
             domain.core.restore_policy(&env.limits.core, project, value)
         }
         Record::Core(core::Record::People(row)) => {
             if !domain.core.restore_people_row(&row) {
                 return false;
             }
-            let mut out = Queue::with_capacity(jig_core_people::max_out(&env.limits.core.people));
-            jig_core_people::step(
+            let mut out = Queue::with_capacity(jig_domain_people::max_out(&env.limits.core.people));
+            jig_domain_people::step(
                 &mut domain.core.people,
                 &Env { now: env.now, wall: env.wall, limits: env.limits.core.people },
-                jig_core_people::Event::Restore { record: row },
+                jig_domain_people::Event::Restore { record: row },
                 &mut out,
             );
             out.is_empty()

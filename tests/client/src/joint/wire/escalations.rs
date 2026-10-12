@@ -1,7 +1,7 @@
 //! Whole held-task escalation with its independent decisions (contract.md, 5.1–5.3).
 use super::{documents::Invalid, offers, task};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
+use jig_domain_core::documents;
 
 /// # Errors
 /// Refuses inconsistent whole Task facts or any nested reserved allocation;
@@ -17,7 +17,7 @@ pub fn document(source: &documents::Escalation, limits: &Limits) -> Result<clien
 pub(crate) mod tests {
     use super::super::owner;
     use super::*;
-    use jig_core::acts;
+    use jig_domain_core::acts;
     use skein_lib::List;
 
     pub(crate) fn source() -> documents::Escalation {

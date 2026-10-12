@@ -1,4 +1,4 @@
-use jig_core_people::{
+use jig_domain_people::{
     Ask, Domain, Entry, EntryKind, Event, Holding, Identity, IdentityKey, Limits, Outcome, Request, Role, Whom, fire,
     max_out, step, worst_case,
 };
@@ -102,7 +102,7 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
                 person: number,
                 sign_in: number,
                 identity,
-                kind: jig_core_people::Kind::Person,
+                kind: jig_domain_people::Kind::Person,
             });
         }
         for project in 1..=limits.projects {
@@ -132,7 +132,7 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
                 test.domain.remember_result(
                     &limits,
                     party,
-                    jig_core_people::ResultRef { task: position, project: 1, at: Wall::EPOCH, position },
+                    jig_domain_people::ResultRef { task: position, project: 1, at: Wall::EPOCH, position },
                 );
                 test.drain();
             }
@@ -142,7 +142,7 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
         {
             let token = test.ask(key).expect("test values are admitted and fit");
             let outcome = if key == 1 {
-                Outcome::Refused(jig_core_people::Refusal::Limit { which: jig_core_people::LimitKind::LiveTasks })
+                Outcome::Refused(jig_domain_people::Refusal::Limit { which: jig_domain_people::LimitKind::LiveTasks })
             } else {
                 Outcome::Started { task: u64::from(key) }
             };
@@ -179,10 +179,10 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
     let mut restored = Measured::new(limits);
     for party in 1..=u64::from(limits.people) {
         for task in 1..=u64::from(limits.inbox_tasks) {
-            restored.event(Event::Restore { record: jig_core_people::Stored::ReadChat { party, task, through: 1 } });
+            restored.event(Event::Restore { record: jig_domain_people::Stored::ReadChat { party, task, through: 1 } });
         }
         restored.event(Event::Restore {
-            record: jig_core_people::Stored::Person {
+            record: jig_domain_people::Stored::Person {
                 number: party,
                 identity: Identity {
                     key: IdentityKey { provider: 0, subject: party.to_be_bytes().into() },
@@ -204,7 +204,7 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
                 restored.domain.remember_result(
                     &limits,
                     party,
-                    jig_core_people::ResultRef { task: number, project, at: Wall::EPOCH, position: number },
+                    jig_domain_people::ResultRef { task: number, project, at: Wall::EPOCH, position: number },
                 );
                 restored.drain();
             }
@@ -231,7 +231,7 @@ fn full_chat_positions_and_replies_fit(limits: Limits) {
             .into_boxed_slice();
         let party = (task - 1) % u64::from(limits.people) + 1;
         let replies = (0..limits.inbox_recipients)
-            .map(|message| jig_core_people::ReplyRef {
+            .map(|message| jig_domain_people::ReplyRef {
                 entry: Entry {
                     task,
                     project: 1,

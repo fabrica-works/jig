@@ -1,7 +1,7 @@
 //! Public cold-restore page scheduling (`domain/testing.md`, sections 4 and 7).
-use jig_core as core;
-use jig_core_people as people;
 use jig_core_world::{client_peer::ClientPeer, effects::World, peers::Peers, store_peer::StorePeer};
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{Duration, ReplyTo, Token};
 

@@ -12,8 +12,8 @@ fn a_testing_engine_runs_against_independent_parties_workers_and_two_systems() {
         assert!(result.commits > 0);
         assert_eq!(world.peers.assignments.len(), 1, "outcome {result:?}, trace {:?}", world.trace);
         assert_eq!(world.peers.answers, 2);
-        assert!(world.peers.restart_steps.contains(&jig_core::RestartStep::RestoreConnector { connector: 1 }));
-        assert!(world.peers.restart_steps.contains(&jig_core::RestartStep::RestoreConnector { connector: 2 }));
+        assert!(world.peers.restart_steps.contains(&jig_domain_core::RestartStep::RestoreConnector { connector: 1 }));
+        assert!(world.peers.restart_steps.contains(&jig_domain_core::RestartStep::RestoreConnector { connector: 2 }));
     }
 }
 
@@ -25,7 +25,7 @@ fn the_system_observes_the_committed_effect_of_the_calling_task() {
     let (task, attempt) = world.peers.assignments[0];
     world.send(jig_test_domain::Event::EffectCall {
         to: ReplyTo::new(Token::new(77)),
-        key: jig_core::CallKey { task, attempt, completion: 1, position: 0 },
+        key: jig_domain_core::CallKey { task, attempt, completion: 1, position: 0 },
         number: 1,
         effect: jig_core_world::effects::World::effect(),
         deadline: Wall::from_nanos(1_000_000_000),

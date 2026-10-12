@@ -3,7 +3,7 @@
 //! reconstructed here; native reads retain their original query separately.
 use super::{owner, reads, results, rows};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
+use jig_domain_core::documents;
 use skein_lib::List;
 
 #[must_use]
@@ -12,8 +12,8 @@ pub fn object(value: documents::InboxObject) -> client::OwnerInboxObject {
         documents::InboxObject::Question { message } => client::OwnerInboxObject::Question { message },
         documents::InboxObject::Proposal { proposer, number } => client::OwnerInboxObject::Proposal {
             proposer: match proposer {
-                jig_core_people::Proposer::Task(number) => client::Proposer::Task(number),
-                jig_core_people::Proposer::Party(number) => client::Proposer::Party(number),
+                jig_domain_people::Proposer::Task(number) => client::Proposer::Task(number),
+                jig_domain_people::Proposer::Party(number) => client::Proposer::Party(number),
             },
             number,
         },
@@ -91,15 +91,15 @@ pub fn document(value: &documents::Inbox, limits: &Limits) -> Result<client::Own
 /// # Errors
 /// Refuses another receiving query; source row membership remains owner-selected.
 #[must_use]
-pub fn scope(value: &client::Read, text: u32) -> Option<jig_core::reads::Scope> {
-    let jig_core::reads::Read::Inbox { group, filter, .. } = reads::read(value, text).ok()? else { return None };
-    Some(jig_core::reads::Scope::Inbox { group, filter })
+pub fn scope(value: &client::Read, text: u32) -> Option<jig_domain_core::reads::Scope> {
+    let jig_domain_core::reads::Read::Inbox { group, filter, .. } = reads::read(value, text).ok()? else { return None };
+    Some(jig_domain_core::reads::Scope::Inbox { group, filter })
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use jig_core_people as people;
+    use jig_domain_people as people;
     use skein_lib::Wall;
     pub(crate) fn limits() -> Limits {
         Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig }
@@ -231,7 +231,7 @@ pub(crate) mod tests {
             documents::TaskLink::Live(chip.clone()),
             documents::TaskLink::Retained { chip: chip.clone(), at: None },
             documents::TaskLink::Retained { chip, at: Some(Wall::EPOCH) },
-            documents::TaskLink::Stored { number: 0, status: Some(jig_core_tasks::Status::Cancelled) },
+            documents::TaskLink::Stored { number: 0, status: Some(jig_domain_tasks::Status::Cancelled) },
         ] {
             value.task = link;
             value.project = Some(0);

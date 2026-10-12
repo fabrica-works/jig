@@ -1,4 +1,4 @@
-use jig_core_notes::{Author, Event, Recall, Refusal, Scope};
+use jig_domain_notes::{Author, Event, Recall, Refusal, Scope};
 use jig_notes_world::{Answer, World, correction, one_scope, search, task_entry};
 use skein_lib::{List, Token};
 

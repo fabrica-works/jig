@@ -3,9 +3,9 @@
 //! (client/domain/testing.md, sections 5–6).
 use crate::harness::{CardKey, Observed};
 use jig_client::contract::{ObjectKey, ProposalKey, Proposer};
-use jig_core as core;
-use jig_core_tasks as tasks;
 use jig_core_world::store_peer::DurableSnapshot;
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -31,7 +31,7 @@ impl Truth {
         let mut observed = vec![Observed::Durable { commit, at: snapshot.at }];
         for (key, record) in &snapshot.rows {
             if self.rows.get(key) != Some(record)
-                && let root::Record::Core(core::Record::People(jig_core_people::Stored::Answer { key, .. })) = record
+                && let root::Record::Core(core::Record::People(jig_domain_people::Stored::Answer { key, .. })) = record
             {
                 observed.push(Observed::Made { party: key.person, key: key.key, commit });
             }
@@ -176,15 +176,15 @@ mod tests {
         }
     }
     fn answer(party: u64) -> root::Record {
-        root::Record::Core(core::Record::People(jig_core_people::Stored::Answer {
-            key: jig_core_people::RequestKey { person: party, key: [9; 16] },
-            ask: Box::new(jig_core_people::Ask::Say {
+        root::Record::Core(core::Record::People(jig_domain_people::Stored::Answer {
+            key: jig_domain_people::RequestKey { person: party, key: [9; 16] },
+            ask: Box::new(jig_domain_people::Ask::Say {
                 project: 1,
                 task: 7,
                 words: b"whole".to_vec().into_boxed_slice(),
                 release: false,
             }),
-            outcome: jig_core_people::Outcome::Said { task: 7, message: 4, released: false },
+            outcome: jig_domain_people::Outcome::Said { task: 7, message: 4, released: false },
             at: Wall::from_nanos(0),
         }))
     }

@@ -1,4 +1,4 @@
-use jig_core_views::{End, Follow, TurnName};
+use jig_domain_views::{End, Follow, TurnName};
 use jig_views_world::World;
 use skein_lib::Token;
 #[test]

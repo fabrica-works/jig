@@ -189,9 +189,9 @@ fn random_drawn_commit_cuts_preserve_whole_turns_and_atomic_effect_decisions() {
                 .rows
                 .values()
                 .filter_map(|row| match row {
-                    jig_test_domain::Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(turn))) => {
-                        Some(turn)
-                    }
+                    jig_test_domain::Record::Core(jig_domain_core::Record::Core(
+                        jig_domain_core::CoreRecord::Turn(turn),
+                    )) => Some(turn),
                     jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
                 })
                 .collect();

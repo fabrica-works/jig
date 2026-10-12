@@ -1,7 +1,7 @@
 //! Small deterministic inventories sweep sizes, priorities and budgets.
 
 use jig_brief_world::{LIMITS, World, referee};
-use jig_core_brief::{Core, GatherEvent, GatherRequest, Planned};
+use jig_domain_brief::{Core, GatherEvent, GatherRequest, Planned};
 use skein_lib::{Duration, Time, Token};
 
 #[test]

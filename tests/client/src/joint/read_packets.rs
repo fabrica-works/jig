@@ -6,7 +6,7 @@ use super::{
     wire,
 };
 use jig_client::{Limits, contract as client};
-use jig_core::{documents, reads};
+use jig_domain_core::{documents, reads};
 use jig_test_client_domain::Event;
 use skein_lib::Token;
 
@@ -165,7 +165,7 @@ mod ledger_page_tests;
 mod tests {
     use super::*;
     use crate::harness::ClientId;
-    use jig_core_people as people;
+    use jig_domain_people as people;
     use skein_lib::List;
     pub(super) fn transport() -> Transport {
         let mut value = Transport::new(client::VersionRange { first: 1, last: u32::MAX });
@@ -312,7 +312,7 @@ mod tests {
         assert_eq!(read(&mut transport, to, &wrong, &limits).err(), Some(Invalid::OwnerRoute));
         assert!(transport.reply(to).is_some());
         source.message = u64::MAX;
-        source.from = jig_core_tasks::Party::Deployment { project: 0 };
+        source.from = jig_domain_tasks::Party::Deployment { project: 0 };
         let source = reads::Answer::Document(Box::new(documents::Document::Question(source)));
         assert_eq!(
             read(&mut transport, to, &source, &Limits { document_bytes: 0, ..limits }).err(),
@@ -548,7 +548,7 @@ mod tests {
             rows: List::with_capacity(2),
             next: Some(reads::Cursor::Store {
                 scope: reads::Scope::ScopedNotes {
-                    scope: jig_core_notes::Scope::Project { project: 0 },
+                    scope: jig_domain_notes::Scope::Project { project: 0 },
                     description: Some(Box::new([])),
                 },
                 after: None,
@@ -562,7 +562,7 @@ mod tests {
         assert!(transport.reply(to).is_some());
         page.next = Some(reads::Cursor::Store {
             scope: reads::Scope::ScopedNotes {
-                scope: jig_core_notes::Scope::Project { project: u32::MAX },
+                scope: jig_domain_notes::Scope::Project { project: u32::MAX },
                 description: Some(Box::new([])),
             },
             after: None,
@@ -618,8 +618,8 @@ mod tests {
         rows.push(reads::PageRow::History(documents::HistoryLine {
             task,
             revision: 0,
-            by: jig_core_tasks::Party::Task(0),
-            change: jig_core_tasks::Change::Amended,
+            by: jig_domain_tasks::Party::Task(0),
+            change: jig_domain_tasks::Change::Amended,
             reason: documents::Text { bytes: Box::new([]), cut: true },
             proposal: None,
             amendment: None,

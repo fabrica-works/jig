@@ -57,23 +57,26 @@ fn assert_alert(world: &jig_conformance::Harness<jig_ops_world::conformance::Ops
     assert!(!world.outcome().stopped, "crashes {:?}: {}", world.outcome().crashes, world.trace.join("\n"));
     assert!(world.peers.results.contains(&5), "on-call read the incident report");
     let ended = |number| {
-        world.store.rows.get(&jig_ops_domain::Key::Core(jig_core::Key::Tasks(jig_core_tasks::Key::Ended(number))))
+        world
+            .store
+            .rows
+            .get(&jig_ops_domain::Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Ended(number))))
     };
     for task in [3, 4, 5, 6] {
         assert!(ended(task).is_some(), "task {task} missing: {}", world.trace.join("\n"));
     }
     for (number, requester) in [(3, 2), (4, 2), (5, 2), (6, 5)] {
-        let Some(jig_ops_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(row)))) =
+        let Some(jig_ops_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(row)))) =
             ended(number)
         else {
             panic!("ended task {number}")
         };
-        assert_eq!(row.requester, jig_core_tasks::Party::Task(requester), "W -> T1,T2,I -> R");
+        assert_eq!(row.requester, jig_domain_tasks::Party::Task(requester), "W -> T1,T2,I -> R");
         if number == 3 || number == 4 {
             assert_eq!(row.authority.delegation.tasks, 0, "triage has no delegate authority");
             assert_eq!(row.authority.delegation.depth, 0);
             assert!(row.delegates.is_empty());
-            let jig_core_tasks::Contract::Verdict { choices } = &row.contract else {
+            let jig_domain_tasks::Contract::Verdict { choices } = &row.contract else {
                 panic!("triage's closed verdict")
             };
             assert_eq!(choices.len(), 2);

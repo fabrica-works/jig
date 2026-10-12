@@ -1,6 +1,6 @@
 //! Independent complete Project fixtures and receiving-boundary proofs.
 use super::*;
-use jig_core::acts;
+use jig_domain_core::acts;
 use skein_lib::{Duration, List, Wall};
 
 pub(crate) fn limits() -> Limits {

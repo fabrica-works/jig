@@ -1,5 +1,5 @@
 use jig_brief_world::referee;
-use jig_core_brief::{Core, GatherPlaced, GatherRequest};
+use jig_domain_brief::{Core, GatherPlaced, GatherRequest};
 use skein_lib::Token;
 
 #[test]

@@ -2,7 +2,7 @@
 //! (client/domain/contract.md, 6). The supplied page loss remains independent of row and cursor facts.
 use super::{activity, cursor, history, inbox, notes, owner, rows};
 use jig_client::{Limits, contract as client};
-use jig_core::reads;
+use jig_domain_core::reads;
 use jig_scripted_engine as admission;
 use skein_lib::List;
 
@@ -240,7 +240,7 @@ pub fn notes_page(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_core_tasks as tasks;
+    use jig_domain_tasks as tasks;
     use skein_lib::Wall;
     fn limits() -> Limits {
         Limits { text: 200, rows: 4, document_bytes: 100_000, ..crate::test::limits().jig }
@@ -305,11 +305,11 @@ mod tests {
         let task = u64::MAX;
         let mut source = List::with_capacity(6);
         source
-            .push(reads::PageRow::Milestone(jig_core::documents::MilestoneLine {
+            .push(reads::PageRow::Milestone(jig_domain_core::documents::MilestoneLine {
                 task,
                 position: 0,
-                phase: jig_core::documents::MilestonePhase::Held {
-                    before: jig_core::documents::PriorPhase::Closing(tasks::Stage::Run { attempt: u64::MAX }),
+                phase: jig_domain_core::documents::MilestonePhase::Held {
+                    before: jig_domain_core::documents::PriorPhase::Closing(tasks::Stage::Run { attempt: u64::MAX }),
                     why: tasks::Hold::Failures(tasks::Class::Invalid),
                     source: None,
                     ending: None,
@@ -358,7 +358,7 @@ mod tests {
     #[test]
     fn conversation_pages_keep_independent_owner_edges_and_refuse_foreign_prefixes_without_consuming_rows() {
         let before = reads::Cursor::ConversationsLiveBefore {
-            before: Some(jig_core::documents::Cursor::Number { number: u64::MAX }),
+            before: Some(jig_domain_core::documents::Cursor::Number { number: u64::MAX }),
         };
         let after = reads::Cursor::Store { scope: reads::Scope::Conversations, after: None };
         let mut page = reads::Page {
@@ -558,13 +558,13 @@ mod tests {
     }
     fn note_source() -> reads::Page {
         let mut rows = List::with_capacity(3);
-        rows.push(reads::PageRow::Note(jig_core::documents::Note {
+        rows.push(reads::PageRow::Note(jig_domain_core::documents::Note {
             acts: List::with_capacity(2),
             number: u64::MAX,
-            scope: jig_core::documents::NoteLocation::Goal { project: u32::MAX, task: u64::MAX },
-            description: jig_core::documents::Text { bytes: Box::new([]), cut: false },
-            body: jig_core::documents::Text { bytes: Box::from([255, 0]), cut: true },
-            writer: jig_core_notes::Author::Task { task: u64::MAX, attempt: u64::MAX },
+            scope: jig_domain_core::documents::NoteLocation::Goal { project: u32::MAX, task: u64::MAX },
+            description: jig_domain_core::documents::Text { bytes: Box::new([]), cut: false },
+            body: jig_domain_core::documents::Text { bytes: Box::from([255, 0]), cut: true },
+            writer: jig_domain_notes::Author::Task { task: u64::MAX, attempt: u64::MAX },
             tasks: List::with_capacity(4),
             changed: None,
             revision: u32::MAX,
@@ -577,7 +577,7 @@ mod tests {
             rows,
             next: Some(reads::Cursor::Store {
                 scope: reads::Scope::ScopedNotes {
-                    scope: jig_core_notes::Scope::Goal { project: u32::MAX, goal: u64::MAX },
+                    scope: jig_domain_notes::Scope::Goal { project: u32::MAX, goal: u64::MAX },
                     description: Some(Box::new([])),
                 },
                 after: None,

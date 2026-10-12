@@ -3,12 +3,12 @@
 #![forbid(unsafe_code)]
 use jig_conformance::scenarios::Scenario;
 use jig_conformance::{Application, Clock, Input, Output};
-use jig_core as core;
-use jig_core_accounts as accounts;
-use jig_core_authority as authority;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
 use jig_core_world::{Store, observations::Observer, peers::Peers};
+use jig_domain_accounts as accounts;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_fake_parties::{Act, Ask, Party, Role};
 use jig_fake_workers::{Script, Worker};
 use jig_test_connector as connector;
@@ -557,10 +557,10 @@ impl Application for Testing {
                 for row in store.rows.values() {
                     let root::Record::Core(core::Record::Notes(record)) = row else { continue };
                     let selected = match (&range, record) {
-                        (jig_core_notes::Range::Entry { name }, jig_core_notes::Record::Entry(entry)) => {
+                        (jig_domain_notes::Range::Entry { name }, jig_domain_notes::Record::Entry(entry)) => {
                             *name == entry.name
                         }
-                        (jig_core_notes::Range::Lines { scope, after }, jig_core_notes::Record::Line(line)) => {
+                        (jig_domain_notes::Range::Lines { scope, after }, jig_domain_notes::Record::Line(line)) => {
                             *scope == line.scope && after.is_none_or(|previous| line.name > previous)
                         }
                         _ => false,
@@ -569,9 +569,9 @@ impl Application for Testing {
                         more = true;
                     }
                 }
-                vec![Input::Event(root::Event::Core(core::Event::Notes(jig_core_notes::Event::Loaded {
+                vec![Input::Event(root::Event::Core(core::Event::Notes(jig_domain_notes::Event::Loaded {
                     owner,
-                    rows: jig_core_notes::Rows { records },
+                    rows: jig_domain_notes::Rows { records },
                     more,
                 })))]
             }

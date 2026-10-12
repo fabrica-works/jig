@@ -15,7 +15,7 @@ fn effect_scenario(world: &mut World) {
     if world.reached_cut.is_some() {
         return;
     }
-    world.end(jig_core_tasks::End::Parked, 2);
+    world.end(jig_domain_tasks::End::Parked, 2);
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn a_cold_restart_retries_a_party_request_and_retained_host_traffic() {
     let task = peers.parties[0].last_task.expect("started chat");
     assert!(
         world.store.rows.values().any(|row| matches!(row,
-            jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(row)))
+            jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(row)))
                 if row.number == task && row.inbox.iter().any(|word| word.words.as_ref() == b"continue")
         )),
         "the unanswered relay stays in the durable whole inbox"
@@ -171,7 +171,9 @@ fn every_startup_sign_in_chat_and_assignment_commit_restarts_on_either_side_of_d
                     .filter(|row| {
                         matches!(
                             row,
-                            jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(_)))
+                            jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(
+                                jig_domain_tasks::Stored::Live(_)
+                            ))
                         )
                     })
                     .count();

@@ -1,7 +1,7 @@
 //! The client-facing seam of the core world (client/domain/testing.md, 5).
 //! Values reach this peer only after the existing store and core referee saw
 //! their release. Workers and systems remain the world's independent fakes.
-use jig_core as core;
+use jig_domain_core as core;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
 use std::collections::BTreeSet;

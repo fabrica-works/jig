@@ -1,10 +1,10 @@
 //! Comparisons of delivered numerical/list facts, without authority rules.
-use jig_core::{
+use jig_domain_core::{
     acts::{Admission, Beyond, Bounds},
     documents::{AuthorityLine, GrantLine, PatternEnd, Task},
 };
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::Wall;
 
 fn deadline(bound: Option<Wall>, draft: Option<Wall>) -> bool {
@@ -38,7 +38,7 @@ fn pattern(segments: &skein_lib::List<Box<[u8]>>, last: &PatternEnd, value: &peo
 fn grant(
     left: &GrantLine,
     right: &people::Grant,
-    implications: &skein_lib::List<jig_core_authority::Implication>,
+    implications: &skein_lib::List<jig_domain_authority::Implication>,
 ) -> bool {
     left.connector == right.connector
         && (left.kind == right.kind
@@ -50,7 +50,7 @@ fn grant(
 fn covers(
     bound: &AuthorityLine,
     draft: &people::Authority,
-    implications: &skein_lib::List<jig_core_authority::Implication>,
+    implications: &skein_lib::List<jig_domain_authority::Implication>,
 ) -> bool {
     !bound.cut
         && draft.spend <= bound.ceiling.spend

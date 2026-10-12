@@ -7,7 +7,7 @@ use super::{
 };
 use crate::harness::ClientId;
 use jig_client::{Limits, contract as client};
-use jig_core::{Event, reads};
+use jig_domain_core::{Event, reads};
 use jig_scripted_engine as admission;
 use jig_test_client_domain::Event as ClientEvent;
 use skein_lib::Token;
@@ -168,8 +168,8 @@ impl Archives {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_core_people as people;
-    use jig_core_tasks as tasks;
+    use jig_domain_people as people;
+    use jig_domain_tasks as tasks;
     use skein_lib::{List, Wall};
     fn transport() -> Transport {
         let mut value = Transport::new(client::VersionRange { first: 1, last: u32::MAX });
@@ -214,8 +214,8 @@ mod tests {
             turn: client::TurnLimits { messages: 1, blocks: 1, text: 3 },
         }
     }
-    fn record(task: u64) -> jig_core::TurnRecord {
-        jig_core::TurnRecord {
+    fn record(task: u64) -> jig_domain_core::TurnRecord {
+        jig_domain_core::TurnRecord {
             task,
             attempt: 17,
             turn: 23,

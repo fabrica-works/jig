@@ -2,8 +2,8 @@
 //! References and chooser/requester metadata belong to the independent details.
 use super::{chips, offers, owner};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
-use jig_core_tasks as tasks;
+use jig_domain_core::documents;
+use jig_domain_tasks as tasks;
 use skein_lib::List;
 
 #[must_use]

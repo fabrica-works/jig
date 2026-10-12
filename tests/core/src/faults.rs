@@ -74,7 +74,7 @@ pub fn worker_fault(world: &mut World, index: usize, fault: Fault) {
 pub fn restart(world: &mut World, seed: u64, engine: bool) {
     world.restart_with(crate::peers::fixture(seed, u32::from(engine)).0);
     // Account usability is an independently refreshed runtime capability.
-    world.send(jig_test_domain::Event::Core(jig_core::Event::Account(jig_core_accounts::Event::Add {
+    world.send(jig_test_domain::Event::Core(jig_domain_core::Event::Account(jig_domain_accounts::Event::Add {
         account: 1,
         generation: 1,
         valid: Some(Duration::from_secs(60)),
@@ -99,8 +99,8 @@ pub fn plan_fixture(seed: u64) -> (jig_test_domain::Config, jig_test_domain::Lim
     limits.core.call_records = 8;
     limits.journal.writes = 10_000;
     limits.journal.held = 10_000;
-    configuration.core.settings.chat_authority.delegation = jig_core_authority::Delegation {
-        kinds: Box::new([jig_core_authority::Executor::Charter(1), jig_core_authority::Executor::Procedure(1)]),
+    configuration.core.settings.chat_authority.delegation = jig_domain_authority::Delegation {
+        kinds: Box::new([jig_domain_authority::Executor::Charter(1), jig_domain_authority::Executor::Procedure(1)]),
         tasks: 4,
         depth: 2,
     };
@@ -111,10 +111,10 @@ pub fn plan_fixture(seed: u64) -> (jig_test_domain::Config, jig_test_domain::Lim
     let mut policy = configuration.core.authority.policy(1).expect("plan policy").clone();
     policy.ceiling.delegation = rules.ceiling.delegation.clone();
     policy.roles[0].authority.delegation = rules.ceiling.delegation.clone();
-    let mut checked = jig_core_authority::Domain::new(rules, limits.core.authority).expect("bounded plan policy");
-    let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
-    jig_core_authority::step(&mut checked, jig_core_authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
+    let mut checked = jig_domain_authority::Domain::new(rules, limits.core.authority).expect("bounded plan policy");
+    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+    jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configuration.core.authority = checked;
     (configuration, limits)
 }

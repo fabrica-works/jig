@@ -1,5 +1,5 @@
 use jig_accounts_world::LIMITS;
-use jig_core_accounts::{Domain, Event, MAX_OUT, step, worst_case};
+use jig_domain_accounts::{Domain, Event, MAX_OUT, step, worst_case};
 use skein_lib::{Duration, Env, Queue, Time, Wall};
 use skein_world::domain::heap::{self, Meter};
 

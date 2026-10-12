@@ -3,11 +3,11 @@
 //! `domain/engine.md`, sections 6–7).
 
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
 use skein_lib::{Decision, Env, List, Queue, ReplyTo, Token};
 

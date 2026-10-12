@@ -3,7 +3,7 @@
 //! keys as it may, every attempt tracked, every relayed call kept, and every
 //! entry point on the way.
 
-use jig_core_fleet::{
+use jig_domain_fleet::{
     Answer, Bounce, Domain, Event, Hello, Hosted, Limits, Phase, Request, fire, max_out, resume, step, worst_case,
 };
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
@@ -120,8 +120,8 @@ impl Measured {
             run,
             attempt,
             workstream,
-            kinds: jig_core_fleet::Kinds::Workers,
-            assignment: jig_core_fleet::Assignment { turns: Token::new(0), answered: Token::new(0) },
+            kinds: jig_domain_fleet::Kinds::Workers,
+            assignment: jig_domain_fleet::Assignment { turns: Token::new(0), answered: Token::new(0) },
         });
         assert!(asked.is_empty(), "a start waits for placement: {asked:?}");
         (run, attempt)
@@ -161,7 +161,7 @@ fn fill(limits: Limits) -> (Measured, Vec<(Token, Token, Token)>, Vec<ReplyTo>) 
             channel,
             run,
             attempt,
-            report: jig_core_fleet::Report::Activity(jig_core_fleet::Activity::Tool {
+            report: jig_domain_fleet::Report::Activity(jig_domain_fleet::Activity::Tool {
                 call: vec![1; usize::try_from(limits.call_name_bytes).expect("fits")].into_boxed_slice(),
                 tool: vec![2; usize::try_from(limits.progress_bytes).expect("fits")].into_boxed_slice(),
             }),
@@ -174,7 +174,7 @@ fn fill(limits: Limits) -> (Measured, Vec<(Token, Token, Token)>, Vec<ReplyTo>) 
             channel,
             run,
             attempt,
-            call: jig_core_fleet::Call {
+            call: jig_domain_fleet::Call {
                 name: vec![7; usize::try_from(limits.call_name_bytes).expect("fits")].into_boxed_slice(),
                 tool: Box::new([]),
                 writes: false,
@@ -208,15 +208,15 @@ fn a_fleet_full_to_its_limits_stays_within_its_worst_case() {
         run,
         attempt,
         workstream,
-        kinds: jig_core_fleet::Kinds::Workers,
-        assignment: jig_core_fleet::Assignment { turns: Token::new(0), answered: Token::new(0) },
+        kinds: jig_domain_fleet::Kinds::Workers,
+        assignment: jig_domain_fleet::Assignment { turns: Token::new(0), answered: Token::new(0) },
     });
     assert!(matches!(refused[..], [Request::Refused { .. }]), "{refused:?}");
     let up = fleet.step(Event::Relay {
         channel: placed[5].0,
         run: placed[5].1,
         attempt: placed[5].2,
-        call: jig_core_fleet::Call {
+        call: jig_domain_fleet::Call {
             name: Box::from(Token::new(9).raw().to_be_bytes()),
             tool: Box::new([]),
             writes: false,
@@ -265,7 +265,7 @@ fn every_entry_point_stays_within_the_worst_case() {
         run: r2,
         attempt: a2,
         kept: 0,
-        kind: jig_core_fleet::HostKind::Worker,
+        kind: jig_domain_fleet::HostKind::Worker,
         worked: false,
     });
     fleet.step(Event::Acknowledge { run: r2, attempt: a2 });
@@ -274,7 +274,7 @@ fn every_entry_point_stays_within_the_worst_case() {
         run: r1,
         attempt: a1,
         kept: 0,
-        kind: jig_core_fleet::HostKind::Worker,
+        kind: jig_domain_fleet::HostKind::Worker,
         worked: false,
     });
     let (r3, a3) = fleet.start();
@@ -285,7 +285,7 @@ fn every_entry_point_stays_within_the_worst_case() {
         channel: placed[0].0,
         run: r3,
         attempt: a3,
-        call: jig_core_fleet::Call {
+        call: jig_domain_fleet::Call {
             name: Box::from(Token::new(1).raw().to_be_bytes()),
             tool: Box::new([]),
             writes: false,
@@ -300,7 +300,7 @@ fn every_entry_point_stays_within_the_worst_case() {
     fleet.step(Event::Inbound {
         run: r3,
         attempt: a3,
-        message: jig_core_fleet::Message { name: Token::new(4), sender: Token::new(4), words: Token::new(4) },
+        message: jig_domain_fleet::Message { name: Token::new(4), sender: Token::new(4), words: Token::new(4) },
     });
     fleet.step(Event::Bounced {
         channel: placed[0].0,
@@ -371,7 +371,7 @@ fn held_and_handed_turn_admissions_stay_within_the_worst_case() {
         run,
         attempt,
         kept: 3,
-        kind: jig_core_fleet::HostKind::Worker,
+        kind: jig_domain_fleet::HostKind::Worker,
         worked: false,
     });
     let released = fleet.settle();

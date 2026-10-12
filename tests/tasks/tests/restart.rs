@@ -1,4 +1,4 @@
-use jig_core_tasks::{Active, End, Event, Key, Party, Phase, Refusal, Stored, TaskResult};
+use jig_domain_tasks::{Active, End, Event, Key, Party, Phase, Refusal, Stored, TaskResult};
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::Wall;
 
@@ -56,13 +56,13 @@ fn stale_claims_and_replayed_terminal_are_and_do_not_mutate() {
         reply_to,
         task: 1,
         attempt: 4,
-        end: End::Failed(jig_core_tasks::Class::Lost),
-        cause: jig_core_tasks::Cause::Unpriced,
+        end: End::Failed(jig_domain_tasks::Class::Lost),
+        cause: jig_domain_tasks::Cause::Unpriced,
     });
     assert_eq!(w.record(1), &record);
     assert!(matches!(
         w.replies.last_key_value().expect("reply").1,
-        Reply::Acknowledged(jig_core_tasks::Accepted::Already)
+        Reply::Acknowledged(jig_domain_tasks::Accepted::Already)
     ));
 }
 
@@ -80,7 +80,7 @@ fn a_crash_before_finished_decision_resumes_current_attempt() {
         task: 1,
         attempt: 1,
         end: End::Finished { result: TaskResult::Report { words: Box::new([1]) }, cancel_delegates: false },
-        cause: jig_core_tasks::Cause::Unpriced,
+        cause: jig_domain_tasks::Cause::Unpriced,
     });
     assert!(w.results.is_empty());
     assert!(w.closing.is_empty());
@@ -93,7 +93,7 @@ fn a_crash_before_finished_decision_resumes_current_attempt() {
 
 #[test]
 fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
-    use jig_core_tasks::{Domain, Request, max_out, step};
+    use jig_domain_tasks::{Domain, Request, max_out, step};
     use skein_lib::{Env, Queue, Time, Wall};
     let mut source = World::new(25, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
@@ -110,7 +110,7 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
                     record.dependencies = Box::new([3 - number]);
                     record.waiting_on = Box::new([3 - number]);
                 }
-                2 => record.contract = jig_core_tasks::Contract::Report { words: 33 },
+                2 => record.contract = jig_domain_tasks::Contract::Report { words: 33 },
                 3 => {
                     if number == 1 {
                         record.delegates = Box::new([2]);
@@ -122,17 +122,17 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
                 }
                 4 => record.result_followups = Box::new([3]),
                 5..=7 => {
-                    record.contract = jig_core_tasks::Contract::Verdict {
-                        choices: Box::new([jig_core_tasks::Verdict {
+                    record.contract = jig_domain_tasks::Contract::Verdict {
+                        choices: Box::new([jig_domain_tasks::Verdict {
                             fields: Box::new([]),
                             code: 7,
                             words: 32,
                             followups: 2,
                         }]),
                     };
-                    record.phase = Phase::Closing(jig_core_tasks::Closing {
-                        stage: jig_core_tasks::Stage::Delegates,
-                        ending: jig_core_tasks::Ending::Done(jig_core_tasks::TaskResult::Verdict {
+                    record.phase = Phase::Closing(jig_domain_tasks::Closing {
+                        stage: jig_domain_tasks::Stage::Delegates,
+                        ending: jig_domain_tasks::Ending::Done(jig_domain_tasks::TaskResult::Verdict {
                             fields: Box::new([]),
                             code: 7,
                             words: Box::new([]),
@@ -153,7 +153,7 @@ fn restore_rejects_corrupt_links_cycles_and_contracts_without_panicking() {
                 10 => record.phase = Phase::Active(Active::BackingOff { until: Wall::EPOCH }),
                 11 => {
                     record.phase = Phase::Active(Active::BackingOff { until: Wall::EPOCH });
-                    record.retry_notice = Some(jig_core_tasks::RetryNotice::Refused { count: 1 });
+                    record.retry_notice = Some(jig_domain_tasks::RetryNotice::Refused { count: 1 });
                 }
                 12 => {
                     record.attempt = 1;
@@ -187,7 +187,7 @@ fn terminal_and_settlement_each_have_a_durable_cut_before_delivery() {
         task: 1,
         attempt: 1,
         end: End::Finished { result: TaskResult::Report { words: Box::new([1]) }, cancel_delegates: false },
-        cause: jig_core_tasks::Cause::Unpriced,
+        cause: jig_domain_tasks::Cause::Unpriced,
     });
     w.durable();
     assert!(w.closing.is_empty());
@@ -244,7 +244,7 @@ fn delegate_cancel_cut_after_durability_stops_adopted_runs_then_closes_deepest()
         task: 1,
         attempt: 1,
         end: End::Finished { result: TaskResult::Report { words: Box::new([1]) }, cancel_delegates: true },
-        cause: jig_core_tasks::Cause::Unpriced,
+        cause: jig_domain_tasks::Cause::Unpriced,
     });
     w.durable();
     assert!(w.stops.is_empty());
@@ -279,7 +279,7 @@ fn dependency_progress_survives_restore_without_loading_historical_ends() {
 
 #[test]
 fn restore_refuses_unrepresentable_eventual_funding_postings() {
-    use jig_core_tasks::{Cause, Domain, Funder, Request, step};
+    use jig_domain_tasks::{Cause, Domain, Funder, Request, step};
     use skein_lib::Queue;
     let mut source = World::new(30, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[])]);
@@ -298,7 +298,7 @@ fn restore_refuses_unrepresentable_eventual_funding_postings() {
         }
     }
     let mut domain = Domain::new(&LIMITS, 30, Box::new([1]));
-    let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
+    let mut out = Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
     for record in rows {
         step(&mut domain, &source.env, Event::Restore { record }, &mut out);
     }
@@ -308,7 +308,7 @@ fn restore_refuses_unrepresentable_eventual_funding_postings() {
 
 #[test]
 fn malformed_unfinished_dependencies_refuse_at_restore_entrance() {
-    use jig_core_tasks::{Domain, Request, step};
+    use jig_domain_tasks::{Domain, Request, step};
     use skein_lib::Queue;
     let mut source = World::new(31, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[])]);
@@ -319,7 +319,7 @@ fn malformed_unfinished_dependencies_refuse_at_restore_entrance() {
         let mut record = source.record(1).clone();
         record.waiting_on = waiting;
         let mut domain = Domain::new(&LIMITS, 31, Box::new([1]));
-        let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
+        let mut out = Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
         step(&mut domain, &source.env, Event::Restore { record: Stored::Live(Box::new(record)) }, &mut out);
         assert!(
             matches!(out.pop(), Some(Request::RestoreRefused { .. })),
@@ -331,7 +331,7 @@ fn malformed_unfinished_dependencies_refuse_at_restore_entrance() {
 
 #[test]
 fn restore_refuses_a_missing_unfinished_live_dependency_before_activation() {
-    use jig_core_tasks::{Domain, Request, step};
+    use jig_domain_tasks::{Domain, Request, step};
     use skein_lib::Queue;
     let mut source = World::new(32, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[]), task(2, &[1])]);
@@ -346,7 +346,7 @@ fn restore_refuses_a_missing_unfinished_live_dependency_before_activation() {
             }
         }
         let mut domain = Domain::new(&LIMITS, 32, Box::new([1]));
-        let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
+        let mut out = Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
         for record in rows {
             step(&mut domain, &source.env, Event::Restore { record }, &mut out);
         }
@@ -362,7 +362,7 @@ fn restore_refuses_a_missing_unfinished_live_dependency_before_activation() {
 
 #[test]
 fn impossible_settled_live_and_inconsistent_ledger_states_refuse_at_restore_entrance() {
-    use jig_core_tasks::{Domain, Funder, Request, Stage, step};
+    use jig_domain_tasks::{Domain, Funder, Request, Stage, step};
     use skein_lib::Queue;
     let mut source = World::new(33, LIMITS);
     source.open_period(1, 300);
@@ -392,7 +392,7 @@ fn impossible_settled_live_and_inconsistent_ledger_states_refuse_at_restore_entr
     }
     for record in invalid {
         let mut domain = Domain::new(&LIMITS, 33, Box::new([1]));
-        let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
+        let mut out = Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
         step(&mut domain, &source.env, Event::Restore { record }, &mut out);
         assert!(matches!(out.pop(), Some(Request::RestoreRefused { .. })));
         assert!(out.pop().is_none());
@@ -401,7 +401,7 @@ fn impossible_settled_live_and_inconsistent_ledger_states_refuse_at_restore_entr
 
 #[test]
 fn restore_refuses_task_funding_outside_its_requester_ancestry() {
-    use jig_core_tasks::{Domain, Funder, Request, step};
+    use jig_domain_tasks::{Domain, Funder, Request, step};
     use skein_lib::Queue;
     let mut source = World::new(34, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[]), task(2, &[])]);
@@ -423,7 +423,7 @@ fn restore_refuses_task_funding_outside_its_requester_ancestry() {
         }
     }
     let mut domain = Domain::new(&LIMITS, 34, Box::new([1]));
-    let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
+    let mut out = Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
     for record in rows {
         step(&mut domain, &source.env, Event::Restore { record }, &mut out);
     }
@@ -433,7 +433,7 @@ fn restore_refuses_task_funding_outside_its_requester_ancestry() {
 
 #[test]
 fn unresolved_or_inconsistent_escalation_rows_refuse_before_retention() {
-    use jig_core_tasks::{Domain, Escalation, EscalationHolder, Hold, Request, Was, step};
+    use jig_domain_tasks::{Domain, Escalation, EscalationHolder, Hold, Request, Was, step};
     use skein_lib::Queue;
     let mut source = World::new(36, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[])]);
@@ -460,7 +460,7 @@ fn unresolved_or_inconsistent_escalation_rows_refuse_before_retention() {
             _ => unreachable!(),
         };
         let mut domain = Domain::new(&LIMITS, 36, Box::new([1]));
-        let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
+        let mut out = Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
         step(&mut domain, &source.env, Event::Restore { record: Stored::Live(Box::new(task)) }, &mut out);
         assert!(matches!(out.pop(), Some(Request::RestoreRefused { .. })));
         assert!(out.pop().is_none());
@@ -469,13 +469,13 @@ fn unresolved_or_inconsistent_escalation_rows_refuse_before_retention() {
 
 #[test]
 fn waiting_restore_requests_recheck_once_and_identical_recipient_changes_nothing() {
-    use jig_core_tasks::{Domain, Escalation, EscalationHolder, Hold, Request, Was, step};
+    use jig_domain_tasks::{Domain, Escalation, EscalationHolder, Hold, Request, Was, step};
     use skein_lib::Queue;
     let mut source = World::new(37, LIMITS);
     source.make(Party::Person(1), vec![task(1, &[])]);
     for rejected in [false, true] {
         let mut domain = Domain::new(&LIMITS, 37, Box::new([1]));
-        let mut out = Queue::with_capacity(jig_core_tasks::max_out(&LIMITS));
+        let mut out = Queue::with_capacity(jig_domain_tasks::max_out(&LIMITS));
         for record in source.records.values() {
             if matches!(record, Stored::Milestone(_) | Stored::Activity(_) | Stored::History(_) | Stored::Ended(_)) {
                 continue;

@@ -1,5 +1,5 @@
 use jig_brief_world::{LIMITS, World, referee};
-use jig_core_brief::{Core, GatherEvent, GatherMissing, GatherPlaced, GatherRequest, Planned};
+use jig_domain_brief::{Core, GatherEvent, GatherMissing, GatherPlaced, GatherRequest, Planned};
 use skein_lib::{Duration, Time, Token};
 
 fn connector(token: u64, required: bool, priority: u16) -> Planned {

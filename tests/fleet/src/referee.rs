@@ -27,7 +27,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use jig_core_fleet::HostKind;
+use jig_domain_fleet::HostKind;
 use skein_lib::Duration;
 use skein_world::domain::{Expectations, Judge};
 

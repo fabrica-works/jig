@@ -36,7 +36,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
     assert!(outcome.judged.0 > 0);
     assert!(!world.front().session.driver.world.store.rows.values().any(|row| matches!(
         row,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+        jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
     )));
     world.person(
         member,
@@ -57,7 +57,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
         .rows
         .values()
         .filter_map(|row| match row {
-            jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer {
+            jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
                 outcome: people::Outcome::GoalProposed { proposal },
                 ..
             })) => Some(*proposal),

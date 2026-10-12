@@ -8,10 +8,10 @@ mod systems;
 
 use jig_conformance::referee as r;
 use jig_conformance::{Application, Clock, Input, Output};
-use jig_core as core;
-use jig_core_accounts as accounts;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_ops_domain as root;
 use jig_ops_domain_infrastructure as infra;
 use jig_ops_domain_observability as obs;
@@ -329,7 +329,7 @@ impl Application for Ops {
                 Vec::new()
             }
             root::Output::ToChild(child) => {
-                if let root::Released::Host(jig_host::Event::Assign { assignment, .. }) = &child {
+                if let root::Released::Host(jig_domain_host::Event::Assign { assignment, .. }) = &child {
                     let task = assignment.assignment.run.raw();
                     let attempt = assignment.assignment.attempt.raw();
                     let budget = observations::snapshot(store).tasks[&task].run_reserved;
@@ -538,9 +538,9 @@ impl Application for Ops {
                 Vec::new()
             }
             root::Output::Core(core::Held::NotesLoad { owner, .. }) => {
-                vec![Input::Event(root::Event::Core(core::Event::Notes(jig_core_notes::Event::Loaded {
+                vec![Input::Event(root::Event::Core(core::Event::Notes(jig_domain_notes::Event::Loaded {
                     owner,
-                    rows: jig_core_notes::Rows { records: List::with_capacity(0) },
+                    rows: jig_domain_notes::Rows { records: List::with_capacity(0) },
                     more: false,
                 })))]
             }

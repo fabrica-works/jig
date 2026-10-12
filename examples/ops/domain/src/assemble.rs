@@ -5,11 +5,11 @@ use crate::domain::Work;
 use crate::{Domain, Limits};
 use alloc::boxed::Box;
 use jig_charter as charter;
-use jig_core as core;
-use jig_core_accounts as accounts;
-use jig_core_brief as brief;
-use jig_core_tasks as tasks;
-use jig_host as host;
+use jig_domain_accounts as accounts;
+use jig_domain_brief as brief;
+use jig_domain_core as core;
+use jig_domain_host as host;
+use jig_domain_tasks as tasks;
 use jig_ops_connectors::Connector;
 use skein_lib::{Decimal, Env, List, Queue, Reader, ReplyTo, Token, Writer};
 
@@ -365,7 +365,7 @@ fn delegated(numbers: &[u64]) -> Box<[u8]> {
     writer.finish()
 }
 
-fn notes(entries: &[jig_core_notes::Entry], more: bool) -> Box<[u8]> {
+fn notes(entries: &[jig_domain_notes::Entry], more: bool) -> Box<[u8]> {
     let tail = if more { b"\nMore notes remain.".as_slice() } else { b"\nEnd of notes.".as_slice() };
     let mut bytes = b"Notes".len().checked_add(tail.len()).expect("page framing");
     for entry in entries {
@@ -420,7 +420,7 @@ pub(crate) fn call(
     to: ReplyTo,
     run: Token,
     attempt: Token,
-    call: jig_core_fleet::Call,
+    call: jig_domain_fleet::Call,
     work: &mut Queue<Work>,
 ) {
     let Some(name) = crate::translate::call_name(&call.name) else {
@@ -442,10 +442,10 @@ pub(crate) fn call(
                 let description =
                     crate::translate::read_description(jig_ops_connectors::number(Connector::Observability), &read);
                 let mut findings = Queue::with_capacity(
-                    jig_core_authority::max_out(&env.limits.core.authority).expect("authority findings"),
+                    jig_domain_authority::max_out(&env.limits.core.authority).expect("authority findings"),
                 );
                 if domain.core.connector_read_admit(run.raw(), description, &mut findings)
-                    != jig_core_authority::Answer::Allow
+                    != jig_domain_authority::Answer::Allow
                     || domain.read_calls.len() == domain.read_calls.capacity()
                 {
                     read_answer(domain, binding, true, Box::from(&b"refused"[..]), work);
@@ -523,5 +523,5 @@ pub(crate) fn read_answer(
         tool: call.tool,
         answer: core::SettledAnswer::Host { error, body },
     }));
-    work.push(Work::Core(core::Event::Fleet(jig_core_fleet::Event::Relayed { to: ReplyTo::new(call.to), answer })));
+    work.push(Work::Core(core::Event::Fleet(jig_domain_fleet::Event::Relayed { to: ReplyTo::new(call.to), answer })));
 }

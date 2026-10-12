@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use jig_host::{
+use jig_domain_host::{
     self as host, Answer, AnsweredCall, Ask, Assignment, Delivery, DeliveryOutcome, Ending, Event, Finish, Limits,
     Reason, Request, RunAssignment, Turn, Workspace,
 };

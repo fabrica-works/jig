@@ -6,7 +6,7 @@ use crate::{
     harness::{ClientId, Front, FrontFault, Observed},
     test::Test,
 };
-use jig_core_people::Identity;
+use jig_domain_people::Identity;
 use jig_test_client_domain::{Event, JigOut, Request, first};
 use skein_lib::{Duration, Time, Token, Wall};
 use std::collections::BTreeMap;
@@ -230,8 +230,8 @@ mod tests {
     use super::*;
     use crate::joint::engine::Driver;
     use jig_client::contract as client;
-    use jig_core_people as people;
     use jig_core_world::peers::Peers;
+    use jig_domain_people as people;
 
     fn clock(now: Time) -> Wall {
         Wall::from_nanos(1_000_000_000_000 + now.as_nanos())
@@ -380,7 +380,7 @@ mod tests {
         let peer = front.session.driver.world.client_peer.as_ref().expect("registered protocol peer");
         assert!(peer.delivered.iter().any(|(_, value)| matches!(
             value,
-            jig_test_domain::Delivery::Core(jig_core::Held::PeopleReply {
+            jig_test_domain::Delivery::Core(jig_domain_core::Held::PeopleReply {
                 reply: people::Reply::Again(people::Again::Busy),
                 ..
             })
@@ -425,7 +425,7 @@ mod tests {
         let captured = &front.session.driver.world.client_peer.as_ref().expect("actual protocol peer").delivered;
         assert!(captured.iter().any(|(_, value)| matches!(
             value,
-            jig_test_domain::Delivery::Core(jig_core::Held::PeopleReply {
+            jig_test_domain::Delivery::Core(jig_domain_core::Held::PeopleReply {
                 sign_in: None,
                 reply: people::Reply::Again(people::Again::NotReady),
                 ..
@@ -479,7 +479,7 @@ mod tests {
         assert!(front.session.driver.world.client_peer.as_ref().expect("actual protocol peer").delivered.iter().any(
             |(_, value)| matches!(
                 value,
-                jig_test_domain::Delivery::Core(jig_core::Held::PeopleReply {
+                jig_test_domain::Delivery::Core(jig_domain_core::Held::PeopleReply {
                     reply: people::Reply::Again(people::Again::NotReady),
                     ..
                 })

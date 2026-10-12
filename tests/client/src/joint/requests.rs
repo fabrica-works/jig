@@ -8,8 +8,8 @@ use super::{
 };
 use crate::harness::ClientId;
 use jig_client::Limits;
-use jig_core::{self as core, documents::ApplicationScope};
-use jig_core_people as people;
+use jig_domain_core::{self as core, documents::ApplicationScope};
+use jig_domain_people as people;
 use jig_test_client_domain::{Ask, JigOut, Request, first};
 use jig_test_connector::ApplicationRequest;
 use jig_test_domain as root;

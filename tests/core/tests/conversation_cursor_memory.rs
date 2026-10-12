@@ -1,5 +1,5 @@
 //! Independent allocator proof of the bounded reverse-live cells and whole page header.
-use jig_core::reads::{self, Cursor, Page, PageRow};
+use jig_domain_core::reads::{self, Cursor, Page, PageRow};
 use skein_lib::{List, Queue};
 use skein_world::domain::heap::{self, Meter};
 

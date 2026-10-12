@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use jig_core_brief::{
+use jig_domain_brief::{
     GatherDomain, GatherEvent, GatherPlaced, GatherRequest, Limits, gather_fire, gather_max_out, gather_step,
 };
 use skein_lib::{Env, Queue, Time, Token, Wall};

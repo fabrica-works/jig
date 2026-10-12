@@ -3,8 +3,8 @@
 //! deliveries. Request durability and every business decision stay in the root.
 use super::transport::Transport;
 use jig_client::contract::VersionRange;
-use jig_core as core;
 use jig_core_world::{client_peer::ClientPeer, effects::World, peers::Peers};
+use jig_domain_core as core;
 use jig_test_domain as root;
 use skein_lib::{Time, Wall};
 
@@ -149,7 +149,7 @@ impl Driver {
 mod tests {
     use super::*;
     use crate::{harness::ClientId, joint::transport::Reply};
-    use jig_core_people as people;
+    use jig_domain_people as people;
 
     #[test]
     fn actual_root_driver_releases_the_supplied_identity_and_independent_session_only_after_its_store_commit() {

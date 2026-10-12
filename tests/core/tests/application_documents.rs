@@ -1,9 +1,9 @@
 //! Connector values through the real root and independently observed store.
-use jig_core::{self as core, documents::ApplicationScope};
 use jig_core_world::{
     effects::{Cut, World},
     reads, watches,
 };
+use jig_domain_core::{self as core, documents::ApplicationScope};
 use jig_test_connector::{self as connector, ClientDocument, ClientSubject};
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
@@ -165,7 +165,7 @@ fn a_connector_subject_ends_when_its_object_does() {
             .as_ref()
             .expect("story fixture supplies this value")
             .endings
-            .contains(&(51, jig_core_views::End::Gone))
+            .contains(&(51, jig_domain_views::End::Gone))
     );
     assert_eq!(received(&world, 51).len(), 1, "the missing object never produces another document");
     world.watches.as_ref().expect("story fixture supplies this value").finish();

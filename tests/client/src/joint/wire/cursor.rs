@@ -2,10 +2,10 @@
 //! The protocol layer interprets the bytes; the client only echoes them
 //! (client/domain/contract.md, 6). No live cursor table owns continuation state.
 use jig_client::contract::{Cursor, Text};
-use jig_core::{CallKey, CoreKey, Key, ProjectionKey, documents, reads};
-use jig_core_notes as notes;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core::{CallKey, CoreKey, Key, ProjectionKey, documents, reads};
+use jig_domain_notes as notes;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use skein_lib::Wall;
 
 /// A complete continuation failed its configured byte bound.

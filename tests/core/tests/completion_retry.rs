@@ -1,6 +1,6 @@
-use jig_core as core;
-use jig_core_views as views;
 use jig_core_world::watches::{open, world};
+use jig_domain_core as core;
+use jig_domain_views as views;
 use jig_test_domain as root;
 use skein_lib::Token;
 

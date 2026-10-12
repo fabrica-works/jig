@@ -3,9 +3,9 @@ use crate::{
     effects::World,
     peers::{Peers, fixture},
 };
-use jig_core as core;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_fake_parties::{self as parties, Act, Ask, Disposal, Keep, Party, Role, Task};
 use jig_fake_workers::{Script, Worker};
 use jig_test_domain as root;

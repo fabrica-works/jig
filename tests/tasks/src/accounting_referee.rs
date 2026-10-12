@@ -1,6 +1,6 @@
 //! Independent conservation from durable task allocations, ended transitions
 //! and admitted priced inputs (domain/tasks.md, 2 and 5).
-use jig_core_tasks::{
+use jig_domain_tasks::{
     Accepted, Escalation, EscalationHolder, Executor, Funder, Key, MessageKind, ProposalHolder, ProposalState, Request,
     Stored, TaskRecord,
 };

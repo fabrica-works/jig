@@ -2,13 +2,13 @@
 //! Commit numbers and changed task identities come only from root outputs;
 //! deliveries are checked against the fake store's durable watermark. The
 //! referee never reads the core, its views child, or the journal's held queue.
-use jig_core::{
+use jig_domain_core::{
     self as core,
     documents::{Document, Subject},
 };
-use jig_core_people as people;
-use jig_core_tasks as tasks;
-use jig_core_views as views;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 use jig_test_domain as root;
 use skein_lib::{Rng, Token};
 use std::collections::{BTreeMap, BTreeSet};

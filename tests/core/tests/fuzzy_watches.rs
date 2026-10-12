@@ -1,9 +1,9 @@
-use jig_core::{
+use jig_core_world::watches::{latest, open, world};
+use jig_domain_core::{
     self as core,
     documents::{Document, Subject},
 };
-use jig_core_tasks as tasks;
-use jig_core_world::watches::{latest, open, world};
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{Rng, Token};
 

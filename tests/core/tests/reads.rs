@@ -1,11 +1,11 @@
-use jig_core::{documents, reads};
-use jig_core_people as people;
-use jig_core_tasks as tasks;
 use jig_core_world::{
     effects::Cut,
     reads::{Fence, ask, complete, latest},
     stories::reads::{conversation, request, world},
 };
+use jig_domain_core::{documents, reads};
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 
 fn a_read_waits_for_the_commit_in_flight_before_it() {

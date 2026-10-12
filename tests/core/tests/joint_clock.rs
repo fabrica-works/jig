@@ -1,6 +1,6 @@
-use jig_core as core;
-use jig_core_people as people;
 use jig_core_world::{effects::World, peers::Peers, world};
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Time, Token, Wall};
 

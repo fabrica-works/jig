@@ -96,7 +96,7 @@ pub(crate) fn sources() -> Vec<(client::Read, reads::Historical)> {
             client::Read::Escalation { task: u64::MAX },
             reads::Past::Escalation {
                 task: Box::new(task.clone()),
-                decision: jig_core::EscalationDecisionRecord {
+                decision: jig_domain_core::EscalationDecisionRecord {
                     project: task.project,
                     requester: 0,
                     task: u64::MAX,
@@ -295,11 +295,12 @@ fn historical_task_all_eight_optional_source_families_survive_the_complete_envel
         document.person_revision = (mask & 4 != 0).then_some(0);
         document.taken_by = (mask & 8 != 0).then_some(0);
         document.instructions =
-            (mask & 16 != 0).then_some(jig_core::documents::Text { bytes: Box::new([]), cut: false });
-        document.result = (mask & 32 != 0).then_some(jig_core::documents::Ending::Failed(jig_core::documents::Text {
-            bytes: Box::from([255]),
-            cut: true,
-        }));
+            (mask & 16 != 0).then_some(jig_domain_core::documents::Text { bytes: Box::new([]), cut: false });
+        document.result =
+            (mask & 32 != 0).then_some(jig_domain_core::documents::Ending::Failed(jig_domain_core::documents::Text {
+                bytes: Box::from([255]),
+                cut: true,
+            }));
         if mask & 64 == 0 {
             document.hold = None;
         }
@@ -377,7 +378,7 @@ fn historical_person_proposal_states_keep_the_independent_whole_decision_and_cre
             let mut source = base.clone();
             let reads::Past::PersonProposal { proposal, decision } = &mut source.value else { panic!("person source") };
             proposal.state = state.clone();
-            *decision = Some(jig_core::ProposalDecisionRecord {
+            *decision = Some(jig_domain_core::ProposalDecisionRecord {
                 project: u32::MAX,
                 proposer: people::Proposer::Party(u64::MAX),
                 proposal: u64::MAX,

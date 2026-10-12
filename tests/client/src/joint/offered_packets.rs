@@ -3,7 +3,7 @@
 use super::packets::Incoming;
 use crate::ClientId;
 use jig_client::contract as client;
-use jig_core::{documents, reads};
+use jig_domain_core::{documents, reads};
 use jig_test_client_domain::Event;
 use skein_lib::List;
 use std::collections::BTreeMap;
@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 /// Both lists from the same whole admitted owner value.
 pub struct CardOffers {
     /// The engine's unchanged supplied list.
-    pub source: List<jig_core::acts::Offered>,
+    pub source: List<jig_domain_core::acts::Offered>,
     /// The receiving client's unchanged supplied list.
     pub native: List<client::Offered>,
 }

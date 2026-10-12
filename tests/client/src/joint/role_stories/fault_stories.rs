@@ -86,7 +86,7 @@ fn two_tabs_decide_one_proposal_and_both_receive_the_original_once_only_decision
             .rows
             .values()
             .filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. }))
         if matches!(outcome, people::Outcome::ProposalDecided { by, choice: people::ProposalChoice::Accepted, .. }
             if *by == first_person)))
             .count(),
@@ -98,7 +98,7 @@ fn two_tabs_decide_one_proposal_and_both_receive_the_original_once_only_decision
             .rows
             .values()
             .filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(task)))
         if task.tracked == Some(7) && task.numbers.budget == 150))
             .count(),
         1
@@ -181,7 +181,7 @@ fn an_inbox_acceptance_updates_the_same_proposal_still_shown_in_the_chat() {
     let engine = &world.front().session.driver.world;
     let person = engine.peers.as_ref().expect("actual parties").parties[0].person.expect("actual owner");
     assert_eq!(engine.store.rows.values().filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. }))
         if matches!(outcome, people::Outcome::ProposalDecided { by, choice: people::ProposalChoice::Accepted, .. } if *by == person))).count(), 1);
     assert_eq!(
         engine
@@ -189,7 +189,7 @@ fn an_inbox_acceptance_updates_the_same_proposal_still_shown_in_the_chat() {
             .rows
             .values()
             .filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(task)))
         if task.tracked == Some(7) && task.numbers.budget == 150))
             .count(),
         1

@@ -1,8 +1,8 @@
 //! Starting facts for a charter instruction amendment and cold continuation.
 use crate::{effects::World, reads::Parties};
-use jig_core::{self as core, documents};
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core::{self as core, documents};
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
 
@@ -43,14 +43,14 @@ pub fn task_document(w: &mut World, task: u64, request: u64) -> documents::Task 
     *doc.clone()
 }
 pub fn sign_in(w: &mut World) {
-    w.send(root::Event::Core(core::Event::Account(jig_core_accounts::Event::Add {
+    w.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
         account: 1,
         generation: 1,
         valid: Some(skein_lib::Duration::from_secs(60)),
     })));
-    w.send(root::Event::Core(core::Event::Fleet(jig_core_fleet::Event::Hello {
+    w.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
         channel: Token::new(7),
-        hello: jig_core_fleet::Hello {
+        hello: jig_domain_fleet::Hello {
             stop_bound: skein_lib::Duration::from_millis(100),
             slots: 2,
             workstreams: Box::new([]),

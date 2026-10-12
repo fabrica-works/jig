@@ -4,9 +4,9 @@
 //! joining its stored rows; this layer cannot reconstruct its absent position.
 use super::{activity, documents, historical_goal, history, owner, person_tasks, results, task};
 use jig_client::{Limits, contract as client};
-use jig_core::reads;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core::reads;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_scripted_engine as admission;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -161,7 +161,7 @@ fn person_proposal(value: &tasks::PersonProposal, limits: &Limits) -> Result<cli
     })
 }
 
-fn proposal_decision(value: jig_core::ProposalDecisionRecord) -> client::OwnerProposalDecision {
+fn proposal_decision(value: jig_domain_core::ProposalDecisionRecord) -> client::OwnerProposalDecision {
     client::OwnerProposalDecision {
         project: value.project,
         proposer: match value.proposer {
@@ -190,7 +190,7 @@ fn proposal_decision(value: jig_core::ProposalDecisionRecord) -> client::OwnerPr
 }
 
 fn escalation_decision(
-    value: &jig_core::EscalationDecisionRecord,
+    value: &jig_domain_core::EscalationDecisionRecord,
     limits: &Limits,
 ) -> Result<client::OwnerEscalationDecisionRecord, Invalid> {
     Ok(client::OwnerEscalationDecisionRecord {

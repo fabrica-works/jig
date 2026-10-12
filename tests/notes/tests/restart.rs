@@ -1,4 +1,4 @@
-use jig_core_notes::{Event, Scope};
+use jig_domain_notes::{Event, Scope};
 use jig_notes_world::{Answer, World, one_scope, task_entry};
 use skein_lib::Token;
 

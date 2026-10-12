@@ -21,7 +21,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use jig_host::{
+use jig_domain_host::{
     AgentFailure, Assignment, Bounce, Ending, Event, Failure, Hosting, Invalid, Limits, Preparation, Reason, Refusal,
     Request, RunAssignment, RunFailure, Workspace,
 };

@@ -2,7 +2,7 @@
 //! would feed them, fails a run that breaks an expectation, and says why; and
 //! passes one that keeps them.
 
-use jig_core_fleet::HostKind;
+use jig_domain_fleet::HostKind;
 use jig_fleet_world::referee::{Down, End, Fleet, Kind, Said, Seen};
 use skein_lib::{Duration, Time};
 use skein_world::domain::{Referee, Verdict};

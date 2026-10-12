@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use jig_core_notes::{Key, Line, Record, Scope};
+use jig_domain_notes::{Key, Line, Record, Scope};
 use jig_notes_world::{Intent, LIMITS, Referee, Write, key_of, saved_entry};
 use skein_lib::Token;
 
-fn line(entry: &jig_core_notes::Entry) -> Line {
+fn line(entry: &jig_domain_notes::Entry) -> Line {
     Line {
         scope: entry.scope.clone(),
         name: entry.name,

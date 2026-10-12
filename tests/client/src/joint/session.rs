@@ -11,8 +11,8 @@ use super::{
 };
 use crate::harness::{ClientId, Observed};
 use jig_client::contract as client;
-use jig_core as core;
-use jig_core_people as people;
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_test_client_domain::{Event, Limits, Request};
 use jig_test_domain as root;
 use skein_lib::{Duration, Time, Wall};
@@ -734,7 +734,7 @@ impl Session {
                 if self.driver.transport.watch(watcher).is_none() {
                     return Ok(());
                 }
-                let source = jig_core_views::Writing { turn, from, to, text, cut, call };
+                let source = jig_domain_views::Writing { turn, from, to, text, cut, call };
                 let value = packets::stream(&mut self.driver.transport, watcher, &source, &self.limits.jig)
                     .map_err(Invalid::Packet)?;
                 if self.driver.transport.is_closing(watcher) {

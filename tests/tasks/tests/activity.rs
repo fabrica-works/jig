@@ -1,4 +1,4 @@
-use jig_core_tasks::{Accepted, ActivityLine, Event, Key, Line, MessageKind, Party, Stored, Word};
+use jig_domain_tasks::{Accepted, ActivityLine, Event, Key, Line, MessageKind, Party, Stored, Word};
 use jig_tasks_world::{LIMITS, Reply, World, task};
 use skein_lib::Wall;
 
@@ -90,7 +90,7 @@ fn a_task_s_activity_survives_its_words_being_taken_and_a_restart() {
     assert!(
         after
             .iter()
-            .any(|row| row.line == Line::RunEnded { attempt: 7, end: jig_core_tasks::EndKind::Finished, spent: 5 })
+            .any(|row| row.line == Line::RunEnded { attempt: 7, end: jig_domain_tasks::EndKind::Finished, spent: 5 })
     );
     let Stored::Ended(ended) = &world.records[&Key::Ended(1)] else { panic!("ended row kept") };
     assert_eq!(ended.activity, after.last().expect("ended activity").position);

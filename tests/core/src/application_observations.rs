@@ -1,8 +1,8 @@
 //! Translate only authenticated peer input and transactions received by the fake store.
 use crate::Store;
 use jig_conformance::referee as r;
-use jig_core as core;
-use jig_core_people as people;
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_fake_store::Write;
 use jig_test_connector as connector;
 use jig_test_domain as root;

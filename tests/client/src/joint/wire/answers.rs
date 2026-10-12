@@ -3,7 +3,7 @@
 //! after the engine's actual commit. Translation itself attests no durability.
 use super::{outcomes, refusals};
 use jig_client::contract as client;
-use jig_core_people as people;
+use jig_domain_people as people;
 use skein_lib::{RequestEnvelope, Token, Wall};
 
 #[derive(Clone, Debug, PartialEq, Eq)]

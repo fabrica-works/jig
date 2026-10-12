@@ -5,9 +5,9 @@ use crate::domain::{Assignment, HostCall, ReadCall, Work};
 use crate::{Output, Write};
 use alloc::boxed::Box;
 use jig_charter as charter;
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_host as host;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_host as host;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Journal, JournalLimits, JournalRoom, Map, Queue, Token};
@@ -76,7 +76,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(limits.host.transcript_bytes)?
         .checked_add(u64::from(limits.core.call_records).checked_mul(u64::from(limits.core.call_answer_bytes))?)?
         .checked_add(u64::from(limits.host.accounts).checked_mul(64)?)?
-        .checked_add(skein_lib::List::<jig_core_tasks::Word>::worst_case(limits.core.tasks.inbox_messages)?)?
+        .checked_add(skein_lib::List::<jig_domain_tasks::Word>::worst_case(limits.core.tasks.inbox_messages)?)?
         .checked_add(u64::from(limits.core.tasks.inbox_bytes))?;
     let value =
         assignment

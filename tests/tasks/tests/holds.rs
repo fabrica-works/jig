@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     Class, End, Event, Funder, Hold, HoldKind, Holding, Kind, MessageKind, Name, NoticeState, Party, Phase, Refusal,
     Stored, Subscription, SubscriptionKind, Taken, Writer,
 };
@@ -117,7 +117,7 @@ fn a_task_waiting_past_its_bound_for_a_hold_is_held_and_its_requester_told() {
     let mut waiter = task(3, &[]);
     waiter.holdings = Box::new([resource(1)]);
     assert_eq!(world.make(Party::Task(1), vec![holder, waiter]), Reply::Made(vec![2, 3]));
-    world.send(jig_core_tasks::Event::Subscribe {
+    world.send(jig_domain_tasks::Event::Subscribe {
         reply_to: ReplyTo::new(Token::new(500)),
         task: 1,
         subscription: Subscription {
@@ -195,7 +195,7 @@ fn a_run_hands_a_held_resource_to_a_procedure_while_it_still_holds_the_writer_sl
     assert_eq!(world.claim_budget_writing(2, 2, 50, Box::new([name.clone()])), Reply::WriterWaiting(name.clone()));
 
     world.send(Event::PreparationFailed { task: 2 });
-    assert_eq!(world.terminal(1, End::Parked), Reply::Acknowledged(jig_core_tasks::Accepted::New));
+    assert_eq!(world.terminal(1, End::Parked), Reply::Acknowledged(jig_domain_tasks::Accepted::New));
     assert!(!world.records.values().any(|row| matches!(row, Stored::Writer(slot) if slot.resource == name)));
     world.elapse(Duration::from_secs(2));
     assert_eq!(world.claim_budget_writing(2, 3, 50, Box::new([name.clone()])), Reply::Done);
@@ -211,7 +211,7 @@ fn a_lost_writer_keeps_its_slot_across_restart_until_its_connector_reads_afresh(
     task.holdings = Box::new([held]);
     assert_eq!(world.make(Party::Person(1), vec![task]), Reply::Made(vec![1]));
     assert_eq!(world.claim_budget_writing(1, 1, 50, Box::new([name.clone()])), Reply::Done);
-    assert_eq!(world.terminal(1, End::Failed(Class::Lost)), Reply::Acknowledged(jig_core_tasks::Accepted::New));
+    assert_eq!(world.terminal(1, End::Failed(Class::Lost)), Reply::Acknowledged(jig_domain_tasks::Accepted::New));
     world.restart();
     assert!(world.records.values().any(|row| matches!(row, Stored::Writer(slot)
         if slot.resource == name && slot.lost)));
@@ -232,7 +232,7 @@ fn a_connector_effect_waits_for_a_run_and_owns_the_writer_until_it_settles() {
     let reply_to = world.to();
     world.send(Event::EffectInFlight { reply_to, task: 1, resource: name.clone(), entry: 99 });
     assert_eq!(world.replies.last_key_value().expect("effect reply").1, &Reply::WriterWaiting(name.clone()));
-    assert_eq!(world.terminal(1, End::Parked), Reply::Acknowledged(jig_core_tasks::Accepted::New));
+    assert_eq!(world.terminal(1, End::Parked), Reply::Acknowledged(jig_domain_tasks::Accepted::New));
     let reply_to = world.to();
     world.send(Event::EffectInFlight { reply_to, task: 1, resource: name.clone(), entry: 99 });
     assert_eq!(world.replies.last_key_value().expect("effect reply").1, &Reply::Done);
@@ -261,11 +261,11 @@ fn a_failed_child_keeps_its_resource_held_until_its_tree_root_closes() {
         world.terminal(
             2,
             End::Finished {
-                result: jig_core_tasks::TaskResult::Failure { reason: Box::new([1]) },
+                result: jig_domain_tasks::TaskResult::Failure { reason: Box::new([1]) },
                 cancel_delegates: false
             }
         ),
-        Reply::Acknowledged(jig_core_tasks::Accepted::New)
+        Reply::Acknowledged(jig_domain_tasks::Accepted::New)
     );
     world.settle_effects(2);
     world.send(Event::Retained { task: 2, root: 1, holding: held.clone() });
@@ -298,7 +298,7 @@ fn a_tree_root_can_retain_more_than_one_childs_per_task_hold_limit() {
         world.terminal(
             task_number,
             End::Finished {
-                result: jig_core_tasks::TaskResult::Failure { reason: Box::new([1]) },
+                result: jig_domain_tasks::TaskResult::Failure { reason: Box::new([1]) },
                 cancel_delegates: false,
             },
         );

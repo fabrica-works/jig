@@ -1,5 +1,5 @@
 //! Finite story configuration, reconstructed unchanged on every cold start.
-use jig_host as host;
+use jig_domain_host as host;
 use jig_ops_domain::{Config, Limits};
 use jig_ops_domain_infrastructure as infrastructure;
 use skein_lib::{Duration, JournalLimits};
@@ -104,9 +104,9 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     config.core.settings.chat_authority = authority(100, false);
     if environment_chat {
         config.core.settings.chat_authority = environment_authority(20, false);
-        config.core.owners = Box::new([jig_core_people::InitialOwner {
+        config.core.owners = Box::new([jig_domain_people::InitialOwner {
             project: 1,
-            identity: jig_core_people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
+            identity: jig_domain_people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
         }]);
     }
     config.core.settings.period = 1;
@@ -122,8 +122,8 @@ pub fn root(seed: u64) -> (Config, Limits) {
     root_for(seed, false)
 }
 
-use jig_core_authority as authority;
-use jig_core_tasks as tasks;
+use jig_domain_authority as authority;
+use jig_domain_tasks as tasks;
 use skein_lib::Queue;
 
 fn pattern(environment: Option<&[u8]>) -> authority::Pattern {

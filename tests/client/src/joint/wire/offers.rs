@@ -1,7 +1,7 @@
 //! Exact offered acts, holder identities and supported draft bounds (contract.md, 5.3).
 use super::{owner, refusals};
 use jig_client::{Limits, contract as client};
-use jig_core::acts;
+use jig_domain_core::acts;
 use skein_lib::List;
 
 #[must_use]
@@ -118,7 +118,7 @@ pub fn offered(value: &List<acts::Offered>, limits: &Limits) -> Result<List<clie
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_core_people as people;
+    use jig_domain_people as people;
     use skein_lib::Wall;
 
     #[test]
@@ -195,8 +195,8 @@ mod tests {
     #[test]
     fn amendment_offer_preserves_reserved_relation_storage_and_independent_whole_authority_loss_before_receiver_admission()
      {
-        use jig_core::documents;
-        use jig_core_tasks as tasks;
+        use jig_domain_core::documents;
+        use jig_domain_tasks as tasks;
         let authority = documents::AuthorityLine {
             tools: tasks::Tools(u64::MAX),
             grants: List::with_capacity(3),

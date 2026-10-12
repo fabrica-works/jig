@@ -1,13 +1,13 @@
-use jig_core::{
-    self as core,
-    documents::{Count, Document, PhaseLine, Subject},
-};
-use jig_core_tasks as tasks;
-use jig_core_views as views;
 use jig_core_world::{
     effects::Cut,
     watches::{latest, open, world},
 };
+use jig_domain_core::{
+    self as core,
+    documents::{Count, Document, PhaseLine, Subject},
+};
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 use jig_test_domain as root;
 use skein_lib::Token;
 
@@ -117,9 +117,9 @@ fn a_watch_on_a_task_that_ends_ends_saying_so() {
 }
 
 fn inbox_across_projects_stories() {
-    use jig_core_authority as authority;
-    use jig_core_people as people;
     use jig_core_world::watches::Parties;
+    use jig_domain_authority as authority;
+    use jig_domain_people as people;
     use skein_lib::{List, Map, Queue};
     let (mut config, mut limits) = super::amendment_world_fixture(788);
     limits.core.tasks.tasks = 4;
@@ -184,7 +184,7 @@ fn inbox_across_projects_stories() {
             people::Ask::SetGoal {
                 project,
                 spec: b"shared goal".as_slice().into(),
-                executor: jig_core_people::GoalExecutor::Charter(1),
+                executor: jig_domain_people::GoalExecutor::Charter(1),
                 budget: 600,
                 priority: 0,
                 deadline: None,

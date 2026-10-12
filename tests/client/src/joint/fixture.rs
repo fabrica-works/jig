@@ -2,8 +2,8 @@
 use super::{Joint, engine::Driver, session::Session};
 use crate::{Settings, Test, World};
 use jig_client::contract as client;
-use jig_core_people as people;
 use jig_core_world::peers::Peers;
+use jig_domain_people as people;
 use jig_fake_workers::{Script, Worker};
 use skein_lib::{Duration, Time, Wall};
 use std::collections::BTreeMap;
@@ -92,7 +92,7 @@ pub(super) fn seeded_world_with_receiving(
     owner.core.documents.lines = 2;
     owner.core.documents.chips = 2;
     owner.core.documents.text_bytes = 32;
-    let room = jig_core::room_max(&owner.core).expect("declared whole core bounds");
+    let room = jig_domain_core::room_max(&owner.core).expect("declared whole core bounds");
     let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two connector routes");
     owner.journal.writes = owner.journal.writes.max(room.writes.checked_add(connectors).expect("whole writes"));
     owner.journal.held = owner.journal.held.max(

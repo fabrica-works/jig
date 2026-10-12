@@ -1,10 +1,10 @@
-use jig_core::{self as core, reads};
-use jig_core_people as people;
 use jig_core_world::{
     effects::Cut,
     reads::{ask, latest},
     stories::reads::world,
 };
+use jig_domain_core::{self as core, reads};
+use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Rng, Token};
 

@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     self as tasks, Cause, Contract, Event, Executor, Funder, Key, New, Numbers, Party, RecurringOverlap,
     RecurringTemplate, Stored, Subscription, SubscriptionKind,
 };

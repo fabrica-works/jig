@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     self as tasks, Contract, Event, Executor, FieldRule, Party, PersonAddress, ResultField, TaskResult, Verdict,
 };
 use jig_tasks_world::{LIMITS, Reply, World, task};

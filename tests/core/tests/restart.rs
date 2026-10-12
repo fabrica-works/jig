@@ -1,7 +1,7 @@
-use jig_core as core;
-use jig_core_fleet as fleet;
-use jig_core_tasks as tasks;
 use jig_core_world::effects::World;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
 use jig_test_domain as root;
 use jig_test_system::Fault;
@@ -15,7 +15,7 @@ fn hello(world: &mut World, hosting: Box<[fleet::Hosted]>) {
 }
 
 fn account(world: &mut World) {
-    world.send(root::Event::Core(core::Event::Account(jig_core_accounts::Event::Add {
+    world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Add {
         account: 1,
         generation: 1,
         valid: Some(Duration::from_secs(60)),
@@ -191,7 +191,7 @@ fn an_unfound_uncertain_entry_keeps_its_saved_retry_deadline_across_restarts() {
 
 #[test]
 fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
-    use jig_core_people as people;
+    use jig_domain_people as people;
     use skein_lib::ReplyTo;
     let mut world = World::new(119, false);
     world.recovery = connector::Recovery::Unrecoverable;

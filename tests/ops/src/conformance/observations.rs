@@ -1,8 +1,8 @@
 //! Durable-row translations and independent production evidence for jig's referee.
 use jig_conformance::referee as r;
-use jig_core as core;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_ops_domain as root;
 use jig_ops_domain_infrastructure as infra;
 use jig_ops_domain_observability as obs;

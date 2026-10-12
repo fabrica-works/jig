@@ -7,15 +7,20 @@ pub(super) fn action(
     world: &mut World<Test, Joint>,
     assignment: &jig_fake_workers::Assignment,
     completion: u32,
-    action: jig_core::NamedAction,
+    action: jig_domain_core::NamedAction,
 ) {
     let now = world.now();
     world.front().session.driver.send(
         now,
         clock(now),
-        jig_test_domain::Event::Core(jig_core::Event::NamedAction {
+        jig_test_domain::Event::Core(jig_domain_core::Event::NamedAction {
             to: skein_lib::ReplyTo::new(Token::new(9_900 + u64::from(completion))),
-            key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion, position: 0 },
+            key: jig_domain_core::CallKey {
+                task: assignment.task,
+                attempt: assignment.attempt,
+                completion,
+                position: 0,
+            },
             action,
         }),
     );
@@ -25,16 +30,16 @@ pub(super) fn action(
 fn a_note_written_corrected_by_a_person_and_recalled() {
     let mut world = configured(8517, vec![Box::new([Script::Wait])], |configuration, owner| {
         let mut rules = configuration.core.authority.rules().clone();
-        rules.ceiling.notes = jig_core_authority::Scopes::PROJECT;
+        rules.ceiling.notes = jig_domain_authority::Scopes::PROJECT;
         let mut policy = configuration.core.authority.policy(1).expect("project policy").clone();
-        policy.ceiling.notes = jig_core_authority::Scopes::PROJECT;
-        policy.roles[2].authority.notes = jig_core_authority::Scopes::PROJECT;
-        let mut checked = jig_core_authority::Domain::new(rules, owner.core.authority).expect("bounded note policy");
-        let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
-        jig_core_authority::step(&mut checked, jig_core_authority::Event::Policy { project: 1, policy }, &mut out);
-        assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
+        policy.ceiling.notes = jig_domain_authority::Scopes::PROJECT;
+        policy.roles[2].authority.notes = jig_domain_authority::Scopes::PROJECT;
+        let mut checked = jig_domain_authority::Domain::new(rules, owner.core.authority).expect("bounded note policy");
+        let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+        jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
+        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
         configuration.core.authority = checked;
-        configuration.core.settings.chat_authority.notes = jig_core_authority::Scopes::PROJECT;
+        configuration.core.settings.chat_authority.notes = jig_domain_authority::Scopes::PROJECT;
     });
     let member = world.client_with(3, crate::stories::conversation(), receiving_limits(), client);
     world.person(member, start(b"remember and correct"));
@@ -47,20 +52,20 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
         &mut world,
         &assignment,
         1,
-        jig_core::NamedAction::Note {
-            entry: jig_core_notes::New {
+        jig_domain_core::NamedAction::Note {
+            entry: jig_domain_notes::New {
                 name: 0,
-                scope: jig_core_notes::Scope::Project { project: 1 },
+                scope: jig_domain_notes::Scope::Project { project: 1 },
                 description: b"original".as_slice().into(),
                 body: b"first body".as_slice().into(),
                 references: skein_lib::List::with_capacity(1),
-                author: jig_core_notes::Author::Task { task: assignment.task, attempt: assignment.attempt },
+                author: jig_domain_notes::Author::Task { task: assignment.task, attempt: assignment.attempt },
             },
             recalled: None,
         },
     );
     let name = match world.front().session.driver.world.answers.last().expect("committed note answer").2 {
-        jig_core::CallPart::NoteWritten { name, revision: 1 } => name,
+        jig_domain_core::CallPart::NoteWritten { name, revision: 1 } => name,
         ref other => panic!("note write must be admitted: {other:?}"),
     };
     let within = Duration::from_secs(1);
@@ -106,24 +111,24 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
         .person
         .expect("member sign-in");
     assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Notes(jig_core_notes::Record::Entry(entry)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Notes(jig_domain_notes::Record::Entry(entry)))
         if entry.name == name && entry.revision == 2 && entry.body.as_ref() == b"second body"
-        && entry.author == jig_core_notes::Author::Party { party: actual })));
+        && entry.author == jig_domain_notes::Author::Party { party: actual })));
     action(
         &mut world,
         &assignment,
         2,
-        jig_core::NamedAction::Recall { by: jig_core_notes::Recall::Name { name }, page: 0 },
+        jig_domain_core::NamedAction::Recall { by: jig_domain_notes::Recall::Name { name }, page: 0 },
     );
     assert!(matches!(world.front().session.driver.world.answers.last(),
-        Some((_, _, jig_core::CallPart::NoteRecalled { entries, more: false }))
+        Some((_, _, jig_domain_core::CallPart::NoteRecalled { entries, more: false }))
         if entries.len() == 1 && entries[0].revision == 2 && entries[0].body.as_ref() == b"second body"));
 }
 
 #[test]
 #[expect(clippy::too_many_lines, reason = "one ordered engine/person escalation story retains its assertions together")]
 fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
-    use jig_core_tasks as tasks;
+    use jig_domain_tasks as tasks;
     use jig_test_domain as root;
     let mut world = configured_with_slots(
         8518,
@@ -148,8 +153,8 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen[0].clone();
     let owner = &world.front().session.driver.world;
     let mut authority =
-        match owner.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Live(assignment.task)))) {
-            Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) => row.authority.clone(),
+        match owner.store.rows.get(&root::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(assignment.task)))) {
+            Some(root::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row)))) => row.authority.clone(),
             other => panic!("actual parent authority: {other:?}"),
         };
     authority.budget.spend = 20;
@@ -158,10 +163,15 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
     world.front().session.driver.send(
         now,
         clock(now),
-        root::Event::Core(jig_core::Event::DelegateValidated {
+        root::Event::Core(jig_domain_core::Event::DelegateValidated {
             to: skein_lib::ReplyTo::new(Token::new(9801)),
-            key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion: 1, position: 0 },
-            batch: Box::new([jig_core::Delegate {
+            key: jig_domain_core::CallKey {
+                task: assignment.task,
+                attempt: assignment.attempt,
+                completion: 1,
+                position: 0,
+            },
+            batch: Box::new([jig_domain_core::Delegate {
                 executor: tasks::Executor::Agent { charter: 1 },
                 spec: tasks::Spec {
                     words: b"retry this delegate".as_slice().into(),
@@ -178,7 +188,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         }),
     );
     let child = match &world.front().session.driver.world.answers.last().expect("delegate answer").2 {
-        jig_core::CallPart::Delegated(numbers) => numbers[0],
+        jig_domain_core::CallPart::Delegated(numbers) => numbers[0],
         other => panic!("delegation must be admitted: {other:?}"),
     };
     world.person(member, vec![Step::Pause { span: Duration::from_millis(2100) }]);
@@ -192,9 +202,9 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         .world
         .store
         .rows
-        .get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child))))
+        .get(&root::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(child))))
     {
-        Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row)))) => {
+        Some(root::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row)))) => {
             assert!(matches!(row.phase, tasks::Phase::Held { why: tasks::Hold::Failures(tasks::Class::Run), .. }));
             match row.escalation {
                 tasks::Escalation::Waiting { revision, holder: tasks::EscalationHolder::Task(parent), .. }
@@ -211,14 +221,18 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         &mut world,
         &assignment,
         2,
-        jig_core::NamedAction::DecideEscalation { task: child, revision, choice: jig_core::EscalationChoice::Pass },
+        jig_domain_core::NamedAction::DecideEscalation {
+            task: child,
+            revision,
+            choice: jig_domain_core::EscalationChoice::Pass,
+        },
     );
     let requester = world.front().session.driver.world.peers.as_ref().expect("actual owner").parties[0]
         .person
         .expect("owner sign-in");
     assert!(
-        matches!(world.front().session.driver.world.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Live(child)))),
-        Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Live(row))))
+        matches!(world.front().session.driver.world.store.rows.get(&root::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Live(child)))),
+        Some(root::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Live(row))))
         if matches!(row.escalation, tasks::Escalation::Waiting { holder: tasks::EscalationHolder::Person(person), .. } if person == requester))
     );
     let within = Duration::from_secs(1);
@@ -250,12 +264,12 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
     assert!(outcome.judged.0 > 0);
     let owner = &world.front().session.driver.world;
     for (task, words) in [(child, b"delegate recovered".as_slice()), (assignment.task, b"parent done".as_slice())] {
-        assert!(matches!(owner.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(tasks::Key::Ended(task)))),
-            Some(root::Record::Core(jig_core::Record::Tasks(tasks::Stored::Ended(row))))
+        assert!(matches!(owner.store.rows.get(&root::Key::Core(jig_domain_core::Key::Tasks(tasks::Key::Ended(task)))),
+            Some(root::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Ended(row))))
             if matches!(&row.phase, tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: actual })) if actual.as_ref() == words)));
     }
     assert!(owner.store.rows.values().any(|row| matches!(row,
-        root::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        root::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. }))
         if matches!(outcome, people::Outcome::Released { task } if *task == child))));
     let attempts: std::collections::BTreeSet<_> = owner.peers.as_ref().expect("actual worker").workers[0]
         .seen
@@ -316,9 +330,9 @@ fn drift_holds_a_task_and_the_person_is_told_why() {
         );
     }
     assert!(
-        matches!(world.front().session.driver.world.store.rows.get(&root::Key::Core(jig_core::Key::Tasks(jig_core_tasks::Key::Live(assignment.task)))),
-        Some(root::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(row))))
-        if matches!(row.phase, jig_core_tasks::Phase::Held { why: jig_core_tasks::Hold::Drift, .. }))
+        matches!(world.front().session.driver.world.store.rows.get(&root::Key::Core(jig_domain_core::Key::Tasks(jig_domain_tasks::Key::Live(assignment.task)))),
+        Some(root::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(row))))
+        if matches!(row.phase, jig_domain_tasks::Phase::Held { why: jig_domain_tasks::Hold::Drift, .. }))
     );
     let within = Duration::from_secs(1);
     world.person(

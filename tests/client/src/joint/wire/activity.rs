@@ -2,7 +2,7 @@
 //! (client/domain/contract.md, 5 and 7; domain/engine.md, 5.4 and 7.2).
 use super::{chips, owner, results, turns};
 use jig_client::{Limits, contract as client};
-use jig_core_tasks as tasks;
+use jig_domain_tasks as tasks;
 use jig_scripted_engine as admission;
 use skein_lib::List;
 
@@ -197,7 +197,7 @@ pub fn line(task: u64, value: &tasks::ActivityLine, limits: &Limits) -> Result<c
 /// Refuses mismatched source identities, invalid whole message metadata, archive decoding failures or a complete payload above the receiving bounds.
 pub fn with_archive(
     value: &client::ActivityLine,
-    archive: &jig_core::TurnRecord,
+    archive: &jig_domain_core::TurnRecord,
     codec: &jig_client_transcript::Limits,
     limits: &Limits,
 ) -> Result<client::ActivityLine, Invalid> {
@@ -329,7 +329,7 @@ mod tests {
         .expect("supplied archive");
         assert!(original.event.decoded_turn().is_none());
         assert_eq!(original.event.read_position(), Some(0));
-        let archive = jig_core::TurnRecord {
+        let archive = jig_domain_core::TurnRecord {
             task: u64::MAX,
             attempt: u64::MAX,
             turn: u32::MAX,
@@ -339,7 +339,7 @@ mod tests {
             transcript: record().into(),
         };
         assert_eq!(
-            with_archive(&original, &jig_core::TurnRecord { attempt: 8, ..archive.clone() }, &codec, &limits),
+            with_archive(&original, &jig_domain_core::TurnRecord { attempt: 8, ..archive.clone() }, &codec, &limits),
             Err(Invalid::Identity)
         );
         let decoded = with_archive(&original, &archive, &codec, &limits).expect("actual fetched record");
@@ -362,7 +362,7 @@ mod tests {
         assert_eq!(
             with_archive(
                 &original,
-                &jig_core::TurnRecord { transcript: Box::from([255, 255]), ..archive.clone() },
+                &jig_domain_core::TurnRecord { transcript: Box::from([255, 255]), ..archive.clone() },
                 &codec,
                 &limits
             ),

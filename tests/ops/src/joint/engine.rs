@@ -4,8 +4,8 @@ use crate::conformance::{self, Config, Delivery, Ops, Systems};
 use jig_client_world::harness::Observed;
 use jig_client_world::joint::{transport::Transport, truth::Truth};
 use jig_conformance::{Application, Clock, Input, Output, referee};
-use jig_core as core;
-use jig_core_people as people;
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_fake_store::Store;
 use jig_ops_domain as root;
 use skein_lib::Time;
@@ -60,10 +60,10 @@ pub fn core_store(store: &Rows) -> jig_core_world::Store {
     values
 }
 
-fn task_row(store: &jig_core_world::Store, number: u64) -> Option<&jig_core_tasks::TaskRecord> {
+fn task_row(store: &jig_core_world::Store, number: u64) -> Option<&jig_domain_tasks::TaskRecord> {
     store.rows.values().find_map(|record| match record {
         jig_test_domain::Record::Core(core::Record::Tasks(
-            jig_core_tasks::Stored::Live(task) | jig_core_tasks::Stored::Ended(task),
+            jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
         )) if task.number == number => Some(task.as_ref()),
         jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
     })
@@ -78,7 +78,7 @@ fn read_page(store: &Rows, range: &core::reads::Range) -> core::reads::Loaded {
     };
     let mut ordered = std::collections::BTreeMap::new();
     for record in store.rows.values() {
-        let jig_test_domain::Record::Core(core::Record::Tasks(jig_core_tasks::Stored::History(history))) = record
+        let jig_test_domain::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::History(history))) = record
         else {
             continue;
         };
@@ -89,14 +89,14 @@ fn read_page(store: &Rows, range: &core::reads::Range) -> core::reads::Loaded {
         let Some(owner) = task_row(&store, history.task) else { continue };
         let mut ancestors = Vec::new();
         let mut parent = owner.requester;
-        while let jig_core_tasks::Party::Task(number) = parent {
+        while let jig_domain_tasks::Party::Task(number) = parent {
             assert!(!ancestors.contains(&number), "actual task ancestry is acyclic");
             ancestors.push(number);
             let Some(row) = task_row(&store, number) else { break };
             parent = row.requester;
         }
         let row = core::reads::Row {
-            value: core::Record::Tasks(jig_core_tasks::Stored::History(history.clone())),
+            value: core::Record::Tasks(jig_domain_tasks::Stored::History(history.clone())),
             owner: Some(Box::new(owner.clone())),
             ancestors: ancestors.into(),
             related: None,
@@ -233,7 +233,7 @@ impl Application for OpsApplication {
         };
         if let root::Output::CoreLoad(core::Now::SeenChat { request, task }) = delivery {
             let row = store.rows.values().find_map(|record| match record {
-                root::Record::Core(core::Record::Tasks(jig_core_tasks::Stored::Ended(row))) if row.number == task => {
+                root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Ended(row))) if row.number == task => {
                     Some(row.clone())
                 }
                 root::Record::Core(_) | root::Record::Infrastructure(_) | root::Record::Observability(_) => None,

@@ -1,5 +1,5 @@
 //! Expectations over client replies and durable task creations, never state.
-use jig_core_people::{Ending, HoldReason, Lack, Moved, Party, Refusal, RequestKey, Role};
+use jig_domain_people::{Ending, HoldReason, Lack, Moved, Party, Refusal, RequestKey, Role};
 use skein_lib::Duration;
 use skein_world::domain::{Expectations, Judge};
 use std::collections::BTreeSet;

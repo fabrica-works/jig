@@ -2,9 +2,9 @@
 //! (client/domain/contract.md, 7). The sign-in supplies the authenticated party;
 //! translation does not choose visibility or reinterpret a role's project.
 use jig_client::contract as client;
-use jig_core::{Event, WatchRefusal, documents};
-use jig_core_tasks as tasks;
-use jig_core_views as views;
+use jig_domain_core::{Event, WatchRefusal, documents};
+use jig_domain_tasks as tasks;
+use jig_domain_views as views;
 use skein_lib::Token;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

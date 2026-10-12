@@ -2,7 +2,7 @@
 //! a counting allocator: the host with every slot holding an assignment of
 //! exactly its limits, then every run ending with as much as it may hold.
 
-use jig_host::{
+use jig_domain_host::{
     AgentFailure, Ask, Bounce, Delivery, DeliveryOutcome, Domain, Ending, Event, Finish, Grant, Invalid, Limits,
     Preparation, Reason, Refusal, Request, RunAssignment, Workspace, max_out, resume, step, worst_case,
 };
@@ -44,7 +44,7 @@ enum Asked {
     Relay { call: Token },
     Save { owner: Token },
     RunEnding { answer: Ending },
-    Answer { answer: jig_host::Answer },
+    Answer { answer: jig_domain_host::Answer },
     Turn,
     Bounced { bounce: Bounce },
     Hosting { runs: usize },
@@ -156,7 +156,7 @@ fn fill(limits: Limits) {
     for run in 0..u64::from(limits.slots) {
         let [Asked::Prepare { owner }] = host.step(Event::Assign {
             reply_to: ReplyTo::new(Token::new(run)),
-            assignment: jig_host::Assignment {
+            assignment: jig_domain_host::Assignment {
                 assignment: assignment(run, &limits),
                 turns: Box::new([]),
                 answered: Box::new([]),
@@ -292,7 +292,7 @@ fn paths(limits: Limits) {
     for run in 0..u64::from(limits.slots) {
         let [Asked::Prepare { owner }] = host.step(Event::Assign {
             reply_to: ReplyTo::new(Token::new(run)),
-            assignment: jig_host::Assignment {
+            assignment: jig_domain_host::Assignment {
                 assignment: assignment(run, &limits),
                 turns: Box::new([]),
                 answered: Box::new([]),
@@ -359,7 +359,7 @@ fn every_entry_point_stays_within_the_worst_case() {
 
 #[test]
 fn ordered_transcripts_and_delivery_feedback_fit_the_hosts_bound() {
-    use jig_host::{Assignment, Ending, Finish, Turn};
+    use jig_domain_host::{Assignment, Ending, Finish, Turn};
     let limits = Limits { transcript_bytes: 2048, turn_bytes: 128, turns: 1, turn_queue_bytes: 128, ..LIMITS };
     let mut owners = Vec::with_capacity(usize::try_from(limits.slots).expect("bounded"));
     let mut host = Measured::new(limits);

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use jig_core_fleet::Limits;
+use jig_domain_fleet::Limits;
 use jig_fleet_world::{LIMITS, Settings, Span, Stats, World};
 use skein_lib::Duration;
 use skein_world::domain::assert_replays;

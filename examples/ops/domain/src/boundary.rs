@@ -2,10 +2,10 @@
 //! copying this application; keep Store and Released (domain/root.md, 2–4).
 use crate::{Range, Record, Write};
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_core_fleet as fleet;
-use jig_core_tasks as tasks;
-use jig_host as host;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_host as host;
+use jig_domain_tasks as tasks;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Queue, ReplyTo, Token, Wall};
@@ -112,7 +112,7 @@ pub enum AgentContent {
     /// Text at `offset` of the completion `turn`'s `retry`; empty as it begins.
     Text { turn: u32, retry: u32, offset: u32, text: Box<[u8]> },
     /// A call the completion makes.
-    Call(jig_core_views::Call),
+    Call(jig_domain_views::Call),
 }
 
 /// A timer retains its owner's identity through the root's admission.

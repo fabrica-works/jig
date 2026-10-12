@@ -1,5 +1,5 @@
 use crate::referee::{People, RouteKind, Seen, Stimulus};
-use jig_core_people::{
+use jig_domain_people::{
     self as people, Again, Ask, Domain, Entry, Event, Holding, Identity, IdentityKey, InitialOwner, Key, Lack, Limits,
     Outcome, ProposalChoice, ProposalDecision, Refusal, Reply, Request, RequestKey, Role, Seed, Stored,
 };

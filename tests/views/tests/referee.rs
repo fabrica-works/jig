@@ -1,4 +1,4 @@
-use jig_core_views::{Event, Follow, Request, TurnName};
+use jig_domain_views::{Event, Follow, Request, TurnName};
 use jig_views_world::World;
 use skein_lib::Token;
 #[test]
@@ -18,7 +18,7 @@ fn ending_before_the_delivery_terminal_fails_the_referee() {
         std::panic::catch_unwind(|| {
             let mut world = World::default();
             world.watch(1, 7);
-            world.referee.saw(&[Request::Ended { watcher: Token::new(1), end: jig_core_views::End::Gone }]);
+            world.referee.saw(&[Request::Ended { watcher: Token::new(1), end: jig_domain_views::End::Gone }]);
         })
         .is_err()
     );

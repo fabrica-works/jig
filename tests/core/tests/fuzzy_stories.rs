@@ -1,6 +1,6 @@
-use jig_core as core;
-use jig_core_tasks as tasks;
 use jig_core_world::{effects::World, faults::plan_fixture};
+use jig_domain_core as core;
+use jig_domain_tasks as tasks;
 use jig_test_connector as connector;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Rng, Token};
@@ -189,26 +189,26 @@ fn random_policy_changes_leave_a_committed_flight_whole_and_recheck_waiting_prop
             world.hold_writes = true;
             world.call(1, 9201);
             let proposal = world.propose(2);
-            world.send(root::Event::Core(core::Event::People(jig_core_people::Event::Ask {
+            world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Ask {
                 reply_to: ReplyTo::new(Token::new(9400)),
                 sign_in: world.sign_in.expect("person"),
                 key: [43; 16],
-                ask: jig_core_people::Ask::ChangePolicy {
+                ask: jig_domain_people::Ask::ChangePolicy {
                     project: 1,
-                    change: jig_core_people::PolicyChange::Requirements {
-                        requirements: Box::new([jig_core_people::Requirement {
+                    change: jig_domain_people::PolicyChange::Requirements {
+                        requirements: Box::new([jig_domain_people::Requirement {
                             connector: 1,
                             kind: 5,
-                            pattern: jig_core_people::Pattern {
+                            pattern: jig_domain_people::Pattern {
                                 segments: Box::new([]),
-                                last: jig_core_people::Last::Open(Box::new([])),
+                                last: jig_domain_people::Last::Open(Box::new([])),
                             },
-                            judge: jig_core_people::Judge {
+                            judge: jig_domain_people::Judge {
                                 connector: 2,
                                 requirement: 9 + u16::try_from(rng.below(4)).expect("requirement"),
                                 parameters: 0,
                             },
-                            guard: jig_core_people::Guard::Guarded,
+                            guard: jig_domain_people::Guard::Guarded,
                             must_be_guarded: true,
                         }]),
                     },
@@ -219,7 +219,7 @@ fn random_policy_changes_leave_a_committed_flight_whole_and_recheck_waiting_prop
             world.call(3, 9203);
             assert!(matches!(
                 world.answers.last(),
-                Some((_, _, core::CallPart::EffectDenied { answer: jig_core_authority::Answer::Refuse, .. }))
+                Some((_, _, core::CallPart::EffectDenied { answer: jig_domain_authority::Answer::Refuse, .. }))
             ));
             assert_eq!(world.systems[0].observed().iter().filter(|row| row.applied).count(), 1);
             assert_eq!(world.spent(), 3);

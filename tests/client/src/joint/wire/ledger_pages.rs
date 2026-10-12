@@ -3,8 +3,8 @@
 //! retains row order, independent clocks and both original opaque edges.
 use super::{chips, cursor, owner, pages::Invalid, results};
 use jig_client::{Limits, contract as client};
-use jig_core::reads;
-use jig_core_tasks as tasks;
+use jig_domain_core::reads;
+use jig_domain_tasks as tasks;
 use jig_scripted_engine as admission;
 use skein_lib::List;
 
@@ -101,7 +101,7 @@ pub fn spend(project: u32, page: &reads::Page, limits: &Limits) -> Result<client
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use jig_core::documents;
+    use jig_domain_core::documents;
     use skein_lib::Wall;
 
     pub(crate) fn limits() -> Limits {
@@ -130,7 +130,10 @@ pub(crate) mod tests {
         reads::Page {
             rows: List::with_capacity(8),
             before: Some(reads::Cursor::Store { scope: scope.clone(), after: None }),
-            next: Some(reads::Cursor::Store { scope, after: Some(reads::Position::Owner(jig_core::Key::Tasks(key))) }),
+            next: Some(reads::Cursor::Store {
+                scope,
+                after: Some(reads::Position::Owner(jig_domain_core::Key::Tasks(key))),
+            }),
             cut: true,
             inbox_selection: None,
         }

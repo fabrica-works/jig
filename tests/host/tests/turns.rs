@@ -1,7 +1,7 @@
 //!  Worker host peers: engine commits, a lossy link, and an
 //! agent and workspace that settle through the host's requests.
 
-use jig_host::{AnsweredCall, DeliveryOutcome, Ending, Failure, Reason, SettledAnswer};
+use jig_domain_host::{AnsweredCall, DeliveryOutcome, Ending, Failure, Reason, SettledAnswer};
 use jig_host_world::turn_world::World;
 use skein_lib::{Duration, Token};
 

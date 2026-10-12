@@ -3,7 +3,7 @@
 //! independent of immutable history and application part scope.
 use super::{chips, history, offers, owner, results};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
+use jig_domain_core::documents;
 
 #[must_use]
 pub fn key(proposer: documents::Proposer, number: u64) -> client::ProposalKey {
@@ -99,7 +99,7 @@ pub fn document(value: &documents::Proposal, limits: &Limits) -> Result<client::
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use jig_core_tasks as tasks;
+    use jig_domain_tasks as tasks;
     use skein_lib::{List, Wall};
 
     pub(crate) fn source() -> documents::Proposal {

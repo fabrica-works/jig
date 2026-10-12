@@ -13,8 +13,8 @@ fn family_client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_
 }
 
 fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &jig_test_domain::Limits) {
-    let kinds: Box<[jig_core_authority::Executor]> =
-        Box::new([jig_core_authority::Executor::Charter(1), jig_core_authority::Executor::Procedure(1)]);
+    let kinds: Box<[jig_domain_authority::Executor]> =
+        Box::new([jig_domain_authority::Executor::Charter(1), jig_domain_authority::Executor::Procedure(1)]);
     configuration.core.settings.chat_authority.delegation.kinds.clone_from(&kinds);
     let mut rules = configuration.core.authority.rules().clone();
     rules.ceiling.delegation.kinds.clone_from(&kinds);
@@ -23,10 +23,10 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
     for role in &mut policy.roles {
         role.authority.delegation.kinds.clone_from(&kinds);
     }
-    let mut checked = jig_core_authority::Domain::new(rules, owner.core.authority).expect("declared executor bounds");
-    let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
-    jig_core_authority::step(&mut checked, jig_core_authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
+    let mut checked = jig_domain_authority::Domain::new(rules, owner.core.authority).expect("declared executor bounds");
+    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+    jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configuration.core.authority = checked;
     configuration.first.procedures = Box::new([jig_test_connector::ProcedureSpec {
         number: 1,
@@ -78,7 +78,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
         .rows
         .values()
         .filter_map(|row| {
-            if let jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer {
+            if let jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
                 outcome: people::Outcome::GoalStarted { task },
                 ..
             })) = row
@@ -121,12 +121,12 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
 }
 
 fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig_test_domain::Limits) {
-    let grant = jig_core_authority::Grant {
+    let grant = jig_domain_authority::Grant {
         connector: 1,
         kind: 5,
-        pattern: jig_core_authority::Pattern {
+        pattern: jig_domain_authority::Pattern {
             segments: Box::new([]),
-            last: jig_core_authority::Last::Open(Box::new([])),
+            last: jig_domain_authority::Last::Open(Box::new([])),
         },
     };
     configuration.core.settings.chat_authority.grants = Box::new([grant.clone()]);
@@ -135,10 +135,10 @@ fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig
     let mut policy = configuration.core.authority.policy(1).expect("actual effect policy").clone();
     policy.ceiling.grants = Box::new([grant.clone()]);
     policy.roles[0].authority.grants = Box::new([grant]);
-    let mut checked = jig_core_authority::Domain::new(rules, owner.core.authority).expect("declared grant bounds");
-    let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
-    jig_core_authority::step(&mut checked, jig_core_authority::Event::Policy { project: 1, policy }, &mut out);
-    assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
+    let mut checked = jig_domain_authority::Domain::new(rules, owner.core.authority).expect("declared grant bounds");
+    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+    jig_domain_authority::step(&mut checked, jig_domain_authority::Event::Policy { project: 1, policy }, &mut out);
+    assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configuration.core.authority = checked;
 }
 
@@ -159,7 +159,12 @@ fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card()
         clock(now),
         jig_test_domain::Event::EffectCall {
             to: skein_lib::ReplyTo::new(Token::new(9860)),
-            key: jig_core::CallKey { task: assignment.task, attempt: assignment.attempt, completion: 1, position: 0 },
+            key: jig_domain_core::CallKey {
+                task: assignment.task,
+                attempt: assignment.attempt,
+                completion: 1,
+                position: 0,
+            },
             number: 1,
             effect: jig_core_world::effects::World::effect(),
             deadline: skein_lib::Wall::from_nanos(clock(now).as_nanos() + 1_000_000_000),
@@ -183,7 +188,7 @@ fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card()
     assert!(outcome.judged.0 > 0);
     let engine = &world.front().session.driver.world;
     assert_eq!(engine.answers.len(), 1);
-    assert!(matches!(engine.answers[0].2, jig_core::CallPart::Proposed { .. }));
+    assert!(matches!(engine.answers[0].2, jig_domain_core::CallPart::Proposed { .. }));
     assert!(
         !engine.store.rows.values().any(|row| matches!(
             row,

@@ -1,10 +1,10 @@
-use jig_core::{self as core, documents, reads};
-use jig_core_people as people;
 use jig_core_world::{
     client_peer::ClientPeer,
     effects::World,
     peers::{Peers, fixture},
 };
+use jig_domain_core::{self as core, documents, reads};
+use jig_domain_people as people;
 use jig_fake_store::Fault;
 use jig_fake_workers::{Script, Worker};
 use jig_test_domain as root;

@@ -50,7 +50,7 @@ fn a_draft_kept_across_a_reload_stays_unsent_on_the_actual_engine() {
             .values()
             .filter(|record| matches!(
                 record,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         1
@@ -86,7 +86,10 @@ pub(super) fn answers(world: &mut World<Test, Joint>) -> usize {
         .rows
         .values()
         .filter(|record| {
-            matches!(record, jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. })))
+            matches!(
+                record,
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
+            )
         })
         .count()
 }

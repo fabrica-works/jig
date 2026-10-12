@@ -25,8 +25,8 @@ fn a_batch_beyond_the_limits_is_refused_whole_and_the_party_told_why() {
     assert!(world.procedure.is_none(), "no member of the refused batch received an ID");
     assert!(
         !world.store.rows.values().any(|row| matches!(row,
-            jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(task)))
-                if task.requester == jig_core_tasks::Party::Task(world.chat.expect("parent goal"))
+            jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(task)))
+                if task.requester == jig_domain_tasks::Party::Task(world.chat.expect("parent goal"))
         )),
         "the batch left no child row"
     );

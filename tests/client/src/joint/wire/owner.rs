@@ -2,8 +2,8 @@
 //! This layer copies opaque names, paths, codes and loss facts. It owns no
 //! application scope or document policy and never clips a receiving value.
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
-use jig_core_tasks as tasks;
+use jig_domain_core::documents;
+use jig_domain_tasks as tasks;
 use skein_lib::List;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,13 +52,13 @@ pub fn text(value: &documents::Text, limits: &Limits) -> Result<client::Document
 }
 
 #[must_use]
-pub fn held_role(value: jig_core_people::Role) -> client::HeldRole {
+pub fn held_role(value: jig_domain_people::Role) -> client::HeldRole {
     match value {
-        jig_core_people::Role::Owner => client::HeldRole::Owner,
-        jig_core_people::Role::Maintainer => client::HeldRole::Maintainer,
-        jig_core_people::Role::Member => client::HeldRole::Member,
-        jig_core_people::Role::Observer => client::HeldRole::Observer,
-        jig_core_people::Role::Policy { role } => client::HeldRole::Policy { role },
+        jig_domain_people::Role::Owner => client::HeldRole::Owner,
+        jig_domain_people::Role::Maintainer => client::HeldRole::Maintainer,
+        jig_domain_people::Role::Member => client::HeldRole::Member,
+        jig_domain_people::Role::Observer => client::HeldRole::Observer,
+        jig_domain_people::Role::Policy { role } => client::HeldRole::Policy { role },
     }
 }
 
@@ -94,8 +94,8 @@ pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Frame,
         party: client::FrameParty {
             number: value.party,
             kind: match value.kind {
-                jig_core_people::Kind::Person => client::PartyKind::Person,
-                jig_core_people::Kind::Service => client::PartyKind::Service,
+                jig_domain_people::Kind::Person => client::PartyKind::Person,
+                jig_domain_people::Kind::Service => client::PartyKind::Service,
             },
             login: text(&value.login, limits)?,
             name: text(&value.name, limits)?,
@@ -789,11 +789,11 @@ pub(super) mod tests {
     #[test]
     fn frame_wire_keeps_independent_identity_loss_owner_counts_memberships_and_project_offers() {
         let roles = [
-            (jig_core_people::Role::Owner, client::HeldRole::Owner),
-            (jig_core_people::Role::Maintainer, client::HeldRole::Maintainer),
-            (jig_core_people::Role::Member, client::HeldRole::Member),
-            (jig_core_people::Role::Observer, client::HeldRole::Observer),
-            (jig_core_people::Role::Policy { role: u32::MAX }, client::HeldRole::Policy { role: u32::MAX }),
+            (jig_domain_people::Role::Owner, client::HeldRole::Owner),
+            (jig_domain_people::Role::Maintainer, client::HeldRole::Maintainer),
+            (jig_domain_people::Role::Member, client::HeldRole::Member),
+            (jig_domain_people::Role::Observer, client::HeldRole::Observer),
+            (jig_domain_people::Role::Policy { role: u32::MAX }, client::HeldRole::Policy { role: u32::MAX }),
         ];
         let mut projects = List::with_capacity(7);
         for (role, _) in roles {
@@ -815,13 +815,18 @@ pub(super) mod tests {
             .expect("the complete supplied fixture is admitted");
         let source = documents::Frame {
             party: u64::MAX,
-            kind: jig_core_people::Kind::Service,
+            kind: jig_domain_people::Kind::Service,
             login: documents::Text { bytes: Box::from([255, b'/']), cut: true },
             name: documents::Text { bytes: Box::new([]), cut: false },
             deployment_role: None,
             projects,
             needs: 123,
-            need_counts: jig_core_people::Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: u32::MAX },
+            need_counts: jig_domain_people::Needs {
+                questions: 1,
+                proposals: 2,
+                escalations: 3,
+                person_tasks: u32::MAX,
+            },
             updates: documents::Count::AtLeast(u32::MAX),
             results_seen: u64::MAX,
             retention: skein_lib::Duration::from_nanos(u64::MAX),
@@ -873,7 +878,7 @@ pub(super) mod tests {
         assert_eq!(frame(&source, &Limits { text: 1, ..limits }), Err(Invalid::TooLarge));
         let mut known = source;
         known.updates = documents::Count::Known(0);
-        known.kind = jig_core_people::Kind::Person;
+        known.kind = jig_domain_people::Kind::Person;
         let translated = frame(&known, &limits).expect("the complete supplied fixture is admitted");
         assert_eq!(translated.updates, client::Count { value: 0, limited: false });
         assert_eq!(translated.party.kind, client::PartyKind::Person);

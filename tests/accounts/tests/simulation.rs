@@ -1,5 +1,5 @@
 use jig_accounts_world::World;
-use jig_core_accounts::{Event, Fact, Failure, Grant, Request, State};
+use jig_domain_accounts::{Event, Fact, Failure, Grant, Request, State};
 use skein_lib::Duration;
 
 fn fresh(world: &mut World) {

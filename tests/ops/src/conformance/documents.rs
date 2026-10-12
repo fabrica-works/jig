@@ -39,8 +39,8 @@ pub fn leads_submitted(peers: &mut Peers, store: &Store) {
         });
         if let Some(association) = association {
             assert!(pending.writes.iter().any(|write| matches!(write,
-                jig_fake_store::Write::Save { row: root::Record::Core(core::Record::Tasks(jig_core_tasks::Stored::Live(task))), .. }
-                if task.number == lead && task.requester == jig_core_tasks::Party::Task(association.task)
+                jig_fake_store::Write::Save { row: root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(task))), .. }
+                if task.number == lead && task.requester == jig_domain_tasks::Party::Task(association.task)
             )), "lead association and actual child are submitted together");
             peers.lead_commits.push((pending.number, incident.clone(), association.clone()));
         }

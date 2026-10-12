@@ -7,7 +7,7 @@ use super::{
 };
 use crate::harness::ClientId;
 use jig_client::{Limits, contract as client};
-use jig_core_people as people;
+use jig_domain_people as people;
 use jig_scripted_engine as admission;
 use jig_test_client_domain::{Answered, Event, connector_values::ConnectorLimits, family};
 use jig_test_connector::ApplicationOutcome;
@@ -59,57 +59,57 @@ fn watched(transport: &Transport, watcher: Token) -> Result<(ClientId, Token, cl
 pub fn document(
     transport: &mut Transport,
     watcher: Token,
-    source: &jig_core::documents::Document,
+    source: &jig_domain_core::documents::Document,
     limits: &Limits,
 ) -> Result<Incoming, Invalid> {
     let (client, watch, subject) = watched(transport, watcher)?;
     let delivery = match source {
-        jig_core::documents::Document::Frame(value) => {
+        jig_domain_core::documents::Document::Frame(value) => {
             if subject != client::Subject::Frame || value.party != transport.party(client) {
                 return Err(Invalid::OwnerRoute);
             }
             wire::documents::frame_delivery(value, limits)
         }
-        jig_core::documents::Document::Task(value) => {
+        jig_domain_core::documents::Document::Task(value) => {
             let client::Subject::Task { task } = subject else { return Err(Invalid::OwnerRoute) };
             if value.chip.number != task {
                 return Err(Invalid::OwnerRoute);
             }
             wire::documents::task_delivery(value, limits)
         }
-        jig_core::documents::Document::Chips(values) => {
+        jig_domain_core::documents::Document::Chips(values) => {
             let client::Subject::Chips { tasks } = subject else { return Err(Invalid::OwnerRoute) };
             if values.iter().any(|chip| !tasks.iter().any(|task| *task == chip.number)) {
                 return Err(Invalid::OwnerRoute);
             }
             wire::documents::chips_delivery(values, limits)
         }
-        jig_core::documents::Document::Run(value) => {
+        jig_domain_core::documents::Document::Run(value) => {
             let client::Subject::Run { task, .. } = subject else { return Err(Invalid::OwnerRoute) };
             if value.task != task {
                 return Err(Invalid::OwnerRoute);
             }
             wire::documents::run_delivery(value, limits)
         }
-        jig_core::documents::Document::Conversations(value) => {
+        jig_domain_core::documents::Document::Conversations(value) => {
             if subject != client::Subject::Conversations {
                 return Err(Invalid::OwnerRoute);
             }
             wire::documents::conversations_delivery(value, limits)
         }
-        jig_core::documents::Document::Goals(value) => {
+        jig_domain_core::documents::Document::Goals(value) => {
             let client::Subject::Goals { project } = subject else {
                 return Err(Invalid::OwnerRoute);
             };
             wire::documents::goals_delivery(project, value, limits)
         }
-        jig_core::documents::Document::Tasks(value) => {
+        jig_domain_core::documents::Document::Tasks(value) => {
             let client::Subject::Tasks { project, filter, .. } = subject else {
                 return Err(Invalid::OwnerRoute);
             };
             wire::documents::tasks_delivery(project, &filter, value, limits)
         }
-        jig_core::documents::Document::Inbox(value) => {
+        jig_domain_core::documents::Document::Inbox(value) => {
             let client::Subject::Inbox { window } = subject else { return Err(Invalid::OwnerRoute) };
             if value.party != transport.party(client)
                 || value.needs.capacity() > window
@@ -119,23 +119,23 @@ pub fn document(
             }
             wire::documents::inbox_delivery(value, limits)
         }
-        jig_core::documents::Document::Tree(value) => {
+        jig_domain_core::documents::Document::Tree(value) => {
             let client::Subject::Tree { task, window } = subject else { return Err(Invalid::OwnerRoute) };
             wire::documents::tree_delivery(task, window, value, limits)
         }
-        jig_core::documents::Document::Deployment(value) => {
+        jig_domain_core::documents::Document::Deployment(value) => {
             if subject != client::Subject::Deployment {
                 return Err(Invalid::OwnerRoute);
             }
             wire::documents::deployment_delivery(value, limits)
         }
-        jig_core::documents::Document::Proposal(_)
-        | jig_core::documents::Document::Escalation(_)
-        | jig_core::documents::Document::Question(_)
-        | jig_core::documents::Document::PersonTask(_)
-        | jig_core::documents::Document::Result(_)
-        | jig_core::documents::Document::Project(_)
-        | jig_core::documents::Document::Note(_) => return Err(Invalid::PendingDocument),
+        jig_domain_core::documents::Document::Proposal(_)
+        | jig_domain_core::documents::Document::Escalation(_)
+        | jig_domain_core::documents::Document::Question(_)
+        | jig_domain_core::documents::Document::PersonTask(_)
+        | jig_domain_core::documents::Document::Result(_)
+        | jig_domain_core::documents::Document::Project(_)
+        | jig_domain_core::documents::Document::Note(_) => return Err(Invalid::PendingDocument),
     }
     .map_err(Invalid::Document)?;
     assert!(transport.delivered(watcher, Pace::Document), "validated owner route");
@@ -151,7 +151,7 @@ pub fn document(
 pub fn stream(
     transport: &mut Transport,
     watcher: Token,
-    source: &jig_core_views::Writing,
+    source: &jig_domain_views::Writing,
     limits: &Limits,
 ) -> Result<Incoming, Invalid> {
     let (client, watch, subject) = watched(transport, watcher)?;
@@ -169,13 +169,13 @@ pub fn stream(
 /// Preserve the owner's exact terminal and remove only that original watch.
 /// # Errors
 /// Rejects a missing or application-owned watch route.
-pub fn ended(transport: &mut Transport, watcher: Token, why: jig_core_views::End) -> Result<Incoming, Invalid> {
+pub fn ended(transport: &mut Transport, watcher: Token, why: jig_domain_views::End) -> Result<Incoming, Invalid> {
     let end = match why {
-        jig_core_views::End::Unwatched => client::WatchEnd::Closed,
-        jig_core_views::End::Gone => client::WatchEnd::SubjectEnded,
-        jig_core_views::End::NotAllowed => client::WatchEnd::NotAllowed,
-        jig_core_views::End::SignedOut => client::WatchEnd::SignedOut,
-        jig_core_views::End::Stopping => client::WatchEnd::Stopping,
+        jig_domain_views::End::Unwatched => client::WatchEnd::Closed,
+        jig_domain_views::End::Gone => client::WatchEnd::SubjectEnded,
+        jig_domain_views::End::NotAllowed => client::WatchEnd::NotAllowed,
+        jig_domain_views::End::SignedOut => client::WatchEnd::SignedOut,
+        jig_domain_views::End::Stopping => client::WatchEnd::Stopping,
     };
     terminal(transport, watcher, end)
 }
@@ -183,12 +183,16 @@ pub fn ended(transport: &mut Transport, watcher: Token, why: jig_core_views::End
 /// Exact immediate refusal, independent of the delivered document's ACK.
 /// # Errors
 /// Rejects an obsolete watch route without consuming another watch.
-pub fn refused(transport: &mut Transport, watcher: Token, why: jig_core::WatchRefusal) -> Result<Incoming, Invalid> {
+pub fn refused(
+    transport: &mut Transport,
+    watcher: Token,
+    why: jig_domain_core::WatchRefusal,
+) -> Result<Incoming, Invalid> {
     let end = match why {
-        jig_core::WatchRefusal::SignedOut => client::WatchEnd::SignedOut,
-        jig_core::WatchRefusal::NotAllowed => client::WatchEnd::NotAllowed,
-        jig_core::WatchRefusal::Unknown => client::WatchEnd::Unknown,
-        jig_core::WatchRefusal::Busy => client::WatchEnd::Busy,
+        jig_domain_core::WatchRefusal::SignedOut => client::WatchEnd::SignedOut,
+        jig_domain_core::WatchRefusal::NotAllowed => client::WatchEnd::NotAllowed,
+        jig_domain_core::WatchRefusal::Unknown => client::WatchEnd::Unknown,
+        jig_domain_core::WatchRefusal::Busy => client::WatchEnd::Busy,
     };
     terminal(transport, watcher, end)
 }
@@ -240,8 +244,8 @@ pub fn application_document(
         return Err(Invalid::OwnerRoute);
     }
     let supplied_scope = match subject.scope {
-        family::Scope::Project(project) => jig_core::documents::ApplicationScope::Project(project),
-        family::Scope::Deployment => jig_core::documents::ApplicationScope::Deployment,
+        family::Scope::Project(project) => jig_domain_core::documents::ApplicationScope::Project(project),
+        family::Scope::Deployment => jig_domain_core::documents::ApplicationScope::Deployment,
     };
     if supplied_scope != scope {
         return Err(Invalid::OwnerRoute);
@@ -410,8 +414,8 @@ mod tests {
         }
         value
     }
-    fn run(task: u64) -> jig_core::documents::Document {
-        jig_core::documents::Document::Run(jig_core::documents::Run {
+    fn run(task: u64) -> jig_domain_core::documents::Document {
+        jig_domain_core::documents::Document::Run(jig_domain_core::documents::Run {
             task,
             attempt: None,
             committed_turn: u32::MAX,
@@ -513,7 +517,7 @@ mod tests {
         let native = Token::new(u64::MAX);
         let wrong = transport.open(ClientId(0), native, Watched::Jig(client::Subject::Task { task: 0 }));
         let owner = transport.open(ClientId(1), native, Watched::Jig(client::Subject::Task { task: u64::MAX }));
-        let source = jig_core::documents::Document::Task(Box::new(wire::task::tests::source()));
+        let source = jig_domain_core::documents::Document::Task(Box::new(wire::task::tests::source()));
         let limits = wire::rows::tests::limits();
         assert!(matches!(document(&mut transport, wrong, &source, &limits), Err(Invalid::OwnerRoute)));
         assert!(matches!(
@@ -539,7 +543,7 @@ mod tests {
         assert_eq!(value.hold.as_ref().expect("owner hold").revision().value, 17);
         assert!(transport.taken(ClientId(0), native).is_none());
         assert!(
-            matches!(transport.taken(ClientId(1), native), Some(jig_core::Event::Delivered { watcher }) if watcher == owner)
+            matches!(transport.taken(ClientId(1), native), Some(jig_domain_core::Event::Delivered { watcher }) if watcher == owner)
         );
         assert!(transport.taken(ClientId(1), native).is_none());
     }
@@ -556,7 +560,7 @@ mod tests {
         );
         let original =
             transport.open(ClientId(1), native, Watched::Jig(client::Subject::Tree { task: u64::MAX, window: 4 }));
-        let source = jig_core::documents::Document::Tree(wire::documents::tests::tree_source());
+        let source = jig_domain_core::documents::Document::Tree(wire::documents::tests::tree_source());
         let limits = wire::rows::tests::limits();
         assert!(matches!(
             document(&mut transport, wrong, &source, &limits),
@@ -587,7 +591,7 @@ mod tests {
         assert_eq!((value.root.task, value.rows.capacity(), value.folded.capacity()), (u64::MAX, 4, 4));
         assert!(transport.taken(ClientId(0), native).is_none());
         assert!(
-            matches!(transport.taken(ClientId(1), native), Some(jig_core::Event::Delivered { watcher }) if watcher == original)
+            matches!(transport.taken(ClientId(1), native), Some(jig_domain_core::Event::Delivered { watcher }) if watcher == original)
         );
         assert!(transport.taken(ClientId(1), native).is_none());
     }
@@ -600,10 +604,10 @@ mod tests {
         let owner = transport.open(ClientId(1), native, Watched::Jig(client::Subject::Inbox { window: 8 }));
         let mut source = wire::inbox::tests::source();
         let limits = wire::inbox::tests::limits();
-        let wrong = jig_core::documents::Document::Inbox(source.clone());
+        let wrong = jig_domain_core::documents::Document::Inbox(source.clone());
         assert!(matches!(document(&mut transport, owner, &wrong, &limits), Err(Invalid::OwnerRoute)));
         source.party = u64::MAX;
-        let source = jig_core::documents::Document::Inbox(source);
+        let source = jig_domain_core::documents::Document::Inbox(source);
         assert!(matches!(document(&mut transport, small, &source, &limits), Err(Invalid::OwnerRoute)));
         assert!(matches!(
             document(&mut transport, owner, &source, &Limits { document_bytes: 100, ..limits }),
@@ -627,7 +631,7 @@ mod tests {
         assert_eq!(value.selection.as_ref().expect("source context").get(0).expect("row").goals.capacity(), 12);
         assert!(transport.taken(ClientId(0), native).is_none());
         assert!(
-            matches!(transport.taken(ClientId(1), native), Some(jig_core::Event::Delivered { watcher }) if watcher == owner)
+            matches!(transport.taken(ClientId(1), native), Some(jig_domain_core::Event::Delivered { watcher }) if watcher == owner)
         );
         assert!(transport.taken(ClientId(1), native).is_none());
     }
@@ -638,9 +642,9 @@ mod tests {
         let native = Token::new(u64::MAX);
         let conversations = transport.open(ClientId(0), native, Watched::Jig(client::Subject::Conversations));
         let goals = transport.open(ClientId(1), native, Watched::Jig(client::Subject::Goals { project: u32::MAX }));
-        let source = jig_core::documents::Document::Conversations(jig_core::documents::Conversations {
+        let source = jig_domain_core::documents::Document::Conversations(jig_domain_core::documents::Conversations {
             lines: skein_lib::List::with_capacity(3),
-            next: Some(jig_core::documents::Cursor::Number { number: u64::MAX }),
+            next: Some(jig_domain_core::documents::Cursor::Number { number: u64::MAX }),
         });
         let limits = Limits { rows: 4, ..crate::test::limits().jig };
         assert!(matches!(document(&mut transport, goals, &source, &limits), Err(Invalid::OwnerRoute)));
@@ -665,10 +669,10 @@ mod tests {
         assert_eq!(value.rows.capacity(), 3);
         assert!(transport.taken(ClientId(1), native).is_none());
         assert!(
-            matches!(transport.taken(ClientId(0), native), Some(jig_core::Event::Delivered { watcher }) if watcher == conversations)
+            matches!(transport.taken(ClientId(0), native), Some(jig_domain_core::Event::Delivered { watcher }) if watcher == conversations)
         );
         assert!(transport.taken(ClientId(0), native).is_none());
-        let source = jig_core::documents::Document::Goals(jig_core::documents::Goals {
+        let source = jig_domain_core::documents::Document::Goals(jig_domain_core::documents::Goals {
             lines: skein_lib::List::with_capacity(3),
             next: None,
         });
@@ -686,7 +690,7 @@ mod tests {
         assert_eq!((watch, value.project, value.more), (native, u32::MAX, false));
         assert_eq!(value.rows.capacity(), 3);
         assert!(
-            matches!(transport.taken(ClientId(1), native), Some(jig_core::Event::Delivered { watcher }) if watcher == goals)
+            matches!(transport.taken(ClientId(1), native), Some(jig_domain_core::Event::Delivered { watcher }) if watcher == goals)
         );
     }
     #[test]
@@ -713,7 +717,7 @@ mod tests {
                 window: 3,
             }),
         );
-        let source = jig_core::documents::Document::Tasks(jig_core::documents::Tasks {
+        let source = jig_domain_core::documents::Document::Tasks(jig_domain_core::documents::Tasks {
             project: u32::MAX,
             filter: wire::watches::task_filter(u32::MAX, &filter).expect("original filter"),
             rows: skein_lib::List::with_capacity(3),
@@ -747,7 +751,7 @@ mod tests {
         assert!(!value.more);
         assert!(transport.taken(ClientId(0), native).is_none());
         assert!(matches!(transport.taken(ClientId(1), native),
-            Some(jig_core::Event::Delivered { watcher: actual }) if actual == watcher));
+            Some(jig_domain_core::Event::Delivered { watcher: actual }) if actual == watcher));
         assert!(transport.taken(ClientId(1), native).is_none());
     }
     #[test]
@@ -771,8 +775,8 @@ mod tests {
         assert_eq!(watch, native);
         assert_eq!(state.task, 31);
         assert_eq!(state.writing, None);
-        let source = jig_core_views::Writing {
-            turn: jig_core_views::TurnName { attempt: u64::MAX, turn: 17, retry: u32::MAX },
+        let source = jig_domain_views::Writing {
+            turn: jig_domain_views::TurnName { attempt: u64::MAX, turn: 17, retry: u32::MAX },
             from: 91,
             to: 93,
             text: Box::from([255, 0]),
@@ -797,12 +801,12 @@ mod tests {
         assert_eq!(text.text.bytes(), &[255, 0]);
         assert!(text.cut);
         assert!(
-            matches!(transport.taken(ClientId(1), native), Some(jig_core::Event::Delivered { watcher: actual }) if actual == watcher)
+            matches!(transport.taken(ClientId(1), native), Some(jig_domain_core::Event::Delivered { watcher: actual }) if actual == watcher)
         );
         assert!(transport.taken(ClientId(1), native).is_none());
         assert!(matches!(transport.continued(ClientId(1), native, client::Subject::Run {
             task: 31, turn: Some(text.turn), offset: text.through,
-        }).expect("exact continuation"), Some(jig_core::Event::StreamDelivered { watcher: actual }) if actual == watcher));
+        }).expect("exact continuation"), Some(jig_domain_core::Event::StreamDelivered { watcher: actual }) if actual == watcher));
         assert_eq!(
             transport.watch(watcher).expect("retained position").subject,
             Watched::Jig(client::Subject::Run { task: 31, turn: Some(text.turn), offset: 93 })
@@ -829,11 +833,11 @@ mod tests {
     #[test]
     fn exact_watch_terminal_clears_only_its_original_client_route_and_both_flights() {
         for (why, expected) in [
-            (jig_core_views::End::Unwatched, client::WatchEnd::Closed),
-            (jig_core_views::End::Gone, client::WatchEnd::SubjectEnded),
-            (jig_core_views::End::NotAllowed, client::WatchEnd::NotAllowed),
-            (jig_core_views::End::SignedOut, client::WatchEnd::SignedOut),
-            (jig_core_views::End::Stopping, client::WatchEnd::Stopping),
+            (jig_domain_views::End::Unwatched, client::WatchEnd::Closed),
+            (jig_domain_views::End::Gone, client::WatchEnd::SubjectEnded),
+            (jig_domain_views::End::NotAllowed, client::WatchEnd::NotAllowed),
+            (jig_domain_views::End::SignedOut, client::WatchEnd::SignedOut),
+            (jig_domain_views::End::Stopping, client::WatchEnd::Stopping),
         ] {
             let mut transport = transport();
             transport.signed_in(ClientId(0), u64::MAX, 7);
@@ -962,12 +966,12 @@ mod tests {
         let watcher = transport.open(
             ClientId(0),
             native,
-            Watched::Application { subject, scope: jig_core::documents::ApplicationScope::Project(u32::MAX) },
+            Watched::Application { subject, scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX) },
         );
         let other = transport.open(
             ClientId(1),
             native,
-            Watched::Application { subject, scope: jig_core::documents::ApplicationScope::Project(u32::MAX) },
+            Watched::Application { subject, scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX) },
         );
         let limits = crate::test::limits().first.connector;
         assert!(matches!(
@@ -1013,7 +1017,7 @@ mod tests {
         assert_eq!(value.subject, subject);
         assert_eq!(*value.value, jig_test_connector::ClientDocument::Result { task: u64::MAX, code: u16::MAX });
         assert!(
-            matches!(transport.application_taken(ClientId(0), native), Some(jig_core::Event::Delivered { watcher: actual }) if actual == watcher)
+            matches!(transport.application_taken(ClientId(0), native), Some(jig_domain_core::Event::Delivered { watcher: actual }) if actual == watcher)
         );
         assert!(transport.application_taken(ClientId(0), native).is_none());
         assert!(transport.application_taken(ClientId(1), native).is_none());
@@ -1076,7 +1080,7 @@ mod tests {
                 native,
                 Watched::Application {
                     subject: application_subject(),
-                    scope: jig_core::documents::ApplicationScope::Project(u32::MAX),
+                    scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX),
                 },
             );
             let other = transport.open(
@@ -1084,7 +1088,7 @@ mod tests {
                 native,
                 Watched::Application {
                     subject: application_subject(),
-                    scope: jig_core::documents::ApplicationScope::Project(u32::MAX),
+                    scope: jig_domain_core::documents::ApplicationScope::Project(u32::MAX),
                 },
             );
             let Incoming::Callback {

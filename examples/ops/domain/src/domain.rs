@@ -3,10 +3,10 @@
 use crate::boundary::Payload;
 use crate::{Event, Limits, Output, Record, Released, Store, Write};
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_core_fleet as fleet;
-use jig_host as host;
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_fleet as fleet;
+use jig_domain_host as host;
 use jig_ops_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
@@ -17,7 +17,7 @@ use skein_lib::{Decision, Env, Journal, Map, Queue, Token};
 pub(crate) struct Assignment {
     pub(crate) attempt: u64,
     pub(crate) value: host::Assignment,
-    pub(crate) inbox: Box<[jig_core_tasks::Word]>,
+    pub(crate) inbox: Box<[jig_domain_tasks::Word]>,
 }
 
 /// A connector read keeps only its caller continuation and opaque envelope.
@@ -104,11 +104,11 @@ impl Domain {
         let mut core = core::Core::new(config.core, &limits.core);
         // Connector hold rules are configuration, so a cold root installs
         // the same translated vocabulary before restoring live task rows.
-        let mut configured = Queue::with_capacity(jig_core_tasks::max_out(&limits.core.tasks));
-        jig_core_tasks::step(
+        let mut configured = Queue::with_capacity(jig_domain_tasks::max_out(&limits.core.tasks));
+        jig_domain_tasks::step(
             &mut core.tasks,
             &Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: limits.core.tasks },
-            jig_core_tasks::Event::Kinds {
+            jig_domain_tasks::Event::Kinds {
                 connector: jig_ops_connectors::number(Connector::Infrastructure),
                 kinds: crate::translate::hold_kinds(jig_ops_connectors::number(Connector::Infrastructure)),
             },

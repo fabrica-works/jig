@@ -1,7 +1,7 @@
 //! Ops-owned encodings and evidence from peers and the fake store.
 use super::{observations::Store, r};
-use jig_core as core;
-use jig_core_people as people;
+use jig_domain_core as core;
+use jig_domain_people as people;
 use jig_fake_store::Write;
 use jig_ops_domain as root;
 use jig_ops_domain_infrastructure as infra;

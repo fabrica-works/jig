@@ -1,4 +1,4 @@
-use jig_core_notes::{self as notes, Domain, Event, Line, Record, Request, Rows, Scope};
+use jig_domain_notes::{self as notes, Domain, Event, Line, Record, Request, Rows, Scope};
 use jig_notes_world::LIMITS;
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};

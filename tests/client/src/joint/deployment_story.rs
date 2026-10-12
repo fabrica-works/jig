@@ -19,15 +19,15 @@ fn world() -> World<Test, Joint> {
     let policy = config.core.authority.policy(1).expect("configured project policy").clone();
     let rules = config.core.authority.rules().clone();
     config.core.authority =
-        jig_core_authority::Domain::new(rules, owner.core.authority).expect("two configured projects");
-    let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
+        jig_domain_authority::Domain::new(rules, owner.core.authority).expect("two configured projects");
+    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
     for project in [1, 0] {
-        jig_core_authority::step(
+        jig_domain_authority::step(
             &mut config.core.authority,
-            jig_core_authority::Event::Policy { project, policy: policy.clone() },
+            jig_domain_authority::Event::Policy { project, policy: policy.clone() },
             &mut out,
         );
-        assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project }));
+        assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project }));
     }
     owner.core.people.initial_owners = 2;
     owner.core.people.projects = 2;
@@ -35,7 +35,7 @@ fn world() -> World<Test, Joint> {
     owner.core.documents.lines = 2;
     owner.core.documents.chips = 2;
     owner.core.documents.text_bytes = 32;
-    let room = jig_core::room_max(&owner.core).expect("fixture core bounds");
+    let room = jig_domain_core::room_max(&owner.core).expect("fixture core bounds");
     let connectors = jig_test_connector::MAX_OUT.checked_mul(2).expect("two connector outputs");
     owner.journal.writes = owner.journal.writes.max(room.writes.checked_add(connectors).expect("fixture writes"));
     owner.journal.held = owner.journal.held.max(
@@ -49,7 +49,7 @@ fn world() -> World<Test, Joint> {
     driver.send(
         Time::ZERO,
         clock(Time::ZERO),
-        jig_test_domain::Event::Core(jig_core::Event::People(people::Event::Roles {
+        jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles {
             project: 0,
             holdings: Box::new([]),
         })),
@@ -130,7 +130,7 @@ fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from
         rows.values()
             .filter(|value| matches!(
                 value,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::SignIn { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::SignIn { .. }))
             ))
             .count(),
         1
@@ -139,17 +139,17 @@ fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from
         rows.values()
             .filter(|value| matches!(
                 value,
-                jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { .. }))
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { .. }))
             ))
             .count(),
         0
     );
     assert!(!rows.values().any(|value| matches!(
         value,
-        jig_test_domain::Record::Core(jig_core::Record::Core(jig_core::CoreRecord::Turn(_)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Core(jig_domain_core::CoreRecord::Turn(_)))
     )));
     assert!(rows.values().any(|value| matches!(value,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Roles { project: 0, holdings }))
+        jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Roles { project: 0, holdings }))
         if holdings.iter().any(|holding| holding.role == people::Role::Owner)
     )));
 }

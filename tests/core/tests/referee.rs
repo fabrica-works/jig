@@ -719,8 +719,8 @@ fn referee_scenario_family() {
 
 #[test]
 fn a_delivered_document_offering_what_admission_refuses_is_caught() {
-    use jig_core::acts::Admission;
-    use jig_core_people::{Outcome, Refusal, Reply, Role};
+    use jig_domain_core::acts::Admission;
+    use jig_domain_people::{Outcome, Refusal, Reply, Role};
     let refusal = Refusal::Role { held: Some(Role::Observer) };
     let actual = Reply::Outcome(Outcome::Refused(refusal));
     assert!(jig_core_world::referee::offers::check(&Admission::Allowed, &actual).is_err());

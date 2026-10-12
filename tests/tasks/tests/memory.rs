@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     self as tasks, Active, AuthorityExecutor, Contract, Domain, End, Event, Funder, Grant, Hold, Last, Limits,
     Parameter, Party, Pattern, Request, Stored, TaskResult, Verdict,
 };
@@ -276,7 +276,7 @@ fn full_delegate_tree_dependency_edges_and_cold_restored_claims_fit() {
     );
 }
 
-fn filled(limits: &Limits, number: u64) -> jig_core_tasks::New {
+fn filled(limits: &Limits, number: u64) -> jig_domain_tasks::New {
     let limits = *limits;
     let mut new = task(number, &[]);
     new.spec.words = vec![1; usize::try_from(limits.spec_bytes).expect("small bound")].into_boxed_slice();

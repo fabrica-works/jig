@@ -1,8 +1,8 @@
-use jig_core as core;
-use jig_core_authority as authority;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
 use jig_core_world::effects::{World, fixture};
+use jig_domain_authority as authority;
+use jig_domain_core as core;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{Queue, ReplyTo, Token};
 
@@ -23,7 +23,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
         ask: people::Ask::SetGoal {
             project: 1,
             spec: Box::from(&b"Project this goal"[..]),
-            executor: jig_core_people::GoalExecutor::Charter(1),
+            executor: jig_domain_people::GoalExecutor::Charter(1),
             budget: 20,
             priority: 1,
             deadline: None,
@@ -218,7 +218,7 @@ fn a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_f
         ask: people::Ask::SetGoal {
             project: 1,
             spec: Box::from(&b"Whole tree"[..]),
-            executor: jig_core_people::GoalExecutor::Charter(1),
+            executor: jig_domain_people::GoalExecutor::Charter(1),
             budget: 300,
             priority: 1,
             deadline: None,

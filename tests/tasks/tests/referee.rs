@@ -1,4 +1,4 @@
-use jig_core_tasks::{Party, Status};
+use jig_domain_tasks::{Party, Status};
 use jig_tasks_world::referee::{Seen, Tasks};
 use skein_lib::Time;
 use skein_world::domain::{Referee, Verdict};
@@ -141,7 +141,7 @@ fn result_before_durable() {
 
 #[test]
 fn resource_referee_rejects_duplicate_holds_partial_holds_pool_overadmission_and_writers() {
-    use jig_core_tasks::{Holding, Name as ResourceName, PoolSlots, Writer, WriterSlot};
+    use jig_domain_tasks::{Holding, Name as ResourceName, PoolSlots, Writer, WriterSlot};
     use jig_tasks_world::{LIMITS, World, task};
     let resource = ResourceName { connector: 1, path: Box::new([Box::new([1])]) };
     let holding = Holding::Write { resource: resource.clone(), kind: 1 };
@@ -154,7 +154,7 @@ fn resource_referee_rejects_duplicate_holds_partial_holds_pool_overadmission_and
     second.holdings = Box::new([holding]);
     second.holds_taken = true;
     rejects(vec![Seen::Resources { live: vec![first.clone(), second.clone()], pools: vec![], writers: vec![] }]);
-    second.phase = jig_core_tasks::Phase::Waiting;
+    second.phase = jig_domain_tasks::Phase::Waiting;
     rejects(vec![Seen::Resources { live: vec![second], pools: vec![], writers: vec![] }]);
 
     let pool = ResourceName { connector: 1, path: Box::new([Box::new([2])]) };
@@ -240,21 +240,21 @@ fn stored_limits() {
             5 => record.spec.inputs = vec![2; 5].into_boxed_slice(),
             6 => {
                 record.spec.parameters =
-                    vec![jig_core_tasks::Parameter::Number { name: 1, value: 1 }; 5].into_boxed_slice();
+                    vec![jig_domain_tasks::Parameter::Number { name: 1, value: 1 }; 5].into_boxed_slice();
             }
-            7 => record.contract = jig_core_tasks::Contract::Report { words: 33 },
+            7 => record.contract = jig_domain_tasks::Contract::Report { words: 33 },
             8 => {
                 record.authority.delegation.kinds =
-                    vec![jig_core_tasks::AuthorityExecutor::Role(1); 4].into_boxed_slice();
+                    vec![jig_domain_tasks::AuthorityExecutor::Role(1); 4].into_boxed_slice();
             }
             9 => {
                 record.authority.grants = vec![
-                    jig_core_tasks::Grant {
+                    jig_domain_tasks::Grant {
                         connector: 0,
                         kind: 0,
-                        pattern: jig_core_tasks::Pattern {
+                        pattern: jig_domain_tasks::Pattern {
                             segments: Box::new([]),
-                            last: jig_core_tasks::Last::Exact(Box::from(b"resource".as_slice()))
+                            last: jig_domain_tasks::Last::Exact(Box::from(b"resource".as_slice()))
                         }
                     };
                     5
@@ -268,13 +268,13 @@ fn stored_limits() {
     let record = w.record(1).clone();
     rejects(vec![Seen::Stored {
         live: vec![record.clone(), record],
-        limits: Box::new(jig_core_tasks::Limits { project_tasks: 1, ..LIMITS }),
+        limits: Box::new(jig_domain_tasks::Limits { project_tasks: 1, ..LIMITS }),
     }]);
 }
 
 #[test]
 fn accounting_referee_rejects_expense_reservation_and_settlement_corruption() {
-    use jig_core_tasks::{Cause, End, Funder, Key, Stored};
+    use jig_domain_tasks::{Cause, End, Funder, Key, Stored};
     use jig_tasks_world::{LIMITS, World, accounting_referee::Accounting, task};
     let mut w = World::new(80, LIMITS);
     w.make(Party::Person(1), vec![task(1, &[])]);
@@ -282,7 +282,10 @@ fn accounting_referee_rejects_expense_reservation_and_settlement_corruption() {
     let before = w.records.clone();
     w.terminal_cause(
         1,
-        End::Finished { result: jig_core_tasks::TaskResult::Report { words: Box::new([1]) }, cancel_delegates: false },
+        End::Finished {
+            result: jig_domain_tasks::TaskResult::Report { words: Box::new([1]) },
+            cancel_delegates: false,
+        },
         Cause::Priced { cumulative: 7 },
     );
     for fault in 0..3 {
@@ -348,7 +351,7 @@ fn accounting_referee_rejects_expense_reservation_and_settlement_corruption() {
 
 #[test]
 fn message_and_escalation_referee_rejects_lost_delivery_and_missing_holder() {
-    use jig_core_tasks::{Escalation, EscalationHolder, Key, MessageKind, Request, Stored, Word};
+    use jig_domain_tasks::{Escalation, EscalationHolder, Key, MessageKind, Request, Stored, Word};
     use jig_tasks_world::{LIMITS, World, accounting_referee::Accounting, task};
     use skein_lib::{ReplyTo, Token, Wall};
 

@@ -1,6 +1,6 @@
 //! Independent literal delivered-fact comparisons do not consult a domain judge.
 use super::*;
-use jig_core_authority::Implication;
+use jig_domain_authority::Implication;
 use skein_lib::List;
 
 fn list(values: &[&[u8]]) -> List<Box<[u8]>> {

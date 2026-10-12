@@ -2,8 +2,8 @@
 use crate::routes::{route_connector, route_core};
 use crate::{Delivery, Domain, Limits, Work, Write};
 use alloc::boxed::Box;
-use jig_core as core;
-use jig_core_views as views;
+use jig_domain_core as core;
+use jig_domain_views as views;
 use jig_test_connector as connector;
 use skein_lib::{Decision, Env, Queue, ReplyTo, Token};
 

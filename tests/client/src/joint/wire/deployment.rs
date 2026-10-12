@@ -3,11 +3,11 @@
 //! cross unchanged. Connector values remain their application owners' facts.
 use super::{chips, owner, refusals, results};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
-use jig_core_accounts as accounts;
-use jig_core_fleet as fleet;
-use jig_core_people as people;
-use jig_core_tasks as tasks;
+use jig_domain_accounts as accounts;
+use jig_domain_core::documents;
+use jig_domain_fleet as fleet;
+use jig_domain_people as people;
+use jig_domain_tasks as tasks;
 
 /// # Errors
 /// Refuses any whole reserved collection or nested owner value above bounds.

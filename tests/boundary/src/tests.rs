@@ -212,6 +212,18 @@ fn no_kit_crate_depends_on_an_application_crate_even_when_empty() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
+const CORE_FAMILY: [&str; 9] = [
+    "jig-domain-core",
+    "jig-domain-accounts",
+    "jig-domain-authority",
+    "jig-domain-brief",
+    "jig-domain-fleet",
+    "jig-domain-notes",
+    "jig-domain-people",
+    "jig-domain-tasks",
+    "jig-domain-views",
+];
+
 #[test]
 fn core_and_children_use_only_the_kit_and_foundation_even_when_empty() {
     let crates = kit_root().join("crates");
@@ -219,15 +231,15 @@ fn core_and_children_use_only_the_kit_and_foundation_even_when_empty() {
         .into_iter()
         .filter(|manifest| {
             manifest.path.starts_with(&crates)
-                && manifest.name.as_deref().is_some_and(|name| name == "jig-core" || name.starts_with("jig-core-"))
+                && manifest.name.as_deref().is_some_and(|name| CORE_FAMILY.contains(&name))
         })
         .flat_map(|manifest| {
             manifest
                 .dependencies
                 .iter()
                 .filter(|name| {
-                    if manifest.name.as_deref() == Some("jig-core") {
-                        **name != "skein-lib" && !name.starts_with("jig-core-")
+                    if manifest.name.as_deref() == Some("jig-domain-core") {
+                        **name != "skein-lib" && !CORE_FAMILY.contains(&name.as_str())
                     } else {
                         **name != "skein-lib"
                     }
@@ -243,12 +255,12 @@ fn core_and_children_use_only_the_kit_and_foundation_even_when_empty() {
 fn hosts_and_translation_use_no_core_crates_even_when_empty() {
     let failures: Vec<_> = manifests()
         .into_iter()
-        .filter(|manifest| matches!(manifest.name.as_deref(), Some("jig-host" | "jig-inline-agent" | "jig-charter")))
+        .filter(|manifest| matches!(manifest.name.as_deref(), Some("jig-domain-host" | "jig-charter")))
         .flat_map(|manifest| {
             manifest
                 .dependencies
                 .iter()
-                .filter(|name| name.starts_with("jig-core"))
+                .filter(|name| CORE_FAMILY.contains(&name.as_str()))
                 .map(|name| format!("{}: {name}", manifest.path.display()))
                 .collect::<Vec<_>>()
         })
@@ -260,7 +272,7 @@ fn hosts_and_translation_use_no_core_crates_even_when_empty() {
 fn host_hub_links_only_skein() {
     let failures: Vec<_> = manifests()
         .into_iter()
-        .filter(|manifest| manifest.name.as_deref() == Some("jig-host"))
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-domain-host"))
         .flat_map(|manifest| {
             manifest
                 .dependencies
@@ -763,8 +775,8 @@ fn client_and_engine_step_crates_share_no_dependencies() {
                 .dependencies
                 .iter()
                 .filter(|dependency| {
-                    (client_step(name) && dependency.starts_with("jig-core"))
-                        || (name.starts_with("jig-core") && client_step(dependency))
+                    (client_step(name) && CORE_FAMILY.contains(&dependency.as_str()))
+                        || (CORE_FAMILY.contains(&name) && client_step(dependency))
                 })
                 .map(|dependency| format!("{}: {dependency}", manifest.path.display()))
                 .collect::<Vec<_>>()
@@ -912,14 +924,14 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "jig-scripted-engine",
                 // The real joint world joins the core and pure test connector
                 // (client/domain/testing.md, 5); client step crates stay separate.
-                "jig-core",
-                "jig-core-authority",
-                "jig-core-people",
-                "jig-core-fleet",
-                "jig-core-accounts",
-                "jig-core-tasks",
-                "jig-core-views",
-                "jig-core-notes",
+                "jig-domain-core",
+                "jig-domain-authority",
+                "jig-domain-people",
+                "jig-domain-fleet",
+                "jig-domain-accounts",
+                "jig-domain-tasks",
+                "jig-domain-views",
+                "jig-domain-notes",
                 // Reuse the actual root/store/workers/systems and referee, not a harness copy.
                 "jig-core-world",
                 // Scripted parties remain beside the real joint protocol peer.

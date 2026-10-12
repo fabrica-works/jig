@@ -69,7 +69,7 @@ fn configured_with_bounds(
     owner.core.documents.chips = 2;
     owner.core.documents.text_bytes = receiving.jig.text;
     // This scenario offers its agent and human executor, not a procedure.
-    let kinds = Box::new([jig_core_authority::Executor::Charter(1), jig_core_authority::Executor::Role(1)]);
+    let kinds = Box::new([jig_domain_authority::Executor::Charter(1), jig_domain_authority::Executor::Role(1)]);
     configuration.core.settings.chat_authority.delegation.kinds = kinds.clone();
     let mut authority_rules = configuration.core.authority.rules().clone();
     authority_rules.ceiling.delegation.kinds = kinds.clone();
@@ -79,14 +79,14 @@ fn configured_with_bounds(
         role.authority.delegation.kinds = kinds.clone();
     }
     configuration.core.authority =
-        jig_core_authority::Domain::new(authority_rules, owner.core.authority).expect("role scenario bounds");
-    let mut out = skein_lib::Queue::with_capacity(jig_core_authority::POLICY_MAX_OUT);
-    jig_core_authority::step(
+        jig_domain_authority::Domain::new(authority_rules, owner.core.authority).expect("role scenario bounds");
+    let mut out = skein_lib::Queue::with_capacity(jig_domain_authority::POLICY_MAX_OUT);
+    jig_domain_authority::step(
         &mut configuration.core.authority,
-        jig_core_authority::Event::Policy { project: 1, policy },
+        jig_domain_authority::Event::Policy { project: 1, policy },
         &mut out,
     );
-    assert_eq!(out.pop(), Some(jig_core_authority::PolicyFact::Added { project: 1 }));
+    assert_eq!(out.pop(), Some(jig_domain_authority::PolicyFact::Added { project: 1 }));
     configure(&mut configuration, &owner);
     let roles = [PartyRole::Owner, PartyRole::Maintainer, PartyRole::Member, PartyRole::Observer];
     let parties = roles
@@ -130,7 +130,7 @@ fn configured_with_bounds(
     driver.send(
         Time::ZERO,
         clock(Time::ZERO),
-        jig_test_domain::Event::Core(jig_core::Event::People(people::Event::Roles { project: 1, holdings })),
+        jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles { project: 1, holdings })),
     );
     let codec = jig_client_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
@@ -210,8 +210,8 @@ fn a_chat_proposing_a_goal_its_member_cannot_fund_is_accepted_by_a_maintainer() 
         .person
         .expect("actual maintainer");
     assert!(world.front().session.driver.world.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
-        if task.tracked == Some(7) && task.requester == jig_core_tasks::Party::Person(actual)
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(task)))
+        if task.tracked == Some(7) && task.requester == jig_domain_tasks::Party::Person(actual)
         && task.numbers.budget == 150)));
 }
 
@@ -285,9 +285,9 @@ fn a_person_answers_a_choice_between_two_reports() {
     assert!(outcome.judged.0 > 0);
     let owner = &world.front().session.driver.world;
     assert!(owner.store.rows.values().any(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
-        if matches!(&task.phase, jig_core_tasks::Phase::Ended(jig_core_tasks::Ending::Done(
-            jig_core_tasks::TaskResult::Verdict { code: 2, words, .. })) if words.as_ref() == b"second report"))));
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(task)))
+        if matches!(&task.phase, jig_domain_tasks::Phase::Ended(jig_domain_tasks::Ending::Done(
+            jig_domain_tasks::TaskResult::Verdict { code: 2, words, .. })) if words.as_ref() == b"second report"))));
     assert!(
         owner.peers.as_ref().expect("actual worker").workers[0]
             .messages
@@ -374,7 +374,7 @@ fn two_parties_decide_one_proposal_and_the_second_is_told_who() {
             .rows
             .values()
             .filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. }))
         if matches!(outcome, people::Outcome::ProposalDecided { by, choice: people::ProposalChoice::Accepted, .. }
             if *by == first_person)))
             .count(),
@@ -386,7 +386,7 @@ fn two_parties_decide_one_proposal_and_the_second_is_told_who() {
             .rows
             .values()
             .filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Ended(task)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Ended(task)))
         if task.tracked == Some(7) && task.numbers.budget == 150))
             .count(),
         1
@@ -420,7 +420,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
     assert!(engine.peers.as_ref().expect("actual worker").workers[0].seen.is_empty());
     assert!(!engine.store.rows.values().any(|row| matches!(
         row,
-        jig_test_domain::Record::Core(jig_core::Record::Tasks(jig_core_tasks::Stored::Live(_)))
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(jig_domain_tasks::Stored::Live(_)))
     )));
     assert_eq!(
         engine
@@ -428,7 +428,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
             .rows
             .values()
             .filter(|row| matches!(row,
-        jig_test_domain::Record::Core(jig_core::Record::People(people::Stored::Answer { outcome, .. }))
+        jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. }))
         if matches!(outcome, people::Outcome::Refused(people::Refusal::Role { held: Some(people::Role::Observer) }))))
             .count(),
         1

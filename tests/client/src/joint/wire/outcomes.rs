@@ -1,7 +1,7 @@
 //! Closed owner facts and separate transport dispositions (contract.md, 4).
 //! Uses the actual whole owner carrier; successful owner translation is kept separate from transport-only dispositions.
 use jig_client::contract as client;
-use jig_core_people as people;
+use jig_domain_people as people;
 use skein_lib::Token;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

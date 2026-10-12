@@ -1,4 +1,4 @@
-use jig_core_tasks::{
+use jig_domain_tasks::{
     self as tasks, Accepted, Cause, End, Event, Funder, Key, Numbers, Party, Refusal, Stored, TaskResult,
 };
 use jig_tasks_world::{LIMITS, Reply, World, task};

@@ -4,7 +4,7 @@ use super::*;
 use jig_fake_person::{Face, Found, TreeFace};
 
 pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, number: u64) {
-    use jig_core::acts::{Act, Admission};
+    use jig_domain_core::acts::{Act, Admission};
     let (source, title) = {
         let packet = world.front().session.task_offers(client, number).expect("actual Task packet");
         assert_eq!(packet.source.len(), packet.native.len());
@@ -61,7 +61,7 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
 }
 
 pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key: client::ObjectKey, title: &[u8]) {
-    use jig_core::acts::{Act, Admission};
+    use jig_domain_core::acts::{Act, Admission};
     let source = {
         let packet = world.front().session.card_offers(client, key).expect("actual admitted card packet");
         assert_eq!(packet.source.len(), packet.native.len());

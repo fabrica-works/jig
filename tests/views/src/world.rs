@@ -2,7 +2,7 @@
 //! Subjects are plain counters. Document sizes and watcher pacing are seeded;
 //! the referee sees only owner inputs and watcher outputs (`domain/engine.md`, 11).
 use crate::referee::{Document, Referee};
-use jig_core_views::{self as views, Call, Domain, End, Event, Follow, Limits, Made, Request, TurnName, Window};
+use jig_domain_views::{self as views, Call, Domain, End, Event, Follow, Limits, Made, Request, TurnName, Window};
 use skein_lib::{Env, List, Queue, Rng, Time, Token, Wall};
 use skein_world::domain::Trace;
 use std::collections::BTreeMap;

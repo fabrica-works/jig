@@ -3,7 +3,7 @@
 //! chip metadata and cached replies never substitute for them.
 use super::{chips, owner};
 use jig_client::{Limits, contract as client};
-use jig_core::documents;
+use jig_domain_core::documents;
 
 /// # Errors
 /// Refuses a whole chip or source text allocation above the receiving bounds.
