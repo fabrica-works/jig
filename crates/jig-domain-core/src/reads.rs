@@ -30,6 +30,60 @@ use alloc::boxed::Box;
 use core::mem::size_of;
 use skein_lib::{Env, Id, List, Queue, ReplyTo, Slab, Token};
 
+/// Which physical rows a fixed read scope loads (protocol/store.md, 4.3 and 7.3).
+/// Cursor admission is separate: notes lines are joined to entry rows before paging.
+#[must_use]
+pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
+    use crate::{Key, notes};
+    use jig_domain_people::Proposer;
+    use jig_domain_tasks::{Funder, Key as TaskKey};
+    match scope {
+        Scope::Task { task } | Scope::PersonTask { task } | Scope::Result { task } => {
+            key == &Key::Tasks(TaskKey::Live(*task)) || key == &Key::Tasks(TaskKey::Ended(*task))
+        }
+        Scope::Reply { task, activity } => key == &Key::Tasks(TaskKey::Activity { task: *task, position: *activity }),
+        Scope::History { task, subtree: false } => match key {
+            Key::Tasks(TaskKey::History { task: owner, .. } | TaskKey::Milestone { task: owner, .. }) => owner == task,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+        },
+        Scope::Proposal { proposer: Proposer::Party(owner), proposal } => {
+            *owner == party
+                && (key == &Key::Tasks(TaskKey::PersonProposal(*proposal))
+                    || key == &Key::Tasks(TaskKey::DecidedProposal(*proposal)))
+        }
+        Scope::Spend { project } => match key {
+            Key::Tasks(
+                TaskKey::Ledger(Funder::Period { project: owner, .. })
+                | TaskKey::ClosedLedger(Funder::Period { project: owner, .. }),
+            ) => owner == project,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+        },
+        Scope::Notes { project } => match key {
+            Key::Notes(notes::Key::Line { scope, .. }) => match scope {
+                notes::Scope::Deployment => *project == 0,
+                notes::Scope::Project { project: owner }
+                | notes::Scope::Goal { project: owner, .. }
+                | notes::Scope::Resources { project: owner, .. } => owner == project,
+            },
+            Key::Notes(_) | Key::Tasks(_) | Key::Core(_) | Key::People(_) => false,
+        },
+        Scope::ScopedNotes { scope: wanted, .. } => match key {
+            Key::Notes(notes::Key::Line { scope, .. }) => scope == wanted,
+            Key::Notes(_) | Key::Tasks(_) | Key::Core(_) | Key::People(_) => false,
+        },
+        Scope::Proposal { proposer: Proposer::Task(_), .. }
+        | Scope::Escalation { .. }
+        | Scope::Question { .. }
+        | Scope::Turn { .. }
+        | Scope::EndedDelegates { .. }
+        | Scope::History { subtree: true, .. }
+        | Scope::Activity { .. }
+        | Scope::Inbox { .. }
+        | Scope::Conversations
+        | Scope::Goals { .. } => false,
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Pending {
     reply: Option<ReplyTo>,

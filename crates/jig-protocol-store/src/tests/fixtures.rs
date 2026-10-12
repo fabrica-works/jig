@@ -184,3 +184,16 @@ pub fn pattern_key(segments: Box<[Box<[u8]>]>) -> jig_domain_notes::Key {
         name: 1,
     }
 }
+
+pub fn within(intervals: &[skein_kv::Range], key: &[u8]) -> bool {
+    for interval in intervals {
+        let before_end = match &interval.end {
+            Some(end) => key < &**end,
+            None => true,
+        };
+        if key >= &*interval.start && before_end {
+            return true;
+        }
+    }
+    false
+}
