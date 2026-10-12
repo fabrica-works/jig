@@ -612,3 +612,5 @@ fn a_people_row_of_another_version_does_not_decode() {
         })
     );
 }
+
+mod record;

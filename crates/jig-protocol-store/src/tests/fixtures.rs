@@ -772,3 +772,6 @@ const fn core_fleet_limits() -> jig_domain_fleet::Limits {
         history: 2,
     }
 }
+
+mod record;
+pub use record::{task_record, task_word};
