@@ -527,3 +527,20 @@ fn a_native_shell_naming_the_store_is_reported() {
     );
     assert_eq!(client_engine_breaches(&[manifest]), ["fixture/shell/Cargo.toml: jig-protocol-store"]);
 }
+
+#[test]
+fn configuration_links_only_its_vocabulary_and_foundation() {
+    let manifests = manifests();
+    let config = manifests
+        .iter()
+        .find(|manifest| manifest.name.as_deref() == Some("jig-protocol-config"))
+        .expect("configuration manifest");
+    for dependency in &config.dependencies {
+        assert!(
+            ["skein-lib", "skein-json", "skein-io"].contains(&dependency.as_str())
+                || CORE_FAMILY.contains(&dependency.as_str())
+                || dependency == "jig-domain-host",
+            "configuration dependency: {dependency}"
+        );
+    }
+}

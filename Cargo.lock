@@ -462,6 +462,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-config"
+version = "0.0.0"
+dependencies = [
+ "skein-io",
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-protocol-store"
 version = "0.0.0"
 dependencies = [
