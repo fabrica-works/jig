@@ -716,6 +716,9 @@ pub(super) fn route_accepted_turn(
         tasks::Accepted::Already => {}
     }
     out.push(Request::Held(Box::new(Held::TaskTurnKept { task, attempt, turn })));
+    if let Some(relay) = crate::relays::next(core, task, env.limits.tasks.run_inbox) {
+        out.push(Request::Held(Box::new(relay)));
+    }
     out.push(Request::Decided);
     Requests::Out(out)
 }

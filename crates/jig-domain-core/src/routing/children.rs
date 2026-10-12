@@ -241,7 +241,7 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 Request::Held(Box::new(Held::Assign { channel, run, attempt, activation, assignment }))
             }
             fleet::Request::Inbound { channel, run, attempt, message } => {
-                let deliver = match core.relaying.take() {
+                let deliver = match core.relaying.remove(&run.raw()) {
                     Some(relay) => {
                         assert!(message.name.raw() == relay.message, "relay name identifies word");
                         match core.proofs.get(&run.raw()) {
@@ -265,7 +265,11 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                     });
                     out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
                 }
-                Request::Held(Box::new(Held::Inbound { channel, run, attempt, message }))
+                out.push(Request::Held(Box::new(Held::Inbound { channel, run, attempt, message })));
+                if let Some(relay) = crate::relays::next(core, run.raw(), env.limits.tasks.run_inbox) {
+                    out.push(Request::Held(Box::new(relay)));
+                }
+                continue;
             }
             fleet::Request::Relay { reply_to, .. } if core.stopping => {
                 Request::Now(Box::new(Now::CallBusy { to: reply_to }))
@@ -282,7 +286,7 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
             }
             fleet::Request::DropCall { call } => Request::Now(Box::new(Now::DropCall { call })),
             fleet::Request::Undelivered { run, attempt, message, undelivered: _ } => {
-                let _pending = core.relaying.take();
+                let _pending = core.relaying.remove(&run.raw());
                 Request::Now(Box::new(Now::Undelivered { run, attempt, message }))
             }
             // A message its host did not pass on stays in the task's inbox,

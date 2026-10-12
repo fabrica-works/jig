@@ -414,6 +414,12 @@ impl Domain {
         crate::escalation::context(self, task)
     }
 
+    /// The oldest inbox word or pending decision numbered past `after` (tasks.md, 8.2).
+    #[must_use]
+    pub fn next_waiting(&self, task: u64, after: Option<u64>) -> Option<crate::Word> {
+        crate::waiting::next(self, task, after)
+    }
+
     #[must_use]
     pub(crate) fn ready(&self) -> bool {
         self.startup == Startup::Ready

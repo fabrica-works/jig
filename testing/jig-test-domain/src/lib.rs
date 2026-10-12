@@ -891,8 +891,8 @@ pub fn release(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>)
                     })),
                 );
             }
-            Delivery::Core(core::Held::Relay { task, attempt, previous, word }) => {
-                let event = relay_message(domain, task, attempt, previous, word);
+            Delivery::Core(core::Held::Relay { task, attempt, word, .. }) => {
+                let event = relay_message(domain, task, attempt, word);
                 step(domain, env, event);
             }
             other @ (Delivery::ApplicationDocument { .. }
@@ -1038,13 +1038,9 @@ pub fn restore_record(domain: &mut Domain, env: &Env<Limits>, record: Record) ->
     }
 }
 
-fn relay_message(domain: &mut Domain, task: u64, attempt: u64, previous: Option<u64>, word: tasks::Word) -> Event {
+fn relay_message(domain: &mut Domain, task: u64, attempt: u64, word: tasks::Word) -> Event {
     let name = Token::new(word.number);
     let body = payload(domain, Payload::InboxWord(word));
-    assert!(
-        domain.core.relaying.replace(core::PendingRelay { previous, message: name.raw() }).is_none(),
-        "one committed relay in flight"
-    );
     Event::Core(core::Event::Fleet(fleet::Event::Inbound {
         run: Token::new(task),
         attempt: Token::new(attempt),

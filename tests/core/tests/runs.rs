@@ -261,10 +261,33 @@ fn a_start_carries_at_most_the_runs_inbox() {
         if task.inbox.iter().any(|word| word.number == second))));
 }
 
+fn relays_wait_while_the_runs_inbox_is_full() {
+    let (config, mut limits) = jig_core_world::effects::fixture(143, false);
+    limits.core.tasks.run_inbox = 1;
+    let mut world = World::configured(143, false, config, limits);
+    let first = world.say(88);
+    let second = world.say(89);
+    assert_eq!(world.inbound.iter().map(|word| word.number).collect::<Vec<_>>(), [first]);
+    world.turn(1, 1, Some(first), b"reads the first words");
+    assert_eq!(world.inbound.iter().map(|word| word.number).collect::<Vec<_>>(), [first, second]);
+}
+
+fn a_run_reading_nothing_is_relayed_nothing_more() {
+    let (config, mut limits) = jig_core_world::effects::fixture(144, false);
+    limits.core.tasks.run_inbox = 1;
+    let mut world = World::configured(144, false, config, limits);
+    let first = world.say(90);
+    world.say(91);
+    world.turn(1, 1, None, b"reads no message");
+    assert_eq!(world.inbound.iter().map(|word| word.number).collect::<Vec<_>>(), [first]);
+}
+
 // Each scenario keeps its own fresh world and all original assertions.
 // A shared entrypoint avoids one process startup per short scenario.
 #[test]
 fn runs_scenarios() {
+    relays_wait_while_the_runs_inbox_is_full();
+    a_run_reading_nothing_is_relayed_nothing_more();
     a_woken_chats_start_carries_its_waiting_words_oldest_first();
     a_start_carries_at_most_the_runs_inbox();
     a_chat_answers_parks_and_resumes();

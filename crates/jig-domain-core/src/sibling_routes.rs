@@ -437,30 +437,4 @@ impl Core {
             }
         }
     }
-
-    /// The first offer of a proposal or escalation is fenced by the last
-    /// committed offer in the current proof. Other messages retain the task
-    /// child's own predecessor.
-    #[must_use]
-    pub fn relay_previous(&self, task: u64, previous: Option<u64>, kind: &tasks::MessageKind) -> Option<u64> {
-        match kind {
-            tasks::MessageKind::Proposal { .. } | tasks::MessageKind::Escalation { .. } => {
-                match self.proofs.get(&task) {
-                    Some(proof) => proof.offered,
-                    None => None,
-                }
-            }
-            tasks::MessageKind::ProposalDecision { .. }
-            | tasks::MessageKind::EffectNotMade { .. }
-            | tasks::MessageKind::Words
-            | tasks::MessageKind::Amendment { .. }
-            | tasks::MessageKind::Question
-            | tasks::MessageKind::Answer { .. }
-            | tasks::MessageKind::Notice { .. }
-            | tasks::MessageKind::Timer { .. }
-            | tasks::MessageKind::News { .. }
-            | tasks::MessageKind::PersonStalled { .. }
-            | tasks::MessageKind::Result(_) => previous,
-        }
-    }
 }

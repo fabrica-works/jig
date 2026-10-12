@@ -38,9 +38,9 @@ pub(super) fn tag_tasks(
         let Some(next) = pending.pop() else { break };
         let request = match next {
             tasks::Request::Erase { key } => Request::Write(Write::Erase(Key::Tasks(key))),
-            tasks::Request::Relay { task, attempt, previous, word } => {
-                let previous = core.relay_previous(task, previous, &word.kind);
-                Request::Held(Box::new(Held::Relay { task, attempt, previous, word }))
+            tasks::Request::Relay { task, .. } => {
+                let Some(relay) = crate::relays::next(core, task, env.limits.tasks.run_inbox) else { continue };
+                Request::Held(Box::new(relay))
             }
             tasks::Request::PersonProposed { reply_to, proposal } => {
                 let event = core.person_proposed(reply_to.into_token(), proposal);
