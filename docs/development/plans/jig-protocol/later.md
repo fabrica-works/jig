@@ -16,3 +16,4 @@ What the design names but this plan does not do.
 | A generic OAuth or OpenID sign-in provider | `protocol/client.md`, section 15 | when an application needs one |
 | A handed-in account read again while the engine runs | `protocol/llm.md`, section 10 | when a deployment needs it |
 | Several people on one deployment | `client/domain/README.md`, 5 and 6 | with such a deployment |
+| Every root with engine slots says its hub's hello, and the fleet places nothing on them before it is admitted (ruling 146) | `domain/engine.md`, 8 ("present from construction"; "no run is placed where smith would refuse its start"); `domain/hosts.md`, 4 | when the test roots' engine slots gain a hub with an agent, or with the reference service's engine slots |

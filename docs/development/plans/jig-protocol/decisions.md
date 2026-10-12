@@ -765,6 +765,19 @@ the file.
      sees two activations. 04.4 makes the fixture read the message before
      parking, as it proposed, under ruling 114. The README's Rules now
      make such a fix no question for any session.
+146. **A root with engine slots and no hello is left as it is** (2026-10-12,
+     the coordinator's block "jig 05.6: engine placement before hello",
+     2026-10-12T20:37:32Z, the question jig 05's file plans to raise).
+     The design's reading is clear: the engine's own slots are "hosted by
+     the engine's own hub ..., its agent `smith-inline-agent` with no
+     workspace, present from construction" (engine.md, 8), whose hello
+     states "the bounds of its `smith-inline-agent`'s configuration"
+     (hosts.md, 4), so that "no run is placed where smith would refuse
+     its start". Making every root say it, and the fleet place nothing
+     before it, changes the constructors and worlds of roots other than
+     `ops`, beyond 05.6's Scope. Plan scope, not design: 05.6 keeps the
+     planned behaviour (`ops` says its hello; other roots unchanged), and
+     the tightening goes to `later.md`.
 
 ## For the user
 
