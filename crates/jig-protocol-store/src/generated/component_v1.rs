@@ -239,7 +239,7 @@ impl Format {
         Ok(value)
     }
 
-    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let version = reader.u16().ok_or(Problem { path: Path::FormatVersion, reason: skein_codec::Reason::Short })?;
         if version != 1 { return Err(Problem { path: Path::FormatVersion, reason: skein_codec::Reason::Version }); }
         let decoded_component = reader.u16().ok_or(Problem { path: Path::FormatComponent, reason: skein_codec::Reason::Short })?;
@@ -249,7 +249,7 @@ impl Format {
         let decoded_notes = reader.u16().ok_or(Problem { path: Path::FormatNotes, reason: skein_codec::Reason::Short })?;
         let decoded_application = reader.u32().ok_or(Problem { path: Path::FormatApplication, reason: skein_codec::Reason::Short })?;
         let decoded_deployment = { let bytes = reader.bytes(16).ok_or(Problem { path: Path::FormatDeployment, reason: skein_codec::Reason::Short })?; bytes.try_into().expect("fixed length checked") };
-        Ok(Self::new(limits, FormatParts { component: decoded_component, core: decoded_core, tasks: decoded_tasks, people: decoded_people, notes: decoded_notes, application: decoded_application, deployment: decoded_deployment }))
+        Ok(Self { component: decoded_component, core: decoded_core, tasks: decoded_tasks, people: decoded_people, notes: decoded_notes, application: decoded_application, deployment: decoded_deployment })
     }
 }
 
@@ -281,12 +281,12 @@ impl Transcript {
         Ok(value)
     }
 
-    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let version = reader.u16().ok_or(Problem { path: Path::TranscriptVersion, reason: skein_codec::Reason::Short })?;
         if version != 1 { return Err(Problem { path: Path::TranscriptVersion, reason: skein_codec::Reason::Version }); }
         let decoded_length = reader.u64().ok_or(Problem { path: Path::TranscriptLength, reason: skein_codec::Reason::Short })?;
         let decoded_window = reader.u64().ok_or(Problem { path: Path::TranscriptWindow, reason: skein_codec::Reason::Short })?;
-        Ok(Self::new(limits, TranscriptParts { length: decoded_length, window: decoded_window }))
+        Ok(Self { length: decoded_length, window: decoded_window })
     }
 }
 
@@ -315,11 +315,11 @@ impl Attempt {
         Ok(value)
     }
 
-    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let version = reader.u16().ok_or(Problem { path: Path::AttemptVersion, reason: skein_codec::Reason::Short })?;
         if version != 1 { return Err(Problem { path: Path::AttemptVersion, reason: skein_codec::Reason::Version }); }
         let decoded_first = reader.u64().ok_or(Problem { path: Path::AttemptFirst, reason: skein_codec::Reason::Short })?;
-        Ok(Self::new(limits, AttemptParts { first: decoded_first }))
+        Ok(Self { first: decoded_first })
     }
 }
 
@@ -425,64 +425,50 @@ pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
 mod golden_tests {
     use super::{CEILINGS, Format, FormatParts, Transcript, TranscriptParts, Attempt, AttemptParts};
 
-    #[test]
-    fn record_format_smallest() {
-        let value = Format::new(&CEILINGS, FormatParts { component: 0_u16, core: 0_u16, tasks: 0_u16, people: 0_u16, notes: 0_u16, application: 0_u32, deployment: [0_u8; 16] });
-        let golden: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize"));
-        value.encode(&mut writer).expect("measured room");
-        assert_eq!(writer.finish().as_ref(), golden);
-        assert_eq!(Format::decode(&CEILINGS, &mut skein_lib::Reader::new(golden)), Ok(value));
+    use alloc::boxed::Box;
+
+    type Case = (&'static str, fn() -> bool);
+
+    pub(super) fn table<const N: usize>(cases: [Case; N]) {
+        let mut failures = [None; N];
+        let mut passed = true;
+        for ((name, case), failure) in cases.into_iter().zip(&mut failures) {
+            if !case() {
+                *failure = Some(name);
+                passed = false;
+            }
+        }
+        assert!(passed, "{failures:?}");
+    }
+
+    pub(super) fn golden<T: PartialEq, E, D>(
+        value: T,
+        bytes: &[u8],
+        encoded: Result<Box<[u8]>, E>,
+        decoded: Result<T, D>,
+    ) -> bool {
+        let encoded = match encoded {
+            Ok(encoded) => encoded.as_ref() == bytes,
+            Err(_) => false,
+        };
+        let decoded = match decoded {
+            Ok(decoded) => decoded == value,
+            Err(_) => false,
+        };
+        encoded && decoded
     }
 
     #[test]
-    fn record_format_full() {
-        let value = Format::new(&CEILINGS, FormatParts { component: u16::MAX, core: u16::MAX, tasks: u16::MAX, people: u16::MAX, notes: u16::MAX, application: u32::MAX, deployment: [165_u8; 16] });
-        let golden: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165];
-        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize"));
-        value.encode(&mut writer).expect("measured room");
-        assert_eq!(writer.finish().as_ref(), golden);
-        assert_eq!(Format::decode(&CEILINGS, &mut skein_lib::Reader::new(golden)), Ok(value));
-    }
-
-    #[test]
-    fn record_transcript_smallest() {
-        let value = Transcript::new(&CEILINGS, TranscriptParts { length: 0_u64, window: 0_u64 });
-        let golden: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize"));
-        value.encode(&mut writer).expect("measured room");
-        assert_eq!(writer.finish().as_ref(), golden);
-        assert_eq!(Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(golden)), Ok(value));
-    }
-
-    #[test]
-    fn record_transcript_full() {
-        let value = Transcript::new(&CEILINGS, TranscriptParts { length: u64::MAX, window: u64::MAX });
-        let golden: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255];
-        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize"));
-        value.encode(&mut writer).expect("measured room");
-        assert_eq!(writer.finish().as_ref(), golden);
-        assert_eq!(Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(golden)), Ok(value));
-    }
-
-    #[test]
-    fn record_attempt_smallest() {
-        let value = Attempt::new(&CEILINGS, AttemptParts { first: 0_u64 });
-        let golden: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0];
-        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize"));
-        value.encode(&mut writer).expect("measured room");
-        assert_eq!(writer.finish().as_ref(), golden);
-        assert_eq!(Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(golden)), Ok(value));
-    }
-
-    #[test]
-    fn record_attempt_full() {
-        let value = Attempt::new(&CEILINGS, AttemptParts { first: u64::MAX });
-        let golden: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255];
-        let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize"));
-        value.encode(&mut writer).expect("measured room");
-        assert_eq!(writer.finish().as_ref(), golden);
-        assert_eq!(Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(golden)), Ok(value));
+    fn golden_0() {
+        const CASES: [Case; 6] = [
+        ("record_format_smallest", || { let value = Format::new(&CEILINGS, FormatParts { component: 0_u16, core: 0_u16, tasks: 0_u16, people: 0_u16, notes: 0_u16, application: 0_u32, deployment: [0_u8; 16] }); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_format_full", || { let value = Format::new(&CEILINGS, FormatParts { component: u16::MAX, core: u16::MAX, tasks: u16::MAX, people: u16::MAX, notes: u16::MAX, application: u32::MAX, deployment: [165_u8; 16] }); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Format::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_transcript_smallest", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: 0_u64, window: 0_u64 }); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_transcript_full", || { let value = Transcript::new(&CEILINGS, TranscriptParts { length: u64::MAX, window: u64::MAX }); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Transcript::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_attempt_smallest", || { let value = Attempt::new(&CEILINGS, AttemptParts { first: 0_u64 }); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_attempt_full", || { let value = Attempt::new(&CEILINGS, AttemptParts { first: u64::MAX }); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Attempt::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ];
+        table(CASES);
     }
 
 }
