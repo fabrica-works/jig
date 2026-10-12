@@ -100,6 +100,12 @@ half, parent face, `smith-inline-agent` and agent shell (built). Section
   it. Waits for a system that limits its rate.
 - **A service's client root** (`client/domain/root.md`, section 11):
   waits for a service that acts as a party.
+- **The browser's shell and the client's wasm32 builds**
+  (`protocol/client.md`, section 12; `client/domain/view.md`, sections 11
+  to 13; `client/domain/testing.md`, the browser tier; skein's `lib.md`,
+  section 2): jig-protocol proves the client's protocol through the native
+  shell only, by the user's choice (2026-10-12). Waits for a plan of its
+  own, once the native client serves.
 - **Several people on one deployment** (`client/domain/README.md`,
   sections 5 and 6): who may see what, a role's entries shared and taken.
   The client is built for one person first. Waits for such a deployment.

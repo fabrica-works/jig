@@ -154,9 +154,10 @@ engine's protocol layer
 - **One driver per engine,** `skein-oauth-accounts`, made at startup with
   each configured account (skein's `oauth.md`, 6.2): its provider's
   registration (its client, and the client's secret if it is
-  confidential), its token endpoint's address and transport, a sign-in
-  source, and skein's private files as its keeper, one file per account in
-  a private directory the configuration names (skein's `oauth.md`, 6.4).
+  confidential), its token endpoint's address and transport, its source,
+  a sign-in or a handed-in record (5.4), and skein's private files as its
+  keeper, one file per account in a private directory the configuration
+  names (skein's `oauth.md`, 6.4).
 - **What it does, and jig does not:** one exchange per account at a time;
   a held account refreshed its refresh lead before expiry, each new
   generation granted again; every new record kept before its token is
@@ -184,6 +185,7 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 | granted: the access token, its generation, how long it is valid | granted: the generation and how long it is valid; the token goes into the table (5.3) |
 | failed: retry later (with how long), malformed, limit, not kept | failed, later, with how long (the driver's delay, or the child's backoff) |
 | failed: sign in again, expired | failed, sign in again |
+| expiring, for a handed-in account | expiring: the account is usable until its token lapses, and the deployment's document says a person must hand in a newer one |
 | failed: client rejected | failed, misconfigured |
 | failed: unloaded | failed, unloaded, with where and why |
 | failed: cancelled; a grant refused as closed | failed, cancelled |
@@ -192,10 +194,8 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 
 - **Unreachable in the engine:** a sign-in's own failures (an invalid
   redirect), since the engine runs no sign-in; a grant's other refusals,
-  for an account the driver was not made with; and `expiring`, which only
-  an access-only record raises, while every account's source is a
-  sign-in (section 10 keeps API keys open). The translation names them,
-  and asserts they never come.
+  for an account the driver was not made with. The translation names
+  them, and asserts they never come.
 
 ### 5.3 The table
 
@@ -226,6 +226,16 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 - **A revoked account** fails as sign in again; the driver drops its dead
   record, so a new sign-in's file is loaded at the next grant the child
   asks for (skein's `oauth.md`, 6.4).
+- **A handed-in account** has no sign-in and no refresh: its record is an
+  access token and the wall time it lapses, in a private file the
+  configuration names, which another program's login may fill (a person,
+  or a test borrowing a login read-only). `jig-protocol-accounts` reads
+  it at start (skein's `shell.md`, 6.1) and hands it in (skein's
+  `oauth.md`, 6.3); the driver lends it until it lapses, never writing to
+  its source. Past that, or once its provider rejects it, the account
+  fails as sign in again, and stays unusable until a restart reads a
+  newer file. It serves tests, live checks and a provider's static keys
+  alike.
 
 ## 6. Credential grants
 
@@ -316,6 +326,5 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   many `smith-inline-agent` runs' completions share one connection
   component and one loop; whether each run gets a share of each
   iteration.
-- **API keys:** accounts whose credential is a static key rather than an
-  OAuth grant, never refreshed: as the driver's handed-in records with no
-  expiry, or a source of skein's of their own.
+- **A handed-in account read again while the engine runs,** so a newer
+  file is heard without a restart, as a signed-in account's is.
