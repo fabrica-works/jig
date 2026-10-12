@@ -212,6 +212,20 @@ the file.
      `crates/skein-io/src/tests/private.rs:87,104` and
      `tests/io/src/private.rs:136,142`. No other repository names
      `Unsafe::Mode` (`git grep` on smith's, jig's and temper's mains).
+103. **An increment's Size is a guide, with a fifth over** (2026-10-12,
+     the coordinator's block "skein 01.1: production size exceeds
+     increment ceiling", 2026-10-12T15:10:55Z). skein 01.1 counts 323
+     lines of production code against "Size: at most 300 lines of
+     production code in skein-io", and asks whether to restructure. No
+     check reads a session file's Size line, so it is a guide
+     (development.md, 4.5: "An allocation meant as a guide and worded as
+     a rule makes sessions stop over a millisecond, or bend their code to
+     fit it"). From now to the run's end, for every session: an increment
+     within N × 1.2 of its "Size: at most N lines", rounded down, lands
+     and gives its count in its report; past that, it asks first.
+     code-organization.md, section 7 says so. skein 01.1 lands at up to
+     360 lines. The 800-line file limit and the 40-line test function
+     stay rules, which `plan pulse` checks.
 
 ## For the user
 
