@@ -778,6 +778,19 @@ the file.
      `ops`, beyond 05.6's Scope. Plan scope, not design: 05.6 keeps the
      planned behaviour (`ops` says its hello; other roots unchanged), and
      the tightening goes to `later.md`.
+147. **jig-repin.s1 moves the whole skein source** (2026-10-12, the
+     coordinator's block "jig repin.s1: cargo update moves ten other
+     skein packages", 2026-10-12T20:44:30Z). The supervisor's defect:
+     `cargo update -p skein-codegen --precise e723e1db` moved
+     `skein-codegen` and ten other skein packages from `90326012`, which
+     ruling 138's step forbade. Between those revisions, skein changed,
+     besides its docs, generator and codec tests, only
+     `crates/skein-llm` (which jig does not compile) and two lines of
+     `testing/skein-world/src/tree.rs` (`git diff --stat 90326012
+     e723e1db`). development.md, 5.7 has a repin move "its whole git
+     source", and never edit `Cargo.lock` by hand. So the step takes
+     cargo's move as it is: every skein package at `e723e1db`, smith's
+     unchanged, the gate the check.
 
 ## For the user
 

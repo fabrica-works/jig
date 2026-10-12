@@ -314,16 +314,18 @@ nothing, and the gap goes to temper's `docs/design/STATUS.md`, under
 A step not in the plan (decisions.md, ruling 138), after skein 02.s1.
 jig's lock holds `skein-codegen` at its own revision (`30dc6f7d`), apart
 from skein's other packages (`90326012`).
-Scope: `Cargo.lock` moves `skein-codegen` alone to skein 02.s1's commit.
+Scope: `Cargo.lock` moves the skein source to skein 02.s1's commit:
+  `skein-codegen` and the ten skein packages `cargo update` moves with it
+  (ruling 147).
 Shape: `heavy cargo update -p skein-codegen --precise <skein 02.s1's
-  commit>`; `git diff origin/main -- Cargo.lock` changes the
-  `skein-codegen` entry only. Where a drift test
+  commit>`; `git diff origin/main -- Cargo.lock` changes skein entries
+  only, no smith entry. Where a drift test
   (`tests/store-codecs/tests/drift.rs`) then reports generated code
   changed, the files are written again by the drift test's own
   environment variable; their golden bytes do not move.
 Proof: gate, `scripts/check.sh`, run by `land`.
-Don't: move another skein or smith package; edit a schema or a generated
-  file by hand. If `cargo update` moves another package, stop and
+Don't: move a smith package; edit `Cargo.lock`, a schema or a generated
+  file by hand. If `cargo update` moves a smith package, stop and
   report.
 Size: nothing besides `Cargo.lock` and generated files.
 
