@@ -233,8 +233,8 @@ pub enum Event {
         deadline: Wall,
         proposal: Option<Box<[u8]>>,
     },
-    /// The rendered reply to a run's read, with no durable call record.
-    ReadAnswer {
+    /// The rendered answer to a read or an undecodable call, with no durable call record.
+    CallAnswered {
         to: ReplyTo,
         call: core::SettledCall,
     },
@@ -475,7 +475,7 @@ enum Work {
         number: u16,
     },
     Restart(core::RestartRequest),
-    ReadAnswer {
+    CallAnswered {
         to: ReplyTo,
         call: core::SettledCall,
     },
@@ -584,7 +584,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         Event::ReadApplication { reply, sign_in, scope, number, subject } => {
             decide(domain, env, Work::ReadApplication { reply, sign_in, scope, number, subject });
         }
-        Event::ReadAnswer { to, call } => decide(domain, env, Work::ReadAnswer { to, call }),
+        Event::CallAnswered { to, call } => decide(domain, env, Work::CallAnswered { to, call }),
         Event::Connector { number, event } => decide(domain, env, Work::Connector { number, event }),
         Event::Text { task, attempt, turn, offset, text } => decide(
             domain,
@@ -629,7 +629,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
         | Work::EffectCall { .. }
         | Work::Turn { .. }
         | Work::Answer { .. }
-        | Work::ReadAnswer { .. } => core::room_max(&env.limits.core),
+        | Work::CallAnswered { .. } => core::room_max(&env.limits.core),
     }
     .expect("validated core room");
     let connector_room = connector::MAX_OUT.checked_mul(2).expect("two connector outputs");
@@ -764,7 +764,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     core::fire(&mut domain.core, &Env { now: env.now, wall: env.wall, limits: env.limits.core }, timer);
                 route_core(domain, env, &mut decision, requests, &mut work);
             }
-            Work::ReadAnswer { to, call } => {
+            Work::CallAnswered { to, call } => {
                 let answer = payload(domain, Payload::SettledCall(call));
                 work.push(Work::Core(core::Event::Fleet(fleet::Event::Relayed { to, answer })));
             }

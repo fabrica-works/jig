@@ -89,7 +89,7 @@ impl Parties {
             | root::Event::ConnectorTimer { .. }
             | root::Event::ProjectionEffect { .. }
             | root::Event::EffectCall { .. }
-            | root::Event::ReadAnswer { .. }
+            | root::Event::CallAnswered { .. }
             | root::Event::TranscriptLoaded { .. } => {}
         }
     }

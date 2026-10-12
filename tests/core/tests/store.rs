@@ -170,7 +170,7 @@ fn a_runs_read_is_answered_while_an_unrelated_commit_is_in_flight() {
         tool: b"read".as_slice().into(),
         answer: core::SettledAnswer::Host { error: false, body: b"fresh result".as_slice().into() },
     };
-    world.send(root::Event::ReadAnswer { to: ReplyTo::new(right), call: answer.clone() });
+    world.send(root::Event::CallAnswered { to: ReplyTo::new(right), call: answer.clone() });
     assert_eq!(world.store.held, held, "the unrelated commit still waits");
     assert_eq!(world.commits.len(), commits, "a read commits nothing");
     assert_eq!(world.host_answers, [(b"read-now".as_slice().into(), answer)]);

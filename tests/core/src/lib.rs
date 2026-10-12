@@ -10,6 +10,7 @@ pub mod client_peer;
 pub mod effects;
 mod historical;
 pub mod peers;
+pub mod protocol;
 pub mod store_peer;
 
 /// The testing application's store, with the fake's opaque row parameters.

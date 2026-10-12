@@ -445,6 +445,13 @@ impl Application for Testing {
                 Delivery::Now(core::Now::Call { to, run, attempt, call }) => {
                     peers.peers.opaque_answer(to, run, attempt, &call).into_iter().map(Input::Event).collect()
                 }
+                Delivery::Now(core::Now::EffectAnswer { to, key, part }) => peers
+                    .peers
+                    .protocol
+                    .answer(to.into_token(), key, &part, false)
+                    .into_iter()
+                    .map(Input::Event)
+                    .collect(),
                 Delivery::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
                     vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Refreshed {
                         account,
@@ -569,9 +576,10 @@ impl Application for Testing {
                     more,
                 })))]
             }
-            root::Delivery::Core(core::Held::CallAnswer { part, .. }) => {
+            root::Delivery::Core(core::Held::CallAnswer { to, key, part }) => {
+                let answer = peers.peers.protocol.answer(to.into_token(), key, &part, true);
                 peers.calls.push(part);
-                Vec::new()
+                answer.into_iter().map(Input::Event).collect()
             }
             root::Delivery::ApplicationDocument { .. }
             | root::Delivery::ApplicationRead { .. }

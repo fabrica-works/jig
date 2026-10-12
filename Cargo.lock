@@ -178,12 +178,15 @@ dependencies = [
  "jig-fake-parties",
  "jig-fake-store",
  "jig-fake-workers",
+ "jig-protocol-charter",
+ "jig-protocol-tools",
  "jig-test-connector",
  "jig-test-connector-world",
  "jig-test-domain",
  "jig-test-system",
  "skein-lib",
  "skein-world",
+ "smith-channel",
 ]
 
 [[package]]

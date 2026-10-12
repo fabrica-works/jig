@@ -23,6 +23,7 @@ pub struct Peers {
     pub requests: Vec<parties::Up>,
     party_flights: BTreeMap<u64, usize>,
     call_hosts: BTreeMap<core::CallKey, (u64, u32)>,
+    pub protocol: crate::protocol::Stand,
     opaque: BTreeMap<OpaqueName, (u64, u32)>,
 }
 
@@ -36,6 +37,7 @@ impl Peers {
             requests: Vec::new(),
             party_flights: BTreeMap::new(),
             call_hosts: BTreeMap::new(),
+            protocol: crate::protocol::Stand::new(crate::world::limits().core),
             opaque: BTreeMap::new(),
         }
     }
@@ -317,14 +319,17 @@ impl Peers {
         self.workers.iter_mut().find(|worker| worker.channel == channel).expect("configured host")
     }
 
-    /// The test root's decoder renders reads now and records answers to writes.
+    /// The world's protocol adapter decodes core tools before application calls.
     pub fn opaque_answer(&mut self, to: ReplyTo, run: Token, attempt: Token, call: &fleet::Call) -> Vec<root::Event> {
         let number = self.opaque.get(&(run.raw(), attempt.raw(), call.name.clone())).expect("retained opaque call").1;
         let key = core::CallKey { task: run.raw(), attempt: attempt.raw(), completion: number, position: 0 };
         self.call_hosts.remove(&key);
         let token = to.into_token();
+        if let Some(event) = self.protocol.decode(token, run, attempt, call) {
+            return vec![event];
+        }
         if !call.writes {
-            return vec![root::Event::ReadAnswer {
+            return vec![root::Event::CallAnswered {
                 to: ReplyTo::new(token),
                 call: core::SettledCall {
                     serial: 0,

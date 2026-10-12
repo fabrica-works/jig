@@ -28,6 +28,7 @@ pub struct World {
     pub domain: root::Domain,
     pub store: Store,
     pub systems: [System; 2],
+    protocol: crate::protocol::Stand,
     pub host_calls: Vec<(Token, u64, u64, fleet::Call)>,
     pub host_answers: Vec<(Box<[u8]>, core::SettledCall)>,
     pub inbound: Vec<tasks::Word>,
@@ -256,6 +257,7 @@ impl World {
             domain: root::Domain::new(configuration, limits),
             store: Store::new(),
             systems: [System::new(), System::new()],
+            protocol: crate::protocol::Stand::new(limits.core),
             host_calls: Vec::new(),
             host_answers: Vec::new(),
             inbound: Vec::new(),
@@ -553,14 +555,28 @@ impl World {
                         self.events.push_back(root::Event::TranscriptLoaded { task, rows: Box::new([]), done: true });
                     }
                     root::Request::Now(core::Now::Call { to, run, attempt, call }) => {
-                        if let Some(peers) = &mut self.peers {
-                            self.events.extend(peers.opaque_answer(to, run, attempt, &call));
+                        let token = to.into_token();
+                        if self.peers.is_none()
+                            && let Some(event) = self.protocol.decode(token, run, attempt, &call)
+                        {
+                            self.events.push_back(event);
+                        } else if let Some(peers) = &mut self.peers {
+                            self.events.extend(peers.opaque_answer(ReplyTo::new(token), run, attempt, &call));
                         } else {
-                            self.host_calls.push((to.into_token(), run.raw(), attempt.raw(), call));
+                            self.host_calls.push((token, run.raw(), attempt.raw(), call));
                         }
                     }
                     root::Request::Now(core::Now::EffectAnswer { to, key, part }) => {
-                        self.answers.push((to.into_token(), key, part));
+                        let token = to.into_token();
+                        if let Some(event) = self
+                            .peers
+                            .as_mut()
+                            .map_or(&mut self.protocol, |peers| &mut peers.protocol)
+                            .answer(token, key, &part, false)
+                        {
+                            self.events.push_back(event);
+                        }
+                        self.answers.push((token, key, part));
                     }
                     root::Request::Now(core::Now::Account(accounts::Request::Refresh { account, generation })) => {
                         self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Refreshed {
@@ -868,6 +884,7 @@ impl World {
                 })));
             }
             root::Delivery::Core(core::Held::CallAnswer { to, key, part }) => {
+                let token = to.into_token();
                 assert!(
                     self.store.rows.contains_key(&root::Key::Core(core::Key::Core(core::CoreKey::Call(key)))),
                     "state-changing answer has its committed record"
@@ -875,7 +892,15 @@ impl World {
                 if self.lose_answer {
                     self.lost_answers += 1;
                 } else {
-                    self.answers.push((to.into_token(), key, part));
+                    if let Some(event) = self
+                        .peers
+                        .as_mut()
+                        .map_or(&mut self.protocol, |peers| &mut peers.protocol)
+                        .answer(token, key, &part, true)
+                    {
+                        self.events.push_back(event);
+                    }
+                    self.answers.push((token, key, part));
                 }
             }
             root::Delivery::Core(core::Held::PeopleReply { reply, .. }) => self.people_answers.push(reply),
@@ -1293,19 +1318,7 @@ impl World {
     }
 
     pub fn host_call(&mut self, name: &[u8], tool: &[u8], input: &[u8], writes: bool) -> Token {
-        let assignment = self.assigned.as_ref().expect("assigned chat");
-        self.send(root::Event::Core(core::Event::Fleet(fleet::Event::Relay {
-            channel: Token::new(7),
-            run: Token::new(assignment.task),
-            attempt: Token::new(assignment.attempt),
-            call: fleet::Call {
-                name: name.into(),
-                tool: tool.into(),
-                writes,
-                input: input.into(),
-                deadline: Duration::from_secs(2),
-            },
-        })));
+        self.relay_call(name, tool, input, writes);
         self.host_calls.last().expect("fleet authenticated call").0
     }
 }
