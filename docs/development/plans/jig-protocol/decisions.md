@@ -1093,6 +1093,24 @@ the file.
      transcript's turns (decision 27) is above 480 in a `Limits` literal on
      `main`, the count takes that value and a turn's ceiling the largest
      power of two that keeps the record within a `u32`.
+173. **The test-cost steps land without the focused suite's 15 s
+     timeout** (2026-10-12, the coordinator's block "jig tests.s1: third
+     focused-suite timeout", 2026-10-12T22:48:15Z). jig-tests.s1, which
+     makes the suite cheaper (its proof: jig-boundary's 56 tests in 0.49 s,
+     the slowest part 0.24 s), failed three gates at the 15 s timeout, the
+     last with 4,083 of 4,084 tests passed and none failing: the suite it
+     relieves is past its timeout before it lands. So jig-tests.s1,
+     jig-tests.s2, jig-tests.s3 and jig-repin.s3 (ruling 169) land with
+     `land --gate 'cargo fmt --check && cargo clippy --workspace
+     --all-targets -- -D warnings && cargo nextest run --workspace
+     --profile measure && cargo nextest run --workspace --profile fuzzy'`:
+     every test of both suites runs and must pass; only the focused
+     suite's global timeout is dropped, for those four landings. The gate
+     of every other landing stays `scripts/check.sh`, and its 15 s stays,
+     as the user asked (22:10Z: make the tests cheaper, not the timeout
+     longer). Reported to the user at once (development.md, 10.4). jig's
+     hold lifts; the test-cost steps land first when the gate lane has a
+     choice.
 
 ## For the user
 
