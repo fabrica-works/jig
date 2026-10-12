@@ -103,6 +103,7 @@ impl ClientPeer {
                 | core::Held::TaskTerminalAcknowledged { .. }
                 | core::Held::TaskTurnKept { .. }
                 | core::Held::AcknowledgeTurn { .. }
+                | core::Held::Drained
                 | core::Held::Cancel { .. }
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }

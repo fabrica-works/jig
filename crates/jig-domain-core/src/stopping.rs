@@ -16,6 +16,7 @@ impl Core {
 
 pub(crate) fn start(core: &mut Core) -> Requests {
     core.stopping = true;
+    core.draining = Some(true);
     empty()
 }
 
@@ -138,5 +139,13 @@ pub(crate) fn waits(timer: Timer) -> bool {
     match timer {
         Timer::People | Timer::Tasks | Timer::Fleet | Timer::Brief => true,
         Timer::Account | Timer::View => false,
+    }
+}
+
+/// The journal holds this terminal behind every earlier commit.
+pub(crate) fn drained(core: &mut Core, out: &mut Queue<Request>) {
+    if core.draining == Some(true) && core.view_subjects.is_empty() {
+        core.draining = Some(false);
+        out.push(Request::Held(Box::new(Held::Drained)));
     }
 }

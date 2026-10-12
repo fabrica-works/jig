@@ -107,3 +107,43 @@ fn a_connector_event_after_the_stop_is_handed_back_busy() {
     assert!(matches!(world.busy_events.as_slice(), [root::Event::Connector { number: 1, .. }]));
     assert_eq!(world.store.applied, commits);
 }
+
+#[test]
+fn every_open_watch_ends_saying_the_engine_is_stopping() {
+    let mut world = jig_core_world::watches::world(168, true);
+    world.stop();
+    assert_eq!(
+        world.watches.as_ref().expect("watch parties").endings,
+        [(1, views::End::Stopping), (2, views::End::Stopping), (3, views::End::Stopping), (4, views::End::Stopping)]
+    );
+}
+
+#[test]
+fn drained_is_released_once_after_the_last_commit_is_durable() {
+    let mut world = World::new(169, false);
+    let task = world.task();
+    let commits = world.store.applied;
+    world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
+    request(
+        &mut world,
+        57,
+        people::Ask::Say { project: 1, task, words: b"before the stop".as_slice().into(), release: false },
+    );
+    world.stop();
+    assert!(!world.stop_deliveries.iter().any(|held| matches!(held, core::Held::Drained)));
+    let number = world.store.release_held().expect("the pending commit");
+    assert!(number > commits);
+    world.send(root::Event::Committed { number });
+    assert_eq!(world.stop_deliveries.iter().filter(|held| matches!(held, core::Held::Drained)).count(), 1);
+    world.drain();
+    assert_eq!(world.store.applied, number);
+    assert_eq!(world.stop_deliveries.iter().filter(|held| matches!(held, core::Held::Drained)).count(), 1);
+}
+
+#[test]
+fn a_second_stop_says_drained_no_second_time() {
+    let mut world = World::new(170, false);
+    world.stop();
+    world.stop();
+    assert_eq!(world.stop_deliveries.iter().filter(|held| matches!(held, core::Held::Drained)).count(), 1);
+}

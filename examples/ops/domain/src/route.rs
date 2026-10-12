@@ -333,6 +333,7 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
         | core::Held::WatchEnded { .. }
         | core::Held::PeopleReply { .. }
         | core::Held::Result { .. }
+        | core::Held::Drained
         | core::Held::Refuse { .. }
         | core::Held::TurnBusy { .. }
         | core::Held::NotesLoad { .. }

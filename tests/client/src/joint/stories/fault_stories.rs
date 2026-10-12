@@ -338,3 +338,17 @@ fn a_crash_after_the_stop_commit_cold_restarts_offline_and_answers_the_same_key_
         .collect();
     assert_eq!(keys.len(), 1);
 }
+
+#[test]
+fn a_watch_ended_as_the_engine_stops_reaches_the_client_as_stopping() {
+    let (mut world, client) = stop_ready();
+    let now = world.now();
+    let wall = skein_lib::Wall::from_nanos(now.as_nanos());
+    world.front().session.driver.world.stop();
+    let mut callbacks = world.front().session.poll(now, wall).expect("stopping watch terminals");
+    callbacks.extend(world.front().session.poll(now, wall).expect("pending watch terminal"));
+    assert!(callbacks.iter().any(|(owner, event)| matches!(event,
+        jig_test_domain_client::Event::Jig(jig_domain_client::Event::Ended {
+            end: jig_domain_client::contract::WatchEnd::Stopping, ..
+        }) if *owner == client)));
+}

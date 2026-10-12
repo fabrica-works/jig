@@ -380,7 +380,9 @@ pub(super) fn end_invalid(core: &mut Core, env: &Env<Limits>) -> Requests {
         watches.push((*watcher, binding.clone())).expect("bounded watch snapshot");
     }
     for (watcher, binding) in watches.into_boxed() {
-        let ending = if core.people.person(binding.sign_in, env.now, env.wall) == Some(binding.party) {
+        let ending = if core.stopping {
+            Some(views::End::Stopping)
+        } else if core.people.person(binding.sign_in, env.now, env.wall) == Some(binding.party) {
             visibility_end(core, &binding)
         } else {
             Some(views::End::SignedOut)
@@ -389,6 +391,7 @@ pub(super) fn end_invalid(core: &mut Core, env: &Env<Limits>) -> Requests {
             append(super::view_routes::route_view(core, env, views::Event::EndWatch { watcher, end }), &mut out);
         }
     }
+    crate::stopping::drained(core, &mut out);
     out.push(Request::Decided);
     Requests::Out(out)
 }

@@ -759,7 +759,9 @@ impl World {
             root::Delivery::Core(core::Held::TurnBusy { run, attempt, turn, .. }) => {
                 self.busy_turns.push((run.raw(), attempt.raw(), turn));
             }
-            root::Delivery::Core(held @ (core::Held::WatchEnded { .. } | core::Held::Acknowledge { .. })) => {
+            root::Delivery::Core(
+                held @ (core::Held::Drained | core::Held::WatchEnded { .. } | core::Held::Acknowledge { .. }),
+            ) => {
                 self.stop_deliveries.push(held);
             }
             root::Delivery::CallAnswer { name, call, .. } => self.host_answers.push((name, call)),

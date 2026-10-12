@@ -255,7 +255,8 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                     out.push(Request::Now(Box::new(Now::DropPayload { payload: message.words })));
                     continue;
                 }
-                if let Some(proof) = core.proofs.get_mut(&run.raw())
+                if !core.stopping
+                    && let Some(proof) = core.proofs.get_mut(&run.raw())
                     && proof.attempt == attempt.raw()
                 {
                     proof.offered = Some(match proof.offered {

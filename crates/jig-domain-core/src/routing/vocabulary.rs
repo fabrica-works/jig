@@ -109,6 +109,8 @@ pub enum Write {
 /// Core output that must follow the decision's commit.
 #[derive(Debug)]
 pub enum Held {
+    /// Every earlier commit is durable when the journal releases this terminal.
+    Drained,
     /// Assemble the connector-owned document prepared for this delivery in the same decision.
     ApplicationDelivery { watcher: Token, connector: u16, subject: Token },
     /// Drop the connector-owned subject binding and deliver its paced ending.
