@@ -455,6 +455,16 @@ the file.
      Reported to the user at once (development.md, 10.4). Before landing,
      smith 01.1 accounts for the two `smith-bench` tests about six times
      slower on its tip than on `main`.
+122. **A test outside Files expecting the answer the Shape changes is
+     updated** (2026-10-12, the coordinator's block "jig 03.5: cursor
+     tests outside Files expect Unknown after sign-out",
+     2026-10-12T18:33:43Z). 03.5's Shape: a loaded read whose sign-in
+     ends answers `SignedOut`; its session file lets `tests.rs` update
+     equalities "unless their case is now signed out". Two tests in
+     `crates/jig-domain-core/src/tests/conversation_cursor.rs` (:262,
+     :486) remove the sign-in and still expect `Why::Unknown`: they
+     expect `Why::SignedOut`, inputs and names kept. The README's Rules
+     now say so for any increment, at most 4 assertions.
 
 ## For the user
 

@@ -204,6 +204,13 @@ ones before it in its session. Dependencies are by capability: "skein
   replaces development.md, 8.2's "it is in your session's own files" for
   this plan; expected values change only as ruling 108 says. Anything
   else outside Files stays a question.
+- **An expected value for the case the Shape changes** (decisions.md,
+  ruling 122). Where an increment's Shape changes what a case answers,
+  a test outside its Files that sets up that very case and expects the
+  old answer is updated to the new one: its inputs and name kept, at
+  most 4 assertions in all, each named in the commit body with the
+  Shape's words it follows. It never loosens an assertion (no
+  `matches!` in place of an equality) and never removes one.
 - **A new module beside a file past 800 lines is inside Files**
   (decisions.md, ruling 116). Where an increment's Files name a file past
   800 lines, the new module that code-organization.md, section 7 sends its
