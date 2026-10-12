@@ -465,6 +465,15 @@ the file.
      :486) remove the sign-in and still expect `Why::Unknown`: they
      expect `Why::SignedOut`, inputs and names kept. The README's Rules
      now say so for any increment, at most 4 assertions.
+123. **A removed mechanism's tests move with its removal** (2026-10-12,
+     the coordinator's block "jig 05.4: migrate removed Told tests
+     outside Files to typed activity", 2026-10-12T18:40:51Z). 05.4's Shape
+     removes `Event::Told`, `Request::Told` and `call::told`; four
+     assertions in `crates/jig-domain-fleet/src/tests.rs` test them.
+     development.md, 8.2 already makes them 05.4's; they move to the typed
+     `Observe(Activity::Active)` behaviour, names and the owned and
+     fenced-channel behaviours kept. The README's Rules now say so for
+     any increment that removes a mechanism.
 
 ## For the user
 

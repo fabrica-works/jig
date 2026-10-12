@@ -211,6 +211,14 @@ ones before it in its session. Dependencies are by capability: "skein
   most 4 assertions in all, each named in the commit body with the
   Shape's words it follows. It never loosens an assertion (no
   `matches!` in place of an equality) and never removes one.
+- **A removed mechanism's tests are its increment's** (decisions.md,
+  ruling 123). Where an increment's Shape removes a mechanism, its tests
+  in any file are the increment's, as development.md, 8.2 says
+  ("Removing a mechanism removes all of it ... tests and docs"): each
+  moved to the replacement's behaviour, name kept, where the Shape names
+  a replacement; removed otherwise; each named in the commit body. The
+  limits of rulings 108, 114 and 122 do not bind them; no other test
+  changes under this rule.
 - **A new module beside a file past 800 lines is inside Files**
   (decisions.md, ruling 116). Where an increment's Files name a file past
   800 lines, the new module that code-organization.md, section 7 sends its
