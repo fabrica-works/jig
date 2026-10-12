@@ -4,7 +4,7 @@
 //! never knows role membership or a worker call identity. Terminal proposals
 //! leave live memory as historical store rows.
 use crate::domain::{Domain, publish, record, refused, task_mut};
-use crate::{Amendment, Authority, Change, History, Limits, New, Party, Phase, Refusal, Request, Stored, Was};
+use crate::{Amendment, Authority, Change, Limits, New, Party, Phase, Refusal, Request, Stored, Was};
 use alloc::boxed::Box;
 use skein_lib::{Env, Queue, ReplyTo, Time, Wall};
 
@@ -359,25 +359,6 @@ pub fn context(domain: &Domain, proposer: u64, number: u64) -> Option<Proposal> 
     }
 }
 
-fn history(domain: &mut Domain, at: Wall, proposal: Proposal, by: Party, change: Change, out: &mut Queue<Request>) {
-    let task = task_mut(domain, proposal.proposer).expect("proposal task live");
-    task.record.revision = task.record.revision.checked_add(1).expect("proposal revision preflighted");
-    let revision = task.record.revision;
-    crate::activity::append(&mut task.record, at, crate::Line::Decided { revision }, out);
-    out.push(Request::Save {
-        record: Stored::History(History {
-            task: proposal.proposer,
-            revision: task.record.revision,
-            by,
-            change,
-            reason: proposal.reason.clone(),
-            proposal: Some(Box::new(proposal)),
-            at,
-            amendment: None,
-        }),
-    });
-}
-
 fn arm(domain: &mut Domain, env: &Env<Limits>, proposer: u64, since: Wall) {
     let until = since.as_nanos().saturating_add(env.limits.proposal_stall.as_nanos());
     let remaining = until.saturating_sub(env.wall.as_nanos());
@@ -493,7 +474,7 @@ pub(crate) fn stalled(
     }
     proposal.state = ProposalState::Pending { holder, since: env.wall };
     task_mut(domain, proposer).expect("live proposal").record.proposal = Some(Box::new(proposal.clone()));
-    history(domain, env.wall, proposal, Party::Task(proposer), Change::ProposalPassed, out);
+    crate::positions::history(domain, env, proposal, Party::Task(proposer), Change::ProposalPassed, out);
     publish(domain, env, proposer, out);
     match holder {
         ProposalHolder::Task(_) | ProposalHolder::Person(_) => arm(domain, env, proposer, env.wall),
@@ -670,7 +651,7 @@ fn install(domain: &mut Domain, env: &Env<Limits>, proposal: Proposal, result: b
     let row = &mut task_mut(domain, number).expect("proposer live").record;
     row.proposal = Some(Box::new(proposal.clone()));
     row.result_proposal = result;
-    history(domain, env.wall, proposal, Party::Task(number), Change::Proposed, out);
+    crate::positions::history(domain, env, proposal, Party::Task(number), Change::Proposed, out);
     publish(domain, env, number, out);
     let pending = context(domain, number, proposal_id).expect("proposal admitted");
     match pending.state {
@@ -757,7 +738,7 @@ pub(crate) fn decide(
         ProposalOutcome::Passed => Change::ProposalPassed,
         ProposalOutcome::Withdrawn | ProposalOutcome::Stale => unreachable!("decision outcome"),
     };
-    history(domain, env.wall, proposal, by, change, out);
+    crate::positions::history(domain, env, proposal, by, change, out);
     publish(domain, env, proposer, out);
     match outcome {
         ProposalOutcome::Passed => {
@@ -843,7 +824,7 @@ pub(crate) fn withdraw_on_close(domain: &mut Domain, env: &Env<Limits>, number: 
     };
     task_mut(domain, number).expect("closing task live").record.result_proposal = false;
     proposal.state = ProposalState::Withdrawn;
-    history(domain, env.wall, proposal, Party::Task(number), Change::ProposalWithdrawn, out);
+    crate::positions::history(domain, env, proposal, Party::Task(number), Change::ProposalWithdrawn, out);
     domain.proposal_alarms.cancel(number);
 }
 
@@ -868,7 +849,7 @@ pub(crate) fn withdraw(
     task_mut(domain, proposer).expect("pending proposer live").record.proposal = None;
     task_mut(domain, proposer).expect("pending proposer live").record.result_proposal = false;
     proposal.state = ProposalState::Withdrawn;
-    history(domain, env.wall, proposal, Party::Task(proposer), Change::ProposalWithdrawn, out);
+    crate::positions::history(domain, env, proposal, Party::Task(proposer), Change::ProposalWithdrawn, out);
     domain.proposal_alarms.cancel(proposer);
     publish(domain, env, proposer, out);
     out.push(Request::ProposalDecided { reply_to: to, proposer, number, outcome: ProposalOutcome::Withdrawn });

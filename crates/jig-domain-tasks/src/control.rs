@@ -375,7 +375,7 @@ pub(crate) fn amend(
     }
     task.record.last_message = message;
     task.record.inbox = prepared.inbox;
-    crate::activity::message(&mut task.record, &prepared.activity_word, out);
+    crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
     if attempt.is_some() {
         task.record.narrowing = true;
         task.record.due_reason = crate::Why::Narrowed;
@@ -615,7 +615,7 @@ pub(crate) fn release(
     if let Some(notice) = notice {
         task.record.last_message = notice.word.number;
         task.record.inbox = notice.inbox;
-        crate::activity::message(&mut task.record, &notice.activity_word, out);
+        crate::activity::message(&mut task.record, &notice.activity_word, env.limits.inbox_messages, out);
     }
     task.record.narrowing |= crate::run::run_attempt(&next).is_some();
     task.record.phase = next;

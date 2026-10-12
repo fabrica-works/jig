@@ -366,6 +366,7 @@ fn valid_record(domain: &Domain, limits: &Limits, task: &TaskRecord) -> bool {
         || !valid_followups(task)
         || !valid_chat_close(task)
         || !valid_person_answer(task)
+        || !crate::positions::valid(task, limits.inbox_messages)
     {
         return false;
     }

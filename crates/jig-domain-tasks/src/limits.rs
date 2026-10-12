@@ -159,6 +159,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::Word>()).ok()?)?)?
         .checked_add(u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::ReplyHint>()).ok()?)?)?
         .checked_add(
+            u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::QuestionLine>()).ok()?)?,
+        )?
+        .checked_add(
+            u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::ProposalRow>()).ok()?)?,
+        )?
+        .checked_add(
             u64::from(limits.inbox_messages).checked_mul(u64::try_from(size_of::<crate::QuestionCredit>()).ok()?)?,
         )?
         .checked_add(

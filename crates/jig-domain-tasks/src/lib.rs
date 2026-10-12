@@ -84,6 +84,8 @@ mod moving;
 mod owned;
 mod parts;
 mod periods;
+mod positions;
+pub use positions::{AnswerLine, ProposalRow, QuestionLine};
 mod person;
 mod procedure;
 mod proposals;

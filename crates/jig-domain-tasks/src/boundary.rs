@@ -842,6 +842,12 @@ pub struct ReplyHint {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent durable lifecycle facts are explicit")]
 pub struct TaskRecord {
+    /// Newest question and answer activity positions, at most `inbox_messages`.
+    pub question_lines: Box<[crate::QuestionLine]>,
+    /// Latest hold milestone; zero before the first hold.
+    pub hold: u64,
+    /// Newest decided proposal history positions, at most `inbox_messages`.
+    pub proposal_rows: Box<[crate::ProposalRow]>,
     /// Agent instruction replacement; absent uses the configured charter default.
     pub instructions: Option<Box<[u8]>>,
     /// A person requested this chat to finish by this durable deadline.

@@ -325,7 +325,7 @@ pub(crate) fn message(
     let task = task_mut(domain, number).expect("admitted task still live");
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
-    crate::activity::message(&mut task.record, &prepared.activity_word, out);
+    crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
     if let Some(question) = answer {
         let mut credits = List::with_capacity(env.limits.inbox_messages);
         for credit in &task.record.questions {
@@ -334,6 +334,8 @@ pub(crate) fn message(
             }
         }
         task.record.questions = credits.into_boxed();
+        let heard = crate::AnswerLine { task: number, position: task.record.activity };
+        crate::positions::sent_answer(domain, env, sender, question, heard, out);
     }
     if released {
         crate::control::release(domain, env, number, sender, None, None, out).expect("release preflight before words");
@@ -401,7 +403,7 @@ pub(crate) fn delegate_result(
     let task = task_mut(domain, number).expect("requester remains live");
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
-    crate::activity::message(&mut task.record, &prepared.activity_word, out);
+    crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
     publish(domain, env, number, out);
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
 }
@@ -423,7 +425,7 @@ pub(crate) fn proposal_decision(
     let task = task_mut(domain, number).expect("proposal's live proposer");
     task.record.last_message = prepared.word.number;
     task.record.inbox = prepared.inbox;
-    crate::activity::message(&mut task.record, &prepared.activity_word, out);
+    crate::activity::message(&mut task.record, &prepared.activity_word, env.limits.inbox_messages, out);
     publish(domain, env, number, out);
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word, out);
 }

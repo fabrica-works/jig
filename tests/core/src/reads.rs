@@ -176,6 +176,28 @@ fn owner(store: &Store, number: u64) -> Option<&tasks::TaskRecord> {
 }
 
 fn row(store: &Store, value: &core::Record, task: &tasks::TaskRecord) -> reads::Row {
+    let related_key = match value {
+        core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
+            line: tasks::Line::Turn { attempt, turn, .. },
+            ..
+        })) => core::CoreKey::Turn { task: task.number, attempt: *attempt, turn: *turn },
+        core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
+            core::CoreKey::Terminal { task: task.number, attempt: task.attempt }
+        }
+    };
+    let related = store.rows.get(&root::Key::Core(core::Key::Core(related_key))).and_then(|record| match record {
+        root::Record::Core(value) => Some(value.clone()),
+        root::Record::Connector { .. } => None,
+    });
+    joined_row(store, value, task, related)
+}
+
+fn joined_row(
+    store: &Store,
+    value: &core::Record,
+    task: &tasks::TaskRecord,
+    related: Option<core::Record>,
+) -> reads::Row {
     let mut ancestors = Vec::new();
     let mut linked = BTreeMap::new();
     let mut requester = task.requester;
@@ -198,19 +220,6 @@ fn row(store: &Store, value: &core::Record, task: &tasks::TaskRecord) -> reads::
             linked.insert(*number, Box::new(value.clone()));
         }
     }
-    let related_key = match value {
-        core::Record::Tasks(tasks::Stored::Activity(tasks::ActivityLine {
-            line: tasks::Line::Turn { attempt, turn, .. },
-            ..
-        })) => core::CoreKey::Turn { task: task.number, attempt: *attempt, turn: *turn },
-        core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
-            core::CoreKey::Terminal { task: task.number, attempt: task.attempt }
-        }
-    };
-    let related = store.rows.get(&root::Key::Core(core::Key::Core(related_key))).and_then(|record| match record {
-        root::Record::Core(value) => Some(value.clone()),
-        root::Record::Connector { .. } => None,
-    });
     reads::Row {
         value: value.clone(),
         owner: Some(Box::new(task.clone())),
@@ -330,9 +339,86 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
     }
 }
 
+fn get(store: &Store, key: core::Key) -> Option<&core::Record> {
+    match store.rows.get(&root::Key::Core(key))? {
+        root::Record::Core(record) => Some(record),
+        root::Record::Connector { .. } => None,
+    }
+}
+
+fn point(store: &Store, scope: &reads::Scope) -> Option<reads::Row> {
+    let (number, key, related) = match scope {
+        reads::Scope::Question { task, message } => {
+            let task_row = owner(store, *task)?;
+            let line = task_row.question_lines.iter().find(|line| line.message == *message)?;
+            (
+                *task,
+                core::Key::Tasks(tasks::Key::Activity { task: *task, position: line.line }),
+                line.answer.map(|answer| {
+                    core::Key::Tasks(tasks::Key::Activity { task: answer.task, position: answer.position })
+                }),
+            )
+        }
+        reads::Scope::Escalation { task } => {
+            let task_row = owner(store, *task)?;
+            (
+                *task,
+                core::Key::Core(core::CoreKey::EscalationDecision {
+                    task: *task,
+                    revision: task_row.escalation.revision(),
+                }),
+                Some(core::Key::Tasks(tasks::Key::Milestone { task: *task, position: task_row.hold })),
+            )
+        }
+        reads::Scope::Proposal { proposer: documents::Proposer::Task(task), proposal } => {
+            let task_row = owner(store, *task)?;
+            let hint = task_row.proposal_rows.iter().find(|row| row.proposal == *proposal)?;
+            (*task, core::Key::Tasks(tasks::Key::History { task: *task, revision: hint.revision }), None)
+        }
+        reads::Scope::Task { .. }
+        | reads::Scope::Proposal { proposer: documents::Proposer::Party(_), .. }
+        | reads::Scope::PersonTask { .. }
+        | reads::Scope::Result { .. }
+        | reads::Scope::Reply { .. }
+        | reads::Scope::Turn { .. }
+        | reads::Scope::EndedDelegates { .. }
+        | reads::Scope::History { .. }
+        | reads::Scope::Activity { .. }
+        | reads::Scope::Inbox { .. }
+        | reads::Scope::Conversations
+        | reads::Scope::Goals { .. }
+        | reads::Scope::Notes { .. }
+        | reads::Scope::ScopedNotes { .. }
+        | reads::Scope::Spend { .. } => return None,
+    };
+    Some(joined_row(store, get(store, key)?, owner(store, number)?, related.and_then(|key| get(store, key)).cloned()))
+}
+
+fn single_page(store: &Store, range: &reads::Range) -> reads::Loaded {
+    let Some(row) = point(store, &range.scope) else { return reads::Loaded::Gone };
+    let key = reads::row_key(&row).expect("single row has a key");
+    if let Some(after) = &range.after
+        && if range.backwards { key >= *after } else { key <= *after }
+    {
+        return reads::Loaded::Page { rows: Box::new([]), next: None };
+    }
+    if range.rows == 0 || row.owned_bytes().expect("single row pricing") > range.bytes {
+        return reads::Loaded::Busy;
+    }
+    reads::Loaded::Page { rows: Box::new([row]), next: None }
+}
+
 /// The fake transport selects durable owner rows and echoes opaque continuations.
 #[must_use]
 pub fn page(store: &Store, range: &reads::Range) -> reads::Loaded {
+    if matches!(
+        range.scope,
+        reads::Scope::Question { .. }
+            | reads::Scope::Escalation { .. }
+            | reads::Scope::Proposal { proposer: documents::Proposer::Task(_), .. }
+    ) {
+        return single_page(store, range);
+    }
     let mut ordered = BTreeMap::new();
     let bounds = index_bounds(range);
     let bounds = match bounds {

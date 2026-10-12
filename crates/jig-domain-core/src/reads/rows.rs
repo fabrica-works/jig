@@ -702,7 +702,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
             let owner = row_owner(&row).expect("matched owner");
             let answer = match &row.related {
                 Some(record) => match activity_record(record) {
-                    Some(answer) if answer.task == *task && answer.position > line.position => match &answer.line {
+                    Some(answer) if super::answers::matches(owner, *number, answer) => match &answer.line {
                         tasks::Line::Words { kind: tasks::MessageKind::Answer { question }, .. }
                             if *question == *number =>
                         {

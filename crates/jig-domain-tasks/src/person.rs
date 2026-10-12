@@ -198,7 +198,7 @@ pub(crate) fn stalled(domain: &mut Domain, env: &Env<Limits>, number: u64, messa
             let parent_row = task_mut(domain, parent).expect("requester remains live");
             parent_row.record.last_message = prepared.word.number;
             parent_row.record.inbox = prepared.inbox;
-            crate::activity::message(&mut parent_row.record, &prepared.activity_word, out);
+            crate::activity::message(&mut parent_row.record, &prepared.activity_word, env.limits.inbox_messages, out);
             publish(domain, env, parent, out);
             crate::wake::after_message(domain, env, parent, prepared.previous, prepared.word, out);
         }

@@ -873,6 +873,9 @@ fn milestone(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queu
         Phase::Held { .. } => true,
         Phase::Waiting | Phase::Active(_) | Phase::Closing(_) | Phase::Ended(_) => false,
     };
+    if held {
+        task.record.hold = position;
+    }
     if initial || held {
         crate::activity::append(&mut task.record, env.wall, crate::Line::Milestone { position }, out);
     }
@@ -1148,6 +1151,9 @@ pub(crate) fn make_admitted(
             published: None,
             procedure_offered: None,
             record: TaskRecord {
+                question_lines: Box::new([]),
+                hold: 0,
+                proposal_rows: Box::new([]),
                 instructions: None,
                 chat_close: None,
                 created_at: env.wall,

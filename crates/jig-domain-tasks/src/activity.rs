@@ -87,7 +87,7 @@ pub(crate) fn append(task: &mut TaskRecord, at: Wall, line: Line, out: &mut Queu
     });
 }
 
-pub(crate) fn message(task: &mut TaskRecord, word: &Word, out: &mut Queue<Request>) {
+pub(crate) fn message(task: &mut TaskRecord, word: &Word, bound: u32, out: &mut Queue<Request>) {
     let line = match word.kind {
         MessageKind::Words | MessageKind::Question | MessageKind::Answer { .. } => {
             Line::Words { message: word.number, by: word.from, kind: word.kind.clone(), words: word.words.clone() }
@@ -104,6 +104,7 @@ pub(crate) fn message(task: &mut TaskRecord, word: &Word, out: &mut Queue<Reques
         | MessageKind::Result(_) => Line::Heard(word.clone()),
     };
     append(task, word.at, line, out);
+    crate::positions::message(task, word, bound);
 }
 
 /// Maximum complete bytes in an emitted line; referenced history/turn rows have their own bounds.

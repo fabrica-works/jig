@@ -409,6 +409,8 @@ pub fn task_bytes(task: &TaskRecord) -> Option<u64> {
         .checked_add(bytes(size_of_val(&*task.subscriptions))?)?
         .checked_add(bytes(size_of_val(&*task.waiting_on))?)?
         .checked_add(bytes(size_of_val(&*task.replies))?)?
+        .checked_add(bytes(size_of_val(&*task.question_lines))?)?
+        .checked_add(bytes(size_of_val(&*task.proposal_rows))?)?
         .checked_add(inbox_bytes)?
         .checked_add(saved_bytes)
 }

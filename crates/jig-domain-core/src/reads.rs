@@ -18,6 +18,7 @@ mod vocabulary;
 pub use vocabulary::{
     Answer, Cursor, Filter, Group, Historical, Loaded, Page, PageRow, Past, Position, Range, Read, Row, Scope, Why,
 };
+mod answers;
 pub mod indexed;
 mod rows;
 pub use rows::row_key;

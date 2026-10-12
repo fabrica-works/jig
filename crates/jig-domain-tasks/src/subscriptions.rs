@@ -253,7 +253,7 @@ pub(crate) fn notice(domain: &mut Domain, env: &Env<Limits>, number: u64, word: 
     let row = task_mut(domain, number).expect("subscriber live");
     row.record.last_message = prepared.word.number;
     row.record.inbox = prepared.inbox;
-    crate::activity::message(&mut row.record, &prepared.activity_word, out);
+    crate::activity::message(&mut row.record, &prepared.activity_word, env.limits.inbox_messages, out);
     publish(domain, env, number, out);
     crate::wake::after_message(domain, env, number, prepared.previous, prepared.word.clone(), out);
     match subscription.kind {
