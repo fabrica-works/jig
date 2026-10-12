@@ -488,6 +488,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-protocol-accounts-world"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-accounts",
+ "jig-protocol-accounts",
+ "skein-fake-machine",
+ "skein-fake-oauth",
+ "skein-fake-peers",
+ "skein-heap",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-oauth",
+ "skein-oauth-accounts",
+ "skein-sim",
+ "skein-tls",
+ "skein-world",
+]
+
+[[package]]
 name = "jig-protocol-charter"
 version = "0.0.0"
 dependencies = [
@@ -769,6 +789,63 @@ version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
 
 [[package]]
+name = "skein-fake-llm-domain"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "skein-fake-llm-protocol"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
+dependencies = [
+ "skein-fake-llm-domain",
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+ "skein-llm",
+]
+
+[[package]]
+name = "skein-fake-machine"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
+dependencies = [
+ "skein-io",
+ "skein-lib",
+ "skein-sim",
+]
+
+[[package]]
+name = "skein-fake-oauth"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+ "skein-oauth",
+]
+
+[[package]]
+name = "skein-fake-peers"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
+dependencies = [
+ "rustls",
+ "skein-fake-llm-domain",
+ "skein-fake-llm-protocol",
+ "skein-fake-oauth",
+ "skein-http",
+ "skein-io",
+ "skein-lib",
+ "skein-llm",
+ "skein-oauth",
+ "skein-world",
+]
+
+[[package]]
 name = "skein-heap"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
@@ -810,6 +887,16 @@ dependencies = [
 name = "skein-lib"
 version = "0.0.0"
 source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
+
+[[package]]
+name = "skein-llm"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#67c1e6e1bf371f7f1ab4c9ed4f6671be66c3b5b2"
+dependencies = [
+ "skein-http",
+ "skein-json",
+ "skein-lib",
+]
 
 [[package]]
 name = "skein-oauth"

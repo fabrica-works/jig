@@ -46,6 +46,7 @@ members = [
     "crates/jig-protocol-config",
     "crates/jig-protocol-store",
     "tests/accounts",
+    "tests/protocol-accounts",
     "tests/brief",
     "tests/fleet",
     "tests/notes",
@@ -64,6 +65,13 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+skein-sim = { git = "https://github.com/forgetic/skein.git" }
+skein-fake-oauth = { git = "https://github.com/forgetic/skein.git" }
+skein-fake-peers = { git = "https://github.com/forgetic/skein.git" }
+skein-fake-machine = { git = "https://github.com/forgetic/skein.git" }
+skein-http = { git = "https://github.com/forgetic/skein.git" }
+skein-tls = { git = "https://github.com/forgetic/skein.git" }
+
 jig-protocol-accounts = { path = "crates/jig-protocol-accounts" }
 skein-oauth = { git = "https://github.com/forgetic/skein.git" }
 skein-oauth-accounts = { git = "https://github.com/forgetic/skein.git" }
