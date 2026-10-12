@@ -8,6 +8,8 @@ use skein_lib::{ReplyTo, Rng, Token};
 fn finish(world: &mut World, task: u64) {
     let run = *world.assignments.iter().rev().find(|(number, _)| *number == task).expect("assigned task");
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task,
         attempt: run.1,

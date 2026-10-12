@@ -171,8 +171,24 @@ pub enum Output {
 /// A turn or terminal the fleet asks the root to carry back by opaque token.
 #[derive(Debug)]
 pub(crate) enum Payload {
-    Turn { task: u64, attempt: u64, turn: u32, spent: u64, read: Option<u64>, body: Box<[u8]> },
-    Answer { task: u64, attempt: u64, spent: u64, ending: host::Ending },
+    Turn {
+        task: u64,
+        attempt: u64,
+        turn: u32,
+        spent: u64,
+        read: Option<u64>,
+        body: Box<[u8]>,
+        opens_window: bool,
+        refused: Box<[(u64, host::MessageRefusal)]>,
+    },
+    Answer {
+        task: u64,
+        attempt: u64,
+        spent: u64,
+        ending: host::Ending,
+        read: Option<u64>,
+        refused: Box<[(u64, host::MessageRefusal)]>,
+    },
     Word(tasks::Word),
     Settled(core::SettledCall),
 }

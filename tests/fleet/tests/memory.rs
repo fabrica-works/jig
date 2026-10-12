@@ -4,7 +4,7 @@
 //! entry point on the way.
 
 use jig_domain_fleet::{
-    Answer, Bounce, Domain, Event, Hello, Hosted, Limits, Phase, Request, fire, max_out, resume, step, worst_case,
+    Answer, Domain, Event, Hello, Hosted, Limits, Phase, Request, fire, max_out, resume, step, worst_case,
 };
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
@@ -283,7 +283,7 @@ fn every_entry_point_stays_within_the_worst_case() {
     let (r3, a3) = fleet.start();
     let placed = placed(&fleet.settle());
     assert_eq!(placed.len(), 1);
-    // Calls, answers, inbound events, bounces and facts.
+    // Calls, answers, inbound events and facts.
     let up = fleet.step(Event::Relay {
         channel: placed[0].0,
         run: r3,
@@ -305,13 +305,7 @@ fn every_entry_point_stays_within_the_worst_case() {
         attempt: a3,
         message: jig_domain_fleet::Message { name: Token::new(4), sender: Token::new(4), words: Token::new(4) },
     });
-    fleet.step(Event::Bounced {
-        channel: placed[0].0,
-        name: Token::new(0),
-        run: r3,
-        attempt: a3,
-        bounce: Bounce::Full,
-    });
+
     fleet.step(Event::Told { channel: placed[0].0, run: r3, attempt: a3, fact: Token::new(5) });
     fleet.step(Event::Cancel { run: r1, attempt: a1 });
     // A busy refusal, placed again.

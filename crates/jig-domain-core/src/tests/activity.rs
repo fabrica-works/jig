@@ -28,6 +28,7 @@ fn activity_decision(core: &mut Core, env: &Env<Limits>, event: Event) -> Vec<Re
                         core,
                         env,
                         Event::AcceptedTurn {
+                            opens_window: false,
                             task,
                             attempt,
                             turn,
@@ -77,6 +78,7 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         &mut core,
         &env,
         Event::TurnPayload {
+            refused: Box::new([]),
             run: Token::new(1),
             attempt: Token::new(7),
             turn: 1,
@@ -111,6 +113,7 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         &mut core,
         &env,
         Event::TurnPayload {
+            refused: Box::new([]),
             run: Token::new(1),
             attempt: Token::new(7),
             turn: 2,
@@ -137,6 +140,8 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         &mut core,
         &env,
         Event::AnswerPayload {
+            read: None,
+            refused: Box::new([]),
             run: Token::new(1),
             attempt: Token::new(7),
             payload: Token::new(13),
@@ -182,6 +187,8 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         &mut core,
         &env,
         Event::AnswerPayload {
+            read: None,
+            refused: Box::new([]),
             run: Token::new(1),
             attempt: Token::new(7),
             payload: Token::new(13),

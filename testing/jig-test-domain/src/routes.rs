@@ -428,8 +428,8 @@ fn route_now(
         }
         core::Now::TurnPayload { run, attempt, turn, body } => {
             let payload = domain.payloads.get(&body).expect("fleet retained the turn body");
-            let (cumulative, read) = match payload {
-                crate::Payload::Turn { cumulative, read, .. } => (*cumulative, *read),
+            let (cumulative, read, refused) = match payload {
+                crate::Payload::Turn { cumulative, read, refused, .. } => (*cumulative, *read, refused.clone()),
                 crate::Payload::Busy
                 | crate::Payload::InboxWord(_)
                 | crate::Payload::SettledCall(_)
@@ -437,12 +437,14 @@ fn route_now(
                     unreachable!("turn body family")
                 }
             };
-            work.push(Work::Core(core::Event::TurnPayload { run, attempt, turn, body, cumulative, read }));
+            work.push(Work::Core(core::Event::TurnPayload { run, attempt, turn, body, cumulative, read, refused }));
         }
         core::Now::AnswerPayload { run, attempt, payload } => {
             let body = domain.payloads.get(&payload).expect("fleet retained the answer body");
-            let (cumulative, end) = match body {
-                crate::Payload::Answer { cumulative, end, .. } => (*cumulative, end.clone()),
+            let (cumulative, end, read, refused) = match body {
+                crate::Payload::Answer { cumulative, end, read, refused, .. } => {
+                    (*cumulative, end.clone(), *read, refused.clone())
+                }
                 crate::Payload::Busy
                 | crate::Payload::InboxWord(_)
                 | crate::Payload::SettledCall(_)
@@ -458,12 +460,16 @@ fn route_now(
                 end,
                 saved: None,
                 invalid_saved: false,
+                read,
+                refused,
             }));
         }
         core::Now::AcceptedTurn { payload, task, attempt, turn, accepted } => {
             let body = domain.payloads.remove(&payload).expect("accepted turn body");
-            let (cumulative, read, transcript) = match body {
-                crate::Payload::Turn { cumulative, read, transcript, .. } => (cumulative, read, transcript),
+            let (cumulative, read, transcript, opens_window) = match body {
+                crate::Payload::Turn { cumulative, read, transcript, opens_window, .. } => {
+                    (cumulative, read, transcript, opens_window)
+                }
                 crate::Payload::Busy
                 | crate::Payload::InboxWord(_)
                 | crate::Payload::SettledCall(_)
@@ -476,6 +482,7 @@ fn route_now(
                 attempt,
                 turn,
                 accepted,
+                opens_window,
                 cumulative,
                 read,
                 transcript,

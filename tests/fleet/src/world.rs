@@ -35,7 +35,7 @@ pub const LIMITS: Limits = Limits {
 
 /// How a world's attempts ended and what the fleet did on the way, by kind,
 /// for the sweep.
-pub const ENDINGS: [&str; 22] = [
+pub const ENDINGS: [&str; 21] = [
     "ended",
     "parked",
     "failed",
@@ -55,7 +55,6 @@ pub const ENDINGS: [&str; 22] = [
     "duplicate",
     "dropped",
     "undelivered",
-    "bounced",
     "adopted",
     "turned away",
 ];
@@ -92,11 +91,10 @@ pub struct Settings {
     pub facts: u32,
     pub call_wait: Duration,
     pub serve: Span,
-    /// Inbound events the parent sends a run once placed, and when; per
-    /// mille those a worker bounces.
+    /// Inbound events the parent sends a run once placed, and when they arrive.
     pub inbound: u32,
     pub inbound_after: Span,
-    pub bounces: u32,
+
     /// Per mille the attempts the parent cancels, and those it replaces with
     /// a newer one, and when; how long it waits for an attempt to end before
     /// cancelling it; how long it backs off before a retry.
@@ -154,7 +152,7 @@ impl Settings {
             serve: Span::millis(5, 500),
             inbound: 2,
             inbound_after: Span::millis(10, 3000),
-            bounces: 0,
+
             cancels: 0,
             replaces: 0,
             act_after: Span::millis(100, 3000),
@@ -203,7 +201,7 @@ impl Settings {
             facts: chance(1000),
             serve: Span::millis(1, 10 + u64::from(chance(6000))),
             inbound: chance(4),
-            bounces: chance(300),
+
             cancels: chance(200),
             replaces: chance(150),
             timeout: Duration::from_secs(10 + u64::from(chance(50))),
@@ -364,7 +362,6 @@ pub(crate) enum Up {
     Hello { slots: u32, workstreams: Vec<u64>, hosting: Vec<(u64, u64, Phase)> },
     Answer { run: u64, attempt: u64, said: Said },
     Relay { run: u64, attempt: u64, call: u64 },
-    Bounced { run: u64, attempt: u64 },
     Told { run: u64, attempt: u64 },
 }
 
@@ -910,13 +907,7 @@ impl World {
                     },
                 }
             }
-            Up::Bounced { run, attempt } => Event::Bounced {
-                channel: token,
-                name: Token::new(0),
-                run: Token::new(run),
-                attempt: Token::new(attempt),
-                bounce: jig_domain_fleet::Bounce::Full,
-            },
+
             Up::Told { run, attempt } => {
                 let fact = self.payload(Payload::Fact);
                 Event::Told { channel: token, run: Token::new(run), attempt: Token::new(attempt), fact }
@@ -937,7 +928,6 @@ impl World {
 
     // The fleet's requests.
 
-    #[expect(clippy::too_many_lines, reason = "one exhaustive route for the fleet boundary requests")]
     fn request(&mut self, request: Request) {
         match request {
             Request::Turned { .. } | Request::AcknowledgeTurn { .. } | Request::TurnBusy { .. } => {
@@ -1025,7 +1015,6 @@ impl World {
                 self.after(self.settings.serve, Delivery::Reply { epoch, reply_to: ReplyTo::new(token) });
             }
             Request::Observed { .. } => self.end("observed"),
-            Request::Bounced { .. } => self.end("bounced"),
             Request::Undelivered { message, undelivered, .. } => {
                 assert_eq!(self.payloads.end(message.words.raw()), Payload::Inbound, "an undelivered event comes back");
                 match undelivered {
@@ -1320,7 +1309,6 @@ fn describe(event: &Event) -> String {
         | Event::Lost { .. }
         | Event::Answer { .. }
         | Event::Relay { .. }
-        | Event::Bounced { .. }
         | Event::Told { .. }
         | Event::Observe { .. }
         | Event::Acknowledge { .. }

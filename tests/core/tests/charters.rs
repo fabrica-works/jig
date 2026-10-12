@@ -166,6 +166,8 @@ fn a_restart_settles_an_engine_charters_claim_at_once() {
     let task = assignment.task;
     let attempt = assignment.attempt;
     world.send(root::Event::Turn {
+        opens_window: false,
+        refused: Box::new([]),
         channel: Token::new(0),
         task,
         attempt,

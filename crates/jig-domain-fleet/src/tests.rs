@@ -5,8 +5,8 @@ use alloc::boxed::Box;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 use crate::{
-    Answer, Assignment, Bounce, Call, Domain, Event, Fact, Hello, HelloRefusal, HostKind, Hosted, Kinds, Limits,
-    Message, Phase, Refusal, Request, Undelivered, Withdrawal, fire, max_out, resume, step, worst_case,
+    Answer, Assignment, Call, Domain, Event, Fact, Hello, HelloRefusal, HostKind, Hosted, Kinds, Limits, Message,
+    Phase, Refusal, Request, Undelivered, Withdrawal, fire, max_out, resume, step, worst_case,
 };
 
 const LIMITS: Limits = Limits {
@@ -626,10 +626,6 @@ fn a_cancelled_attempt_is_fenced_but_its_answer_ends_its_call() {
         &*h.step(Event::Relay { channel: C1, run: R1, attempt: A1, call: host_call(Token::new(7), payload(6)) }),
         &[Request::DropCall { call: host_call(Token::new(7), payload(6)) }]
     );
-    assert!(
-        h.step(Event::Bounced { channel: C1, name: Token::new(0), run: R1, attempt: A1, bounce: Bounce::Ending })
-            .is_empty()
-    );
     assert_eq!(&*h.step(Event::Told { channel: C1, run: R1, attempt: A1, fact: payload(7) }), &[drop(7)]);
     assert_eq!(&*h.answer(C1, R1, A1, Answer::Failed, 8), &[answered(A1, R1, Answer::Failed, 8)]);
     // Answered: a cancel changes nothing.
@@ -736,9 +732,6 @@ fn unowned_worker_inputs(h: &mut Harness, channel: Token) {
         &[Request::DropCall { call: host_call(Token::new(8), payload(8)) }]
     );
     assert_eq!(&*h.step(Event::Told { channel, run: R1, attempt: A1, fact: payload(9) }), &[drop(9)]);
-    assert!(
-        h.step(Event::Bounced { channel, run: R1, attempt: A1, name: Token::new(3), bounce: Bounce::Full }).is_empty()
-    );
     assert!(h.step(Event::Rejected { channel, run: R1, attempt: A1, account: 7, generation: 4 }).is_empty());
     assert!(
         h.step(Event::Exhausted { channel, run: R1, attempt: A1, account: 7, retry_after: Duration::from_secs(5) })
@@ -750,10 +743,6 @@ fn owned_worker_notices(h: &mut Harness, channel: Token) {
     assert_eq!(
         &*h.step(Event::Told { channel, run: R1, attempt: A1, fact: payload(9) }),
         &[Request::Told { run: R1, attempt: A1, fact: payload(9) }]
-    );
-    assert_eq!(
-        &*h.step(Event::Bounced { channel, run: R1, attempt: A1, name: Token::new(3), bounce: Bounce::Full }),
-        &[Request::Bounced { run: R1, attempt: A1, name: Token::new(3), bounce: Bounce::Full }]
     );
     assert_eq!(
         &*h.step(Event::Rejected { channel, run: R1, attempt: A1, account: 7, generation: 4 }),
@@ -799,7 +788,7 @@ fn worker_inputs_require_the_current_host_but_accepted_calls_survive_its_channel
 }
 
 #[test]
-fn inbound_events_bounces_and_facts_pass_while_the_claim_is_live() {
+fn inbound_events_and_facts_pass_while_the_claim_is_live() {
     let mut h = Harness::new(LIMITS);
     let event = payload(1);
     h.start(R1, A1, 1);
@@ -812,10 +801,6 @@ fn inbound_events_bounces_and_facts_pass_while_the_claim_is_live() {
     assert_eq!(
         &*h.step(Event::Inbound { run: R1, attempt: A1, message: message(event) }),
         &[Request::Inbound { channel: C1, run: R1, attempt: A1, message: message(event) }]
-    );
-    assert_eq!(
-        &*h.step(Event::Bounced { channel: C1, name: Token::new(0), run: R1, attempt: A1, bounce: Bounce::Full }),
-        &[Request::Bounced { name: Token::new(0), run: R1, attempt: A1, bounce: Bounce::Full }]
     );
     assert_eq!(
         &*h.step(Event::Told { channel: C1, run: R1, attempt: A1, fact: payload(2) }),

@@ -348,9 +348,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::TurnKept { run, attempt, turn } => turn::kept(domain, run, attempt, turn, out),
         Event::TurnBusy { run, attempt, turn } => turn::busy(domain, run, attempt, turn, out),
-        Event::Bounced { channel, run, attempt, name, bounce } => {
-            call::bounced(domain, channel, run, attempt, name, bounce, out);
-        }
+
         Event::Observe { channel, run, attempt, report } => {
             crate::progress::received(domain, env, channel, run, attempt, report, out);
         }

@@ -74,6 +74,8 @@ fn a_crash_before_a_turn_is_durable_loses_only_its_uncommitted_turn() {
         &mut world.domain,
         &env,
         root::Event::Turn {
+            opens_window: false,
+            refused: Box::new([]),
             channel: Token::new(7),
             task,
             attempt,

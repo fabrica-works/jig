@@ -34,6 +34,7 @@ pub struct World {
     pub inbound: Vec<tasks::Word>,
     pub answers: Vec<(Token, core::CallKey, core::CallPart)>,
     pub assigned: Option<root::Assignment>,
+    last_read: Option<u64>,
     pub assignments: Vec<(u64, u64)>,
     pub cancellations: Vec<(u64, u64)>,
     pub busy_turns: Vec<(u64, u64, u32)>,
@@ -263,6 +264,7 @@ impl World {
             inbound: Vec::new(),
             answers: Vec::new(),
             assigned: None,
+            last_read: None,
             assignments: Vec::new(),
             cancellations: Vec::new(),
             busy_turns: Vec::new(),
@@ -792,6 +794,7 @@ impl World {
             root::Delivery::CallAnswer { name, call, .. } => self.host_answers.push((name, call)),
             root::Delivery::Message { word, .. } => self.inbound.push(word),
             root::Delivery::Assigned { assignment, .. } => {
+                self.last_read = None;
                 self.assignments.push((assignment.task, assignment.attempt));
                 self.assigned = Some(assignment);
             }
@@ -1303,8 +1306,11 @@ impl World {
     }
 
     pub fn turn(&mut self, number: u32, spent: u64, read: Option<u64>, body: &[u8]) {
+        self.last_read = read;
         let assignment = self.assigned.as_ref().expect("assigned chat");
         self.send(root::Event::Turn {
+            opens_window: number == 1 && assignment.transcript.is_empty(),
+            refused: Box::new([]),
             channel: Token::new(7),
             task: assignment.task,
             attempt: assignment.attempt,
@@ -1318,6 +1324,8 @@ impl World {
     pub fn end(&mut self, end: tasks::End, cumulative: u64) {
         let assignment = self.assigned.as_ref().expect("assigned chat");
         self.send(root::Event::Answer {
+            read: self.last_read,
+            refused: Box::new([]),
             channel: Token::new(7),
             task: assignment.task,
             attempt: assignment.attempt,

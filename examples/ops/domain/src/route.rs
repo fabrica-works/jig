@@ -1269,21 +1269,31 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         }
         core::Now::TurnPayload { run, attempt, turn, body } => {
             let payload = domain.payloads.get(&body).expect("fleet retained the turn body");
-            let (spent, read) = match payload {
-                Payload::Turn { spent, read, .. } => (*spent, *read),
+            let (spent, read, refused) = match payload {
+                Payload::Turn { spent, read, refused, .. } => (*spent, *read, crate::assemble::refusal_names(refused)),
                 Payload::Word(_) | Payload::Settled(_) | Payload::Answer { .. } => {
                     unreachable!("turn body family")
                 }
             };
-            work.push(Work::Core(core::Event::TurnPayload { run, attempt, turn, body, cumulative: spent, read }));
+            work.push(Work::Core(core::Event::TurnPayload {
+                run,
+                attempt,
+                turn,
+                body,
+                cumulative: spent,
+                read,
+                refused,
+            }));
         }
         core::Now::AnswerPayload { run, attempt, payload } => {
             crate::assemble::answer_payload(domain, run, attempt, payload, work);
         }
         core::Now::AcceptedTurn { payload, task, attempt, turn, accepted } => {
             let body = domain.payloads.remove(&payload).expect("accepted turn body");
-            let (spent, read, transcript) = match body {
-                Payload::Turn { spent, read, body: transcript, .. } => (spent, read, transcript),
+            let (spent, read, transcript, opens_window) = match body {
+                Payload::Turn { spent, read, body: transcript, opens_window, .. } => {
+                    (spent, read, transcript, opens_window)
+                }
                 Payload::Word(_) | Payload::Settled(_) | Payload::Answer { .. } => {
                     unreachable!("accepted turn body family")
                 }
@@ -1293,6 +1303,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 attempt,
                 turn,
                 accepted,
+                opens_window,
                 cumulative: spent,
                 read,
                 transcript,
@@ -1445,6 +1456,8 @@ fn host_out(
                             None => None,
                         },
                         body: turn.body,
+                        opens_window: turn.opens_window,
+                        refused: crate::assemble::refusals(turn.refused),
                     });
                     work.push(Work::Core(core::Event::Fleet(fleet::Event::Turn {
                         channel: Token::new(0),
@@ -1465,6 +1478,8 @@ fn host_out(
                         attempt: attempt.raw(),
                         spent: answer.spent,
                         ending: answer.ending,
+                        read: crate::assemble::message_read(answer.read),
+                        refused: crate::assemble::refusals(answer.refused),
                     });
                     work.push(Work::Core(core::Event::Fleet(fleet::Event::Answer {
                         channel: Token::new(0),
@@ -1487,19 +1502,7 @@ fn host_out(
                     }
                     work.push(Work::Host(host::Event::RelayCancelled { call }));
                 }
-                host::Request::Bounced { run, attempt, name, bounce } => {
-                    work.push(Work::Core(core::Event::Fleet(fleet::Event::Bounced {
-                        channel: Token::new(0),
-                        run,
-                        attempt,
-                        name,
-                        bounce: match bounce {
-                            host::Bounce::TooLarge => fleet::Bounce::TooLarge,
-                            host::Bounce::Full => fleet::Bounce::Full,
-                            host::Bounce::Ending => fleet::Bounce::Ending,
-                        },
-                    })));
-                }
+
                 host::Request::Hello { .. } => {}
                 host::Request::Prepare { owner, .. } => work.push(Work::Host(host::Event::Unprepared {
                     owner,

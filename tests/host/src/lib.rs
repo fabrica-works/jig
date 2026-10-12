@@ -28,11 +28,12 @@
 //!
 //! The peer world in [`turn_world`] adds a committing engine,
 //! a link that loses and restores contact, and the host's agent and workspace
-//! capabilities. It checks the retained turns, their replay and exact ACKs,
+//! capabilities. It checks each refusal inside a turn or answer no later than the first whose fence passes it, the retained turns, their replay and exact ACKs,
 //! independent agent acknowledgements, answer order, and best-effort agent facts (hosts.md, 11).
 
 pub mod engine;
 pub mod parent;
+mod refusals;
 mod trace;
 pub mod turn_world;
 mod world;

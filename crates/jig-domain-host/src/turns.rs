@@ -168,7 +168,14 @@ impl Turns {
 }
 
 fn copy(turn: &Turn) -> Turn {
-    Turn { turn: turn.turn, spent: turn.spent, read: turn.read, body: copy_of(&turn.body) }
+    Turn {
+        turn: turn.turn,
+        spent: turn.spent,
+        read: turn.read,
+        opens_window: turn.opens_window,
+        refused: turn.refused.clone(),
+        body: copy_of(&turn.body),
+    }
 }
 
 fn len(bytes: &[u8]) -> u64 {

@@ -82,7 +82,7 @@ impl Peers {
             workers::Up::Text { task, attempt, turn, offset, text, .. } => {
                 root::Event::Text { task, attempt, turn, offset, text }
             }
-            workers::Up::Turn { channel, task, attempt, turn, spent, read, body } => root::Event::Turn {
+            workers::Up::Turn { channel, task, attempt, turn, spent, read, body, opens_window } => root::Event::Turn {
                 channel: Token::new(channel),
                 task,
                 attempt,
@@ -90,13 +90,17 @@ impl Peers {
                 cumulative: spent,
                 read,
                 transcript: body,
+                opens_window,
+                refused: Box::new([]),
             },
-            workers::Up::Answer { channel, task, attempt, spent, end } => root::Event::Answer {
+            workers::Up::Answer { channel, task, attempt, spent, end, read } => root::Event::Answer {
                 channel: Token::new(channel),
                 task,
                 attempt,
                 cumulative: spent,
                 end: end_value(end),
+                read,
+                refused: Box::new([]),
             },
             workers::Up::Call { channel, task, attempt, number, call } => {
                 let key = core::CallKey { task, attempt, completion: number, position: 0 };

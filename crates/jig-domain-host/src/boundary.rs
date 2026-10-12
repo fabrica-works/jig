@@ -36,6 +36,7 @@ pub enum Event {
         owner: Token,
         turns: u32,
         spent: u64,
+        read: Option<Token>,
         finish: Finish,
     },
     /// Terminal for a cancelled relay: its local delivery and wait have ended.
@@ -74,11 +75,11 @@ pub enum Event {
         owner: Token,
         agent: Token,
     },
-    /// The agent could not take an inbound event for the run, for `bounce`.
-    Bounced {
+    /// The agent could not take an inbound event for the run, for `reason`.
+    Refused {
         owner: Token,
         name: Token,
-        bounce: Bounce,
+        reason: MessageRefusal,
     },
     /// The run yielded: it waits for its next inbound event.
     Yielded {
@@ -151,13 +152,7 @@ pub enum Request {
         call: Token,
     },
     /// To the engine: an inbound event for the run `run`'s attempt `attempt`
-    /// was not passed on, for `bounce`.
-    Bounced {
-        run: Token,
-        attempt: Token,
-        name: Token,
-        bounce: Bounce,
-    },
+    /// was not passed on, for `reason`.
     /// Prepare `workspace` for the hosted run `owner`.
     Prepare {
         owner: Token,
@@ -255,16 +250,17 @@ pub enum FromAgent {
         owner: Token,
         turns: u32,
         spent: u64,
+        read: Option<Token>,
         finish: Finish,
     },
     Started {
         owner: Token,
         agent: Token,
     },
-    Bounced {
+    Refused {
         owner: Token,
         name: Token,
-        bounce: Bounce,
+        reason: MessageRefusal,
     },
     Yielded {
         owner: Token,
@@ -288,9 +284,11 @@ impl Event {
             FromAgent::Withdrawn { owner, call } => Event::Withdrawn { owner, call },
             FromAgent::Turn { owner, turn } => Event::Turn { owner, turn },
             FromAgent::Facts { owner, fact } => Event::Facts { owner, fact },
-            FromAgent::Finished { owner, turns, spent, finish } => Event::Finished { owner, turns, spent, finish },
+            FromAgent::Finished { owner, turns, spent, read, finish } => {
+                Event::Finished { owner, turns, spent, read, finish }
+            }
             FromAgent::Started { owner, agent } => Event::Started { owner, agent },
-            FromAgent::Bounced { owner, name, bounce } => Event::Bounced { owner, name, bounce },
+            FromAgent::Refused { owner, name, reason } => Event::Refused { owner, name, reason },
             FromAgent::Yielded { owner } => Event::Yielded { owner },
             FromAgent::Faulted { owner, fault } => Event::Faulted { owner, fault },
             FromAgent::Gone { owner, detail } => Event::Gone { owner, detail },
@@ -301,6 +299,7 @@ impl Event {
 impl Request {
     /// Take an agent request for translation by the root, returning
     /// any request addressed to another capability unchanged.
+    #[expect(clippy::result_large_err, reason = "the root receives an owned link record with its refusal metadata")]
     pub fn to_agent(self) -> Result<ToAgent, Request> {
         match self {
             Request::Message { agent, name, sender, words } => Ok(ToAgent::Message { agent, name, sender, words }),
@@ -313,7 +312,6 @@ impl Request {
             other @ (Request::Up(..)
             | Request::Deliver { .. }
             | Request::CancelRelay { .. }
-            | Request::Bounced { .. }
             | Request::Hello { .. }
             | Request::Prepare { .. }
             | Request::Abort { .. }
@@ -400,6 +398,8 @@ pub enum SettledAnswer {
 /// A turn's cumulative spend and last read message name are opaque accounting.
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Turn {
+    pub opens_window: bool,
+    pub refused: Box<[Refused]>,
     pub turn: u32,
     pub spent: u64,
     pub read: Option<Token>,
@@ -415,6 +415,8 @@ pub enum Finish {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Answer {
+    pub read: Option<Token>,
+    pub refused: Box<[Refused]>,
     pub turns: u32,
     pub spent: u64,
     pub ending: Ending,
@@ -494,11 +496,12 @@ pub enum DeliveryOutcome {
 
 /// Why an inbound event was not passed on.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Bounce {
+pub enum MessageRefusal {
     /// It holds more bytes than the limits allow.
     TooLarge,
     /// The run is not live yet, and holds as many events as it may.
     Full,
+    NameInUse,
     /// The run is ending.
     Ending,
 }
@@ -627,4 +630,11 @@ pub struct Grant {
     pub account: u32,
     pub generation: u64,
     pub valid: Duration,
+}
+
+/// A message refusal carried by its next turn or answer (hosts.md, 6.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Refused {
+    pub name: Token,
+    pub reason: MessageRefusal,
 }

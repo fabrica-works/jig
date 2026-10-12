@@ -547,6 +547,8 @@ impl World {
             let assignment = self.assignment.as_ref().expect("goal worker was assigned");
             self.goal_answer_sent = true;
             self.events.push_back(root::Event::Turn {
+                opens_window: false,
+                refused: Box::new([]),
                 channel: Token::new(7),
                 task: assignment.task,
                 attempt: assignment.attempt,
@@ -646,6 +648,8 @@ impl World {
                 self.assignment = Some(assignment);
                 match self.scenario {
                     Scenario::Chat => self.events.push_back(root::Event::Turn {
+                        opens_window: false,
+                        refused: Box::new([]),
                         channel,
                         task,
                         attempt,
@@ -726,6 +730,8 @@ impl World {
             root::Delivery::Message { channel, task: run, attempt, word } => {
                 assert_eq!(word.from, tasks::Party::Task(self.procedure.expect("delegated child")));
                 self.events.push_back(root::Event::Answer {
+                    read: None,
+                    refused: Box::new([]),
                     channel,
                     task: run,
                     attempt,
@@ -748,6 +754,8 @@ impl World {
                 );
                 self.turn_acks += 1;
                 self.events.push_back(root::Event::Answer {
+                    read: None,
+                    refused: Box::new([]),
                     channel,
                     task: run.raw(),
                     attempt: attempt.raw(),

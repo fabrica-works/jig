@@ -278,6 +278,8 @@ fn settle_tree(world: &mut World, goal: (u64, u64), child: (u64, u64), restart_c
         })
         .expect("live parent");
     world.send(root::Event::Turn {
+        opens_window: false,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: child.0,
         attempt: child.1,
@@ -287,6 +289,8 @@ fn settle_tree(world: &mut World, goal: (u64, u64), child: (u64, u64), restart_c
         transcript: Box::from(&b"Read delegate result"[..]),
     });
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: child.0,
         attempt: child.1,
@@ -299,6 +303,8 @@ fn settle_tree(world: &mut World, goal: (u64, u64), child: (u64, u64), restart_c
     world.hold_projection_settlements = true;
     world.projections.clear();
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: goal.0,
         attempt: goal.1,

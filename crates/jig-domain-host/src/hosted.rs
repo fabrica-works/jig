@@ -12,8 +12,8 @@ use skein_lib::{Env, Id, List, Map, Queue, ReplyTo, Set, Slab, Token};
 
 use crate::assignment::{self, len};
 use crate::boundary::{
-    AgentFailure, AnsweredCall, Ask, Assignment, Bounce, Delivery, Ending, Failure, Finish, Grant, Hosting, Phase,
-    Preparation, Reason, Refusal, Reply, Request, RunAssignment, RunFailure, SettledAnswer, Work,
+    AgentFailure, AnsweredCall, Ask, Assignment, Delivery, Ending, Failure, Finish, Grant, Hosting, MessageRefusal,
+    Phase, Preparation, Reason, Refusal, Refused, Reply, Request, RunAssignment, RunFailure, SettledAnswer, Work,
 };
 use crate::call::{self, Call};
 use crate::domain::Domain;
@@ -27,6 +27,7 @@ pub(crate) struct Hosted {
     pub(crate) attempt: Token,
     grants: Box<[Grant]>,
     refreshed: bool,
+    refusals: crate::refusals::Refusals,
     pub(crate) answer: Option<crate::answers::Kept>,
     /// Whether the workspace saves unfinished work before release.
     save: bool,
@@ -46,6 +47,7 @@ struct Runtime {
     start: Option<Conversation>,
     turns: u32,
     spent: u64,
+    read: Option<Token>,
 }
 
 type CallName = Box<[u8]>;
@@ -68,7 +70,7 @@ struct Conversation {
 
 #[derive(Debug)]
 pub(crate) struct NamedEvent {
-    name: Token,
+    pub(crate) name: Token,
     event: Box<[u8]>,
     sender: Option<Box<[u8]>>,
 }
@@ -135,7 +137,14 @@ pub(crate) fn assign(
         return;
     }
     let conversation = Conversation { identity: assignment.identity, messages, turns, answered };
-    assign_runtime(domain, env, reply_to, assignment, Runtime { start: Some(conversation), turns: 0, spent: 0 }, out);
+    assign_runtime(
+        domain,
+        env,
+        reply_to,
+        assignment,
+        Runtime { start: Some(conversation), turns: 0, spent: 0, read: None },
+        out,
+    );
 }
 
 fn conversation_fits(turns: &[Box<[u8]>], answered: &[AnsweredCall], limits: &Limits) -> bool {
@@ -217,6 +226,7 @@ fn assign_runtime(
         grants,
         refreshed: false,
         answer: None,
+        refusals: crate::refusals::Refusals::new(env.limits.inbox),
         save: save && workspace.is_some(),
         left: None,
         relays: Set::with_capacity(env.limits.run_calls),
@@ -268,18 +278,20 @@ fn inbound_named(
         None => false,
     };
     if !fits {
-        out.push(Request::Bounced { run, attempt, name: message.name, bounce: Bounce::TooLarge });
+        let entry = domain.hosted.get_mut(id).expect("a named run is hosted");
+        crate::refusals::keep(&mut entry.refusals, Refused { name: message.name, reason: MessageRefusal::TooLarge });
+        conclude(domain, id, out);
         return;
     }
     let entry = domain.hosted.get_mut(id).expect("a named run is hosted");
     let state = mem::replace(&mut entry.state, State::Closed);
     entry.state = match state {
         State::Preparing { reply_to, charter, mut held } => {
-            hold(&mut held, message, run, attempt, out);
+            crate::refusals::hold(&mut held, message, &mut entry.refusals);
             State::Preparing { reply_to, charter, held }
         }
         State::Starting { reply_to, workspace, mut held } => {
-            hold(&mut held, message, run, attempt, out);
+            crate::refusals::hold(&mut held, message, &mut entry.refusals);
             State::Starting { reply_to, workspace, held }
         }
         State::Active { reply_to, workspace, agent } => {
@@ -292,7 +304,7 @@ fn inbound_named(
             State::Active { reply_to, workspace, agent }
         }
         state @ (State::Cancelling { .. } | State::Unwanted { .. } | State::Stopping { .. } | State::Saving { .. }) => {
-            out.push(Request::Bounced { run, attempt, name: message.name, bounce: Bounce::Ending });
+            crate::refusals::keep(&mut entry.refusals, Refused { name: message.name, reason: MessageRefusal::Ending });
             state
         }
         State::Closed => unreachable!("a closed run has left the names"),
@@ -476,7 +488,7 @@ pub(crate) fn unprepared(
     entry.state = match state {
         // Nothing of the workspace is held: nothing to release.
         State::Preparing { reply_to, held, .. } => {
-            bounce_held(held, entry.run, entry.attempt, out);
+            crate::refusals::ending(held, &mut entry.refusals);
             let detail = tail(detail, &env.limits);
             let ending = RunEnding::Failed { failure: Failure::Unprepared(failure), detail };
             answer(entry, facts, reply_to, ending, None, out)
@@ -610,12 +622,18 @@ fn withdrawn_named(domain: &mut Domain, owner: Token, call: CallName, out: &mut 
     conclude(domain, id, out);
 }
 
-pub(crate) fn bounced(domain: &mut Domain, owner: Token, name: Token, bounce: Bounce, out: &mut Queue<Request>) {
+pub(crate) fn refused_message(
+    domain: &mut Domain,
+    owner: Token,
+    name: Token,
+    reason: MessageRefusal,
+    out: &mut Queue<Request>,
+) {
     let id = Id::<Hosted>::from_token(owner);
-    let entry = domain.hosted.get(id).expect("a run lives until its agent has gone");
+    let entry = domain.hosted.get_mut(id).expect("a run lives until its agent has gone");
     match &entry.state {
         State::Active { .. } | State::Waiting { .. } | State::Stopping { .. } => {
-            out.push(Request::Bounced { run: entry.run, attempt: entry.attempt, name, bounce });
+            crate::refusals::keep(&mut entry.refusals, Refused { name, reason });
         }
         State::Preparing { .. }
         | State::Cancelling { .. }
@@ -727,7 +745,7 @@ pub(crate) fn gone(domain: &mut Domain, env: &Env<Limits>, owner: Token, detail:
     entry.state = match state {
         // Nothing ran: nothing to save.
         State::Starting { reply_to, workspace, held } => {
-            bounce_held(held, entry.run, entry.attempt, out);
+            crate::refusals::ending(held, &mut entry.refusals);
             let ending = RunEnding::Failed { failure: Failure::Agent(AgentFailure::Unstarted), detail };
             release(entry, facts, reply_to, workspace, ending, None, out)
         }
@@ -835,12 +853,12 @@ fn stop(domain: &mut Domain, env: &Env<Limits>, id: Id<Hosted>, reason: Reason, 
     entry.state = match state {
         // A prepare in flight is abandoned, and its end waited for.
         State::Preparing { reply_to, held, .. } => {
-            bounce_held(held, entry.run, entry.attempt, out);
+            crate::refusals::ending(held, &mut entry.refusals);
             out.push(Request::Abort { owner: id.token() });
             State::Cancelling { reply_to, reason }
         }
         State::Starting { reply_to, workspace, held } => {
-            bounce_held(held, entry.run, entry.attempt, out);
+            crate::refusals::ending(held, &mut entry.refusals);
             State::Unwanted { reply_to, workspace, reason }
         }
         State::Active { reply_to, workspace, agent } | State::Waiting { reply_to, workspace, agent } => {
@@ -881,8 +899,10 @@ fn drain_stopping(domain: &mut Domain, env: &Env<Limits>, id: Id<Hosted>, out: &
 /// that has settled saves, or releases its workspace and answers; and a
 /// Closed run is retired, leaving the names and the ready list.
 fn conclude(domain: &mut Domain, id: Id<Hosted>, out: &mut Queue<Request>) {
-    let Domain { hosted, names, ready, facts, answers, .. } = domain;
+    let Domain { hosted, names, ready, facts, answers, refusals_lost, .. } = domain;
     let entry = hosted.get_mut(id).expect("a run lives until it is retired");
+    *refusals_lost = refusals_lost.saturating_add(entry.refusals.lost);
+    entry.refusals.lost = 0;
     let settled = match &entry.state {
         State::Stopping { gone, .. } => *gone && entry.delivery.is_none() && entry.relays.is_empty(),
         State::Preparing { .. }
@@ -1003,33 +1023,23 @@ fn answer(
             Ending::Failed { failure, detail, work }
         }
     };
-    let answer = next_answer(entry.runtime.turns, entry.runtime.spent, answer);
+    let answer = crate::Answer {
+        turns: entry.runtime.turns,
+        spent: entry.runtime.spent,
+        read: entry.runtime.read,
+        refused: entry.refusals.take(),
+        ending: answer,
+    };
     let reply_to = reply_to.into_token();
     entry.answer = Some(crate::answers::Kept { reply_to, answer: answer.clone() });
     out.push(Request::Up(LinkUp::Answer { reply_to: ReplyTo::new(reply_to), run, attempt, answer }));
     State::Closed
 }
 
-/// Holds `event` until the run is live, or bounces it if the hold is full.
-fn hold(held: &mut Queue<NamedEvent>, event: NamedEvent, run: Token, attempt: Token, out: &mut Queue<Request>) {
-    let name = event.name;
-    if held.try_push(event).is_err() {
-        out.push(Request::Bounced { run, attempt, name, bounce: Bounce::Full });
-    }
-}
-
 fn deliver_message(agent: Token, message: NamedEvent, out: &mut Queue<Request>) {
     match message.sender {
         Some(sender) => out.push(Request::Message { agent, name: message.name, sender, words: message.event }),
         None => unreachable!("every held message retains its sender label"),
-    }
-}
-
-/// Return messages accepted during preparation when the run cannot start.
-fn bounce_held(mut held: Queue<NamedEvent>, run: Token, attempt: Token, out: &mut Queue<Request>) {
-    for _ in 0..held.len() {
-        let event = held.pop().expect("the queue held this many messages");
-        out.push(Request::Bounced { run, attempt, name: event.name, bounce: Bounce::Ending });
     }
 }
 
@@ -1241,7 +1251,7 @@ pub(crate) fn grant(domain: &mut Domain, run: Token, attempt: Token, grant: Gran
 }
 
 fn next_answer(turns: u32, spent: u64, answer: Ending) -> crate::Answer {
-    crate::Answer { turns, spent, ending: answer }
+    crate::Answer { turns, spent, read: None, refused: Box::new([]), ending: answer }
 }
 
 fn refuse(reply_to: ReplyTo, assignment: &RunAssignment, refusal: Refusal, out: &mut Queue<Request>) {
@@ -1267,7 +1277,7 @@ pub(crate) fn turned(
     domain: &mut Domain,
     env: &Env<Limits>,
     owner: Token,
-    turn: crate::Turn,
+    mut turn: crate::Turn,
     out: &mut Queue<Request>,
 ) {
     let id = Id::<Hosted>::from_token(owner);
@@ -1286,14 +1296,19 @@ pub(crate) fn turned(
         | State::Saving { .. }
         | State::Closed => return,
     };
-    let valid = if entry.runtime.turns.checked_add(1) != Some(turn.turn) || len(&turn.body) > env.limits.turn_bytes {
+    let valid = if entry.runtime.turns.checked_add(1) != Some(turn.turn)
+        || len(&turn.body) > env.limits.turn_bytes
+        || !turn.refused.is_empty()
+    {
         false
     } else {
         entry.runtime.turns = turn.turn;
+        entry.runtime.read = turn.read;
         true
     };
     if valid {
         let (run, attempt) = (entry.run, entry.attempt);
+        turn.refused = entry.refusals.take();
         domain.turns.retain(agent, run, attempt, turn);
         let stopping = match entry.state {
             State::Stopping { .. } => true,
@@ -1333,6 +1348,7 @@ pub(crate) fn told(domain: &mut Domain, env: &Env<Limits>, owner: Token, fact: B
     domain.told.push(Told { run: hosting.run, attempt: hosting.attempt, fact }, env.limits.fact_bytes);
 }
 
+#[expect(clippy::too_many_arguments, reason = "one last word carries its fence and accounting")]
 pub(crate) fn finished(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -1340,6 +1356,7 @@ pub(crate) fn finished(
     turns: u32,
     spent: u64,
     finish: Finish,
+    read: Option<Token>,
     out: &mut Queue<Request>,
 ) {
     let Some(entry) = domain.hosted.get_mut(Id::<Hosted>::from_token(owner)) else {
@@ -1348,6 +1365,7 @@ pub(crate) fn finished(
     let valid = turns == entry.runtime.turns;
     if valid {
         entry.runtime.spent = spent;
+        entry.runtime.read = read;
     }
     if !valid {
         faulted(domain, env, owner, AgentFailure::Rules, out);

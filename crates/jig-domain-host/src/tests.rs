@@ -5,8 +5,8 @@ use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, ReplyTo, Time, Token, Wall};
 
 use crate::{
-    Bounce, Delivery, DeliveryOutcome, Domain, Event, Failure, Finish, Invalid, Limits, Preparation, Reason, Refusal,
-    Reply, Request, RunAssignment, Told, Work, Workspace, max_out, step,
+    Delivery, DeliveryOutcome, Domain, Event, Failure, Finish, Invalid, Limits, MessageRefusal, Preparation, Reason,
+    Refusal, Refused, Reply, Request, RunAssignment, Told, Work, Workspace, max_out, step,
 };
 
 const LIMITS: Limits = Limits {
@@ -161,7 +161,14 @@ fn turns_stay_in_the_host_until_their_own_ack_and_credit_returns() {
     assert!(h.step(Event::Started { owner, agent }).is_empty());
     for number in 1..=2 {
         let usage = u64::from(number == 1);
-        let turn = crate::Turn { turn: number, spent: usage, read: None, body: Box::from([7_u8; 64]) };
+        let turn = crate::Turn {
+            opens_window: false,
+            refused: Box::new([]),
+            turn: number,
+            spent: usage,
+            read: None,
+            body: Box::from([7_u8; 64]),
+        };
         let requests = h.step(Event::Turn { owner, turn });
         let [
             Request::Up(LinkUp::Turn { turn: sent, .. }),
@@ -341,23 +348,22 @@ fn messages_held_during_a_failed_prepare_are_returned_by_name() {
     let requests = h.step(Event::Unprepared { owner, failure: Preparation::Transient, detail: Box::new([]) });
     assert_eq!(
         &*requests,
-        [
-            Request::Bounced { run, attempt, name, bounce: Bounce::Ending },
-            Request::Up(LinkUp::Answer {
-                reply_to: ReplyTo::new(run),
-                run,
-                attempt,
-                answer: crate::Answer {
-                    turns: 0,
-                    spent: 0,
-                    ending: crate::Ending::Failed {
-                        failure: Failure::Unprepared(Preparation::Transient),
-                        detail: Box::new([]),
-                        work: Work { left: None, saved: None },
-                    }
-                },
-            }),
-        ]
+        [Request::Up(LinkUp::Answer {
+            reply_to: ReplyTo::new(run),
+            run,
+            attempt,
+            answer: crate::Answer {
+                read: None,
+                refused: Box::from([Refused { name, reason: MessageRefusal::Ending }]),
+                turns: 0,
+                spent: 0,
+                ending: crate::Ending::Failed {
+                    failure: Failure::Unprepared(Preparation::Transient),
+                    detail: Box::new([]),
+                    work: Work { left: None, saved: None },
+                }
+            },
+        }),]
     );
 }
 
@@ -371,10 +377,7 @@ fn cancellation_returns_messages_held_before_the_agent_starts() {
     let requests = h.step(Event::Prepared { owner, workspace });
     let [Request::Start { .. }] = &*requests else { panic!("the agent starts: {requests:?}") };
     assert!(h.step(fixtures::inbound(run, attempt, name, Box::from(&b"question"[..]))).is_empty());
-    assert_eq!(
-        &*h.step(Event::Down(LinkDown::Cancel { run, attempt })),
-        [Request::Bounced { run, attempt, name, bounce: Bounce::Ending }]
-    );
+    assert_eq!(&*h.step(Event::Down(LinkDown::Cancel { run, attempt })), []);
     let agent = Token::new(301);
     assert_eq!(&*h.step(Event::Started { owner, agent }), [Request::Stop { agent }]);
     let requests = h.step(Event::Gone { owner, detail: Box::new([]) });
@@ -411,7 +414,7 @@ mod fixtures {
     }
 
     pub fn finished(owner: Token, finish: Finish) -> Event {
-        Event::Finished { owner, turns: 0, spent: 0, finish }
+        Event::Finished { read: None, owner, turns: 0, spent: 0, finish }
     }
     pub fn deliver(title: Box<[u8]>) -> Ask {
         Ask::Deliver { title, body: Box::new([]) }
@@ -447,4 +450,33 @@ fn a_grant_keeps_its_table_through_the_start() {
     let [Request::Start { start, .. }] = &*requests else { panic!("expected start: {requests:?}") };
     assert_eq!(start.grants[0].table, crate::GrantTable::Accounts);
     assert_eq!(start.grants[1].table, crate::GrantTable::Application);
+}
+
+#[test]
+fn an_agent_cannot_supply_the_hubs_turn_refusals() {
+    let mut h = Harness::new();
+    let (owner, workspace, agent) = h.live(1);
+    let turn = crate::Turn {
+        turn: 1,
+        spent: 0,
+        read: None,
+        opens_window: false,
+        refused: Box::from([Refused { name: Token::new(42), reason: MessageRefusal::Full }]),
+        body: Box::new([]),
+    };
+    assert_eq!(&*h.step(Event::Turn { owner, turn }), &[Request::Stop { agent }]);
+    assert_eq!(&*h.step(Event::Gone { owner, detail: Box::new([]) }), &[Request::Save { owner, workspace }]);
+    let requests = h.step(Event::Saved { owner, at: None });
+    let [Request::Release { .. }, Request::Up(LinkUp::Answer { answer, .. })] = &*requests else {
+        panic!("one failed answer")
+    };
+    assert_eq!(
+        answer.ending,
+        crate::Ending::Failed {
+            failure: Failure::Agent(crate::AgentFailure::Rules),
+            detail: Box::new([]),
+            work: Work { left: None, saved: None }
+        }
+    );
+    assert!(answer.refused.is_empty());
 }

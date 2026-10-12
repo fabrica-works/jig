@@ -1,6 +1,6 @@
 //! What the fleet relays between the parent and the runs (domain/engine.md,
 //! section 8; domain/hosts.md, 4.2): inbound events down, a run's host calls
-//! up and their answers back, its bounces and its facts up. Each goes through
+//! up and their answers back, its facts up. Each goes through
 //! only while its attempt is the parent's live claim; what comes for an
 //! attempt cancelled, replaced, lost or answered is dropped (attempts are
 //! fenced), and an inbound event that reaches no worker goes back to the
@@ -20,7 +20,7 @@ use core::mem;
 use skein_lib::{Env, Id, Queue, ReplyTo, Token};
 
 use crate::attempt::{Attempt, State, Where};
-use crate::boundary::{Bounce, Call, Message, Request, Undelivered};
+use crate::boundary::{Call, Message, Request, Undelivered};
 use crate::channel;
 use crate::domain::Domain;
 use crate::facts::Fact;
@@ -158,24 +158,6 @@ pub(crate) fn inbound(domain: &mut Domain, run: Token, attempt: Token, message: 
         None => Undelivered::Gone,
     };
     out.push(Request::Undelivered { run, attempt, message, undelivered });
-}
-
-/// A bounce, from a worker: up to the parent, if its attempt is the live
-/// claim.
-pub(crate) fn bounced(
-    domain: &mut Domain,
-    channel: Token,
-    run: Token,
-    attempt: Token,
-    name: Token,
-    bounce: Bounce,
-    out: &mut Queue<Request>,
-) {
-    if owned(domain, channel, run, attempt).is_some() {
-        out.push(Request::Bounced { run, attempt, name, bounce });
-    } else {
-        domain.facts.push(Fact::Dropped);
-    }
 }
 
 /// A fact a run told, from its worker: up to the parent, if its attempt is

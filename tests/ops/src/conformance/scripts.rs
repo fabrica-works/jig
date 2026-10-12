@@ -71,6 +71,8 @@ struct Agent {
     result: bool,
     /// The result of the last resumed turn's finish, accepted again first.
     refinish: Option<Box<[u8]>>,
+    last_read: Option<Token>,
+    fresh: bool,
     unread: Vec<(Token, Box<[u8]>)>,
     pending: Option<Box<[u8]>>,
     ready: bool,
@@ -91,6 +93,7 @@ impl Agents {
         let (owner, agent) = self.live.iter_mut().find(|(_, agent)| !agent.finished).expect("active scripted agent");
         agent.finished = true;
         root::Event::Agent(host::FromAgent::Finished {
+            read: agent.last_read,
             owner: *owner,
             turns: agent.turns,
             spent: agent.spent,
@@ -118,6 +121,8 @@ impl Agents {
                     result: false,
                     refinish: None,
                     unread: messages.into_vec().into_iter().map(|message| (message.name, message.words)).collect(),
+                    last_read: None,
+                    fresh: turns.is_empty(),
                     pending: None,
                     ready: false,
                     parks_at: None,
@@ -153,6 +158,7 @@ impl Agents {
                 if let Some(agent) = self.live.remove(&owner) {
                     if !agent.finished {
                         out.push(host::FromAgent::Finished {
+                            read: agent.last_read,
                             owner,
                             turns: agent.turns,
                             spent: agent.spent,
@@ -190,6 +196,7 @@ impl Agents {
                 agent.parks_at = None;
                 agent.finished = true;
                 out.push(root::Event::Agent(host::FromAgent::Finished {
+                    read: agent.last_read,
                     owner,
                     turns: agent.turns,
                     spent: agent.spent,
@@ -201,6 +208,7 @@ impl Agents {
                 agent.ready = false;
                 agent.finished = true;
                 out.push(root::Event::Agent(host::FromAgent::Finished {
+                    read: agent.last_read,
                     owner,
                     turns: agent.turns,
                     spent: agent.spent,
@@ -226,10 +234,18 @@ impl Agents {
                 for content in stream(owner, agent, &step) {
                     out.push(root::Event::AgentContent { owner, content });
                 }
+                agent.last_read = read;
                 let body = turn(agent, &texts, &step);
                 out.push(root::Event::Agent(host::FromAgent::Turn {
                     owner,
-                    turn: host::Turn { turn: agent.turns, spent: agent.spent, read, body },
+                    turn: host::Turn {
+                        opens_window: agent.turns == 1 && agent.fresh,
+                        refused: Box::new([]),
+                        turn: agent.turns,
+                        spent: agent.spent,
+                        read,
+                        body,
+                    },
                 }));
                 match step {
                     Step::Call { tool, input } => {
@@ -256,6 +272,7 @@ impl Agents {
                     Step::Finish(outcome) => {
                         agent.finished = true;
                         out.push(root::Event::Agent(host::FromAgent::Finished {
+                            read: agent.last_read,
                             owner,
                             turns: agent.turns,
                             spent: agent.spent,

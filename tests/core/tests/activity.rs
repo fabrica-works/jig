@@ -98,6 +98,8 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
         people::Ask::MarkSeen { seen: people::Seen::Chat { task: parent.0, through: 2 } },
     );
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: parent.0,
         attempt: parent.1,

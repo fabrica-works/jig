@@ -28,6 +28,8 @@ fn seeded_parties_take_frame_chat_tree_and_inbox_deliveries_at_their_own_pace() 
                 });
                 burst.push(root::Event::Core(core::Event::StreamDelivered { watcher: Token::new(5) }));
                 burst.push(root::Event::Turn {
+                    opens_window: false,
+                    refused: Box::new([]),
                     channel: Token::new(7),
                     task,
                     attempt,

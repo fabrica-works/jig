@@ -229,6 +229,8 @@ pub enum Event {
         turn: u32,
         cumulative: u64,
         read: Option<u64>,
+        opens_window: bool,
+        refused: Box<[u64]>,
         transcript: Box<[u8]>,
     },
     /// A scripted worker's retained terminal answer.
@@ -238,6 +240,8 @@ pub enum Event {
         attempt: u64,
         cumulative: u64,
         end: tasks::End,
+        read: Option<u64>,
+        refused: Box<[u64]>,
     },
     /// A bounded store page of prior opaque turns; pages arrive oldest first.
     TranscriptLoaded {
@@ -479,6 +483,8 @@ enum Work {
         turn: u32,
         cumulative: u64,
         read: Option<u64>,
+        opens_window: bool,
+        refused: Box<[u64]>,
         transcript: Box<[u8]>,
     },
     Answer {
@@ -487,16 +493,9 @@ enum Work {
         attempt: u64,
         cumulative: u64,
         end: tasks::End,
+        read: Option<u64>,
+        refused: Box<[u64]>,
     },
-}
-
-#[derive(Debug)]
-enum Payload {
-    Busy,
-    Turn { task: u64, attempt: u64, turn: u32, cumulative: u64, read: Option<u64>, transcript: Box<[u8]> },
-    Answer { task: u64, attempt: u64, cumulative: u64, end: tasks::End },
-    SettledCall(core::SettledCall),
-    InboxWord(tasks::Word),
 }
 
 /// Admit one input and route all synchronous continuations inside one decision.
@@ -571,11 +570,15 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
                 call: None,
             }),
         ),
-        Event::Turn { channel, task, attempt, turn, cumulative, read, transcript } => {
-            decide(domain, env, Work::Turn { channel, task, attempt, turn, cumulative, read, transcript });
+        Event::Turn { channel, task, attempt, turn, cumulative, read, transcript, opens_window, refused } => {
+            decide(
+                domain,
+                env,
+                Work::Turn { channel, task, attempt, turn, cumulative, read, transcript, opens_window, refused },
+            );
         }
-        Event::Answer { channel, task, attempt, cumulative, end } => {
-            decide(domain, env, Work::Answer { channel, task, attempt, cumulative, end });
+        Event::Answer { channel, task, attempt, cumulative, end, read, refused } => {
+            decide(domain, env, Work::Answer { channel, task, attempt, cumulative, end, read, refused });
         }
     }
 }
@@ -776,25 +779,13 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                 connector::resume(numbered(domain, number), &mut requests);
                 route_connector(domain, env, &mut decision, number, &mut requests, &mut work);
             }
-            Work::Turn { channel, task, attempt, turn, cumulative, read, transcript } => {
-                let body = payload(domain, Payload::Turn { task, attempt, turn, cumulative, read, transcript });
-                work.push(Work::Core(core::Event::Fleet(fleet::Event::Turn {
-                    channel,
-                    run: Token::new(task),
-                    attempt: Token::new(attempt),
-                    turn,
-                    body,
-                })));
+            Work::Turn { channel, task, attempt, turn, cumulative, read, transcript, opens_window, refused } => {
+                let body = Payload::Turn { task, attempt, turn, cumulative, read, transcript, opens_window, refused };
+                messages::receive(domain, &mut work, channel, body);
             }
-            Work::Answer { channel, task, attempt, cumulative, end } => {
-                let body = payload(domain, Payload::Answer { task, attempt, cumulative, end });
-                work.push(Work::Core(core::Event::Fleet(fleet::Event::Answer {
-                    channel,
-                    run: Token::new(task),
-                    attempt: Token::new(attempt),
-                    answer: fleet::Answer::Ended,
-                    payload: body,
-                })));
+            Work::Answer { channel, task, attempt, cumulative, end, read, refused } => {
+                let body = Payload::Answer { task, attempt, cumulative, end, read, refused };
+                messages::receive(domain, &mut work, channel, body);
             }
         }
     }
@@ -980,7 +971,9 @@ fn hold(decision: &mut Decision<Write, Delivery>, value: Delivery) {
 // must make the testing application say how it crosses its root.
 mod application_facts;
 mod client_documents;
+mod messages;
 mod routes;
+use messages::Payload;
 mod stopping;
 use routes::{route_connector, route_core};
 

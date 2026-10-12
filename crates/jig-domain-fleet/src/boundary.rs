@@ -17,8 +17,7 @@
 //!   keeps nothing. [`Request::Inbound`], [`Request::Cancel`] and
 //!   [`Request::Relayed`] are notices to the worker hosting an attempt;
 //!   [`Event::Relay`] is a call of the run's, which the fleet passes up and
-//!   whose answer it passes down, at most once; [`Event::Bounced`] and
-//!   [`Event::Told`] are notices. [`Request::Refuse`] turns a worker away
+//!   whose answer it passes down, at most once; [`Event::Told`] are notices. [`Request::Refuse`] turns a worker away
 //!   at its hello, when the fleet has no room for another: its channel is
 //!   to be closed. An answer from a channel not in contact is dropped, and
 //!   not acknowledged. Everything a worker sends names a run and an attempt,
@@ -272,13 +271,6 @@ pub enum Event {
     },
     /// From a worker: an inbound event for the attempt `attempt` of the run
     /// `run` was not passed on, for `bounce`.
-    Bounced {
-        channel: Token,
-        run: Token,
-        attempt: Token,
-        name: Token,
-        bounce: Bounce,
-    },
     /// Best-effort typed activity from the current hosting channel.
     Observe {
         channel: Token,
@@ -459,12 +451,6 @@ pub enum Request {
     },
     /// To the parent: an inbound event its worker did not pass on, for
     /// `bounce`.
-    Bounced {
-        run: Token,
-        attempt: Token,
-        name: Token,
-        bounce: Bounce,
-    },
     /// A message reached no live host; all its values remain the parent's.
     Undelivered {
         run: Token,
@@ -541,17 +527,6 @@ pub enum Answer {
     /// Refused at the entrance: the assignment does not fit the worker's
     /// limits.
     Invalid,
-}
-
-/// Why a worker did not pass an inbound event on (domain/hosts.md, 4.2).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Bounce {
-    /// It holds more bytes than the worker's limits allow.
-    TooLarge,
-    /// The run is not live yet, and holds as many events as it may.
-    Full,
-    /// The run is ending.
-    Ending,
 }
 
 /// Why an inbound event reached no worker.

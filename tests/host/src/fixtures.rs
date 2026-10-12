@@ -33,7 +33,7 @@ pub fn withdrawn(owner: Token, call: Token) -> Event {
 }
 #[must_use]
 pub fn finished(owner: Token, finish: Finish) -> Event {
-    Event::Finished { owner, turns: 0, spent: 0, finish }
+    Event::Finished { read: None, owner, turns: 0, spent: 0, finish }
 }
 #[must_use]
 pub fn deliver(title: Box<[u8]>) -> Ask {

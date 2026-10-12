@@ -38,6 +38,8 @@ fn running(world: &World, task: u64) -> (u64, u64) {
 
 fn finish(world: &mut World, run: (u64, u64), words: &[u8]) {
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: run.0,
         attempt: run.1,
@@ -129,6 +131,8 @@ fn a_plan_of_reports_and_a_procedure_is_revised_midway_and_done() {
     let choice = delegate(&mut world, parent, 4, choice);
     let choice_run = running(&world, choice);
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: choice_run.0,
         attempt: choice_run.1,
@@ -313,6 +317,8 @@ fn a_goal_cancelled_with_live_runs_and_an_effect_in_flight_closes_deepest_first(
     assert_eq!(world.cancellations, [grandchild_run, child_run]);
     for run in [grandchild_run, child_run] {
         world.send(root::Event::Answer {
+            read: None,
+            refused: Box::new([]),
             channel: Token::new(7),
             task: run.0,
             attempt: run.1,
@@ -456,6 +462,8 @@ fn an_exhausted_delegate_escalates_to_a_person_who_releases_it_to_finish() {
     for index in 0..2 {
         let run = running(&world, child);
         world.send(root::Event::Answer {
+            read: None,
+            refused: Box::new([]),
             channel: Token::new(7),
             task: run.0,
             attempt: run.1,
@@ -629,6 +637,8 @@ fn a_run_hands_a_resource_to_a_procedure_while_retaining_its_writer_slot() {
             if slot.writer == tasks::Writer::Run { task: holder, attempt: holder_run.1 })));
     assert!(world.systems[0].observed().is_empty(), "the procedure's effect waits for the writer");
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: holder,
         attempt: holder_run.1,
@@ -1722,6 +1732,8 @@ fn a_verdicts_machine_fields_reach_its_requester_whole_after_commit_and_restart(
     let before = world.inbound.len();
     world.store.fault(jig_fake_store::Fault::Hold { commits: 1 });
     world.send(root::Event::Answer {
+        read: None,
+        refused: Box::new([]),
         channel: Token::new(7),
         task: run.0,
         attempt: run.1,

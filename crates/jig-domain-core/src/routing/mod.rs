@@ -470,13 +470,13 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
             route_holdings(core, env, work, request, connector, holdings)
         }
         Event::Fleet(event) => route_fleet(core, env, event),
-        Event::TurnPayload { run, attempt, turn, body, read, cumulative } => {
+        Event::TurnPayload { run, attempt, turn, body, read, cumulative, refused: _ } => {
             route_turn_payload(core, work, run, attempt, turn, body, read, cumulative)
         }
-        Event::AnswerPayload { run, attempt, payload, cumulative, end, saved, invalid_saved } => {
+        Event::AnswerPayload { run, attempt, payload, cumulative, end, saved, invalid_saved, read: _, refused: _ } => {
             route_answer_payload(core, work, run, attempt, payload, cumulative, end, saved, invalid_saved)
         }
-        Event::AcceptedTurn { task, attempt, turn, accepted, cumulative, read, transcript } => {
+        Event::AcceptedTurn { task, attempt, turn, accepted, cumulative, read, transcript, opens_window: _ } => {
             route_accepted_turn(core, env, task, attempt, turn, accepted, cumulative, read, transcript)
         }
         Event::RefusedPayload { request, problem, payload } => {

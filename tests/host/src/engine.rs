@@ -23,8 +23,8 @@ use jig_domain_host::{LinkDown, LinkUp};
 use std::collections::{BTreeMap, BTreeSet};
 
 use jig_domain_host::{
-    AgentFailure, Assignment, Bounce, Ending, Event, Failure, Hosting, Invalid, Limits, Preparation, Reason, Refusal,
-    Request, RunAssignment, RunFailure, Workspace,
+    AgentFailure, Assignment, Ending, Event, Failure, Hosting, Invalid, Limits, MessageRefusal, Preparation, Reason,
+    Refusal, Request, RunAssignment, RunFailure, Workspace,
 };
 use skein_lib::{Duration, ReplyTo, Rng, Token};
 use skein_world::domain::Span;
@@ -191,19 +191,13 @@ impl Engine {
             Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
                 assert_eq!(reply_to, ReplyTo::new(run), "an answer goes to its assignment");
                 if self.open.contains_key(&(run, attempt)) {
+                    self.refusals(&answer.refused);
                     self.answered(run, attempt, &answer.ending);
                 }
                 vec![Self::host(Event::Down(LinkDown::Acknowledge { run, attempt }), false)]
             }
             Request::Up(LinkUp::Call { run, attempt, delivery: call, .. }) => self.relay(run, attempt, call),
-            Request::Bounced { name: _, run: _, attempt: _, bounce } => {
-                match bounce {
-                    Bounce::TooLarge => self.tally.too_large += 1,
-                    Bounce::Full => self.tally.full += 1,
-                    Bounce::Ending => self.tally.ending += 1,
-                }
-                Vec::new()
-            }
+
             Request::Up(LinkUp::Turn { .. }) | Request::AcknowledgeAgentTurn { .. } => {
                 unreachable!("turns are exercised by turn_world")
             }
@@ -473,4 +467,17 @@ pub const ENDINGS: [&str; 20] = [
 
 fn bytes(len: u64) -> Box<[u8]> {
     vec![b'x'; usize::try_from(len).expect("a test length fits")].into_boxed_slice()
+}
+
+impl Engine {
+    fn refusals(&mut self, refused: &[jig_domain_host::Refused]) {
+        for refusal in refused {
+            match refusal.reason {
+                MessageRefusal::TooLarge => self.tally.too_large += 1,
+                MessageRefusal::Full => self.tally.full += 1,
+                MessageRefusal::Ending => self.tally.ending += 1,
+                MessageRefusal::NameInUse => {}
+            }
+        }
+    }
 }

@@ -26,7 +26,7 @@
 //! worker reports that no claim adopts within the grace from then is
 //! cancelled, the parent told of it meanwhile. It relays inbound events and
 //! cancels down to a run's worker, a run's host calls up to the parent and
-//! their answers back, each call answered once, and its bounces and facts
+//! their answers back, each call answered once, and its facts
 //! up.
 //!
 //! Sans-io: [`step`], [`fire`] and [`resume`] turn events into requests and
@@ -65,7 +65,7 @@ mod tests;
 mod turn;
 
 pub use boundary::{
-    Answer, Assignment, AttemptState, AttemptView, Bounce, Call, Event, Grant, GrantName, GrantTable, Hello, HostKind,
+    Answer, Assignment, AttemptState, AttemptView, Call, Event, Grant, GrantName, GrantTable, Hello, HostKind,
     HostView, Hosted, Kinds, Message, Phase, Placement, Refusal, Request, Undelivered, Withdrawal,
 };
 pub use domain::{Domain, fire, max_out, resume, step};

@@ -213,6 +213,8 @@ fn every_connector_must_acknowledge_closure_and_duplicates_cannot_replace_a_miss
         &mut core,
         &env,
         core::Event::AnswerPayload {
+            read: None,
+            refused: Box::new([]),
             run: Token::new(key.task),
             attempt: Token::new(key.attempt),
             payload: Token::new(9941),
@@ -262,6 +264,8 @@ fn a_conflicting_late_terminal_cannot_replace_an_already_committed_answer() {
         &mut core,
         &env,
         core::Event::AnswerPayload {
+            read: None,
+            refused: Box::new([]),
             run: Token::new(key.task),
             attempt: Token::new(key.attempt),
             payload: Token::new(9920),

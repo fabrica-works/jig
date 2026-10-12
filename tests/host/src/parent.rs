@@ -283,7 +283,6 @@ impl Parent {
             Request::Up(LinkUp::Turn { .. } | LinkUp::Answer { .. } | LinkUp::Call { .. })
             | Request::AcknowledgeAgentTurn { .. }
             | Request::CancelRelay { .. }
-            | Request::Bounced { .. }
             | Request::Hello { .. } => {
                 unreachable!("for the engine or the top level")
             }

@@ -4,8 +4,8 @@
 //! those answers again; hosts what it is assigned, refusing as busy beyond its
 //! slots or for a run it hosts another attempt of, and as invalid by chance;
 //! runs each to its planned end, or winds it down once cancelled; relays host
-//! calls and withdraws them past their deadline; bounces inbound events by
-//! chance and tells facts; keeps each answer until it is acknowledged; and,
+//! calls and withdraws them past their deadline; receives inbound events and
+//! tells facts; keeps each answer until it is acknowledged; and,
 //! out of contact past its own grace, cancels its runs itself.
 
 use jig_domain_fleet::Phase;
@@ -35,15 +35,7 @@ impl World {
     pub(crate) fn receive(&mut self, worker: usize, channel: u64, message: Message) {
         match message {
             Message::Assign { run, attempt } => self.assigned(worker, channel, run, attempt),
-            Message::Inbound { run, attempt } => {
-                let live = match self.workers[worker].runs.get(&(run, attempt)) {
-                    Some(hosting) => !hosting.cancelled,
-                    None => false,
-                };
-                if live && self.rng.chance(self.settings.bounces) {
-                    self.say(channel, Up::Bounced { run, attempt });
-                }
-            }
+            Message::Inbound { .. } => {}
             Message::Cancel { run, attempt } => {
                 if let Some(hosting) = self.workers[worker].runs.get_mut(&(run, attempt))
                     && !hosting.cancelled

@@ -3,8 +3,8 @@
 //! exactly its limits, then every run ending with as much as it may hold.
 
 use jig_domain_host::{
-    AgentFailure, Ask, Bounce, Delivery, DeliveryOutcome, Domain, Ending, Event, Finish, Grant, Invalid, Limits,
-    Preparation, Reason, Refusal, Request, RunAssignment, Workspace, max_out, resume, step, worst_case,
+    AgentFailure, Ask, Delivery, DeliveryOutcome, Domain, Ending, Event, Finish, Grant, Invalid, Limits, Preparation,
+    Reason, Refusal, Request, RunAssignment, Workspace, max_out, resume, step, worst_case,
 };
 use jig_domain_host::{LinkDown, LinkUp};
 use skein_lib::{Duration, Env, Queue, ReplyTo, Time, Token, Wall};
@@ -48,7 +48,6 @@ enum Asked {
     RunEnding { answer: Ending },
     Answer { answer: jig_domain_host::Answer },
     Turn,
-    Bounced { bounce: Bounce },
     Hosting { runs: usize },
     Other,
 }
@@ -112,7 +111,6 @@ impl Measured {
                 Request::Start { .. } => Asked::Start,
                 Request::Prepare { owner, .. } => Asked::Prepare { owner },
                 Request::Save { owner, .. } => Asked::Save { owner },
-                Request::Bounced { bounce, .. } => Asked::Bounced { bounce },
                 Request::Hello { hello } => Asked::Hosting { runs: hello.hosting.len() },
                 Request::CancelRelay { call } => {
                     cancelled.push(call);
@@ -286,7 +284,7 @@ fn beyond(host: &mut Measured, limits: &Limits) {
         Token::new(1),
         bytes(limits.event_bytes + 1),
     );
-    assert_eq!(host.step(large), [Asked::Bounced { bounce: Bounce::TooLarge }]);
+    assert!(host.step(large).is_empty());
 }
 
 /// A delivery still in flight as its run ended settles, and the run answers.
@@ -403,14 +401,22 @@ fn ordered_transcripts_and_delivery_feedback_fit_the_hosts_bound() {
         };
         let delivery = Delivery { outcome: DeliveryOutcome::Refused, left: Token::new(7), changed: false };
         assert_eq!(host.step(Event::Delivered { owner: call, delivery }), [Asked::Other]);
+        fill_refusals(&mut host, owner, limits.inbox);
         assert_eq!(
             host.step(Event::Turn {
                 owner,
-                turn: Turn { turn: 1, spent: 23, read: None, body: bytes(limits.turn_bytes) }
+                turn: Turn {
+                    opens_window: false,
+                    refused: Box::new([]),
+                    turn: 1,
+                    spent: 23,
+                    read: None,
+                    body: bytes(limits.turn_bytes)
+                }
             }),
             [Asked::Turn, Asked::Other]
         );
-        host.step(Event::Finished { owner, turns: 1, spent: 29, finish: Finish::Parked });
+        host.step(Event::Finished { read: None, owner, turns: 1, spent: 29, finish: Finish::Parked });
         let [Asked::Save { owner: saving }] =
             host.step(Event::Gone { owner, detail: bytes(u64::from(limits.detail_bytes)) })[..]
         else {
@@ -424,4 +430,17 @@ fn ordered_transcripts_and_delivery_feedback_fit_the_hosts_bound() {
     }
     host.acknowledge_answers();
     assert_eq!(host.domain.hosted(), 0);
+}
+
+fn fill_refusals(host: &mut Measured, owner: Token, inbox: u32) {
+    for name in 0..inbox {
+        assert!(
+            host.step(Event::Refused {
+                owner,
+                name: Token::new(u64::from(name)),
+                reason: jig_domain_host::MessageRefusal::Full
+            })
+            .is_empty()
+        );
+    }
 }

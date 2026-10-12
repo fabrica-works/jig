@@ -23,14 +23,15 @@ mod facts;
 mod hosted;
 mod limits;
 mod link;
+mod refusals;
 #[cfg(test)]
 mod tests;
 mod turns;
 
 pub use boundary::{
-    AgentFailure, Answer, AnsweredCall, Ask, Assignment, Bounce, Delivery, DeliveryOutcome, Ending, Event, Failure,
-    Finish, FromAgent, Grant, GrantTable, Hosting, Invalid, Phase, Preparation, Reason, Refusal, Reply, Request,
-    RunAssignment, RunFailure, SettledAnswer, Start, StartMessage, ToAgent, Turn, Work, Workspace,
+    AgentFailure, Answer, AnsweredCall, Ask, Assignment, Delivery, DeliveryOutcome, Ending, Event, Failure, Finish,
+    FromAgent, Grant, GrantTable, Hosting, Invalid, MessageRefusal, Phase, Preparation, Reason, Refusal, Refused,
+    Reply, Request, RunAssignment, RunFailure, SettledAnswer, Start, StartMessage, ToAgent, Turn, Work, Workspace,
 };
 pub use domain::{Domain, max_out, resume, step};
 pub use facts::{Fact, Told};

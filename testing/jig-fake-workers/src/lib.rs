@@ -107,11 +107,20 @@ pub enum Up {
     /// The channel disappeared.
     Lost { channel: u64 },
     /// One retained whole turn.
-    Turn { channel: u64, task: u64, attempt: u64, turn: u32, spent: u64, read: Option<u64>, body: Box<[u8]> },
+    Turn {
+        channel: u64,
+        task: u64,
+        attempt: u64,
+        turn: u32,
+        spent: u64,
+        read: Option<u64>,
+        body: Box<[u8]>,
+        opens_window: bool,
+    },
     /// A call waiting for one answer.
     Call { channel: u64, task: u64, attempt: u64, number: u32, call: Call },
     /// A retained activation answer.
-    Answer { channel: u64, task: u64, attempt: u64, spent: u64, end: End },
+    Answer { channel: u64, task: u64, attempt: u64, spent: u64, end: End, read: Option<u64> },
 }
 
 #[derive(Clone, Debug)]
@@ -121,6 +130,7 @@ struct Run {
     spent: u64,
     kept_spent: u64,
     next_turn: u32,
+    read: Option<u64>,
     next_call: u32,
     turns: Vec<Up>,
     answer: Option<Up>,
@@ -211,6 +221,7 @@ impl Worker {
                         spent: 0,
                         kept_spent: 0,
                         next_turn: 1,
+                        read: None,
                         next_call: 1,
                         turns: Vec::new(),
                         answer: None,
@@ -403,6 +414,7 @@ impl Worker {
                         .get_mut(&(run.assignment.task, run.assignment.attempt))
                         .expect("assigned expense")
                         .spent = run.spent;
+                    run.read = read;
                     let turn = Up::Turn {
                         channel: self.channel,
                         task: run.assignment.task,
@@ -410,6 +422,7 @@ impl Worker {
                         turn: run.next_turn,
                         spent: run.spent,
                         read,
+                        opens_window: run.next_turn == 1 && run.assignment.transcript.is_empty(),
                         body,
                     };
                     run.next_turn += 1;
@@ -482,5 +495,12 @@ impl Worker {
 }
 
 fn answer(channel: u64, run: &Run, end: End) -> Up {
-    Up::Answer { channel, task: run.assignment.task, attempt: run.assignment.attempt, spent: run.spent, end }
+    Up::Answer {
+        channel,
+        task: run.assignment.task,
+        attempt: run.assignment.attempt,
+        spent: run.spent,
+        end,
+        read: run.read,
+    }
 }

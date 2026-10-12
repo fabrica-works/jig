@@ -339,6 +339,7 @@ pub struct World {
     shut: bool,
     stats: Stats,
     trace: Trace,
+    refusals: crate::refusals::Referee,
 }
 
 impl World {
@@ -381,6 +382,7 @@ impl World {
             shut: false,
             stats: Stats::default(),
             trace,
+            refusals: crate::refusals::Referee::default(),
         };
         if let Some(outage) = settings.outage {
             let lost = Time::ZERO.saturating_add(outage.at.draw(&mut rng));
@@ -585,6 +587,9 @@ impl World {
 
     /// What the host takes as `event`, for the world to note.
     fn take(&mut self, event: &Event, stale: bool) -> Taken {
+        if !stale {
+            self.refusals.event(event);
+        }
         if stale {
             return Taken::Stale;
         }
@@ -640,7 +645,7 @@ impl World {
             | Event::Facts { .. }
             | Event::RelayCancelled { .. }
             | Event::Withdrawn { .. }
-            | Event::Bounced { .. }
+            | Event::Refused { .. }
             | Event::Yielded { .. }
             | Event::Turn { .. }
             | Event::Faulted { .. } => Taken::Other,
@@ -725,6 +730,7 @@ impl World {
                 }
             }
             Request::Prepare { owner, workspace: _ } => {
+                self.refusals.admitted(*owner, run, attempt);
                 let entry = Hosted {
                     agent: None,
                     delivered: None,
@@ -738,7 +744,6 @@ impl World {
             }
             Request::Up(LinkUp::Call { .. } | LinkUp::Turn { .. })
             | Request::CancelRelay { .. }
-            | Request::Bounced { .. }
             | Request::Grant { .. }
             | Request::Hello { .. }
             | Request::Abort { .. }
@@ -755,6 +760,7 @@ impl World {
 
     /// Hands the host's `request` to whom it is for, checking it on the way.
     fn route(&mut self, request: Request) {
+        self.refusals.request(&request);
         self.trace.log(self.now, format_args!("host -> {request:?}"));
         match request {
             Request::Up(LinkUp::Answer { reply_to, run, attempt, answer }) => {
@@ -784,7 +790,6 @@ impl World {
                     self.stage.push(Arrival { event, stale: false, duplicate: false });
                 }
             }
-            Request::Bounced { .. } => self.send_engine(request),
             Request::Hello { hello } => {
                 let mut hosting = BTreeSet::new();
                 for entry in &hello.hosting {

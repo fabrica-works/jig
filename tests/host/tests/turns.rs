@@ -286,3 +286,90 @@ fn a_start_message_beyond_the_byte_bound_is_refused() {
         Ending::Refused(jig_domain_host::Refusal::Invalid(jig_domain_host::Invalid::Messages))
     );
 }
+
+#[test]
+fn a_refusal_rides_with_the_runs_next_turn() {
+    let mut world = World::new();
+    world.assign(false);
+    world.relay_message(Token::new(1));
+    world.refuse(Token::new(1), jig_domain_host::MessageRefusal::Full);
+    world.turn(1, b"one");
+    assert_eq!(
+        &*world.received_turn(1).expect("turn received").refused,
+        &[jig_domain_host::Refused { name: Token::new(1), reason: jig_domain_host::MessageRefusal::Full }]
+    );
+}
+#[test]
+fn a_refusal_with_no_later_turn_rides_with_the_answer() {
+    let mut world = World::new();
+    world.assign(false);
+    world.relay_message(Token::new(1));
+    world.refuse(Token::new(1), jig_domain_host::MessageRefusal::TooLarge);
+    world.finish(0, false);
+    assert_eq!(
+        &*world.answer().expect("answer received").refused,
+        &[jig_domain_host::Refused { name: Token::new(1), reason: jig_domain_host::MessageRefusal::TooLarge }]
+    );
+}
+#[test]
+fn a_refusal_is_resent_with_its_turn_after_a_hello() {
+    let mut world = World::new();
+    world.assign(false);
+    world.lose_contact();
+    world.relay_message(Token::new(1));
+    world.refuse(Token::new(1), jig_domain_host::MessageRefusal::NameInUse);
+    world.turn(1, b"one");
+    world.reconnect();
+    world.reconnect();
+    assert_eq!(
+        &*world.received_turn(1).expect("resent turn").refused,
+        &[jig_domain_host::Refused { name: Token::new(1), reason: jig_domain_host::MessageRefusal::NameInUse }]
+    );
+    assert_eq!(world.stats().transmissions, 2);
+}
+#[test]
+fn the_hubs_own_full_refusal_rides_with_the_next_turn() {
+    let mut world = World::new();
+    world.preparing();
+    world.relay_message(Token::new(1));
+    world.relay_message(Token::new(2));
+    world.relay_message(Token::new(3));
+    world.prepared();
+    world.relay_message(Token::new(4));
+    world.turn_with(1, b"one", Some(Token::new(4)), false);
+    assert_eq!(
+        &*world.received_turn(1).expect("turn received").refused,
+        &[jig_domain_host::Refused { name: Token::new(3), reason: jig_domain_host::MessageRefusal::Full }]
+    );
+}
+#[test]
+fn the_answer_names_the_last_message_its_run_read() {
+    let mut world = World::new();
+    world.assign(false);
+    world.relay_message(Token::new(1));
+    world.turn_with(1, b"one", Some(Token::new(1)), false);
+    world.finish(1, false);
+    assert_eq!(world.answer().expect("answer received").read, Some(Token::new(1)));
+}
+#[test]
+fn a_window_turn_crosses_with_its_flag() {
+    let mut world = World::new();
+    world.assign_conversation(Box::new([]), Box::new([]));
+    world.turn_with(1, b"one", None, true);
+    assert!(world.received_turn(1).expect("turn received").opens_window);
+}
+
+#[test]
+fn refusals_beyond_the_inbox_are_dropped_and_counted() {
+    let mut world = World::new();
+    world.assign(false);
+    for name in 1..=5 {
+        world.relay_message(Token::new(name));
+        world.refuse(Token::new(name), jig_domain_host::MessageRefusal::Full);
+    }
+    world.finish(0, false);
+    assert_eq!(world.answer().expect("answer received").refused.len(), 4);
+    assert_eq!(world.lost_refusals(), 1);
+    world.acknowledge_answer();
+    assert_eq!(world.lost_refusals(), 1);
+}

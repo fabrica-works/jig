@@ -40,6 +40,7 @@ pub struct Domain {
     pub(crate) answers: Map<(Token, Token), Id<Hosted>>,
     /// The root is shutting down: it admits no more runs.
     pub(crate) shut: bool,
+    pub(crate) refusals_lost: u64,
 }
 
 impl Domain {
@@ -57,6 +58,7 @@ impl Domain {
             turns: Turns::new(limits),
             answers: Map::with_capacity(limits.slots),
             shut: false,
+            refusals_lost: 0,
         }
     }
 
@@ -214,6 +216,12 @@ impl Domain {
         self.turns.abandoned()
     }
 
+    /// Refusals dropped beyond the per-run inbox bound.
+    #[must_use]
+    pub const fn refusals_lost(&self) -> u64 {
+        self.refusals_lost
+    }
+
     /// The reclaim point: frees what closed in this iteration.
     pub fn reclaim(&mut self) {
         self.hosted.reclaim();
@@ -228,8 +236,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Withdrawn { owner, call } => hosted::withdrawn(domain, owner, call, out),
         Event::Turn { owner, turn } => hosted::turned(domain, env, owner, turn, out),
         Event::Facts { owner, fact } => hosted::told(domain, env, owner, fact),
-        Event::Finished { owner, turns, spent, finish } => {
-            hosted::finished(domain, env, owner, turns, spent, finish, out);
+        Event::Finished { owner, turns, spent, read, finish } => {
+            hosted::finished(domain, env, owner, turns, spent, finish, read, out);
         }
         Event::RelayCancelled { call } => hosted::relay_cancelled(domain, call, out),
         Event::CancelAll { reason } => hosted::cancel_all(domain, reason),
@@ -239,7 +247,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Prepared { owner, workspace } => hosted::prepared(domain, owner, workspace, out),
         Event::Unprepared { owner, failure, detail } => hosted::unprepared(domain, env, owner, failure, detail, out),
         Event::Started { owner, agent } => hosted::started(domain, env, owner, agent, out),
-        Event::Bounced { owner, name, bounce } => hosted::bounced(domain, owner, name, bounce, out),
+        Event::Refused { owner, name, reason } => hosted::refused_message(domain, owner, name, reason, out),
         Event::Yielded { owner } => hosted::yielded(domain, owner, out),
         Event::Faulted { owner, fault } => hosted::faulted(domain, env, owner, fault, out),
         Event::Gone { owner, detail } => hosted::gone(domain, env, owner, detail, out),

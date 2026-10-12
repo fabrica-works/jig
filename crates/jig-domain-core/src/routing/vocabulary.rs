@@ -431,7 +431,15 @@ pub enum Event {
     /// Host, run or attempt.
     Fleet(fleet::Event),
     /// Root-translated contents of a host turn payload.
-    TurnPayload { run: Token, attempt: Token, turn: u32, body: Token, read: Option<u64>, cumulative: u64 },
+    TurnPayload {
+        run: Token,
+        attempt: Token,
+        turn: u32,
+        body: Token,
+        read: Option<u64>,
+        cumulative: u64,
+        refused: Box<[u64]>,
+    },
     /// Root-translated contents of a host answer payload.
     AnswerPayload {
         run: Token,
@@ -441,6 +449,8 @@ pub enum Event {
         end: tasks::End,
         saved: Option<Box<[tasks::SavedResource]>>,
         invalid_saved: bool,
+        read: Option<u64>,
+        refused: Box<[u64]>,
     },
     /// Root-translated accepted turn and its owned transcript.
     AcceptedTurn {
@@ -448,6 +458,7 @@ pub enum Event {
         attempt: u64,
         turn: u32,
         accepted: tasks::Accepted,
+        opens_window: bool,
         cumulative: u64,
         read: Option<u64>,
         transcript: Box<[u8]>,

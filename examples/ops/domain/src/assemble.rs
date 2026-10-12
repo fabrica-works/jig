@@ -283,7 +283,9 @@ pub(crate) fn answer_payload(domain: &mut Domain, run: Token, attempt: Token, pa
 }
 
 pub(crate) fn result_read(domain: &Domain, payload: Token, end: tasks::End, work: &mut Queue<Work>) {
-    let Some(crate::boundary::Payload::Answer { task, attempt, spent, .. }) = domain.payloads.get(&payload) else {
+    let Some(crate::boundary::Payload::Answer { task, attempt, spent, read, refused, .. }) =
+        domain.payloads.get(&payload)
+    else {
         return;
     };
     work.push(Work::Core(core::Event::AnswerPayload {
@@ -294,6 +296,8 @@ pub(crate) fn result_read(domain: &Domain, payload: Token, end: tasks::End, work
         end,
         saved: None,
         invalid_saved: false,
+        read: *read,
+        refused: refusal_names(refused),
     }));
 }
 
@@ -541,3 +545,5 @@ pub(crate) fn read_answer(
     }));
     work.push(Work::Core(core::Event::Fleet(jig_domain_fleet::Event::Relayed { to: ReplyTo::new(call.to), answer })));
 }
+
+pub(crate) use crate::message_refusals::{message_read, refusal_names, refusals};

@@ -94,8 +94,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let told =
         Queue::<Told>::worst_case(limits.told)?.checked_add(u64::from(limits.told).checked_mul(limits.fact_bytes)?)?;
     let capacity = limits.slots.checked_mul(limits.turns)?.checked_mul(2)?;
+    let refusal_bytes = u64::from(limits.inbox).checked_mul(u64::try_from(size_of::<crate::Refused>()).ok()?)?;
     let turns = Map::<Name, Pending>::worst_case(capacity)?
-        .checked_add(u64::from(limits.slots).checked_mul(limits.turn_queue_bytes.checked_mul(2)?)?)?;
+        .checked_add(u64::from(limits.slots).checked_mul(limits.turn_queue_bytes.checked_mul(2)?)?)?
+        .checked_add(u64::from(capacity).checked_mul(refusal_bytes)?)?;
     // Until its agent starts, a run holds its charter, its conversation and the
     // inbound events that came meanwhile; from when it is told how the run
     // finishes, the outcome or the detail of the failure.
@@ -112,6 +114,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let run = starting
         .max(ending)
         .checked_add(run_calls)?
+        .checked_add(skein_lib::List::<crate::Refused>::worst_case(limits.inbox)?)?
+        .checked_add(refusal_bytes)?
         .checked_add(u64::from(limits.accounts).checked_mul(u64::try_from(size_of::<crate::Grant>()).ok()?)?)?;
     let runs = u64::from(limits.slots).checked_mul(run)?;
     // One terminal arrives per step; its fixed payload is included.
