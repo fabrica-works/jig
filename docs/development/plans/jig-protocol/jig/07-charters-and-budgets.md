@@ -365,14 +365,18 @@ project's current period as `route_period` records it (from the root's
 `Event::Period`), restored with the funders' records; each use of
 `settings.period` reads the project's. A period's budget is the
 event's, within the policy's `period_spend`. A pool's budget is the
-role's `period_spend`, and a chat's authority the role's authority.
+role's `period_spend`, and a chat's authority the most that fits under
+its person's role, as the authority child's person batch fits any task
+a person makes: the role's authority one level shallower, within the
+tasks and spend left (configuration.md, 3; authority.md, 5 and 6; the
+designer, 2026-10-12, jig `e7eb8486`); the person batch is unchanged.
 The recurring procedure's executor uses `core::RECURRING`, a constant
 the core reserves (`u16::MAX`). `ToolFamilies` gets jig's constant
 numbering, `ToolFamilies::JIG`. The roots' worlds say each project's
 first period at a first start (`tests/core/src/world.rs:219-345`'s
 fixture drops the five fields).
 Test shape: `two_projects_with_different_spends_fund_their_own_periods`,
-`a_chat_takes_its_persons_role_authority`,
+`a_chat_takes_the_most_that_fits_under_its_persons_role`,
 `a_policy_change_reaches_the_next_pool_budget` (core world); the
 existing stories unchanged in their expectations.
 Proof: the gate.

@@ -423,7 +423,7 @@ Shape:
       workspace: option Workspace
       save: bool
       charter: bytes 67108864
-      turns: list 480 bytes 8388608   # ruling 172
+      transcript: bytes 8388608   # one piece: each turn after its u32 length (channel.md, 6.1)
       answered: list 1024 AnsweredCall
       messages: list 1024 Message
       grants: list 64 Grant
@@ -627,10 +627,9 @@ pub mod v1 {
 pub struct Sizes {
     /// Largest charter's bytes (the hub's charter bound).
     pub charter: u32,
-    /// Largest current window's bytes (the resume limit).
+    /// Largest current window as it crosses, one piece: the resume limit, each turn counted
+    /// with its four-byte length (channel.md, 6.1).
     pub transcript: u32,
-    /// Most turns a resumed window carries.
-    pub window_turns: u32,
     /// Largest turn's body.
     pub turn: u32,
     /// Largest message's words, and its sender's label.
@@ -703,10 +702,12 @@ pub fn worker_cap(sizes: &Sizes) -> Option<WorkerCap> { todo!() }
 
 ## Questions to raise when reached
 
-- **A resumed window's turn count.** channel.md, 11 bounds the current
-  window by bytes ("the resume limit"), but a list needs a count:
-  `Sizes::window_turns` takes it from the domain limit that bounds it,
-  if jig 06 lands one; if none does, raise it before 22.4 lands.
+- **A resumed window's turn count:** settled by the designer (jig
+  `e7eb8486`; channel.md, 6.1, "A window crosses as one piece"): the
+  window crosses as one piece in smith's form, `transcript: bytes
+  8388608`, each turn after its `u32` length; the resume limit bounds the
+  piece, each turn counted with its length, and no count is kept. This
+  replaces ruling 172's `turns: list 480 bytes 8388608`.
 - **A field jig 05, 04, 06 or 08 landed that the records lack,** or the
   reverse: raise it before the increment that carries the record lands.
 - **The link vocabulary as one pair of enumerations.** jig 05 keeps the

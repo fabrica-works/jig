@@ -231,7 +231,11 @@ sent first and nothing before it; `translate.rs`, both halves: each
 `host::LinkUp` variant to its up record, the application's parts' bytes
 written whole; each down record to its `host::LinkDown` variant, the
 parts named by tokens of the component's; each grant's value handed out
-as `Value`, with its deadline, before the record that names it; `Lost`
+as `Value`, with its deadline, before the record that names it; an
+assignment's transcript piece split back into the hub's turns, a piece
+whose lengths do not end exactly at its end reaching the root as a
+transcript that does not decode, which it refuses as invalid (channel.md,
+6.1); `Lost`
 once for each channel that was up; an `Up` while no channel is up
 dropped, but a relay (24.3) (channel.md, 3, 5, 6.2, 8, 10.1).
 Needs: nothing beyond 24.1.
@@ -278,7 +282,8 @@ Test shape:
   `each_up_record_reaches_the_engine_in_order`,
   `each_down_record_reaches_the_root_in_order`,
   `grant_values_reach_the_layer_before_the_assignment`,
-  `an_undecodable_assignment_is_refused_as_framing`.
+  `an_undecodable_assignment_is_refused_as_framing`,
+  `a_transcript_piece_that_does_not_split_is_refused_as_invalid`.
 Proof: world, `heavy cargo nextest run -p jig-worker-link-world -E
 'test(link) | test(records)'` once: the hello goes first on every
 channel, records cross both ways as the hub's vocabulary, and a grant's

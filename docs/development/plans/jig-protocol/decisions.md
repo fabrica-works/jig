@@ -105,8 +105,10 @@ the file.
     provider names one, the account's id, from the account's
     configuration or its handed-in file (`protocol/llm.md`, section 6):
     smith's ChatGPT provider needs it.
-27. **A resumed window's turn count** is bounded by the domain's limit on
-    a transcript's turns; the application's resource names by
+27. **A resumed window crosses as one piece,** bounded by the resume
+    limit, each turn counted with its length; no turn count is kept (the
+    designer, 2026-10-12, jig `e7eb8486`; `protocol/channel.md`, 6.1;
+    replacing ruling 172's list); the application's resource names by
     `Sizes::resource` (`protocol/channel.md`, section 11).
 28. **The worker keeps credential values** in `jig-protocol-accounts`'
     `Table`, held by its protocol layer; `jig-protocol-worker-link` hands

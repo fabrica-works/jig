@@ -304,8 +304,10 @@ Removes: nothing.
 
 Scope: `translate.rs`'s down half: each `host::LinkDown` variant to its
 record, the parts' bytes written whole, each grant's value moved in from
-`Down`'s values, a grant without one left out; a `Down` for a channel
-that is gone, or not yet heard, dropped (channel.md, 5.2, 6.2, 8, 10.3).
+`Down`'s values, a grant without one left out; an assignment's window
+turns joined into one piece, each after its `u32` length (channel.md,
+6.1, "A window crosses as one piece"); a `Down` for a channel that is
+gone, or not yet heard, dropped (channel.md, 5.2, 6.1, 6.2, 8, 10.3).
 The assignment's run identity is the 16 bytes the hub's assignment
 carries, made by `jig_protocol_charter::run_identity` (jig 06.2) where
 the engine's protocol layer puts the assignment together; this component
