@@ -199,6 +199,9 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 
 ### 5.3 The table
 
+- **A grant's value** is the access token and, where the account's
+  provider names one (a ChatGPT account does), the account's id, from
+  its configuration or its handed-in file; the table holds both.
 - **The access tokens lent,** by account, at most the two newest
   generations of each, with their expiry on the engine's clock, held by
   `jig-protocol-accounts`.

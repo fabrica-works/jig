@@ -165,7 +165,8 @@ down:  released and door outputs → components → io submissions
   2. **The core hears that the engine is stopping**
      (`../domain/engine.md`, 6.1) and from then on takes nothing that
      would make a commit: a party's request is answered not ready; a run's
-     turn, answer or call is answered busy, so its host keeps it; a
+     turn or call is answered busy, and its answer left unacknowledged,
+     so its host keeps them; a
      connector's events and outcomes are held by the connector, as when
      the journal is full; no run is placed and no procedure stepped. It
      ends every watch saying the engine is stopping
@@ -333,10 +334,10 @@ same parts as between hosts.
   each worker's link use an in-process address (skein's `io.md`, 3.5),
   so the channel's opening, authentication, liveness, relays and grants
   run as they do between hosts, in plaintext, with no TLS.
-- **A browser on loopback.** The engine's clients' listener is a TCP
-  listener on a loopback address; the browser reaches it as it reaches
-  any engine, and a person signs in by the link the engine prints at
-  start (`client.md`, section 8).
+- **A client on loopback.** The engine's clients' listener is a TCP
+  listener on a loopback address; a client reaches it as it reaches any
+  engine, and a person signs in by the link the engine prints at start
+  (`client.md`, section 8).
 - **Agents as child processes,** as between hosts (section 6): one
   binary may serve as the service and each agent it spawns, as the
   reference binary does (section 7). Or, as a worker's root's choice, in

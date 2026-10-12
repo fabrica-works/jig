@@ -211,3 +211,7 @@ secret, and every credential its runs need comes with their assignments
   digits, and nothing else but a final newline.
 - **A secret file** holds the secret's bytes as they are, and nothing
   else but a final newline, which is not part of the secret.
+- **A handed-in account's file** (`llm.md`, 5.4) is one JSON object:
+  `access_token`, a string; `expires_at`, the Unix time in seconds at
+  which it lapses; and `account_id`, a string, where the account's
+  provider names one. Nothing else.
