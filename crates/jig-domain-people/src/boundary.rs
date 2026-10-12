@@ -548,6 +548,14 @@ pub enum Key {
     Answer(RequestKey),
 }
 
+impl Key {
+    /// Every people family is restored at start (protocol/store.md, 7.2).
+    #[must_use]
+    pub const fn live(&self) -> bool {
+        true
+    }
+}
+
 /// Owned durable record submitted to the parent or restored from it; capacities and payload
 /// bytes are checked when admitted. (domain/people.md, sections 3–5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

@@ -60,6 +60,7 @@ pub struct World {
     pub lose_answer: bool,
     pub trace: Vec<String>,
     pub restart_steps: Vec<core::RestartStep>,
+    pub restore_ranges: Vec<core::RestoreRange>,
     pub hold_restart_reads: bool,
     /// Withhold requested whole store pages during a real cold restore.
     pub hold_restore_pages: bool,
@@ -102,6 +103,7 @@ struct Restore {
     first: root::Key,
     last: root::Key,
     rows: Vec<root::Record>,
+    remaining: std::collections::VecDeque<(root::Key, root::Key)>,
 }
 
 fn grant() -> authority::Grant {
@@ -283,6 +285,7 @@ impl World {
             lose_answer: false,
             trace: Vec::new(),
             restart_steps: Vec::new(),
+            restore_ranges: Vec::new(),
             hold_restart_reads: false,
             hold_restore_pages: false,
             store_delay: 0,
@@ -1067,23 +1070,45 @@ impl World {
     }
 
     fn load_restart(&mut self, step: core::RestartStep) {
-        let keys: Vec<_> = self
-            .store
-            .rows
-            .keys()
-            .filter(|key| match (step, key) {
-                (core::RestartStep::LoadCore, root::Key::Core(_)) => true,
-                (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
-                (core::RestartStep::RestoreConnector { connector }, root::Key::Connector { number, .. }) => {
-                    connector == *number
+        let mut intervals = std::collections::VecDeque::new();
+        if step == core::RestartStep::LoadCore {
+            self.restore_ranges.extend(core::RestoreRange::LIVE);
+            for range in core::RestoreRange::LIVE {
+                let mut keys = self.store.rows.keys().filter(|key| match key {
+                    root::Key::Core(key) => range.admits(key),
+                    root::Key::Connector { .. } => false,
+                });
+                if let Some(first) = keys.next() {
+                    let last = keys.next_back().unwrap_or(first);
+                    intervals.push_back((first.clone(), last.clone()));
                 }
-                _ => false,
-            })
-            .cloned()
-            .collect();
-        if let (Some(first), Some(last)) = (keys.first(), keys.last()) {
-            self.store.load(1, first, last, None, 2);
-            self.restoring = Some(Restore { step, first: first.clone(), last: last.clone(), rows: Vec::new() });
+            }
+        } else {
+            let mut interval = None;
+            for key in self.store.rows.keys() {
+                let admitted = match (step, key) {
+                    (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
+                    (core::RestartStep::RestoreConnector { connector }, root::Key::Connector { number, .. }) => {
+                        connector == *number
+                    }
+                    _ => false,
+                };
+                if admitted {
+                    match &mut interval {
+                        Some((_, last)) => *last = key.clone(),
+                        None => interval = Some((key.clone(), key.clone())),
+                    }
+                } else if let Some(bounds) = interval.take() {
+                    intervals.push_back(bounds);
+                }
+            }
+            if let Some(bounds) = interval {
+                intervals.push_back(bounds);
+            }
+        }
+        if let Some((first, last)) = intervals.pop_front() {
+            self.store.load(1, &first, &last, None, 2);
+            self.restoring = Some(Restore { step, first, last, rows: Vec::new(), remaining: intervals });
         } else {
             self.restored(step, &[]);
         }
@@ -1093,16 +1118,32 @@ impl World {
         if self.hold_restore_pages {
             return;
         }
-        for (owner, page) in self.store.tick_pages() {
-            assert_eq!(owner, 1, "one restart page at a time");
-            let mut restore = self.restoring.take().expect("requested restart page");
-            self.trace.push(format!("store page {:?} {} rows", restore.step, page.rows.len()));
-            restore.rows.extend(page.rows);
-            if let Some(after) = page.next {
-                self.store.load(1, &restore.first, &restore.last, Some(&after), 2);
-                self.restoring = Some(restore);
-            } else {
-                self.restored(restore.step, &restore.rows);
+        loop {
+            let pages = self.store.tick_pages();
+            if pages.is_empty() {
+                break;
+            }
+            for (owner, page) in pages {
+                assert_eq!(owner, 1, "one restart page at a time");
+                let mut restore = self.restoring.take().expect("requested restart page");
+                let live = restore.step == core::RestartStep::LoadCore;
+                let rows = page.rows.len() + if live { restore.rows.len() % 2 } else { 0 };
+                if !live || rows == 2 || (page.next.is_none() && restore.remaining.is_empty()) {
+                    self.trace.push(format!("store page {:?} {rows} rows", restore.step));
+                }
+                restore.rows.extend(page.rows);
+                if let Some(after) = page.next {
+                    self.store.load(1, &restore.first, &restore.last, Some(&after), 2);
+                    self.restoring = Some(restore);
+                } else if let Some((first, last)) = restore.remaining.pop_front() {
+                    let room = if live { 2 - restore.rows.len() % 2 } else { 2 };
+                    self.store.load(1, &first, &last, None, u32::try_from(room).expect("two-row page"));
+                    restore.first = first;
+                    restore.last = last;
+                    self.restoring = Some(restore);
+                } else {
+                    self.restored(restore.step, &restore.rows);
+                }
             }
         }
     }
@@ -1122,38 +1163,8 @@ impl World {
             self.events.push_back(root::Event::RestartDone(step));
             return;
         }
-        for group in 0..4 {
-            for row in rows {
-                let rank = match row {
-                    root::Record::Core(core::Record::Core(core::CoreRecord::Deployment(_))) => 0,
-                    root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(_))) => 2,
-                    root::Record::Core(core::Record::Core(core::CoreRecord::Call(_))) => 3,
-                    root::Record::Core(
-                        core::Record::Core(
-                            core::CoreRecord::Turn(_)
-                            | core::CoreRecord::Terminal(_)
-                            | core::CoreRecord::ProposalDecision(_)
-                            | core::CoreRecord::EscalationDecision(_),
-                        )
-                        | core::Record::Tasks(
-                            tasks::Stored::History(_)
-                            | tasks::Stored::Activity(_)
-                            | tasks::Stored::Ended(_)
-                            | tasks::Stored::Milestone(_),
-                        ),
-                    ) => continue,
-                    root::Record::Core(
-                        core::Record::Tasks(_)
-                        | core::Record::People(_)
-                        | core::Record::Notes(_)
-                        | core::Record::Core(core::CoreRecord::Projection(_)),
-                    )
-                    | root::Record::Connector { .. } => 1,
-                };
-                if rank == group {
-                    assert!(root::restore_record(&mut self.domain, &env, row.clone()), "restored {row:?}");
-                }
-            }
+        for row in rows {
+            assert!(root::restore_record(&mut self.domain, &env, row.clone()), "restored {row:?}");
         }
         if step == core::RestartStep::LoadCore {
             self.events.push_back(root::Event::Core(core::Event::People(people::Event::Restored)));
@@ -1221,6 +1232,7 @@ impl World {
         self.pending_lookups.clear();
         self.restart_reads.clear();
         self.restart_steps.clear();
+        self.restore_ranges.clear();
         if let Some(peers) = &mut self.peers {
             peers.restart();
         }

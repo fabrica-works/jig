@@ -4,6 +4,36 @@
 
 use crate::{Core, fleet};
 
+/// Ordered live ranges of the cold start (protocol/store.md, 4.3 and 7.2).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum RestoreRange {
+    /// The deployment header, first.
+    Deployment,
+    /// All people's live families.
+    People,
+    /// The tasks child's live families.
+    Tasks,
+    /// The core's remaining live families.
+    Core,
+}
+
+impl RestoreRange {
+    /// The fixed order of `LoadCore`'s ranges.
+    pub const LIVE: [Self; 4] = [Self::Deployment, Self::People, Self::Tasks, Self::Core];
+
+    /// Predicate checked against the store's intervals (protocol/store.md, 4.3).
+    #[must_use]
+    pub fn admits(&self, key: &crate::Key) -> bool {
+        match key {
+            crate::Key::Core(crate::CoreKey::Deployment) => *self == Self::Deployment,
+            crate::Key::Core(key) => *self == Self::Core && key.live(),
+            crate::Key::People(key) => *self == Self::People && key.live(),
+            crate::Key::Tasks(key) => *self == Self::Tasks && key.live(),
+            crate::Key::Notes(_) => false,
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RestartStep {
     LoadCore,

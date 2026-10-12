@@ -353,44 +353,31 @@ impl Application for Ops {
                 if step != core::RestartStep::LoadInbox {
                     peers.observed.push(r::Observed::RestartStage { position });
                 }
-                let mut rows: Vec<_> = store
-                    .rows
-                    .values()
-                    .filter(|row| match (range, row) {
-                        (root::Range::Inbox, root::Record::Core(_)) => match row.key() {
-                            root::Key::Core(key) => core::inbox_restore_key(&key),
-                            root::Key::Observability(_) | root::Key::Infrastructure(_) => false,
-                        },
-                        (
-                            root::Range::Core,
-                            root::Record::Core(core::Record::Tasks(
-                                tasks::Stored::Ended(_)
-                                | tasks::Stored::Activity(_)
-                                | tasks::Stored::History(_)
-                                | tasks::Stored::Milestone(_),
-                            )),
-                        ) => false,
-                        (root::Range::Core, root::Record::Core(_))
-                        | (root::Range::Observability, root::Record::Observability(_))
-                        | (root::Range::Infrastructure, root::Record::Infrastructure(_)) => true,
-                        (
-                            root::Range::Core
-                            | root::Range::Inbox
-                            | root::Range::Observability
-                            | root::Range::Infrastructure,
-                            _,
-                        ) => false,
-                    })
-                    .cloned()
-                    .collect();
-                rows.sort_by_key(|row| match row {
-                    root::Record::Core(core::Record::Core(core::CoreRecord::Deployment(_))) => 0,
-                    root::Record::Core(core::Record::People(people::Stored::Person { .. })) => 1,
-                    root::Record::Core(core::Record::People(_)) => 2,
-                    root::Record::Core(core::Record::Tasks(_)) => 3,
-                    root::Record::Core(_) => 4,
-                    root::Record::Infrastructure(_) | root::Record::Observability(_) => 5,
-                });
+                let rows: Vec<_> = if range == root::Range::Core {
+                    core::RestoreRange::LIVE
+                        .iter()
+                        .flat_map(|range| {
+                            store.rows.iter().filter_map(move |(key, row)| match key {
+                                root::Key::Core(key) if range.admits(key) => Some(row.clone()),
+                                root::Key::Core(_) | root::Key::Observability(_) | root::Key::Infrastructure(_) => None,
+                            })
+                        })
+                        .collect()
+                } else {
+                    store
+                        .rows
+                        .iter()
+                        .filter_map(|(key, row)| {
+                            let admitted = match (range, key) {
+                                (root::Range::Inbox, root::Key::Core(key)) => core::inbox_restore_key(key),
+                                (root::Range::Observability, root::Key::Observability(_))
+                                | (root::Range::Infrastructure, root::Key::Infrastructure(_)) => true,
+                                _ => false,
+                            };
+                            admitted.then(|| row.clone())
+                        })
+                        .collect()
+                };
                 let mut events: Vec<_> = rows.into_iter().map(Input::Restore).collect();
                 events.push(Input::Event(root::Event::Store(root::Store::Restored(step))));
                 events

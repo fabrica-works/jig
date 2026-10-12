@@ -45,7 +45,7 @@ pub mod reads;
 mod resources;
 mod restart;
 mod stopping;
-pub use restart::{RestartRequest, RestartStep};
+pub use restart::{RestartRequest, RestartStep, RestoreRange};
 mod revisions;
 mod roles;
 mod routing;

@@ -108,3 +108,77 @@ fn an_unknown_header_cannot_allocate_any_family_or_become_dirty_on_time() {
     assert_eq!(core.counters.deployment(), expected);
     assert!(!core.counters.dirty());
 }
+
+fn core_keys() -> [CoreKey; 7] {
+    [
+        CoreKey::Projection(ProjectionKey::Goal(0)),
+        CoreKey::RunProof(0),
+        CoreKey::Call(CallKey { task: 0, attempt: 0, completion: 0, position: 0 }),
+        CoreKey::Turn { task: 0, attempt: 0, turn: 0 },
+        CoreKey::Terminal { task: 0, attempt: 0 },
+        CoreKey::ProposalDecision { proposer: Proposer::Task(0), proposal: 0 },
+        CoreKey::EscalationDecision { task: 0, revision: 0 },
+    ]
+}
+
+#[test]
+fn the_deployment_key_sorts_before_every_other_core_key() {
+    for key in core_keys() {
+        assert!(CoreKey::Deployment < key);
+    }
+}
+
+#[test]
+fn restore_ranges_admit_no_turn_terminal_history_or_note() {
+    let mut history = List::with_capacity(9);
+    for key in core_keys().into_iter().skip(3) {
+        history.push(Key::Core(key)).expect("history fixture capacity");
+    }
+    for key in [
+        Key::Tasks(tasks::Key::Ended(0)),
+        Key::Tasks(tasks::Key::History { task: 0, revision: 0 }),
+        Key::Tasks(tasks::Key::Milestone { task: 0, position: 0 }),
+        Key::Tasks(tasks::Key::Activity { task: 0, position: 0 }),
+        Key::Notes(notes::Key::Entry { name: 0 }),
+    ] {
+        history.push(key).expect("history fixture capacity");
+    }
+    for key in &history {
+        for range in RestoreRange::LIVE {
+            assert!(!range.admits(key), "{range:?} excludes {key:?}");
+        }
+    }
+}
+
+#[test]
+fn restore_ranges_admit_each_live_family_once() {
+    let mut live = List::with_capacity(17);
+    for key in core_keys().into_iter().take(3) {
+        live.push(Key::Core(key)).expect("live fixture capacity");
+    }
+    for key in [
+        Key::Core(CoreKey::Deployment),
+        Key::Tasks(tasks::Key::Live(0)),
+        Key::Tasks(tasks::Key::Stub(0)),
+        Key::Tasks(tasks::Key::Ledger(tasks::Funder::Task(0))),
+        Key::Tasks(tasks::Key::Writer(0)),
+        Key::Tasks(tasks::Key::Pool(0)),
+        Key::Tasks(tasks::Key::PersonProposal(0)),
+        Key::People(people::Key::Person(0)),
+        Key::People(people::Key::ReadResults { party: 0 }),
+        Key::People(people::Key::ReadChat { party: 0, task: 0 }),
+        Key::People(people::Key::SignIn(0)),
+        Key::People(people::Key::Roles(0)),
+        Key::People(people::Key::Policy(0)),
+        Key::People(people::Key::Answer(people::RequestKey { person: 0, key: [0; 16] })),
+    ] {
+        live.push(key).expect("live fixture capacity");
+    }
+    for key in &live {
+        let mut count = 0;
+        for range in RestoreRange::LIVE {
+            count += u32::from(range.admits(key));
+        }
+        assert_eq!(count, 1, "{key:?}");
+    }
+}

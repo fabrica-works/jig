@@ -181,10 +181,10 @@ pub enum CoreRecord {
 /// Core-owned fixed-size addresses, ordered within the core's own family.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum CoreKey {
-    /// One bounded row of a retained goal projection.
-    Projection(crate::ProjectionKey),
     /// Singleton deployment header.
     Deployment,
+    /// One bounded row of a retained goal projection.
+    Projection(crate::ProjectionKey),
     /// Current claim evidence for one task.
     RunProof(u64),
     /// Live named call answer.
@@ -197,6 +197,21 @@ pub enum CoreKey {
     ProposalDecision { proposer: jig_domain_people::Proposer, proposal: u64 },
     /// One accepted held-chat race.
     EscalationDecision { task: u64, revision: u64 },
+}
+
+impl CoreKey {
+    /// Live families restored after the deployment header (protocol/store.md, 7.2).
+    #[must_use]
+    pub const fn live(&self) -> bool {
+        match self {
+            Self::Projection(_) | Self::RunProof(_) | Self::Call(_) => true,
+            Self::Deployment
+            | Self::Turn { .. }
+            | Self::Terminal { .. }
+            | Self::ProposalDecision { .. }
+            | Self::EscalationDecision { .. } => false,
+        }
+    }
 }
 
 /// The core's store vocabulary wraps each durable child under one variant.

@@ -976,26 +976,42 @@ pub struct TaskRecord {
 /// in this child. (domain/tasks.md, section 2).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Key {
-    /// One immutable line in the ordered task activity range.
-    Activity { task: u64, position: u64 },
-    /// A person-origin proposal, retained as history after its decision.
-    PersonProposal(u64),
-    /// Immutable plan change outside the live arena.
-    History { task: u64, revision: u64 },
-    /// One immutable lifecycle milestone in a task's history.
-    Milestone { task: u64, position: u64 },
     /// Logical mutable live-task row.
-    Live(/** `Live` task identity whose row is replaced or erased. */ u64),
-    /// Logical historical ended-task row.
-    Ended(/** Historical ended task identity retained in the store, outside the live arena. */ u64),
-    /// Working-set pointer retained only while a live task names the ending.
+    Live(u64),
+    /// Working-set pointer retained while a live task names the ending.
     Stub(u64),
     /// Logical finite period/pool row.
-    Ledger(/** Period/pool source identity. */ Funder),
+    Ledger(Funder),
     /// One occupied writer slot for a held resource.
     Writer(u64),
     /// Last known capacity for a connector pool.
     Pool(u64),
+    /// A person-origin proposal.
+    PersonProposal(u64),
+    /// Logical historical ended-task row.
+    Ended(u64),
+    /// Immutable plan change outside the live arena.
+    History { task: u64, revision: u64 },
+    /// One immutable lifecycle milestone in a task's history.
+    Milestone { task: u64, position: u64 },
+    /// One immutable line in the ordered task activity range.
+    Activity { task: u64, position: u64 },
+}
+
+impl Key {
+    /// Whether a restart loads this family (protocol/store.md, 7.2).
+    #[must_use]
+    pub const fn live(&self) -> bool {
+        match self {
+            Self::Live(_)
+            | Self::Stub(_)
+            | Self::Ledger(_)
+            | Self::Writer(_)
+            | Self::Pool(_)
+            | Self::PersonProposal(_) => true,
+            Self::Ended(_) | Self::History { .. } | Self::Milestone { .. } | Self::Activity { .. } => false,
+        }
+    }
 }
 
 /// Tasks-to-root persistence row or root-to-tasks startup restore input; live tasks,

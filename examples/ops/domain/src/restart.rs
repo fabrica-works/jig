@@ -119,7 +119,6 @@ pub(crate) fn store(
                         core::Restored::Live | core::Restored::Archive => true,
                         core::Restored::Rejected => false,
                     },
-                    Record::Core(core::Record::Tasks(tasks::Stored::Milestone(_))) => true,
                     Record::Core(core::Record::Tasks(row)) => {
                         if domain.core.restore_task_row(&row) {
                             let mut out = Queue::with_capacity(tasks::max_out(&env.limits.core.tasks));

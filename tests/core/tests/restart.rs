@@ -278,3 +278,19 @@ fn a_refused_claim_keeps_the_conversation_for_the_next_resume() {
     core.begin_transcript(task, saved.attempt);
     assert_eq!(core.transcripts.get(&task).expect("next resume").from, saved.conversation);
 }
+
+#[test]
+fn a_restart_restores_people_before_live_tasks_and_core_rows() {
+    let mut world = World::new(120, false);
+    world.restart(120, false);
+    assert_eq!(
+        world.restore_ranges,
+        [
+            core::RestoreRange::Deployment,
+            core::RestoreRange::People,
+            core::RestoreRange::Tasks,
+            core::RestoreRange::Core,
+        ]
+    );
+    assert!(world.domain.ready());
+}

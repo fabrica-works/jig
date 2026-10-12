@@ -136,6 +136,7 @@ struct Restore {
     first: root::Key,
     last: root::Key,
     rows: Vec<root::Record>,
+    remaining: std::collections::VecDeque<(root::Key, root::Key)>,
 }
 
 fn env(config: &Config, clock: Clock) -> Env<root::Limits> {
@@ -150,39 +151,7 @@ impl Neighbours {
             inputs.push(Input::Event(root::Event::RestartDone(step)));
             return inputs;
         }
-        for group in 0..4 {
-            for row in rows {
-                let rank = match row {
-                    root::Record::Core(core::Record::Core(core::CoreRecord::Deployment(_))) => 0,
-                    root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(_))) => 2,
-                    root::Record::Core(core::Record::Core(core::CoreRecord::Call(_))) => 3,
-                    root::Record::Core(
-                        core::Record::Core(
-                            core::CoreRecord::Turn(_)
-                            | core::CoreRecord::Terminal(_)
-                            | core::CoreRecord::ProposalDecision(_)
-                            | core::CoreRecord::EscalationDecision(_),
-                        )
-                        | core::Record::Tasks(
-                            tasks::Stored::History(_)
-                            | tasks::Stored::Activity(_)
-                            | tasks::Stored::Ended(_)
-                            | tasks::Stored::Milestone(_),
-                        ),
-                    ) => continue,
-                    root::Record::Core(
-                        core::Record::Tasks(_)
-                        | core::Record::People(_)
-                        | core::Record::Notes(_)
-                        | core::Record::Core(core::CoreRecord::Projection(_)),
-                    )
-                    | root::Record::Connector { .. } => 1,
-                };
-                if rank == group {
-                    inputs.push(Input::Restore(row.clone()));
-                }
-            }
-        }
+        inputs.extend(rows.iter().cloned().map(Input::Restore));
         if step == core::RestartStep::LoadCore {
             inputs.push(Input::Event(root::Event::Core(core::Event::People(people::Event::Restored))));
         }
@@ -194,22 +163,45 @@ impl Neighbours {
         self.restart_steps.push(step);
         match step {
             core::RestartStep::LoadCore | core::RestartStep::LoadInbox | core::RestartStep::RestoreConnector { .. } => {
-                let keys: Vec<_> = store
-                    .rows
-                    .keys()
-                    .filter(|key| match (step, key) {
-                        (core::RestartStep::LoadCore, root::Key::Core(_)) => true,
-                        (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
-                        (core::RestartStep::RestoreConnector { connector }, root::Key::Connector { number, .. }) => {
-                            connector == *number
+                let mut intervals = std::collections::VecDeque::new();
+                if step == core::RestartStep::LoadCore {
+                    for range in core::RestoreRange::LIVE {
+                        let mut keys = store.rows.keys().filter(|key| match key {
+                            root::Key::Core(key) => range.admits(key),
+                            root::Key::Connector { .. } => false,
+                        });
+                        if let Some(first) = keys.next() {
+                            let last = keys.next_back().unwrap_or(first);
+                            intervals.push_back((first.clone(), last.clone()));
                         }
-                        _ => false,
-                    })
-                    .cloned()
-                    .collect();
-                if let (Some(first), Some(last)) = (keys.first(), keys.last()) {
-                    store.load(1, first, last, None, 2);
-                    self.restoring = Some(Restore { step, first: first.clone(), last: last.clone(), rows: Vec::new() });
+                    }
+                } else {
+                    let mut interval = None;
+                    for key in store.rows.keys() {
+                        let admitted = match (step, key) {
+                            (core::RestartStep::LoadInbox, root::Key::Core(key)) => core::inbox_restore_key(key),
+                            (
+                                core::RestartStep::RestoreConnector { connector },
+                                root::Key::Connector { number, .. },
+                            ) => connector == *number,
+                            _ => false,
+                        };
+                        if admitted {
+                            match &mut interval {
+                                Some((_, last)) => *last = key.clone(),
+                                None => interval = Some((key.clone(), key.clone())),
+                            }
+                        } else if let Some(bounds) = interval.take() {
+                            intervals.push_back(bounds);
+                        }
+                    }
+                    if let Some(bounds) = interval {
+                        intervals.push_back(bounds);
+                    }
+                }
+                if let Some((first, last)) = intervals.pop_front() {
+                    store.load(1, &first, &last, None, 2);
+                    self.restoring = Some(Restore { step, first, last, rows: Vec::new(), remaining: intervals });
                     Vec::new()
                 } else {
                     Self::restored(step, &[])
@@ -606,6 +598,11 @@ impl Application for Testing {
             restore.rows.extend(page.rows);
             if let Some(after) = page.next {
                 store.load(1, &restore.first, &restore.last, Some(&after), 2);
+                peers.restoring = Some(restore);
+            } else if let Some((first, last)) = restore.remaining.pop_front() {
+                store.load(1, &first, &last, None, 2);
+                restore.first = first;
+                restore.last = last;
                 peers.restoring = Some(restore);
             } else {
                 events.extend(Neighbours::restored(restore.step, &restore.rows));

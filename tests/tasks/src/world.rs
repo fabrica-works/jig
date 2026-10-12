@@ -988,17 +988,7 @@ impl World {
         self.contexts.clear();
         self.stops.clear();
         self.closing.clear();
-        let rows = self
-            .records
-            .values()
-            .filter(|row| {
-                matches!(
-                    row,
-                    Stored::Live(_) | Stored::Ledger(_) | Stored::Stub(_) | Stored::Writer(_) | Stored::Pool(_)
-                )
-            })
-            .cloned()
-            .collect::<Vec<_>>();
+        let rows = self.records.values().filter(|row| row.key().live()).cloned().collect::<Vec<_>>();
         for record in rows {
             self.send(Event::Restore { record });
         }

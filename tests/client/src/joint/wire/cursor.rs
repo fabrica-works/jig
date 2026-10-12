@@ -595,11 +595,11 @@ fn take_key(r: &mut Reader<'_>) -> Option<Key> {
 fn put_core_key(w: &mut Writer, value: &CoreKey) -> Option<()> {
     match value {
         CoreKey::Projection(value) => {
-            w.byte(0)?;
+            w.byte(1)?;
             put_projection_key(w, value)?;
         }
         CoreKey::Deployment => {
-            w.byte(1)?;
+            w.byte(0)?;
         }
         CoreKey::RunProof(value) => {
             w.byte(2)?;
@@ -635,8 +635,8 @@ fn put_core_key(w: &mut Writer, value: &CoreKey) -> Option<()> {
 }
 fn take_core_key(r: &mut Reader<'_>) -> Option<CoreKey> {
     Some(match r.byte()? {
-        0 => CoreKey::Projection(take_projection_key(r)?),
-        1 => CoreKey::Deployment,
+        0 => CoreKey::Deployment,
+        1 => CoreKey::Projection(take_projection_key(r)?),
         2 => CoreKey::RunProof(r.u64()?),
         3 => CoreKey::Call(take_call_key(r)?),
         4 => CoreKey::Turn { task: r.u64()?, attempt: r.u64()?, turn: r.u32()? },
@@ -791,46 +791,46 @@ fn take_funder(r: &mut Reader<'_>) -> Option<tasks::Funder> {
 fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
     match value {
         tasks::Key::Activity { task, position } => {
-            w.byte(0)?;
+            w.byte(9)?;
             w.u64(*task)?;
             w.u64(*position)?;
         }
         tasks::Key::PersonProposal(value) => {
-            w.byte(1)?;
+            w.byte(5)?;
             w.u64(*value)?;
         }
         tasks::Key::History { task, revision } => {
-            w.byte(2)?;
+            w.byte(7)?;
             w.u64(*task)?;
             w.u64(*revision)?;
         }
         tasks::Key::Milestone { task, position } => {
-            w.byte(3)?;
+            w.byte(8)?;
             w.u64(*task)?;
             w.u64(*position)?;
         }
         tasks::Key::Live(value) => {
-            w.byte(4)?;
+            w.byte(0)?;
             w.u64(*value)?;
         }
         tasks::Key::Ended(value) => {
-            w.byte(5)?;
-            w.u64(*value)?;
-        }
-        tasks::Key::Stub(value) => {
             w.byte(6)?;
             w.u64(*value)?;
         }
+        tasks::Key::Stub(value) => {
+            w.byte(1)?;
+            w.u64(*value)?;
+        }
         tasks::Key::Ledger(value) => {
-            w.byte(7)?;
+            w.byte(2)?;
             put_funder(w, value)?;
         }
         tasks::Key::Writer(value) => {
-            w.byte(8)?;
+            w.byte(3)?;
             w.u64(*value)?;
         }
         tasks::Key::Pool(value) => {
-            w.byte(9)?;
+            w.byte(4)?;
             w.u64(*value)?;
         }
     }
@@ -838,16 +838,16 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
 }
 fn take_task_key(r: &mut Reader<'_>) -> Option<tasks::Key> {
     Some(match r.byte()? {
-        0 => tasks::Key::Activity { task: r.u64()?, position: r.u64()? },
-        1 => tasks::Key::PersonProposal(r.u64()?),
-        2 => tasks::Key::History { task: r.u64()?, revision: r.u64()? },
-        3 => tasks::Key::Milestone { task: r.u64()?, position: r.u64()? },
-        4 => tasks::Key::Live(r.u64()?),
-        5 => tasks::Key::Ended(r.u64()?),
-        6 => tasks::Key::Stub(r.u64()?),
-        7 => tasks::Key::Ledger(take_funder(r)?),
-        8 => tasks::Key::Writer(r.u64()?),
-        9 => tasks::Key::Pool(r.u64()?),
+        9 => tasks::Key::Activity { task: r.u64()?, position: r.u64()? },
+        5 => tasks::Key::PersonProposal(r.u64()?),
+        7 => tasks::Key::History { task: r.u64()?, revision: r.u64()? },
+        8 => tasks::Key::Milestone { task: r.u64()?, position: r.u64()? },
+        0 => tasks::Key::Live(r.u64()?),
+        6 => tasks::Key::Ended(r.u64()?),
+        1 => tasks::Key::Stub(r.u64()?),
+        2 => tasks::Key::Ledger(take_funder(r)?),
+        3 => tasks::Key::Writer(r.u64()?),
+        4 => tasks::Key::Pool(r.u64()?),
         _ => return None,
     })
 }
