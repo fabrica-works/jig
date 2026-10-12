@@ -939,6 +939,23 @@ the file.
      `every_limit_of_the_small_profile_has_a_name` lists each. 20.3's
      Don't "or of a limit's part" now reads "or of a whole compound limit
      at once".
+160. **A grant's value is smith's envelope, by jig 25's default, until the
+     designer answers** (2026-10-12, the coordinator's block "jig 21.2:
+     grant access token and account-id representation",
+     2026-10-12T21:49:42Z). llm.md, 5.3: "A grant's value is the access
+     token and, where the account's provider names one ..., the account's
+     id ...; the table holds both"; 21.2's sketch keeps `value: Secret`
+     with a token bound only. jig 25's file already names the default
+     for this question ("the engine's routing fills an LLM grant's value
+     as smith's envelope, from the driver's access token and the
+     account's id jig 20 parsed"; smith's agent reads a two-byte
+     big-endian length, the id, then the token,
+     `smith/crates/smith-agent-service/src/service.rs:759-770`). So
+     21.2's `Table` keeps one `Secret` per generation, that envelope, and
+     its bound is the value's: 2 + `ACCOUNT_ID_BYTES` (256, a constant of
+     `jig-protocol-accounts`) + the token's; no typed `Value`. The
+     question goes to the designer (question.md); a different answer
+     changes 21.2 and the routing that fills the table.
 
 ## For the user
 
