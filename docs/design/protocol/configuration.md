@@ -90,9 +90,11 @@ the application's main (its shell)
   application's members, as its root gives them.
 - **What the core takes that no member names:**
   - *a project's current period and its budget,* from the application's
-    root as each period begins (section 5), at every start before the
-    core admits a party's request; the policy's spend per period bounds
-    it;
+    root as each period begins (section 5), the first at the
+    deployment's first start, before the core admits a party's request;
+    the store keeps the current one across restarts
+    (`../domain/engine.md`, 5.4), and the policy's spend per period
+    bounds its budget;
   - *a party's pool* for a period: the allotment their role gives, from
     the project's policy;
   - *a chat's authority and budget:* its person's role's, from the
