@@ -484,7 +484,9 @@ Don't: forget a chat whose result or replies are unread; load more than
 conditions.
 Size: at most 80 lines of production code.
 Removes: the half-forget at `routing/tasks.rs:686-697`; the test's own
-`ForgetChat` at `tests/core/tests/activity.rs:207`.
+`ForgetChat` at `tests/core/tests/activity.rs:207`, and jig 12.1's at
+`tests/core/tests/reads.rs:217`, each replaced by the person's marks
+(ruling 118).
 
 ### 03.5 Reads answered signed out
 
