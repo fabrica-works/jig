@@ -19,5 +19,11 @@ fn fuzzy_up_decoders_never_panic_and_reencode_what_they_read() {
         let bytes: Vec<u8> = (0..len).map(|_| u8::try_from(rng.below(256)).expect("a byte")).collect();
         check!(&bytes, Credential);
         check!(&bytes, Hello);
+        check!(&bytes, Turn);
+        check!(&bytes, Call);
+        check!(&bytes, Answer);
+        check!(&bytes, Fact);
+        check!(&bytes, Rejected);
+        check!(&bytes, Exhausted);
     }
 }

@@ -16,6 +16,17 @@ pub const LIMITS: v1::Limits = v1::Limits {
     bounds_models: 2,
     hello_workstreams: 2,
     hello_hosting: 2,
+    turn_refused: 2,
+    turn_body: 32,
+    call_name: 16,
+    call_tool: 16,
+    call_input: 32,
+    work_left_some: 16,
+    work_saved_some: 16,
+    ended_outcome: 32,
+    resource_resource_some: 16,
+    failed_detail: 16,
+    answer_refused: 2,
 };
 
 pub fn encode(hello: &Hello) -> Box<[u8]> {
@@ -69,4 +80,103 @@ pub fn hello_fullest() -> Hello {
 pub fn hello_smallest() -> Hello {
     // Three empty counts, plus the hello's and agent bounds' fixed fields.
     Hello::decode(&LIMITS, &mut skein_lib::Reader::new(&[0; 72])).expect("smallest hello")
+}
+
+pub const MESSAGE_FIRST: u64 = 41;
+pub const MESSAGE_SECOND: u64 = 42;
+
+pub fn refusal(name: u64, reason: crate::MessageRefusal) -> crate::Refused {
+    crate::Refused::new(&LIMITS, crate::RefusedParts { name, reason }).expect("named refusal")
+}
+
+fn refusals() -> List<crate::Refused> {
+    let mut refused = List::with_capacity(2);
+    refused.push(refusal(MESSAGE_FIRST, crate::MessageRefusal::TooLarge)).expect("first refusal slot");
+    refused.push(refusal(MESSAGE_SECOND, crate::MessageRefusal::Ending)).expect("second refusal slot");
+    refused
+}
+
+pub fn turn_with_refusals() -> crate::Turn {
+    crate::Turn::new(
+        &LIMITS,
+        crate::TurnParts {
+            task: 3,
+            attempt: 4,
+            number: 7,
+            spent: 100,
+            read: Some(MESSAGE_FIRST),
+            opens_window: true,
+            refused: refusals(),
+            body: b"opaque-turn".as_slice().into(),
+        },
+    )
+    .expect("turn within small limits")
+}
+
+fn work() -> crate::Work {
+    crate::Work::new(
+        &LIMITS,
+        crate::WorkParts { left: Some(b"left-work".as_slice().into()), saved: Some(b"saved-work".as_slice().into()) },
+    )
+    .expect("application's opaque work")
+}
+
+fn answer(ending: crate::Ending) -> crate::Answer {
+    crate::Answer::new(
+        &LIMITS,
+        crate::AnswerParts {
+            task: 3,
+            attempt: 4,
+            turns: 7,
+            spent: 100,
+            read: Some(MESSAGE_FIRST),
+            refused: refusals(),
+            ending,
+        },
+    )
+    .expect("answer within small limits")
+}
+
+pub fn answer_ended() -> crate::Answer {
+    let ended =
+        crate::Ended::new(&LIMITS, crate::EndedParts { outcome: b"opaque-result".as_slice().into(), work: work() })
+            .expect("ended result");
+    answer(crate::Ending::Ended(ended))
+}
+
+pub fn answer_failed() -> crate::Answer {
+    let run = crate::RunFailureValue::new(&LIMITS, crate::RunFailureValueParts { value: crate::RunFailure::Model })
+        .expect("typed run failure");
+    let failed = crate::Failed::new(
+        &LIMITS,
+        crate::FailedParts {
+            failure: crate::Failure::Run(run),
+            detail: b"bounded-detail".as_slice().into(),
+            work: work(),
+        },
+    )
+    .expect("failed answer");
+    answer(crate::Ending::Failed(failed))
+}
+
+fn fact(activity: crate::Activity) -> crate::Fact {
+    crate::Fact::new(&LIMITS, crate::FactParts { task: 3, attempt: 4, activity }).expect("typed activity")
+}
+
+pub fn fact_count() -> crate::Fact {
+    let count = crate::Count::new(
+        &LIMITS,
+        crate::CountParts { kind: crate::CountKind::LlmRetried, elapsed: Duration::from_secs(2), value: 3 },
+    )
+    .expect("count activity");
+    fact(crate::Activity::Count(count))
+}
+
+pub fn fact_long() -> crate::Fact {
+    let long = crate::Long::new(
+        &LIMITS,
+        crate::LongParts { operation: crate::Operation::Checks, span: Duration::from_secs(6) },
+    )
+    .expect("long activity");
+    fact(crate::Activity::Long(long))
 }

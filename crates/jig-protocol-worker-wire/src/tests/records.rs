@@ -8,8 +8,12 @@ fn hello_schema() -> skein_channel::Schema {
 }
 
 fn hello_terms(largest: u32) -> List<Term> {
-    let mut terms = List::with_capacity(1);
+    let mut terms = List::with_capacity(7);
     terms.push(Term { kind: 0x0100, largest }).expect("hello term slot");
+    // Hand-counted bounds for Turn, Call, Answer, Fact and both notices.
+    for (kind, largest) in [(0x0101, 96), (0x0102, 101), (0x0103, 145), (0x0104, 34), (0x0105, 28), (0x0106, 28)] {
+        terms.push(Term { kind, largest }).expect("one term per up kind");
+    }
     terms
 }
 
@@ -110,7 +114,7 @@ fn the_schema_lists_the_hello_from_the_initiator() {
     let schema = hello_schema();
     let version = schema.version(1).expect("one version");
     assert_eq!(schema.magic, *b"jigw");
-    assert_eq!(version.kinds.len(), 1);
+    assert_eq!(version.kinds.len(), 7);
     assert_eq!(
         version.kind(0x0100),
         Some(skein_channel::Kind { kind: 0x0100, direction: Direction::FromInitiator, largest: 178 })
@@ -135,4 +139,122 @@ fn terms_without_the_hello_name_the_hello_kind() {
 #[test]
 fn the_responder_needs_no_sending_hello_term() {
     assert_eq!(crate::terms_gap(&hello_schema(), Role::Responder, &no_terms()), None);
+}
+
+fn answer_through_bytes(answer: &crate::Answer) -> crate::Answer {
+    let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("small answer"));
+    answer.encode(&mut writer).expect("measured room");
+    crate::Answer::decode(&fixtures::LIMITS, &mut Reader::new(&writer.finish())).expect("answer within limits")
+}
+
+fn fact_through_bytes(fact: &crate::Fact) -> crate::Fact {
+    let mut writer = skein_lib::Writer::new(usize::try_from(fact.measure()).expect("small fact"));
+    fact.encode(&mut writer).expect("measured room");
+    crate::Fact::decode(&fixtures::LIMITS, &mut Reader::new(&writer.finish())).expect("fact within limits")
+}
+
+#[test]
+fn a_turn_keeps_its_refusals_and_window_flag_through_bytes() {
+    let turn = fixtures::turn_with_refusals();
+    let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).expect("small turn"));
+    turn.encode(&mut writer).expect("measured room");
+    let decoded = crate::Turn::decode(&fixtures::LIMITS, &mut Reader::new(&writer.finish())).expect("turn");
+    assert!(decoded.opens_window());
+    assert_eq!(decoded.refused().len(), 2);
+    let first = decoded.refused().get(0).expect("first refusal");
+    let second = decoded.refused().get(1).expect("second refusal");
+    assert_eq!(first.name(), fixtures::MESSAGE_FIRST);
+    assert_eq!(first.reason(), &crate::MessageRefusal::TooLarge);
+    assert_eq!(second.name(), fixtures::MESSAGE_SECOND);
+    assert_eq!(second.reason(), &crate::MessageRefusal::Ending);
+    assert_eq!(decoded, turn);
+}
+
+#[test]
+fn a_turn_past_the_inbox_refusal_bound_is_refused() {
+    let mut parts = fixtures::turn_with_refusals().into_parts();
+    let mut refused = List::with_capacity(3);
+    for name in [41, 42, 43] {
+        refused.push(fixtures::refusal(name, crate::MessageRefusal::Full)).expect("three fixture slots");
+    }
+    parts.refused = refused;
+    assert_eq!(
+        crate::Turn::new(&fixtures::LIMITS, parts).expect_err("third refusal refused").reason,
+        skein_codec::Reason::Bound
+    );
+}
+
+#[test]
+fn an_answer_keeps_its_unread_fence_through_bytes() {
+    let answer = fixtures::answer_ended();
+    let decoded = answer_through_bytes(&answer);
+    assert_eq!(decoded.read(), &Some(fixtures::MESSAGE_FIRST));
+    assert_eq!(decoded.refused().len(), 2);
+    assert_eq!(decoded, answer);
+}
+
+#[test]
+fn a_failed_answer_keeps_its_failure_kind_and_detail() {
+    let answer = fixtures::answer_failed();
+    let decoded = answer_through_bytes(&answer);
+    match decoded.ending() {
+        crate::Ending::Failed(failed) => {
+            assert_eq!(failed.detail(), b"bounded-detail");
+            match failed.failure() {
+                crate::Failure::Run(run) => assert_eq!(run.value(), &crate::RunFailure::Model),
+                other @ (crate::Failure::Unprepared(_) | crate::Failure::Agent(_) | crate::Failure::Cancelled(_)) => {
+                    panic!("unexpected failure {other:?}")
+                }
+            }
+        }
+        other @ (crate::Ending::Refused(_) | crate::Ending::Ended(_) | crate::Ending::Parked(_)) => {
+            panic!("unexpected ending {other:?}")
+        }
+    }
+    assert_eq!(decoded, answer);
+}
+
+#[test]
+fn a_count_fact_carries_kind_time_and_count() {
+    let fact = fixtures::fact_count();
+    let decoded = fact_through_bytes(&fact);
+    match decoded.activity() {
+        crate::Activity::Count(count) => {
+            assert_eq!(count.kind(), &crate::CountKind::LlmRetried);
+            assert_eq!(count.elapsed(), Duration::from_secs(2));
+            assert_eq!(count.value(), 3);
+        }
+        other @ (crate::Activity::Phase(_) | crate::Activity::Long(_) | crate::Activity::LongDone) => {
+            panic!("unexpected activity {other:?}")
+        }
+    }
+    assert_eq!(decoded, fact);
+}
+
+#[test]
+fn a_long_operation_fact_keeps_its_span() {
+    let fact = fixtures::fact_long();
+    let decoded = fact_through_bytes(&fact);
+    match decoded.activity() {
+        crate::Activity::Long(long) => {
+            assert_eq!(long.operation(), &crate::Operation::Checks);
+            assert_eq!(long.span(), Duration::from_secs(6));
+        }
+        other @ (crate::Activity::Phase(_) | crate::Activity::Count(_) | crate::Activity::LongDone) => {
+            panic!("unexpected activity {other:?}")
+        }
+    }
+    assert_eq!(decoded, fact);
+}
+
+#[test]
+fn the_schema_lists_every_up_kind_from_the_initiator() {
+    let schema = hello_schema();
+    assert_eq!(schema.versions.len(), 1);
+    for version in &schema.versions {
+        assert_eq!(version.kinds.len(), 7);
+        for number in [0x0100, 0x0101, 0x0102, 0x0103, 0x0104, 0x0105, 0x0106] {
+            assert_eq!(version.kind(number).expect("every up kind").direction, Direction::FromInitiator);
+        }
+    }
 }

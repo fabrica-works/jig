@@ -6,6 +6,12 @@ use skein_lib::List;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
     Hello,
+    Turn,
+    Call,
+    Answer,
+    Fact,
+    Rejected,
+    Exhausted,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -16,7 +22,16 @@ pub struct KindRule {
 }
 
 /// Every kind is required, in wire number order.
-pub const KINDS: &[KindRule] = &[KindRule { kind: 0x0100, direction: Direction::FromInitiator, body: Kind::Hello }];
+#[rustfmt::skip]
+pub const KINDS: &[KindRule] = &[
+    KindRule { kind: 0x0100, direction: Direction::FromInitiator, body: Kind::Hello },
+    KindRule { kind: 0x0101, direction: Direction::FromInitiator, body: Kind::Turn },
+    KindRule { kind: 0x0102, direction: Direction::FromInitiator, body: Kind::Call },
+    KindRule { kind: 0x0103, direction: Direction::FromInitiator, body: Kind::Answer },
+    KindRule { kind: 0x0104, direction: Direction::FromInitiator, body: Kind::Fact },
+    KindRule { kind: 0x0105, direction: Direction::FromInitiator, body: Kind::Rejected },
+    KindRule { kind: 0x0106, direction: Direction::FromInitiator, body: Kind::Exhausted },
+];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Overflow {
@@ -29,6 +44,12 @@ pub fn schema(limits: &v1::Limits) -> Result<Schema, Overflow> {
     for rule in KINDS {
         let largest = match rule.body {
             Kind::Hello => v1::Hello::worst_case_bytes(limits),
+            Kind::Turn => v1::Turn::worst_case_bytes(limits),
+            Kind::Call => v1::Call::worst_case_bytes(limits),
+            Kind::Answer => v1::Answer::worst_case_bytes(limits),
+            Kind::Fact => v1::Fact::worst_case_bytes(limits),
+            Kind::Rejected => v1::Rejected::worst_case_bytes(limits),
+            Kind::Exhausted => v1::Exhausted::worst_case_bytes(limits),
         };
         let largest = largest.ok_or(Overflow::Body)?;
         let Ok(largest) = u32::try_from(largest) else { return Err(Overflow::Frame) };

@@ -25,3 +25,62 @@ record Hello {
     hosting: list 65536 Hosting
     bounds: Bounds
 }
+
+# Other worker-to-engine records (protocol/channel.md, 5.1 and 6.4).
+enum MessageRefusal { too_large, full, name_in_use, ending }
+record Refused { name: u64 reason: MessageRefusal }
+record Turn {
+    task: u64 attempt: u64 number: u32 spent: u64
+    read: option u64
+    opens_window: bool
+    refused: list 1024 Refused
+    body: bytes 8388608
+}
+record Call {
+    task: u64 attempt: u64
+    name: bytes 64
+    tool: text 64
+    writes: bool
+    input: bytes 1048576
+    deadline: duration
+}
+enum Invalid { charter, transcript, grants, messages }
+record InvalidValue { value: Invalid }
+enum Refusal { busy, invalid: InvalidValue }
+record RefusalValue { value: Refusal }
+record Work { left: option bytes 65536 saved: option bytes 65536 }
+record Ended { outcome: bytes 67108864 work: Work }
+record Parked { work: Work }
+record Resource { resource: option bytes 1024 }
+enum Preparation { transient, permanent: Resource }
+record PreparationValue { value: Preparation }
+enum RunFailure { model, budget, policy, cancelled, stale, exhausted }
+record RunFailureValue { value: RunFailure }
+enum AgentFailure { unstarted, exited, rules, no_progress, wall_time }
+record AgentFailureValue { value: AgentFailure }
+enum CancelReason { engine, contact, shutdown }
+record CancelReasonValue { value: CancelReason }
+enum Failure {
+    unprepared: PreparationValue, run: RunFailureValue,
+    agent: AgentFailureValue, cancelled: CancelReasonValue
+}
+record Failed { failure: Failure detail: bytes 4096 work: Work }
+enum Ending { refused: RefusalValue, ended: Ended, parked: Parked, failed: Failed }
+record Answer {
+    task: u64 attempt: u64 turns: u32 spent: u64
+    read: option u64
+    refused: list 1024 Refused
+    ending: Ending
+}
+enum Operation { checks, completion, command }
+record Long { operation: Operation span: duration }
+enum CountKind {
+    admitted, ended, llm_started, llm_retried, llm_finished,
+    tool_started, tool_finished, check_started, check_finished, text_arrived
+}
+record Count { kind: CountKind elapsed: duration value: u64 }
+record PhaseValue { value: Phase }
+enum Activity { phase: PhaseValue, long: Long, long_done, count: Count }
+record Fact { task: u64 attempt: u64 activity: Activity }
+record Rejected { task: u64 attempt: u64 account: u32 generation: u64 }
+record Exhausted { task: u64 attempt: u64 account: u32 retry_after: duration }

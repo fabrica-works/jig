@@ -15,6 +15,15 @@ mod tests;
 
 pub use kinds::{KINDS, Kind, KindRule, Overflow, schema, terms_gap};
 pub use v1::{
+    Activity, AgentFailure, AgentFailureValue, AgentFailureValueParts, Answer, AnswerParts, Call, CallParts,
+    CancelReason, CancelReasonValue, CancelReasonValueParts, Count, CountKind, CountParts, Ended, EndedParts, Ending,
+    Exhausted, ExhaustedParts, Fact, FactParts, Failed, FailedParts, Failure, Invalid, InvalidValue, InvalidValueParts,
+    Long, LongParts, MessageRefusal, Operation, Parked, ParkedParts, PhaseValue, PhaseValueParts, Preparation,
+    PreparationValue, PreparationValueParts, Refusal, RefusalValue, RefusalValueParts, Refused, RefusedParts, Rejected,
+    RejectedParts, Resource, ResourceParts, RunFailure, RunFailureValue, RunFailureValueParts, Turn, TurnParts, Work,
+    WorkParts,
+};
+pub use v1::{
     Bounds, BoundsParts, CEILINGS, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,
     ModelBoundParts, Phase,
 };
