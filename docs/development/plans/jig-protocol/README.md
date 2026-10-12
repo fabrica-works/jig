@@ -268,6 +268,17 @@ ones before it in its session. Dependencies are by capability: "skein
   infrastructure. This replaces development.md, 8.5's "a second failure
   on the same tree is a question" for this plan; any other failure is as
   8.5 says.
+- **A gate failure the Shape explains is fixed without asking**
+  (decisions.md, ruling 145). When the gate fails, other than on a
+  timeout, in a test outside the increment's Files because the
+  behaviour the Shape adds reaches that test's fixture or story (a new
+  control pressed, a message now judged again), the session fixes the
+  fixture or the story's inputs under ruling 114 (at most 20 lines,
+  every test's name and expected value kept), names in its commit body
+  the Shape's words that explain it, and runs `land` again. This
+  replaces development.md, 8.5's "stop on a question" for that case
+  only; a failure the Shape does not explain, or a fix past ruling
+  114's limits, is still a question.
 
 ## Live services
 

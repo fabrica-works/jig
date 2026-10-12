@@ -736,9 +736,46 @@ the file.
      their agent fixtures. Nothing derives them from a charter. Each
      `Config` literal outside 05.6's Files gains its one line, named in
      the commit body.
+144. **The code-graph daemon runs at idle priority; jig's line restarts**
+     (2026-10-12, the coordinator's block "jig 12.4: third timeout-only
+     gate failure and Jig infrastructure hold", 2026-10-12T20:32:28Z).
+     jig 12.4's three gates each stopped only at the focused suite's 15 s
+     global timeout, in tests it does not touch, with the code-graph
+     service (`codebase-memory-mcp --cbm-daemon-internal`, pid 272) at
+     565 % and 569 % CPU of eight cores at the first and third gate's
+     start: its watcher (`auto_watch = true`) indexes a checkout when it
+     changes, so each landing that moves `main` starts an index just as
+     the next queued gate starts. At 20:35Z the supervisor set every
+     thread of pid 272 to `SCHED_IDLE` and nice 19, and its IO to the
+     idle class (`chrt --idle`, `ionice -c 3`), which the workers it
+     forks inherit: indexing now takes only CPU nothing else wants, and
+     the index still follows `main`. The coordinator lifts jig's hold
+     (development.md, 10.6), and jig 12.4 runs `land` again, a fourth
+     attempt on its tree; ruling 140 applies afresh from it. Reported to
+     the user under "For the user".
+145. **A gate failure the Shape's new behaviour explains is fixed without
+     asking** (2026-10-12, the coordinator's block "jig 04.4: fault
+     fixture leaves a message unread before parking",
+     2026-10-12T20:32:28Z; the second such block, after jig 03.6's at
+     20:28Z). 04.4 makes an unread message start another attempt
+     (tasks.md, 8.3: "A message a run refused or left unread (8.2) is
+     judged again when the run ends, as if it arrived then"), and the
+     shared fixture `tests/core/src/faults.rs:26` parks a turn with
+     `read: None`, so `a_slow_worker_keeps_its_assignment_and_resumes_after_the_delay`
+     sees two activations. 04.4 makes the fixture read the message before
+     parking, as it proposed, under ruling 114. The README's Rules now
+     make such a fix no question for any session.
 
 ## For the user
 
+- **The code-graph daemon's priority** (ruling 144): on carbon-forge,
+  `codebase-memory-mcp`'s daemon (pid 272, started at boot) re-indexed
+  on every change at normal priority, taking about six of eight cores as
+  gates started. The supervisor set it to `SCHED_IDLE` and the idle IO
+  class at 20:35Z; a restart of the daemon or the machine loses that. A
+  lasting fix is yours: start the daemon under `nice -n 19 chrt --idle 0
+  ionice -c 3`, or set `auto_watch` off and index `main` through the
+  queue (`heavy codebase-memory-mcp cli index_repository ...`).
 - **The gate lane bounds the run** (supervision.md, checks of 17:22 and
   18:22): gates ran 81 to 91 % of each hour, pausing the build lane, so a
   build command waited about 4 minutes and landings fell to 8 to 14 an
