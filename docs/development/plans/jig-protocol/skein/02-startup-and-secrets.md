@@ -497,6 +497,30 @@ Don't: guess a type's size; box a variant not marked; add an allowance
 Size: at most 250 lines of production code; generated files and goldens
   are not counted.
 
+### 02.s2 A list of fixed-width items generates no unused loop
+
+A step not in the plan (decisions.md, ruling 152), after jig 22.1 found
+it: for a `list N u64` field (`Hello.workstreams`), skein-codegen at
+`e723e1db` writes an empty check loop and a measure loop whose `item_0`
+is unused, which `-D warnings` refuses.
+Scope: codec.md, 6: generated files "pass the workspace's lints with no
+  allowances: the generator writes what the lints accept".
+Needs: 02.s1.
+Files: `testing/skein-codegen/src/*.rs`; `tests/codec/schema/lints-v1.schema`,
+  its generated `tests/codec/src/lints/v1.rs` and goldens.
+Shape: a list whose items need no check writes no check loop; a list of
+  fixed-width items measures as its count times the item's width, with no
+  loop. Output for a schema without such a list is unchanged, byte for
+  byte.
+Test shape: `lints-v1.schema` gains a `list 4 u64` field and a `list 4
+  u32` one; the gate's clippy over the fixture is the check.
+Proof: unit, `heavy cargo nextest run -p skein-codegen -p
+  skein-codec-tests` once; `git diff --stat --diff-filter=MD origin/main
+  -- tests/codec/src/generated tests/codec/src/scalars
+  tests/codec/src/secrets tests/codec/golden` prints nothing.
+Don't: change the bytes of any encoding; add an allowance.
+Size: at most 60 lines of production code.
+
 ## Interface sketches
 
 ```rust

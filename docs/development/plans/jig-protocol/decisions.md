@@ -853,6 +853,16 @@ the file.
      declares the document types its refusals reach, which 30.3 and 30.4
      reuse. 30.1's Size guide becomes 900, and the README's rule "A codec
      increment lands past its Size, up to twice it" now covers jig 30.
+152. **skein 02.s2 and jig-repin.s2 clean a list of fixed-width items**
+     (2026-10-12, the coordinator's block "jig 22.1: generated
+     primitive-list unused variables", 2026-10-12T21:21:54Z). For
+     `Hello.workstreams`, a `list 65536 u64`, skein-codegen at `e723e1db`
+     writes an empty check loop and an unused `item_0` in its measure
+     loop (jig 22.1's `src/generated/v1.rs:473,726`), which `-D warnings`
+     refuses; codec.md, 6 has generated files pass the lints "with no
+     allowances". Two steps not in the plan, as for ruling 138: skein
+     02.s2 (`skein/02-startup-and-secrets.md`), then jig-repin.s2 (README,
+     "Repin"). jig 22.1 commits on its branch and lands after them.
 
 ## For the user
 
