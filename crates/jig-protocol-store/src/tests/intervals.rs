@@ -122,3 +122,131 @@ fn fixed_scopes() -> [jig_domain_core::reads::Scope; 14] {
         Scope::ScopedNotes { scope: notes::Scope::Deployment, description: None },
     ]
 }
+
+fn inbox_scope(group: jig_domain_core::reads::Group) -> jig_domain_core::reads::Scope {
+    use jig_domain_core::reads::{Filter, Scope};
+    Scope::Inbox { group, filter: Filter { project: Some(1), goal: Some(1) } }
+}
+
+fn indexed_scopes() -> [jig_domain_core::reads::Scope; 4] {
+    use jig_domain_core::reads::{Group, Scope};
+    [inbox_scope(Group::Updates), inbox_scope(Group::Results), inbox_scope(Group::Replies), Scope::Conversations]
+}
+
+fn indexed_mapping(
+    party: u64,
+    scope: jig_domain_core::reads::Scope,
+) -> (u64, jig_domain_core::reads::Scope, Box<[skein_kv::Range]>) {
+    let intervals = intervals::scope(party, &scope).expect("landed index family");
+    (party, scope, intervals)
+}
+
+#[test]
+fn each_indexed_scope_holds_the_keys_it_admits_and_no_others() {
+    use jig_domain_core::reads;
+    let mut rng = Rng::new(0x5701_e007);
+    let mut mappings = skein_lib::List::with_capacity(22);
+    for scope in indexed_scopes() {
+        for party in [0, 1, 2, u64::MAX] {
+            let mapping = indexed_mapping(party, scope.clone());
+            mappings.push(mapping).expect("party, project and requester mappings fit");
+        }
+    }
+    for project in [0, 1, u32::MAX] {
+        let mapping = indexed_mapping(1, reads::Scope::Goals { project });
+        mappings.push(mapping).expect("party, project and requester mappings fit");
+    }
+    for requester in [0, 1, u64::MAX] {
+        let mapping = indexed_mapping(1, reads::Scope::EndedDelegates { task: requester });
+        mappings.push(mapping).expect("party, project and requester mappings fit");
+    }
+    for _ in 0_u32..1_000 {
+        let key = fixtures::key(&mut rng);
+        let bytes = key_bytes(&key);
+        for (party, scope, intervals) in &mappings {
+            assert_eq!(
+                reads::admits(*party, scope, &key),
+                fixtures::within(intervals, &bytes),
+                "{party}, {scope:?}, {key:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_partys_updates_interval_holds_no_other_partys_rows() {
+    use jig_domain_core::reads::Group;
+    use jig_domain_tasks::{Key as TaskKey, Newest, UpdateObject};
+    let ranges = intervals::scope(1, &inbox_scope(Group::Updates)).expect("updates index");
+    for party in [0, 1, 2, u64::MAX] {
+        for object in [UpdateObject::Result, UpdateObject::Reply { message: Newest::of(1), activity: Newest::of(1) }] {
+            let key = Key::Tasks(TaskKey::Update { party, at: Newest::of(1), task: Newest::of(1), object });
+            assert_eq!(fixtures::within(&ranges, &key_bytes(&key)), party == 1, "{key:?}");
+        }
+    }
+}
+
+fn census() -> jig_domain_core::Census {
+    use jig_domain_core::{Census, ReadResults};
+    Census {
+        results: Box::new([
+            ReadResults { party: 2, after: 1 },
+            ReadResults { party: 1, after: 0 },
+            ReadResults { party: u64::MAX, after: u64::MAX },
+        ]),
+    }
+}
+
+#[test]
+fn the_census_holds_the_keys_it_admits_and_no_others() {
+    use jig_domain_core::Census;
+    let mut rng = Rng::new(0x5701_e008);
+    let empty = RestoreRange::Census(Census { results: Box::new([]) });
+    let listed = RestoreRange::Census(census());
+    let mappings = [(&empty, intervals::restore(&empty)), (&listed, intervals::restore(&listed))];
+    for _ in 0_u32..2_000 {
+        let key = fixtures::key(&mut rng);
+        let bytes = key_bytes(&key);
+        for (range, intervals) in &mappings {
+            assert_eq!(range.admits(&key), fixtures::within(intervals, &bytes), "{range:?}, {key:?}");
+        }
+    }
+}
+
+#[test]
+fn the_census_reads_conversations_then_results_in_listed_order() {
+    let ranges = intervals::restore(&RestoreRange::Census(census()));
+    let starts: [&[u8]; 4] = [
+        &[1, 1, 15],
+        &[1, 1, 13, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        &[1, 1, 13, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        &[1, 1, 13, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0],
+    ];
+    assert_eq!(ranges.len(), starts.len());
+    for (range, expected) in ranges.iter().zip(starts) {
+        assert_eq!(range.start.as_ref(), expected);
+    }
+}
+
+#[test]
+fn a_requesters_delegates_interval_holds_its_edges_only() {
+    use jig_domain_tasks::Key as TaskKey;
+    let mut rng = Rng::new(0x5701_e009);
+    let mappings = [
+        (0, intervals::delegates(0)),
+        (1, intervals::delegates(1)),
+        (2, intervals::delegates(2)),
+        (u64::MAX, intervals::delegates(u64::MAX)),
+    ];
+    for _ in samples() {
+        let key = fixtures::key(&mut rng);
+        let bytes = key_bytes(&key);
+        for (requester, interval) in &mappings {
+            let admitted = match &key {
+                Key::Tasks(TaskKey::Delegate { requester: owner, .. }) => owner == requester,
+                Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+            };
+            assert_eq!(admitted, fixtures::within(core::slice::from_ref(interval), &bytes), "{requester}, {key:?}");
+        }
+    }
+}

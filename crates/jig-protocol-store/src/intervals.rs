@@ -24,13 +24,13 @@ fn census_ranges(census: &core::Census) -> Box<[Range]> {
         .checked_add(1)
         .expect("census parties and conversation family");
     let mut ranges = List::with_capacity(capacity);
+    ranges.push(Range::prefix(&[keys::JIG, 1, 15])).expect("one conversation family");
     for read in &census.results {
         let mut range = numbered_prefix(&[keys::JIG, 1, 13], read.party);
         let key = core::Key::Tasks(jig_domain_tasks::Key::Result { party: read.party, position: read.after });
         range.start = after(&encoded(&key));
         ranges.push(range).expect("one result interval per census party");
     }
-    ranges.push(Range::prefix(&[keys::JIG, 1, 15])).expect("one conversation family");
     ranges.into_boxed()
 }
 
@@ -69,7 +69,7 @@ fn after(key: &[u8]) -> Box<[u8]> {
     writer.finish().expect("the domain's bounded key and one cursor byte fit a u32 length")
 }
 
-/// Scopes served from fixed keys; other scopes need their owner's record or an index.
+/// Scopes served from fixed keys and indexes; other scopes need their owner's record.
 #[must_use]
 pub fn scope(party: u64, scope: &core::reads::Scope) -> Option<Box<[Range]>> {
     use core::reads::Scope;
@@ -111,14 +111,25 @@ pub fn scope(party: u64, scope: &core::reads::Scope) -> Option<Box<[Range]>> {
             }
         }
         Scope::ScopedNotes { scope, .. } => notes(&notes::Range::Lines { scope: scope.clone(), after: None }),
+        Scope::Inbox { group, .. } => match group {
+            core::reads::Group::Updates | core::reads::Group::Results | core::reads::Group::Replies => {
+                Box::new([numbered_prefix(&[keys::JIG, 1, 12], party)])
+            }
+            core::reads::Group::Needs
+            | core::reads::Group::Proposals
+            | core::reads::Group::Escalations
+            | core::reads::Group::Questions
+            | core::reads::Group::PersonTasks => return None,
+        },
+        Scope::Conversations => {
+            Box::new([numbered_prefix(&[keys::JIG, 1, 14], party), numbered_prefix(&[keys::JIG, 1, 15], party)])
+        }
         Scope::Proposal { proposer: jig_domain_people::Proposer::Task(_), .. }
         | Scope::Escalation { .. }
         | Scope::Question { .. }
         | Scope::Turn { .. }
         | Scope::History { subtree: true, .. }
-        | Scope::Activity { .. }
-        | Scope::Inbox { .. }
-        | Scope::Conversations => return None,
+        | Scope::Activity { .. } => return None,
     })
 }
 fn numbered_prefix(prefix: &[u8], number: u64) -> Range {
@@ -129,4 +140,10 @@ fn numbered_prefix(prefix: &[u8], number: u64) -> Range {
     writer.u64(number);
     let bytes = writer.finish().expect("fixed-width family prefix fits a u32 length");
     Range::prefix(&bytes)
+}
+
+/// Direct delegate edges used to collect one bounded subtree (protocol/store.md, 7.3).
+#[must_use]
+pub fn delegates(requester: u64) -> Range {
+    numbered_prefix(&[keys::JIG, 1, 18], requester)
 }

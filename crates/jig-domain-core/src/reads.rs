@@ -31,7 +31,7 @@ use alloc::boxed::Box;
 use core::mem::size_of;
 use skein_lib::{Env, Id, List, Queue, ReplyTo, Slab, Token};
 
-/// Which physical rows a fixed read scope loads (protocol/store.md, 4.3 and 7.3).
+/// Which physical rows a read scope loads (protocol/store.md, 4.3 and 7.3).
 /// Cursor admission is separate: notes lines are joined to entry rows before paging.
 #[must_use]
 pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
@@ -80,14 +80,26 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
             Key::Notes(notes::Key::Line { scope, .. }) => scope == wanted,
             Key::Notes(_) | Key::Tasks(_) | Key::Core(_) | Key::People(_) => false,
         },
+        Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. } => match key {
+            Key::Tasks(TaskKey::Update { party: owner, .. }) => *owner == party,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+        },
+        Scope::Conversations => match key {
+            Key::Tasks(
+                TaskKey::ConversationNewest { party: owner, .. } | TaskKey::ConversationOldest { party: owner, .. },
+            ) => *owner == party,
+            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
+        },
         Scope::Proposal { proposer: Proposer::Task(_), .. }
         | Scope::Escalation { .. }
         | Scope::Question { .. }
         | Scope::Turn { .. }
         | Scope::History { subtree: true, .. }
         | Scope::Activity { .. }
-        | Scope::Inbox { .. }
-        | Scope::Conversations => false,
+        | Scope::Inbox {
+            group: Group::Needs | Group::Proposals | Group::Escalations | Group::Questions | Group::PersonTasks,
+            ..
+        } => false,
     }
 }
 
