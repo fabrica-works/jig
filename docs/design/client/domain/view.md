@@ -1,6 +1,6 @@
 # The view
 
-Provisional, 2026-10-09, revised 2026-10-10. `jig-client-view`: the client
+Provisional, 2026-10-09, revised 2026-10-10. `jig-view`: the client
 domain's state as a tree a shell shows, a person's acts coming back as
 typed actions, and the diff between the last tree and the next. It is
 optional: a service has none, and a command-line tool may write its own.
@@ -49,7 +49,7 @@ open is listed in section 14.
 ## 2. Structure
 
 ```
-jig-client-view/src/
+jig-view/src/
 ├── tree.rs         the tree: nodes, ids, keys, roles, states, style tokens, text
 ├── builder.rs      the builder: nodes, keys, names, bindings, slots; splicing
 ├── binding.rs      bindings: an owner and a token; the shell's acts; decoding jig's
@@ -68,7 +68,7 @@ jig-client-view/src/
 └── tests.rs
 ```
 
-The application's view root (`<application>-client-view`) depends on it,
+The application's view root (`<application>-view`) depends on it,
 and on its families' views.
 
 ## 3. The tree

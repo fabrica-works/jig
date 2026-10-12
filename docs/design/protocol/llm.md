@@ -57,7 +57,7 @@ section 10.
 ```
 engine's root
 ├── core: accounts                  want, rejected, release; granted, failed, availability   (names only)
-├── jig-host                        the engine's own hub: its runs' turns, activity and text
+├── jig-domain-host                 the engine's own hub: its runs' turns, activity and text
 ├── smith-inline-agent              completions asked and cancelled, and their terminals; facts and content drained
 └── …
 engine's protocol layer
@@ -128,13 +128,13 @@ engine's protocol layer
   transport (TLS with its server name and trusted roots, or plaintext to
   loopback), the dialect's path and headers, its options, and the account
   its grants are named by (smith's `protocol/agent.md`, section 4).
-- **One list, three views.** The configuration's list makes the charter's
-  endpoint names (`jig-charter`), smith's component's endpoints and
-  skein's connection endpoints, by index, in the application's startup. A
-  run's charter names endpoints the engine knows; a worker's agents
-  resolve the same names against their own configuration's list, against
-  which the worker's routing decodes charters (`configuration.md`,
-  section 4).
+- **One list, three views.** The configuration's list makes the
+  charter's endpoint names (`jig-protocol-charter`), smith's component's
+  endpoints and skein's connection endpoints, by index, in the
+  application's startup. A run's charter names endpoints the engine
+  knows; a worker's agents resolve the same names against their own
+  configuration's list, against which the worker's routing decodes
+  charters (`configuration.md`, section 4).
 - **Models and their prices** are configuration too, and the charter
   carries them (smith's `protocol/charter.md`, section 2;
   `../domain/hosts.md`, section 8): each model's endpoint; its window, the

@@ -42,23 +42,23 @@ uses for its examples.
 ```
 an application's engine
 <application>-domain            the root: the application's (root.md)
-├── jig-core                    the core (engine.md)
-│   ├── jig-core-tasks          the hub (tasks.md)
-│   ├── jig-core-authority      policy (authority.md)
-│   ├── jig-core-people         parties (people.md)
-│   ├── jig-core-fleet          hosts, placement, attempts
-│   ├── jig-core-accounts       LLM accounts
-│   ├── jig-core-brief          briefs
-│   ├── jig-core-notes          notes
-│   └── jig-core-views          parties' watches
+├── jig-domain-core             the core (engine.md)
+│   ├── jig-domain-tasks        the hub (tasks.md)
+│   ├── jig-domain-authority    policy (authority.md)
+│   ├── jig-domain-people       parties (people.md)
+│   ├── jig-domain-fleet        hosts, placement, attempts
+│   ├── jig-domain-accounts     LLM accounts
+│   ├── jig-domain-brief        briefs
+│   ├── jig-domain-notes        notes
+│   └── jig-domain-views        parties' watches
 ├── <connector>…                the application's (connectors.md)
-├── jig-host                    hosted runs on the engine's slots, if it runs agents (hosts.md)
+├── jig-domain-host             hosted runs on the engine's slots, if it runs agents (hosts.md)
 ├── smith-inline-agent          their agent, smith's: its domains in this process
 └── …                           the application's own child domains
 
 an application's worker, if it has workers
 <application>-worker            the worker's root: the application's
-├── jig-host                    hosted runs (hosts.md)
+├── jig-domain-host             hosted runs (hosts.md)
 ├── smith-host-domain           their agent, smith's: processes; or smith-inline-agent, as the root chooses
 └── <workspace>                 the application's
 
@@ -154,7 +154,7 @@ system.
 | projection, home | what a connector writes of a goal for people to read; where, per project |
 | owned, participating | what the application writes alone; what it writes among others |
 | drift | a change the application did not make to what it owns and relies on |
-| host, hub | where a run runs: the engine's own slots, or a worker; `jig-host`, the one hub hosting runs on either (hosts.md, section 6) |
+| host, hub | where a run runs: the engine's own slots, or a worker; `jig-domain-host`, the one hub hosting runs on either (hosts.md, section 6) |
 | agent capability | the hub's agent, one of smith's two crates speaking smith's parent face: `smith-host-domain`, agent processes, one per run (hosts.md, 5.1); or `smith-inline-agent`, smith's domains in the host's process, the engine's hub's agent and a worker's by its root's choice (hosts.md, 5.2) |
 | smith's payloads | the charter, a resumed run's transcript, turns' bodies, call names and results: typed in smith's agent capabilities, bytes in the hub, translated by hand-out to the root's protocol layer; smith's facts are decoded the same way into jig's typed activity (hosts.md, 6.8) |
 | workspace, item | what a run works in; what a connector names for it to hold |
@@ -233,13 +233,13 @@ where each is answered:
 - **What the conformance world catches** is stated as what its scenarios
   reach, with fakes reporting what they observed independently of the
   root's translation (root.md, section 1; testing.md, section 5).
-- **One host:** runs are hosted by one hub, `jig-host`, in the engine and
-  on workers alike, its agent a capability of two kinds, both smith's
-  (agent processes, `smith-host-domain`; or `smith-inline-agent`, in the
-  engine, or on a worker by its root's choice), translated with the same
-  functions, its link to the core its root's. jig ships no agent of its
-  own. The run's lifecycle is built and tested once (hosts.md, sections 1
-  and 4 to 6).
+- **One host:** runs are hosted by one hub, `jig-domain-host`, in the
+  engine and on workers alike, its agent a capability of two kinds, both
+  smith's (agent processes, `smith-host-domain`; or
+  `smith-inline-agent`, in the engine, or on a worker by its root's
+  choice), translated with the same functions, its link to the core its
+  root's. jig ships no agent of its own. The run's lifecycle is built
+  and tested once (hosts.md, sections 1 and 4 to 6).
 - **One process runs workers' agents as child processes,** as between
   hosts: the engine and its workers share the process, and each worker's
   agents run in processes of their own, which the application's binary

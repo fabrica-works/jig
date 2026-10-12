@@ -24,10 +24,10 @@ and 8. What is still open is listed in section 12.
 - **Three shapes** (section 3): no agents; agents inside the engine;
   agents on workers. An application may mix the last two, a charter
   saying which hosts may run it.
-- **One host** (section 6): `jig-host`, the hub of hosted runs, composed
-  by every root that hosts runs: the engine's, when the application runs
-  agents there, and a worker's. It knows a hosted run's lifecycle
-  (admission, fencing, relays, turns and the answer kept until
+- **One host** (section 6): `jig-domain-host`, the hub of hosted runs,
+  composed by every root that hosts runs: the engine's, when the
+  application runs agents there, and a worker's. It knows a hosted run's
+  lifecycle (admission, fencing, relays, turns and the answer kept until
   acknowledged, cancel) and nothing of how the agent runs, where its
   workspace is, or how it reaches the core. Those are its root's and its
   capabilities'.
@@ -47,9 +47,9 @@ and 8. What is still open is listed in section 12.
   has none, by policy: it runs no commands for its agents.
 - **Neither the core nor the hub depends on smith** (6.8). The core
   keeps turns as bytes and its charter in its own terms, which
-  `jig-charter` puts into smith's (section 8); the hub carries smith's
-  payloads as bytes, which its root hands out to its protocol layer to be
-  decoded for the agent, or encoded from it.
+  `jig-protocol-charter` puts into smith's (section 8); the hub carries
+  smith's payloads as bytes, which its root hands out to its protocol
+  layer to be decoded for the agent, or encoded from it.
 - **Every message ends once** (section 9): read, refused or unread. The
   start carries the messages waiting in the task's inbox; a refusal
   travels inside the run's next turn, or its answer; a message the run
@@ -151,7 +151,7 @@ In the engine, when it hosts runs:
 ```
 <application>-domain           the application's root
 ├── core                       jig's core
-├── jig-host                   the hub: hosted runs on the engine's own slots
+├── jig-domain-host            the hub: hosted runs on the engine's own slots
 ├── smith-inline-agent         the agent, smith's: its domains in this process, one per run in flight
 └── …
 ```
@@ -160,7 +160,7 @@ On a worker:
 
 ```
 <application>-worker           the worker's root: the application's; routes among its children
-├── jig-host                   the hub: hosted runs, admit, prepare, start, relay, park or end
+├── jig-domain-host            the hub: hosted runs, admit, prepare, start, relay, park or end
 ├── smith-host-domain          the agent, smith's: processes, spawn, channel, watchdog, cancel then kill
 └── <workspace>                the application's: prepare, save, deliver, release (section 7)
 ```
@@ -255,10 +255,10 @@ for its agents, and why a worker composes it only by its root's choice.
 
 ## 6. The hub
 
-`jig-host` hosts runs on a fixed number of slots: a worker's, or the
-engine's own, a configured number. It is the same hub in both places;
-what differs is its root and its capabilities. One hub, rather than one
-per shape, buys:
+`jig-domain-host` hosts runs on a fixed number of slots: a worker's, or
+the engine's own, a configured number. It is the same hub in both
+places; what differs is its root and its capabilities. One hub, rather
+than one per shape, buys:
 
 - **one lifecycle:** admission, fencing, relays, turns and answers kept
   until acknowledged, and cancel are written, reviewed and tested once,
@@ -520,12 +520,12 @@ reach past the grace.
     each of smith's channel facts is decoded into jig's typed activity
     (6.5), so the hub and jig's channel carry jig's activity, never
     smith's facts.
-- **Who links smith:** `jig-charter` (section 8), a client's decoding of
-  turns (`../client/domain/client.md`, section 10), and an application's
-  roots that compose smith's agent capability, with their protocol
-  layers' routing, which also runs smith's components where it composes
-  them. Never the hub, the core, or jig's channel's components, which
-  pass smith's bytes through (`../protocol/channel.md`, 6.1).
+- **Who links smith:** `jig-protocol-charter` (section 8), a client's
+  decoding of turns (`../client/domain/client.md`, section 10), and an
+  application's roots that compose smith's agent capability, with their
+  protocol layers' routing, which also runs smith's components where it
+  composes them. Never the hub, the core, or jig's channel's components,
+  which pass smith's bytes through (`../protocol/channel.md`, 6.1).
 
 ## 7. Workspaces
 
@@ -569,10 +569,10 @@ pushes to a saved-work branch. It is an example, not part of jig.
 The core decides a run's charter in its own terms (engine.md, 7.1). Its
 translation into smith's charter, version 2 (smith's `domain/run.md`,
 3.1; smith's `protocol/charter.md`, section 2), is in one place,
-`jig-charter`, a function of jig's that links smith, which the engine's
-protocol layer calls for every run, on workers and in the engine alike,
-and which reads every run's result back by the path of host tools' calls
-(6.8).
+`jig-protocol-charter`, a function of jig's that links smith, which the
+engine's protocol layer calls for every run, on workers and in the
+engine alike, and which reads every run's result back by the path of
+host tools' calls (6.8).
 
 - **Instructions and brief:** the charter's instructions, and the brief's
   sections rendered as smith's titled sections, in order, the
@@ -714,11 +714,12 @@ and which reads every run's result back by the path of host tools' calls
   it ever reached the engine, want a grace of their own.
 - **The hand-out's cost in the engine.** smith's payloads cross the hub
   as bytes (6.8), so for runs in the engine some are encoded and decoded
-  once more than they need to be: the charter, encoded by `jig-charter`
-  and decoded again for `smith-inline-agent`; a result, encoded for the
-  hub and read back by `jig-charter`. Each turn is encoded once, as the
-  core keeps it anyway. Whether that ever shows, and if so whether the
-  hub carries tokens its root resolves.
+  once more than they need to be: the charter, encoded by
+  `jig-protocol-charter` and decoded again for `smith-inline-agent`; a
+  result, encoded for the hub and read back by `jig-protocol-charter`.
+  Each turn is encoded once, as the core keeps it anyway. Whether that
+  ever shows, and if so whether the hub carries tokens its root
+  resolves.
 - **Workspaces in the engine.** Whether a deployment may give in-engine
   runs a workspace, for one person's machine, knowing it has no
   containment; the mechanism would allow it.

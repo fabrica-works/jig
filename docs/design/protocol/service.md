@@ -189,7 +189,7 @@ down:  released and door outputs → components → io submissions
 
 ```
 <application>-worker-service      iterate
-├── <application>-worker          the worker's root: jig-host, smith's host domain, its workspace
+├── <application>-worker          the worker's root: jig-domain-host, smith's host domain, its workspace
 └── the protocol layer
     ├── jig-protocol-worker-link  the link to the engine; smith's payloads carried as bytes (channel.md)
     ├── smith-host-protocol       one channel per agent process, over its pipes; grants filled into its start

@@ -51,7 +51,7 @@ are connectors.md. What is still open is listed in section 14.
 <application>-domain        the root: the journal, routing, translation, putting outputs together
 ├── core                    jig's core (engine.md)
 ├── <connector>…            the application's connectors (connectors.md)
-├── jig-host                jig's hub, for runs on the engine's slots, if the application runs agents there (hosts.md)
+├── jig-domain-host         jig's hub, for runs on the engine's slots, if the application runs agents there (hosts.md)
 ├── smith-inline-agent      the hub's agent in the engine, smith's: its domains in this process (hosts.md, 5.2)
 └── …                       the application's own child domains
 ```

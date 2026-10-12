@@ -518,7 +518,7 @@ which the client's protocol designs (`../../protocol/client.md`):
   both ends, from one schema, with their versions; each application's own
   wire crate does the same for its own.
 - **Turns** cross as their bytes, inside activity lines, and are decoded
-  by `jig-client-transcript` in the client's protocol layer.
+  by `jig-protocol-transcript` in the client's protocol layer.
 - **Sign-in exchanges** are each provider's, in the engine's protocol
   layer and the client's shell.
 - **The browser's client is served by the engine,** from its one origin.

@@ -23,7 +23,7 @@ smith, and builds what section 2's rows name it for.
 
 | Document | Built | Left |
 |---|---|---|
-| `README.md` | partly | 8: the store; 9: agents on workers over the workers' channel, smith's payloads by hand-out; 10: the client's wire and the native shell; 15: the crates' new names (jig-protocol); 9: `smith-inline-agent` in the engine; 10: the browser's shell; 14: versioning, open: not planned |
+| `README.md` | partly | 8: the store; 9: agents on workers over the workers' channel, smith's payloads by hand-out; 10: the client's wire and the native shell (jig-protocol); 9: `smith-inline-agent` in the engine; 10: the browser's shell; 14: versioning, open: not planned |
 | `domain/README.md` | partly | 5: a task's proposal that nobody may accept, refused to its proposer (jig-protocol) |
 | `domain/core.md` | yes | 12: open questions only |
 | `domain/tasks.md` | partly | 5.5: a budget held for its reserve and one most costly completion; 8.2, 8.3: the start carries the inbox, a message refused or left unread stays and wakes the task again; 9: a task's proposal that nobody may accept, refused (jig-protocol) |

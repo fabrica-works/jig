@@ -105,7 +105,7 @@ client's link is a client's reach of the engine, not a worker's link.
 ```
 engine     the root (../domain/root.md) and its protocol layer:
            the store, workers' channels, LLM calls and accounts, host tools, clients, connectors' systems
-worker     if any: the worker's root (jig-host, an agent capability, a workspace) and its protocol layer:
+worker     if any: the worker's root (jig-domain-host, an agent capability, a workspace) and its protocol layer:
            the link to the engine, smith's host half and its agent processes, the workspace's io
 client     the client root and view (../client/domain/) and its protocol layer:
            the connection to the engine, the small store, the shell
@@ -140,7 +140,7 @@ An application that mixes the last two has both.
 | `jig-protocol-worker-wire` | codecs | engine, worker | the channel's records and a worker's credential (`channel.md`) |
 | `jig-protocol-engine-workers` | component | engine | workers' channels: opening, authentication, liveness, translation to and from the hub's vocabulary (`channel.md`) |
 | `jig-protocol-worker-link` | component | worker | the link: dialling, liveness, the grace's clock, relays across channels, translation to and from the hub's vocabulary, smith's payloads carried as bytes (`channel.md`) |
-| `jig-charter` | translation | engine | the core's charter put into smith's, as smith's bytes, and a run's result read back (`../domain/hosts.md`, section 8) |
+| `jig-protocol-charter` | translation | engine | the core's charter put into smith's, as smith's bytes, and a run's result read back (`../domain/hosts.md`, section 8) |
 | `jig-protocol-tools` | translation | engine | the core's host tools: their schemas and descriptions, their calls decoded into the core's typed requests, their answers rendered as text (`channel.md`, 6.3) |
 | `jig-protocol-accounts` | translation, table | engine | the accounts child's vocabulary to skein's accounts driver's and back, and the access tokens lent (`llm.md`, section 5) |
 | `jig-protocol-config` | parsing | engine, worker | jig's part of a configuration, parsed and checked (`configuration.md`) |
@@ -148,11 +148,8 @@ An application that mixes the last two has both.
 | `jig-protocol-client-wire` | codecs | engine, client | the client's records: requests, answers, reads, subjects, documents, the small store's (`client.md`, section 3) |
 | `jig-protocol-engine-clients` | component | engine | clients' connections: exchanges, streams, sign-ins, translation to and from the core's vocabulary (`client.md`) |
 | `jig-protocol-client-link` | component | client | the connection to the engine: attempts, the stream, envelopes, the small store's records (`client.md`) |
-| `jig-client-transcript` | decoding | client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
+| `jig-protocol-transcript` | decoding | client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
 | `jig-shell-web`, `jig-shell-native` | shells | client | the browser's and the native shells (`client.md`, section 12) |
-
-Crates that exist keep their names here until they are renamed
-(`../README.md`, section 15); new crates take the names they will keep.
 
 Beside them, smith's components, by the agent capability:
 `smith-protocol-llm`, over skein's `skein-llm-connection`, in a process
@@ -168,9 +165,9 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
   hub's for the channel's sides, the core's (or a child's) for the
   engine's others. None depends on an application's crate, and none names
   a system.
-- **Which crates link smith.** Of jig's, only `jig-charter` and the
-  client's decoding of turns; `jig-protocol-tools` gives its schemas as
-  bytes the charter declares. The application links the rest where it
+- **Which crates link smith.** Of jig's, only `jig-protocol-charter` and
+  the client's decoding of turns; `jig-protocol-tools` gives its schemas
+  as bytes the charter declares. The application links the rest where it
   composes them: its root, the agent capability; its protocol layer,
   smith's components and smith's codecs.
 

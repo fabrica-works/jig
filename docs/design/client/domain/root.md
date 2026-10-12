@@ -14,16 +14,16 @@ in section 14.
 ## 1. In one page
 
 - **The application owns the client's root,** as it owns the engine's.
-  The root composes `jig-client` (client.md) with the client's side of
-  each of the application's connectors: a child domain that shows the
-  connector's values, and holds the application's own kinds of object,
-  families, with their cards, their pages and their requests. It alone
-  faces the client's protocol layer and the shell.
+  The root composes `jig-domain-client` (client.md) with the client's
+  side of each of the application's connectors: a child domain that
+  shows the connector's values, and holds the application's own kinds of
+  object, families, with their cards, their pages and their requests. It
+  alone faces the client's protocol layer and the shell.
 - **The root routes and translates; it never decides or orders.** What
   makes jig's promises to a party true (a request made once, shown as
   asked until durable, kept across a restart; the link judged once for
-  every child) is decided by `jig-client` or kept by the request table.
-  The root carries it.
+  every child) is decided by `jig-domain-client` or kept by the request
+  table. The root carries it.
 - **One shape** (section 3): every event routed to its child; every keyed
   request into the table; every read, watch and address out; the table's
   sends out after the small store is written.
@@ -43,15 +43,15 @@ in section 14.
   fills the slot.
 - **Both ways.** An application's page shows jig's objects (an
   incident's proposals, its task's chip) through slots of the same kind,
-  which `jig-client` and jig's view fill (section 7).
+  which `jig-domain-client` and jig's view fill (section 7).
 - **Copied, not invented.** `ops`'s client root is the reference every
   client root is copied from (section 12).
 
 ## 2. What a client root is
 
 ```
-<application>-client-domain     the client root: the request table, routing, translation
-├── jig-client                  jig's client domain (client.md)
+<application>-domain-client     the client root: the request table, routing, translation
+├── jig-domain-client           jig's client domain (client.md)
 ├── <connector>…                the client's side of each connector: its parts, its families and their pages
 └── …                           anything else of the application's, such as a settings page of its own
 ```
@@ -64,8 +64,9 @@ in section 14.
   requests to each. It is the union of its children's, wrapped: an
   exhaustive enum per direction, with one variant per child.
 - **Its children are siblings,** sharing no types (programming-model.md,
-  4.5). The application's children know nothing of `jig-client`, and
-  `jig-client` knows them only as parts' owners and as elsewhere.
+  4.5). The application's children know nothing of `jig-domain-client`,
+  and `jig-domain-client` knows them only as parts' owners and as
+  elsewhere.
 - **One child per connector.** Each connector of the engine's root has
   one child in the client root, its client side: it shows the
   connector's parts, and holds the families of objects that are the
@@ -121,19 +122,19 @@ iterate, after the step:
 
 The client's barrier, in skein-lib, generic over the requests it holds
 and the owner its asker names for each, as the journal is over the
-writes and outputs it holds
-(`../../README.md`, 6.2). jig cannot keep it: `jig-client` may not hold
-the application's requests, and its code may not be generic. It is not
-policy either: it is a data structure with a lifecycle, as a queue is.
-Its design is a section of skein's `lib.md`, written before its first
-jig consumer.
+writes and outputs it holds (`../../README.md`, 6.2). jig cannot keep
+it: `jig-domain-client` may not hold the application's requests, and its
+code may not be generic. It is not policy either: it is a data structure
+with a lifecycle, as a queue is. Its design is a section of skein's
+`lib.md`, written before its first jig consumer.
 
 - **What it does:**
   - **a key per request,** drawn from the client's seed, which is fresh at
     every start, and never reused for another;
   - **a scope per request:** an opaque number its asker gives, which
-    `jig-client` names: the party the request is for. Only the requests
-    of the party confirmed are ever sent (client.md, section 11);
+    `jig-domain-client` names: the party the request is for. Only the
+    requests of the party confirmed are ever sent (client.md,
+    section 11);
   - **an owner per request:** a value of the root's own, which the
     table holds, hands back with the request's progress and its final
     answer, and never reads. It is an enum of the root's: one variant
@@ -169,7 +170,8 @@ jig consumer.
     owner of its scope, parked until a party is confirmed. A kept
     request has no card to show it: when it is retired, answered or
     unknown, the root hands its answer to no child, and tells
-    `jig-client` one of that scope's kept requests is gone (section 8);
+    `jig-domain-client` one of that scope's kept requests is gone
+    (section 8);
   - **progress for display:** in flight, retrying, parked, or unknown,
     handed to the request's owner as it changes, so its card can say so;
   - **bounded:** a limit on requests held, and on bytes; a request past
@@ -177,8 +179,8 @@ jig consumer.
   - **its worst case,** priced like every lib container.
 - **What it does not do:** read a request, an answer or an owner.
   Whoever owns the bytes checks their bounds before asking. Judging the
-  link, and which party is confirmed, are `jig-client`'s (client.md,
-  sections 8 and 11); the root passes both on.
+  link, and which party is confirmed, are `jig-domain-client`'s
+  (client.md, sections 8 and 11); the root passes both on.
 - **It keeps to the subset,** as the journal does: generic types and
   lib's own containers, no traits, no closures.
 
@@ -196,7 +198,7 @@ jig consumer.
 - **Acts by owner.** The view decodes a person's act into the root's
   action, already wrapped with the owner of the node acted on
   (view.md, section 5); the root hands it to that child.
-- **The link to everyone.** `jig-client` judges the link, from the
+- **The link to everyone.** `jig-domain-client` judges the link, from the
   frame's watch (client.md, 8.2); the root passes each change to every
   other child, which opens its watches while it is live and reopens them
   when it comes back, and to the request table, which parks or resumes.
@@ -204,8 +206,8 @@ jig consumer.
 - **Behind is the page's owner's.** Whoever owns the page at the address
   says whether its watches are behind; the frame shows it.
 - **The frame to everyone who asks.** A child that needs to know who is
-  signed in, or which project the person is in, asks `jig-client` through
-  the root, as a hand-off answered within the step.
+  signed in, or which project the person is in, asks `jig-domain-client`
+  through the root, as a hand-off answered within the step.
 
 ## 6. Parts and slots
 
@@ -231,15 +233,15 @@ How jig's pages show an application's values.
 - **A slot** is where one of jig's pages or cards shows a part. The page
   or card names it, and jig's view leaves an empty node for it
   (view.md, section 4).
-- **Showing a part.** When a page of `jig-client` shows a part, it asks
-  the root, with the page's generation and the part's scope: the project
-  it shows in, or the deployment. The root routes it to the client side
-  of the part's connector, which holds it in its own working set, reads
-  or watches its value through the application's own documents, naming
-  that scope (contract.md, section 5 and 7.2), and forgets it when told
-  the page's parts have left. A connector, a resource or a kind needs no
-  document: its words are the owner's view's, from its number or its
-  path.
+- **Showing a part.** When a page of `jig-domain-client` shows a part,
+  it asks the root, with the page's generation and the part's scope: the
+  project it shows in, or the deployment. The root routes it to the
+  client side of the part's connector, which holds it in its own working
+  set, reads or watches its value through the application's own
+  documents, naming that scope (contract.md, section 5 and 7.2), and
+  forgets it when told the page's parts have left. A connector, a
+  resource or a kind needs no document: its words are the owner's
+  view's, from its number or its path.
 - **Filling a slot.** The view root asks the owner's view to build each
   slot's nodes, from the owner's state, and jig's view splices them in
   (view.md, section 4). A part not yet read shows as loading; a part its
@@ -259,7 +261,7 @@ How jig's pages show an application's values.
   part, its request goes to the connector it concerns, and what that
   changes in the core is a request of jig's, made by the engine's root on
   the party's behalf (`../../domain/people.md`, 5.1). No request of
-  `jig-client`'s carries an application's value.
+  `jig-domain-client`'s carries an application's value.
 - **A connector not shown is a build error.** The root's match on a
   part's connector is exhaustive, as the engine's root's match on
   connectors is (`../../README.md`, section 4).
@@ -280,13 +282,13 @@ How jig's pages show an application's values.
     naming its scope, a project or the deployment, in which the engine
     admits the party and its connector judges what they may see
     (contract.md, 7.2).
-- **An application's page shows jig's objects** through slots of the same
-  kind, the other way round. An incident's page shows its task's chip,
-  the proposals waiting in its subtree and its plan: it names each by
-  jig's key, the root routes the request to `jig-client`, which holds the
-  object in its working set as shown elsewhere and watches it, and jig's
-  view fills the slot with jig's card. One object, one card, wherever it
-  shows (objects.md, section 2).
+- **An application's page shows jig's objects** through slots of the
+  same kind, the other way round. An incident's page shows its task's
+  chip, the proposals waiting in its subtree and its plan: it names each
+  by jig's key, the root routes the request to `jig-domain-client`,
+  which holds the object in its working set as shown elsewhere and
+  watches it, and jig's view fills the slot with jig's card. One object,
+  one card, wherever it shows (objects.md, section 2).
 - **A family follows jig's rules for what it shows:** nothing shown done
   before its answer is durable; acts naming the revision they saw;
   provisional values marked. Its world checks it, with jig's referee
@@ -305,12 +307,12 @@ How jig's pages show an application's values.
   the table's to the table, each request with the kept owner of its
   scope (section 4), before the first step.
 - **Whose work was kept.** Once the table's records are restored, the
-  root tells `jig-client` each scope they name, once, with its count of
-  requests, read from the records' own scopes; and whenever the table
-  retires a kept request, answered or unknown past the retention, that
-  one of that scope's is gone. Whether to warn of someone else's work is
-  `jig-client`'s to decide (client.md, section 11); the root passes on
-  what the table kept, and decides nothing.
+  root tells `jig-domain-client` each scope they name, once, with its
+  count of requests, read from the records' own scopes; and whenever the
+  table retires a kept request, answered or unknown past the retention,
+  that one of that scope's is gone. Whether to warn of someone else's
+  work is `jig-domain-client`'s to decide (client.md, section 11); the
+  root passes on what the table kept, and decides nothing.
 
 ## 9. The view, composed
 
@@ -342,9 +344,9 @@ A service is a party with no view and no person (`../../domain/people.md`,
 section 3): a deploy pipeline that sets goals, a monitor that answers a
 person task addressed to its role.
 
-- **Its root** composes `jig-client` and the request table with the
-  service's own logic, and no view. It asks by value (client.md, 4.1),
-  reads and watches as any client does, and opens no page.
+- **Its root** composes `jig-domain-client` and the request table with
+  the service's own logic, and no view. It asks by value (client.md,
+  4.1), reads and watches as any client does, and opens no page.
 - **Its small store** is a file, written and synced before any request
   of the same step leaves, so a restart of the service sends what was
   pending again with its keys.
@@ -359,19 +361,19 @@ written to be copied, commented as such. Its crate has one module per
 part of this document:
 
 ```
-<application>-client-domain/src/
+<application>-domain-client/src/
 ├── lib.rs          the tree, re-exports
 ├── boundary.rs     the root's vocabulary: events in, requests out, one variant per child
 ├── address.rs      the root's addresses: jig's and each connector side's
 ├── domain.rs       Domain, step, fire, iterate's part: the one shape (section 3)
 ├── route.rs        which child each event, act and hand-off goes to (section 5)
-├── parts.rs        parts to their connectors' sides, jig's objects to jig-client (sections 6 and 7)
+├── parts.rs        parts to their connectors' sides, jig's objects to jig-domain-client (sections 6 and 7)
 ├── store.rs        the small store's records, the children's wrapped (section 8)
 ├── limits.rs       the children's limits and the table's, and their sum
 └── tests.rs
 ```
 
-Its view root, `<application>-client-view`, has the same shape for the
+Its view root, `<application>-view`, has the same shape for the
 view (view.md, section 4). A new application copies both, replaces
 `ops`'s connectors' sides with its own, and lets the compiler list the
 arms to fill.

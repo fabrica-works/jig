@@ -462,9 +462,10 @@ and the conformance world crashes the application at every commit.
   An application may mix the second and third shapes: a charter says
   which hosts may run it.
 - **One host for every shape that runs agents** (`domain/hosts.md`):
-  - `jig-host`, the hub: slots, admission, fenced attempts, relays,
-    turns and the answer kept until acknowledged, cancel; composed by the
-    engine's root for its own slots, and by a worker's root;
+  - `jig-domain-host`, the hub: slots, admission, fenced attempts,
+    relays, turns and the answer kept until acknowledged, cancel;
+    composed by the engine's root for its own slots, and by a worker's
+    root;
   - its agent, a capability of two kinds, both smith's, speaking smith's
     parent face: agent processes, supervised through
     `smith-host-domain`, on a worker; `smith-inline-agent`, smith's
@@ -630,25 +631,16 @@ section 5). What remains here:
   own name: `jig-ops-domain-*`, `jig-ops-protocol-*`, `jig-ops-view`. Its
   service (its `iterate` and its protocol layer's routing) and its binary
   carry its name alone: `jig-ops-service`, `jig-ops`.
-- **Renamed from the names as built.** The design's documents use the
-  names as built until the rename lands, and new crates take their names
-  at once:
+- **jig's crates,** by layer, and where each is designed:
 
-| As built | Renamed |
+| Layer | Crates |
 |---|---|
-| `jig-core` | `jig-domain-core` |
-| `jig-core-accounts`, `-authority`, `-brief`, `-fleet`, `-notes`, `-people`, `-tasks`, `-views` | `jig-domain-accounts`, `-authority`, `-brief`, `-fleet`, `-notes`, `-people`, `-tasks`, `-views` |
-| `jig-host` | `jig-domain-host` |
-| `jig-client` | `jig-domain-client` |
-| `jig-client-view` | `jig-view` |
-| `jig-charter` | `jig-protocol-charter` |
-| `jig-client-transcript` | `jig-protocol-transcript` |
-| `jig-test-client-domain` | `jig-test-domain-client` |
-| `jig-test-client-view` | `jig-test-view` |
-| `jig-ops-client-domain` | `jig-ops-domain-client` |
-| `jig-ops-client-view` | `jig-ops-view` |
-| `jig-ops-connectors` | `jig-ops-domain-connectors` |
+| a domain's step code | the core, `jig-domain-core`, and its children `jig-domain-accounts`, `-authority`, `-brief`, `-fleet`, `-notes`, `-people`, `-tasks`, `-views` (`domain/engine.md`, section 3); the hub, `jig-domain-host` (`domain/hosts.md`, section 6); the client's domain, `jig-domain-client` (`client/domain/client.md`) |
+| the protocol layer's | `jig-protocol-charter`, `jig-protocol-transcript`, and the codecs, components and parsing `protocol/README.md`, section 5 lists |
+| the client's view | `jig-view` (`client/domain/view.md`) |
+| the client's shells | `jig-shell-native`, `jig-shell-web` (`protocol/client.md`, section 12) |
 
-  Every other crate keeps its name: the test kits, the worlds, `ops`'s
-  domains, `jig-test-domain`, the reference root's test application, and
+- **Outside the layers,** a crate is named by its kind: the test kits
+  (`jig-test-domain`, `jig-test-domain-client`, `jig-test-view` and the
+  rest), the worlds, the reference root's test application, and
   `jig-boundary`, the check of the crate graph.

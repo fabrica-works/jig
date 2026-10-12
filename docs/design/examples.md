@@ -48,8 +48,8 @@ What is still open is listed in section 11.
 examples/ops/domain                   jig-ops-domain                   the engine's root: the core and two connectors, routed
 examples/ops/domain-observability     jig-ops-domain-observability     the observability connector
 examples/ops/domain-infrastructure    jig-ops-domain-infrastructure    the infrastructure connector
-examples/ops/client-domain            jig-ops-client-domain            the client's root: jig's client domain, incidents, environments
-examples/ops/client-view              jig-ops-client-view              the view root: jig's view, and incidents' and environments'
+examples/ops/domain-client            jig-ops-domain-client            the client's root: jig's client domain, incidents, environments
+examples/ops/view                     jig-ops-view                     the view root: jig's view, and incidents' and environments'
 testing/jig-ops-fake-production       jig-ops-fake-production          the fake production: services, quotas, logs, metrics
 tests/ops                             jig-ops-world                    its worlds, on jig's conformance world
 ```
@@ -154,7 +154,7 @@ jig-ops-domain                    the engine's root
 ├── core                          jig's core
 ├── observability                 jig-ops-domain-observability
 ├── infrastructure                jig-ops-domain-infrastructure
-├── host                          jig-host: hosted runs on the engine's slots (domain/hosts.md, section 6)
+├── host                          jig-domain-host: hosted runs on the engine's slots (domain/hosts.md, section 6)
 └── agent                         smith-inline-agent: smith's domains, one per run in flight (domain/hosts.md, 5.2)
 ```
 

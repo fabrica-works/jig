@@ -345,10 +345,10 @@ restarts, they start empty.
   pending stays in the small store until the client is updated.
 - **Someone else's work:** the small store kept another party's pending
   requests (client.md, section 11): the page says so, and keeps them
-  hidden. It shows while `jig-client` still counts kept requests of a
-  party other than the one signed in, and goes when that party signs in
-  again, or once each of their requests is retired as unknown, past the
-  engine's retention.
+  hidden. It shows while `jig-domain-client` still counts kept requests
+  of a party other than the one signed in, and goes when that party
+  signs in again, or once each of their requests is retired as unknown,
+  past the engine's retention.
 
 ## 9. What an application adds
 

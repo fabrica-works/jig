@@ -1,14 +1,14 @@
 # The client domain
 
-Provisional, 2026-10-09, revised 2026-10-12. `jig-client`: what a party's
-client knows of the engine's work, and what it does with it. It is the
-client's counterpart of the engine's core: a child of the application's
-client root, holding jig's part of the client: the frame and the link,
-jig's pages and the objects they show, the person's drafts and
-confirmations, and what a page reads and watches. How the root composes
-it with the application's own objects is root.md; what it shows is
-pages.md and objects.md; what it asks of the engine is contract.md. What
-is still open is listed in section 18.
+Provisional, 2026-10-09, revised 2026-10-12. `jig-domain-client`: what a
+party's client knows of the engine's work, and what it does with it. It
+is the client's counterpart of the engine's core: a child of the
+application's client root, holding jig's part of the client: the frame
+and the link, jig's pages and the objects they show, the person's drafts
+and confirmations, and what a page reads and watches. How the root
+composes it with the application's own objects is root.md; what it shows
+is pages.md and objects.md; what it asks of the engine is contract.md.
+What is still open is listed in section 18.
 
 ## 1. In one page
 
@@ -56,7 +56,7 @@ is still open is listed in section 18.
 ```
 person ⇄ shell ⇄ view ┐                          ┌ protocol ⇄ engine
                       └──── the client root ─────┘
-                            ├── jig-client          the frame, the link, jig's pages and objects
+                            ├── jig-domain-client   the frame, the link, jig's pages and objects
                             ├── <connector>…        each connector's side: its parts, its families
                             └── the request table   keyed requests, until durable
 ```
@@ -77,7 +77,7 @@ person ⇄ shell ⇄ view ┐                          ┌ protocol ⇄ engine
 
 ## 3. Structure
 
-`jig-client` keeps, each part in its own module:
+`jig-domain-client` keeps, each part in its own module:
 
 - **the frame** (pages.md, section 2): who is signed in, the projects
   they hold roles in, what needs them, the engine's versions and the
@@ -527,7 +527,7 @@ the client's protocol designs (`../../protocol/client.md`):
   decoded into its owner's vocabulary; again, for busy or not ready;
   lost, when no answer came; signed out (contract.md, section 4).
 - **Documents decoded whole,** into the domain's types, before they reach
-  it (programming-model.md, 4.4); turns through `jig-client-transcript`
+  it (programming-model.md, 4.4); turns through `jig-protocol-transcript`
   (section 10).
 - **Watches kept alive,** a delivery at a time, with a heartbeat when
   nothing changes.
@@ -539,15 +539,15 @@ the client's protocol designs (`../../protocol/client.md`):
 
 ## 17. The world
 
-`jig-client` has its world, with the engine scripted and the person
-acting on the view (testing.md, section 4), and joins the engine's
-domain in the joint world (testing.md, section 5). Its stories: signing
-in and starting a chat; a held chat released; a proposal accepted in the
-inbox while its chat shows it; two tabs deciding one thing; a reload
-with requests pending; the engine restarting under a pending request; a
-watch dropped and the page behind; a page left with reads in flight; a
-draft kept across a reload; a goal beyond the person's allotment,
-proposed as the confirmation said it would be.
+`jig-domain-client` has its world, with the engine scripted and the
+person acting on the view (testing.md, section 4), and joins the
+engine's domain in the joint world (testing.md, section 5). Its stories:
+signing in and starting a chat; a held chat released; a proposal
+accepted in the inbox while its chat shows it; two tabs deciding one
+thing; a reload with requests pending; the engine restarting under a
+pending request; a watch dropped and the page behind; a page left with
+reads in flight; a draft kept across a reload; a goal beyond the
+person's allotment, proposed as the confirmation said it would be.
 
 Its referee: nothing is shown as done before the engine made it durable;
 every request the person made is made once, whatever the faults; no word

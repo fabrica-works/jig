@@ -36,18 +36,18 @@ document uses for its examples, with temper where a second one helps.
 
 ```
 an application's client
-<application>-client-domain     the client root: the application's (root.md)
-├── jig-client                  jig's client domain: the frame, the link, jig's pages and objects (client.md)
+<application>-domain-client     the client root: the application's (root.md)
+├── jig-domain-client           jig's client domain: the frame, the link, jig's pages and objects (client.md)
 └── <connector>…                each connector's client side: its parts, its families and their pages
-<application>-client-view       the view root: jig's view and the application's, its slots filled (view.md)
-└── jig-client-view             jig's view: the tree, the builder, the diff, words, jig's pages and cards
+<application>-view              the view root: jig's view and the application's, its slots filled (view.md)
+└── jig-view                    jig's view: the tree, the builder, the diff, words, jig's pages and cards
 
 skein-lib's request table       keyed requests: the client root's only way out for them (root.md, section 4)
 
 below the domain, with the client's protocol layer
 jig-protocol-client-wire        jig's documents, encoded, for both ends (contract.md, section 10)
 jig-protocol-client-link        the connection to the engine: exchanges, the stream, envelopes (../../protocol/client.md)
-jig-client-transcript           turns decoded with smith's transcript crate (client.md, section 10)
+jig-protocol-transcript         turns decoded with smith's transcript crate (client.md, section 10)
 jig-shell-web                   the browser's shell (view.md, section 11)
 jig-shell-native                a shell on skein's HTTP client, for Linux and the worlds
 
@@ -57,11 +57,11 @@ testing/jig-scripted-engine     the engine as the client's world plays it (testi
 tests/client                    the client's world, and the joint world (testing.md, sections 4 and 5)
 ```
 
-- **The crate graph is the role graph,** as in the engine. `jig-client`
-  depends on skein-lib alone. `jig-client-view` depends on skein-lib and
-  `jig-client`. Neither links smith: only `jig-client-transcript`, below
-  the domain, does, and it is the client's only use of smith
-  (`../../README.md`, section 9).
+- **The crate graph is the role graph,** as in the engine.
+  `jig-domain-client` depends on skein-lib alone. `jig-view` depends on
+  skein-lib and `jig-domain-client`. Neither links smith: only
+  `jig-protocol-transcript`, below the domain, does, and it is the
+  client's only use of smith (`../../README.md`, section 9).
 - **The application owns the roots,** of its domain and of its view, as
   it owns the engine's (root.md). Nothing in jig's client knows an
   application's types.
@@ -106,7 +106,7 @@ tests/client                    the client's world, and the joint world (testing
 | chip | a task named in passing: its number, its title, its phase, kept live |
 | client side | the child of the client root that shows one connector's values, and holds its families (root.md, section 2) |
 | family | an application's kind of object, with its own card and pages (root.md, section 7) |
-| owner | the child that keeps a value, or that asked for a keyed request: `jig-client`, or a connector's client side; never a project's role, which is always "a project's owner" |
+| owner | the child that keeps a value, or that asked for a keyed request: `jig-domain-client`, or a connector's client side; never a project's role, which is always "a project's owner" |
 | part | a value of an application's that a jig document names by reference: a connector's name, a resource, a kind, a panel, an effect's description (root.md, section 6) |
 | slot | the place a jig page or card leaves for a part, filled by its owner |
 | document | a typed value the engine gives a client about one subject, its owner's alone (contract.md, section 5) |
@@ -114,7 +114,7 @@ tests/client                    the client's world, and the joint world (testing
 | read | a request for a document, or a page of a list; one answer |
 | watch | a live view of a subject: its current document, delivered whenever it has changed, one delivery at a time (contract.md, section 7) |
 | keyed request | a party's request: keyed by the client, pending until its answer is durable |
-| intent | a request `jig-client` asked the root to send, kept so its card shows it being decided (client.md, section 6) |
+| intent | a request `jig-domain-client` asked the root to send, kept so its card shows it being decided (client.md, section 6) |
 | generation | the number of the page at the address, which what a page asked for names, so what comes for an old page is dropped (client.md, section 5) |
 | request table | skein-lib's container of keyed requests: the client root's only way out for them (root.md, section 4) |
 | link | whether the client reaches the engine: starting, live, behind or offline (client.md, section 8) |

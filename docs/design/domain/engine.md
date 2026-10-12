@@ -50,7 +50,7 @@ is still open is listed in section 16.
 application root        the journal, routing, translation; faces the protocol layer
 ├── core                tasks, authority, people, fleet, accounts, brief, notes, views
 ├── <connectors>        the application's
-├── jig-host            jig's hub, for runs on the engine's own slots, if the application runs agents there (hosts.md)
+├── jig-domain-host     jig's hub, for runs on the engine's own slots, if the application runs agents there (hosts.md)
 ├── smith-inline-agent  the hub's agent capability in the engine: smith's domains in this process, with no workspace
 └── …                   the application's own children
 ```
@@ -73,15 +73,15 @@ application root        the journal, routing, translation; faces the protocol la
 ## 3. Structure
 
 ```
-jig-core                    the core: routing among its children, runs, calls, the restart script, numbers
-├── jig-core-tasks          the hub: tasks, batches, lifecycle, holds, inboxes, wakes, proposals
-├── jig-core-authority      authority's order and checks; the rules and the projects' policies
-├── jig-core-people         parties: identities, sign-ins, roles, requests, inboxes
-├── jig-core-fleet          hosts: slots, placement, attempts, relaying
-├── jig-core-accounts       LLM accounts and an application's credentials: usable, granted
-├── jig-core-brief          a run's brief, from typed sections and connectors' sized ones, within a budget
-├── jig-core-notes          notes: scopes, entries, indexes
-└── jig-core-views          parties' watches, level-triggered
+jig-domain-core             the core: routing among its children, runs, calls, the restart script, numbers
+├── jig-domain-tasks        the hub: tasks, batches, lifecycle, holds, inboxes, wakes, proposals
+├── jig-domain-authority    authority's order and checks; the rules and the projects' policies
+├── jig-domain-people       parties: identities, sign-ins, roles, requests, inboxes
+├── jig-domain-fleet        hosts: slots, placement, attempts, relaying
+├── jig-domain-accounts     LLM accounts and an application's credentials: usable, granted
+├── jig-domain-brief        a run's brief, from typed sections and connectors' sized ones, within a budget
+├── jig-domain-notes        notes: scopes, entries, indexes
+└── jig-domain-views        parties' watches, level-triggered
 ```
 
 The tree follows programming-model.md, 4.5: each child domain has its

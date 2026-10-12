@@ -111,10 +111,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   jig's but `skein-codec`.
 - **Translation at each end:** `jig-protocol-engine-clients` between the
   wire and the core's vocabulary; `jig-protocol-client-link` between the
-  wire and `jig-client`'s; the application's protocol layer between its
-  wire and its connectors' and client sides' vocabularies. Each is a
-  module of small total functions, exhaustive both ways, as the channel's
-  are (`channel.md`, section 3).
+  wire and `jig-domain-client`'s; the application's protocol layer
+  between its wire and its connectors' and client sides' vocabularies.
+  Each is a module of small total functions, exhaustive both ways, as
+  the channel's are (`channel.md`, section 3).
 - **Documents are decoded whole,** into the client's types, and checked
   against the client's limits before they reach the domain: a document
   past its bytes, rows or texts is refused at decoding, as too large,
@@ -122,9 +122,9 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   wire's generated worst cases price each document at the client's
   limits.
 - **Turns cross as their bytes,** smith's, inside the documents that
-  carry them, and are decoded by `jig-client-transcript` in the client's
-  protocol layer (`../client/domain/client.md`, section 10); a turn
-  that does not decode crosses up as such, never dropped.
+  carry them, and are decoded by `jig-protocol-transcript` in the
+  client's protocol layer (`../client/domain/client.md`, section 10); a
+  turn that does not decode crosses up as such, never dropped.
 - **No time crosses, only walls.** Documents carry wall times, which the
   store keeps (`../client/domain/contract.md`, 5.3); durations (a
   retention, a heartbeat) cross as durations.
