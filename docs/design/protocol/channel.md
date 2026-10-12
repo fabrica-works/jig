@@ -432,6 +432,11 @@ holds, and neither of its components reads them.
   the table the grant names, through its protocol layer. A grant whose
   generation the table no longer holds is left out as it is encoded: a
   newer one follows it.
+- **A value crosses in its parts:** an LLM account's as its access token
+  and its account's id, empty where its provider names none, both
+  secret (`llm.md`, 5.3); an application's credential as one secret. The
+  worker's protocol layer puts a value in the form its agent capability
+  takes as it hands it over, never the engine (`llm.md`, 5.3).
 - **The worker's side takes the values out** as it decodes, into the
   worker's table of the same owner, by number, at most the two newest
   generations of each, and the hub hears the names. The worker's

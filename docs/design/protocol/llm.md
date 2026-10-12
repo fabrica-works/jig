@@ -201,7 +201,18 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 
 - **A grant's value** is the access token and, where the account's
   provider names one (a ChatGPT account does), the account's id, from
-  its configuration or its handed-in file; the table holds both.
+  its configuration or its handed-in file: what skein's LLM client
+  takes as a credential. The table holds the two apart, both secret, and
+  so does jig's channel (`channel.md`, section 8).
+- **Put in its taker's form where it is handed over.** The protocol
+  layer that hands a value to an agent capability puts it in the form
+  that capability takes: smith's LLM component takes the two as they
+  are; smith's host half takes them as one string for its agent
+  processes (smith's `protocol/channel.md`, section 6), as smith's agent
+  service reads it: the id's length in two bytes, big-endian, then the
+  id and the token. On a worker that is the worker's protocol layer,
+  which knows the capability it composes; the engine does not, so it
+  never sends a value in an agent's form.
 - **The access tokens lent,** by account, at most the two newest
   generations of each, with their expiry on the engine's clock, held by
   `jig-protocol-accounts`.
@@ -252,7 +263,7 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   from the accounts' table as it encodes an assignment or a grant record,
   and the worker's protocol layer hands it to smith's host half for its
   agent processes, or to its own LLM component's table when it composes
-  `smith-inline-agent` (`channel.md`, section 8).
+  `smith-inline-agent`, each in its form (5.3; `channel.md`, section 8).
 - **Pushed to every live attempt** whose account it is, when a new
   generation is lent, and sent again to each attempt a worker keeps after
   its hello, or that the fleet adopts (`../domain/engine.md`, sections 8
