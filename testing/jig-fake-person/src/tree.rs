@@ -2,7 +2,7 @@
 //! The preorder subtree sizes scope queries (client/domain/view.md, section 3).
 use crate::{Face, Find, Found, Target};
 use alloc::vec::Vec;
-use jig_client_view::{Act, Node, NodeId, Role, State, Tree};
+use jig_view::{Act, Node, NodeId, Role, State, Tree};
 
 /// An immediate face over the last tree shown to the person.
 #[derive(Debug)]
@@ -45,7 +45,7 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
 fn text(node: &Node) -> Vec<u8> {
     node.text.as_slice().iter().flat_map(|run| run.text.iter().copied()).collect()
 }
-fn exactly_named(nodes: &[Node], index: usize, role: jig_client_view::Role, name: &[u8]) -> bool {
+fn exactly_named(nodes: &[Node], index: usize, role: jig_view::Role, name: &[u8]) -> bool {
     let node = &nodes[index];
     if node.role != role {
         return false;

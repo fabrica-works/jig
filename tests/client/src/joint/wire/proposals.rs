@@ -2,7 +2,7 @@
 //! Source identity, current holder and optional funding observations remain
 //! independent of immutable history and application part scope.
 use super::{chips, history, offers, owner, results};
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::documents;
 
 #[must_use]

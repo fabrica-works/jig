@@ -1,7 +1,7 @@
 use super::*;
 use crate::payload::fits;
 use core::mem::size_of;
-use jig_client::contract::{
+use jig_domain_client::contract::{
     Chip, ChipPhase, Executor, FieldRule, OwnerExecutor, OwnerPart, OwnerPartKey, OwnerPartKind, PersonAddress, Phase,
     ProposalKey, Proposer, TaskContractDocument, Text, VerdictChoice,
 };
@@ -12,7 +12,7 @@ fn chip() -> Chip {
     dependencies.push(u64::MAX).unwrap();
     Chip {
         task: u64::MAX,
-        title: jig_client::contract::DocumentText::complete(Text::new(copy_of(b"raw"), 3).unwrap()),
+        title: jig_domain_client::contract::DocumentText::complete(Text::new(copy_of(b"raw"), 3).unwrap()),
         executor: Executor::Agent { charter: u32::MAX },
         phase: Phase::Waiting,
         details: Box::new(ChipPhase::Waiting { dependencies, hold: None }),

@@ -834,7 +834,7 @@ pub(crate) enum Decoded {
     Effect { effect: infrastructure::Effect, reason: Option<Box<[u8]>> },
 }
 
-pub(crate) fn tools(timeout: skein_lib::Duration) -> Box<[jig_charter::Tool]> {
+pub(crate) fn tools(timeout: skein_lib::Duration) -> Box<[jig_protocol_charter::Tool]> {
     let names: &[&[u8]] = &[
         b"delegate",
         b"message",
@@ -859,14 +859,14 @@ pub(crate) fn tools(timeout: skein_lib::Duration) -> Box<[jig_charter::Tool]> {
     let mut tools = List::with_capacity(u32::try_from(names.len()).expect("finite tool registry"));
     for name in names {
         tools
-            .push(jig_charter::Tool {
+            .push(jig_protocol_charter::Tool {
                 name: Box::from(*name),
                 description: Box::from(*name),
                 schema: Box::from(&br#"{"type":"object","additionalProperties":true}"#[..]),
                 effect: if name.starts_with(b"read_") {
-                    jig_charter::ToolEffect::Read
+                    jig_protocol_charter::ToolEffect::Read
                 } else {
-                    jig_charter::ToolEffect::Write
+                    jig_protocol_charter::ToolEffect::Write
                 },
                 timeout,
             })

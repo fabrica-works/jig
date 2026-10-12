@@ -2,7 +2,7 @@
 use super::*;
 use jig_fake_person::{Face, Found, TreeFace};
 
-fn confirm(world: &World<Test, Joint>, tab: crate::ClientId) -> jig_client_view::NodeId {
+fn confirm(world: &World<Test, Joint>, tab: crate::ClientId) -> jig_view::NodeId {
     match TreeFace::new(world.tree(tab)).find(&Find::exactly_named(Role::Button, b"Confirm")) {
         Found::Node(node) => node,
         Found::Absent | Found::Pending => panic!("both real confirmations must be ready"),

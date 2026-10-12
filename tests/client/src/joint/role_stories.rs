@@ -4,7 +4,7 @@ use super::*;
 use jig_fake_parties::{Act, Party, Role as PartyRole};
 use jig_fake_workers::Call;
 
-fn receiving_limits() -> jig_test_client_domain::Limits {
+fn receiving_limits() -> jig_test_domain_client::Limits {
     let mut limits = crate::test::limits();
     limits.jig.text = 128;
     limits.jig.rows = 2;
@@ -16,17 +16,17 @@ fn receiving_limits() -> jig_test_client_domain::Limits {
     limits
 }
 
-fn choice_limits() -> jig_test_client_domain::Limits {
+fn choice_limits() -> jig_test_domain_client::Limits {
     let mut limits = receiving_limits();
     limits.jig.text = 128;
     limits.first.text = 128;
     limits
 }
-fn choice_client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+fn choice_client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
     crate::test::new(&choice_limits(), seed)
 }
 
-fn client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
     crate::test::new(&receiving_limits(), seed)
 }
 
@@ -56,7 +56,7 @@ fn configured_with_bounds(
     scripts: Vec<Box<[Script]>>,
     slots: u32,
     configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
-    receiving: jig_test_client_domain::Limits,
+    receiving: jig_test_domain_client::Limits,
 ) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
     owner.core.fleet.slots = slots;
@@ -132,7 +132,7 @@ fn configured_with_bounds(
         clock(Time::ZERO),
         jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles { project: 1, holdings })),
     );
-    let codec = jig_client_transcript::Limits {
+    let codec = jig_protocol_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 8, blocks: 8, text: 128 },
@@ -156,7 +156,7 @@ fn configured_with_bounds(
     World::new(Settings { seed, ..Settings::default() }, front)
 }
 
-fn start(words: &[u8]) -> Vec<Step<jig_test_client_domain::Address>> {
+fn start(words: &[u8]) -> Vec<Step<jig_test_domain_client::Address>> {
     let within = Duration::from_secs(1);
     vec![
         Step::See { find: Find::named(Role::Button, b"Sign in with Test"), within },
@@ -243,9 +243,9 @@ fn a_person_answers_a_choice_between_two_reports() {
     world.person(
         member,
         vec![Step::Go {
-            address: jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
+            address: jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
                 project: 1,
-                section: jig_client::address::ProjectSection::Overview,
+                section: jig_domain_client::address::ProjectSection::Overview,
             }),
         }],
     );

@@ -1,7 +1,7 @@
 use super::{bytes, fits, worst_case};
 use crate::{Bounds, payload};
 use core::mem::size_of;
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8]) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 8).expect("fixture text fits"), cut: true }

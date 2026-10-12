@@ -1,21 +1,21 @@
 //! P and Q's supplied owner facts and public-tree observations.
 #![allow(clippy::wildcard_imports, reason = "finite story fixtures enumerate the complete client vocabulary")]
 use super::{Document, Ops, OpsScript, Scripted, Subject};
-use jig_client::{
-    address::{Address as JigAddress, TaskSection},
-    contract::*,
-};
-use jig_client_view::{Owner, Role, Tree as ViewTree};
 use jig_client_world::{
     Settings, World,
     harness::{CardKey, CardSeen, Seen},
     observe,
     stories::{frame, party, proposal, task, text},
 };
+use jig_domain_client::{
+    address::{Address as JigAddress, TaskSection},
+    contract::*,
+};
 use jig_fake_person::{Face, Find, Found, TreeFace};
 use jig_ops_client_domain::{Address, infrastructure as infra, observability as obs};
 use jig_ops_connectors::{Connector, number};
 use jig_scripted_engine::{Bounds, Script, Truth};
+use jig_view::{Owner, Role, Tree as ViewTree};
 use skein_lib::{Duration, Wall};
 /// The same independent shell world used by the reference client.
 pub type ClientWorld = World<Ops, Scripted>;

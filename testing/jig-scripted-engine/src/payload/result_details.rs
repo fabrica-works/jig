@@ -1,7 +1,7 @@
 //! Whole result metadata pricing (client/domain/contract.md, 5.3).
 use super::{Payload, sum};
 use crate::Bounds;
-use jig_client::contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, ResultDetails};
+use jig_domain_client::contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, ResultDetails};
 
 impl Payload for OwnerRequester {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {

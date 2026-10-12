@@ -1,13 +1,13 @@
 //! P and Q use the composed public client under the common shell referee.
-use jig_client::{
+use jig_client_world::{Until, harness::App};
+use jig_domain_client::{
     address::{Address as JigAddress, TaskSection},
     contract::{ObjectKey, ReadValue},
 };
-use jig_client_view::Role;
-use jig_client_world::{Until, harness::App};
 use jig_fake_person::{Find, Step};
 use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_world::client::{Ops, stories};
+use jig_view::Role;
 use skein_lib::Duration;
 use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]

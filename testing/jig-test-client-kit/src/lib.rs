@@ -2,4 +2,4 @@
 //! Ordinary Rust, with no world, lifecycle, permission or delivery policy.
 #![forbid(unsafe_code)]
 pub mod connector_values;
-pub use jig_test_client_domain::connector_values::ConnectorLimits as Bounds;
+pub use jig_test_domain_client::connector_values::ConnectorLimits as Bounds;

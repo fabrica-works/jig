@@ -1,7 +1,7 @@
 //! Keep: checked phrase data beside jig's phrasebook (view.md, section 7).
 //! Replace: the application's closed English vocabulary.
 use alloc::boxed::Box;
-use jig_client_view::{
+use jig_view::{
     Builder, Owner, Role, Run,
     phrases::{
         Form, Hole, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook,

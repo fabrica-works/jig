@@ -2,8 +2,8 @@
 //! It accepts supplied clocks and owner inputs and exposes only external peer
 //! deliveries. Request durability and every business decision stay in the root.
 use super::transport::Transport;
-use jig_client::contract::VersionRange;
 use jig_core_world::{client_peer::ClientPeer, effects::World, peers::Peers};
+use jig_domain_client::contract::VersionRange;
 use jig_domain_core as core;
 use jig_test_domain as root;
 use skein_lib::{Time, Wall};
@@ -167,7 +167,7 @@ mod tests {
         driver.transport.bind(ClientId(0), 1, supplied.clone());
         assert_eq!(
             driver.transport.hello(),
-            jig_client::Event::Hello { versions: VersionRange { first: 1, last: u32::MAX } }
+            jig_domain_client::Event::Hello { versions: VersionRange { first: 1, last: u32::MAX } }
         );
         driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
         let event = driver.transport.start_sign_in(ClientId(0));

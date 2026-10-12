@@ -1,6 +1,6 @@
-use jig_client_view::{Act, NodeId, Role};
 use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World, stories};
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
+use jig_view::{Act, NodeId, Role};
 use skein_lib::{Duration, Time, Wall};
 fn node(w: &World<Test, Scripted>, c: ClientId, find: &Find) -> NodeId {
     let Found::Node(node) = TreeFace::new(w.tree(c)).find(find) else {
@@ -81,7 +81,7 @@ fn a_double_press_emits_one_decision() {
 fn a_reload_retains_the_request_before_resending() {
     let (mut w, c) = prepared(37);
     begin(&mut w, c);
-    assert!(w.kept(c).iter().any(|r| matches!(r, jig_test_client_domain::store::Record::Table { .. })));
+    assert!(w.kept(c).iter().any(|r| matches!(r, jig_test_domain_client::store::Record::Table { .. })));
     w.fault(Fault::Reload { client: c });
     finish(&mut w, c);
 }
@@ -149,7 +149,7 @@ fn another_party_keeps_the_original_partys_work_parked_and_hidden() {
     w.fault(Fault::OtherParty { client: c, party: 8 });
     w.person(c, vec![Step::See { find: Find::text(b"Someone else's work"), within: Duration::from_secs(1) }]);
     w.run(Until::Done);
-    assert!(w.kept(c).iter().any(|r| matches!(r, jig_test_client_domain::store::Record::Table { .. })));
+    assert!(w.kept(c).iter().any(|r| matches!(r, jig_test_domain_client::store::Record::Table { .. })));
     w.sign_as(c, 7);
     finish(&mut w, c);
 }
@@ -187,6 +187,6 @@ fn two_tabs_pressing_the_same_card_receive_the_first_decision() {
     assert_eq!(w.front().engine.commits().iter().filter(|c| c.key.is_some()).count(), 2);
     assert!(w.front().engine.commits().iter().any(|c| matches!(
         c.answer,
-        Some(jig_client::contract::Answer::Done(jig_client::contract::Outcome::DecidedFirst { .. }))
+        Some(jig_domain_client::contract::Answer::Done(jig_domain_client::contract::Outcome::DecidedFirst { .. }))
     )));
 }

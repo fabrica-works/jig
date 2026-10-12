@@ -1,10 +1,10 @@
 //! Concrete test-application adapter; application vocabulary is read only here.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::harness::*;
-use jig_client::{boundary::Offset, contract::*};
-use jig_client_view::{Act, NodeId, Patch, Tree};
-use jig_test_client_domain::{self as domain, Address, Event, JigOut, Request, first};
-use jig_test_client_view as view;
+use jig_domain_client::{boundary::Offset, contract::*};
+use jig_test_domain_client::{self as domain, Address, Event, JigOut, Request, first};
+use jig_test_view as view;
+use jig_view::{Act, NodeId, Patch, Tree};
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
 use std::{
     collections::BTreeMap,
@@ -14,9 +14,9 @@ use std::{
 pub struct Test;
 /// Returns the small focused-world capacities.
 #[must_use]
-pub fn limits() -> jig_test_client_domain::Limits {
-    jig_test_client_domain::Limits {
-        jig: jig_client::Limits {
+pub fn limits() -> jig_test_domain_client::Limits {
+    jig_test_domain_client::Limits {
+        jig: jig_domain_client::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -42,11 +42,14 @@ pub fn limits() -> jig_test_client_domain::Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_client::limits::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+            backoff: jig_domain_client::limits::Backoff {
+                first: Duration::from_millis(10),
+                most: Duration::from_millis(80),
+            },
             heartbeat: Duration::from_millis(100),
         },
         first: first::Limits {
-            connector: jig_test_client_domain::connector_values::ConnectorLimits {
+            connector: jig_test_domain_client::connector_values::ConnectorLimits {
                 rows: 4,
                 paths: 0,
                 segments: 0,
@@ -87,7 +90,7 @@ pub fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
 
 // The world varies roots, not English. Load each configured book once;
 // each view still owns a clone of the immutable checked data.
-type Books = (jig_client_view::words::Words, view::words::Words);
+type Books = (jig_view::words::Words, view::words::Words);
 fn phrasebooks(limits: &domain::Limits) -> Books {
     static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32), Books>>> = OnceLock::new();
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
@@ -107,10 +110,13 @@ pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View) {
     let (words, family) = phrasebooks(limits);
     let bounds = view::Limits::for_world(limits, &words, &family, 1024, 256).expect("view bounds fit");
     let mut root = domain::new(limits, seed);
-    domain::provider(&mut root, jig_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
+    domain::provider(&mut root, jig_domain_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
         .expect("provider fits");
-    domain::provider(&mut root, jig_client::signin::Provider { number: 2, name: crate::stories::text(b"Other") })
-        .expect("second provider fits");
+    domain::provider(
+        &mut root,
+        jig_domain_client::signin::Provider { number: 2, name: crate::stories::text(b"Other") },
+    )
+    .expect("second provider fits");
     (root, view::View::new(&bounds, limits, words, family, first::Address { project: 1, item: 1 }))
 }
 impl App for Test {
@@ -186,10 +192,10 @@ impl App for Test {
                 Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
             }
             Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_client::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
+                Some(Event::Jig(jig_domain_client::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
             }
             Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_client::Event::Ended { watch, end: WatchEnd::Dropped }))
+                Some(Event::Jig(jig_domain_client::Event::Ended { watch, end: WatchEnd::Dropped }))
             }
             Request::First(first::Out::Read { read, .. }) => {
                 Some(Event::First(first::Event::Read { read, result: first::ReadResult::Busy }))

@@ -3,7 +3,7 @@
 //! supplies the finite ceiling for recursively nested result values.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_client::contract::{OwnerMilestoneLine, OwnerMilestonePhase};
+use jig_domain_client::contract::{OwnerMilestoneLine, OwnerMilestonePhase};
 impl Payload for OwnerMilestoneLine {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         self.phase.heap(bounds)

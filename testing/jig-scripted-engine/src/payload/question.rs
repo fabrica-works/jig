@@ -2,7 +2,7 @@
 use super::{Payload, fits};
 use crate::Bounds;
 use core::mem::size_of;
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn question(from: Option<OwnerRequester>) -> Question {
     let mut dependencies = List::with_capacity(3);

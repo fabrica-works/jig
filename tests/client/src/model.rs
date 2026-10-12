@@ -1,5 +1,5 @@
 //! A platform tree changed only by patches (client/domain/view.md, 6).
-use jig_client_view::{Made, NodeId, Patch, Tree};
+use jig_view::{Made, NodeId, Patch, Tree};
 #[derive(Debug)]
 struct Entry {
     node: Made,

@@ -1,6 +1,6 @@
 //! Retained rows and scoped opaque cursors; contract.md, 6.
 use crate::{Bounds, Engine, Invalid, Up, payload};
-use jig_client::contract::{
+use jig_domain_client::contract::{
     ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryPage,
     HistoryRow, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Note, NotePage, NoteScope, ObjectKey, ObjectPage,
     Read, ReadNone, ReadResult, ReadValue, Result, SpendPage, SpendPeriod, Text,
@@ -321,7 +321,7 @@ impl<A: crate::Application> Engine<A> {
                 }
             }).collect();
                 rows.sort_by(|a, b| {
-                    let order = if jig_client::pages::inbox::needs(a.group) { a.at.cmp(&b.at) } else { b.at.cmp(&a.at) };
+                    let order = if jig_domain_client::pages::inbox::needs(a.group) { a.at.cmp(&b.at) } else { b.at.cmp(&a.at) };
                     order.then(a.object.cmp(&b.object))
                 });
                 Rows::Inbox(rows)

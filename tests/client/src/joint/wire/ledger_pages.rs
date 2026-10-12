@@ -2,7 +2,7 @@
 //! pages.md, 5.2 and 6.5). Source selection belongs to the core; this boundary
 //! retains row order, independent clocks and both original opaque edges.
 use super::{chips, cursor, owner, pages::Invalid, results};
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::reads;
 use jig_domain_tasks as tasks;
 use jig_scripted_engine as admission;

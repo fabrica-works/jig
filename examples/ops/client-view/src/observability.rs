@@ -5,8 +5,7 @@ use crate::{
     drawing,
     words::{Word, Words},
 };
-use jig_client::contract::{ObjectKey, Part, Proposer};
-use jig_client_view::{Builder, Key, Owner, Role, Run, SlotRef, phrases::Hole};
+use jig_domain_client::contract::{ObjectKey, Part, Proposer};
 use jig_ops_client_domain::{
     Action,
     observability::{
@@ -14,6 +13,7 @@ use jig_ops_client_domain::{
         documents::{Document, Incident, Kind, Scope, State, Subject},
     },
 };
+use jig_view::{Builder, Key, Owner, Role, Run, SlotRef, phrases::Hole};
 use skein_lib::Token;
 pub const NAV: SlotRef = SlotRef {
     owner: Owner::Side { connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability) },
@@ -232,7 +232,7 @@ pub fn part(
         Part::Resource { path, .. } => {
             words.text(builder, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(b""))]);
             for segment in path {
-                jig_client_view::literal_segment::render(builder, segment);
+                jig_view::literal_segment::render(builder, segment);
             }
         }
         Part::Kind { kind, .. } => words.text(builder, Word::Kind, &[Hole::Number(u64::from(*kind))]),

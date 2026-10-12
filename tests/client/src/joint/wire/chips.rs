@@ -1,7 +1,7 @@
 //! Whole compact task facts (contract.md, 5.1; objects.md, 3).
 //! Metadata remains mandatory and independent of phase, observation and ending.
 use super::{owner, results};
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 

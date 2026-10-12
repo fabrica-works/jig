@@ -1,15 +1,15 @@
 //! Ops root/view shell adapter; observations come from public requests and trees.
 #![allow(clippy::wildcard_imports, reason = "the adapter translates complete owner vocabularies")]
-use jig_client::contract::Outcome;
-use jig_client::{boundary::Offset, contract::*};
-use jig_client_view::{Act, NodeId, Owner, Patch, Role, Tree};
 use jig_client_world::harness::Seen;
 use jig_client_world::{harness::*, observe};
+use jig_domain_client::contract::Outcome;
+use jig_domain_client::{boundary::Offset, contract::*};
 use jig_ops_client_domain::{
     self as domain, Action, Address, Event, JigOut, Request, infrastructure as infra, observability as obs,
 };
 use jig_ops_client_view as view;
 use jig_ops_connectors::{Connector, number};
+use jig_view::{Act, NodeId, Owner, Patch, Role, Tree};
 use skein_lib::{Duration, Env, Queue, RequestEnvelope, RequestLimits, Time};
 
 use std::{
@@ -23,7 +23,7 @@ pub struct Ops;
 #[must_use]
 pub fn limits() -> domain::Limits {
     domain::Limits {
-        jig: jig_client::Limits {
+        jig: jig_domain_client::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -50,7 +50,10 @@ pub fn limits() -> domain::Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_client::limits::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+            backoff: jig_domain_client::limits::Backoff {
+                first: Duration::from_millis(10),
+                most: Duration::from_millis(80),
+            },
             heartbeat: Duration::from_millis(100),
         },
         observability: obs::Limits {
@@ -84,7 +87,7 @@ pub fn limits() -> domain::Limits {
         },
     }
 }
-type Books = (jig_client_view::words::Words, view::words::Words, view::words::Words);
+type Books = (jig_view::words::Words, view::words::Words, view::words::Words);
 type BookCache = Mutex<BTreeMap<(u32, u32, u32), Books>>;
 fn phrasebooks(limits: &domain::Limits) -> Books {
     static BOOKS: OnceLock<BookCache> = OnceLock::new();
@@ -93,8 +96,8 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
         .entry((limits.jig.text, limits.observability.text, limits.infrastructure.text))
         .or_insert_with(|| {
             (
-                jig_client_view::words::Words {
-                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
+                jig_view::words::Words {
+                    book: jig_view::phrases::english::english(limits.jig.text).expect("English fits"),
                     language: 0,
                     offset_minutes: 0,
                 },
@@ -110,7 +113,7 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
 // Builder checks catch a fixture growing beyond these bounds.
 fn view_bounds(
     limits: &domain::Limits,
-    jig: &jig_client_view::words::Words,
+    jig: &jig_view::words::Words,
     obs: &view::words::Words,
     infra: &view::words::Words,
 ) -> view::Limits {
@@ -156,7 +159,7 @@ impl App for Ops {
         let mut root = domain::new(&limits, seed);
         domain::provider(
             &mut root,
-            jig_client::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
+            jig_domain_client::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
         )
         .expect("provider fits");
         (root, view::View::new(&bounds, &limits, jig, obs, infra, 1))
@@ -226,10 +229,10 @@ impl App for Ops {
                 Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
             }
             Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_client::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
+                Some(Event::Jig(jig_domain_client::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
             }
             Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_client::Event::Ended { watch, end: WatchEnd::Dropped }))
+                Some(Event::Jig(jig_domain_client::Event::Ended { watch, end: WatchEnd::Dropped }))
             }
             Request::Observability(obs::Out::Read { read, .. }) => {
                 Some(Event::Observability(obs::Event::Read { read, result: obs::ReadResult::Busy }))
@@ -270,7 +273,7 @@ impl App for Ops {
     }
     fn window_changed(event: &Event) -> bool {
         match event {
-            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_client::Event::Act { act }) => {
+            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_domain_client::Event::Act { act }) => {
                 observe::jig_window_changed(act)
             }
             Event::Act {
@@ -296,8 +299,8 @@ impl App for Ops {
             domain::Ask::Infrastructure(infra::Ask::NativeMoveEnd { object, revision, .. }) => Sent {
                 attempt: *attempt,
                 key: *key,
-                card: Some(CardKey::of(jig_client_view::Key {
-                    owner: jig_client_view::Owner::Side { connector: 2 },
+                card: Some(CardKey::of(jig_view::Key {
+                    owner: jig_view::Owner::Side { connector: 2 },
                     kind: 12,
                     a: 0,
                     b: object.raw(),

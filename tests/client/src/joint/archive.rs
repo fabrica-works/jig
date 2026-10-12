@@ -6,10 +6,10 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::{Event, reads};
 use jig_scripted_engine as admission;
-use jig_test_client_domain::Event as ClientEvent;
+use jig_test_domain_client::Event as ClientEvent;
 use skein_lib::Token;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -40,7 +40,7 @@ pub struct Archives {
 fn callback(client: ClientId, read: Token, page: Box<client::ActivityPage>) -> Incoming {
     Incoming::Callback {
         client,
-        event: ClientEvent::Jig(jig_client::Event::Read {
+        event: ClientEvent::Jig(jig_domain_client::Event::Read {
             read,
             result: client::ReadResult::Value(client::ReadValue::Activity(page)),
         }),
@@ -101,7 +101,7 @@ impl Archives {
         transport: &mut Transport,
         to: Token,
         answer: &reads::Answer,
-        codec: &jig_client_transcript::Limits,
+        codec: &jig_protocol_transcript::Limits,
         limits: &Limits,
     ) -> Result<Option<Incoming>, Invalid> {
         let Some(Reply::Archive { request, task, attempt, turn, .. }) = transport.reply(to) else {
@@ -207,8 +207,8 @@ mod tests {
         }
         reads::Page { before: None, inbox_selection: None, rows, next: None, cut: false }
     }
-    fn codec() -> jig_client_transcript::Limits {
-        jig_client_transcript::Limits {
+    fn codec() -> jig_protocol_transcript::Limits {
+        jig_protocol_transcript::Limits {
             smith: smith_transcript::v3::CEILINGS,
             bytes: 127,
             turn: client::TurnLimits { messages: 1, blocks: 1, text: 3 },
@@ -222,7 +222,7 @@ mod tests {
             spent: u64::MAX,
             read: Some(0),
             at: Wall::EPOCH,
-            transcript: include_bytes!("../../../../crates/jig-client-transcript/tests/data/record_turn_full.bin")
+            transcript: include_bytes!("../../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin")
                 .as_slice()
                 .into(),
         }
@@ -259,7 +259,7 @@ mod tests {
         let Some(Incoming::Callback {
             client: ClientId(0),
             event:
-                ClientEvent::Jig(jig_client::Event::Read {
+                ClientEvent::Jig(jig_domain_client::Event::Read {
                     read,
                     result: client::ReadResult::Value(client::ReadValue::Activity(page)),
                 }),
@@ -298,7 +298,7 @@ mod tests {
         };
         let Some(Incoming::Callback {
             event:
-                ClientEvent::Jig(jig_client::Event::Read {
+                ClientEvent::Jig(jig_domain_client::Event::Read {
                     result: client::ReadResult::Value(client::ReadValue::Activity(page)),
                     ..
                 }),

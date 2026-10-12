@@ -3,8 +3,8 @@
 //! (client/domain/testing.md, sections 5–7).
 use super::{Joint, fixture};
 use crate::{Fault, FrontFault, Outcome, Test, Until, World};
-use jig_client_view::Role;
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
+use jig_view::Role;
 use skein_lib::{Duration, Rng};
 use skein_world::domain::Verdict;
 
@@ -75,13 +75,13 @@ fn answers(world: &mut World<Test, Joint>) -> usize {
         })
         .count()
 }
-fn receiving() -> jig_test_client_domain::Limits {
+fn receiving() -> jig_test_domain_client::Limits {
     let mut limits = crate::test::limits();
     limits.jig.text = 128;
     limits.first.text = 128;
     limits
 }
-fn client(seed: u64) -> (jig_test_client_domain::Domain, jig_test_client_view::View) {
+fn client(seed: u64) -> (jig_test_domain_client::Domain, jig_test_view::View) {
     crate::test::new(&receiving(), seed)
 }
 fn ready(seed: u64) -> (World<Test, Joint>, crate::ClientId) {

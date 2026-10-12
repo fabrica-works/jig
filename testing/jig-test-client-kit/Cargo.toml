@@ -8,7 +8,7 @@ publish.workspace = true
 
 [dependencies]
 skein-lib.workspace = true
-jig-test-client-domain.workspace = true
+jig-test-domain-client.workspace = true
 jig-test-connector.workspace = true
 
 [lints.rust]

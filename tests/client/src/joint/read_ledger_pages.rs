@@ -19,7 +19,7 @@ fn retained(source: reads::Page, what: &client::Read, wrong: client::Read) {
     }
     let Incoming::Callback {
         client: actual_client,
-        event: Event::Jig(jig_client::Event::Read { read: actual, result }),
+        event: Event::Jig(jig_domain_client::Event::Read { read: actual, result }),
     } = read(&mut transport, to, &source, &l).expect("whole exact historical page")
     else {
         panic!("original native callback")

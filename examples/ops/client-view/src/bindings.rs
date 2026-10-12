@@ -1,8 +1,8 @@
 //! Keep: owner-tagged bounded bindings, rebuilt each tree (view.md, 5).
 //! Replace: application actions and family document identities.
-use jig_client::contract::{ObjectKey, Revision};
-use jig_client_view::{Act, Binding, Owner};
+use jig_domain_client::contract::{ObjectKey, Revision};
 use jig_ops_client_domain::{Action, infrastructure};
+use jig_view::{Act, Binding, Owner};
 use skein_lib::{List, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Meaning {
@@ -68,7 +68,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                         Some(Action::Infrastructure(infrastructure::Act::Until {
                             object: *object,
                             revision: *revision,
-                            value: crate::time::wall(jig_client_view::number(&value)?)?,
+                            value: crate::time::wall(jig_view::number(&value)?)?,
                         }))
                     }
                     Act::Press | Act::Toggle | Act::Submit => None,
@@ -81,7 +81,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<Action> {
                         Some(Action::Infrastructure(infrastructure::Act::NativeUntil {
                             object: *object,
                             revision: *revision,
-                            value: jig_client_view::number(&value)?,
+                            value: jig_view::number(&value)?,
                         }))
                     }
                     Act::Press | Act::Toggle | Act::Submit => None,

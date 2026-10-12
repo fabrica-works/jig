@@ -1,7 +1,7 @@
 //! Exact result payload and closing facts (client/domain/objects.md, 8).
 //! References and chooser/requester metadata belong to the independent details.
 use super::{chips, offers, owner};
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 use skein_lib::List;

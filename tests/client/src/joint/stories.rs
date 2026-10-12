@@ -2,12 +2,12 @@
 //! (client/domain/testing.md, sections 5–6; domain/people.md, section 11).
 use super::{Joint, engine::Driver, session::Session};
 use crate::{Settings, Test, Until, World};
-use jig_client::contract as client;
-use jig_client_view::Role;
 use jig_core_world::peers::Peers;
+use jig_domain_client::contract as client;
 use jig_domain_people as people;
 use jig_fake_person::{Find, Step};
 use jig_fake_workers::{Script, Worker};
+use jig_view::Role;
 use skein_lib::{Duration, Time, Token};
 use std::collections::BTreeMap;
 

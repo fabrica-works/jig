@@ -23,11 +23,14 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
     w.fail_store();
     w.event(
         c,
-        jig_test_client_domain::Event::Jig(jig_client::Event::Ask {
-            ask: jig_client::intents::ByValue {
+        jig_test_domain_client::Event::Jig(jig_domain_client::Event::Ask {
+            ask: jig_domain_client::intents::ByValue {
                 asked: skein_lib::Token::new(99),
                 scope: 7,
-                ask: Box::new(jig_client::contract::Ask::StartChat { project: 1, words: stories::text(b"Hello") }),
+                ask: Box::new(jig_domain_client::contract::Ask::StartChat {
+                    project: 1,
+                    words: stories::text(b"Hello"),
+                }),
             },
         }),
     );
@@ -39,7 +42,7 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
         "same key retries after lost envelope"
     );
     assert!(
-        w.kept(c).iter().all(|r| !matches!(r, jig_test_client_domain::store::Record::Table { .. })),
+        w.kept(c).iter().all(|r| !matches!(r, jig_test_domain_client::store::Record::Table { .. })),
         "answered keys are erased"
     );
 }

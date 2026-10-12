@@ -2,7 +2,7 @@
 //! The kit stands in for decoding; client/domain/contract.md, 5.3.
 use crate::Bounds;
 use core::mem::size_of;
-use jig_client::contract::{
+use jig_domain_client::contract::{
     Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, AddressChange, Admission, AdmissionLimit,
     Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Call, Capacity, Charter, Chip, ChipPhase,
     Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CurrentCall, CurrentHold, Cursor,
@@ -48,7 +48,7 @@ plain!(
     RunStage,
     ClosingStage,
     Proposer,
-    jig_client::contract::RecurringOverlap
+    jig_domain_client::contract::RecurringOverlap
 );
 impl Payload for RetryNotice {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
@@ -538,7 +538,7 @@ impl Payload for Admission {
         }
     }
 }
-impl Payload for jig_client::contract::Bounds {
+impl Payload for jig_domain_client::contract::Bounds {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Goal { pool_left, charters, procedures, latest, budget, maximum_budget, maximum_deadline } => sum(&[
@@ -645,13 +645,13 @@ fields!(ProposedTask {
     cut
 });
 plain!(
-    jig_client::contract::OwnerExecutor,
-    jig_client::contract::PersonAddress,
-    jig_client::contract::Funder,
-    jig_client::contract::OwnerPartKind
+    jig_domain_client::contract::OwnerExecutor,
+    jig_domain_client::contract::PersonAddress,
+    jig_domain_client::contract::Funder,
+    jig_domain_client::contract::OwnerPartKind
 );
-fields!(jig_client::contract::OwnerPart { connector, kind, key });
-impl Payload for jig_client::contract::OwnerPartKey {
+fields!(jig_domain_client::contract::OwnerPart { connector, kind, key });
+impl Payload for jig_domain_client::contract::OwnerPartKey {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Path(segments) => segments.heap(bounds),
@@ -659,8 +659,8 @@ impl Payload for jig_client::contract::OwnerPartKey {
         }
     }
 }
-fields!(jig_client::contract::VerdictChoice { code, words, followups, fields });
-impl Payload for jig_client::contract::TaskContractDocument {
+fields!(jig_domain_client::contract::VerdictChoice { code, words, followups, fields });
+impl Payload for jig_domain_client::contract::TaskContractDocument {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Approval { state, part } => sum(&[state.heap(bounds), part.heap(bounds)]),
@@ -709,7 +709,7 @@ impl Payload for ResultContract {
         }
     }
 }
-impl Payload for jig_client::contract::TaskResource {
+impl Payload for jig_domain_client::contract::TaskResource {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Part(part) => part.heap(bounds),
@@ -717,7 +717,7 @@ impl Payload for jig_client::contract::TaskResource {
         }
     }
 }
-impl Payload for jig_client::contract::TaskResult {
+impl Payload for jig_domain_client::contract::TaskResult {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Document(value) => value.heap(bounds),
@@ -823,7 +823,7 @@ fields!(Host { number, connected, grace, used, free, runs, refused });
 fields!(Account { number, usable, reason, runs, waiting });
 fields!(Capacity { project, live, limit });
 fields!(HistoryLine { position, task, by, at, change });
-impl Payload for jig_client::contract::HistoryRow {
+impl Payload for jig_domain_client::contract::HistoryRow {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Line(value) => value.heap(bounds),
@@ -859,7 +859,7 @@ impl Payload for Activity {
         match self {
             Self::Owner { source, decoded } => {
                 if let Some(archive) = decoded {
-                    let jig_client::contract::OwnerActivity::Turn { attempt, turn, .. } = source.line else {
+                    let jig_domain_client::contract::OwnerActivity::Turn { attempt, turn, .. } = source.line else {
                         return None;
                     };
                     if archive.task != source.task || archive.name != (TurnName { attempt, number: turn }) {
@@ -1073,7 +1073,7 @@ impl Payload for Refusal {
     }
 }
 fields!(Turn { messages, used, spent, read_through, cut });
-fields!(jig_client::contract::ArchivedTurn { task, name, cumulative, read, at, turn });
+fields!(jig_domain_client::contract::ArchivedTurn { task, name, cumulative, read, at, turn });
 fields!(Usage { input, output, cached, cache_written });
 fields!(Message { speaker, blocks });
 impl Payload for Speaker {
@@ -1136,7 +1136,7 @@ impl Payload for Delivery {
         }
     }
 }
-fields!(jig_client::contract::CallIdentity { owner, sequence, retry, id });
+fields!(jig_domain_client::contract::CallIdentity { owner, sequence, retry, id });
 fields!(CurrentCall { identity, tool, input, cut, began });
 impl Payload for LiveCall {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -1303,7 +1303,7 @@ pub mod owner_outcome;
 
 mod owner_kind_order;
 
-fields!(jig_client::contract::OwnerPhaseCounts {
+fields!(jig_domain_client::contract::OwnerPhaseCounts {
     waiting,
     idle,
     starting,
@@ -1328,4 +1328,4 @@ impl Payload for TaskHold {
     }
 }
 
-fields!(jig_client::contract::OwnerEscalation { task; acts });
+fields!(jig_domain_client::contract::OwnerEscalation { task; acts });

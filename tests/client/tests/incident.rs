@@ -1,13 +1,13 @@
 //! The two independent incident journeys of pages.md, section 10.
-use jig_client::{
+use jig_client_world::{Scripted, Test, Until, World, stories};
+use jig_domain_client::{
     address::{Address, TaskSection},
     contract::*,
 };
-use jig_client_view::Role;
-use jig_client_world::{Scripted, Test, Until, World, stories};
 use jig_fake_person::{Find, Step};
 use jig_scripted_engine::{Change, Rows, Source};
-use jig_test_client_domain::{Address as RootAddress, family};
+use jig_test_domain_client::{Address as RootAddress, family};
+use jig_view::Role;
 use skein_lib::{Duration, Wall};
 const WITHIN: Duration = Duration::from_secs(1);
 fn see(words: &[u8]) -> Step<RootAddress> {
@@ -28,7 +28,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
     item.revision.value += 1;
     let mut delegate = stories::task();
     delegate.chip.task = 10;
-    delegate.chip.title = jig_client::contract::DocumentText::complete(stories::text(b"Delegate ten"));
+    delegate.chip.title = jig_domain_client::contract::DocumentText::complete(stories::text(b"Delegate ten"));
     let lead = stories::reported(stories::task(), b"Incident resolved");
     let delegate = stories::reported(delegate, if withdrawn { b"Already healthy by hand" } else { b"Service healthy" });
     let mut proposal = stories::proposal();
@@ -47,7 +47,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
         .act_application(
             now,
             Wall::EPOCH,
-            jig_test_client_domain::FIRST,
+            jig_test_domain_client::FIRST,
             1,
             state,
             vec![
@@ -61,7 +61,7 @@ fn finish(w: &mut World<Test, Scripted>, withdrawn: bool) {
                 Change::Source(Source {
                     party: 7,
                     read: Read::Inbox {
-                        group: jig_client::contract::InboxReadGroup::Needs,
+                        group: jig_domain_client::contract::InboxReadGroup::Needs,
                         project: None,
                         kind: None,
                         goal: None,
@@ -118,7 +118,7 @@ fn resolved_incident(seed: u64) {
     part.value = 32;
     w.front()
         .engine
-        .act_application(now, Wall::EPOCH, jig_test_client_domain::FIRST, 1, state, vec![])
+        .act_application(now, Wall::EPOCH, jig_test_domain_client::FIRST, 1, state, vec![])
         .expect("incident fixture fits and exists");
     w.person(c, vec![see(b"Value: 32")]);
     w.run(Until::Done);

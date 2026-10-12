@@ -1,7 +1,7 @@
 use super::{bytes, fits, worst_case};
 use crate::Bounds;
 use core::mem::size_of;
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 8).unwrap(), cut }

@@ -1,10 +1,10 @@
 //! The application's actual scoped owner values (client/domain/root.md, 6–7).
 //! This source uses the actual whole family consumer; it remains unregistered and unexecuted until the coherent wire increment.
-use jig_test_client_domain::{
+use jig_test_connector::{ApplicationOutcome, ApplicationRequest, ClientDocument, ClientScope, ClientSubject};
+use jig_test_domain_client::{
     connector_values::{ConnectorAnswer, ConnectorDocument, ConnectorLimits},
     family,
 };
-use jig_test_connector::{ApplicationOutcome, ApplicationRequest, ClientDocument, ClientScope, ClientSubject};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
@@ -176,7 +176,7 @@ pub fn document(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_client::contract::{ProposalKey, Proposer, Revision};
+    use jig_domain_client::contract::{ProposalKey, Proposer, Revision};
     use skein_lib::List;
 
     #[test]

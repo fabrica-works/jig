@@ -3,16 +3,16 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/jig-client",
-    "crates/jig-client-transcript",
-    "crates/jig-client-view",
+    "crates/jig-domain-client",
+    "crates/jig-protocol-transcript",
+    "crates/jig-view",
     "crates/jig-domain-core",
     "crates/jig-domain-accounts",
     "testing/jig-test-connector",
     "testing/jig-test-domain",
-    "testing/jig-test-client-domain",
+    "testing/jig-test-domain-client",
     "testing/jig-test-client-kit",
-    "testing/jig-test-client-view",
+    "testing/jig-test-view",
     "testing/jig-conformance",
     "tests/conformance",
     "tests/client",
@@ -40,7 +40,7 @@ members = [
     "crates/jig-domain-tasks",
     "crates/jig-domain-views",
     "crates/jig-domain-host",
-    "crates/jig-charter",
+    "crates/jig-protocol-charter",
     "tests/accounts",
     "tests/brief",
     "tests/fleet",
@@ -60,9 +60,9 @@ publish = false
 
 [workspace.dependencies]
 jig-client-world = { path = "tests/client" }
-jig-client = { path = "crates/jig-client" }
-jig-client-transcript = { path = "crates/jig-client-transcript" }
-jig-client-view = { path = "crates/jig-client-view" }
+jig-domain-client = { path = "crates/jig-domain-client" }
+jig-protocol-transcript = { path = "crates/jig-protocol-transcript" }
+jig-view = { path = "crates/jig-view" }
 jig-fake-person = { path = "testing/jig-fake-person" }
 jig-scripted-engine = { path = "testing/jig-scripted-engine" }
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
@@ -75,9 +75,9 @@ sha2 = { version = "=0.10.9", default-features = false }
 jig-domain-accounts = { path = "crates/jig-domain-accounts" }
 jig-test-connector = { path = "testing/jig-test-connector" }
 jig-test-domain = { path = "testing/jig-test-domain" }
-jig-test-client-domain = { path = "testing/jig-test-client-domain" }
+jig-test-domain-client = { path = "testing/jig-test-domain-client" }
 jig-test-client-kit = { path = "testing/jig-test-client-kit" }
-jig-test-client-view = { path = "testing/jig-test-client-view" }
+jig-test-view = { path = "testing/jig-test-view" }
 jig-conformance = { path = "testing/jig-conformance" }
 jig-fake-store = { path = "testing/jig-fake-store" }
 jig-fake-workers = { path = "testing/jig-fake-workers" }
@@ -99,7 +99,7 @@ jig-domain-brief = { path = "crates/jig-domain-brief" }
 jig-domain-fleet = { path = "crates/jig-domain-fleet" }
 jig-domain-views = { path = "crates/jig-domain-views" }
 jig-domain-host = { path = "crates/jig-domain-host" }
-jig-charter = { path = "crates/jig-charter" }
+jig-protocol-charter = { path = "crates/jig-protocol-charter" }
 
 # Panics are fail-stop and overflow traps, in every profile. (The test harness
 # needs unwinding, so cargo ignores `panic` for test targets.)

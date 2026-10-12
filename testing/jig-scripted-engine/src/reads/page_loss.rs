@@ -1,5 +1,5 @@
 use crate::{Bounds, Engine, Script};
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use skein_lib::List;
 
 fn text(bytes: &[u8]) -> Text {

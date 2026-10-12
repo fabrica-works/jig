@@ -1,5 +1,4 @@
 //! A card and dialog share facts, while each draft has one platform input.
-use jig_client_view::Role;
 use jig_client_world::{
     Until,
     stories::{
@@ -8,6 +7,7 @@ use jig_client_world::{
     },
 };
 use jig_fake_person::{Find, Step};
+use jig_view::Role;
 use skein_lib::Duration;
 
 fn answer(form: Form, seed: u64) {

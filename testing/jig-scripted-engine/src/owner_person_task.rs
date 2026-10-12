@@ -1,7 +1,7 @@
 //! Whole pending person work admission (client/domain/contract.md, 5.3).
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_client::contract::{OwnerPersonTask, OwnerShownResult};
+use jig_domain_client::contract::{OwnerPersonTask, OwnerShownResult};
 impl Payload for OwnerShownResult {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         self.task.heap(bounds)?.checked_add(self.result.heap(bounds)?)

@@ -90,7 +90,7 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             delegate: super::scripts::lead(),
         }]),
         backend: infrastructure::Backend::OperationIds,
-        charter_endpoints: Box::new([jig_charter::EndpointName {
+        charter_endpoints: Box::new([jig_protocol_charter::EndpointName {
             number: 1,
             dialect: 1,
             account: 1,

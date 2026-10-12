@@ -5,8 +5,8 @@ use crate::{
     harness::{Front, FrontFault, Observed},
     test::Test,
 };
-use jig_client::address::ProjectSection;
-use jig_test_client_domain::{Address, Event, Place, Request};
+use jig_domain_client::address::ProjectSection;
+use jig_test_domain_client::{Address, Event, Place, Request};
 use skein_lib::{Time, Wall};
 use skein_world::domain::{Span, Verdict};
 
@@ -30,7 +30,7 @@ impl Front<Test> for Receipts {
     fn fault(&mut self, _now: Time, _fault: FrontFault) {}
     fn reload(&mut self, _client: ClientId, _now: Time) {}
     fn received(&mut self, client: ClientId, event: &Event) {
-        if matches!(event, Event::Jig(jig_client::Event::Hello { .. })) {
+        if matches!(event, Event::Jig(jig_domain_client::Event::Hello { .. })) {
             self.hello += 1;
         }
         if let Event::Went { place: Place::Address(address) } = event {
@@ -45,7 +45,7 @@ fn world() -> (World<Test, Receipts>, ClientId) {
     (world, client)
 }
 fn project(section: ProjectSection) -> Address {
-    Address::Jig(jig_client::address::Address::Project { project: 1, section })
+    Address::Jig(jig_domain_client::address::Address::Project { project: 1, section })
 }
 fn drain(world: &mut World<Test, Receipts>) -> super::Outcome {
     let outcome = world.run(Until::Steps(2));
@@ -205,8 +205,8 @@ fn a_new_navigation_does_not_discard_a_current_epoch_engine_callback() {
         super::Due {
             client,
             epoch: 0,
-            event: Event::Jig(jig_client::Event::Hello {
-                versions: jig_client::contract::VersionRange { first: 1, last: 1 },
+            event: Event::Jig(jig_domain_client::Event::Hello {
+                versions: jig_domain_client::contract::VersionRange { first: 1, last: 1 },
             }),
             navigation: None,
         },

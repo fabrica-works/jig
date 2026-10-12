@@ -43,7 +43,7 @@ pub struct Joint {
     pub disconnects: u64,
     pub reconnects: u64,
     pub limits: client::Limits,
-    codec: jig_client_transcript::Limits,
+    codec: jig_protocol_transcript::Limits,
     story: Story,
     archives: Archives,
     watches: BTreeMap<Token, Watch>,
@@ -64,11 +64,11 @@ pub struct Joint {
 }
 impl Joint {
     #[must_use]
-    pub fn new(seed: u64, limits: client::Limits, codec: jig_client_transcript::Limits) -> Self {
+    pub fn new(seed: u64, limits: client::Limits, codec: jig_protocol_transcript::Limits) -> Self {
         Self::for_story(seed, limits, codec, Story::Alert)
     }
     #[must_use]
-    pub fn for_story(seed: u64, limits: client::Limits, codec: jig_client_transcript::Limits, story: Story) -> Self {
+    pub fn for_story(seed: u64, limits: client::Limits, codec: jig_protocol_transcript::Limits, story: Story) -> Self {
         let configuration = Config::new(seed, story).client_backed().client_recovery();
         let application_rows = configuration.limits().core.documents.rows;
         let mut engine = Harness::with_trace(configuration, seed, false);
@@ -129,22 +129,22 @@ impl Joint {
         match packet {
             Incoming::Callback { client, event } => {
                 let event = match event {
-                    jig_test_client_domain::Event::Jig(value) => client::Event::Jig(value),
-                    jig_test_client_domain::Event::Answer { attempt, envelope, answer } => client::Event::Answer {
+                    jig_test_domain_client::Event::Jig(value) => client::Event::Jig(value),
+                    jig_test_domain_client::Event::Answer { attempt, envelope, answer } => client::Event::Answer {
                         attempt,
                         envelope,
                         answer: answer.map(|answer| match answer {
-                            jig_test_client_domain::Answered::Jig(value) => client::Answered::Jig(value),
-                            jig_test_client_domain::Answered::First(_) => {
+                            jig_test_domain_client::Answered::Jig(value) => client::Answered::Jig(value),
+                            jig_test_domain_client::Answered::First(_) => {
                                 panic!("Ops never registers first-owner replies")
                             }
                         }),
                     },
-                    jig_test_client_domain::Event::SignedOut => client::Event::SignedOut,
-                    jig_test_client_domain::Event::First(_)
-                    | jig_test_client_domain::Event::Start { .. }
-                    | jig_test_client_domain::Event::Went { .. }
-                    | jig_test_client_domain::Event::Act { .. } => panic!("45 protocol emits only its jig owner"),
+                    jig_test_domain_client::Event::SignedOut => client::Event::SignedOut,
+                    jig_test_domain_client::Event::First(_)
+                    | jig_test_domain_client::Event::Start { .. }
+                    | jig_test_domain_client::Event::Went { .. }
+                    | jig_test_domain_client::Event::Act { .. } => panic!("45 protocol emits only its jig owner"),
                 };
                 self.callbacks.push((client, event));
             }
@@ -506,7 +506,7 @@ impl Joint {
             {
                 self.incoming(packet);
             }
-        } else if matches!(route, Reply::Read { what: jig_client::contract::Read::Activity { .. }, .. })
+        } else if matches!(route, Reply::Read { what: jig_domain_client::contract::Read::Activity { .. }, .. })
             && let core::reads::Answer::Page(page) = answer
         {
             match self
@@ -549,11 +549,11 @@ impl Joint {
                                 },
                             )
                             .expect("whole entrance refusal admission");
-                            let jig_client::contract::Answer::Refused(why) = answer else {
+                            let jig_domain_client::contract::Answer::Refused(why) = answer else {
                                 panic!("application entrance terminal")
                             };
                             client::Answered::Infrastructure(infra::Answer::EntranceRefused(
-                                jig_client::contract::EntranceRefusal::new(why).expect("whole entrance refusal"),
+                                jig_domain_client::contract::EntranceRefusal::new(why).expect("whole entrance refusal"),
                             ))
                         });
                         if envelope == skein_lib::RequestEnvelope::SignedOut {
@@ -954,9 +954,9 @@ impl Front<super::fixture::Client> for Joint {
     }
     fn received(&mut self, client: ClientId, event: &client::Event) {
         match event {
-            client::Event::Jig(jig_client::Event::Watch {
+            client::Event::Jig(jig_domain_client::Event::Watch {
                 watch,
-                event: jig_client::contract::WatchEvent::Delivered(_),
+                event: jig_domain_client::contract::WatchEvent::Delivered(_),
             }) => {
                 if let Some(core::Event::Delivered { watcher }) = self.engine.peers.transport.taken(client, *watch) {
                     self.engine.peers.protocol.consumed(watcher);

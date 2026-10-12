@@ -1,7 +1,7 @@
 //! Whole owner vocabulary shared by document translations (contract.md, 5).
 //! This layer copies opaque names, paths, codes and loss facts. It owns no
 //! application scope or document policy and never clips a receiving value.
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 use skein_lib::List;

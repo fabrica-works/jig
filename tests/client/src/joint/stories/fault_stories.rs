@@ -1,7 +1,7 @@
 //! Client faults cross the real protocol loop (testing.md, sections 5–7).
 use super::*;
 
-fn start() -> Vec<Step<jig_test_client_domain::Address>> {
+fn start() -> Vec<Step<jig_test_domain_client::Address>> {
     let within = Duration::from_secs(1);
     vec![
         Step::See { find: Find::exactly_named(Role::Button, b"Sign in with Test"), within },
@@ -33,7 +33,7 @@ fn a_draft_kept_across_a_reload_stays_unsent_on_the_actual_engine() {
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert!(outcome.judged.0 > 0);
     assert!(world.kept(client).iter().any(|record| matches!(record,
-        jig_test_client_domain::store::Record::Jig(jig_client::store::Record::Draft { words, .. })
+        jig_test_domain_client::store::Record::Jig(jig_domain_client::store::Record::Draft { words, .. })
         if words.bytes() == b"Unsent draft")));
     assert!(
         world

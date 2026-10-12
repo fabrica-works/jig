@@ -1,9 +1,9 @@
 //! Starting truth and person's scripts shared by focused and random worlds.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::{Scripted, Settings, Test, World, scripted::Family, test::list};
-use jig_client::{address::Address, contract::*};
+use jig_domain_client::{address::Address, contract::*};
 use jig_scripted_engine::{Bounds, Script, Truth};
-use jig_test_client_domain::Address as RootAddress;
+use jig_test_domain_client::Address as RootAddress;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
 pub mod person_confirmation;
@@ -168,7 +168,7 @@ pub fn task() -> Task {
             executor: Executor::Agent { charter: 1 },
             phase: Phase::Running,
             details: Box::new(ChipPhase::Procedure {
-                panel: Part::Panel { connector: jig_test_client_domain::FIRST, task: 9 },
+                panel: Part::Panel { connector: jig_test_domain_client::FIRST, task: 9 },
             }),
         },
         goal: None,
@@ -213,7 +213,7 @@ pub fn task() -> Task {
         result: None,
         delegates: list([]),
 
-        context: Some(Box::new(jig_client::contract::TaskContext {
+        context: Some(Box::new(jig_domain_client::contract::TaskContext {
             escalation: None,
             parts: list([]),
             closing: None,
@@ -289,7 +289,7 @@ pub fn conversation() -> RootAddress {
 /// Names the initial chat’s activity page.
 #[must_use]
 pub fn chat() -> RootAddress {
-    RootAddress::Jig(Address::Task { task: 9, section: jig_client::address::TaskSection::Activity })
+    RootAddress::Jig(Address::Task { task: 9, section: jig_domain_client::address::TaskSection::Activity })
 }
 /// Starts with the initial chat already durable.
 #[must_use]
@@ -331,7 +331,7 @@ pub fn project() -> Project {
         last_batch: list([8, 9]),
         cut: false,
     };
-    let part = Part::Project { connector: jig_test_client_domain::FIRST, project: 1 };
+    let part = Part::Project { connector: jig_test_domain_client::FIRST, project: 1 };
     Project {
         period: 3,
         spend_lines: list([TaskSpend { chip: task.chip.clone(), spent: 5 }, TaskSpend { chip: task.chip, spent: 6 }]),
@@ -391,8 +391,8 @@ pub fn deployment() -> Deployment {
         proposals: 2,
         refusals: list([Refusal::Limit { which: Limit::Objects }, Refusal::Limit { which: Limit::Reads }]),
         parts: list([
-            Part::Deployment { connector: jig_test_client_domain::FIRST },
-            Part::Deployment { connector: jig_test_client_domain::SECOND },
+            Part::Deployment { connector: jig_test_domain_client::FIRST },
+            Part::Deployment { connector: jig_test_domain_client::SECOND },
         ]),
     }
 }
@@ -407,7 +407,7 @@ pub fn proposal() -> Proposal {
         proposer: Proposer::Task(10),
         why: text(b"Resolve the incident"),
         action: ProposalAction::Effect {
-            part: Part::Effect { connector: jig_test_client_domain::FIRST, proposal: key },
+            part: Part::Effect { connector: jig_test_domain_client::FIRST, proposal: key },
         },
         needs: authority(),
         funding: budget(),
@@ -446,7 +446,7 @@ fn proposal_fixture(seed: u64, delegate_chip: bool) -> World<Test, Scripted> {
         jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
             party: 7,
             read: Read::Inbox {
-                group: jig_client::contract::InboxReadGroup::Needs,
+                group: jig_domain_client::contract::InboxReadGroup::Needs,
                 project: None,
                 kind: None,
                 goal: None,
@@ -568,7 +568,7 @@ fn accepted_proposal(world: &mut World<Test, Scripted>, p: &Proposal) {
                 jig_scripted_engine::Change::Source(jig_scripted_engine::Source {
                     party: 7,
                     read: Read::Inbox {
-                        group: jig_client::contract::InboxReadGroup::Needs,
+                        group: jig_domain_client::contract::InboxReadGroup::Needs,
                         project: None,
                         kind: None,
                         goal: None,
@@ -618,8 +618,8 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
 /// Person's new-chat sequence, reused by focused and random worlds.
 #[must_use]
 pub fn start_chat_steps() -> Vec<jig_fake_person::Step<RootAddress>> {
-    use jig_client_view::Role;
     use jig_fake_person::{Find, Step};
+    use jig_view::Role;
     vec![
         Step::See { find: Find::named(Role::TextArea, b"First words"), within: Duration::from_secs(1) },
         Step::Type { find: Find::named(Role::TextArea, b"First words"), words: Box::from(*b"Hello") },
@@ -635,7 +635,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: jig_client::contract::Bounds::Goal {
+            within: jig_domain_client::contract::Bounds::Goal {
                 pool_left: 1,
                 procedures: list([]),
                 charters: list([1]),
@@ -692,7 +692,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
-            within: jig_client::contract::Bounds::Goal {
+            within: jig_domain_client::contract::Bounds::Goal {
                 pool_left: 1,
                 procedures: list([GoalProcedure { connector: 2, code: 7 }]),
                 charters: list([]),
@@ -753,17 +753,17 @@ fn incident_delegate() -> Task {
     delegate.chip.task = 10;
     delegate.chip.title = DocumentText::complete(text(b"Delegate ten"));
     delegate.chip.details =
-        Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 } });
+        Box::new(ChipPhase::Procedure { panel: Part::Panel { connector: jig_test_domain_client::FIRST, task: 10 } });
     delegate.requester = OwnerRequester::Task(9);
     delegate.context.as_mut().expect("supplied task context").parts =
-        list([Part::Panel { connector: jig_test_client_domain::FIRST, task: 10 }]);
+        list([Part::Panel { connector: jig_test_domain_client::FIRST, task: 10 }]);
     delegate.proposals = list([proposal().key]);
     delegate
 }
 /// Lead task, delegate and connector parts behind the incident journey.
 #[must_use]
 pub fn incident_world(seed: u64) -> World<Test, Scripted> {
-    use jig_test_client_domain::family as f;
+    use jig_test_domain_client::family as f;
     let mut world = proposal_fixture(seed, true);
     let delegate = incident_delegate();
     let mut lead = task();
@@ -835,14 +835,14 @@ pub fn incident_world(seed: u64) -> World<Test, Scripted> {
     world
         .front()
         .engine
-        .act_application(skein_lib::Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, family, vec![])
+        .act_application(skein_lib::Time::ZERO, Wall::EPOCH, jig_test_domain_client::FIRST, 1, family, vec![])
         .expect("incident family fits");
     world
 }
 /// The application's family incident address.
 #[must_use]
 pub fn incident() -> RootAddress {
-    RootAddress::First(jig_test_client_domain::first::Address { project: 1, item: 1 })
+    RootAddress::First(jig_test_domain_client::first::Address { project: 1, item: 1 })
 }
 /// Complete a scripted task with its whole final report.
 #[must_use]
@@ -852,7 +852,7 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
     task.context.as_mut().expect("supplied task context").runtime = Runtime::Ended;
     task.acts = list([]);
     task.proposals = list([]);
-    task.result = Some(jig_client::contract::TaskResult::Document(Box::new(Result {
+    task.result = Some(jig_domain_client::contract::TaskResult::Document(Box::new(Result {
         task: task.chip.clone(),
         ending: Ending::Done,
         value: Some(ResultValue::Report(DocumentText::complete(text(report)))),
@@ -864,8 +864,8 @@ pub fn reported(mut task: Task, report: &[u8]) -> Task {
     task
 }
 
-fn specification(words: jig_client::contract::Text) -> jig_client::contract::SpecificationDocument {
-    jig_client::contract::SpecificationDocument::complete(jig_client::contract::Specification {
+fn specification(words: jig_domain_client::contract::Text) -> jig_domain_client::contract::SpecificationDocument {
+    jig_domain_client::contract::SpecificationDocument::complete(jig_domain_client::contract::Specification {
         words,
         parameters: skein_lib::List::with_capacity(0),
         inputs: skein_lib::List::with_capacity(0),

@@ -1,5 +1,5 @@
 use super::{Seen, jig_seen, seen};
-use jig_client_view::{Builder, Limits, Role, Run, View};
+use jig_view::{Builder, Limits, Role, Run, View};
 use skein_lib::Queue;
 
 fn status(builder: &mut Builder, name: &[u8]) {

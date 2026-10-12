@@ -3,7 +3,7 @@
 //! proposal key is recursively priced through its owner's Payload impl.
 use super::{Payload, sum};
 use crate::{Bounds, Invalid};
-use jig_client::contract::{OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice};
+use jig_domain_client::contract::{OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice};
 use std::mem::size_of;
 
 impl Payload for OwnerProposalChoice {

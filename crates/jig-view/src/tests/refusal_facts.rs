@@ -1,0 +1,236 @@
+#![expect(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    reason = "ordinary tests inspect complete semantic trees"
+)]
+use super::cards::{CLIENT, contains, limits, shared_words, text};
+use crate::{Builder, Role, Tree};
+use jig_domain_client::contract::*;
+use skein_lib::{List, Wall};
+fn render(refusal: Refusal) -> Tree {
+    let mut builder = Builder::new(&limits());
+    builder.open(Role::Page);
+    shared_words().refusal(&mut builder, &refusal);
+    builder.close();
+    let tree = builder.finish();
+    assert!(tree.len() <= crate::refusal_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
+    super::cards_access::check(&tree);
+    tree
+}
+#[test]
+#[expect(clippy::too_many_lines, reason = "all independent engine refusal categories are checked together")]
+fn engine_refusals_keep_categories_supplied_hold_reasons_and_absent_ending_details() {
+    for which in [
+        AdmissionLimit::Words,
+        AdmissionLimit::Identity,
+        AdmissionLimit::Roles,
+        AdmissionLimit::Arithmetic,
+        AdmissionLimit::Duplicate,
+        AdmissionLimit::Empty,
+        AdmissionLimit::Batch,
+        AdmissionLimit::ProjectLiveTasks,
+        AdmissionLimit::LiveTasks,
+        AdmissionLimit::Tree,
+        AdmissionLimit::Depth,
+        AdmissionLimit::Delegates,
+        AdmissionLimit::Subscription,
+        AdmissionLimit::Dependencies,
+        AdmissionLimit::Cycle,
+        AdmissionLimit::Spec,
+        AdmissionLimit::Contract,
+        AdmissionLimit::Authority,
+        AdmissionLimit::Inputs,
+        AdmissionLimit::Attempts,
+        AdmissionLimit::LiveDelegates,
+        AdmissionLimit::Restore,
+        AdmissionLimit::Read,
+        AdmissionLimit::Turn,
+        AdmissionLimit::HoldKind,
+        AdmissionLimit::HoldTaken,
+        AdmissionLimit::Holds,
+        AdmissionLimit::InboxFull,
+        AdmissionLimit::Notes,
+        AdmissionLimit::Revision,
+        AdmissionLimit::Question,
+        AdmissionLimit::Priority,
+        AdmissionLimit::Policy,
+        AdmissionLimit::Resource,
+        AdmissionLimit::Service,
+    ] {
+        let tree = render(Refusal::Limit { which: Limit::Admission { which } });
+        assert!(
+            tree.nodes()
+                .iter()
+                .any(|node| node.text.iter().any(|run| run.text.starts_with(b"Engine admission limit: ")))
+        );
+        assert_eq!(tree.len(), 2);
+    }
+    for held in [
+        None,
+        Some(HeldRole::Owner),
+        Some(HeldRole::Maintainer),
+        Some(HeldRole::Member),
+        Some(HeldRole::Observer),
+        Some(HeldRole::Policy { role: 7 }),
+        Some(HeldRole::Policy { role: u32::MAX }),
+    ] {
+        let tree = render(Refusal::Role { held });
+        assert!(contains(&tree, b"The held role does not permit this action"));
+        assert_eq!(tree.len(), 3);
+    }
+    for issue in [DisposalIssue::Missing, DisposalIssue::Unknown, DisposalIssue::Repeated] {
+        let tree = render(Refusal::Disposal { task: 81, issue });
+        assert!(tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.windows(2).any(|v| v == b"81"))));
+    }
+    for lacking in [
+        Lacking::Approver,
+        Lacking::Budget { needed: 8, left: 3 },
+        Lacking::GrantKind { kind: 9 },
+        Lacking::Funding,
+        Lacking::TaskKind { executor: None },
+        Lacking::Depth { needed: None, allowed: 7 },
+        Lacking::Deadline { asked: None, latest: None },
+        Lacking::Tasks { needed: None, left: 4 },
+        Lacking::Tool,
+        Lacking::Scope,
+        Lacking::Reference,
+        Lacking::ResourceAccess,
+        Lacking::ResourceUnavailable,
+        Lacking::Shape,
+        Lacking::Again { required: true },
+        Lacking::Again { required: false },
+        Lacking::Account,
+        Lacking::Writer,
+        Lacking::Required { connector: 2, kind: 9 },
+        Lacking::Failed { connector: 2, kind: 9 },
+        Lacking::Unguarded { connector: 2, kind: 9 },
+    ] {
+        let tree = render(Refusal::Authority { lacking, proposable: None });
+        assert!(tree.len() > 1);
+        assert!(!contains(&tree, b"Nobody in this project may accept this proposal"));
+    }
+    for refusal in [Refusal::Taken { by: 7 }, Refusal::NotWaiting, Refusal::NoFurther] {
+        assert!(render(refusal).len() > 1);
+    }
+    for how in [
+        Ending::Failed { reason: None },
+        Ending::Deleted,
+        Ending::Cancelled { by: Actor::ProjectDeployment { project: 6 }, reason: None, at: Some(Wall::EPOCH) },
+        Ending::Decided { by: 7, party: None, how: None, at: Wall::EPOCH },
+    ] {
+        let tree = render(Refusal::Ended { how });
+        assert!(!contains(&tree, b"Accepted"));
+        assert!(!contains(&tree, b"Rejected"));
+    }
+    let mut failures = List::with_capacity(2);
+    for attempt in [1, 2] {
+        failures
+            .push(AttemptFailure {
+                attempt,
+                class: FailureClass::HostLost,
+                reason: text(b"whole failure reason"),
+                at: Wall::EPOCH,
+            })
+            .unwrap();
+    }
+    let tree = render(Refusal::Moved {
+        now: Revision { value: 23 },
+        what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(HoldReason::Tries { failures }))) },
+    });
+    assert!(contains(&tree, b"Current revision 23"));
+    assert!(contains(&tree, b"Reason: whole failure reason"));
+    assert!(contains(&tree, b"Attempt 1"));
+    assert!(contains(&tree, b"Attempt 2"));
+}
+
+#[test]
+fn sparse_current_hold_facts_keep_only_supplied_categories_and_numeric_identities() {
+    let mut reasons = Vec::from([
+        HoldCategory::Stalled,
+        HoldCategory::Dependency { task: 123 },
+        HoldCategory::Stopped,
+        HoldCategory::StoppedBy { party: 123 },
+        HoldCategory::Drift,
+        HoldCategory::Effects,
+        HoldCategory::EffectFailed,
+        HoldCategory::Uncertain { entry: 123 },
+        HoldCategory::Budget,
+        HoldCategory::Deadline,
+        HoldCategory::HoldsWaited,
+        HoldCategory::ResourceUnavailable,
+        HoldCategory::ResourceAccess,
+        HoldCategory::PoolLost { pool: 123 },
+        HoldCategory::Procedure,
+    ]);
+    for class in [
+        HoldFailure::Transient,
+        HoldFailure::Permanent,
+        HoldFailure::Run,
+        HoldFailure::Agent,
+        HoldFailure::Lost,
+        HoldFailure::Invalid,
+    ] {
+        reasons.push(HoldCategory::Failures { class });
+    }
+    for reason in reasons {
+        let tree = render(Refusal::Moved {
+            now: Revision { value: 23 },
+            what: Moved::Hold { reason: Some(CurrentHold::Reason(reason)) },
+        });
+        assert!(contains(&tree, b"Current revision 23"));
+        assert!(tree.len() >= 4);
+        assert!(!tree.nodes().iter().any(|node| node.role == Role::Time));
+        assert!(!contains(&tree, b"Attempt "));
+        assert!(!contains(&tree, b"Reason: "));
+        match reason {
+            HoldCategory::Dependency { .. }
+            | HoldCategory::StoppedBy { .. }
+            | HoldCategory::Uncertain { .. }
+            | HoldCategory::PoolLost { .. } => assert!(contains(&tree, b"123")),
+            HoldCategory::Failures { .. }
+            | HoldCategory::Stalled
+            | HoldCategory::Stopped
+            | HoldCategory::Drift
+            | HoldCategory::Effects
+            | HoldCategory::EffectFailed
+            | HoldCategory::Budget
+            | HoldCategory::Deadline
+            | HoldCategory::HoldsWaited
+            | HoldCategory::ResourceUnavailable
+            | HoldCategory::ResourceAccess
+            | HoldCategory::Procedure => {}
+        }
+    }
+    for (part, label) in [
+        (Part::Panel { connector: 2, task: 123 }, b"Task panel".as_slice()),
+        (Part::Result { connector: 2, task: 123 }, b"Connector result".as_slice()),
+        (Part::Hold { connector: 2, task: 123 }, b"Connector hold".as_slice()),
+    ] {
+        let tree = render(Refusal::Moved {
+            now: Revision { value: 23 },
+            what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(HoldReason::Procedure { part }))) },
+        });
+        assert!(contains(&tree, label));
+        assert!(contains(&tree, b"123"));
+    }
+}
+
+#[test]
+fn outbox_hold_facts_show_the_actual_entry_scope_without_a_proposal_identity() {
+    for scope in [PartScope::Project(u32::MAX), PartScope::Deployment] {
+        let tree = render(Refusal::Moved {
+            now: Revision { value: 9 },
+            what: Moved::Hold {
+                reason: Some(CurrentHold::Document(Box::new(HoldReason::EffectUncertain {
+                    part: Part::Outbox { connector: 2, scope, entry: u64::MAX },
+                }))),
+            },
+        });
+        assert!(contains(&tree, b"Outbox entry 18446744073709551615"));
+        assert!(!contains(&tree, b"Proposal "));
+        match scope {
+            PartScope::Project(_) => assert!(contains(&tree, b"Project 4294967295")),
+            PartScope::Deployment => assert!(contains(&tree, b"Deployment")),
+        }
+    }
+}

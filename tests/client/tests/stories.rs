@@ -1,6 +1,6 @@
-use jig_client_view::Role;
 use jig_client_world::{Until, stories};
 use jig_fake_person::{Find, Step};
+use jig_view::Role;
 use skein_lib::Duration;
 const WITHIN: Duration = Duration::from_secs(1);
 #[test]
@@ -45,7 +45,7 @@ fn a_draft_is_kept_across_a_reload() {
         ],
     );
     w.run(Until::Done);
-    assert!(w.kept(c).iter().any(|r| matches!(r,jig_test_client_domain::store::Record::Jig(jig_client::store::Record::Draft { words,.. }) if words.bytes()==b"Unsent draft")));
+    assert!(w.kept(c).iter().any(|r| matches!(r,jig_test_domain_client::store::Record::Jig(jig_domain_client::store::Record::Draft { words,.. }) if words.bytes()==b"Unsent draft")));
     assert!(w.tree(c).nodes().iter().any(|n| n.value.as_ref().is_some_and(|v| v.text.as_ref() == b"Unsent draft")));
 }
 
@@ -197,9 +197,9 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
         let mut w = stories::goal_world(seed);
         let c = w.client(
             7,
-            jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
+            jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
                 project: 1,
-                section: jig_client::address::ProjectSection::Goals,
+                section: jig_domain_client::address::ProjectSection::Goals,
             }),
         );
         w.person(
@@ -224,11 +224,11 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
         let requests: Vec<_> = commits.iter().filter_map(|c| c.ask.as_ref()).collect();
         assert_eq!(requests.len(), 1);
         assert!(
-            matches!(requests[0], jig_client::contract::Ask::SetGoal { budget: 2, spec, .. } if spec.bytes() == b"Resolve incident")
+            matches!(requests[0], jig_domain_client::contract::Ask::SetGoal { budget: 2, spec, .. } if spec.bytes() == b"Resolve incident")
         );
         assert!(matches!(
             commits.iter().find(|c| c.key.is_some()).expect("incident fixture fits and exists").answer,
-            Some(jig_client::contract::Answer::Done(jig_client::contract::Outcome::Proposed { .. }))
+            Some(jig_domain_client::contract::Answer::Done(jig_domain_client::contract::Outcome::Proposed { .. }))
         ));
     }
 }
@@ -239,9 +239,9 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         let mut w = stories::procedure_goal_world(seed);
         let c = w.client(
             7,
-            jig_test_client_domain::Address::Jig(jig_client::address::Address::Project {
+            jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Project {
                 project: 1,
-                section: jig_client::address::ProjectSection::Goals,
+                section: jig_domain_client::address::ProjectSection::Goals,
             }),
         );
         w.person(
@@ -268,10 +268,10 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         assert_eq!(requests.len(), 1);
         assert_eq!(
             requests[0],
-            &jig_client::contract::Ask::SetGoal {
+            &jig_domain_client::contract::Ask::SetGoal {
                 project: 1,
                 spec: stories::text(b"Resolve incident"),
-                executor: jig_client::contract::GoalExecutor::Procedure { connector: 2, code: 7 },
+                executor: jig_domain_client::contract::GoalExecutor::Procedure { connector: 2, code: 7 },
                 budget: 2,
                 priority: 0,
                 deadline: None,
@@ -279,7 +279,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         );
         assert!(matches!(
             commits.iter().find(|c| c.key.is_some()).expect("the procedure goal has one keyed commit").answer,
-            Some(jig_client::contract::Answer::Done(jig_client::contract::Outcome::Proposed { .. }))
+            Some(jig_domain_client::contract::Answer::Done(jig_domain_client::contract::Outcome::Proposed { .. }))
         ));
     }
 }

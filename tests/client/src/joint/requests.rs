@@ -7,12 +7,12 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
-use jig_client::Limits;
+use jig_domain_client::Limits;
 use jig_domain_core::{self as core, documents::ApplicationScope};
 use jig_domain_people as people;
-use jig_test_client_domain::{Ask, JigOut, Request, first};
 use jig_test_connector::ApplicationRequest;
 use jig_test_domain as root;
+use jig_test_domain_client::{Ask, JigOut, Request, first};
 use sha2::{Digest, Sha256};
 use skein_lib::{Time, Wall};
 
@@ -222,7 +222,8 @@ mod tests {
     #[test]
     fn real_request_dispatch_waits_for_the_supplied_session_without_consuming_native_names() {
         let (mut driver, now, wall) = driver();
-        let value = Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_client::contract::Subject::Frame });
+        let value =
+            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_domain_client::contract::Subject::Frame });
         assert_eq!(
             send(&mut driver, ClientId(0), now, wall, &value, &crate::test::limits().jig),
             Err(Invalid::Session)
@@ -231,7 +232,7 @@ mod tests {
         assert!(driver.poll(now, wall).is_empty());
         assert_eq!(
             value,
-            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_client::contract::Subject::Frame })
+            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_domain_client::contract::Subject::Frame })
         );
     }
 
@@ -255,7 +256,7 @@ mod tests {
         let request = Request::Send {
             attempt,
             key,
-            ask: Ask::Jig(Box::new(jig_client::contract::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: Ask::Jig(Box::new(jig_domain_client::contract::Ask::Stop { project: 1, task: u64::MAX })),
         };
         driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
         send(&mut driver, ClientId(0), now, wall, &request, &crate::test::limits().jig)

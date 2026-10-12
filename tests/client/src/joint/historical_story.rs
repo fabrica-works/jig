@@ -22,7 +22,7 @@ fn world() -> World<Test, Joint> {
         Time::ZERO,
         clock(Time::ZERO),
     );
-    let codec = jig_client_transcript::Limits {
+    let codec = jig_protocol_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 2, blocks: 2, text: 32 },
@@ -128,7 +128,7 @@ fn a_person_revisits_the_whole_historical_task_and_result_by_its_fresh_public_ad
     world.person(
         client,
         vec![
-            Step::Go { address: jig_test_client_domain::Address::Jig(jig_client::address::Address::task(task)) },
+            Step::Go { address: jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::task(task)) },
             Step::See { find: Find::named(Role::Region, b"Historical object"), within },
             Step::See { find: Find::text(b"finished"), within },
         ],

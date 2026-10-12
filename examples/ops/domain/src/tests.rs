@@ -47,7 +47,7 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         triage_templates: Box::new([]),
         lead_templates: Box::new([]),
         backend: infrastructure::Backend::OperationIds,
-        charter_endpoints: Box::new([jig_charter::EndpointName {
+        charter_endpoints: Box::new([jig_protocol_charter::EndpointName {
             number: 1,
             dialect: 1,
             account: 1,

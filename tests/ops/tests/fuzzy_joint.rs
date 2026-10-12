@@ -1,15 +1,15 @@
 //! P reads and acts on the actual engine's public Ops client tree.
-use jig_client::address::{Address as JigAddress, TaskSection};
-use jig_client_view::Role;
 use jig_client_world::{
     Until,
     harness::{ClientId, FrontFault},
 };
 use jig_conformance::Cut;
+use jig_domain_client::address::{Address as JigAddress, TaskSection};
 use jig_fake_person::{Find, Step};
 use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
+use jig_view::Role;
 use skein_lib::Duration;
 use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]
@@ -525,7 +525,7 @@ fn assert_durable_end(
                 pool: environment.pool.clone(),
                 name: environment.name.clone(),
             },
-            revision: jig_client::contract::Revision { value: 0 },
+            revision: jig_domain_client::contract::Revision { value: 0 },
             until: 1_209_600,
         })
         .expect("the protocol hash includes all supplied owner facts, independent of the local view handle");

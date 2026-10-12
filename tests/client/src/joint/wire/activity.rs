@@ -1,7 +1,7 @@
 //! Immutable activity, whole admitted words and separately fetched archives
 //! (client/domain/contract.md, 5 and 7; domain/engine.md, 5.4 and 7.2).
 use super::{chips, owner, results, turns};
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_tasks as tasks;
 use jig_scripted_engine as admission;
 use skein_lib::List;
@@ -11,7 +11,7 @@ pub enum Invalid {
     Owner(owner::Invalid),
     Payload,
     Identity,
-    Archive(jig_client_transcript::Undecodable),
+    Archive(jig_protocol_transcript::Undecodable),
 }
 fn bounds(limits: &Limits) -> admission::Bounds {
     admission::Bounds {
@@ -198,7 +198,7 @@ pub fn line(task: u64, value: &tasks::ActivityLine, limits: &Limits) -> Result<c
 pub fn with_archive(
     value: &client::ActivityLine,
     archive: &jig_domain_core::TurnRecord,
-    codec: &jig_client_transcript::Limits,
+    codec: &jig_protocol_transcript::Limits,
     limits: &Limits,
 ) -> Result<client::ActivityLine, Invalid> {
     let client::Activity::Owner { source, .. } = &value.event else {
@@ -311,12 +311,12 @@ mod tests {
         }
     }
     fn record() -> &'static [u8] {
-        include_bytes!("../../../../../crates/jig-client-transcript/tests/data/record_turn_full.bin")
+        include_bytes!("../../../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin")
     }
     #[test]
     fn fetched_archive_content_retains_the_exact_reference_and_rejects_another_reply_or_whole_overflow() {
         let limits = limits();
-        let codec = jig_client_transcript::Limits {
+        let codec = jig_protocol_transcript::Limits {
             smith: smith_transcript::v3::CEILINGS,
             bytes: 127,
             turn: client::TurnLimits { messages: 1, blocks: 1, text: 3 },
@@ -366,7 +366,7 @@ mod tests {
                 &codec,
                 &limits
             ),
-            Err(Invalid::Archive(jig_client_transcript::Undecodable::Version { found: u16::MAX }))
+            Err(Invalid::Archive(jig_protocol_transcript::Undecodable::Version { found: u16::MAX }))
         );
         assert!(original.event.decoded_turn().is_none());
     }

@@ -1,6 +1,6 @@
 //! Whole note owner facts and literal scopes (contract.md, 5.2; objects.md, 10).
 use super::{offers, owner};
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::documents;
 use jig_domain_notes as notes;
 

@@ -25,7 +25,7 @@ fn deployment_read_keeps_original_query_client_and_token_until_whole_owner_admis
     let Incoming::Callback {
         client: actual_client,
         event:
-            Event::Jig(jig_client::Event::Read {
+            Event::Jig(jig_domain_client::Event::Read {
                 read: actual,
                 result: client::ReadResult::Value(client::ReadValue::OwnerDeployment(value)),
             }),
@@ -64,7 +64,7 @@ fn deployment_watch_keeps_original_subject_and_ack_until_whole_delivery_admissio
     let Incoming::Callback {
         client: actual_client,
         event:
-            Event::Jig(jig_client::Event::Watch {
+            Event::Jig(jig_domain_client::Event::Watch {
                 watch,
                 event: client::WatchEvent::Delivered(client::Delivery::OwnerDeployment(value)),
             }),

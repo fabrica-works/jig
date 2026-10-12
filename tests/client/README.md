@@ -49,7 +49,7 @@ negative referee cases, shell/store and memory cases. `fuzzy_client` keeps
 six independent 16-seed story sweeps and one 32-seed random-truth sweep.
 
 The test application's restored table owner carries `Kept { scope }`.
-At start its root routes `jig_client::Event::Kept { scope, requests }` once
+At start its root routes `jig_domain_client::Event::Kept { scope, requests }` once
 per restored scope; final or retention-unknown retirement routes
 `KeptGone { scope }`. `Limits::kept` must be at least the table's request
 capacity. The client owns the foreign-work warning and clears it after the

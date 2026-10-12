@@ -1,21 +1,21 @@
 //! Whole committed turn decoding through the actual codec (client.md, 10).
 //! Provisional completion identities and offsets never become committed names.
-use jig_client::contract::Turn;
-use jig_client_transcript::{Limits, Undecodable};
+use jig_domain_client::contract::Turn;
+use jig_protocol_transcript::{Limits, Undecodable};
 
 /// # Errors
 /// Returns the actual codec error for unsupported versions, malformed bytes or a record above its admitted bounds.
 pub fn turn(bytes: &[u8], limits: &Limits) -> Result<Turn, Undecodable> {
-    jig_client_transcript::decode(limits, bytes)
+    jig_protocol_transcript::decode(limits, bytes)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_client::contract::{Block, TurnLimits};
+    use jig_domain_client::contract::{Block, TurnLimits};
 
     fn record() -> &'static [u8] {
-        include_bytes!("../../../../../crates/jig-client-transcript/tests/data/record_turn_full.bin")
+        include_bytes!("../../../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin")
     }
 
     fn limits() -> Limits {

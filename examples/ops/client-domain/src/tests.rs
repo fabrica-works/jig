@@ -7,7 +7,7 @@
     reason = "test fixtures collect observed root outputs and locate their variants"
 )]
 use crate::{Address, Answered, Ask, Domain, Event, JigOut, Limits, Request, infrastructure, new, step, take};
-use jig_client::{
+use jig_domain_client::{
     boundary::Offset,
     contract::{
         self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, Outcome, PartyKind, VersionRange,
@@ -17,7 +17,7 @@ use jig_client::{
     link::Link,
 };
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time, Token, Wall};
-const JIG: jig_client::Limits = jig_client::Limits {
+const JIG: jig_domain_client::Limits = jig_domain_client::Limits {
     watches: 4,
     notices: 2,
     notice_life: Duration::from_secs(5),
@@ -104,7 +104,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
     let rows = drive(
         root,
         Event::Start {
-            address: Address::Jig(jig_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
             kept,
             offset: Offset { minutes: 0 },
         },
@@ -117,7 +117,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
         .unwrap()
 }
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
-    drive(root, Event::Jig(jig_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
+    drive(root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {
@@ -138,14 +138,17 @@ fn confirm(root: &mut Domain, watch: Token, party: u64) {
     };
     drive(
         root,
-        Event::Jig(jig_client::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) }),
+        Event::Jig(jig_domain_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))),
+        }),
     );
 }
 fn ask(root: &mut Domain, asked: Token) -> Vec<Request> {
     drive(
         root,
-        Event::Jig(jig_client::Event::Ask {
-            ask: jig_client::intents::ByValue {
+        Event::Jig(jig_domain_client::Event::Ask {
+            ask: jig_domain_client::intents::ByValue {
                 asked,
                 scope: 7,
                 ask: Box::new(contract::Ask::Stop { project: 1, task: 9 }),
@@ -257,7 +260,7 @@ fn link_and_confirmation_reach_both_children_and_park_the_table() {
     assert_eq!(root.infrastructure().party(), Some(7));
     assert_eq!(root.observability().party(), Some(7));
     ask(&mut root, Token::new(42));
-    drive(&mut root, Event::Jig(jig_client::Event::Ended { watch, end: WatchEnd::Dropped }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Ended { watch, end: WatchEnd::Dropped }));
     assert_eq!(root.infrastructure().link(), Link::Offline);
     assert_eq!(root.observability().link(), Link::Offline);
     for row in taken(&mut root) {
@@ -298,8 +301,8 @@ fn restored_requests(count: u32) -> List<crate::store::Record> {
     for n in 0..count {
         drive(
             &mut old,
-            Event::Jig(jig_client::Event::Ask {
-                ask: jig_client::intents::ByValue {
+            Event::Jig(jig_domain_client::Event::Ask {
+                ask: jig_domain_client::intents::ByValue {
                     asked: Token::new(u64::from(n)),
                     scope: 7,
                     ask: Box::new(contract::Ask::Stop { project: 1, task: 9 + u64::from(n) }),
@@ -320,7 +323,7 @@ fn restored_foreign_scope_counts_are_routed_without_root_page_policy() {
     let mut root = new(&limits(), 31);
     let watch = start(&mut root, restored_requests(2));
     confirm(&mut root, watch, 8);
-    assert_eq!(root.jig().page(), &jig_client::pages::Page::SomeoneElse);
+    assert_eq!(root.jig().page(), &jig_domain_client::pages::Page::SomeoneElse);
     assert_eq!(root.infrastructure().party(), Some(8));
     assert!(taken(&mut root).is_empty());
     confirm(&mut root, watch, 7);
@@ -370,7 +373,7 @@ fn retention_unknown_retires_the_last_foreign_scope_and_clears_its_warning() {
     let mut root = new(&limits(), 33);
     let watch = start(&mut root, restored_requests(1));
     confirm(&mut root, watch, 8);
-    assert_eq!(root.jig().page(), &jig_client::pages::Page::SomeoneElse);
+    assert_eq!(root.jig().page(), &jig_domain_client::pages::Page::SomeoneElse);
     let mut future = env();
     future.now = Time::from_nanos(1_002_000_000_000);
     future.wall = Wall::from_nanos(1_002_000_000_000);
@@ -380,15 +383,15 @@ fn retention_unknown_retires_the_last_foreign_scope_and_clears_its_warning() {
     assert!(work_page(root.jig().page()));
 }
 
-fn work_page(page: &jig_client::pages::Page) -> bool {
+fn work_page(page: &jig_domain_client::pages::Page) -> bool {
     match page {
-        jig_client::pages::Page::Work { .. } => true,
-        jig_client::pages::Page::Starting
-        | jig_client::pages::Page::Elsewhere
-        | jig_client::pages::Page::SigningIn
-        | jig_client::pages::Page::Missing
-        | jig_client::pages::Page::OutOfDate
-        | jig_client::pages::Page::SomeoneElse => false,
+        jig_domain_client::pages::Page::Work { .. } => true,
+        jig_domain_client::pages::Page::Starting
+        | jig_domain_client::pages::Page::Elsewhere
+        | jig_domain_client::pages::Page::SigningIn
+        | jig_domain_client::pages::Page::Missing
+        | jig_domain_client::pages::Page::OutOfDate
+        | jig_domain_client::pages::Page::SomeoneElse => false,
     }
 }
 fn ready(seed: u64) -> Domain {
@@ -602,7 +605,7 @@ fn abandoned_read_and_closing_watch_tokens_cannot_recreate_a_page() {
     let rows = drive(
         &mut root,
         Event::Went {
-            place: crate::Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })),
+            place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Inbox { project: None })),
         },
     );
     assert!(rows.contains(&Request::Infrastructure(infrastructure::Out::Close { watch })));
@@ -660,7 +663,7 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
         let mut root = ready(45);
         let rows = drive(
             &mut root,
-            Event::Went { place: crate::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+            Event::Went { place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
         );
         let watch = rows
             .iter()
@@ -674,7 +677,7 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
         let expected = parts.clone();
         let rows = drive(
             &mut root,
-            Event::Jig(jig_client::Event::Watch {
+            Event::Jig(jig_domain_client::Event::Watch {
                 watch,
                 event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
                     hosts: List::with_capacity(0),
@@ -734,7 +737,9 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
         let rows = drive(
             &mut root,
             Event::Went {
-                place: crate::Place::Address(Address::Jig(jig_client::address::Address::Inbox { project: None })),
+                place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Inbox {
+                    project: None,
+                })),
             },
         );
         assert_eq!(
@@ -837,10 +842,10 @@ fn incident_facts_keep_cuts_and_unknown_health_and_never_turn_a_watch_into_a_lea
 }
 #[test]
 fn application_navigation_is_forwarded_before_start_and_retains_order() {
-    use jig_client::pages::navigation::{Destination, Navigation};
+    use jig_domain_client::pages::navigation::{Destination, Navigation};
     let mut root = new(&limits(), 47);
     let mut navigation = Navigation::new(2);
-    navigation.entries.push(Destination::Jig(jig_client::address::Address::Inbox { project: None })).unwrap();
+    navigation.entries.push(Destination::Jig(jig_domain_client::address::Address::Inbox { project: None })).unwrap();
     navigation
         .entries
         .push(Destination::Application {

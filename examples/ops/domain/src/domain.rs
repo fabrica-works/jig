@@ -48,7 +48,7 @@ pub struct Config {
     /// The infrastructure backend's available recovery promise.
     pub backend: infrastructure::Backend,
     /// Charter codec endpoint names for the configured endpoint identities.
-    pub charter_endpoints: Box<[jig_charter::EndpointName]>,
+    pub charter_endpoints: Box<[jig_protocol_charter::EndpointName]>,
 }
 
 pub(crate) type CallEnvelope = (Box<[u8]>, Box<[u8]>);
@@ -62,9 +62,9 @@ pub struct Domain {
     pub(crate) infrastructure: infrastructure::Domain,
     pub(crate) host: host::Domain,
     pub(crate) journal: Journal<Write, Output>,
-    pub(crate) charter_endpoints: Box<[jig_charter::EndpointName]>,
+    pub(crate) charter_endpoints: Box<[jig_protocol_charter::EndpointName]>,
     pub(crate) assignments: Map<u64, Assignment>,
-    pub(crate) briefs: Map<u64, Box<[jig_charter::Section]>>,
+    pub(crate) briefs: Map<u64, Box<[jig_protocol_charter::Section]>>,
     pub(crate) calls: Map<core::CallKey, CallEnvelope>,
     pub(crate) read_calls: Map<Token, ReadCall>,
     pub(crate) payloads: Map<Token, Payload>,

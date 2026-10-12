@@ -5,10 +5,10 @@
     reason = "fixtures inspect public tree nodes and observed boundary outputs"
 )]
 use crate::{Limits, View, build, words};
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use jig_ops_client_domain::{self as root, Address, Domain, Event, JigOut, Request, infrastructure, observability};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall};
-const JIG: jig_client::Limits = jig_client::Limits {
+const JIG: jig_domain_client::Limits = jig_domain_client::Limits {
     watches: 4,
     notices: 2,
     notice_life: Duration::from_secs(5),
@@ -34,7 +34,7 @@ const JIG: jig_client::Limits = jig_client::Limits {
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,
-    backoff: jig_client::limits::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
+    backoff: jig_domain_client::limits::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
     heartbeat: Duration::from_nanos(100),
 };
 fn limits() -> root::Limits {
@@ -86,9 +86,9 @@ fn ready() -> Domain {
     let rows = drive(
         &mut root,
         Event::Start {
-            address: Address::Jig(jig_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
             kept: List::with_capacity(0),
-            offset: jig_client::boundary::Offset { minutes: 0 },
+            offset: jig_domain_client::boundary::Offset { minutes: 0 },
         },
     );
     let watch = rows
@@ -98,7 +98,7 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
+    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { versions: VersionRange { first: 1, last: 1 } }));
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {
@@ -119,18 +119,21 @@ fn ready() -> Domain {
     };
     drive(
         &mut root,
-        Event::Jig(jig_client::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) }),
+        Event::Jig(jig_domain_client::Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))),
+        }),
     );
     root
 }
-fn phrasebooks() -> (jig_client_view::words::Words, words::Words, words::Words) {
-    static WORDS: std::sync::OnceLock<(jig_client_view::words::Words, words::Words, words::Words)> =
+fn phrasebooks() -> (jig_view::words::Words, words::Words, words::Words) {
+    static WORDS: std::sync::OnceLock<(jig_view::words::Words, words::Words, words::Words)> =
         std::sync::OnceLock::new();
     WORDS
         .get_or_init(|| {
             (
-                jig_client_view::words::Words {
-                    book: jig_client_view::phrases::english::english(32).unwrap(),
+                jig_view::words::Words {
+                    book: jig_view::phrases::english::english(32).unwrap(),
                     language: 0,
                     offset_minutes: 0,
                 },
@@ -236,13 +239,15 @@ fn an_incident_drawing_has_a_readable_fallback_and_missing_lead_is_explicit() {
         view.tree()
             .nodes()
             .iter()
-            .any(|n| n.role == jig_client_view::Role::Drawing && n.name.as_deref() == Some(b"Error rate".as_slice()))
+            .any(|n| n.role == jig_view::Role::Drawing && n.name.as_deref() == Some(b"Error rate".as_slice()))
     );
     let text: Vec<u8> =
         view.tree().nodes().iter().flat_map(|n| n.text.iter().flat_map(|r| r.text.iter().copied())).collect();
     assert!(String::from_utf8(text).unwrap().contains("Error rate 30 % Since 10:02, Before: 2 %"));
-    assert!(view.tree().nodes().iter().any(|n| n.role == jig_client_view::Role::Status
-        && n.name.as_deref() == Some(b"No lead task has been supplied".as_slice())));
+    assert!(
+        view.tree().nodes().iter().any(|n| n.role == jig_view::Role::Status
+            && n.name.as_deref() == Some(b"No lead task has been supplied".as_slice()))
+    );
     while patches.pop().is_some() {}
     build(&mut view, &root, &mut patches);
     assert!(patches.is_empty());
@@ -296,7 +301,7 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
     let mut root = ready();
     let rows = drive(
         &mut root,
-        Event::Went { place: root::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+        Event::Went { place: root::Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
     );
     let watch = rows
         .iter()
@@ -312,7 +317,7 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
     }
     let rows = drive(
         &mut root,
-        Event::Jig(jig_client::Event::Watch {
+        Event::Jig(jig_domain_client::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
                 hosts: List::with_capacity(0),
@@ -355,12 +360,7 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
     let mut patches = Queue::with_capacity(view.limits().tree.patches);
     build(&mut view, &root, &mut patches);
     for kind in [5, 10] {
-        let expected = jig_client_view::Key {
-            owner: jig_client_view::Owner::Side { connector: 2 },
-            kind,
-            a: u64::MAX,
-            b: u64::MAX,
-        };
+        let expected = jig_view::Key { owner: jig_view::Owner::Side { connector: 2 }, kind, a: u64::MAX, b: u64::MAX };
         assert_eq!(view.tree().nodes().iter().filter(|node| node.key == Some(expected)).count(), 1);
     }
     assert!(contains(&view, b"Loading"));
@@ -549,7 +549,7 @@ fn an_incident_with_a_proposal_and_an_infrastructure_panel_fills_both_slot_passe
                 _ => continue,
             };
             let parts =
-                drive(&mut root, Event::Jig(jig_client::Event::Read { read, result: ReadResult::Value(value) }));
+                drive(&mut root, Event::Jig(jig_domain_client::Event::Read { read, result: ReadResult::Value(value) }));
             for r in parts {
                 if let Request::Infrastructure(infrastructure::Out::Read { read, subject }) = r {
                     use infrastructure::documents::{Panel, PartDocument, Phase, Procedure, Service};
@@ -598,8 +598,13 @@ fn an_incident_with_a_proposal_and_an_infrastructure_panel_fills_both_slot_passe
     build(&mut view, &root, &mut patches);
     assert!(contains(&view, b"Task 9"));
     assert!(contains(&view, b"Waiting at policy roles"));
-    assert!(view.tree().nodes().iter().any(|n| n.role == jig_client_view::Role::Region
-        && n.name.as_deref() == Some(b"Infrastructure procedure".as_slice())));
+    assert!(
+        view.tree()
+            .nodes()
+            .iter()
+            .any(|n| n.role == jig_view::Role::Region
+                && n.name.as_deref() == Some(b"Infrastructure procedure".as_slice()))
+    );
     assert!(contains(&view, b"Waiting for condition"));
     assert!(view.tree().len() <= view.limits().tree.nodes);
     while patches.pop().is_some() {}
@@ -659,12 +664,12 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
         .nodes()
         .iter()
         .find(|n| {
-            n.role == jig_client_view::Role::TextField
+            n.role == jig_view::Role::TextField
                 && n.name.as_deref() == Some(b"New end (seconds since epoch)".as_slice())
         })
         .unwrap()
         .id;
-    let action = crate::decode(&mut view, field, jig_client_view::Act::Input { value: Box::from(*b"900") }).unwrap();
+    let action = crate::decode(&mut view, field, jig_view::Act::Input { value: Box::from(*b"900") }).unwrap();
     drive(&mut root, Event::Act { action });
     while patches.pop().is_some() {}
     build(&mut view, &root, &mut patches);
@@ -672,10 +677,10 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
         .tree()
         .nodes()
         .iter()
-        .find(|n| n.role == jig_client_view::Role::Button && n.name.as_deref() == Some(b"Move end".as_slice()))
+        .find(|n| n.role == jig_view::Role::Button && n.name.as_deref() == Some(b"Move end".as_slice()))
         .unwrap()
         .id;
-    let action = crate::decode(&mut view, button, jig_client_view::Act::Press).unwrap();
+    let action = crate::decode(&mut view, button, jig_view::Act::Press).unwrap();
     assert!(drive(&mut root, Event::Act { action }).is_empty());
     let mut out = Queue::with_capacity(root::max_out(&limits()));
     root::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
@@ -711,8 +716,8 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
 }
 #[test]
 fn extreme_capacity_and_wall_overflow_are_refused_before_building() {
-    let jig = jig_client_view::words::Words {
-        book: jig_client_view::phrases::english::english(32).unwrap(),
+    let jig = jig_view::words::Words {
+        book: jig_view::phrases::english::english(32).unwrap(),
         language: 0,
         offset_minutes: 0,
     };
@@ -767,7 +772,7 @@ fn an_environment_without_an_end_has_no_revision_or_move_form() {
     let mut view = view();
     let mut patches = Queue::with_capacity(view.limits().tree.patches);
     build(&mut view, &root, &mut patches);
-    assert!(!view.tree().nodes().iter().any(|n| n.role == jig_client_view::Role::TextField
+    assert!(!view.tree().nodes().iter().any(|n| n.role == jig_view::Role::TextField
         && n.name.as_deref() == Some(b"New end (seconds since epoch)".as_slice())));
     assert!(!view.tree().nodes().iter().any(|n| n.name.as_deref() == Some(b"Move end".as_slice())));
     assert!(!contains(&view, b"Cost:"));
@@ -867,7 +872,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
         let mut root = ready();
         let rows = drive(
             &mut root,
-            Event::Went { place: root::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+            Event::Went { place: root::Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
         );
         let watch = rows
             .iter()
@@ -880,7 +885,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
         parts.push(Part::Outbox { connector: 2, scope, entry: 17 }).unwrap();
         let rows = drive(
             &mut root,
-            Event::Jig(jig_client::Event::Watch {
+            Event::Jig(jig_domain_client::Event::Watch {
                 watch,
                 event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
                     hosts: List::with_capacity(0),
@@ -918,8 +923,7 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
             PartScope::Project(project) => u64::from(project),
             PartScope::Deployment => u64::MAX,
         };
-        let expected_key =
-            jig_client_view::Key { owner: jig_client_view::Owner::Side { connector: 2 }, kind: 6, a: value, b: 17 };
+        let expected_key = jig_view::Key { owner: jig_view::Owner::Side { connector: 2 }, kind: 6, a: value, b: 17 };
         assert!(view.tree().nodes().iter().any(|node| node.key == Some(expected_key)));
         assert!(contains(&view, b"Outbox entry 17"));
         assert!(contains(&view, b"Sent"));
@@ -986,14 +990,14 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     assert!(tree_limits.nodes <= envelope.nodes);
     assert!(tree_limits.slots <= envelope.slots);
     assert!(tree_limits.text_per_node >= 128);
-    let mut builder = jig_client_view::Builder::new(&tree_limits);
-    let mut jig_bindings = jig_client_view::JigBindings::new(16, JIG.text);
+    let mut builder = jig_view::Builder::new(&tree_limits);
+    let mut jig_bindings = jig_view::JigBindings::new(16, JIG.text);
     let mut obs_bindings = crate::bindings::Bindings::new(16, 32, 1);
     let mut infra_bindings = crate::bindings::Bindings::new(16, 32, 2);
     let mut obs = observability::Side::new(&domain_limits.observability, 63);
     let mut infra = infrastructure::Side::new(&domain_limits.infrastructure, 64);
     let mut expected = Vec::new();
-    builder.open(jig_client_view::Role::Page);
+    builder.open(jig_view::Role::Page);
     for connector in [1, 2] {
         for path in [
             list([Box::<[u8]>::from(*b"a/b"), Box::<[u8]>::from(*b"c")]),
@@ -1031,7 +1035,7 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
                 assert!(infra.contains(&part, 11));
                 assert!(out.is_empty());
             }
-            jig_client_view::cards::common::part(&mut builder, &part, &jig_words, &mut jig_bindings);
+            jig_view::cards::common::part(&mut builder, &part, &jig_words, &mut jig_bindings);
             expected.push(part);
         }
     }
@@ -1041,11 +1045,11 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
     assert_eq!(slots.len(), 8);
     for (slot, part) in slots.iter().zip(&expected) {
         assert_eq!(jig_bindings.part(slot.reference.token), Some(part));
-        let mut fragment = jig_client_view::Builder::new(&tree_limits);
-        if slot.reference.owner == (jig_client_view::Owner::Side { connector: 1 }) {
+        let mut fragment = jig_view::Builder::new(&tree_limits);
+        if slot.reference.owner == (jig_view::Owner::Side { connector: 1 }) {
             crate::observability::part(&mut fragment, &obs, part, 11, &obs_words, &mut obs_bindings);
         } else {
-            assert_eq!(slot.reference.owner, jig_client_view::Owner::Side { connector: 2 });
+            assert_eq!(slot.reference.owner, jig_view::Owner::Side { connector: 2 });
             crate::infrastructure::part(&mut fragment, &infra, part, 11, &infra_words, &jig_words, &mut infra_bindings);
         }
         builder.splice(slot.id, fragment);
@@ -1055,7 +1059,7 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
         .nodes()
         .iter()
         .flat_map(|node| node.text.iter())
-        .filter(|run| run.run == jig_client_view::Run::Code)
+        .filter(|run| run.run == jig_view::Run::Code)
         .map(|run| run.text.as_ref())
         .collect();
     for bytes in [b"a/b".as_slice(), b"c", b"a", b"b/c", b"/\0", b"\\xFF\\x00"] {
@@ -1082,7 +1086,7 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
 fn deployment_read(root: &mut Domain, connector: u16) -> Request {
     let rows = drive(
         root,
-        Event::Went { place: root::Place::Address(Address::Jig(jig_client::address::Address::Deployment)) },
+        Event::Went { place: root::Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
     );
     let watch = rows
         .iter()
@@ -1093,7 +1097,7 @@ fn deployment_read(root: &mut Domain, connector: u16) -> Request {
         .unwrap();
     let rows = drive(
         root,
-        Event::Jig(jig_client::Event::Watch {
+        Event::Jig(jig_domain_client::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
                 hosts: list([]),
@@ -1275,7 +1279,7 @@ fn unknown_deployment_parts_keep_missing_owner_facts_without_not_kept_captions()
 
 #[test]
 fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_holes() {
-    use jig_client_view::phrases::{
+    use jig_view::phrases::{
         Form, Language, Phrase, PhraseLimits, PhraseShape, Phrasebook, PluralClass, PluralRule, Segment, SpanUnit,
         WallFormat,
     };
@@ -1314,7 +1318,7 @@ fn deferred_connector_diagnostic_words_select_bounded_checked_language_without_h
         let book = Phrasebook::load(shapes.clone().into_boxed_slice(), languages.clone(), &bounds).unwrap();
         let selected_words = words::Words { book, language: 1, connector };
         let tree_limits = view().limits().tree;
-        let mut builder = jig_client_view::Builder::new(&tree_limits);
+        let mut builder = jig_view::Builder::new(&tree_limits);
         for (word, text) in ids.into_iter().zip(texts) {
             assert_eq!(selected_words.say(word, &[]).as_ref(), text);
             selected_words.text(&mut builder, word, &[]);
@@ -1359,8 +1363,8 @@ fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_ke
     for connector in [1, 2] {
         for proposal in [0, u64::MAX] {
             let part = Part::OwnerEffect { connector, proposal };
-            let mut builder = jig_client_view::Builder::new(&tree_limits);
-            builder.open(jig_client_view::Role::Page);
+            let mut builder = jig_view::Builder::new(&tree_limits);
+            builder.open(jig_view::Role::Page);
             let mut bindings = crate::bindings::Bindings::new(0, 32, connector);
             if connector == 1 {
                 let mut side = observability::Side::new(&domain_limits.observability, 84);
@@ -1397,8 +1401,7 @@ fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_ke
             }
             builder.close();
             let tree = builder.finish();
-            let status: Vec<_> =
-                tree.nodes().iter().filter(|node| node.role == jig_client_view::Role::Status).collect();
+            let status: Vec<_> = tree.nodes().iter().filter(|node| node.role == jig_view::Role::Status).collect();
             assert_eq!(status.len(), 1);
             let expected =
                 if connector == 1 { b"Cannot show this part".as_slice() } else { b"Loading document".as_slice() };
@@ -1424,7 +1427,7 @@ fn native_effect_facts_have_distinct_proposal_and_state_labels() {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.infrastructure };
     let mut out = Queue::with_capacity(infrastructure::max_out(&limits.infrastructure));
     for event in [
-        infrastructure::Event::Link { link: jig_client::link::Link::Live },
+        infrastructure::Event::Link { link: jig_domain_client::link::Link::Live },
         infrastructure::Event::Confirmed { party: Some(1) },
         infrastructure::Event::Show { part: part.clone(), generation: 9, scope: infrastructure::Scope::Project(0) },
     ] {
@@ -1468,8 +1471,8 @@ fn native_effect_facts_have_distinct_proposal_and_state_labels() {
         },
         &mut out,
     );
-    let mut builder = jig_client_view::Builder::new(&tree_limits);
-    builder.open(jig_client_view::Role::Page);
+    let mut builder = jig_view::Builder::new(&tree_limits);
+    builder.open(jig_view::Role::Page);
     let mut bindings = crate::bindings::Bindings::new(tree_limits.bindings, limits.infrastructure.text, 2);
     crate::infrastructure::part(&mut builder, &side, &part, 9, &words, &jig_words, &mut bindings);
     builder.close();
@@ -1544,7 +1547,7 @@ fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_wi
         .nodes()
         .iter()
         .find(|node| {
-            node.role == jig_client_view::Role::TextField
+            node.role == jig_view::Role::TextField
                 && node.name.as_deref() == Some(b"New end (seconds since epoch)".as_slice())
         })
         .expect("native end field");
@@ -1552,7 +1555,7 @@ fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_wi
     assert_eq!(field.value.as_ref().expect("native value").written, 17);
     let field = field.id;
     assert_eq!(
-        crate::decode(&mut view, field, jig_client_view::Act::Input { value: Box::from(*b"18446744073709551614") }),
+        crate::decode(&mut view, field, jig_view::Act::Input { value: Box::from(*b"18446744073709551614") }),
         Some(jig_ops_client_domain::Action::Infrastructure(infrastructure::Act::NativeUntil {
             object: id.token(),
             revision: Revision { value: 17 },

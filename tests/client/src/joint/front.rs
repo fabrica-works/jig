@@ -7,7 +7,7 @@ use crate::{
     test::Test,
 };
 use jig_domain_people::Identity;
-use jig_test_client_domain::{Event, JigOut, Request, first};
+use jig_test_domain_client::{Event, JigOut, Request, first};
 use skein_lib::{Duration, Time, Token, Wall};
 use std::collections::BTreeMap;
 
@@ -37,7 +37,7 @@ pub struct Joint {
     last_client: Option<ClientId>,
     last_watch: Option<(ClientId, Token)>,
     last_attempt: Option<(ClientId, Token)>,
-    version_fault: Option<jig_client::contract::VersionRange>,
+    version_fault: Option<jig_domain_client::contract::VersionRange>,
     restart_configuration: Option<fn() -> jig_test_domain::Config>,
     busy_pressure: Option<fn() -> jig_fake_parties::Party>,
     not_ready_restore: Option<(fn() -> jig_test_domain::Config, Duration)>,
@@ -75,7 +75,7 @@ impl Joint {
     }
 
     /// Configure the actual incompatible served range for a version fault.
-    pub fn version_fault(&mut self, versions: jig_client::contract::VersionRange) {
+    pub fn version_fault(&mut self, versions: jig_domain_client::contract::VersionRange) {
         self.version_fault = Some(versions);
     }
 
@@ -229,8 +229,8 @@ impl Front<Test> for Joint {
 mod tests {
     use super::*;
     use crate::joint::engine::Driver;
-    use jig_client::contract as client;
     use jig_core_world::peers::Peers;
+    use jig_domain_client::contract as client;
     use jig_domain_people as people;
 
     fn clock(now: Time) -> Wall {
@@ -250,7 +250,7 @@ mod tests {
             clock(Time::ZERO),
         );
         let limits = crate::test::limits();
-        let codec = jig_client_transcript::Limits {
+        let codec = jig_protocol_transcript::Limits {
             smith: smith_transcript::v3::CEILINGS,
             bytes: 1_048_576,
             turn: client::TurnLimits { messages: 64, blocks: 16, text: 65_536 },
@@ -266,8 +266,8 @@ mod tests {
     #[test]
     fn an_unsigned_protocol_client_signs_in_only_when_the_person_chooses_the_visible_provider() {
         use crate::{Settings, Until, World};
-        use jig_client_view::Role;
         use jig_fake_person::{Find, Step};
+        use jig_view::Role;
         let mut limits = jig_core_world::world::limits();
         limits.core.documents.rows = 2;
         limits.core.documents.lines = 2;
@@ -306,7 +306,7 @@ mod tests {
         Front::<Test>::bind(&mut front, ClientId(0), 1);
         let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
         assert_eq!(callbacks.len(), 1);
-        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client::Event::Hello { .. }))));
+        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))));
         let observations = Front::<Test>::observed(&mut front);
         assert!(matches!(observations.first(), Some(Observed::Durable { at: Time::ZERO, .. })));
         assert!(Front::<Test>::observed(&mut front).is_empty());
@@ -358,7 +358,7 @@ mod tests {
         let mut front = front_with_limits(&owner_limits);
         Front::<Test>::bind(&mut front, ClientId(0), 1);
         let initial = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
-        assert!(matches!(initial.as_slice(), [(ClientId(0), Event::Jig(jig_client::Event::Hello { .. }))]));
+        assert!(matches!(initial.as_slice(), [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))]));
         let _ = Front::<Test>::observed(&mut front);
         front.busy_pressure(pressure_party);
         front.try_fault(Time::ZERO, &FrontFault::Busy).expect("actual scripted source");
@@ -374,7 +374,7 @@ mod tests {
         let request = |attempt| Request::Send {
             attempt,
             key: [62; 16],
-            ask: jig_test_client_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: jig_test_domain_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
         };
         Front::<Test>::wire(&mut front, ClientId(0), Time::ZERO, clock(Time::ZERO), request(Token::new(31)));
         let peer = front.session.driver.world.client_peer.as_ref().expect("registered protocol peer");
@@ -473,7 +473,7 @@ mod tests {
         let request = |attempt| Request::Send {
             attempt,
             key: [63; 16],
-            ask: jig_test_client_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+            ask: jig_test_domain_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
         };
         Front::<Test>::wire(&mut front, ClientId(0), Time::ZERO, clock(Time::ZERO), request(Token::new(41)));
         assert!(front.session.driver.world.client_peer.as_ref().expect("actual protocol peer").delivered.iter().any(
@@ -529,9 +529,9 @@ mod tests {
         Front::<Test>::fault(&mut front, Time::ZERO, FrontFault::Versions);
         let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
         assert!(
-            matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_client::Event::Hello { versions }))] if *versions == supplied)
+            matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { versions }))] if *versions == supplied)
         );
-        assert_eq!(front.session.driver.transport.hello(), jig_client::Event::Hello { versions: supplied });
+        assert_eq!(front.session.driver.transport.hello(), jig_domain_client::Event::Hello { versions: supplied });
         assert_eq!(front.session.driver.world.store.rows, rows);
         assert!(Front::<Test>::observed(&mut front).is_empty());
     }
@@ -552,7 +552,7 @@ mod tests {
         assert!(Front::<Test>::observed(&mut front).is_empty());
         let until = Time::ZERO.saturating_add(span);
         let callbacks = Front::<Test>::poll(&mut front, until, clock(until));
-        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_client::Event::Hello { .. }))]));
+        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))]));
         assert!(matches!(Front::<Test>::observed(&mut front).first(), Some(Observed::Reachable { live: true })));
         assert!(Front::<Test>::observed(&mut front).is_empty());
     }

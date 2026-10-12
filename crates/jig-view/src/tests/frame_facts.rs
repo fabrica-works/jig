@@ -1,0 +1,143 @@
+#![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and exact supplied source values")]
+use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
+use crate::{Builder, JigBindings, Owner, Role, SlotRef, Tree};
+use jig_domain_client::{Domain, Event, contract::*};
+use skein_lib::{List, Token, Wall};
+fn tree(domain: &Domain) -> Tree {
+    let mut sized = limits();
+    sized.nodes = crate::frame_nodes(&CLIENT).unwrap().checked_add(1).unwrap();
+    let mut builder = Builder::new(&sized);
+    let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
+    builder.open(Role::Page);
+    crate::frame::frame(
+        &mut builder,
+        domain,
+        SlotRef { owner: Owner::Other { child: 1 }, token: Token::new(1) },
+        &words(),
+        &mut bindings,
+    );
+    builder.close();
+    let tree = builder.finish();
+    assert!(tree.len() <= sized.nodes);
+    super::cards_access::check(&tree);
+    tree
+}
+fn ready(source: Frame) -> Domain {
+    let (mut domain, watch) = start();
+    drive(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) });
+    domain
+}
+#[test]
+fn frame_tree_keeps_absent_empty_and_partial_names_separate_from_identity_loss() {
+    for name in
+        [None, Some(DocumentText::complete(text(b""))), Some(DocumentText { bytes: text(b"partial-name"), cut: true })]
+    {
+        let mut source = document();
+        source.party.kind = PartyKind::Service;
+        source.party.login = DocumentText { bytes: text(b"supplied-login"), cut: true };
+        source.party.name = DocumentText::complete(text(b"supplied-name"));
+        source.projects.get_mut(0).unwrap().name = name.clone();
+        source.projects.get_mut(0).unwrap().pool = None;
+        let domain = ready(source.clone());
+        let shown = tree(&domain);
+        assert!(contains(&shown, b"Login: supplied-login"));
+        assert!(contains(&shown, b"supplied-name"));
+        assert!(contains(&shown, b"Service"));
+        assert!(contains(&shown, b"Pool ledger not supplied"));
+        let expected = match name {
+            None => b"Project 4".as_slice(),
+            Some(ref value) if value.bytes().is_empty() => b"Project: ".as_slice(),
+            Some(_) => b"Project: partial-name".as_slice(),
+        };
+        assert!(shown.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(expected)));
+        assert_eq!(
+            shown
+                .nodes()
+                .iter()
+                .filter(|node| node.text.iter().any(|run| run.text.as_ref() == b"Only part of this text was supplied"))
+                .count(),
+            if name.as_ref().is_some_and(|value| value.cut) { 2 } else { 1 }
+        );
+        assert_eq!(domain.frame().document.as_ref(), Some(&source));
+    }
+}
+#[test]
+fn frame_tree_uses_supplied_totals_goal_list_loss_and_all_pool_ledger_facts() {
+    let mut source = document();
+    source.needs_total = 17;
+    source.results_seen = u64::MAX;
+    source.cut = true;
+    source.charters.get_mut(0).unwrap().project = u32::MAX;
+    source.charters.get_mut(0).unwrap().cut = true;
+    source.projects.get_mut(0).unwrap().role = HeldRole::Policy { role: u32::MAX };
+    let ledger = PoolLedger {
+        source: Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX },
+        parent: Some(Funder::Period { project: 18, period: 19 }),
+        numbers: OwnerNumbers { budget: 101, spent: 7, spent_below: 11, reserved: 13 },
+        left: 17,
+        closed: true,
+        began: Some(Wall::from_nanos(60_000_000_000)),
+        next: Some(Wall::from_nanos(120_000_000_000)),
+    };
+    source.projects.get_mut(0).unwrap().pool = Some(ledger.clone());
+    let domain = ready(source.clone());
+    let shown = tree(&domain);
+    for bytes in [
+        b"17 need you".as_slice(),
+        b"Questions: 1; proposals: 2; escalations: 3; person tasks: 4",
+        b"Results read through 18446744073709551615",
+        b"More project memberships than shown",
+        b"More goal charters in project 4294967295",
+        b"Budget: 101",
+        b"Spent directly: 7",
+        b"Settled spend below: 11",
+        b"Reserved for funded work: 13",
+        b"Left: 17",
+    ] {
+        assert!(contains(&shown, bytes), "missing {bytes:?}");
+    }
+    assert!(!contains(&shown, b"Pool ledger not supplied"));
+    assert_eq!(domain.frame().document.as_ref().unwrap().projects.get(0).unwrap().pool.as_ref(), Some(&ledger));
+    source.projects.get_mut(0).unwrap().pool.as_mut().unwrap().left = 0;
+    source.projects.get_mut(0).unwrap().pool.as_mut().unwrap().closed = false;
+    let zero = tree(&ready(source));
+    assert!(contains(&zero, b"Left: 0"));
+    assert!(!contains(&zero, b"Pool ledger not supplied"));
+}
+#[test]
+fn chat_forms_join_membership_only_by_supplied_project_and_preserve_optional_charter_names() {
+    let mut source = document();
+    let mut chats = List::with_capacity(2);
+    chats.push(Charter { number: u32::MAX, name: None }).unwrap();
+    chats.push(Charter { number: 0, name: Some(DocumentText { bytes: text(b"actual-charter"), cut: true }) }).unwrap();
+    source.charters.get_mut(0).unwrap().chats = chats;
+    source.projects.get_mut(0).unwrap().chat_budget = 123;
+    let mut domain = ready(source.clone());
+    drive(
+        &mut domain,
+        Event::Went {
+            place: jig_domain_client::address::Place::Jig(jig_domain_client::address::Address::Conversations {
+                project: None,
+            }),
+        },
+    );
+    let shown = super::pages::build(&domain, 1, &words()).0;
+    for bytes in
+        [b"Charter 4294967295".as_slice(), b"actual-charter", b"Budget 123", b"Only part of this text was supplied"]
+    {
+        assert!(contains(&shown, bytes));
+    }
+    source.charters.get_mut(0).unwrap().project = 9;
+    let mut mismatched = ready(source);
+    drive(
+        &mut mismatched,
+        Event::Went {
+            place: jig_domain_client::address::Place::Jig(jig_domain_client::address::Address::Conversations {
+                project: None,
+            }),
+        },
+    );
+    let shown = super::pages::build(&mismatched, 1, &words()).0;
+    assert!(!contains(&shown, b"Budget 123"));
+    assert!(!contains(&shown, b"actual-charter"));
+}

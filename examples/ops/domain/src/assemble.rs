@@ -4,13 +4,13 @@
 use crate::domain::Work;
 use crate::{Domain, Limits};
 use alloc::boxed::Box;
-use jig_charter as charter;
 use jig_domain_accounts as accounts;
 use jig_domain_brief as brief;
 use jig_domain_core as core;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
 use jig_ops_connectors::Connector;
+use jig_protocol_charter as charter;
 use skein_lib::{Decimal, Env, List, Queue, Reader, ReplyTo, Token, Writer};
 
 pub(crate) fn brief(order: Box<[brief::GatherPlaced]>) -> Box<[charter::Section]> {

@@ -54,7 +54,7 @@ fn world() -> World<Test, Joint> {
             holdings: Box::new([]),
         })),
     );
-    let codec = jig_client_transcript::Limits {
+    let codec = jig_protocol_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 2, blocks: 2, text: 32 },
@@ -73,7 +73,7 @@ fn world() -> World<Test, Joint> {
 #[test]
 fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from_the_engine() {
     let mut world = world();
-    let client = world.client(1, jig_test_client_domain::Address::Jig(jig_client::address::Address::Deployment));
+    let client = world.client(1, jig_test_domain_client::Address::Jig(jig_domain_client::address::Address::Deployment));
     let within = Duration::from_secs(1);
     world.person(
         client,
@@ -107,8 +107,8 @@ fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from
         .take(region.size as usize - 1)
         .filter_map(|node| node.slot)
         .map(|slot| match slot.owner {
-            jig_client_view::Owner::Side { connector } => connector,
-            other @ (jig_client_view::Owner::Jig | jig_client_view::Owner::Other { .. }) => {
+            jig_view::Owner::Side { connector } => connector,
+            other @ (jig_view::Owner::Jig | jig_view::Owner::Other { .. }) => {
                 panic!("connector catalogue slot has its actual side owner: {other:?}")
             }
         })

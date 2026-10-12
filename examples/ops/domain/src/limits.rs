@@ -4,12 +4,12 @@ use crate::boundary::Payload;
 use crate::domain::{Assignment, HostCall, ReadCall, Work};
 use crate::{Output, Write};
 use alloc::boxed::Box;
-use jig_charter as charter;
 use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_host as host;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
+use jig_protocol_charter as charter;
 use skein_lib::{Journal, JournalLimits, JournalRoom, Map, Queue, Token};
 
 /// Each child receives its own limits and the journal reserves their sum.

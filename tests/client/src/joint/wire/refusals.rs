@@ -1,6 +1,6 @@
 //! Exact sparse entrance facts (client/domain/contract.md, 4–5).
 //! Missing explanations, actors' names and numerical bounds remain absent.
-use jig_client::contract as client;
+use jig_domain_client::contract as client;
 use jig_domain_people as people;
 
 pub fn refusal(value: people::Refusal) -> client::Refusal {

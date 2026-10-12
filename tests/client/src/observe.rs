@@ -1,10 +1,10 @@
 //! Shared jig observations and the Test application's family vocabulary.
 #![allow(clippy::wildcard_imports, reason = "boundary adapter covers the owner vocabulary")]
 use crate::harness::{CardKey, CardSeen, Receipt, Seen, Sent};
-use jig_client::contract::*;
-use jig_client_view::{Key, NodeId, Owner, Role, Tree};
+use jig_domain_client::contract::*;
 use jig_fake_person::{Face, Find, Found, TreeFace};
-use jig_test_client_domain::{self as domain, Event, Request, family};
+use jig_test_domain_client::{self as domain, Event, Request, family};
+use jig_view::{Key, NodeId, Owner, Role, Tree};
 use skein_lib::RequestEnvelope;
 
 #[must_use]
@@ -30,7 +30,7 @@ pub fn sent(request: &Request) -> Option<Sent> {
     };
     let (card, revision, words) = match ask {
         domain::Ask::First(family::Ask::Touch { project, item, revision, .. }) => (
-            Some(CardKey::of(jig_test_client_view::family_key(&family::Subject {
+            Some(CardKey::of(jig_test_view::family_key(&family::Subject {
                 scope: family::Scope::Project(*project),
                 kind: family::Kind::Item(*item),
             }))),
@@ -38,7 +38,7 @@ pub fn sent(request: &Request) -> Option<Sent> {
             None,
         ),
         domain::Ask::First(family::Ask::ChangeObject { project, object, revision, .. }) => (
-            Some(CardKey::of(jig_test_client_view::family_key(&family::Subject {
+            Some(CardKey::of(jig_test_view::family_key(&family::Subject {
                 scope: family::Scope::Project(*project),
                 kind: family::Kind::Item(*object),
             }))),
@@ -157,7 +157,7 @@ fn family(doc: &family::Document) -> Receipt {
         family::Document::Connector(_) => doc.revision(),
     };
     Receipt::Card {
-        key: CardKey::of(jig_test_client_view::family_key(&doc.subject())),
+        key: CardKey::of(jig_test_view::family_key(&doc.subject())),
         revisions: revision.map_or_else(Vec::new, |revision| vec![(0, revision.value)]),
     }
 }
@@ -196,35 +196,37 @@ pub fn received(event: &Event) -> Vec<Receipt> {
 }
 /// Observe delivered jig documents and sign-in state before the root callback.
 #[must_use]
-pub fn jig_received(event: &jig_client::Event) -> Vec<Receipt> {
+pub fn jig_received(event: &jig_domain_client::Event) -> Vec<Receipt> {
     match event {
-        jig_client::Event::Start { .. } => vec![Receipt::Started],
-        jig_client::Event::Hello { versions } => {
-            if versions.contains(jig_client::contract::CLIENT_VERSION) {
+        jig_domain_client::Event::Start { .. } => vec![Receipt::Started],
+        jig_domain_client::Event::Hello { versions } => {
+            if versions.contains(jig_domain_client::contract::CLIENT_VERSION) {
                 vec![]
             } else {
                 vec![Receipt::OutOfDate]
             }
         }
-        jig_client::Event::Read { result: ReadResult::Value(value), .. } => read(value),
-        jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => vec![task(value)],
-        jig_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Frame(value)), .. } => frame(value),
-        jig_client::Event::SignedOut
-        | jig_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
-        | jig_client::Event::Ended { end: WatchEnd::SignedOut, .. } => vec![Receipt::Parked],
-        jig_client::Event::Kept { .. }
-        | jig_client::Event::KeptGone { .. }
-        | jig_client::Event::Went { .. }
-        | jig_client::Event::Act { .. }
-        | jig_client::Event::Ask { .. }
-        | jig_client::Event::Progress { .. }
-        | jig_client::Event::Answered { .. }
-        | jig_client::Event::Read { .. }
-        | jig_client::Event::Watch { .. }
-        | jig_client::Event::Ended { .. }
-        | jig_client::Event::ShowObjects { .. }
-        | jig_client::Event::ObjectsLeft
-        | jig_client::Event::Frame { .. } => vec![],
+        jig_domain_client::Event::Read { result: ReadResult::Value(value), .. } => read(value),
+        jig_domain_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => {
+            vec![task(value)]
+        }
+        jig_domain_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Frame(value)), .. } => frame(value),
+        jig_domain_client::Event::SignedOut
+        | jig_domain_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. }
+        | jig_domain_client::Event::Ended { end: WatchEnd::SignedOut, .. } => vec![Receipt::Parked],
+        jig_domain_client::Event::Kept { .. }
+        | jig_domain_client::Event::KeptGone { .. }
+        | jig_domain_client::Event::Went { .. }
+        | jig_domain_client::Event::Act { .. }
+        | jig_domain_client::Event::Ask { .. }
+        | jig_domain_client::Event::Progress { .. }
+        | jig_domain_client::Event::Answered { .. }
+        | jig_domain_client::Event::Read { .. }
+        | jig_domain_client::Event::Watch { .. }
+        | jig_domain_client::Event::Ended { .. }
+        | jig_domain_client::Event::ShowObjects { .. }
+        | jig_domain_client::Event::ObjectsLeft
+        | jig_domain_client::Event::Frame { .. } => vec![],
     }
 }
 
@@ -397,7 +399,7 @@ mod link_tests;
 #[must_use]
 pub fn window_changed(event: &Event) -> bool {
     let act = match event {
-        Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_client::Event::Act { act }) => act,
+        Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_domain_client::Event::Act { act }) => act,
         Event::Start { .. }
         | Event::Went { .. }
         | Event::Act { action: domain::Action::First(_) }
@@ -410,41 +412,42 @@ pub fn window_changed(event: &Event) -> bool {
 }
 /// Only decoded jig person acts explain a changed displayed window (QUESTIONS 34).
 #[must_use]
-pub fn jig_window_changed(act: &jig_client::action::Act) -> bool {
+pub fn jig_window_changed(act: &jig_domain_client::action::Act) -> bool {
     // Settings review and explicit service role selection keep the current windows.
     if matches!(
         act,
-        jig_client::action::Act::ProjectSettings { .. } | jig_client::action::Act::ProjectServiceRole { .. }
+        jig_domain_client::action::Act::ProjectSettings { .. }
+            | jig_domain_client::action::Act::ProjectServiceRole { .. }
     ) {
         return false;
     }
     matches!(
         act,
-        jig_client::action::Act::Go { .. }
-            | jig_client::action::Act::Fold { .. }
-            | jig_client::action::Act::FoldCall { .. }
-            | jig_client::action::Act::FoldCurrentCall { .. }
-            | jig_client::action::Act::Filter { .. }
-            | jig_client::action::Act::More { .. }
-            | jig_client::action::Act::FilterInbox { .. }
-            | jig_client::action::Act::FilterTasks { .. }
-            | jig_client::action::Act::FilterNotes { .. }
-            | jig_client::action::Act::FilterPlan { .. }
-            | jig_client::action::Act::HistoryScope { .. }
-            | jig_client::action::Act::OpenEnded { .. }
-            | jig_client::action::Act::OpenUpdates
+        jig_domain_client::action::Act::Go { .. }
+            | jig_domain_client::action::Act::Fold { .. }
+            | jig_domain_client::action::Act::FoldCall { .. }
+            | jig_domain_client::action::Act::FoldCurrentCall { .. }
+            | jig_domain_client::action::Act::Filter { .. }
+            | jig_domain_client::action::Act::More { .. }
+            | jig_domain_client::action::Act::FilterInbox { .. }
+            | jig_domain_client::action::Act::FilterTasks { .. }
+            | jig_domain_client::action::Act::FilterNotes { .. }
+            | jig_domain_client::action::Act::FilterPlan { .. }
+            | jig_domain_client::action::Act::HistoryScope { .. }
+            | jig_domain_client::action::Act::OpenEnded { .. }
+            | jig_domain_client::action::Act::OpenUpdates
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::{CardKey, CardSeen, Key, Owner, Role, Seen, jig_seen};
-    use jig_client_view::View;
+    use jig_view::View;
     use skein_lib::Queue;
 
     #[test]
     fn a_nested_application_status_cannot_decide_a_jig_card() {
-        let limits = jig_client_view::Limits {
+        let limits = jig_view::Limits {
             nodes: 16,
             depth: 4,
             text_per_node: 64,
@@ -478,8 +481,8 @@ mod tests {
     }
     #[test]
     fn public_observations_keep_equal_task_and_party_proposal_cards_and_requests_distinct() {
-        use jig_client::contract::{Ask, Decision, ObjectKey, ProposalKey, Proposer};
-        let limits = jig_client_view::Limits {
+        use jig_domain_client::contract::{Ask, Decision, ObjectKey, ProposalKey, Proposer};
+        let limits = jig_view::Limits {
             nodes: 16,
             depth: 4,
             text_per_node: 64,
@@ -511,7 +514,7 @@ mod tests {
             assert_eq!(sent.card, Some(card.clone()));
             builder.open(Role::Item);
             builder.key(Key { owner: Owner::Jig, kind, a: u64::MAX, b: u64::MAX });
-            builder.text(jig_client_view::Run::Plain, b"supplied proposal");
+            builder.text(jig_view::Run::Plain, b"supplied proposal");
             builder.close();
             expected.push(Seen::Card { key: card, state: CardSeen::Waiting, revision: None });
         }
@@ -529,8 +532,8 @@ mod tests {
     #[test]
     fn public_owner_answer_receipts_keep_original_attempt_envelope_and_exact_message_ids() {
         use super::{Receipt, received};
-        use jig_client::contract::{Answer, Outcome, OwnerOutcome};
-        use jig_test_client_domain::{Answered, Event};
+        use jig_domain_client::contract::{Answer, Outcome, OwnerOutcome};
+        use jig_test_domain_client::{Answered, Event};
         use skein_lib::{RequestEnvelope, Token};
         let cases = [
             (OwnerOutcome::Said { task: u64::MAX, message: 37, released: false }, Some((u64::MAX, 37))),

@@ -5,7 +5,7 @@ pub use faults::Fault;
 pub mod referee;
 pub use observation::*;
 mod world;
-use jig_client_view::{Act, NodeId, Patch, Tree};
+use jig_view::{Act, NodeId, Patch, Tree};
 use skein_lib::{Env, Queue, Time, Wall};
 use std::fmt::Debug;
 pub use world::*;

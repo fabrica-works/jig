@@ -3,8 +3,8 @@
 //! (client/domain/testing.md, 4; client/domain/view.md, 11).
 use super::{App, CardKey, Duty, Fault, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
-use jig_client_view::{Act, NodeId, Tree};
 use jig_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
+use jig_view::{Act, NodeId, Tree};
 use skein_lib::{Duration, Env, Queue, Rng, Time, Wall};
 use skein_world::domain::{Referee, Schedule, Span, Trace, Verdict};
 
@@ -83,7 +83,7 @@ struct Client<A: App> {
     root: A::Root,
     view: A::View,
     model: Model,
-    patches: Queue<jig_client_view::Patch>,
+    patches: Queue<jig_view::Patch>,
     kept: Vec<A::Record>,
     deferred: Vec<StoreWrite<A::Record, A::Key>>,
     history: Vec<A::Address>,
@@ -383,9 +383,9 @@ impl<A: App, F: Front<A>> World<A, F> {
             6 => Fault::Reload { client },
             7 => {
                 let Some(node) = A::tree(&self.clients[client.0].view).nodes().iter().find(|n| {
-                    n.role == jig_client_view::Role::Button
+                    n.role == jig_view::Role::Button
                         && n.binding.is_some()
-                        && !n.states.iter().any(|s| *s == jig_client_view::State::Disabled)
+                        && !n.states.iter().any(|s| *s == jig_view::State::Disabled)
                 }) else {
                     return;
                 };
@@ -417,7 +417,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                         A::tree(&c.view)
                             .nodes()
                             .iter()
-                            .filter(|n| n.role == jig_client_view::Role::Button && n.binding.is_some())
+                            .filter(|n| n.role == jig_view::Role::Button && n.binding.is_some())
                             .find_map(|n| {
                                 A::tree(&o.view)
                                     .nodes()
@@ -810,8 +810,8 @@ impl<A: App, F: Front<A>> World<A, F> {
 #[cfg(test)]
 mod tests {
     use super::Until;
-    use jig_client_view::Role;
     use jig_fake_person::{Find, Step};
+    use jig_view::Role;
     use skein_lib::Duration;
     use skein_world::domain::Verdict;
 

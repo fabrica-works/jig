@@ -1,6 +1,6 @@
 use super::{script, task, text};
 use crate::{Engine, Invalid};
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use skein_lib::{List, Wall};
 #[test]
 fn question_sender_kit_rejects_malformed_original_packet_before_engine_state_exists() {

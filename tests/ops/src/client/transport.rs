@@ -1,8 +1,8 @@
 //! Opaque shell token routes and the finite Ops protocol adapter, beside the shared world.
 #![allow(clippy::wildcard_imports, reason = "adapter exhaustively translates owner boundary vocabularies")]
 use super::{Document, Ops, OpsScript, Subject};
-use jig_client::contract::*;
 use jig_client_world::{harness::*, observe};
+use jig_domain_client::{self as client, contract::*};
 use jig_ops_client_domain::{self as domain, Event, JigOut, Request, infrastructure as infra, observability as obs};
 use jig_ops_connectors::{Connector, number};
 use jig_scripted_engine::{self as engine, ApplicationScope, Envelope, Up};
@@ -131,7 +131,7 @@ fn connector(channel: Channel) -> u16 {
 }
 fn watch(channel: Channel, local: Token, event: WatchEvent) -> Event {
     match channel {
-        Channel::Jig => Event::Jig(jig_client::Event::Watch { watch: local, event }),
+        Channel::Jig => Event::Jig(client::Event::Watch { watch: local, event }),
         Channel::Observability => Event::Observability(obs::Event::Watch {
             watch: local,
             event: match event {
@@ -152,7 +152,7 @@ fn watch(channel: Channel, local: Token, event: WatchEvent) -> Event {
 }
 fn end(channel: Channel, local: Token, why: WatchEnd) -> Event {
     match channel {
-        Channel::Jig => Event::Jig(jig_client::Event::Ended { watch: local, end: why }),
+        Channel::Jig => Event::Jig(client::Event::Ended { watch: local, end: why }),
         Channel::Observability => Event::Observability(obs::Event::Ended {
             watch: local,
             end: match why {
@@ -358,7 +358,7 @@ impl Front<Ops> for Scripted {
         self.recover(now, wall);
         let mut delivered: Vec<_> = std::mem::take(&mut self.hellos)
             .into_iter()
-            .map(|client| (client, Event::Jig(jig_client::Event::Hello { versions: self.engine.versions() })))
+            .map(|client| (client, Event::Jig(client::Event::Hello { versions: self.engine.versions() })))
             .collect();
         for up in self.engine.poll(now) {
             let token = match &up {
@@ -396,13 +396,13 @@ impl Front<Ops> for Scripted {
                         domain::Answered::Infrastructure(match result {
                             Ok(answer) => answer,
                             Err(refusal) => infra::Answer::EntranceRefused(
-                                jig_client::contract::EntranceRefusal::new(refusal)
+                                client::contract::EntranceRefusal::new(refusal)
                                     .expect("scripted engine supplies bounded entrance facts"),
                             ),
                         })
                     }),
                 },
-                Up::Read { terminal, .. } => Event::Jig(jig_client::Event::Read { read: local, result: terminal }),
+                Up::Read { terminal, .. } => Event::Jig(client::Event::Read { read: local, result: terminal }),
                 Up::Watch { event, .. } => watch(route.channel, local, event),
                 Up::App { document, .. } => match document {
                     Document::Observability(doc) => Event::Observability(obs::Event::Watch {
@@ -530,7 +530,7 @@ impl Front<Ops> for Scripted {
     }
     fn received(&mut self, client: ClientId, event: &Event) {
         let selected = match event {
-            Event::Jig(jig_client::Event::Watch { watch, event: WatchEvent::Delivered(_), .. }) => {
+            Event::Jig(client::Event::Watch { watch, event: WatchEvent::Delivered(_), .. }) => {
                 Some((*watch, Channel::Jig))
             }
             Event::Observability(obs::Event::Watch { watch, event: obs::WatchEvent::Delivered(_) }) => {
@@ -566,21 +566,21 @@ impl Front<Ops> for Scripted {
     }
 }
 struct SubjectRun {
-    turn: Option<jig_client::contract::ProvisionalTurnName>,
+    turn: Option<client::contract::ProvisionalTurnName>,
     offset: u32,
 }
-fn run_position(subject: &jig_client::contract::Subject) -> SubjectRun {
+fn run_position(subject: &client::contract::Subject) -> SubjectRun {
     match subject {
-        jig_client::contract::Subject::Run { turn, offset, .. } => SubjectRun { turn: *turn, offset: *offset },
-        jig_client::contract::Subject::Frame
-        | jig_client::contract::Subject::Task { .. }
-        | jig_client::contract::Subject::Tree { .. }
-        | jig_client::contract::Subject::Chips { .. }
-        | jig_client::contract::Subject::Inbox { .. }
-        | jig_client::contract::Subject::Goals { .. }
-        | jig_client::contract::Subject::Tasks { .. }
-        | jig_client::contract::Subject::Conversations
-        | jig_client::contract::Subject::Deployment => unreachable!("only run watches continue"),
+        client::contract::Subject::Run { turn, offset, .. } => SubjectRun { turn: *turn, offset: *offset },
+        client::contract::Subject::Frame
+        | client::contract::Subject::Task { .. }
+        | client::contract::Subject::Tree { .. }
+        | client::contract::Subject::Chips { .. }
+        | client::contract::Subject::Inbox { .. }
+        | client::contract::Subject::Goals { .. }
+        | client::contract::Subject::Tasks { .. }
+        | client::contract::Subject::Conversations
+        | client::contract::Subject::Deployment => unreachable!("only run watches continue"),
     }
 }
 fn source_facts(source: &engine::Source, commit: u64, out: &mut Vec<Observed>) {

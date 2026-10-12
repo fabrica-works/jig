@@ -1,11 +1,11 @@
 //! Seeded public truth and fake-person exploration (testing.md, sections 3 and 7).
 use crate::{Outcome, Scripted, Test, Until, World, stories};
-use jig_client::{
+use jig_domain_client::{
     address::{Address, ProjectSection, TaskSection},
     contract::{ObjectKey, ReadValue},
 };
 use jig_scripted_engine::Change;
-use jig_test_client_domain::{Address as RootAddress, family};
+use jig_test_domain_client::{Address as RootAddress, family};
 use skein_lib::{Rng, Wall};
 
 /// Independently replayable story starting states for a random person.
@@ -104,7 +104,7 @@ fn world_with_heap(seed: u64, memory: bool) -> (Outcome, Reach) {
     world
         .front()
         .engine
-        .act_application(skein_lib::Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, family, vec![])
+        .act_application(skein_lib::Time::ZERO, Wall::EPOCH, jig_test_domain_client::FIRST, 1, family, vec![])
         .expect("whole random family fits");
     match rng.below(4) {
         0 => address = stories::inbox(),

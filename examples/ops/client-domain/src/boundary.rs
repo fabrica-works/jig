@@ -5,7 +5,7 @@ use crate::{
     store::{Key, Record},
 };
 use alloc::boxed::Box;
-use jig_client::contract::{Ask as JigAsk, Read, Subject};
+use jig_domain_client::contract::{Ask as JigAsk, Read, Subject};
 use skein_lib::{List, RequestEnvelope, RequestKey, Token};
 /// One keyed request, tagged with the child that owns its meaning.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -16,24 +16,24 @@ pub enum Ask {
 /// A decoded terminal tagged with its owning child.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
-    Jig(jig_client::contract::Answer),
+    Jig(jig_domain_client::contract::Answer),
     Infrastructure(infrastructure::Answer),
 }
 /// A view act routed exhaustively to its child.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
-    Jig(jig_client::action::Act),
+    Jig(jig_domain_client::action::Act),
     Infrastructure(infrastructure::Act),
     Observability(crate::observability::Act),
 }
 /// One external fact or act for the root to route.
 #[derive(Debug)]
 pub enum Event {
-    Start { address: Address, kept: List<Record>, offset: jig_client::boundary::Offset },
+    Start { address: Address, kept: List<Record>, offset: jig_domain_client::boundary::Offset },
     Went { place: Place },
     Act { action: Action },
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered> },
-    Jig(jig_client::Event),
+    Jig(jig_domain_client::Event),
     Infrastructure(infrastructure::Event),
     Observability(crate::observability::Event),
     SignedOut,
@@ -45,13 +45,13 @@ pub enum JigOut {
     Open { watch: Token, subject: Subject },
     Continue { watch: Token, subject: Subject },
     Close { watch: Token },
-    Answered { asked: Token, answer: jig_client::contract::Answer },
+    Answered { asked: Token, answer: jig_domain_client::contract::Answer },
     Unknown { asked: Token },
 }
 /// Bounded routing and child facts for the shell to observe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
-    Jig(jig_client::facts::Fact),
+    Jig(jig_domain_client::facts::Fact),
     TableFull,
     PartsFull,
     InvalidRecord,

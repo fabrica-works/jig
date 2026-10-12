@@ -1,9 +1,9 @@
 //! Token routing between a client root and scripted engine. No root state is read.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::{harness::*, test::Test};
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use jig_scripted_engine::{self as engine, Application, ApplicationValue, Decision, Envelope, Truth, Up};
-use jig_test_client_domain::{self as domain, Ask, Event, JigOut, Request, family, first};
+use jig_test_domain_client::{self as domain, Ask, Event, JigOut, Request, family, first};
 use sha2::{Digest, Sha256};
 use skein_lib::{RequestEnvelope, Time, Token, Wall};
 use skein_world::domain::Ledger;
@@ -33,8 +33,8 @@ impl Application for Family {
                     }
                     Some(doc) => match doc.revision() {
                         Some(revision) => family::Answer::Moved { item: *item, revision },
-                        None => family::Answer::Connector(jig_test_client_domain::connector_values::ConnectorAnswer {
-                            value: jig_test_client_domain::connector_values::ApplicationOutcome::Unknown,
+                        None => family::Answer::Connector(jig_test_domain_client::connector_values::ConnectorAnswer {
+                            value: jig_test_domain_client::connector_values::ApplicationOutcome::Unknown,
                         }),
                     },
                     None => family::Answer::Gone,
@@ -45,41 +45,41 @@ impl Application for Family {
                     family::Subject { scope: family::Scope::Project(*project), kind: family::Kind::Item(*object) };
                 let outcome = match self.documents.get_mut(&subject) {
                     Some(family::Document::Connector(doc)) => match doc.value.as_mut() {
-                        jig_test_client_domain::connector_values::ClientDocument::Object { object: number, now }
+                        jig_test_domain_client::connector_values::ClientDocument::Object { object: number, now }
                             if number == object =>
                         {
                             if now.revision != revision.value {
-                                jig_test_client_domain::connector_values::ApplicationOutcome::Moved {
+                                jig_test_domain_client::connector_values::ApplicationOutcome::Moved {
                                     object: *object,
                                     now: *now,
                                 }
                             } else if let Some(next) = now.revision.checked_add(1) {
                                 now.revision = next;
                                 now.value = *value;
-                                jig_test_client_domain::connector_values::ApplicationOutcome::Changed {
+                                jig_test_domain_client::connector_values::ApplicationOutcome::Changed {
                                     object: *object,
                                     now: *now,
                                 }
                             } else {
-                                jig_test_client_domain::connector_values::ApplicationOutcome::Exhausted
+                                jig_test_domain_client::connector_values::ApplicationOutcome::Exhausted
                             }
                         }
-                        jig_test_client_domain::connector_values::ClientDocument::Object { .. }
-                        | jig_test_client_domain::connector_values::ClientDocument::Panel { .. }
-                        | jig_test_client_domain::connector_values::ClientDocument::Result { .. }
-                        | jig_test_client_domain::connector_values::ClientDocument::Effect { .. }
-                        | jig_test_client_domain::connector_values::ClientDocument::Outbox { .. }
-                        | jig_test_client_domain::connector_values::ClientDocument::Hold { .. }
-                        | jig_test_client_domain::connector_values::ClientDocument::Project { .. }
-                        | jig_test_client_domain::connector_values::ClientDocument::Deployment { .. } => {
-                            jig_test_client_domain::connector_values::ApplicationOutcome::Unknown
+                        jig_test_domain_client::connector_values::ClientDocument::Object { .. }
+                        | jig_test_domain_client::connector_values::ClientDocument::Panel { .. }
+                        | jig_test_domain_client::connector_values::ClientDocument::Result { .. }
+                        | jig_test_domain_client::connector_values::ClientDocument::Effect { .. }
+                        | jig_test_domain_client::connector_values::ClientDocument::Outbox { .. }
+                        | jig_test_domain_client::connector_values::ClientDocument::Hold { .. }
+                        | jig_test_domain_client::connector_values::ClientDocument::Project { .. }
+                        | jig_test_domain_client::connector_values::ClientDocument::Deployment { .. } => {
+                            jig_test_domain_client::connector_values::ApplicationOutcome::Unknown
                         }
                     },
                     None | Some(family::Document::Item(_) | family::Document::Part(_)) => {
-                        jig_test_client_domain::connector_values::ApplicationOutcome::Unknown
+                        jig_test_domain_client::connector_values::ApplicationOutcome::Unknown
                     }
                 };
-                family::Answer::Connector(jig_test_client_domain::connector_values::ConnectorAnswer { value: outcome })
+                family::Answer::Connector(jig_test_domain_client::connector_values::ConnectorAnswer { value: outcome })
             }
         };
         Decision { answer, changes: vec![] }
@@ -146,7 +146,7 @@ impl Scripted {
     fn hello_events(&mut self) -> Vec<(ClientId, Event)> {
         std::mem::take(&mut self.hellos)
             .into_iter()
-            .map(|client| (client, Event::Jig(jig_client::Event::Hello { versions: self.engine.versions() })))
+            .map(|client| (client, Event::Jig(jig_domain_client::Event::Hello { versions: self.engine.versions() })))
             .collect()
     }
     /// Installs a checked story and its application documents.
@@ -396,10 +396,10 @@ impl Front<Test> for Scripted {
                             answer: answer.map(domain::Answered::Jig),
                         },
                         Up::Read { token: _, terminal } => {
-                            Event::Jig(jig_client::Event::Read { read: local, result: terminal })
+                            Event::Jig(jig_domain_client::Event::Read { read: local, result: terminal })
                         }
                         Up::Watch { token: _, event } => match route {
-                            Route::Jig(_, _) => Event::Jig(jig_client::Event::Watch { watch: local, event }),
+                            Route::Jig(_, _) => Event::Jig(jig_domain_client::Event::Watch { watch: local, event }),
                             Route::First(_, _) => Event::First(first::Event::Watch {
                                 watch: local,
                                 event: match event {
@@ -434,7 +434,7 @@ impl Front<Test> for Scripted {
                             event: family::WatchEvent::Delivered(document),
                         }),
                         Up::Ended { token: _, why } => match route {
-                            Route::Jig(_, _) => Event::Jig(jig_client::Event::Ended { watch: local, end: why }),
+                            Route::Jig(_, _) => Event::Jig(jig_domain_client::Event::Ended { watch: local, end: why }),
                             Route::First(_, _) => Event::First(first::Event::Ended {
                                 watch: local,
                                 end: match why {
@@ -548,7 +548,9 @@ impl Front<Test> for Scripted {
     }
     fn received(&mut self, client: ClientId, event: &Event) {
         let selected = match event {
-            Event::Jig(jig_client::Event::Watch { watch, event: WatchEvent::Delivered(_) }) => Some((*watch, false)),
+            Event::Jig(jig_domain_client::Event::Watch { watch, event: WatchEvent::Delivered(_) }) => {
+                Some((*watch, false))
+            }
             Event::First(first::Event::Watch { watch, event: family::WatchEvent::Delivered(_) }) => {
                 Some((*watch, true))
             }

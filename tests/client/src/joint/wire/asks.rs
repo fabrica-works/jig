@@ -1,7 +1,7 @@
 //! Exact request translation (client/domain/contract.md, 3).
 //! Whole supplied fields preserve independent revisions and optional edits.
 use super::request_arguments;
-use jig_client::contract as client;
+use jig_domain_client::contract as client;
 use jig_domain_people as people;
 use skein_lib::List;
 
@@ -373,7 +373,7 @@ mod tests {
         inputs.push(0).expect("room");
         let selected = client::Specification { words: text(b""), parameters, inputs: inputs.clone() };
         let source = super::super::owner::tests::amendment_source();
-        let limits = jig_client::Limits { rows: 4, text: 128, ..crate::test::limits().jig };
+        let limits = jig_domain_client::Limits { rows: 4, text: 128, ..crate::test::limits().jig };
         let authority = super::super::owner::authority(&source.authority, &limits).expect("whole authority").authority;
         let wake = client::OwnerWakePolicy {
             words: client::WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::ZERO },

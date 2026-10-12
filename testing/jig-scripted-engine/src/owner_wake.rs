@@ -1,7 +1,9 @@
 //! Price complete wake facts at the scripted decoding boundary.
 //! See client/domain/contract.md, 5.3; domain/tasks.md, 8.3–8.4.
 use crate::{Bounds, payload::Payload};
-use jig_client::contract::{OwnerWakePolicy, ResultsWake, Subscription, SubscriptionKind, Subscriptions, WakeRule};
+use jig_domain_client::contract::{
+    OwnerWakePolicy, ResultsWake, Subscription, SubscriptionKind, Subscriptions, WakeRule,
+};
 
 impl Payload for WakeRule {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {

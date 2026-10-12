@@ -4,9 +4,9 @@ use skein_world::domain::{Verdict, heap::Counting};
 static HEAP: Counting = Counting;
 #[test]
 fn clearing_the_filter_shows_the_same_still_waiting_proposal() {
-    use jig_client_view::Role;
     use jig_client_world::{Until, stories};
     use jig_fake_person::{Find, Step};
+    use jig_view::Role;
     use skein_lib::Duration;
     let mut world = stories::proposal_world(111);
     let client = world.client(7, stories::inbox());

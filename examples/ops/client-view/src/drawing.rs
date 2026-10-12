@@ -1,8 +1,8 @@
 //! Keep: owner-written bounded data and readable fallback (view.md, 3).
 //! Replace: observability's error-rate drawing.
 use crate::words::{Word, Words};
-use jig_client_view::{Builder, DrawingKind, Owner, Run, phrases::Hole};
 use jig_ops_client_domain::observability::documents::Incident;
+use jig_view::{Builder, DrawingKind, Owner, Run, phrases::Hole};
 pub const BYTES: u32 = 32;
 pub fn rate(b: &mut Builder, words: &Words, incident: &Incident) {
     let Some(health) = incident.health else { return };

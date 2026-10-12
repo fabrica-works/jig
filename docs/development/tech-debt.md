@@ -74,7 +74,7 @@ whole runs of single tests:
     for every client, tab, device and reload;
   - `Phrasebook::load` checks duplicates quadratically, and looks
     phrases up by scanning: `shape`, `phrase` and `capacity` in
-    `crates/jig-client-view/src/phrases.rs`, and
+    `crates/jig-view/src/phrases.rs`, and
     `Limits::of_words`/`compose`. The scans also run in the shipped
     client, on every `say`;
   - skein's counting allocator spends 34 % on bookkeeping
@@ -152,7 +152,7 @@ to see the story the test tells.
   exhaustive seams, kept whole on purpose. The rest should be checked
   for a split.
 - **Large files:**
-  - `jig-client-view/src/phrases/jig.rs`: 2,821 lines;
+  - `jig-view/src/phrases/jig.rs`: 2,821 lines;
   - `jig-domain-people/src/domain.rs`: 1,873;
   - `examples/ops/domain/src/route.rs`: 1,777;
   - `jig-domain-tasks/src/boundary.rs`: 1,776;

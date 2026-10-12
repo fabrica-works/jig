@@ -2,10 +2,10 @@
 //! These routes retain original shell tokens and authenticated session numbers.
 //! They do not inspect engine tasks, choose outcomes, or own request durability.
 use crate::harness::ClientId;
-use jig_client::contract::{Read, Subject, VersionRange};
+use jig_domain_client::contract::{Read, Subject, VersionRange};
 use jig_domain_core::{Event, documents::ApplicationScope};
 use jig_domain_people as people;
-use jig_test_client_domain::family;
+use jig_test_domain_client::family;
 use skein_lib::{ReplyTo, Token};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -125,8 +125,8 @@ impl Transport {
     }
 
     #[must_use]
-    pub fn hello(&self) -> jig_client::Event {
-        jig_client::Event::Hello { versions: self.versions }
+    pub fn hello(&self) -> jig_domain_client::Event {
+        jig_domain_client::Event::Hello { versions: self.versions }
     }
 
     /// Replace only the protocol's configured served range, supplied outside Frame.
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn normal_run_taken_and_provisional_continue_release_only_their_original_independent_flights() {
-        use jig_client::contract::ProvisionalTurnName;
+        use jig_domain_client::contract::ProvisionalTurnName;
         let mut front = Transport::new(VersionRange { first: 1, last: 1 });
         front.bind(ClientId(0), 7, identity(b"same"));
         front.bind(ClientId(1), 7, identity(b"same"));
@@ -512,8 +512,8 @@ mod tests {
         let native = Token::new(u64::MAX);
         let what = Read::Goals {
             project: u32::MAX,
-            after: Some(jig_client::contract::Cursor {
-                value: jig_client::contract::Text::new(Box::from([255, 0]), 2).expect("whole opaque cursor"),
+            after: Some(jig_domain_client::contract::Cursor {
+                value: jig_domain_client::contract::Text::new(Box::from([255, 0]), 2).expect("whole opaque cursor"),
             }),
         };
         let jig = Reply::Read { client: ClientId(0), read: native, what: what.clone() };
@@ -530,8 +530,9 @@ mod tests {
             what,
             Read::Goals {
                 project: u32::MAX,
-                after: Some(jig_client::contract::Cursor {
-                    value: jig_client::contract::Text::new(Box::from([255, 0]), 2).expect("original whole cursor")
+                after: Some(jig_domain_client::contract::Cursor {
+                    value: jig_domain_client::contract::Text::new(Box::from([255, 0]), 2)
+                        .expect("original whole cursor")
                 })
             }
         );
@@ -545,7 +546,7 @@ mod tests {
         let mut front = Transport::new(versions);
         let supplied = identity(&[255, b'/', 0]);
         front.bind(ClientId(0), u64::MAX, supplied.clone());
-        assert_eq!(front.hello(), jig_client::Event::Hello { versions });
+        assert_eq!(front.hello(), jig_domain_client::Event::Hello { versions });
         assert_eq!(front.sign_in(ClientId(0)), None);
         let Event::SignIn { reply_to, identity: actual } = front.start_sign_in(ClientId(0)) else {
             panic!("authentic sign-in input")

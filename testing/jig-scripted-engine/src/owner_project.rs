@@ -1,7 +1,7 @@
 //! Whole allocated Project admission; client/domain/contract.md, 5.3.
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
-use jig_client::contract::{
+use jig_domain_client::contract::{
     OwnerProject, OwnerProjectMember, OwnerProjectPolicy, OwnerProjectPolicyRole, OwnerProjectResource,
     OwnerProjectResourceRole, OwnerProjectSpend,
 };

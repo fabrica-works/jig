@@ -1,8 +1,8 @@
-use jig_test_client_domain::{
+use jig_test_client_kit::{Bounds, connector_values::*};
+use jig_test_domain_client::{
     connector_values::*,
     family::{Kind, Scope, Subject},
 };
-use jig_test_client_kit::{Bounds, connector_values::*};
 use skein_lib::{List, Wall};
 use std::mem::size_of;
 fn list<T>(capacity: u32, values: impl IntoIterator<Item = T>) -> List<T> {

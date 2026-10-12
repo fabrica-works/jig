@@ -4,8 +4,7 @@ use crate::{
     bindings::{Bindings, Meaning},
     words::{Word, Words},
 };
-use jig_client::contract::{Part, Proposer};
-use jig_client_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
+use jig_domain_client::contract::{Part, Proposer};
 use jig_ops_client_domain::{
     Action,
     infrastructure::{
@@ -16,6 +15,7 @@ use jig_ops_client_domain::{
         },
     },
 };
+use jig_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
 use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef = SlotRef {
     owner: Owner::Side { connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure) },
@@ -55,7 +55,7 @@ pub fn page(
     builder: &mut Builder,
     side: &infrastructure::Side,
     words: &Words,
-    jig_words: &jig_client_view::words::Words,
+    jig_words: &jig_view::words::Words,
     bindings: &mut Bindings,
 ) {
     builder.open(Role::Heading { level: 1 });
@@ -72,7 +72,7 @@ fn show_object(
     side: &infrastructure::Side,
     id: Id<infrastructure::Object>,
     words: &Words,
-    jig_words: &jig_client_view::words::Words,
+    jig_words: &jig_view::words::Words,
     bindings: &mut Bindings,
 ) {
     let object = side.object(id).expect("named object");
@@ -98,7 +98,7 @@ fn show_object(
                         native_form(
                             builder,
                             id,
-                            jig_client::contract::Revision { value: *end_revision },
+                            jig_domain_client::contract::Revision { value: *end_revision },
                             until,
                             object,
                             words,
@@ -157,7 +157,7 @@ fn form(
 fn native_form(
     builder: &mut Builder,
     id: Id<infrastructure::Object>,
-    revision: jig_client::contract::Revision,
+    revision: jig_domain_client::contract::Revision,
     until: u64,
     object: &infrastructure::Object,
     words: &Words,
@@ -189,7 +189,7 @@ fn native_form(
     }
     builder.close();
 }
-fn show_card(builder: &mut Builder, card: &Card, words: &Words, jig_words: &jig_client_view::words::Words) {
+fn show_card(builder: &mut Builder, card: &Card, words: &Words, jig_words: &jig_view::words::Words) {
     match card {
         Card::Open => {}
         Card::Unknown => words.status(builder, Word::Unknown, &[]),
@@ -219,7 +219,7 @@ fn show_card(builder: &mut Builder, card: &Card, words: &Words, jig_words: &jig_
             }
             Answer::Gone => words.status(builder, Word::Gone, &[]),
             Answer::EntranceRefused(refusal) => {
-                jig_client_view::cards::refusal(builder, refusal.refusal(), jig_words);
+                jig_view::cards::refusal(builder, refusal.refusal(), jig_words);
             }
             Answer::Refused { why } => {
                 words.status(builder, Word::Refused, &[]);
@@ -555,7 +555,7 @@ pub fn part(
     part: &Part,
     generation: u32,
     words: &Words,
-    jig_words: &jig_client_view::words::Words,
+    jig_words: &jig_view::words::Words,
     bindings: &mut Bindings,
 ) {
     if !side.contains(part, generation) {
@@ -571,7 +571,7 @@ pub fn part(
         Part::Resource { path, .. } => {
             words.text(builder, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(b""))]);
             for segment in path {
-                jig_client_view::literal_segment::render(builder, segment);
+                jig_view::literal_segment::render(builder, segment);
             }
         }
         Part::Kind { kind, .. } => words.text(builder, Word::Kind, &[Hole::Number(u64::from(*kind))]),

@@ -1,6 +1,6 @@
 use super::{admit_owner_outcome, owner_outcome_bytes};
 use crate::{Bounds, Invalid};
-use jig_client::contract::{
+use jig_domain_client::contract::{
     OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
 };
 use skein_lib::Wall;
@@ -108,7 +108,7 @@ fn closed_decision_choices_and_release_flags_need_no_explanation_payload() {
 #[test]
 fn durable_owner_answers_are_admitted_only_with_the_complete_answer_envelope() {
     use crate::payload::{Payload, fits};
-    use jig_client::contract::{Answer, Outcome};
+    use jig_domain_client::contract::{Answer, Outcome};
     let bytes = u64::try_from(size_of::<Answer>()).unwrap();
     let exact = Bounds { text: 0, rows: 0, document_bytes: bytes, ..Bounds::default() };
     let short = Bounds { document_bytes: bytes - 1, ..exact };

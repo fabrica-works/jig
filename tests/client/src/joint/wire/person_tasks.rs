@@ -1,7 +1,7 @@
 //! Whole pending person work (client/domain/objects.md, 7; contract.md, 5).
 //! Shown links and optional complete results remain independent source facts.
 use super::{chips, offers, owner, results};
-use jig_client::{Limits, contract as client};
+use jig_domain_client::{Limits, contract as client};
 use jig_domain_core::documents;
 
 /// # Errors

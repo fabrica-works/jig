@@ -1,7 +1,7 @@
 //! Whole closed offered-act allocation admission (client/domain/contract.md, 5.3).
 //! Ordinary row bounds continue to apply to every nested supplied list.
 use crate::{Bounds, payload::Payload};
-use jig_client::contract::{MAX_OFFERED_ACTS, Offered};
+use jig_domain_client::contract::{MAX_OFFERED_ACTS, Offered};
 use skein_lib::List;
 
 /// Price every reserved offer slot and every populated admission recursively.

@@ -1,6 +1,6 @@
 use super::{frame, script, text};
 use crate::{Bounds, Engine, Invalid, Script, owner_project};
-use jig_client::contract::*;
+use jig_domain_client::contract::*;
 use skein_lib::{List, Time, Token};
 fn source() -> OwnerProject {
     OwnerProject {
@@ -256,7 +256,7 @@ fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_orde
     roles.push(u32::MAX).unwrap();
     value.acts.get_mut(last).unwrap().act = ActKind::SetGoal;
     value.acts.get_mut(last).unwrap().admission = Admission::Bounded {
-        within: jig_client::contract::Bounds::Goal {
+        within: jig_domain_client::contract::Bounds::Goal {
             pool_left: u64::MAX,
             charters,
             procedures: List::with_capacity(2),

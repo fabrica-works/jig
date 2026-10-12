@@ -96,7 +96,7 @@ fn own_script() -> Script {
         chip.details = Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH });
         setup.truth.objects.insert(
             entry.object,
-            ReadValue::Result(Box::new(jig_client::contract::Result {
+            ReadValue::Result(Box::new(jig_domain_client::contract::Result {
                 task: chip,
                 ending: Ending::Done,
                 acts: list(vec![]),
@@ -109,7 +109,7 @@ fn own_script() -> Script {
         setup.truth.object_projects.insert(entry.object, 1);
     }
     let read = Read::Inbox {
-        group: jig_client::contract::InboxReadGroup::Updates,
+        group: jig_domain_client::contract::InboxReadGroup::Updates,
         project: None,
         kind: None,
         goal: None,

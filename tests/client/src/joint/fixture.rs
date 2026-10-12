@@ -1,8 +1,8 @@
 //! One shared authentic core/worker/client fixture, with externally supplied seeds and bounds.
 use super::{Joint, engine::Driver, session::Session};
 use crate::{Settings, Test, World};
-use jig_client::contract as client;
 use jig_core_world::peers::Peers;
+use jig_domain_client::contract as client;
 use jig_domain_people as people;
 use jig_fake_workers::{Script, Worker};
 use skein_lib::{Duration, Time, Wall};
@@ -84,7 +84,7 @@ pub(super) fn seeded_world_with_receiving(
     body: Box<[u8]>,
     configure: fn(&mut Joint),
     bounds: fn(&mut jig_test_domain::Limits),
-    receiving: jig_test_client_domain::Limits,
+    receiving: jig_test_domain_client::Limits,
 ) -> World<Test, Joint> {
     let mut owner = jig_core_world::world::limits();
     bounds(&mut owner);
@@ -120,7 +120,7 @@ pub(super) fn seeded_world_with_receiving(
         Time::ZERO,
         clock(Time::ZERO),
     );
-    let codec = jig_client_transcript::Limits {
+    let codec = jig_protocol_transcript::Limits {
         smith: smith_transcript::v3::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 2, blocks: 2, text: 32 },

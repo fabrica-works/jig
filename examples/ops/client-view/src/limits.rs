@@ -4,13 +4,13 @@ use crate::{bindings, drawing, words::Words};
 /// Bounds for the composed tree and owner bindings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    pub tree: jig_client_view::Limits,
+    pub tree: jig_view::Limits,
 }
 impl Limits {
     #[must_use]
     pub fn of(
         domain: &jig_ops_client_domain::Limits,
-        jig: &jig_client_view::words::Words,
+        jig: &jig_view::words::Words,
         observability: &Words,
         infrastructure: &Words,
     ) -> Option<Self> {
@@ -22,7 +22,7 @@ impl Limits {
             .checked_mul(rows.checked_add(1)?)?
             .checked_mul(80)?
             .checked_add(34)?
-            .checked_add(jig_client_view::refusal_nodes(&domain.jig)?)?;
+            .checked_add(jig_view::refusal_nodes(&domain.jig)?)?;
         let application_nodes = part.checked_mul(rows.checked_add(1)?)?;
         // A full connector document is reached through a chip phase, runtime,
         // effect, hold, approval, project or deployment slot. Nested rows bound
@@ -36,20 +36,18 @@ impl Limits {
             .checked_pow(3)?
             .checked_mul(domain.jig.objects.checked_add(1)?.checked_pow(2)?)?
             .checked_mul(8)?;
-        let jig_nodes = jig_client_view::Limits::of_words(&domain.jig, jig)?.nodes;
-        let jig_cards = jig_client_view::card_nodes(&domain.jig)?.checked_mul(rows.checked_add(1)?)?;
+        let jig_nodes = jig_view::Limits::of_words(&domain.jig, jig)?.nodes;
+        let jig_cards = jig_view::card_nodes(&domain.jig)?.checked_mul(rows.checked_add(1)?)?;
         let slot_nodes = documents
             .checked_mul(part)?
             .checked_add(jig_nodes.checked_mul(rows.checked_add(3)?)?)?
             .checked_add(jig_cards)?
             .checked_add(8)?;
-        let mut tree = jig_client_view::Limits::compose(&domain.jig, jig, application_nodes, slot_nodes, 8)?;
+        let mut tree = jig_view::Limits::compose(&domain.jig, jig, application_nodes, slot_nodes, 8)?;
         tree.text_per_node = tree
             .text_per_node
             .max(observability.capacity()?.max(infrastructure.capacity()?).checked_mul(2)?.checked_add(32)?)
-            .max(jig_client_view::literal_segment::max_bytes(
-                domain.observability.text.max(domain.infrastructure.text),
-            )?);
+            .max(jig_view::literal_segment::max_bytes(domain.observability.text.max(domain.infrastructure.text))?);
         tree.text_bytes = tree.nodes.checked_mul(tree.text_per_node)?;
         tree.drawing_bytes = drawing::BYTES;
         let limits = Self { tree };
@@ -61,23 +59,23 @@ impl Limits {
 pub fn worst_case(
     limits: &Limits,
     domain: &jig_ops_client_domain::Limits,
-    jig: &jig_client_view::words::Words,
+    jig: &jig_view::words::Words,
     observability: &Words,
     infrastructure: &Words,
 ) -> Option<u64> {
-    jig_client_view::worst_case(&limits.tree)?
-        .checked_add(jig_client_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
+    jig_view::worst_case(&limits.tree)?
+        .checked_add(jig_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(
             bindings::worst_case(limits.tree.bindings, domain.infrastructure.text.max(domain.observability.text))?
                 .checked_mul(2)?,
         )?
-        .checked_add(jig_client_view::phrases::worst_case(jig.book.limits())?)?
-        .checked_add(jig_client_view::phrases::worst_case(observability.book.limits())?)?
-        .checked_add(jig_client_view::phrases::worst_case(infrastructure.book.limits())?)?
+        .checked_add(jig_view::phrases::worst_case(jig.book.limits())?)?
+        .checked_add(jig_view::phrases::worst_case(observability.book.limits())?)?
+        .checked_add(jig_view::phrases::worst_case(infrastructure.book.limits())?)?
         .checked_add(u64::from(
             observability
                 .capacity()?
                 .max(infrastructure.capacity()?)
-                .max(jig.book.capacity(jig_client_view::phrases::jig::JigPhrase::LoadingPart.id())?),
+                .max(jig.book.capacity(jig_view::phrases::jig::JigPhrase::LoadingPart.id())?),
         ))
 }

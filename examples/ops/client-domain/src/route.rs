@@ -7,15 +7,15 @@ use crate::{
     store::{Key, Record},
 };
 use skein_lib::{Env, List, Map, Queue, RequestProgress};
-pub(crate) fn jig_env(env: &Env<Limits>) -> Env<jig_client::Limits> {
+pub(crate) fn jig_env(env: &Env<Limits>) -> Env<jig_domain_client::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.jig }
 }
 fn infrastructure_env(env: &Env<Limits>) -> Env<infrastructure::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.infrastructure }
 }
-pub(crate) fn jig(root: &mut Domain, env: &Env<Limits>, event: jig_client::Event, out: &mut Queue<Request>) {
-    let mut child = Queue::with_capacity(jig_client::max_out(&env.limits.jig));
-    jig_client::step(&mut root.jig, &jig_env(env), event, &mut child);
+pub(crate) fn jig(root: &mut Domain, env: &Env<Limits>, event: jig_domain_client::Event, out: &mut Queue<Request>) {
+    let mut child = Queue::with_capacity(jig_domain_client::max_out(&env.limits.jig));
+    jig_domain_client::step(&mut root.jig, &jig_env(env), event, &mut child);
     route_jig(root, env, &mut child, out);
 }
 pub(crate) fn infrastructure(
@@ -83,12 +83,12 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
             let jig_address = match address.clone() {
                 Address::Jig(address) => address,
                 Address::Infrastructure(_) | Address::Observability(_) => {
-                    jig_client::address::Address::Inbox { project: None }
+                    jig_domain_client::address::Address::Inbox { project: None }
                 }
             };
-            jig(root, env, jig_client::Event::Start { address: jig_address, kept: jig_kept, offset }, out);
+            jig(root, env, jig_domain_client::Event::Start { address: jig_address, kept: jig_kept, offset }, out);
             for (scope, requests) in &scopes {
-                jig(root, env, jig_client::Event::Kept { scope: *scope, requests: *requests }, out);
+                jig(root, env, jig_domain_client::Event::Kept { scope: *scope, requests: *requests }, out);
             }
             match address {
                 Address::Jig(_) => {
@@ -105,7 +105,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         }
         Event::Went { place } => went(root, env, place, out),
         Event::Act { action } => match action {
-            Action::Jig(act) => jig(root, env, jig_client::Event::Act { act }, out),
+            Action::Jig(act) => jig(root, env, jig_domain_client::Event::Act { act }, out),
             Action::Infrastructure(act) => infrastructure(root, env, infrastructure::Event::Act { act }, out),
             Action::Observability(act) => observability(root, env, observability::Event::Act { act }, out),
         },
@@ -115,7 +115,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         Event::Jig(event) => jig(root, env, event, out),
         Event::Infrastructure(event) => infrastructure(root, env, event, out),
         Event::Observability(event) => observability(root, env, event, out),
-        Event::SignedOut => jig(root, env, jig_client::Event::SignedOut, out),
+        Event::SignedOut => jig(root, env, jig_domain_client::Event::SignedOut, out),
     }
 }
 fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Request>) {
@@ -123,80 +123,87 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
         Place::Address(Address::Jig(address)) => {
             infrastructure(root, env, infrastructure::Event::Left, out);
             observability(root, env, observability::Event::Left, out);
-            jig(root, env, jig_client::Event::Went { place: jig_client::address::Place::Jig(address) }, out);
+            jig(
+                root,
+                env,
+                jig_domain_client::Event::Went { place: jig_domain_client::address::Place::Jig(address) },
+                out,
+            );
         }
         Place::Address(Address::Infrastructure(address)) => {
             observability(root, env, observability::Event::Left, out);
-            jig(root, env, jig_client::Event::Went { place: jig_client::address::Place::Elsewhere }, out);
+            jig(root, env, jig_domain_client::Event::Went { place: jig_domain_client::address::Place::Elsewhere }, out);
             infrastructure(root, env, infrastructure::Event::Went { address }, out);
         }
         Place::Address(Address::Observability(address)) => {
             infrastructure(root, env, infrastructure::Event::Left, out);
-            jig(root, env, jig_client::Event::Went { place: jig_client::address::Place::Elsewhere }, out);
+            jig(root, env, jig_domain_client::Event::Went { place: jig_domain_client::address::Place::Elsewhere }, out);
             observability(root, env, observability::Event::Went { address }, out);
         }
         Place::Missing => {
             infrastructure(root, env, infrastructure::Event::Left, out);
             observability(root, env, observability::Event::Left, out);
-            jig(root, env, jig_client::Event::Went { place: jig_client::address::Place::Missing }, out);
+            jig(root, env, jig_domain_client::Event::Went { place: jig_domain_client::address::Place::Missing }, out);
         }
     }
 }
 pub(crate) fn route_jig(
     root: &mut Domain,
     env: &Env<Limits>,
-    child: &mut Queue<jig_client::Request>,
+    child: &mut Queue<jig_domain_client::Request>,
     out: &mut Queue<Request>,
 ) {
     for _ in 0..child.len() {
         match child.pop().expect("counted jig output") {
-            jig_client::Request::Send { request, scope, ask } => {
+            jig_domain_client::Request::Send { request, scope, ask } => {
                 crate::domain::ask(root, env, Owner::Jig(request), scope, Ask::Jig(ask), out);
             }
-            jig_client::Request::Read { read, what } => out.push(Request::Jig(JigOut::Read { read, what })),
-            jig_client::Request::Open { watch, subject } => out.push(Request::Jig(JigOut::Open { watch, subject })),
-            jig_client::Request::Continue { watch, subject } => {
+            jig_domain_client::Request::Read { read, what } => out.push(Request::Jig(JigOut::Read { read, what })),
+            jig_domain_client::Request::Open { watch, subject } => {
+                out.push(Request::Jig(JigOut::Open { watch, subject }));
+            }
+            jig_domain_client::Request::Continue { watch, subject } => {
                 out.push(Request::Jig(JigOut::Continue { watch, subject }));
             }
-            jig_client::Request::Close { watch } => out.push(Request::Jig(JigOut::Close { watch })),
-            jig_client::Request::Show { address, replace } => {
+            jig_domain_client::Request::Close { watch } => out.push(Request::Jig(JigOut::Close { watch })),
+            jig_domain_client::Request::Show { address, replace } => {
                 out.push(Request::Show { address: Address::Jig(address), replace });
             }
-            jig_client::Request::Save { record } => out.push(Request::Save { record: Record::Jig(record) }),
-            jig_client::Request::Erase { key } => out.push(Request::Erase { key: Key::Jig(key) }),
-            jig_client::Request::SignIn { provider, back } => {
+            jig_domain_client::Request::Save { record } => out.push(Request::Save { record: Record::Jig(record) }),
+            jig_domain_client::Request::Erase { key } => out.push(Request::Erase { key: Key::Jig(key) }),
+            jig_domain_client::Request::SignIn { provider, back } => {
                 out.push(Request::SignIn { provider, back: Address::Jig(back) });
             }
-            jig_client::Request::ShowPart { part, generation, scope } => {
+            jig_domain_client::Request::ShowPart { part, generation, scope } => {
                 crate::parts::show(root, env, part, generation, scope, out);
             }
-            jig_client::Request::PartsLeft { generation } => {
+            jig_domain_client::Request::PartsLeft { generation } => {
                 infrastructure(root, env, infrastructure::Event::PartsLeft { generation }, out);
                 observability(root, env, observability::Event::PartsLeft { generation }, out);
             }
-            jig_client::Request::Link { link } => {
+            jig_domain_client::Request::Link { link } => {
                 infrastructure(root, env, infrastructure::Event::Link { link }, out);
                 observability(root, env, observability::Event::Link { link }, out);
                 root.table.link(match link {
-                    jig_client::link::Link::Live => true,
-                    jig_client::link::Link::Starting | jig_client::link::Link::Offline => false,
+                    jig_domain_client::link::Link::Live => true,
+                    jig_domain_client::link::Link::Starting | jig_domain_client::link::Link::Offline => false,
                 });
             }
-            jig_client::Request::Confirmed { party } => {
+            jig_domain_client::Request::Confirmed { party } => {
                 infrastructure(root, env, infrastructure::Event::Confirmed { party }, out);
                 observability(root, env, observability::Event::Confirmed { party }, out);
                 root.table.confirmed(party);
             }
-            jig_client::Request::Retention { retention } => root.table.retention(retention),
-            jig_client::Request::FrameIs { asked, frame } => {
+            jig_domain_client::Request::Retention { retention } => root.table.retention(retention),
+            jig_domain_client::Request::FrameIs { asked, frame } => {
                 infrastructure(root, env, infrastructure::Event::FrameIs { asked, frame: frame.clone() }, out);
                 observability(root, env, observability::Event::FrameIs { asked, frame }, out);
             }
-            jig_client::Request::Answered { asked, answer } => {
+            jig_domain_client::Request::Answered { asked, answer } => {
                 out.push(Request::Jig(JigOut::Answered { asked, answer }));
             }
-            jig_client::Request::Unknown { asked } => out.push(Request::Jig(JigOut::Unknown { asked })),
-            jig_client::Request::Fact { fact } => out.push(Request::Fact { fact: Fact::Jig(fact) }),
+            jig_domain_client::Request::Unknown { asked } => out.push(Request::Jig(JigOut::Unknown { asked })),
+            jig_domain_client::Request::Fact { fact } => out.push(Request::Fact { fact: Fact::Jig(fact) }),
         }
     }
 }
@@ -208,7 +215,7 @@ pub(crate) fn route_infrastructure(
 ) {
     for _ in 0..child.len() {
         match child.pop().expect("counted infrastructure output") {
-            infrastructure::Request::Frame { asked } => jig(root, env, jig_client::Event::Frame { asked }, out),
+            infrastructure::Request::Frame { asked } => jig(root, env, jig_domain_client::Event::Frame { asked }, out),
             infrastructure::Request::Show { address } => {
                 out.push(Request::Show { address: Address::Infrastructure(address), replace: false });
             }
@@ -220,7 +227,7 @@ pub(crate) fn route_infrastructure(
             }
             infrastructure::Request::Out(value) => match value {
                 infrastructure::Out::Fact { fact: infrastructure::Fact::SignedOut } => {
-                    jig(root, env, jig_client::Event::SignedOut, out);
+                    jig(root, env, jig_domain_client::Event::SignedOut, out);
                 }
                 infrastructure::Out::Read { .. }
                 | infrastructure::Out::Open { .. }
@@ -236,9 +243,9 @@ pub(crate) fn route_infrastructure(
                 }
             },
             infrastructure::Request::ShowObjects { objects } => {
-                jig(root, env, jig_client::Event::ShowObjects { objects }, out);
+                jig(root, env, jig_domain_client::Event::ShowObjects { objects }, out);
             }
-            infrastructure::Request::ObjectsLeft => jig(root, env, jig_client::Event::ObjectsLeft, out),
+            infrastructure::Request::ObjectsLeft => jig(root, env, jig_domain_client::Event::ObjectsLeft, out),
         }
     }
 }
@@ -250,7 +257,7 @@ pub(crate) fn route_observability(
 ) {
     for _ in 0..child.len() {
         match child.pop().expect("counted observability output") {
-            observability::Request::Frame { asked } => jig(root, env, jig_client::Event::Frame { asked }, out),
+            observability::Request::Frame { asked } => jig(root, env, jig_domain_client::Event::Frame { asked }, out),
             observability::Request::Show { address } => {
                 out.push(Request::Show { address: Address::Observability(address), replace: false });
             }
@@ -259,7 +266,7 @@ pub(crate) fn route_observability(
             }
             observability::Request::Out(value) => match value {
                 observability::Out::Fact { fact: observability::Fact::SignedOut } => {
-                    jig(root, env, jig_client::Event::SignedOut, out);
+                    jig(root, env, jig_domain_client::Event::SignedOut, out);
                 }
                 observability::Out::Read { .. }
                 | observability::Out::Open { .. }
@@ -275,9 +282,9 @@ pub(crate) fn route_observability(
                 }
             },
             observability::Request::ShowObjects { objects } => {
-                jig(root, env, jig_client::Event::ShowObjects { objects }, out);
+                jig(root, env, jig_domain_client::Event::ShowObjects { objects }, out);
             }
-            observability::Request::ObjectsLeft => jig(root, env, jig_client::Event::ObjectsLeft, out),
+            observability::Request::ObjectsLeft => jig(root, env, jig_domain_client::Event::ObjectsLeft, out),
         }
     }
 }
@@ -291,19 +298,19 @@ pub(crate) fn progress(
     match owner {
         Owner::Jig(request) => {
             let progress = match progress {
-                RequestProgress::InFlight => jig_client::intents::Progress::InFlight,
-                RequestProgress::Retrying => jig_client::intents::Progress::Retrying,
-                RequestProgress::Parked => jig_client::intents::Progress::Parked,
-                RequestProgress::Unknown => jig_client::intents::Progress::Unknown,
+                RequestProgress::InFlight => jig_domain_client::intents::Progress::InFlight,
+                RequestProgress::Retrying => jig_domain_client::intents::Progress::Retrying,
+                RequestProgress::Parked => jig_domain_client::intents::Progress::Parked,
+                RequestProgress::Unknown => jig_domain_client::intents::Progress::Unknown,
             };
-            jig(root, env, jig_client::Event::Progress { request, progress }, out);
+            jig(root, env, jig_domain_client::Event::Progress { request, progress }, out);
         }
         Owner::Infrastructure(request) => {
             infrastructure(root, env, infrastructure::Event::Progress { request, progress }, out);
         }
         Owner::Observability(_) => out.push(Request::Fact { fact: Fact::InvalidAnswer }),
         Owner::Kept { scope } => match progress {
-            RequestProgress::Unknown => jig(root, env, jig_client::Event::KeptGone { scope }, out),
+            RequestProgress::Unknown => jig(root, env, jig_domain_client::Event::KeptGone { scope }, out),
             RequestProgress::InFlight | RequestProgress::Retrying | RequestProgress::Parked => {}
         },
     }

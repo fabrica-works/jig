@@ -1,7 +1,7 @@
 //! Faulty client and front run through real callbacks, trees, patches and people.
-use jig_client_view::{Act, Binding, Key, NodeId, Owner, Patch, Role, Run, Tree, View};
 use jig_client_world::{Until, harness::*};
 use jig_fake_person::{Face, Find, Found, Step, TreeFace};
+use jig_view::{Act, Binding, Key, NodeId, Owner, Patch, Role, Run, Tree, View};
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 
 #[global_allocator]
@@ -19,7 +19,7 @@ enum Event {
 }
 struct Wire;
 const KEY: Key = Key { owner: Owner::Jig, kind: 1, a: 1, b: 1 };
-const LIMITS: jig_client_view::Limits = jig_client_view::Limits {
+const LIMITS: jig_view::Limits = jig_view::Limits {
     nodes: 16,
     depth: 4,
     text_per_node: 64,
@@ -300,7 +300,7 @@ fn recovered_truth_without_an_online_view_misses_its_deadline() {
 
 #[test]
 fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
-    use jig_test_client_domain::family;
+    use jig_test_domain_client::family;
     let mut w = jig_client_world::stories::chat_ready(20);
     let subject = family::Subject { scope: family::Scope::Project(1), kind: family::Kind::Item(1) };
     let mut state = jig_client_world::scripted::Family::default();
@@ -309,7 +309,7 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
         family::Document::Item(family::Item {
             project: 1,
             key: 1,
-            revision: jig_client::contract::Revision { value: 7 },
+            revision: jig_domain_client::contract::Revision { value: 7 },
             state: family::ItemState::Ready,
             value: 1,
             task: 9,
@@ -319,11 +319,11 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
     );
     w.front()
         .engine
-        .act_application(Time::ZERO, Wall::EPOCH, jig_test_client_domain::FIRST, 1, state, vec![])
+        .act_application(Time::ZERO, Wall::EPOCH, jig_test_domain_client::FIRST, 1, state, vec![])
         .expect("family fixture fits");
     let c = w.client(
         7,
-        jig_test_client_domain::Address::First(jig_test_client_domain::first::Address { project: 1, item: 1 }),
+        jig_test_domain_client::Address::First(jig_test_domain_client::first::Address { project: 1, item: 1 }),
     );
     w.person(
         c,
@@ -340,8 +340,8 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
 
 #[test]
 fn the_test_clients_sent_words_are_found_in_committed_activity() {
-    use jig_client::contract::{Activity, ActivityLine, Answer, Ask, Made, Outcome, Read};
     use jig_client_world::stories;
+    use jig_domain_client::contract::{Activity, ActivityLine, Answer, Ask, Made, Outcome, Read};
     let mut w = stories::chat_ready(21);
     w.front()
         .engine

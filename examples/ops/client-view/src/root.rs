@@ -6,15 +6,15 @@ use crate::{
     infrastructure, observability,
     words::{self, Word},
 };
-use jig_client_view::{Act, Builder, JigBindings, NodeId, Owner, Patch, Role, Tree};
 use jig_ops_client_domain::Domain;
 use jig_ops_connectors::Connector;
+use jig_view::{Act, Builder, JigBindings, NodeId, Owner, Patch, Role, Tree};
 use skein_lib::Queue;
 /// The composed semantic tree and its owner binding tables.
 #[derive(Debug)]
 pub struct View {
-    render: jig_client_view::View,
-    words: jig_client_view::words::Words,
+    render: jig_view::View,
+    words: jig_view::words::Words,
     observability_words: words::Words,
     infrastructure_words: words::Words,
     jig: JigBindings,
@@ -29,7 +29,7 @@ impl View {
     pub fn new(
         limits: &Limits,
         domain: &jig_ops_client_domain::Limits,
-        words: jig_client_view::words::Words,
+        words: jig_view::words::Words,
         observability_words: words::Words,
         infrastructure_words: words::Words,
         project: u32,
@@ -44,7 +44,7 @@ impl View {
             "view capacities are checked"
         );
         Self {
-            render: jig_client_view::View::new(&limits.tree),
+            render: jig_view::View::new(&limits.tree),
             jig: JigBindings::new(limits.tree.bindings, domain.jig.text),
             observability: Bindings::new(
                 limits.tree.bindings,
@@ -88,7 +88,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     view.infrastructure.begin();
     let mut builder = view.render.builder();
     builder.open(Role::Page);
-    if !jig_client_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
+    if !jig_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
         if root.observability().address().is_some() {
             observability::page(&mut builder, root.observability(), &view.observability_words, &mut view.observability);
         } else {
@@ -100,7 +100,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                 &mut view.infrastructure,
             );
         }
-        jig_client_view::after_page(&mut builder, root.jig(), &view.words, &mut view.jig);
+        jig_view::after_page(&mut builder, root.jig(), &view.words, &mut view.jig);
     }
     builder.close();
     for pass in 0..2 {
@@ -114,11 +114,11 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                     };
                     match key {
                         Some(key) => match root.jig().objects().find(key) {
-                            Some(id) => jig_client_view::cards::card(
+                            Some(id) => jig_view::cards::card(
                                 &mut fragment,
                                 root.jig(),
                                 id,
-                                &jig_client_view::cards::Place::Elsewhere,
+                                &jig_view::cards::Place::Elsewhere,
                                 &view.words,
                                 &mut view.jig,
                             ),
@@ -189,11 +189,11 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     }
     view.render.finish(builder, shown, out);
 }
-fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Option<jig_client::contract::Part> {
+fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Option<jig_domain_client::contract::Part> {
     match bindings.part(token) {
         Some(part) => Some(part.clone()),
         None => match bindings.owner_part(token) {
-            Some(part) => jig_client::application::owner_effect(part),
+            Some(part) => jig_domain_client::application::owner_effect(part),
             None => None,
         },
     }
@@ -203,7 +203,7 @@ fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Optio
 pub fn decode(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
     match bound.binding.owner {
-        Owner::Jig => match jig_client_view::decode(&mut view.jig, bound.binding.token, bound.act) {
+        Owner::Jig => match jig_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(value) => Some(Action::Jig(value)),
             None => None,
         },
