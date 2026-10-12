@@ -722,6 +722,20 @@ the file.
      to print nothing. The Proof now runs with `--diff-filter=MD`: no
      existing generated file or golden changes or goes; the new lint
      goldens are added and listed in the commit body.
+143. **ops's configuration carries its inline agent's bounds**
+     (2026-10-12, the coordinator's block "jig 05.6: ops construction has
+     no authentic agent Bounds input", 2026-10-12T20:25:10Z). A plan
+     defect: 05.6 has `ops`'s construction send its hub's hello on channel
+     0, but `examples/ops/domain/src/domain.rs`'s `Config` holds no
+     agent bounds. hosts.md, 4: "The engine's root translates its own
+     hub's link as it translates a worker's ..., its hello stating the
+     bounds of its `smith-inline-agent`'s configuration". So `ops::Config`
+     gains `agent_bounds: host::Bounds` (`crates/jig-domain-host/src/link.rs:73`),
+     which construction puts in the hello; each producer of an `ops`
+     `Config` supplies its configured agent's bounds, the worlds from
+     their agent fixtures. Nothing derives them from a charter. Each
+     `Config` literal outside 05.6's Files gains its one line, named in
+     the commit body.
 
 ## For the user
 
