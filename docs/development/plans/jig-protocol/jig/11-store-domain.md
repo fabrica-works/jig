@@ -246,15 +246,19 @@ Removes: the decided-proposal branch of `restore` that reads and discards
 ### 11.3 Keys for single reads
 
 Scope: a task's record names the activity positions of each question it
-heard and of the answer, the milestone position of its latest hold, and the
-history revision that keeps each of its decided proposals; the core world's
+heard and of its answer, with the task whose activity holds the answer
+(store.md 7.3, "An answer is read where it was heard"), the milestone
+position of its latest hold, and the history revision that keeps each of
+its decided proposals; the core world's
 read transport serves `Scope::Question`, `Scope::Escalation` and
 `Scope::Proposal { proposer: Task(_), .. }` by key from them (store.md
 15.7, 7.3; decision 9).
 Needs: nothing beyond 11.1.
 Files:
-- `crates/jig-domain-tasks/src/boundary.rs` (`TaskRecord` :844-972: three fields; `QuestionLine`, `ProposalRow`);
-- `crates/jig-domain-tasks/src/activity.rs` (`message` :90-107: a Question line records its position; an Answer line fills `answer`);
+- `crates/jig-domain-tasks/src/boundary.rs` (`TaskRecord` :844-972: three fields; `QuestionLine`, `AnswerLine`, `ProposalRow`);
+- `crates/jig-domain-tasks/src/activity.rs` (`message` :90-107: a Question line records its position; a party's Answer line fills `answer` with the task's own);
+- `crates/jig-domain-tasks/src/inbox.rs` (`message`, where a task's answer clears its asker's credit: the answering task's `QuestionLine` names the line in the asker's activity, and its record is published in the same decision);
+- `crates/jig-domain-core/src/reads/rows.rs` (the `Scope::Question` arm, :668-720: the answer's line is accepted from the task the record names, not only the question's);
 - `crates/jig-domain-tasks/src/domain.rs` (`milestone` :827-880: `hold` set when the phase is Held);
 - `crates/jig-domain-tasks/src/control.rs` and `proposals.rs` (where a decided proposal's `History` row is saved for its proposer);
 - `crates/jig-domain-tasks/src/stored.rs` (`valid_record`: the new fields' bounds), `owned.rs` (:403, the record's bytes);
@@ -263,18 +267,26 @@ Files:
 - if jig 14 has landed the tasks family's codec: its schema, generated code and translation (README, "Rules").
 Shape:
 - `TaskRecord.question_lines: Box<[QuestionLine]>`: "the activity positions
-  of the questions this task heard and of their answers, newest first, at
-  most `inbox_messages`".
+  of the questions this task heard and of their answers, each answer with
+  the task that heard it, newest first, at most `inbox_messages`".
+- Where an answer is: a party's answer is a line in the task's own
+  activity; the task's answer to the delegate that asked is the line
+  `inbox::message` appends to the delegate's activity, as today, and the
+  same decision names it in the answering task's `QuestionLine`
+  (`AnswerLine { task: delegate, position }`). No line is added to the
+  answering task's activity. The first answer is kept; a later one
+  changes nothing.
 - `TaskRecord.hold: u64`: "the milestone position of this task's latest
   hold; zero before its first".
 - `TaskRecord.proposal_rows: Box<[ProposalRow]>`: "the history revision
   that keeps each proposal this task made and that was decided, newest
   first, at most `inbox_messages`".
-- `QuestionLine` and `ProposalRow` as sketched.
+- `QuestionLine`, `AnswerLine` and `ProposalRow` as sketched.
 - The scopes' reads stay as they are (`crates/jig-domain-core/src/reads/vocabulary.rs:61-96`):
   the transport finds the owner's record by key (`Live(task)`, then
   `Ended(task)`), and from it the row's key: `Activity { task, position:
-  line }` with `related` `Activity { task, position: answer }`;
+  line }` with `related` `Activity { task: answer.task, position:
+  answer.position }`;
   `EscalationDecision { task, revision: escalation.revision() }` with
   `related` `Milestone { task, position: hold }`; `History { task:
   proposer, revision }`. A read whose position the record no longer keeps
@@ -285,11 +297,13 @@ Test shape:
   `a_question_read_after_its_task_ended_finds_both_lines_by_key`,
   `an_escalation_read_shows_its_latest_decision_and_its_hold`,
   `a_task_proposal_read_finds_its_history_row_by_key`,
-  `a_question_older_than_the_kept_lines_reads_as_gone`. Each is its own
-  `#[test]`, focused ceiling 0.5 s.
+  `a_question_older_than_the_kept_lines_reads_as_gone`,
+  `a_question_answered_by_its_task_reads_the_line_in_the_delegates_activity`.
+  Each is its own `#[test]`, focused ceiling 0.5 s.
 - In `crates/jig-domain-tasks/src/tests/revisions.rs` (its `Harness`):
   `a_held_task_names_the_milestone_of_its_hold`,
-  `question_lines_keep_the_newest_within_inbox_messages`. Unit ceiling
+  `question_lines_keep_the_newest_within_inbox_messages`,
+  `a_tasks_answer_names_the_line_in_the_delegates_activity`. Unit ceiling
   20 ms.
 - The transport's three new arms read only the keys named above: no
   iteration over `store.rows` for these scopes (its `page` keeps the scan
@@ -298,8 +312,9 @@ Proof: world. `cargo nextest run -p jig-core-world --test reads` once,
 through `heavy`: a person reads a question, an escalation and a task's
 proposal after the task ended, each found by key. Bound: 1 minute.
 Don't: change `Scope`, `Read` or `Position`; scan a family in the
-transport's new arms.
-Size: at most 200 lines of production code.
+transport's new arms; add a line to the answering task's activity.
+Size: at most 240 lines of production code (the designer's answer on an
+answer's task, 2026-10-12, adds about 40).
 Removes: nothing.
 
 ### 11.4 Fill: the event, the mark, refusals at the entrances
@@ -445,15 +460,23 @@ impl Key {
     pub const fn live(&self) -> bool { todo!() }
 }
 
-/// A question this task heard, and where its answer is (store.md 15.7).
+/// A question this task heard, and where its answer is (store.md 7.3, 15.7).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct QuestionLine {
     /// The question's message number, as `Scope::Question` names it.
     pub message: u64,
     /// The question's activity position in this task.
     pub line: u64,
-    /// The answer's activity position in this task, once answered.
-    pub answer: Option<u64>,
+    /// Where its first answer was heard, once answered.
+    pub answer: Option<AnswerLine>,
+}
+
+/// An answer's activity line: this task's own for a party's answer, the
+/// asking delegate's for this task's answer to it.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AnswerLine {
+    pub task: u64,
+    pub position: u64,
 }
 
 /// The history row that keeps one of this task's decided proposals.
