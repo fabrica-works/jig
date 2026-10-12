@@ -7,3 +7,6 @@ pub mod keys;
 pub use boundary::{
     Cursor, Event, Family, Get, Load, OpenRefusal, Request, Restore, Row, SecretOwner, Secrets, TranscriptRead, Write,
 };
+
+#[cfg(test)]
+mod tests;
