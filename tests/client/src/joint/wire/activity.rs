@@ -330,6 +330,7 @@ mod tests {
         assert!(original.event.decoded_turn().is_none());
         assert_eq!(original.event.read_position(), Some(0));
         let archive = jig_domain_core::TurnRecord {
+            opens_window: false,
             task: u64::MAX,
             attempt: u64::MAX,
             turn: u32::MAX,

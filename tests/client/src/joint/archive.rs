@@ -216,6 +216,7 @@ mod tests {
     }
     fn record(task: u64) -> jig_domain_core::TurnRecord {
         jig_domain_core::TurnRecord {
+            opens_window: false,
             task,
             attempt: 17,
             turn: 23,

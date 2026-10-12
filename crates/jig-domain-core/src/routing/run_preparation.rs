@@ -88,7 +88,8 @@ pub(super) fn workspace_prepared(
         && transcript.bytes <= u64::from(core.settings.resume_bytes);
     let conversation = if resume && transcript.last.is_some() { transcript.from } else { attempt };
     let messages = start_messages(context.inbox, env.limits.tasks.run_inbox);
-    let proof = start_proof(core, task, attempt, conversation, &messages);
+    let mut proof = start_proof(core, task, attempt, conversation, &messages);
+    proof.window = if resume { transcript.window } else { None };
     let previous = core.proofs.insert(task, proof).expect("claim proof reserved before child mutation");
     if let Some(previous) = previous {
         assert!(core.replaced.insert(task, previous) == Ok(None), "one pending replacement per task");

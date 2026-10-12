@@ -358,3 +358,23 @@ fn a_restart_with_workers_elsewhere_still_waits_for_them() {
     assert_eq!(restored_task(&world, task).phase, tasks::Phase::Active(tasks::Active::Running { attempt }));
     assert_eq!(restored_task(&world, task).tries.lost, 0);
 }
+
+#[test]
+fn a_restart_keeps_the_window_a_turn_opened() {
+    let mut world = World::new(125, false);
+    world.turn(1, 1, None, b"earlier window");
+    world.window_turn(2, 2, None, b"current window");
+    let assignment = world.assigned.as_ref().expect("live worker");
+    let (task, attempt) = (assignment.task, assignment.attempt);
+    let hosted = fleet::Hosted { run: Token::new(task), attempt: Token::new(attempt), phase: fleet::Phase::Active };
+    world.restart(125, false);
+    hello(&mut world, Box::new([hosted]));
+    world.end(tasks::End::Parked, 2);
+    account(&mut world);
+    world.say(92);
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(task)));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &world.store.rows[&key] else {
+        panic!("restored conversation proof")
+    };
+    assert_eq!(proof.window, Some((attempt, 2)));
+}

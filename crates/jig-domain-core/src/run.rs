@@ -23,6 +23,7 @@ pub enum RunAdmission {
 /// Empty turn bodies need no slot: they add nothing to a resumed conversation.
 #[derive(Debug)]
 pub struct Transcript {
+    pub window: Option<(u64, u32)>,
     pub previous_attempt: u64,
     pub last: Option<(u64, u32)>,
     pub from: u64,
@@ -144,6 +145,10 @@ impl Core {
 
     /// Begin a bounded transcript load for a due task's previous attempt.
     pub fn begin_transcript(&mut self, task: u64, previous_attempt: u64) {
+        let window = match self.proofs.get(&task) {
+            Some(proof) => proof.window,
+            None => None,
+        };
         let from = match self.proofs.get(&task) {
             Some(proof) => proof.conversation,
             None => 1,
@@ -153,6 +158,7 @@ impl Core {
                 .insert(
                     task,
                     Transcript {
+                        window,
                         previous_attempt,
                         last: None,
                         from,

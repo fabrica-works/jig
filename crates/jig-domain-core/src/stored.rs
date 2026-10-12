@@ -509,6 +509,8 @@ pub struct CallKey {
 /// (domain/engine.md, 5.1 and 7.2). Loads return the same owned shape.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TurnRecord {
+    /// A window turn, or the conversation's first.
+    pub opens_window: bool,
     /// Positive durable task number owning this transcript.
     pub task: u64,
     /// Positive root-issued activation fence for the transcript.
@@ -572,6 +574,9 @@ pub struct RunProof {
     /// The conversation's first attempt: this claim's attempt when its run starts
     /// fresh, the previous proof's when it resumes; never zero.
     pub conversation: u64,
+    /// The current window's first turn: the last committed turn of this
+    /// conversation that opened a window, by attempt and turn.
+    pub window: Option<(u64, u32)>,
     /// Host selected for this claim; engine claims cannot survive a restart.
     pub host: jig_domain_fleet::HostKind,
     /// Highest inbox message offered to this attempt in an assignment or committed relay.
@@ -631,6 +636,6 @@ impl RunProof {
         offered: Option<u64>,
         host: jig_domain_fleet::HostKind,
     ) -> Self {
-        Self { task, attempt, conversation, host, offered, turn: None, terminal: None }
+        Self { task, attempt, conversation, window: None, host, offered, turn: None, terminal: None }
     }
 }

@@ -30,10 +30,7 @@ use run_preparation::{
     route_prepared_agent, start_brief, workspace_prepared,
 };
 pub(crate) use runs::named_propose;
-use runs::{
-    named_action, route_accepted_turn, route_answer_payload, route_named_answer, route_refused_payload,
-    route_turn_payload,
-};
+use runs::{named_action, route_answer_payload, route_named_answer, route_refused_payload, route_turn_payload};
 use skein_lib::{Env, JournalRoom, List, Queue, ReplyTo, Token};
 use task_routes::{
     route_connector_repair, route_person_escalation, route_person_proposal, route_task_escalation, route_tasks,
@@ -59,6 +56,8 @@ pub(crate) mod refusals;
 mod run_delegation;
 mod run_preparation;
 mod runs;
+mod turns;
+use turns::route_accepted_turn;
 #[path = "tasks.rs"]
 mod task_routes;
 #[path = "views.rs"]
@@ -482,8 +481,8 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::AnswerPayload { run, attempt, payload, cumulative, end, saved, invalid_saved, read: _, refused: _ } => {
             route_answer_payload(core, work, run, attempt, payload, cumulative, end, saved, invalid_saved)
         }
-        Event::AcceptedTurn { task, attempt, turn, accepted, cumulative, read, transcript, opens_window: _ } => {
-            route_accepted_turn(core, env, task, attempt, turn, accepted, cumulative, read, transcript)
+        Event::AcceptedTurn { task, attempt, turn, accepted, cumulative, read, transcript, opens_window } => {
+            route_accepted_turn(core, env, task, attempt, turn, accepted, cumulative, read, transcript, opens_window)
         }
         Event::RefusedPayload { request, problem, payload } => {
             route_refused_payload(core, work, request, problem, payload)

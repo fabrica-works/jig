@@ -683,6 +683,15 @@ fn valid_proof(proof: &RunProof, expected: &RestoringProof, result_bytes: u32) -
     if proof.task == 0 || proof.attempt == 0 || proof.conversation == 0 || proof.conversation > proof.attempt {
         return false;
     }
+    let last_turn = match proof.turn {
+        Some(turn) => turn.turn,
+        None => 0,
+    };
+    if let Some(window) = proof.window
+        && (window < (proof.conversation, 1) || window > (proof.attempt, last_turn))
+    {
+        return false;
+    }
     let spent = match proof.turn {
         Some(turn) => {
             let read_valid = match turn.read {

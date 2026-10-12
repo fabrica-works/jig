@@ -215,6 +215,7 @@ fn record_key_rows() -> [(CoreRecord, CoreKey); 8] {
         ),
         (
             CoreRecord::Turn(TurnRecord {
+                opens_window: false,
                 task: 31,
                 attempt: 37,
                 turn: 41,

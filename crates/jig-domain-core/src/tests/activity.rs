@@ -237,3 +237,13 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         _ => false,
     }));
 }
+
+#[test]
+fn a_proof_whose_window_passes_its_turn_is_refused_at_restore() {
+    let (mut core, limits) = core();
+    let mut proof = RunProof::claimed(1, 7, 7, None, jig_domain_fleet::HostKind::Worker);
+    proof.turn = Some(TurnProof { turn: 1, cumulative: 0, read: None });
+    proof.window = Some((7, 2));
+    core.restoring_proofs.insert(1, RestoringProof { attempt: 7, turn: 1, run_spent: 0, last_answer: None }).unwrap();
+    assert!(!core.restore_proof(proof, limits.tasks.result_bytes));
+}

@@ -5,7 +5,7 @@
 use super::NoteRoute;
 use super::run_delegation::propose_batch;
 use crate::{
-    CallKey, CallPart, CallRecord, Core, CoreKey, CoreRecord, EscalationChoice, Event, Held, Key, Limits, NamedAction,
+    CallKey, CallPart, CallRecord, Core, CoreRecord, EscalationChoice, Event, Held, Limits, NamedAction,
     PayloadRefusal, ProposalChoice, Record, Request, Requests, RoutedCall, ToolKind, Write,
 };
 use alloc::boxed::Box;
@@ -676,49 +676,6 @@ pub(super) fn route_refused_payload(
         Some(PayloadRefusal::Turn { .. } | PayloadRefusal::Answer { .. }) | None => {}
     }
     let mut out = Queue::with_capacity(1);
-    out.push(Request::Decided);
-    Requests::Out(out)
-}
-
-#[expect(clippy::too_many_arguments, reason = "the route retains its event fields")]
-pub(super) fn route_accepted_turn(
-    core: &mut Core,
-    env: &Env<Limits>,
-    task: u64,
-    attempt: u64,
-    turn: u32,
-    accepted: tasks::Accepted,
-    cumulative: u64,
-    read: Option<u64>,
-    transcript: Box<[u8]>,
-) -> Requests {
-    let proof = core.proofs.get_mut(&task).expect("turn proof reserved before child mutation");
-    assert!(proof.attempt == attempt, "turn callback retains its claim");
-    let mut out = Queue::with_capacity(env.limits.call_records.checked_add(6).expect("turn route room"));
-    match accepted {
-        tasks::Accepted::New => {
-            proof.turn = Some(crate::TurnProof { turn, cumulative, read });
-            out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
-            out.push(Request::Write(Write::Save(Record::Core(CoreRecord::Turn(crate::TurnRecord {
-                task,
-                attempt,
-                turn,
-                spent: cumulative,
-                read,
-                at: env.wall,
-                transcript,
-            })))));
-            for key in core.retire_calls(task, attempt, turn, env.limits.call_records) {
-                out.push(Request::Write(Write::Erase(Key::Core(CoreKey::Call(key)))));
-            }
-            super::view_routes::touch_number(core, &env.limits, task);
-        }
-        tasks::Accepted::Already => {}
-    }
-    out.push(Request::Held(Box::new(Held::TaskTurnKept { task, attempt, turn })));
-    if let Some(relay) = crate::relays::next(core, task, env.limits.tasks.run_inbox) {
-        out.push(Request::Held(Box::new(relay)));
-    }
     out.push(Request::Decided);
     Requests::Out(out)
 }

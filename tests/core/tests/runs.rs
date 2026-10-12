@@ -118,6 +118,7 @@ fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
     let mut core = core::Core::new(config, &limits);
     core.begin_transcript(1, 3);
     let turn = core::TurnRecord {
+        opens_window: false,
         task: 1,
         attempt: 2,
         turn: 1,
@@ -131,6 +132,7 @@ fn loaded_transcript_pages_reject_repeated_and_reversed_turns() {
     assert!(!core.append_transcript(
         1,
         core::TurnRecord {
+            opens_window: false,
             task: 1,
             attempt: 1,
             turn: 2,
@@ -418,4 +420,44 @@ fn an_account_unusable_at_the_second_check_waits_and_is_not_held() {
         if matches!(task.phase, tasks::Phase::Active(tasks::Active::Preparing)))));
     account_granted(&mut world);
     assert_eq!(world.assignments.len(), assigned + 1);
+}
+
+fn current_window_proof(world: &World) -> &core::RunProof {
+    let task = world.assigned.as_ref().expect("assigned chat").task;
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(task)));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &world.store.rows[&key] else {
+        panic!("durable window proof")
+    };
+    proof
+}
+
+#[test]
+fn a_window_turn_moves_the_tasks_window_in_its_commit() {
+    let mut world = World::new(113, false);
+    let attempt = world.assigned.as_ref().expect("assigned chat").attempt;
+    world.turn(1, 1, None, b"opening turn");
+    assert_eq!(current_window_proof(&world).window, Some((attempt, 1)));
+    world.window_turn(2, 2, None, b"compacted window");
+    assert_eq!(current_window_proof(&world).window, Some((attempt, 2)));
+    let proof = current_window_proof(&world);
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::Turn { task: proof.task, attempt, turn: 2 }));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::Turn(turn))) = &world.store.rows[&key] else {
+        panic!("committed window turn")
+    };
+    assert!(turn.opens_window);
+    world.end(tasks::End::Parked, 2);
+    world.say(85);
+    assert_eq!(current_window_proof(&world).window, Some((attempt, 2)));
+}
+
+#[test]
+fn a_fresh_start_clears_the_window_until_its_first_turn() {
+    let mut world = World::new(114, false);
+    world.window_turn(1, 1, None, b"old window");
+    world.end(tasks::End::Failed(tasks::Class::Transient), 1);
+    world.retry_due();
+    let attempt = current_window_proof(&world).attempt;
+    assert_eq!(current_window_proof(&world).window, None);
+    world.turn(1, 1, None, b"fresh first turn");
+    assert_eq!(current_window_proof(&world).window, Some((attempt, 1)));
 }
