@@ -396,6 +396,22 @@ the file.
      restore open rows only and assert a closed period's pools absent,
      keeping their names and their other expectations; no history join
      is added to the Project document.
+118. **No test forgets a chat by its own event; ruling 115 amended**
+     (2026-10-12, the coordinator's block "jig 03.4: forgetting a
+     never-marked chat with no replies", 2026-10-12T17:49:58Z). The case
+     jig 03.4 raises is decision 31's "one never read waits for retention
+     (`later.md`)", and `later.md`'s retention row holds "chats
+     forgotten": 03.4 goes on as planned, adding nothing. But jig 03's
+     "Done when" says "No chat is forgotten by a test's own event", and
+     ruling 115 had jig 12.1 forget a chat by sending
+     `core::Event::ForgetChat` from its test. jig 12.1's forgotten-chat
+     test forgets the chat as 03.4 makes the domain do it: the person
+     marks the ended chat's replies and its result seen. If jig-03.4 has
+     not landed when the rest of 12.1 is ready, 12.1 yields until it
+     lands. jig 03's check now greps `core::Event::ForgetChat`, since the
+     people child's worlds send the child's own `Event::ForgetChat`
+     (`tests/people/src/world.rs:347`, `tests/people/tests/memory.rs:257`),
+     which stays.
 
 ## For the user
 
