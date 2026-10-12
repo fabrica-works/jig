@@ -300,3 +300,63 @@ fn a_restart_restores_people_before_live_tasks_and_core_rows() {
     );
     assert!(world.domain.ready());
 }
+
+fn restored_task(world: &World, task: u64) -> &tasks::TaskRecord {
+    let row = &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))];
+    let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task))) = row else { panic!("live task") };
+    task
+}
+
+#[test]
+fn a_restart_with_workers_in_process_settles_their_claims_at_once() {
+    let mut world = World::new(121, false);
+    world.turn(1, 2, None, b"worker turn");
+    let task = world.task();
+    let before = world.wall_time().as_nanos();
+    let mut config = jig_core_world::effects::fixture(121, false).0;
+    config.core.workers_in_process = true;
+    world.restart_with(config);
+    assert!(world.domain.ready());
+    assert_eq!(restored_task(&world, task).tries.lost, 1);
+    assert!(world.wall_time().as_nanos() - before < Duration::from_secs(5).as_nanos());
+}
+
+#[test]
+fn a_restart_with_workers_in_process_assigns_without_a_grace() {
+    let mut world = World::new(122, false);
+    let (task, attempt) = (world.task(), world.attempt());
+    let before = world.wall_time().as_nanos();
+    let mut config = jig_core_world::effects::fixture(122, false).0;
+    config.core.workers_in_process = true;
+    world.assigned = None;
+    world.restart_with(config);
+    assert_eq!(restored_task(&world, task).refusals, 1, "an unworked claim was not started");
+    assert_eq!(restored_task(&world, task).tries.lost, 0);
+    hello(&mut world, Box::new([]));
+    account(&mut world);
+    world.advance(Duration::from_millis(100));
+    let assigned = world.assigned.as_ref().expect("next attempt passes only its retry backoff");
+    assert_eq!(assigned.task, task);
+    assert!(assigned.attempt > attempt);
+    assert!(world.wall_time().as_nanos() - before < Duration::from_secs(5).as_nanos());
+}
+
+#[test]
+fn a_restart_with_workers_elsewhere_still_waits_for_them() {
+    let mut world = World::new(123, false);
+    world.turn(1, 2, None, b"remote turn");
+    let (task, attempt) = (world.task(), world.attempt());
+    world.assigned = None;
+    world.restart(123, false);
+    account(&mut world);
+    world.advance(Duration::from_millis(100));
+    assert!(world.assigned.is_none());
+    assert_eq!(restored_task(&world, task).tries.lost, 0);
+    hello(
+        &mut world,
+        Box::new([fleet::Hosted { run: Token::new(task), attempt: Token::new(attempt), phase: fleet::Phase::Active }]),
+    );
+    assert_eq!(restored_task(&world, task).attempt, attempt);
+    assert_eq!(restored_task(&world, task).phase, tasks::Phase::Active(tasks::Active::Running { attempt }));
+    assert_eq!(restored_task(&world, task).tries.lost, 0);
+}

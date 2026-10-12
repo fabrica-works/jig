@@ -169,7 +169,11 @@ impl Core {
         self.adopted.push(fleet::Event::Adopt {
             holds: Box::new([]),
             grants: Box::new([]),
-            kind: self.proofs.get(&task).expect("restored claim has its proof").host,
+            kind: if self.workers_in_process {
+                fleet::HostKind::Engine
+            } else {
+                self.proofs.get(&task).expect("restored claim has its proof").host
+            },
             worked,
             reply_to: skein_lib::ReplyTo::new(Token::new(task)),
             run: Token::new(task),

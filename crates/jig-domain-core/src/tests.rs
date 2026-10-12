@@ -227,6 +227,7 @@ fn config(seed: u64) -> Config {
     Config {
         deployment: [31; 16],
         seed,
+        workers_in_process: false,
         owners: Box::new([people::InitialOwner {
             project: 1,
             identity: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },

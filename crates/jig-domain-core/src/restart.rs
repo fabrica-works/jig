@@ -81,8 +81,10 @@ impl Core {
         let mut workers = 0_u32;
         for (task, _) in &self.unreported_restored {
             match self.proofs.get(task).expect("restored claim has its proof").host {
-                fleet::HostKind::Worker => workers = workers.checked_add(1).expect("bounded restored claims"),
-                fleet::HostKind::Engine => {}
+                fleet::HostKind::Worker if !self.workers_in_process => {
+                    workers = workers.checked_add(1).expect("bounded restored claims");
+                }
+                fleet::HostKind::Worker | fleet::HostKind::Engine => {}
             }
         }
         if workers > self.restart_attempts {

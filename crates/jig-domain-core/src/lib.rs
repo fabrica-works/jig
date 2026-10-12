@@ -84,13 +84,16 @@ use jig_domain_tasks as tasks;
 use jig_domain_views as views;
 use skein_lib::{List, Map, Queue, Token, Wall};
 
-/// Application-supplied initial core state, in jig's vocabulary.
+/// Application-supplied initial core state, in jig's vocabulary
+/// (`engine.md`, 6; `configuration.md`, 3).
 #[derive(Debug)]
 pub struct Config {
     /// Identity committed with the first decision.
     pub deployment: [u8; 16],
     /// Deterministic task scheduling seed.
     pub seed: u64,
+    /// Workers share this engine's process and cannot outlive it.
+    pub workers_in_process: bool,
     /// Initial authenticated owners.
     pub owners: Box<[people::InitialOwner]>,
     /// Configured authority and policy.
@@ -216,6 +219,7 @@ pub(crate) struct WatchedSubject {
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
+    pub(crate) workers_in_process: bool,
     pub(crate) stopping: bool,
     pub(crate) draining: Option<bool>,
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
@@ -493,6 +497,7 @@ impl Core {
             );
         }
         Core {
+            workers_in_process: config.workers_in_process,
             stopping: false,
             draining: None,
             archived_chats: Map::with_capacity(
