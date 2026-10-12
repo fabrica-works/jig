@@ -87,15 +87,13 @@ pub(super) fn tag_tasks(
                         continue;
                     }
                     tasks::EscalationOutcome::Stale => {
-                        append_people(
-                            core,
-                            env,
-                            people::Event::Decided {
-                                request: flight.request,
-                                outcome: people::Outcome::Refused(people::Refusal::Unknown),
-                            },
-                            &mut out,
-                        );
+                        out.push(Request::Now(Box::new(Now::HistoricalEscalation {
+                            request: flight.request,
+                            person: flight.person,
+                            project: flight.project,
+                            task,
+                            revision,
+                        })));
                         continue;
                     }
                 };

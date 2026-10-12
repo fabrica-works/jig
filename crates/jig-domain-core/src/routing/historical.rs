@@ -64,6 +64,21 @@ pub(super) fn route_historical_escalation(
         } else {
             people::Outcome::Refused(people::Refusal::Unknown)
         }
+    } else if match core.tasks.task(task) {
+        Some(row) => {
+            row.project == project
+                && core.people.role(person, project).is_some()
+                && match row.phase {
+                    tasks::Phase::Ended(_) => false,
+                    tasks::Phase::Waiting
+                    | tasks::Phase::Active(_)
+                    | tasks::Phase::Closing(_)
+                    | tasks::Phase::Held { .. } => true,
+                }
+        }
+        None => false,
+    } {
+        people::Outcome::Refused(people::Refusal::NotWaiting)
     } else {
         people::Outcome::Refused(people::Refusal::Unknown)
     };

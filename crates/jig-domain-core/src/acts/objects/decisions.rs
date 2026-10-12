@@ -144,7 +144,7 @@ pub(crate) fn escalation(
     match context.escalation {
         tasks::Escalation::Waiting { .. } => {}
         tasks::Escalation::Unheld { .. } | tasks::Escalation::Routing { .. } | tasks::Escalation::Rejected { .. } => {
-            return Err(people::Refusal::Unknown);
+            return Err(people::Refusal::NotWaiting);
         }
     }
     if !Core::escalation_standing(&context, party, role) {

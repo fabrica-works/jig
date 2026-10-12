@@ -343,7 +343,7 @@ pub(super) fn person_escalation_decide(
         }
     };
     if !pending {
-        pool_refused(work, request, people::Refusal::Unknown);
+        pool_refused(work, request, people::Refusal::NotWaiting);
         return;
     }
     let act = match &decision {

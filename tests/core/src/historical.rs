@@ -30,3 +30,19 @@ pub(crate) fn proposal(
         busy: false,
     })
 }
+
+pub(crate) fn escalation(
+    store: &Store,
+    request: Token,
+    person: u64,
+    project: u32,
+    task: u64,
+    revision: u64,
+) -> root::Event {
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::EscalationDecision { task, revision }));
+    let row = match store.rows.get(&key) {
+        Some(root::Record::Core(core::Record::Core(core::CoreRecord::EscalationDecision(row)))) => Some(row.clone()),
+        Some(_) | None => None,
+    };
+    root::Event::Core(core::Event::HistoricalEscalation { request, person, project, task, revision, row, busy: false })
+}
