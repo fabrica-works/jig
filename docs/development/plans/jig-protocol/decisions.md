@@ -591,6 +591,22 @@ the file.
      `src/codec/people.rs`. Each now names its family's facade, for the
      limits and the encode and decode arms of the rows and bounded fields
      it adds, and nothing else of it, at the increment's Size.
+134. **A row the codec does not translate yet joins its refusal arm**
+     (2026-10-12, the coordinator's block "jig 12.4: codec-following rule
+     before the changed record codec exists", 2026-10-12T20:02:08Z). The
+     README's rule "A durable record's codec follows its record" binds a
+     record whose translation has landed. On jig `115258a1`, the tasks
+     facade translates `Ledger`, `ClosedLedger`, `Writer` and `Pool`
+     only, and refuses `Update`, `Result`, the conversations, `Live`,
+     `Ended` and the rest in one arm
+     (`crates/jig-protocol-store/src/codec/tasks.rs:80-93`); 14.4's Scope
+     names "`TaskRecord` (with ... jig 12's `Endings` where they have
+     landed); ... jig 12's index rows that have landed (... `GoalRow`
+     ...); each `tasks::Stored` variant on `main` when the increment
+     starts". So jig 12.4 adds `domain::Stored::Goal(_)` to that arm, and
+     neither encodes `GoalRow` nor `Endings` nor moves the tasks family to
+     version 2; jig 14.4 translates them in tasks-v1. The README's rule
+     now says so for every family.
 
 ## For the user
 

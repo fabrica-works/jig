@@ -153,6 +153,11 @@ ones before it in its session. Dependencies are by capability: "skein
   at the first such change in this plan (development.md, 5.1: formats
   are pre-release); nothing checks it, and the supervisor's hourly check
   looks at schema diffs for it.
+  The rule binds a record or row whose translation has landed. A record,
+  field or row of a family the codec does not translate yet joins the
+  facade's arm that refuses the untranslated rows (one line), and the
+  family's later codec increment translates it as `main` has it
+  (decisions.md, ruling 134); the version does not move for it.
 - **No browser, no wasm32, no web shell,** in any session: no
   session adds one, builds for wasm32 or starts a browser itself. Editing
   skein's existing browser kit and tests where an increment's Files name
