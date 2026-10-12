@@ -1111,6 +1111,16 @@ the file.
      longer). Reported to the user at once (development.md, 10.4). jig's
      hold lifts; the test-cost steps land first when the gate lane has a
      choice.
+174. **Until the suite is cheaper, a timed-out landing waits for the next
+     test-cost step** (2026-10-12, the coordinator's block "jig 21.5:
+     third focused-suite timeout", 2026-10-12T22:58:00Z, the third such
+     block, after jig 30.1's and 19.1's). Until jig-repin.s3 has landed
+     (ruling 169), a session whose three gates fail only on the focused
+     suite's timeout keeps its commit and ends its turn, and the
+     coordinator runs its `land` again, three attempts, after each
+     test-cost step lands (jig-tests.s1 landed at 22:56Z, skein-tests.s1
+     at 22:54Z). No block is written for it. The codec increments still
+     wait for jig-repin.s3 (rulings 167, 168). The README's Rules say so.
 
 ## For the user
 

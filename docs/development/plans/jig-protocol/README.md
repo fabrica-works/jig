@@ -290,6 +290,11 @@ ones before it in its session. Dependencies are by capability: "skein
   test under `src/generated/`, which no session edits, lands when it runs
   within 200 ms; past that it is a question. Hand-written tests keep
   their increments' ceilings.
+- **Until the suite is cheaper, a timed-out landing waits** (decisions.md,
+  ruling 174). Until jig-repin.s3 has landed, a session whose three gates
+  fail only on the focused suite's timeout keeps its commit and ends its
+  turn; the coordinator runs its `land` again (three attempts) after each
+  test-cost step of `tests-cost.md` lands. No block is written for it.
 
 ## Live services
 
