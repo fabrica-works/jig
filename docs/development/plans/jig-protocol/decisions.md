@@ -380,6 +380,22 @@ the file.
      "new code goes in new modules"); it puts 44 lines in a new
      `cursor/index.rs` and 3 wiring lines in the file. The README's Rules
      now count such a module inside the increment's Files.
+117. **A closed period's pools leave the live Project document**
+     (2026-10-12, the coordinator's block "jig 11.2: closed funding
+     baseline fixtures contradict live-only restore",
+     2026-10-12T17:49:20Z). A plan defect: 11.2 evicts a closed ledger
+     from `domain.funding` and refuses it at restore, and checked the
+     readers of `FundingRecord.closed` against that, but not
+     `crates/jig-domain-core/src/tests/project_baselines.rs`, whose first
+     and third tests restore closed rows and expect a closed configured
+     pool in the live Project document. The design reads past periods
+     from the store: client/domain/pages.md, Spend, "the project's
+     period, spent, reserved and left; each person's pool in it; ...
+     past periods, read a page at a time"; store.md 7.3, "a project's
+     spend | the funders' periods of the project". So those two tests
+     restore open rows only and assert a closed period's pools absent,
+     keeping their names and their other expectations; no history join
+     is added to the Project document.
 
 ## For the user
 
