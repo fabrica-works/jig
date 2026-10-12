@@ -112,9 +112,10 @@ index rows, and jig 16 serves them from the real store.
 
 Scope: `tasks::Newest`; the `Update` index (a person's results and replies,
 newest first), written by the core where it routes a task's ending and a
-reply's activity line, erased with a forgotten chat's result; the stored
-part of the Updates, Results and Replies groups read from it, its keys as
-positions (store.md 7.3, 7.4, 15.3).
+reply's activity line, a result's erased by `forget_chat` and a reply's
+left to retention (store.md 7.4, "An owner erased first"); the stored part
+of the Updates, Results and Replies groups read from it, its keys as
+positions, skipping a row whose owner is gone (store.md 7.3, 7.4, 15.3).
 Needs: nothing beyond the session's start.
 Files:
 - `crates/jig-domain-tasks/src/index.rs` (new: `Newest`, `Update`, `UpdateObject`), `crates/jig-domain-tasks/src/boundary.rs` (`Key::Update`, `Stored::Update`, `Stored::key`), `crates/jig-domain-tasks/src/lib.rs` (exports);
@@ -174,6 +175,10 @@ Test shape:
   `a_forgotten_chats_result_leaves_the_updates_index`,
   `the_results_group_pages_results_only_from_the_index`. Each its own
   `#[test]`.
+- `a_forgotten_chats_result_leaves_the_updates_index`: once the chat is
+  forgotten, its result's `Update` row is gone, its replies' `Update` rows
+  stay, and the person's updates page from the store shows neither
+  (store.md 7.4).
 - The transport's updates arm reads `Update` rows of `range.party` from
   `after` in key order and joins their owners; it reads no `Ended` or
   `Activity` row but those an `Update` names.
@@ -182,7 +187,8 @@ Proof: world. `cargo nextest run -p jig-core-world --test reads` once,
 through `heavy`: a person's updates page from the store newest first,
 across a restart, with the transport reading only the party's `Update`
 rows and what they name. Bound: 1 minute.
-Don't: index a need; change `Position::Inbox` for the needs groups.
+Don't: index a need; change `Position::Inbox` for the needs groups; erase
+a reply's `Update` in `forget_chat`, or load a chat's replies to find them.
 Size: at most 220 lines of production code.
 Removes: the transport's scan of `Ended` and `Activity` rows for the
 updates groups (`tests/core/src/reads.rs:251-290`).
@@ -401,7 +407,8 @@ pub enum UpdateObject {
 }
 
 /// One update in a person's inbox. Written by the core with the decision
-/// that made it; erased with a forgotten chat's result.
+/// that made it; a result's erased when its chat is forgotten, a reply's
+/// by retention (store.md 7.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Update {
     pub party: u64,
@@ -496,16 +503,19 @@ pub struct Census {
   each scope and `Census` to intervals; jig 16 serves the pages from them.
 - **What ends what.** An index row ends with what it names: a chat's
   conversation rows and its result's rows with `forget_chat`; a
-  `Delegate` row with an adoption. Retention (`later.md`) ends the rest.
+  `Delegate` row with an adoption. Retention (`later.md`) ends the rest,
+  a forgotten chat's replies' `Update` rows among them, which pages skip
+  until then (store.md 7.4).
 
 ## Questions to raise when reached
 
-- **A forgotten chat's replies** (12.1). `forget_chat` erases the chat's
-  ended row and its result's index rows, but the reply's `Update` rows
-  point at activity lines that stay (`inbox.rs:487-489`: "collected by the
-  store's retention pass"); a stored updates page skips them, since their
-  owner is gone. Retention is later (decision 13); whether they should go
-  with the chat now is the designer's.
+- **A forgotten chat's replies** (12.1): settled by the designer (jig
+  `36de4733`, store.md 7.4, "An owner erased first"). `forget_chat`
+  erases the chat's ended row and its result's index rows; its replies'
+  `Update` rows stay until retention erases the activity lines they name,
+  since a chat's replies are unbounded and a decision is bounded. A stored
+  updates page skips a row whose owner is gone, counting it within its
+  bounds.
 - **Goals' order** (12.4). store.md 7.3 reads ended goals newest first;
   today's core pages them oldest first. This plan follows the design.
 
