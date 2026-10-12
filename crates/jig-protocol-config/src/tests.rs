@@ -1,5 +1,7 @@
 mod fixtures;
 mod forms;
+mod hosts;
+mod llm;
 mod overrides;
 mod profile;
 mod read;
