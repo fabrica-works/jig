@@ -286,7 +286,7 @@ Don't: declare a type the tasks family's rows do not reach once 14.4 has
 added them all (ruling 128): the 26 types above are reached by `live`
 (14.4), and `Name` and `Writer` by `writer` and `pool`; until 14.4,
 14.2's tests round-trip them directly.
-Size: at most 450 lines of production code.
+Size: at most 900 lines of production code (ruling 130).
 Removes: nothing.
 
 ### 14.3 The tasks family, part 2: phases, holds, proposals, history
@@ -314,7 +314,7 @@ Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
 jig-store-codecs-world` once: history, milestones and proposals read back
 as saved. Bound: 1 minute.
 Don't: drop a field on the way down, other than the refused template.
-Size: at most 600 lines of production code.
+Size: at most 1,200 lines of production code (ruling 130).
 Removes: nothing.
 
 ### 14.4 The tasks family, part 3: activity, the task's record, the indexes
@@ -345,7 +345,7 @@ jig-store-codecs-world` once: each tasks row kind of the fixtures reads
 back as saved. Bound:
 1 minute.
 Don't: leave a `tasks::Stored` variant without its arm.
-Size: at most 600 lines of production code.
+Size: at most 1,200 lines of production code (ruling 130).
 Removes: 14.2's `Problem` arm for rows not yet translated.
 
 ## Interface sketches

@@ -62,7 +62,7 @@ jig-store-codecs-world` once: each kind of call answer reads back as saved,
 its tasks and notes values decoded by their own families' code. Bound: 1
 minute.
 Don't: declare `End`, `Phase`, `Change` or `Problem` in the core's schema.
-Size: at most 600 lines of production code.
+Size: at most 1,200 lines of production code (ruling 130).
 Removes: nothing.
 
 ### 19.2 The core family, part 2: the deployment, projections, runs, turns, decisions
@@ -90,7 +90,7 @@ jig-store-codecs-world` once: each core row kind of the fixtures reads back
 as saved. Bound: 1
 minute.
 Don't: leave a `CoreRecord` variant without its arm.
-Size: at most 450 lines of production code.
+Size: at most 900 lines of production code (ruling 130).
 Removes: 19.1's `Problem` arm for rows not yet translated.
 
 ### 19.3 The people family, part 1: identities, roles, policy, asks
@@ -118,7 +118,7 @@ Proof: unit. `heavy cargo nextest run -p jig-protocol-store -p
 jig-store-codecs-world` once: people's rows read back as saved. Bound: 1
 minute.
 Don't: share a type with the tasks family's schema (no imports).
-Size: at most 600 lines of production code.
+Size: at most 1,200 lines of production code (ruling 130).
 Removes: nothing.
 
 ### 19.4 The people family, part 2: refusals, outcomes, answered keys
@@ -140,7 +140,7 @@ jig-store-codecs-world` once: each people row kind of the fixtures reads
 back as saved. Bound:
 1 minute.
 Don't: leave a `people::Stored` variant without its arm.
-Size: at most 550 lines of production code.
+Size: at most 1,100 lines of production code (ruling 130).
 Removes: 19.3's `Problem` arm for rows not yet translated.
 
 ### 19.5 The format row, the dispatch, sizes

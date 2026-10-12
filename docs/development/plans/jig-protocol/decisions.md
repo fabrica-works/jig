@@ -536,6 +536,15 @@ the file.
      06.5 changes them in `charters.rs` (`Core::claim_proof`,
      `Core::claim_done`), its boundary signatures as planned. The README's
      Rules now say so for any increment.
+130. **The codec increments' Sizes double** (2026-10-12, the
+     coordinator's block "jig 14.2: production size 879 exceeds 450-line
+     guide", 2026-10-12T19:39:05Z). jig 14.2 counts 879 lines against 450:
+     schema 75, facade 120, translations 680 for the 26 types ruling 128
+     confirmed and four rows, each file under 800. The plan priced the
+     exhaustive translations at about half what they take. 14.2 lands at
+     879 (Size 900); the codec increments not yet landed double theirs:
+     14.3 and 14.4 to 1,200; 19.1 to 1,200, 19.2 to 900, 19.3 to 1,200,
+     19.4 to 1,100. Each stays a guide (ruling 103).
 
 ## For the user
 
