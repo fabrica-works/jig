@@ -974,6 +974,15 @@ the file.
      channel; the worker's layer builds smith's envelope as it hands it
      to smith's host half. jig 21.2 had not landed on ruling 160's
      envelope (the ledger had it running), so no step is added.
+163. **jig 21.s1 changes the landed table; ruling 162 corrected**
+     (2026-10-12, the coordinator's block "jig 21.2: typed-pair reversal
+     arrives after default table landed", 2026-10-12T21:59:20Z). jig 21.2
+     landed (jig `530b795a`, 21:58:15Z) on ruling 160's envelope while
+     ruling 162 was written, so 162's "no step is added" is wrong. The
+     designer's answer says so for this case ("If 21.2 has landed on
+     ruling 160's envelope, the same change is a step of the
+     supervisor's"): jig 21.s1 (`jig/21-accounts.md`), before jig 21.3
+     lands.
 
 ## For the user
 

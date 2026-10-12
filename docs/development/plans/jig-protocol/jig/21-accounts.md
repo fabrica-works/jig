@@ -390,6 +390,25 @@ Don't: add a fuzzy test (Choices).
 Size: at most 20 lines of production code (test code excepted).
 Removes: nothing.
 
+### 21.s1 The table holds a grant's value in its parts
+
+A step not in the plan (decisions.md, ruling 163): 21.2 landed (jig
+`530b795a`) on ruling 160's envelope before decision 37 reversed it.
+Scope: llm.md, 5.3: "The table holds the two apart, both secret".
+Needs: 21.2.
+Files: as 21.2's.
+Shape: as 21.2's Shape and sketch now say: `Table::granted(account,
+  generation, value: Value, expires)`, `Table::value(..) ->
+  Option<&Value>`, `Value { token: Secret, account_id: Secret }`, the id
+  empty where its provider names none and bounded by `ACCOUNT_ID_BYTES`
+  (256); ruling 160's envelope and its bound removed.
+Test shape: 21.2's tests on `Value`, through `fixtures::value(token)`;
+  adds `an_account_id_past_its_bound_is_refused`.
+Proof: as 21.2's, run once.
+Don't: build smith's envelope anywhere in the engine.
+Size: at most 80 lines of production code.
+Removes: the envelope and its bound.
+
 ## Interface sketches
 
 ```rust
