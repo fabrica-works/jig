@@ -42,13 +42,20 @@ enum Seen {
     Ended { watcher: Token, end: End },
     Refused { watcher: Token },
 }
+#[derive(Debug, Default)]
+struct Text {
+    bytes: Vec<u8>,
+    call: Option<Call>,
+    beginning: u32,
+    cut: bool,
+}
 #[derive(Debug)]
 struct Checks {
     limits: Limits,
     asked: BTreeMap<Token, Watch>,
     open: BTreeMap<Token, Watch>,
     generations: BTreeMap<Token, u64>,
-    text: BTreeMap<(Token, TurnName), (Vec<u8>, Option<Call>)>,
+    text: BTreeMap<(Token, TurnName), Text>,
     deliveries: u64,
     ended: Vec<(Token, End)>,
 }
@@ -150,19 +157,33 @@ impl Expectations for Checks {
                 watch.document_flight = false;
             }
             Seen::Text { run, turn, offset, text, call } => {
+                let known = self.text.contains_key(&(run, turn));
                 let source = self.text.entry((run, turn)).or_default();
-                let offset = usize::try_from(offset).expect("text offset");
-                assert!(offset <= source.0.len(), "the scripted host writes consecutive offsets");
-                assert_eq!(source.0.get(offset..), text.get(..source.0.len() - offset), "repeated host prefixes agree");
-                source.0.truncate(offset);
-                source.0.extend_from_slice(&text);
+                let offset_index = usize::try_from(offset).expect("text offset");
+                if offset_index > source.bytes.len() {
+                    source.beginning = offset;
+                    source.cut |= known;
+                    source.bytes.resize(offset_index, 0);
+                } else {
+                    assert_eq!(
+                        source.bytes.get(offset_index..),
+                        text.get(..source.bytes.len() - offset_index),
+                        "repeated host prefixes agree"
+                    );
+                }
+                source.bytes.truncate(offset_index);
+                source.bytes.extend_from_slice(&text);
+                let end = u32::try_from(source.bytes.len()).expect("source length");
+                let beginning = end.saturating_sub(self.limits.text_bytes);
+                source.cut |= beginning > source.beginning;
+                source.beginning = source.beginning.max(beginning);
                 if let Some(call) = call {
-                    source.1 = Some(observed_call(call, source.1.as_ref()));
+                    source.call = Some(observed_call(call, source.call.as_ref()));
                 }
             }
             Seen::Called { run, call } => {
                 if let Some((_, source)) = self.text.iter_mut().rfind(|((owner, _), _)| *owner == run) {
-                    source.1 = Some(observed_call(call, source.1.as_ref()));
+                    source.call = Some(observed_call(call, source.call.as_ref()));
                 }
             }
             Seen::Stream { watcher, turn, from, to, text, cut, call } => {
@@ -171,14 +192,13 @@ impl Expectations for Checks {
                 let follow = watch.follow.expect("watch follows this run");
                 let source = self.text.get(&(follow.run, turn)).expect("host wrote this named turn");
                 let requested = *watch.positions.get(&turn).unwrap_or(&0);
-                let end = u32::try_from(source.0.len()).expect("source length");
-                let beginning = end.saturating_sub(self.limits.text_bytes);
+                let end = u32::try_from(source.bytes.len()).expect("source length");
+                let beginning = source.beginning;
                 let position = if (beginning..=end).contains(&requested) { requested } else { 0 };
-                if cut {
-                    assert!(from > position, "cut says which prefix was omitted");
-                } else {
+                if !cut {
                     assert_eq!(from, position, "each turn keeps its own offset");
                 }
+                assert_eq!(cut, source.cut || from > position, "a gap or trimmed suffix marks the turn cut");
                 assert_eq!(
                     to.checked_sub(from),
                     Some(u32::try_from(text.len()).expect("bounded text")),
@@ -189,7 +209,7 @@ impl Expectations for Checks {
                     "bounded retained suffix"
                 );
                 assert_eq!(
-                    source.0.get(usize::try_from(from).expect("from")..usize::try_from(to).expect("to")),
+                    source.bytes.get(usize::try_from(from).expect("from")..usize::try_from(to).expect("to")),
                     Some(text.as_slice()),
                     "provisional bytes are a prefix-consistent source copy"
                 );
@@ -200,7 +220,7 @@ impl Expectations for Checks {
                         "bounded provisional call"
                     );
                 }
-                assert_eq!(&call, &source.1, "current call belongs to this turn");
+                assert_eq!(&call, &source.call, "current call belongs to this turn");
                 watch.stream_flight = Some((turn, to));
             }
             Seen::StreamTaken { watcher } => {

@@ -124,6 +124,10 @@ impl World {
         *offset += u32::try_from(text.len()).expect("bounded script");
         self.step(Event::Text { run: Token::new(run), turn, offset: from, text: text.into(), call })
     }
+    pub fn drop_text(&mut self, run: u64, turn: TurnName, bytes: u32) {
+        let offset = self.source.entry((Token::new(run), turn)).or_default();
+        *offset = offset.checked_add(bytes).expect("bounded script");
+    }
     pub fn settle(&mut self) {
         for _ in 0..3 {
             for watcher in self.referee.open_names() {

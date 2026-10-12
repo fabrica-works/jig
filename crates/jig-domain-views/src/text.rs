@@ -4,10 +4,10 @@
 //! or starts at the current retained beginning.
 //! Only the current turn's suffix and call remain in memory. Each watch keeps a
 //! turn-qualified acknowledged offset, and one separate stream in flight.
-//! The source's ordered offsets are checked; stale turns and gaps are ignored.
+//! Stale turns are ignored; a gap replaces the suffix and marks the turn cut.
 //! An acknowledged earlier turn never advances a later turn's offset.
 //! Reports and combined call bytes are bounded by `text_bytes` at ingress;
-//! the retained suffix is cut only as several reports cross that bound.
+//! a gap or trimming the retained suffix marks the current turn cut.
 //!
 //! ```text
 //! stream state  event                 next       emits
@@ -36,6 +36,7 @@ pub(crate) struct Run {
     call: Option<Call>,
     revision: u64,
     committed: bool,
+    cut: bool,
 }
 
 /// A stream terminal advances only this named turn's position.
@@ -103,7 +104,9 @@ pub(crate) fn written(
         }
         None => true,
     };
+    let gap = !new_turn && offset > run.to;
     if new_turn {
+        run.cut = false;
         run.attempt = turn.attempt;
         run.turn = Some(turn);
         run.committed = false;
@@ -111,8 +114,11 @@ pub(crate) fn written(
         run.to = offset;
         run.text = Box::new([]);
         run.call = None;
-    } else if offset > run.to {
-        return;
+    } else if gap {
+        run.cut = true;
+        run.from = offset;
+        run.to = offset;
+        run.text = Box::new([]);
     }
     // Duplicates may overlap retained bytes; inconsistent overlap is fenced.
     for position in offset.max(run.from)..end.min(run.to) {
@@ -126,7 +132,7 @@ pub(crate) fn written(
         Some(call) => Some(timed(call, run.call.as_ref(), env.wall)),
         None => run.call.clone(),
     };
-    if !new_turn && end <= run.to && call == run.call {
+    if !new_turn && !gap && end <= run.to && call == run.call {
         return;
     }
     if end > run.to {
@@ -140,6 +146,7 @@ pub(crate) fn written(
             let index = usize::try_from(position.checked_sub(offset).expect("incoming offset")).expect("byte index");
             suffix.push(*text.get(index).expect("incoming byte")).expect("bounded suffix");
         }
+        run.cut = run.cut || from > run.from;
         run.text = suffix.into_boxed();
         run.from = from;
         run.to = end;
@@ -173,7 +180,17 @@ fn timed(mut call: Call, previous: Option<&Call>, wall: Wall) -> Call {
 }
 
 fn empty(attempt: u64) -> Run {
-    Run { attempt, turn: None, from: 0, to: 0, text: Box::new([]), call: None, revision: 0, committed: false }
+    Run {
+        attempt,
+        turn: None,
+        from: 0,
+        to: 0,
+        text: Box::new([]),
+        call: None,
+        revision: 0,
+        committed: false,
+        cut: false,
+    }
 }
 
 pub(crate) fn called(
@@ -291,7 +308,7 @@ fn offer(watch: &mut Watcher, run: &Run, out: &mut Queue<Request>) {
         from,
         to: run.to,
         text: copy_of(run.text.get(index..).expect("retained suffix")),
-        cut: from > offset,
+        cut: run.cut || from > offset,
         call: run.call.clone(),
     });
 }
@@ -344,7 +361,7 @@ pub fn writing(domain: &Domain, token: Token, capacity: u32) -> Option<crate::Wr
         from,
         to: run.to,
         text: copy_of(run.text.get(index..).expect("retained suffix")),
-        cut: from != 0,
+        cut: run.cut || from != 0,
         call: bounded_call(run.call.clone(), capacity),
     })
 }

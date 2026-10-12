@@ -66,3 +66,25 @@ fn world_run_admission_survives_detach_and_late_text_starts_when_an_ended_run_fr
     } if *watcher == Token::new(2) && *turn == name(0) && text.as_ref() == b"kept")));
     world.settle();
 }
+
+#[test]
+fn a_dropped_fact_marks_the_watched_turn_cut() {
+    let mut world = World::default();
+    open(&mut world, 1);
+    world.text(7, name(0), b"prefix", None);
+    world.settle();
+    world.drop_text(7, name(0), 3);
+    assert_eq!(
+        world.text(7, name(0), b"suffix", None),
+        vec![Request::Stream {
+            watcher: Token::new(1),
+            turn: name(0),
+            from: 9,
+            to: 15,
+            text: Box::from(&b"suffix"[..]),
+            cut: true,
+            call: None,
+        }]
+    );
+    world.settle();
+}

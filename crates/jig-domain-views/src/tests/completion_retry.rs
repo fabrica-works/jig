@@ -99,10 +99,37 @@ fn an_unwatched_suffix_keeps_the_original_byte_bound_and_overlap_fence() {
     report(&mut domain, 1, 0, b"abcdefghijklmnop");
     report(&mut domain, 1, 16, b"qrst");
     assert!(report(&mut domain, 1, 18, b"XX").is_empty());
-    assert!(report(&mut domain, 1, 21, b"gap").is_empty());
     assert!(report(&mut domain, 1, 0, b"report beyond sixteen bytes").is_empty());
     assert_eq!(follow(&mut domain, 1, 7, Some(name(1)), 2).last(), Some(&expected(1, 1, 4, b"efghijklmnopqrst", true)));
     assert_eq!(writing(&domain, Token::new(7), 8).unwrap().text.as_ref(), b"mnopqrst");
+}
+
+fn cut_domain() -> Domain {
+    let mut domain = Domain::new(&LIMITS);
+    report(&mut domain, 1, 0, b"prefix");
+    report(&mut domain, 1, 9, b"gap");
+    domain
+}
+
+#[test]
+fn text_past_a_gap_restarts_there_and_marks_the_turn_cut() {
+    let mut domain = cut_domain();
+    assert_eq!(follow(&mut domain, 1, 7, None, 0).last(), Some(&expected(1, 1, 9, b"gap", true)));
+    take(&mut domain, 1);
+    assert_eq!(report(&mut domain, 1, 12, b"more").as_ref(), &[expected(1, 1, 12, b"more", true)]);
+    let writing = writing(&domain, Token::new(7), 16).unwrap();
+    assert_eq!((writing.from, writing.to, writing.cut), (9, 16, true));
+    assert_eq!(writing.text.as_ref(), b"gapmore");
+}
+
+#[test]
+fn a_new_turn_after_a_cut_one_starts_uncut() {
+    let mut domain = cut_domain();
+    text(&mut domain, 2, 0, b"next");
+    let writing = writing(&domain, Token::new(7), 16).unwrap();
+    assert_eq!(writing.turn, TurnName { attempt: 1, turn: 2, retry: 0 });
+    assert_eq!((writing.from, writing.to, writing.cut), (0, 4, false));
+    assert_eq!(writing.text.as_ref(), b"next");
 }
 
 #[test]
