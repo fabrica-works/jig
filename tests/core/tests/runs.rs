@@ -231,10 +231,42 @@ fn a_bounced_message_stays_unread_for_a_later_read() {
     assert_eq!(world.spent(), 1, "{:?}", world.trace);
 }
 
+fn a_woken_chats_start_carries_its_waiting_words_oldest_first() {
+    let mut world = World::new(141, false);
+    let first = world.say(84);
+    world.end(tasks::End::Parked, 0);
+    let second = world.say(85);
+    let messages = &world.assigned.as_ref().expect("woken chat").messages;
+    assert_eq!(messages.iter().map(|word| word.number).collect::<Vec<_>>(), [first, second]);
+    assert_eq!(messages[0].words.as_ref(), [84]);
+    assert_eq!(messages[1].words.as_ref(), [85]);
+}
+
+fn a_start_carries_at_most_the_runs_inbox() {
+    let (config, mut limits) = jig_core_world::effects::fixture(142, false);
+    limits.core.tasks.run_inbox = 1;
+    let mut world = World::configured(142, false, config, limits);
+    let first = world.say(86);
+    world.end(tasks::End::Parked, 0);
+    let second = world.say(87);
+    let assigned = world.assigned.as_ref().expect("woken chat");
+    assert_eq!(assigned.messages.iter().map(|word| word.number).collect::<Vec<_>>(), [first]);
+    let key = root::Key::Core(core::Key::Core(core::CoreKey::RunProof(assigned.task)));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &world.store.rows[&key] else {
+        panic!("durable claim proof")
+    };
+    assert_eq!(proof.offered, Some(first));
+    assert!(world.store.rows.values().any(|row| matches!(row,
+        root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)))
+        if task.inbox.iter().any(|word| word.number == second))));
+}
+
 // Each scenario keeps its own fresh world and all original assertions.
 // A shared entrypoint avoids one process startup per short scenario.
 #[test]
 fn runs_scenarios() {
+    a_woken_chats_start_carries_its_waiting_words_oldest_first();
+    a_start_carries_at_most_the_runs_inbox();
     a_chat_answers_parks_and_resumes();
     a_turn_admits_its_read_fence_and_spend_together_and_duplicates_change_nothing();
     settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it();

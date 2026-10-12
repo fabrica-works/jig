@@ -57,6 +57,9 @@ pub struct Limits {
     /// Maximum result/reason bytes; contracts cannot allow larger results and cancellation may
     /// retain one bounded reason plus one bounded partial result.
     pub result_bytes: u32,
+    /// Messages a run's inbox takes: the most its start carries, and the most relayed
+    /// and unread (tasks.md, 8.2). At most `inbox_messages`.
+    pub run_inbox: u32,
     /// Maximum whole unread word messages kept by one live task.
     pub inbox_messages: u32,
     /// Maximum total unread word bytes kept by one live task.
@@ -110,6 +113,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.tasks == 0
         || limits.batch == 0
         || limits.tree_tasks == 0
+        || limits.run_inbox == 0
+        || limits.run_inbox > limits.inbox_messages
         || limits.inbox_messages == 0
         || limits.inbox_bytes == 0
         || limits.message_bytes == 0

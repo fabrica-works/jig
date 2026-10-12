@@ -34,7 +34,6 @@ const fn title(kind: brief::Core) -> &'static [u8] {
     match kind {
         brief::Core::Task => b"Task",
         brief::Core::Lineage => b"Requesters",
-        brief::Core::Inbox => b"Inbox",
         brief::Core::Results => b"Results",
         brief::Core::Plan => b"Plan",
         brief::Core::Attempts => b"Attempts",
@@ -54,6 +53,7 @@ pub(crate) fn assignment(
     run: core::RunCharter,
     sections: Box<[charter::Section]>,
     transcript: Box<[Box<[u8]>]>,
+    messages: Box<[tasks::Word]>,
     grant: accounts::Grant,
 ) -> Option<host::Assignment> {
     let policy = run.policy;
@@ -95,8 +95,18 @@ pub(crate) fn assignment(
         };
         answered.push(host::AnsweredCall { name: value.name, tool: value.tool, answer }).ok()?;
     }
+    let mut start_messages = List::with_capacity(env.limits.core.tasks.run_inbox);
+    for word in messages {
+        start_messages
+            .push(host::StartMessage {
+                name: Token::new(word.number),
+                sender: sender(word.from),
+                words: inbox_words(&word),
+            })
+            .ok()?;
+    }
     Some(host::Assignment {
-        messages: Box::new([]),
+        messages: start_messages.into_boxed(),
         assignment: host::RunAssignment {
             identity: charter::run_identity(&domain.deployment, task, conversation),
             run: Token::new(task),

@@ -3,7 +3,7 @@
 
 use super::NoteRoute;
 use super::children::remember_due;
-use crate::{Ask, Core, Event, Limits, Now, Request, Requests, RunCharter};
+use crate::{Ask, Core, Event, Limits, Now, Request, Requests, RunCharter, RunProof};
 use alloc::boxed::Box;
 use jig_domain_authority as authority;
 use jig_domain_brief as brief;
@@ -90,8 +90,8 @@ pub(super) fn workspace_prepared(
         && context.tries.transient == 0
         && transcript.bytes <= u64::from(core.settings.resume_bytes);
     let conversation = if resume && transcript.last.is_some() { transcript.from } else { attempt };
-    let offered = if context.last_message == 0 { None } else { Some(context.last_message) };
-    let proof = core.claim_proof(task, attempt, conversation, offered);
+    let messages = start_messages(context.inbox, env.limits.tasks.run_inbox);
+    let proof = start_proof(core, task, attempt, conversation, &messages);
     let previous = core.proofs.insert(task, proof).expect("claim proof reserved before child mutation");
     if let Some(previous) = previous {
         assert!(core.replaced.insert(task, previous) == Ok(None), "one pending replacement per task");
@@ -135,7 +135,7 @@ pub(super) fn workspace_prepared(
         conversation,
         charter: core.charter_of(task).number,
         run: Box::new(run),
-        inbox: context.inbox,
+        messages,
         saved: context.saved,
         transcript: turns,
         answered: answered.into_boxed(),
@@ -143,6 +143,25 @@ pub(super) fn workspace_prepared(
     })));
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+fn start_messages(inbox: Box<[tasks::Word]>, most: u32) -> Box<[tasks::Word]> {
+    let mut messages = List::with_capacity(most);
+    for word in inbox {
+        if messages.len() == most {
+            break;
+        }
+        messages.push(word).expect("start inbox bound");
+    }
+    messages.into_boxed()
+}
+
+fn start_proof(core: &Core, task: u64, attempt: u64, conversation: u64, messages: &[tasks::Word]) -> RunProof {
+    let mut offered = None;
+    for word in messages {
+        offered = Some(word.number);
+    }
+    core.claim_proof(task, attempt, conversation, offered)
 }
 
 pub(super) fn start_brief(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, task: u64) -> Requests {

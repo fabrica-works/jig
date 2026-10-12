@@ -17,7 +17,6 @@ use skein_lib::{Decision, Env, Journal, Map, Queue, Token};
 pub(crate) struct Assignment {
     pub(crate) attempt: u64,
     pub(crate) value: host::Assignment,
-    pub(crate) inbox: Box<[jig_domain_tasks::Word]>,
 }
 
 /// A connector read keeps only its caller continuation and opaque envelope.

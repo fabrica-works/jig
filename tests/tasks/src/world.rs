@@ -37,6 +37,7 @@ pub const LIMITS: Limits = Limits {
     spec_bytes: 64,
     parameters: 4,
     result_bytes: 32,
+    run_inbox: 8,
     inbox_messages: 8,
     inbox_bytes: 128,
     message_bytes: 32,

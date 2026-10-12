@@ -262,6 +262,7 @@ impl Peers {
                     conversation: assignment.conversation,
                     budget: assignment.run.budget,
                     transcript: assignment.transcript.clone(),
+                    messages: assignment.messages.iter().map(|word| word.number).collect(),
                 });
             }
             root::Delivery::Core(core::Held::AcknowledgeTurn { channel, run, attempt, turn }) => {

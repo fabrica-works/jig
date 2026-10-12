@@ -115,7 +115,7 @@ pub struct Assignment {
     pub charter: u32,
     pub run: Box<core::RunCharter>,
     /// Whole words and prior committed conversation offered to the worker.
-    pub inbox: Box<[tasks::Word]>,
+    pub messages: Box<[tasks::Word]>,
     pub transcript: Box<[Box<[u8]>]>,
     pub answered: Box<[core::SettledCall]>,
     /// The selected account grant.

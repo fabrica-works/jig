@@ -20,6 +20,8 @@ pub struct Assignment {
     pub attempt: u64,
     pub budget: u64,
     pub transcript: Box<[Box<[u8]>]>,
+    /// Names of the messages carried by the start, oldest first.
+    pub messages: Box<[u64]>,
 }
 
 /// A classified run failure, in the host fake's own terms.

@@ -261,7 +261,7 @@ pub enum Now {
         conversation: u64,
         charter: u32,
         run: Box<RunCharter>,
-        inbox: Box<[tasks::Word]>,
+        messages: Box<[tasks::Word]>,
         saved: Box<[tasks::SavedResource]>,
         transcript: Box<[Box<[u8]>]>,
         answered: Box<[CallKey]>,

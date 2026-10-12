@@ -107,7 +107,7 @@ impl Agents {
         let mut out = Vec::new();
         match request {
             host::ToAgent::Start { owner, start } => {
-                let host::Start { charter, activation, turns, .. } = *start;
+                let host::Start { charter, activation, turns, messages, .. } = *start;
                 let mut agent = Agent {
                     role: self.role(&charter),
                     activation,
@@ -117,7 +117,7 @@ impl Agents {
                     acted: false,
                     result: false,
                     refinish: None,
-                    unread: Vec::new(),
+                    unread: messages.into_vec().into_iter().map(|message| (message.name, message.words)).collect(),
                     pending: None,
                     ready: false,
                     parks_at: None,

@@ -51,6 +51,7 @@ fn limits() -> Limits {
         spec_bytes: 64,
         parameters: 1,
         result_bytes: 128,
+        run_inbox: 4,
         inbox_messages: 4,
         inbox_bytes: 192,
         message_bytes: 64,

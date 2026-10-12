@@ -16,8 +16,6 @@ pub enum Core {
     Task,
     /// Its requesters' specifications, nearest first.
     Lineage,
-    /// Messages since the task's last run, keeping people's words whole.
-    Inbox,
     /// Dependencies' and inputs' results.
     Results,
     /// Delegates, their states and results that came since the last turn.
@@ -107,9 +105,8 @@ pub struct Plan {
     pub size: u32,
 }
 
-/// Plan sections by requirement and priority within `budget`. A required
-/// inbox must fit whole; other sections can be cut by their owner.
-/// Returns `None` when the inventory or a required inbox cannot fit.
+/// Plan sections by requirement and priority within `budget`.
+/// Sections can be cut by their owner. Returns `None` when the inventory cannot fit.
 #[must_use]
 pub fn plan(sections: &[Planned], budget: u32) -> Option<Plan> {
     let count = u32::try_from(sections.len()).ok()?;
@@ -145,27 +142,6 @@ pub fn plan(sections: &[Planned], budget: u32) -> Option<Plan> {
         let section = sections.get(usize::try_from(index).ok()?)?;
         let wanted = section.size();
         let allotted = wanted.min(section.limit()).min(left);
-        let whole = match section {
-            Planned::Core { kind: Core::Inbox, required: true, .. } => true,
-            Planned::Core {
-                kind:
-                    Core::Task
-                    | Core::Lineage
-                    | Core::Inbox
-                    | Core::Results
-                    | Core::Plan
-                    | Core::Attempts
-                    | Core::Calls
-                    | Core::Waiting
-                    | Core::NotesIndex
-                    | Core::TranscriptTail,
-                ..
-            }
-            | Planned::Connector { .. } => false,
-        };
-        if whole && allotted < wanted {
-            return None;
-        }
         *sizes.get_mut(index)? = allotted;
         left = left.checked_sub(allotted)?;
         match section {
@@ -251,19 +227,6 @@ mod tests {
         let planned = plan(&sections, 4).unwrap();
         assert_eq!(planned.order.len(), 1);
         assert_eq!(planned.connectors.as_ref(), [ConnectorAction::Drop { connector: 2, token: Token::new(5) }]);
-    }
-
-    #[test]
-    fn a_required_inbox_is_kept_whole() {
-        let sections = [Planned::Core {
-            kind: Core::Inbox,
-            text: Box::from(&b"human words"[..]),
-            limit: 11,
-            priority: 0,
-            required: true,
-        }];
-        assert_eq!(plan(&sections, 10), None);
-        assert_eq!(plan(&sections, 11).unwrap().order[0].size, 11);
     }
 
     #[test]

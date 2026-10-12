@@ -394,7 +394,7 @@ fn route_now(
             assert!(domain.workspace_writes.insert(task, names.into_boxed()).is_ok(), "workspace per task");
             work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(checks.into_boxed()) }));
         }
-        core::Now::RunPrepared { task, attempt, conversation, charter, run, inbox, transcript, grant, .. } => {
+        core::Now::RunPrepared { task, attempt, conversation, charter, run, messages, transcript, grant, .. } => {
             let budget = run.budget;
             assert!(
                 domain
@@ -407,7 +407,7 @@ fn route_now(
                             conversation,
                             charter,
                             run,
-                            inbox,
+                            messages,
                             transcript,
                             answered: domain.core.settled_calls(task, attempt),
                             grant

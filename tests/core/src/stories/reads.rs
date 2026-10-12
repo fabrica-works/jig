@@ -18,6 +18,7 @@ fn read_world(seed: u64, reply_bound: Option<u32>) -> World {
     let (configuration, mut limits) = crate::effects::fixture(seed, false);
     if let Some(bound) = reply_bound {
         limits.core.tasks.inbox_messages = bound;
+        limits.core.tasks.run_inbox = bound;
         limits.core.people.inbox_entries = bound;
     }
     limits.core.documents.rows = 2;

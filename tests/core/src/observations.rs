@@ -844,7 +844,7 @@ impl Observer {
                         budget: assignment.run.budget,
                     },
                 );
-                for word in &assignment.inbox {
+                for word in &assignment.messages {
                     self.observe(now, r::Observed::Reached(r::Receipt::Word(assignment.task, word.number)));
                 }
             }

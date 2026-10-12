@@ -262,7 +262,6 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
                     assignment: assignment.value,
                 })),
             );
-            offered_inbox(decision, run, attempt, assignment.inbox);
         }
         core::Held::SettledCall { to, key, call } => {
             domain.calls.remove(&key);
@@ -345,23 +344,6 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
         | core::Held::NotesLoad { .. }
         | core::Held::NotesWritten { .. }
         | core::Held::NotesDeleted { .. }) => held(decision, Output::Core(other)),
-    }
-}
-
-fn offered_inbox(decision: &mut Decision<Write, Output>, run: Token, attempt: Token, inbox: Box<[tasks::Word]>) {
-    // Carry the core's offered inbox to the newly assigned attempt.
-    // The hub's opaque message names become the run's read fence.
-    for word in inbox {
-        child(
-            decision,
-            Released::Host(host::Event::Down(host::LinkDown::Message {
-                run,
-                attempt,
-                name: Token::new(word.number),
-                sender: crate::assemble::sender(word.from),
-                words: crate::assemble::inbox_words(&word),
-            })),
-        );
     }
 }
 
@@ -1253,7 +1235,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         core::Now::WorkspaceRequest { task, attempt, .. } => {
             work.push(Work::Core(core::Event::WorkspacePrepared { task, attempt, writes: Some(Box::new([])) }));
         }
-        core::Now::RunPrepared { task, attempt, conversation, run, inbox, transcript, grant, .. } => {
+        core::Now::RunPrepared { task, attempt, conversation, run, messages, transcript, grant, .. } => {
             let budget = run.budget;
             let sections = domain.briefs.remove(&task).expect("completed brief parts");
             match crate::assemble::assignment(
@@ -1265,12 +1247,13 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 *run,
                 sections,
                 transcript,
+                messages,
                 grant,
             ) {
                 Some(value) => {
                     domain
                         .assignments
-                        .insert(task, crate::domain::Assignment { attempt, value, inbox })
+                        .insert(task, crate::domain::Assignment { attempt, value })
                         .expect("core-selected assignment");
                     work.push(Work::Core(core::Event::ClaimPrepared { task, attempt, budget, writes: Box::new([]) }));
                 }

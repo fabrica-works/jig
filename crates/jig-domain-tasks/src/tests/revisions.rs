@@ -41,6 +41,7 @@ pub(super) const LIMITS: Limits = Limits {
     spec_bytes: 64,
     parameters: 4,
     result_bytes: 32,
+    run_inbox: 8,
     inbox_messages: 8,
     inbox_bytes: 128,
     message_bytes: 32,
@@ -845,6 +846,7 @@ fn pending_task_proposal_room_keeps_original_action_and_excludes_wrong_project()
     assert_eq!(rows.get(0).unwrap().request.cause, crate::CapacityCause::Proposals { limit: 1 });
     assert_eq!(h.domain.proposal(1, 7).unwrap().number, 7);
     h.env.limits.inbox_messages = 1;
+    h.env.limits.run_inbox = 1;
     h.env.wall = Wall::from_nanos(23);
     let prior = h.domain.task(1).unwrap().clone();
     let denied = h.send(Event::Message {

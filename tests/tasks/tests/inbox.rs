@@ -95,6 +95,7 @@ fn task_words(world: &mut World, source: u64, target: u64, number: u64, kind: Me
 fn a_question_keeps_room_for_its_answer_while_words_fill_the_inbox() {
     let mut limits = LIMITS;
     limits.inbox_messages = 2;
+    limits.run_inbox = 2;
     let mut world = World::new(83, limits);
     world.make(Party::Person(9), vec![task(1, &[])]);
     world.make(Party::Task(1), vec![task(2, &[])]);
@@ -180,6 +181,7 @@ fn a_coordinator_is_woken_once_by_a_burst() {
 fn an_inbox_filling_merges_news_refuses_words_and_still_takes_a_result() {
     let mut limits = LIMITS;
     limits.inbox_messages = 3;
+    limits.run_inbox = 3;
     let mut world = World::new(85, limits);
     world.make(Party::Person(9), vec![task(1, &[])]);
     world.make(Party::Task(1), vec![task(2, &[])]);

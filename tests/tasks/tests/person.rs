@@ -192,6 +192,7 @@ fn a_persons_wait_starts_after_dependencies_and_notifies_its_requester_once_acro
 fn person_stall_news_and_the_result_keep_room_before_ordinary_words() {
     let mut limits = LIMITS;
     limits.inbox_messages = 2;
+    limits.run_inbox = 2;
     limits.person_stall = skein_lib::Duration::from_secs(1);
     let mut world = World::new(225, limits);
     let mut parent = task(1, &[]);
