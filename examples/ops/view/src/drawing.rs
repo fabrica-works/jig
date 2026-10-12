@@ -1,7 +1,7 @@
 //! Keep: owner-written bounded data and readable fallback (view.md, 3).
 //! Replace: observability's error-rate drawing.
 use crate::words::{Word, Words};
-use jig_ops_client_domain::observability::documents::Incident;
+use jig_ops_domain_client::observability::documents::Incident;
 use jig_view::{Builder, DrawingKind, Owner, Run, phrases::Hole};
 pub const BYTES: u32 = 32;
 pub fn rate(b: &mut Builder, words: &Words, incident: &Incident) {
@@ -40,8 +40,8 @@ fn open_rate(b: &mut Builder, words: &Words, percent: u8, observed: skein_lib::W
 pub fn native_rate(
     b: &mut Builder,
     words: &Words,
-    incident: &jig_ops_client_domain::observability::native::Incident,
-    fact: &jig_ops_client_domain::observability::native::Fact,
+    incident: &jig_ops_domain_client::observability::native::Incident,
+    fact: &jig_ops_domain_client::observability::native::Fact,
 ) {
     let observed = skein_lib::Wall::from_nanos(fact.observed.saturating_mul(1_000_000_000));
     open_rate(b, words, fact.error_rate_percent, observed);

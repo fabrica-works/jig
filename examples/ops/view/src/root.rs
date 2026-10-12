@@ -6,8 +6,8 @@ use crate::{
     infrastructure, observability,
     words::{self, Word},
 };
-use jig_ops_client_domain::Domain;
-use jig_ops_connectors::Connector;
+use jig_ops_domain_client::Domain;
+use jig_ops_domain_connectors::Connector;
 use jig_view::{Act, Builder, JigBindings, NodeId, Owner, Patch, Role, Tree};
 use skein_lib::Queue;
 /// The composed semantic tree and its owner binding tables.
@@ -28,15 +28,15 @@ impl View {
     #[must_use]
     pub fn new(
         limits: &Limits,
-        domain: &jig_ops_client_domain::Limits,
+        domain: &jig_ops_domain_client::Limits,
         words: jig_view::words::Words,
         observability_words: words::Words,
         infrastructure_words: words::Words,
         project: u32,
     ) -> Self {
         assert!(
-            observability_words.connector == jig_ops_connectors::number(Connector::Observability)
-                && infrastructure_words.connector == jig_ops_connectors::number(Connector::Infrastructure),
+            observability_words.connector == jig_ops_domain_connectors::number(Connector::Observability)
+                && infrastructure_words.connector == jig_ops_domain_connectors::number(Connector::Infrastructure),
             "phrasebooks belong to their connector owners"
         );
         assert!(
@@ -49,12 +49,12 @@ impl View {
             observability: Bindings::new(
                 limits.tree.bindings,
                 domain.observability.text,
-                jig_ops_connectors::number(Connector::Observability),
+                jig_ops_domain_connectors::number(Connector::Observability),
             ),
             infrastructure: Bindings::new(
                 limits.tree.bindings,
                 domain.infrastructure.text,
-                jig_ops_connectors::number(Connector::Infrastructure),
+                jig_ops_domain_connectors::number(Connector::Infrastructure),
             ),
             words,
             observability_words,
@@ -79,7 +79,7 @@ impl View {
 }
 #[expect(clippy::too_many_lines, reason = "the root exhaustively routes two connectors in both slot passes")]
 pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
-    let shown = jig_ops_client_domain::shown(root);
+    let shown = jig_ops_domain_client::shown(root);
     if !view.render.stale(shown) {
         return;
     }
@@ -127,7 +127,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                         None => false,
                     }
                 }
-                Owner::Side { connector } => match jig_ops_connectors::connector(connector) {
+                Owner::Side { connector } => match jig_ops_domain_connectors::connector(connector) {
                     Some(Connector::Observability) => {
                         if slot.reference == observability::NAV {
                             observability::navigation(
@@ -207,7 +207,7 @@ pub fn decode(view: &mut View, node: NodeId, act: Act) -> Option<Action> {
             Some(value) => Some(Action::Jig(value)),
             None => None,
         },
-        Owner::Side { connector } => match jig_ops_connectors::connector(connector) {
+        Owner::Side { connector } => match jig_ops_domain_connectors::connector(connector) {
             Some(Connector::Observability) => bindings::decode(&view.observability, bound.binding.token, bound.act),
             Some(Connector::Infrastructure) => bindings::decode(&view.infrastructure, bound.binding.token, bound.act),
             None => None,

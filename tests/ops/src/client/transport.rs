@@ -3,8 +3,8 @@
 use super::{Document, Ops, OpsScript, Subject};
 use jig_client_world::{harness::*, observe};
 use jig_domain_client::{self as client, contract::*};
-use jig_ops_client_domain::{self as domain, Event, JigOut, Request, infrastructure as infra, observability as obs};
-use jig_ops_connectors::{Connector, number};
+use jig_ops_domain_client::{self as domain, Event, JigOut, Request, infrastructure as infra, observability as obs};
+use jig_ops_domain_connectors::{Connector, number};
 use jig_scripted_engine::{self as engine, ApplicationScope, Envelope, Up};
 use sha2::{Digest, Sha256};
 use skein_lib::{RequestEnvelope, Time, Token, Wall};

@@ -8,7 +8,7 @@ publish.workspace = true
 
 [dependencies]
 skein-lib.workspace = true
-jig-ops-connectors.workspace = true
+jig-ops-domain-connectors.workspace = true
 skein-json.workspace = true
 jig-domain-core.workspace = true
 jig-domain-tasks.workspace = true

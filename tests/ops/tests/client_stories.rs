@@ -5,7 +5,7 @@ use jig_domain_client::{
     contract::{ObjectKey, ReadValue},
 };
 use jig_fake_person::{Find, Step};
-use jig_ops_client_domain::{Address, observability as obs};
+use jig_ops_domain_client::{Address, observability as obs};
 use jig_ops_world::client::{Ops, stories};
 use jig_view::Role;
 use skein_lib::Duration;
@@ -128,13 +128,13 @@ fn q_asks_for_an_environment_in_a_chat_and_accepts_what_it_costs() {
         let subject = stories::environment_document();
         let doc = state
             .documents
-            .get(&jig_ops_world::client::Subject::Infrastructure(jig_ops_client_domain::infrastructure::Subject {
-                scope: jig_ops_client_domain::infrastructure::Scope::Project(1),
-                kind: jig_ops_client_domain::infrastructure::Kind::Environment(7),
+            .get(&jig_ops_world::client::Subject::Infrastructure(jig_ops_domain_client::infrastructure::Subject {
+                scope: jig_ops_domain_client::infrastructure::Scope::Project(1),
+                kind: jig_ops_domain_client::infrastructure::Kind::Environment(7),
             }))
             .expect("original owner environment retained");
         let jig_ops_world::client::Document::Infrastructure(
-            jig_ops_client_domain::infrastructure::Document::Environment(after),
+            jig_ops_domain_client::infrastructure::Document::Environment(after),
         ) = doc
         else {
             unreachable!()

@@ -6,7 +6,7 @@ use crate::{
     words::{Word, Words},
 };
 use jig_domain_client::contract::{ObjectKey, Part, Proposer};
-use jig_ops_client_domain::{
+use jig_ops_domain_client::{
     Action,
     observability::{
         self, Value,
@@ -16,7 +16,9 @@ use jig_ops_client_domain::{
 use jig_view::{Builder, Key, Owner, Role, Run, SlotRef, phrases::Hole};
 use skein_lib::Token;
 pub const NAV: SlotRef = SlotRef {
-    owner: Owner::Side { connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability) },
+    owner: Owner::Side {
+        connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
+    },
     token: Token::new(0),
 };
 pub fn navigation(builder: &mut Builder, project: u32, words: &Words, bindings: &mut Bindings) {
@@ -227,7 +229,9 @@ pub fn part(
         Part::Connector { .. } => words.text(
             builder,
             Word::Connector,
-            &[Hole::Number(u64::from(jig_ops_connectors::number(jig_ops_connectors::Connector::Observability)))],
+            &[Hole::Number(u64::from(jig_ops_domain_connectors::number(
+                jig_ops_domain_connectors::Connector::Observability,
+            )))],
         ),
         Part::Resource { path, .. } => {
             words.text(builder, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(b""))]);

@@ -6,7 +6,7 @@
 )]
 use crate::{Limits, View, build, words};
 use jig_domain_client::contract::*;
-use jig_ops_client_domain::{self as root, Address, Domain, Event, JigOut, Request, infrastructure, observability};
+use jig_ops_domain_client::{self as root, Address, Domain, Event, JigOut, Request, infrastructure, observability};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall};
 const JIG: jig_domain_client::Limits = jig_domain_client::Limits {
     watches: 4,
@@ -1516,7 +1516,7 @@ fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_wi
     let requests = drive(
         &mut root,
         Event::Went {
-            place: jig_ops_client_domain::Place::Address(Address::Infrastructure(
+            place: jig_ops_domain_client::Place::Address(Address::Infrastructure(
                 infrastructure::Address::NativeEnvironment { project: 3, environment: environment.clone() },
             )),
         },
@@ -1556,7 +1556,7 @@ fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_wi
     let field = field.id;
     assert_eq!(
         crate::decode(&mut view, field, jig_view::Act::Input { value: Box::from(*b"18446744073709551614") }),
-        Some(jig_ops_client_domain::Action::Infrastructure(infrastructure::Act::NativeUntil {
+        Some(jig_ops_domain_client::Action::Infrastructure(infrastructure::Act::NativeUntil {
             object: id.token(),
             revision: Revision { value: 17 },
             value: u64::MAX - 1

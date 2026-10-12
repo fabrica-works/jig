@@ -1,5 +1,5 @@
 //! Ops own vocabulary translation; jig vocabulary reuses session 45 unchanged.
-use jig_ops_client_domain::infrastructure::native;
+use jig_ops_domain_client::infrastructure::native;
 use jig_ops_domain_infrastructure as source;
 
 #[must_use]
@@ -381,9 +381,9 @@ pub fn translate_value(value: source::ClientDocument) -> native::Value {
 /// # Errors
 /// Numeric fixture identities cannot represent the native owner identity.
 pub fn ask(
-    value: jig_ops_client_domain::infrastructure::Ask,
+    value: jig_ops_domain_client::infrastructure::Ask,
 ) -> Result<(u32, source::ApplicationRequest, [u8; 32]), &'static str> {
-    use jig_ops_client_domain::infrastructure::Ask;
+    use jig_ops_domain_client::infrastructure::Ask;
     use sha2::{Digest, Sha256};
     let (project, value) = match value {
         Ask::NativeMoveEnd { project, environment, revision, until, object: _ } => (
@@ -409,9 +409,9 @@ pub fn ask(
     Ok((project, value, digest.finalize().into()))
 }
 #[must_use]
-pub fn answer(value: source::ApplicationOutcome) -> jig_ops_client_domain::infrastructure::Answer {
+pub fn answer(value: source::ApplicationOutcome) -> jig_ops_domain_client::infrastructure::Answer {
     use jig_domain_client::contract::Revision;
-    use jig_ops_client_domain::infrastructure::{Answer, documents::Refusal};
+    use jig_ops_domain_client::infrastructure::{Answer, documents::Refusal};
     match value {
         source::ApplicationOutcome::MovedEnd { environment, now } => Answer::NativeMovedEnd {
             environment: translate_environment(environment),
@@ -434,7 +434,7 @@ pub fn answer(value: source::ApplicationOutcome) -> jig_ops_client_domain::infra
 mod tests {
     use super::*;
     use jig_domain_client::contract::Revision;
-    use jig_ops_client_domain::infrastructure::{Answer, Ask, documents::Refusal};
+    use jig_ops_domain_client::infrastructure::{Answer, Ask, documents::Refusal};
     use skein_lib::Token;
     #[test]
     fn native_move_end_wire_keeps_scope_raw_names_whole_width_values_and_distinct_terminals() {

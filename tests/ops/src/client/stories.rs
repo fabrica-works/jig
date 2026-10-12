@@ -12,8 +12,8 @@ use jig_domain_client::{
     contract::*,
 };
 use jig_fake_person::{Face, Find, Found, TreeFace};
-use jig_ops_client_domain::{Address, infrastructure as infra, observability as obs};
-use jig_ops_connectors::{Connector, number};
+use jig_ops_domain_client::{Address, infrastructure as infra, observability as obs};
+use jig_ops_domain_connectors::{Connector, number};
 use jig_scripted_engine::{Bounds, Script, Truth};
 use jig_view::{Owner, Role, Tree as ViewTree};
 use skein_lib::{Duration, Wall};

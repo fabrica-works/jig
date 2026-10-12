@@ -1,5 +1,5 @@
 [package]
-name = "jig-ops-client-domain"
+name = "jig-ops-domain-client"
 description = "Ops reference client root and connector sides"
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 jig-domain-client.workspace = true
-jig-ops-connectors.workspace = true
+jig-ops-domain-connectors.workspace = true
 
 [lints]
 workspace = true

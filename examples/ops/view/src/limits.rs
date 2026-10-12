@@ -9,7 +9,7 @@ pub struct Limits {
 impl Limits {
     #[must_use]
     pub fn of(
-        domain: &jig_ops_client_domain::Limits,
+        domain: &jig_ops_domain_client::Limits,
         jig: &jig_view::words::Words,
         observability: &Words,
         infrastructure: &Words,
@@ -58,7 +58,7 @@ impl Limits {
 #[must_use]
 pub fn worst_case(
     limits: &Limits,
-    domain: &jig_ops_client_domain::Limits,
+    domain: &jig_ops_domain_client::Limits,
     jig: &jig_view::words::Words,
     observability: &Words,
     infrastructure: &Words,

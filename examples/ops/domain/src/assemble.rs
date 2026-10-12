@@ -9,7 +9,7 @@ use jig_domain_brief as brief;
 use jig_domain_core as core;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
-use jig_ops_connectors::Connector;
+use jig_ops_domain_connectors::Connector;
 use jig_protocol_charter as charter;
 use skein_lib::{Decimal, Env, List, Queue, Reader, ReplyTo, Token, Writer};
 
@@ -439,8 +439,10 @@ pub(crate) fn call(
         let binding = crate::domain::ReadCall { to: to.into_token(), name: call.name, tool: call.tool.clone() };
         match crate::translate::decode(&call.tool, &call.input) {
             Ok(crate::translate::Decoded::Read(read)) => {
-                let description =
-                    crate::translate::read_description(jig_ops_connectors::number(Connector::Observability), &read);
+                let description = crate::translate::read_description(
+                    jig_ops_domain_connectors::number(Connector::Observability),
+                    &read,
+                );
                 let mut findings = Queue::with_capacity(
                     jig_domain_authority::max_out(&env.limits.core.authority).expect("authority findings"),
                 );

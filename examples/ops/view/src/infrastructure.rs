@@ -5,7 +5,7 @@ use crate::{
     words::{Word, Words},
 };
 use jig_domain_client::contract::{Part, Proposer};
-use jig_ops_client_domain::{
+use jig_ops_domain_client::{
     Action,
     infrastructure::{
         self, Card, Value,
@@ -18,7 +18,9 @@ use jig_ops_client_domain::{
 use jig_view::{Builder, Key, Owner, Role, SlotRef, State, phrases::Hole};
 use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef = SlotRef {
-    owner: Owner::Side { connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure) },
+    owner: Owner::Side {
+        connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Infrastructure),
+    },
     token: Token::new(0),
 };
 pub fn navigation(builder: &mut Builder, project: u32, native: bool, words: &Words, bindings: &mut Bindings) {
@@ -566,7 +568,9 @@ pub fn part(
         Part::Connector { .. } => words.text(
             builder,
             Word::Connector,
-            &[Hole::Number(u64::from(jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure)))],
+            &[Hole::Number(u64::from(jig_ops_domain_connectors::number(
+                jig_ops_domain_connectors::Connector::Infrastructure,
+            )))],
         ),
         Part::Resource { path, .. } => {
             words.text(builder, Word::Resource, &[Hole::Name(skein_lib::bytes::copy_of(b""))]);

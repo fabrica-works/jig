@@ -7,11 +7,11 @@ use crate::{
 use jig_client_world::{Settings, World};
 use jig_domain_core as core;
 use jig_domain_tasks as tasks;
-use jig_ops_client_domain as client;
-use jig_ops_client_view as view;
 use jig_ops_domain as root;
+use jig_ops_domain_client as client;
 use jig_ops_domain_infrastructure as infra;
 use jig_ops_domain_observability as obs;
+use jig_ops_view as view;
 use skein_lib::Duration;
 #[must_use]
 pub fn limits() -> client::Limits {

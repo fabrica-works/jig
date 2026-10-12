@@ -7,7 +7,7 @@ use jig_domain_authority as authority;
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_host as host;
-use jig_ops_connectors::Connector;
+use jig_ops_domain_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Decision, Env, Journal, Map, Queue, Token};
@@ -109,8 +109,8 @@ impl Domain {
             &mut core.tasks,
             &Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: limits.core.tasks },
             jig_domain_tasks::Event::Kinds {
-                connector: jig_ops_connectors::number(Connector::Infrastructure),
-                kinds: crate::translate::hold_kinds(jig_ops_connectors::number(Connector::Infrastructure)),
+                connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
+                kinds: crate::translate::hold_kinds(jig_ops_domain_connectors::number(Connector::Infrastructure)),
             },
             &mut configured,
         );

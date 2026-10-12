@@ -1,5 +1,5 @@
 //! Whole genuine owner facts, with no inferred lead, revision, proposal or load.
-use jig_ops_client_domain::observability::{documents, native};
+use jig_ops_domain_client::observability::{documents, native};
 use jig_ops_domain_observability as source;
 use skein_lib::List;
 #[must_use]

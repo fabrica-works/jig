@@ -141,14 +141,14 @@ pub fn authority(spend: u64, person: bool) -> authority::Authority {
     let mut grants = Vec::new();
     for kind in [1, 2] {
         grants.push(authority::Grant {
-            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure),
+            connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Infrastructure),
             kind,
             pattern: pattern(if person { None } else { Some(b"staging") }),
         });
     }
     for kind in [2, 3, 4] {
         grants.push(authority::Grant {
-            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+            connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
             kind,
             pattern: authority::Pattern { segments: Box::new([]), last: authority::Last::Open(Box::new([])) },
         });
@@ -206,11 +206,11 @@ pub fn environment_authority(spend: u64, person: bool) -> authority::Authority {
 fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> authority::Domain {
     let requirements: Box<[_]> = [
         authority::Requirement {
-            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure),
+            connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Infrastructure),
             kind: 1,
             pattern: pattern(None),
             judge: authority::Judge {
-                connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+                connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
                 requirement: 1,
                 parameters: 0,
             },
@@ -218,11 +218,11 @@ fn policy_domain(limits: &authority::Limits, environment_chat: bool) -> authorit
             must_be_guarded: false,
         },
         authority::Requirement {
-            connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Infrastructure),
+            connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Infrastructure),
             kind: 2,
             pattern: pattern(None),
             judge: authority::Judge {
-                connector: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+                connector: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
                 requirement: 2,
                 parameters: 0,
             },

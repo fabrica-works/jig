@@ -760,9 +760,9 @@ fn client_step(name: &str) -> bool {
             | "jig-protocol-transcript"
             | "jig-test-domain-client"
             | "jig-test-view"
-            | "jig-ops-connectors"
-            | "jig-ops-client-domain"
-            | "jig-ops-client-view"
+            | "jig-ops-domain-connectors"
+            | "jig-ops-domain-client"
+            | "jig-ops-view"
     )
 }
 
@@ -793,7 +793,7 @@ fn client_roles_cover_step_crates_and_exclude_the_world() {
     assert!(client_step("jig-protocol-transcript"));
     assert!(client_step("jig-test-domain-client"));
     assert!(client_step("jig-test-view"));
-    assert!(client_step("jig-ops-connectors"));
+    assert!(client_step("jig-ops-domain-connectors"));
     assert!(!client_step("jig-client-world"));
     assert!(!client_step("jig-fake-person"));
     assert!(!client_step("jig-scripted-engine"));
@@ -952,10 +952,12 @@ fn client_world_joins_only_the_client_and_test_roles() {
 
 #[test]
 fn ops_connector_identities_link_only_the_foundation() {
-    let roots: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-connectors")).collect();
+    let roots: Vec<_> =
+        manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-domain-connectors")).collect();
     assert_eq!(roots.len(), 1, "one Ops connector vocabulary");
     assert_eq!(roots[0].dependencies, ["skein-lib"]);
-    let source = fs::read_to_string(kit_root().join("examples/ops/connectors/src/lib.rs")).expect("connector source");
+    let source =
+        fs::read_to_string(kit_root().join("examples/ops/domain-connectors/src/lib.rs")).expect("connector source");
     assert!(source.contains("cfg_attr(not(test), no_std)"), "connector identities are step code");
     assert!(source.contains("forbid(unsafe_code)"), "connector identities forbid unsafe");
 }
@@ -963,27 +965,27 @@ fn ops_connector_identities_link_only_the_foundation() {
 #[test]
 fn ops_client_domain_is_step_code_with_only_client_and_connector_vocabulary() {
     let roots: Vec<_> =
-        manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-client-domain")).collect();
+        manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-domain-client")).collect();
     assert_eq!(roots.len(), 1);
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-domain-client", "jig-ops-connectors", "skein-lib"]);
-    let source = fs::read_to_string(kit_root().join("examples/ops/client-domain/src/lib.rs")).expect("domain source");
+    assert_eq!(dependencies, ["jig-domain-client", "jig-ops-domain-connectors", "skein-lib"]);
+    let source = fs::read_to_string(kit_root().join("examples/ops/domain-client/src/lib.rs")).expect("domain source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
 }
 
 #[test]
 fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
-    let roots: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-client-view")).collect();
+    let roots: Vec<_> = manifests().into_iter().filter(|m| m.name.as_deref() == Some("jig-ops-view")).collect();
     assert_eq!(roots.len(), 1);
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
     assert_eq!(
         dependencies,
-        ["jig-domain-client", "jig-ops-client-domain", "jig-ops-connectors", "jig-view", "skein-lib"]
+        ["jig-domain-client", "jig-ops-domain-client", "jig-ops-domain-connectors", "jig-view", "skein-lib"]
     );
-    let source = fs::read_to_string(kit_root().join("examples/ops/client-view/src/lib.rs")).expect("view source");
+    let source = fs::read_to_string(kit_root().join("examples/ops/view/src/lib.rs")).expect("view source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
 }

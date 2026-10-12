@@ -5,7 +5,7 @@ use crate::{ClientDocument, ClientMissing, ClientSubject, Domain, Limits, Output
 use alloc::boxed::Box;
 use jig_domain_core as core;
 use jig_domain_views as views;
-use jig_ops_connectors::Connector;
+use jig_ops_domain_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Decision, Env, Queue, ReplyTo, Token};
@@ -14,17 +14,17 @@ pub(crate) fn prepare(_domain: &Domain, token: Token, subject: ClientSubject, wo
     match subject {
         ClientSubject::Infrastructure(subject) => {
             work.push(Work::Infrastructure(infrastructure::Event::DocumentPrepare { token, subject }));
-            jig_ops_connectors::number(Connector::Infrastructure)
+            jig_ops_domain_connectors::number(Connector::Infrastructure)
         }
         ClientSubject::Observability(subject) => {
             work.push(Work::Observability(observability::Event::DocumentPrepare { token, subject }));
-            jig_ops_connectors::number(Connector::Observability)
+            jig_ops_domain_connectors::number(Connector::Observability)
         }
     }
 }
 
 pub(crate) fn forget(_domain: &Domain, number: u16, subject: Token, work: &mut Queue<Work>) {
-    match jig_ops_connectors::connector(number) {
+    match jig_ops_domain_connectors::connector(number) {
         Some(Connector::Infrastructure) => {
             work.push(Work::Infrastructure(infrastructure::Event::DocumentForget { subject }));
         }
@@ -57,7 +57,7 @@ pub(crate) fn ask_document(
     party: u64,
     work: &mut Queue<Work>,
 ) {
-    match jig_ops_connectors::connector(number) {
+    match jig_ops_domain_connectors::connector(number) {
         Some(Connector::Infrastructure) => {
             work.push(Work::Infrastructure(infrastructure::Event::Document {
                 watcher,
@@ -175,7 +175,7 @@ pub(crate) fn read(
     work: &mut Queue<Work>,
 ) {
     let mut reply = Some(reply);
-    match jig_ops_connectors::connector(number) {
+    match jig_ops_domain_connectors::connector(number) {
         Some(Connector::Infrastructure) => {
             let mut out = Queue::with_capacity(infrastructure::MAX_OUT);
             infrastructure::step(

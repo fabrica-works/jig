@@ -14,8 +14,8 @@ use jig_client_world::{
 use jig_conformance::Harness;
 use jig_domain_core as core;
 use jig_domain_people as people;
-use jig_ops_client_domain::{self as client, infrastructure as infra, observability as obs};
 use jig_ops_domain as root;
+use jig_ops_domain_client::{self as client, infrastructure as infra, observability as obs};
 use skein_lib::{Duration, ReplyTo, Time, Token, Wall};
 use std::collections::BTreeMap;
 #[derive(Clone, Debug, PartialEq, Eq)]

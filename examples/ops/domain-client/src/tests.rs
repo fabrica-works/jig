@@ -659,7 +659,9 @@ fn whole_document_limits_keep_unknown_owner_facts_unknown() {
     reason = "the same exhaustive scoped lifecycle is checked independently for both connector families"
 )]
 fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_words() {
-    for connector in [jig_ops_connectors::Connector::Infrastructure, jig_ops_connectors::Connector::Observability] {
+    for connector in
+        [jig_ops_domain_connectors::Connector::Infrastructure, jig_ops_domain_connectors::Connector::Observability]
+    {
         let mut root = ready(45);
         let rows = drive(
             &mut root,
@@ -672,7 +674,7 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
                 _ => None,
             })
             .unwrap();
-        let number = jig_ops_connectors::number(connector);
+        let number = jig_ops_domain_connectors::number(connector);
         let parts = connector_parts(number);
         let expected = parts.clone();
         let rows = drive(
@@ -702,10 +704,10 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
         let generation = root.jig().generation();
         for part in &expected {
             match connector {
-                jig_ops_connectors::Connector::Infrastructure => {
+                jig_ops_domain_connectors::Connector::Infrastructure => {
                     assert!(root.infrastructure().contains(part, generation));
                 }
-                jig_ops_connectors::Connector::Observability => {
+                jig_ops_domain_connectors::Connector::Observability => {
                     assert!(root.observability().contains(part, generation));
                 }
             }
@@ -754,10 +756,10 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
         );
         for part in &expected {
             match connector {
-                jig_ops_connectors::Connector::Infrastructure => {
+                jig_ops_domain_connectors::Connector::Infrastructure => {
                     assert!(!root.infrastructure().contains(part, generation));
                 }
-                jig_ops_connectors::Connector::Observability => {
+                jig_ops_domain_connectors::Connector::Observability => {
                     assert!(!root.observability().contains(part, generation));
                 }
             }
@@ -849,7 +851,7 @@ fn application_navigation_is_forwarded_before_start_and_retains_order() {
     navigation
         .entries
         .push(Destination::Application {
-            owner: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+            owner: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
             number: 1,
         })
         .unwrap();
@@ -857,7 +859,7 @@ fn application_navigation_is_forwarded_before_start_and_retains_order() {
     assert_eq!(
         root.jig().navigation().entries.as_slice()[1],
         Destination::Application {
-            owner: jig_ops_connectors::number(jig_ops_connectors::Connector::Observability),
+            owner: jig_ops_domain_connectors::number(jig_ops_domain_connectors::Connector::Observability),
             number: 1
         }
     );

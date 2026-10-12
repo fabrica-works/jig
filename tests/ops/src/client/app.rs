@@ -4,11 +4,11 @@ use jig_client_world::harness::Seen;
 use jig_client_world::{harness::*, observe};
 use jig_domain_client::contract::Outcome;
 use jig_domain_client::{boundary::Offset, contract::*};
-use jig_ops_client_domain::{
+use jig_ops_domain_client::{
     self as domain, Action, Address, Event, JigOut, Request, infrastructure as infra, observability as obs,
 };
-use jig_ops_client_view as view;
-use jig_ops_connectors::{Connector, number};
+use jig_ops_domain_connectors::{Connector, number};
+use jig_ops_view as view;
 use jig_view::{Act, NodeId, Owner, Patch, Role, Tree};
 use skein_lib::{Duration, Env, Queue, RequestEnvelope, RequestLimits, Time};
 

@@ -12,8 +12,8 @@ pub(crate) fn show(
     out: &mut Queue<Request>,
 ) {
     let number = connector(&part);
-    match jig_ops_connectors::connector(number) {
-        Some(jig_ops_connectors::Connector::Infrastructure) => route::infrastructure(
+    match jig_ops_domain_connectors::connector(number) {
+        Some(jig_ops_domain_connectors::Connector::Infrastructure) => route::infrastructure(
             root,
             env,
             infrastructure::Event::Show {
@@ -26,7 +26,7 @@ pub(crate) fn show(
             },
             out,
         ),
-        Some(jig_ops_connectors::Connector::Observability) => {
+        Some(jig_ops_domain_connectors::Connector::Observability) => {
             route::observability(
                 root,
                 env,

@@ -6,7 +6,7 @@ use jig_domain_core as core;
 use jig_domain_notes as notes;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use jig_ops_connectors::Connector;
+use jig_ops_domain_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Decision, Env, Queue};
@@ -24,7 +24,7 @@ pub(crate) fn route(
             core::RestartStep::LoadCore => held(decision, Output::Load { step, range: Range::Core }),
             core::RestartStep::LoadInbox => held(decision, Output::Load { step, range: Range::Inbox }),
             core::RestartStep::RestoreConnector { connector } => {
-                let range = match jig_ops_connectors::connector(connector) {
+                let range = match jig_ops_domain_connectors::connector(connector) {
                     Some(Connector::Infrastructure) => Range::Infrastructure,
                     Some(Connector::Observability) => Range::Observability,
                     None => {
@@ -38,7 +38,7 @@ pub(crate) fn route(
                 work.push(Work::Core(core::Event::Tasks(tasks::Event::Restored)));
                 work.push(Work::AdoptClaims);
             }
-            core::RestartStep::ReadAfresh { connector } => match jig_ops_connectors::connector(connector) {
+            core::RestartStep::ReadAfresh { connector } => match jig_ops_domain_connectors::connector(connector) {
                 Some(Connector::Infrastructure) => {
                     work.push(Work::Infrastructure(infrastructure::Event::ReadAfresh));
                 }
@@ -49,7 +49,7 @@ pub(crate) fn route(
                     let _request = domain.core.restart_refuse();
                 }
             },
-            core::RestartStep::SettleOutbox { connector } => match jig_ops_connectors::connector(connector) {
+            core::RestartStep::SettleOutbox { connector } => match jig_ops_domain_connectors::connector(connector) {
                 Some(Connector::Infrastructure) => {
                     work.push(Work::Infrastructure(infrastructure::Event::Restart));
                 }
@@ -185,7 +185,7 @@ fn restore_roles(domain: &mut Domain, env: &Env<Limits>, record: &infrastructure
                     &Env { now: env.now, wall: env.wall, limits: env.limits.core },
                     *project,
                     tasks::Name {
-                        connector: jig_ops_connectors::number(Connector::Infrastructure),
+                        connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                         path: named.resource.segments(),
                     },
                     crate::translate::resource_role(named.role),

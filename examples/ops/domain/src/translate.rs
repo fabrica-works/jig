@@ -206,13 +206,13 @@ pub(crate) fn procedure(code: u32, spec: &tasks::Spec) -> Option<infrastructure:
     }
 }
 pub(crate) fn holdings(number: u16, executor: tasks::Executor, spec: &tasks::Spec) -> Option<Box<[tasks::Holding]>> {
-    match jig_ops_connectors::connector(number) {
-        Some(jig_ops_connectors::Connector::Infrastructure) => {}
-        Some(jig_ops_connectors::Connector::Observability) | None => return Some(Box::new([])),
+    match jig_ops_domain_connectors::connector(number) {
+        Some(jig_ops_domain_connectors::Connector::Infrastructure) => {}
+        Some(jig_ops_domain_connectors::Connector::Observability) | None => return Some(Box::new([])),
     }
     match executor {
-        tasks::Executor::Procedure { connector, code } => match jig_ops_connectors::connector(connector) {
-            Some(jig_ops_connectors::Connector::Infrastructure) => {
+        tasks::Executor::Procedure { connector, code } => match jig_ops_domain_connectors::connector(connector) {
+            Some(jig_ops_domain_connectors::Connector::Infrastructure) => {
                 if code == infrastructure::PROVISION_CODE {
                     let environment = spec_environment(spec)?;
                     return Some(Box::from([
@@ -233,7 +233,7 @@ pub(crate) fn holdings(number: u16, executor: tasks::Executor, spec: &tasks::Spe
                     ]));
                 }
             }
-            Some(jig_ops_connectors::Connector::Observability) | None => return Some(Box::new([])),
+            Some(jig_ops_domain_connectors::Connector::Observability) | None => return Some(Box::new([])),
         },
         tasks::Executor::Agent { .. } | tasks::Executor::Person(_) => return Some(Box::new([])),
     }

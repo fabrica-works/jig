@@ -1,5 +1,5 @@
 [package]
-name = "jig-ops-connectors"
+name = "jig-ops-domain-connectors"
 description = "Ops connector identities shared by its engine and client roots"
 version.workspace = true
 edition.workspace = true

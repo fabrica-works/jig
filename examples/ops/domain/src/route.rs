@@ -10,7 +10,7 @@ use jig_domain_core as core;
 use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_domain_tasks as tasks;
-use jig_ops_connectors::Connector;
+use jig_ops_domain_connectors::Connector;
 use jig_ops_domain_infrastructure as infrastructure;
 use jig_ops_domain_observability as observability;
 use skein_lib::{Decision, Env, List, Queue, ReplyTo, Token};
@@ -126,7 +126,7 @@ fn event_in(
                 sign_in,
                 key,
                 project,
-                connector: jig_ops_connectors::number(Connector::Infrastructure),
+                connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                 digest,
                 owner,
             }));
@@ -149,7 +149,7 @@ fn event_in(
             Released::Observability(event) => work.push(Work::Observability(event)),
             Released::Restart(step) => work.push(Work::Restart(core::RestartRequest::Step(step))),
             Released::Procedure { task, step: _, connector, code: _ } => {
-                match jig_ops_connectors::connector(connector) {
+                match jig_ops_domain_connectors::connector(connector) {
                     Some(Connector::Infrastructure) => {
                         work.push(Work::Infrastructure(infrastructure::Event::Procedure {
                             task,
@@ -169,7 +169,7 @@ fn event_in(
             };
             work.push(Work::Core(core::Event::EffectStart {
                 owner,
-                connector: jig_ops_connectors::number(Connector::Infrastructure),
+                connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                 origin,
             }));
         }
@@ -231,14 +231,17 @@ fn core_held(domain: &mut Domain, decision: &mut Decision<Write, Output>, value:
             held(decision, Output::Core(core::Held::WatchEnded { watcher, why }));
         }
         core::Held::Applied { to, connector, token } => {
-            assert!(connector == jig_ops_connectors::number(Connector::Infrastructure), "application request owner");
+            assert!(
+                connector == jig_ops_domain_connectors::number(Connector::Infrastructure),
+                "application request owner"
+            );
             let outcome = domain
                 .infrastructure
                 .application_outcome(token)
                 .expect("kept people token has its retained connector outcome");
             held(decision, Output::Application { to, outcome });
         }
-        core::Held::MakeEffect { connector, entry } => match jig_ops_connectors::connector(connector) {
+        core::Held::MakeEffect { connector, entry } => match jig_ops_domain_connectors::connector(connector) {
             Some(Connector::Infrastructure) => {
                 child(decision, Released::Infrastructure(infrastructure::Event::MakeEntry { entry }));
             }
@@ -373,7 +376,7 @@ fn core_ask(
             crate::client_documents::read(domain, env, decision, number, reply, scope, read, party, work);
         }
         core::Ask::Application { request, token, owner, person, project, role, retention } => {
-            assert!(number == jig_ops_connectors::number(Connector::Infrastructure), "application owner");
+            assert!(number == jig_ops_domain_connectors::number(Connector::Infrastructure), "application owner");
             work.push(Work::Infrastructure(infrastructure::Event::Application {
                 request,
                 token,
@@ -384,7 +387,7 @@ fn core_ask(
                 retention,
             }));
         }
-        core::Ask::DropApplication { owner } => match jig_ops_connectors::connector(number) {
+        core::Ask::DropApplication { owner } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Infrastructure(infrastructure::Event::ApplicationDrop { owner }));
             }
@@ -437,7 +440,7 @@ fn core_ask(
                 }
             };
             domain.procedures.insert(task, (step, number, code)).expect("core-selected procedure continuation");
-            match jig_ops_connectors::connector(number) {
+            match jig_ops_domain_connectors::connector(number) {
                 Some(Connector::Infrastructure) => {
                     match translate::procedure(code, &context.spec) {
                         Some(procedure) => {
@@ -524,7 +527,7 @@ fn core_ask(
                 None => {}
             }
         }
-        core::Ask::ClaimDone { task, attempt } => match jig_ops_connectors::connector(number) {
+        core::Ask::ClaimDone { task, attempt } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 child(
                     decision,
@@ -540,7 +543,7 @@ fn core_ask(
             }
             Some(Connector::Observability) | None => {}
         },
-        core::Ask::Close { task, .. } => match jig_ops_connectors::connector(number) {
+        core::Ask::Close { task, .. } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Infrastructure(infrastructure::Event::Close { task }));
             }
@@ -549,7 +552,7 @@ fn core_ask(
             }
             None => {}
         },
-        core::Ask::Release { task, .. } => match jig_ops_connectors::connector(number) {
+        core::Ask::Release { task, .. } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Infrastructure(infrastructure::Event::Release { task }));
             }
@@ -572,7 +575,7 @@ fn core_ask(
             }
         }
         core::Ask::SubscriptionDone { request, key, subscription } => {
-            match jig_ops_connectors::connector(number) {
+            match jig_ops_domain_connectors::connector(number) {
                 Some(Connector::Observability) => {
                     work.push(Work::Observability(observability::Event::LinkWatch { task: key.task, subscription }));
                 }
@@ -580,7 +583,7 @@ fn core_ask(
             }
             // The core broadcasts this completed task operation to every
             // connector. The permanent hub receives one assembled answer.
-            match jig_ops_connectors::connector(number) {
+            match jig_ops_domain_connectors::connector(number) {
                 Some(Connector::Infrastructure) => {
                     work.push(Work::Core(core::Event::NamedAnswer {
                         to: ReplyTo::new(request),
@@ -591,7 +594,7 @@ fn core_ask(
                 Some(Connector::Observability) | None => {}
             }
         }
-        core::Ask::UnsubscriptionDone { request, key } => match jig_ops_connectors::connector(number) {
+        core::Ask::UnsubscriptionDone { request, key } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Core(core::Event::NamedAnswer {
                     to: ReplyTo::new(request),
@@ -641,7 +644,7 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
         }
         core::connector::Ask::Keep { owner, entry, key, .. } => {
             domain.effect_procedures.remove(&owner);
-            match jig_ops_connectors::connector(number) {
+            match jig_ops_domain_connectors::connector(number) {
                 Some(Connector::Infrastructure) => {
                     work.push(Work::Infrastructure(infrastructure::Event::Keep {
                         token: owner,
@@ -679,7 +682,7 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
                 work.push(Work::Infrastructure(infrastructure::Event::Procedure { task, signal }));
             }
             domain.effects.remove(&owner);
-            match jig_ops_connectors::connector(number) {
+            match jig_ops_domain_connectors::connector(number) {
                 Some(Connector::Infrastructure) => {
                     work.push(Work::Infrastructure(infrastructure::Event::Drop { token: owner }));
                 }
@@ -721,13 +724,13 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
                 }))),
             }
         }
-        core::connector::Ask::ResolveUncertain { entry, again } => match jig_ops_connectors::connector(number) {
+        core::connector::Ask::ResolveUncertain { entry, again } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Infrastructure(infrastructure::Event::ResolveEntry { entry, repeat: again }));
             }
             Some(Connector::Observability) | None => {}
         },
-        core::connector::Ask::Make { entry } => match jig_ops_connectors::connector(number) {
+        core::connector::Ask::Make { entry } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Infrastructure(infrastructure::Event::MakeEntry { entry }));
             }
@@ -736,7 +739,7 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
             }
             None => {}
         },
-        core::connector::Ask::ReadAfresh => match jig_ops_connectors::connector(number) {
+        core::connector::Ask::ReadAfresh => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Infrastructure(infrastructure::Event::ReadAfresh));
             }
@@ -745,7 +748,7 @@ fn effect_ask(domain: &mut Domain, env: &Env<Limits>, number: u16, ask: core::co
             }
             None => {}
         },
-        core::connector::Ask::SettleOutbox => match jig_ops_connectors::connector(number) {
+        core::connector::Ask::SettleOutbox => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 work.push(Work::Infrastructure(infrastructure::Event::Restart));
             }
@@ -800,7 +803,7 @@ pub(crate) fn infrastructure_out(
                     domain,
                     env,
                     decision,
-                    jig_ops_connectors::number(Connector::Infrastructure),
+                    jig_ops_domain_connectors::number(Connector::Infrastructure),
                     watcher,
                     subject,
                     document,
@@ -812,7 +815,7 @@ pub(crate) fn infrastructure_out(
             }
             infrastructure::Request::Marked { subjects } => {
                 work.push(Work::Core(core::Event::Marked {
-                    connector: jig_ops_connectors::number(Connector::Infrastructure),
+                    connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                     subjects,
                 }));
             }
@@ -828,7 +831,7 @@ pub(crate) fn infrastructure_out(
             infrastructure::Request::Closed { task } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Closed {
                     task,
-                    connector: jig_ops_connectors::number(Connector::Infrastructure),
+                    connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                 })));
             }
             infrastructure::Request::Released { task } => {
@@ -843,7 +846,7 @@ pub(crate) fn infrastructure_out(
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Described {
                     owner: token,
                     description: Box::new(translate::infrastructure_description(
-                        jig_ops_connectors::number(Connector::Infrastructure),
+                        jig_ops_domain_connectors::number(Connector::Infrastructure),
                         description,
                     )),
                 })));
@@ -858,7 +861,7 @@ pub(crate) fn infrastructure_out(
             }
             infrastructure::Request::Outcome { entry, key, outcome } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Outbox {
-                    connector: jig_ops_connectors::number(Connector::Infrastructure),
+                    connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                     entry,
                     task: key.task,
                     outcome: translate::infrastructure_outcome(outcome),
@@ -928,7 +931,7 @@ pub(crate) fn infrastructure_out(
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Drift {
                     task,
                     resource: tasks::Name {
-                        connector: jig_ops_connectors::number(Connector::Infrastructure),
+                        connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                         path: resource.segments(),
                     },
                 })));
@@ -936,7 +939,7 @@ pub(crate) fn infrastructure_out(
             infrastructure::Request::Slots { pool, quota, used: _ } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::PoolSlots {
                     name: tasks::Name {
-                        connector: jig_ops_connectors::number(Connector::Infrastructure),
+                        connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                         path: infrastructure::Resource::Pool(pool).segments(),
                     },
                     slots: quota,
@@ -961,7 +964,7 @@ pub(crate) fn infrastructure_out(
                         project,
                         role: translate::resource_role(named.role),
                         name: tasks::Name {
-                            connector: jig_ops_connectors::number(Connector::Infrastructure),
+                            connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                             path: named.resource.segments(),
                         },
                         hold,
@@ -971,10 +974,10 @@ pub(crate) fn infrastructure_out(
             infrastructure::Request::Restarted { stage } => {
                 let step = match stage {
                     infrastructure::RestartStage::ReadAfresh => core::RestartStep::ReadAfresh {
-                        connector: jig_ops_connectors::number(Connector::Infrastructure),
+                        connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                     },
                     infrastructure::RestartStage::Outbox => core::RestartStep::SettleOutbox {
-                        connector: jig_ops_connectors::number(Connector::Infrastructure),
+                        connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                     },
                 };
                 let request = domain.core.restart_done(step);
@@ -1005,7 +1008,7 @@ pub(crate) fn observability_out(
                     domain,
                     env,
                     decision,
-                    jig_ops_connectors::number(Connector::Observability),
+                    jig_ops_domain_connectors::number(Connector::Observability),
                     watcher,
                     subject,
                     document,
@@ -1017,14 +1020,14 @@ pub(crate) fn observability_out(
             }
             observability::Request::Marked { subjects } => {
                 work.push(Work::Core(core::Event::Marked {
-                    connector: jig_ops_connectors::number(Connector::Observability),
+                    connector: jig_ops_domain_connectors::number(Connector::Observability),
                     subjects,
                 }));
             }
             observability::Request::Closed { task } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Closed {
                     task,
-                    connector: jig_ops_connectors::number(Connector::Observability),
+                    connector: jig_ops_domain_connectors::number(Connector::Observability),
                 })));
             }
             observability::Request::Released { task } => {
@@ -1065,7 +1068,7 @@ pub(crate) fn observability_out(
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Described {
                     owner: token,
                     description: Box::new(translate::observability_description(
-                        jig_ops_connectors::number(Connector::Observability),
+                        jig_ops_domain_connectors::number(Connector::Observability),
                         effect,
                     )),
                 })));
@@ -1084,7 +1087,7 @@ pub(crate) fn observability_out(
             }
             observability::Request::Outcome { entry, key, outcome } => {
                 work.push(Work::Core(core::Event::EffectConnector(core::connector::Event::Outbox {
-                    connector: jig_ops_connectors::number(Connector::Observability),
+                    connector: jig_ops_domain_connectors::number(Connector::Observability),
                     entry,
                     task: key.task,
                     outcome: translate::observability_outcome(outcome),
@@ -1125,7 +1128,7 @@ pub(crate) fn observability_out(
                     subscription: tasks::Subscription {
                         number: subscription,
                         kind: tasks::SubscriptionKind::Topic {
-                            connector: jig_ops_connectors::number(Connector::Observability),
+                            connector: jig_ops_domain_connectors::number(Connector::Observability),
                             topic,
                         },
                     },
@@ -1174,10 +1177,10 @@ pub(crate) fn observability_out(
             observability::Request::Restarted { stage } => {
                 let step = match stage {
                     observability::RestartStage::ReadAfresh => core::RestartStep::ReadAfresh {
-                        connector: jig_ops_connectors::number(Connector::Observability),
+                        connector: jig_ops_domain_connectors::number(Connector::Observability),
                     },
                     observability::RestartStage::Outbox => core::RestartStep::SettleOutbox {
-                        connector: jig_ops_connectors::number(Connector::Observability),
+                        connector: jig_ops_domain_connectors::number(Connector::Observability),
                     },
                 };
                 let request = domain.core.restart_done(step);
@@ -1337,7 +1340,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 None => None,
             };
             if let Some(number) = connector {
-                match jig_ops_connectors::connector(number) {
+                match jig_ops_domain_connectors::connector(number) {
                     Some(Connector::Observability) => {
                         work.push(Work::Observability(observability::Event::ProcedureDelegateOutcome {
                             task,

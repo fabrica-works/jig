@@ -325,33 +325,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jig-ops-client-domain"
-version = "0.0.0"
-dependencies = [
- "jig-domain-client",
- "jig-ops-connectors",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-ops-client-view"
-version = "0.0.0"
-dependencies = [
- "jig-domain-client",
- "jig-ops-client-domain",
- "jig-ops-connectors",
- "jig-view",
- "skein-lib",
-]
-
-[[package]]
-name = "jig-ops-connectors"
-version = "0.0.0"
-dependencies = [
- "skein-lib",
-]
-
-[[package]]
 name = "jig-ops-domain"
 version = "0.0.0"
 dependencies = [
@@ -366,7 +339,7 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-domain-views",
- "jig-ops-connectors",
+ "jig-ops-domain-connectors",
  "jig-ops-domain-infrastructure",
  "jig-ops-domain-observability",
  "jig-ops-world",
@@ -374,6 +347,22 @@ dependencies = [
  "skein-json",
  "skein-lib",
  "smith-charter",
+]
+
+[[package]]
+name = "jig-ops-domain-client"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "jig-ops-domain-connectors",
+ "skein-lib",
+]
+
+[[package]]
+name = "jig-ops-domain-connectors"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
 ]
 
 [[package]]
@@ -395,6 +384,17 @@ name = "jig-ops-fake-production"
 version = "0.0.0"
 
 [[package]]
+name = "jig-ops-view"
+version = "0.0.0"
+dependencies = [
+ "jig-domain-client",
+ "jig-ops-domain-client",
+ "jig-ops-domain-connectors",
+ "jig-view",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-ops-world"
 version = "0.0.0"
 dependencies = [
@@ -413,13 +413,13 @@ dependencies = [
  "jig-domain-views",
  "jig-fake-person",
  "jig-fake-store",
- "jig-ops-client-domain",
- "jig-ops-client-view",
- "jig-ops-connectors",
  "jig-ops-domain",
+ "jig-ops-domain-client",
+ "jig-ops-domain-connectors",
  "jig-ops-domain-infrastructure",
  "jig-ops-domain-observability",
  "jig-ops-fake-production",
+ "jig-ops-view",
  "jig-protocol-charter",
  "jig-protocol-transcript",
  "jig-scripted-engine",
