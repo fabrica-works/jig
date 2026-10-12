@@ -901,6 +901,16 @@ the file.
      both fixes to jig. jig 30.1 marks its large variants `boxed`
      (`Fact.owner_chip_details`, `Ask.amend`), as the README's rule says,
      and lands after jig-repin.s2.
+156. **A field several kinds share takes the largest bound** (2026-10-12,
+     the coordinator's block "jig 14.4: shared Word bytes ceiling under
+     ruling 154", 2026-10-12T21:29:56Z). `Word.words` holds an ordinary
+     message's words (bounded by `message_bytes`), a result's payload
+     (`result_bytes`) and a notice's or news' (the larger of the two):
+     `crates/jig-domain-tasks/src/stored.rs:494-510`. As ruling 135 has
+     for the people family ("a field `Policy` and an ask share takes the
+     larger"), its ceiling is `max(message_bytes, result_bytes)`; a field
+     one kind owns keeps its own bound (`ActivityWords.words`,
+     `message_bytes`). The README's rule now says so.
 
 ## For the user
 

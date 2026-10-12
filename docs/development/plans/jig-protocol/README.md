@@ -283,7 +283,8 @@ ones before it in its session. Dependencies are by capability: "skein
   (decisions.md, rulings 135 and 154). In jig 14, 19 and 30, a codec's
   `limits` maps the domain's limits to the generated `Limits`, each
   field's ceiling the domain limit that bounds it (a sum where only a sum
-  does); its translations check no sum. No family adds a wrapper
+  does; the largest of their bounds where several kinds of value share the
+  field, ruling 156); its translations check no sum. No family adds a wrapper
   `Limits` type; the domain checks its sums at admission and restore.
 
 ## Live services
