@@ -805,6 +805,27 @@ the file.
      button; the client's own fuzzy tests keep it. The 14-line re-sign-in
      helper is dropped. At most 20 lines under ruling 114; seeds, names
      and expected values kept.
+149. **jig 30's ceilings follow jig 14's rule; `Owned` stays unversioned**
+     (2026-10-12, the coordinator's block "jig 30.1: field ceilings and
+     envelope version proof", 2026-10-12T21:08:10Z). Two plan defects.
+     First, 30.1 took each ceiling from "`jig_domain_client::Limits`'
+     largest profile value", but no client profile exists before jig 20,
+     and its fallback of 65536 for every unbounded field makes a `list`
+     of `bytes` pass a `u32` worst case (4 + 65536 × 65540), which
+     skein's `codec.md`, 4 refuses. 30.1 now applies jig 14's Choice
+     ("each `bytes N` or `list N` takes the domain limit that bounds it
+     ..., with a ceiling at least the worlds' fixtures' value and as large
+     as keeps each type's worst case within a `u32`"): the largest value
+     any `Limits` literal on `main` gives the bounding field; unbounded,
+     `bytes`/`text` 65536 and `list` 256, halved together within a record
+     until it fits. Second, its test
+     `an_owned_record_of_another_family_version_is_refused` contradicts
+     the sketch's unversioned `Owned { owner, version: u32, record }`:
+     client.md, 9 has "an exchange names the version of each owner's
+     record it carries", and the range the engine serves is checked by
+     jig 31 and 32, not by generated code. So the envelopes stay as
+     sketched, and the test becomes
+     `an_owned_record_keeps_its_owners_version`.
 
 ## For the user
 

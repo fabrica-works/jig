@@ -149,13 +149,18 @@ interface sketch below. Each ask's record mirrors its contract variant
 field by field, in the contract's field order; a contract `Text` is
 `text N` when the contract bounds it by `Limits::text`, `bytes N`
 otherwise; a contract `List<T>` is `list N T`; an `Option<T>` is
-`option T`. N is each field's ceiling from `jig_domain_client::Limits`'
-largest profile value; where the contract has no bound, 65536.
+`option T`. Ceilings (ruling 149): a field a `jig_domain_client::Limits`
+field bounds takes at least the largest value any `Limits` literal on
+`main` gives it (`git grep -n '<field>:' -- testing tests
+crates/jig-domain-client`), with a schema comment naming that field; a
+field no `Limits` field bounds takes `bytes`/`text` 65536 and `list` 256;
+within a record whose worst case passes a `u32`, those unbounded
+ceilings halve together until it fits. jig 20's profiles must fit them.
 Test shape: step tests in `src/tests.rs`, fixtures in
 `src/tests/fixtures.rs` (`limits()`, `bytes(n)`, `ceiling_text(n)`, `start_chat()`,
 `refused_moved()`: the contract's values written as records). Tests:
 `a_keyed_request_past_its_bound_is_refused_naming_it`,
-`an_owned_record_of_another_family_version_is_refused`,
+`an_owned_record_keeps_its_owners_version` (owner version `u32::MAX`, ruling 149),
 `a_refusal_with_its_facts_round_trips_unchanged`,
 `each_answer_kind_round_trips_unchanged`,
 `a_bearer_token_past_its_bound_is_refused`. Drift (world,
