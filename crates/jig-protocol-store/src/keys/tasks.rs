@@ -1,0 +1,103 @@
+//! Task and funding addresses (protocol/store.md, section 4.1).
+use jig_domain_tasks::{Funder, Key};
+use skein_kv::{KeyReader, KeyWriter};
+pub(super) fn write(writer: &mut KeyWriter, key: &Key) {
+    match key {
+        Key::Live(task) => {
+            writer.tag(0);
+            writer.u64(*task);
+        }
+        Key::Stub(task) => {
+            writer.tag(1);
+            writer.u64(*task);
+        }
+        Key::Ledger(value) => {
+            writer.tag(2);
+            funder(writer, value);
+        }
+        Key::Writer(slot) => {
+            writer.tag(3);
+            writer.u64(*slot);
+        }
+        Key::Pool(slot) => {
+            writer.tag(4);
+            writer.u64(*slot);
+        }
+        Key::PersonProposal(proposal) => {
+            writer.tag(5);
+            writer.u64(*proposal);
+        }
+        Key::Ended(task) => {
+            writer.tag(6);
+            writer.u64(*task);
+        }
+        Key::History { task, revision } => {
+            writer.tag(7);
+            writer.u64(*task);
+            writer.u64(*revision);
+        }
+        Key::Milestone { task, position } => {
+            writer.tag(8);
+            writer.u64(*task);
+            writer.u64(*position);
+        }
+        Key::Activity { task, position } => {
+            writer.tag(9);
+            writer.u64(*task);
+            writer.u64(*position);
+        }
+    }
+}
+pub(super) fn read(reader: &mut KeyReader<'_>) -> Option<Key> {
+    Some(match reader.tag()? {
+        0 => Key::Live(reader.u64()?),
+        1 => Key::Stub(reader.u64()?),
+        2 => Key::Ledger(read_funder(reader)?),
+        3 => Key::Writer(reader.u64()?),
+        4 => Key::Pool(reader.u64()?),
+        5 => Key::PersonProposal(reader.u64()?),
+        6 => Key::Ended(reader.u64()?),
+        7 => Key::History { task: reader.u64()?, revision: reader.u64()? },
+        8 => Key::Milestone { task: reader.u64()?, position: reader.u64()? },
+        9 => Key::Activity { task: reader.u64()?, position: reader.u64()? },
+        _ => return None,
+    })
+}
+fn funder(writer: &mut KeyWriter, key: &Funder) {
+    match key {
+        Funder::Task(task) => {
+            writer.tag(0);
+            writer.u64(*task);
+        }
+        Funder::Pool { project, person, period } => {
+            writer.tag(1);
+            writer.u64(u64::from(*project));
+            writer.u64(*person);
+            writer.u64(*period);
+        }
+        Funder::Recurring { project, task, period } => {
+            writer.tag(2);
+            writer.u64(u64::from(*project));
+            writer.u64(*task);
+            writer.u64(*period);
+        }
+        Funder::Period { project, period } => {
+            writer.tag(3);
+            writer.u64(u64::from(*project));
+            writer.u64(*period);
+        }
+    }
+}
+fn read_funder(reader: &mut KeyReader<'_>) -> Option<Funder> {
+    Some(match reader.tag()? {
+        0 => Funder::Task(reader.u64()?),
+        1 => Funder::Pool { project: u32::try_from(reader.u64()?).ok()?, person: reader.u64()?, period: reader.u64()? },
+        2 => Funder::Recurring {
+            project: u32::try_from(reader.u64()?).ok()?,
+            task: reader.u64()?,
+            period: reader.u64()?,
+        },
+        3 => Funder::Period { project: u32::try_from(reader.u64()?).ok()?, period: reader.u64()? },
+        _ => return None,
+    })
+}

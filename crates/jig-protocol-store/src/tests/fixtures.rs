@@ -1,5 +1,6 @@
 //! Shared keys favor number boundaries and common prefixes (protocol/store.md, 4.1).
 use crate::keys::Own;
+use alloc::boxed::Box;
 use jig_domain_core::{self as core, CoreKey, ProjectionKey};
 use jig_domain_people::{self as people, Proposer};
 use skein_lib::Rng;
@@ -81,8 +82,91 @@ pub fn people_key(rng: &mut Rng) -> people::Key {
     }
 }
 pub fn key(rng: &mut Rng) -> core::Key {
-    match rng.below(2) {
+    match rng.below(4) {
         0 => core::Key::Core(core_key(rng)),
-        _ => core::Key::People(people_key(rng)),
+        1 => core::Key::Tasks(tasks_key(rng)),
+        2 => core::Key::People(people_key(rng)),
+        _ => core::Key::Notes(notes_key(rng)),
+    }
+}
+
+pub fn funder(rng: &mut Rng) -> jig_domain_tasks::Funder {
+    use jig_domain_tasks::Funder;
+    match rng.below(4) {
+        0 => Funder::Task(number(rng)),
+        1 => Funder::Pool { project: narrow(rng), person: number(rng), period: number(rng) },
+        2 => Funder::Recurring { project: narrow(rng), task: number(rng), period: number(rng) },
+        _ => Funder::Period { project: narrow(rng), period: number(rng) },
+    }
+}
+pub fn tasks_key(rng: &mut Rng) -> jig_domain_tasks::Key {
+    use jig_domain_tasks::Key;
+    match rng.below(10) {
+        0 => Key::Live(number(rng)),
+        1 => Key::Stub(number(rng)),
+        2 => Key::Ledger(funder(rng)),
+        3 => Key::Writer(number(rng)),
+        4 => Key::Pool(number(rng)),
+        5 => Key::PersonProposal(number(rng)),
+        6 => Key::Ended(number(rng)),
+        7 => Key::History { task: number(rng), revision: number(rng) },
+        8 => Key::Milestone { task: number(rng), position: number(rng) },
+        _ => Key::Activity { task: number(rng), position: number(rng) },
+    }
+}
+pub fn segment(rng: &mut Rng) -> Box<[u8]> {
+    match rng.below(5) {
+        0 => Box::new([]),
+        1 => Box::new([0]),
+        2 => Box::new([0, 0]),
+        3 => Box::new([0, 255]),
+        _ => Box::new([1]),
+    }
+}
+pub fn pattern(rng: &mut Rng) -> jig_domain_notes::Pattern {
+    use jig_domain_notes::Last;
+    let mut segments = skein_lib::List::with_capacity(3);
+    for _ in 0..rng.below(4) {
+        segments.push(segment(rng)).expect("at most three segments");
+    }
+    let last = match rng.below(2) {
+        0 => Last::Exact(segment(rng)),
+        _ => Last::Open(segment(rng)),
+    };
+    jig_domain_notes::Pattern { segments: segments.into_boxed(), last }
+}
+pub fn notes_key(rng: &mut Rng) -> jig_domain_notes::Key {
+    use jig_domain_notes::{Key, Scope};
+    match rng.below(2) {
+        0 => Key::Entry { name: number(rng) },
+        _ => Key::Line {
+            scope: match rng.below(4) {
+                0 => Scope::Deployment,
+                1 => Scope::Project { project: narrow(rng) },
+                2 => Scope::Goal { project: narrow(rng), goal: number(rng) },
+                _ => Scope::Resources {
+                    project: narrow(rng),
+                    connector: match rng.below(4) {
+                        0 => 0,
+                        1 => 1,
+                        2 => 2,
+                        _ => u16::MAX,
+                    },
+                    pattern: pattern(rng),
+                },
+            },
+            name: number(rng),
+        },
+    }
+}
+pub fn pattern_key(segments: Box<[Box<[u8]>]>) -> jig_domain_notes::Key {
+    use jig_domain_notes::{Key, Last, Pattern, Scope};
+    Key::Line {
+        scope: Scope::Resources {
+            project: 1,
+            connector: 1,
+            pattern: Pattern { segments, last: Last::Exact(Box::new([])) },
+        },
+        name: 1,
     }
 }
