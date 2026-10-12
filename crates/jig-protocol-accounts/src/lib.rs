@@ -5,5 +5,4 @@ pub mod table;
 #[cfg(test)]
 mod tests;
 pub mod translate;
-/// The provider account id bound inside smith's grant envelope.
-pub const ACCOUNT_ID_BYTES: u32 = 256;
+pub use table::ACCOUNT_ID_BYTES;

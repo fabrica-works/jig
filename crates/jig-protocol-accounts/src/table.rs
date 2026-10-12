@@ -1,12 +1,19 @@
 //! The two newest lent generations per account (protocol/llm.md, 5.3).
-//! Routing supplies smith's envelope: an account id and its access token.
-use crate::ACCOUNT_ID_BYTES;
+//! Routing supplies the token and provider account id as separate secrets.
 use skein_lib::{List, Secret, Time};
 
+/// The provider account id bound; empty when the provider names none.
+pub const ACCOUNT_ID_BYTES: u32 = 256;
+/// A grant's two secret parts, put in its taker's form only when handed over.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Value {
+    pub token: Secret,
+    pub account_id: Secret,
+}
 #[derive(Debug)]
 pub struct Table {
     accounts: List<Generations>,
-    value_bytes: u64,
+    token_bytes: u32,
 }
 #[derive(Debug)]
 struct Generations {
@@ -16,7 +23,7 @@ struct Generations {
 #[derive(Debug)]
 struct Entry {
     generation: u64,
-    value: Secret,
+    value: Value,
     expires: Time,
 }
 /// An account or value beyond the configured bounds.
@@ -30,10 +37,12 @@ impl Table {
         for _account in 0..accounts {
             slots.push(Generations { newest: None, older: None }).expect("one slot per configured account");
         }
-        Table { accounts: slots, value_bytes: value_bytes(token_bytes) }
+        Table { accounts: slots, token_bytes }
     }
-    pub fn granted(&mut self, account: u32, generation: u64, value: Secret, expires: Time) -> Result<(), Unfit> {
-        if u64::try_from(value.len()).expect("a value's length fits u64") > self.value_bytes {
+    pub fn granted(&mut self, account: u32, generation: u64, value: Value, expires: Time) -> Result<(), Unfit> {
+        if value.token.len() > usize::try_from(self.token_bytes).expect("u32 fits usize")
+            || value.account_id.len() > usize::try_from(ACCOUNT_ID_BYTES).expect("u32 fits usize")
+        {
             return Err(Unfit);
         }
         let Some(slots) = self.accounts.get_mut(account) else { return Err(Unfit) };
@@ -52,7 +61,7 @@ impl Table {
         Ok(())
     }
     #[must_use]
-    pub fn value(&self, account: u32, generation: u64, now: Time) -> Option<&Secret> {
+    pub fn value(&self, account: u32, generation: u64, now: Time) -> Option<&Value> {
         let slots = self.accounts.get(account)?;
         for entry in [&slots.newest, &slots.older].into_iter().flatten() {
             if entry.generation == generation && now < entry.expires {
@@ -92,19 +101,16 @@ fn expire(slot: &mut Option<Entry>, now: Time) {
         *slot = None;
     }
 }
-fn value_bytes(token_bytes: u32) -> u64 {
-    u64::from(token_bytes)
-        .checked_add(u64::from(ACCOUNT_ID_BYTES))
-        .expect("u32 bounds fit u64")
-        .checked_add(2)
-        .expect("envelope header fits u64")
-}
-/// The fixed slots and both bounded envelope allocations per account.
+/// The fixed slots and both bounded parts of two generations per account.
 #[must_use]
 pub fn worst_case(accounts: u32, token_bytes: u32) -> Option<u64> {
     if accounts == 0 || token_bytes == 0 {
         return None;
     }
-    List::<Generations>::worst_case(accounts)?
-        .checked_add(value_bytes(token_bytes).checked_mul(2)?.checked_mul(u64::from(accounts))?)
+    List::<Generations>::worst_case(accounts)?.checked_add(
+        u64::from(token_bytes)
+            .checked_add(u64::from(ACCOUNT_ID_BYTES))?
+            .checked_mul(2)?
+            .checked_mul(u64::from(accounts))?,
+    )
 }
