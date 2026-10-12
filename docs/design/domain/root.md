@@ -1,6 +1,6 @@
 # The application's root
 
-Provisional, 2026-10-07, revised 2026-10-10. What an application's
+Provisional, 2026-10-07, revised 2026-10-12. What an application's
 engine root is and does: the top-level domain every application on jig
 writes, which composes jig's core with the application's connectors and
 its own child domains. It says what the root carries, the one shape
@@ -14,8 +14,9 @@ are connectors.md. What is still open is listed in section 14.
 - **The application owns the root.** skein's model nests step machines,
   and the top one is always the application's (programming-model.md,
   4.5). The root composes the core, the application's connectors, jig's
-  host and the inline agent if it runs agents in the engine, and its own
-  child domains. It alone faces the application's protocol layer.
+  host and smith's `smith-inline-agent` if it runs agents in the engine,
+  and its own child domains. It alone faces the application's protocol
+  layer.
 - **The root routes and translates; it never decides or orders.**
   Everything that makes jig's promises true (what commits together, what
   waits for a commit, the order of a restart, the check on every effect)
@@ -51,7 +52,7 @@ are connectors.md. What is still open is listed in section 14.
 ├── core                    jig's core (engine.md)
 ├── <connector>…            the application's connectors (connectors.md)
 ├── jig-host                jig's hub, for runs on the engine's slots, if the application runs agents there (hosts.md)
-├── jig-inline-agent        the hub's agent in the engine: smith's domains in this process (hosts.md, 5.2)
+├── smith-inline-agent      the hub's agent in the engine, smith's: its domains in this process (hosts.md, 5.2)
 └── …                       the application's own child domains
 ```
 
@@ -60,9 +61,11 @@ are connectors.md. What is still open is listed in section 14.
   to resume). It has no records of its own in the store.
 - **Its vocabulary** is what crosses the domain boundary: the store's
   commits and loads, the workers' channel, the clients' requests, each
-  connector's protocol, the LLM accounts' driver, timers. It is the union
-  of its children's, wrapped: an exhaustive enum per direction, with one
-  variant per child.
+  connector's protocol, the LLM accounts' driver, timers; and, when it
+  runs agents in the engine, `smith-inline-agent`'s LLM requests and
+  their terminals, and smith's payloads it hands out to be decoded or
+  encoded (section 5). It is the union of its children's, wrapped: an
+  exhaustive enum per direction, with one variant per child.
 - **Its children are siblings,** sharing no types (programming-model.md,
   4.5). The core knows each connector by a number the root gives it in
   configuration; each connector knows nothing of the core.
@@ -164,10 +167,25 @@ It inspects nothing it holds. What jig asks of it:
 - **To the hub inside the engine:** the core's assignments, relays and
   cancels for runs placed on the engine's own slots go to the hub, and
   what it says goes back to the core as a worker's would (hosts.md,
-  6.1). Between the hub and the inline agent, the root translates as a
-  worker's root does between its hub and smith's host domain, with the
-  same functions; the inline agent's LLM completions go to the protocol
-  layer, and their answers back to it (hosts.md, 5.2).
+  6.1).
+- **Between the hub and its agent capability:** `smith-inline-agent`, in
+  the engine. The root translates between them as a worker's root does
+  between its hub and either of smith's agent capabilities, with the
+  same functions, since both kinds speak smith's parent face (hosts.md,
+  sections 4 and 5).
+- **Below the inline agent:** its LLM completions go to the protocol
+  layer, which runs them on smith's LLM component, keeping each slot's
+  result contract beside it, and their terminals come back to the run
+  that asked (`../protocol/llm.md`, section 3; hosts.md, 5.2). They pass
+  through neither the hub nor the core. The root drains the inline
+  agent's facts and content (smith's `domain/host.md`, 9.1), and a run's
+  text comes from smith's LLM component in the protocol layer
+  (`../protocol/llm.md`, section 3); both reach the hub as text and
+  activity (hosts.md, 6.5).
+- **smith's payloads, by hand-out:** as the root routes one between the
+  hub and `smith-inline-agent`, it hands it out to the protocol layer to
+  be decoded or encoded, as a host tool's call is, and routes on what
+  comes back; it never encodes or decodes one itself (hosts.md, 6.8).
 - **Nothing is routed by content** beyond the variant: which child an
   event is for is in its type.
 
@@ -179,6 +197,10 @@ It inspects nothing it holds. What jig asks of it:
 - **The core's connector vocabulary** (engine.md, 4.1) is translated to
   each connector's own and back: a connector's number, its resources'
   names as paths, its effect descriptions, its verdicts, its news.
+- **The hub's agent vocabulary** is translated to smith's parent face and
+  back, with the same functions whichever of smith's agent capabilities
+  the root composes, smith's payloads among it by hand-out (section 5;
+  hosts.md, section 4).
 - **The store's vocabulary.** The root's `Key`, `Record`, `Write` and
   `Range` wrap the core's and each connector's: one variant per child.
   Its keys order first by child, then by the child's own order, so a
@@ -195,11 +217,11 @@ own (core.md, section 5). The root puts each together in the step it is
 decided:
 
 - **An assignment:** the core's part (the run, its attempt, its charter,
-  its core sections, its transcript, its calls) names the connectors'
-  sections and workspace items by token; the root asks each connector to
-  hand over what it keeps under those tokens, and wraps the whole in the
-  application's assignment, which the journal holds until the claim
-  commits.
+  its core sections, its transcript's current window, its calls, the
+  start's messages) names the connectors' sections and workspace items
+  by token; the root asks each connector to hand over what it keeps
+  under those tokens, and wraps the whole in the application's
+  assignment, which the journal holds until the claim commits.
 - **A call's answer:** the core's part (status, the effect's key, why it
   was refused) and, for an effect made, the connector's part (what it
   made), kept under the call's key; the root asks again when the call is

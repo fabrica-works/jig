@@ -1,14 +1,15 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07, revised 2026-10-10. Where an application's
+Provisional, 2026-10-07, revised 2026-10-12. Where an application's
 agents run, and what hosts them: the contract between the core and a
 host, the three shapes an application may take, the agent as a
-capability of two kinds, jig's one host for runs wherever their agents
-run, the application's workspaces, and how a run's charter, tools,
-contract and delivery become smith's. The agent is smith, whose design
-is its own (smith's `docs/design/domain/`, cited as smith's `run.md`,
-`session.md`, `tools.md`, `host.md`). The core's side of runs is
-engine.md, sections 7 and 8. What is still open is listed in section 12.
+capability of two kinds, both smith's, jig's one host for runs wherever
+their agents run, smith's payloads it carries, the application's
+workspaces, and how a run's charter, tools, contract, messages and
+delivery become smith's. The agent is smith, whose design is its own
+(smith's `docs/design/`, cited by path: smith's `domain/run.md`, smith's
+`protocol/channel.md`). The core's side of runs is engine.md, sections 7
+and 8. What is still open is listed in section 12.
 
 ## 1. In one page
 
@@ -19,7 +20,7 @@ engine.md, sections 7 and 8. What is still open is listed in section 12.
   host starts a run with an assignment, relays messages and calls, keeps
   turns and the answer until the core acknowledges them, and hears how
   the run ends. smith's host contract carries the same (smith's
-  `host.md`).
+  `domain/host.md`, section 2).
 - **Three shapes** (section 3): no agents; agents inside the engine;
   agents on workers. An application may mix the last two, a charter
   saying which hosts may run it.
@@ -30,11 +31,12 @@ engine.md, sections 7 and 8. What is still open is listed in section 12.
   acknowledged, cancel) and nothing of how the agent runs, where its
   workspace is, or how it reaches the core. Those are its root's and its
   capabilities'.
-- **The agent is a capability of two kinds** (section 5): smith's host
-  domain, one process per run, on a worker; and the inline agent, smith's
-  domains in this process (smith's `host.md`, section 9), in the engine.
-  Both hand the hub the same calls, turns, waits, notices and answer, in
-  the same order, and their failures typed.
+- **The agent is a capability of two kinds, both smith's** (section 5):
+  agent processes, `smith-host-domain`, one process per run; and
+  `smith-inline-agent`, smith's domains in the host's own process. Both
+  speak smith's parent face. The engine's hub has `smith-inline-agent`; a
+  worker's has agent processes, or `smith-inline-agent` by its root's
+  choice. jig ships no agent of its own.
 - **The link to the core is the root's:** over a channel the worker
   dials, through its protocol layer; or, in the engine, straight into the
   core's fleet, linked from construction and lost only with the engine.
@@ -43,11 +45,18 @@ engine.md, sections 7 and 8. What is still open is listed in section 12.
   delivers what a run hands over, and says what the run left. jig defines
   the vocabulary; temper's git checkouts are one workspace. The engine
   has none, by policy: it runs no commands for its agents.
-- **The core never depends on smith.** It keeps turns as bytes and its
-  charter in its own terms. One translation of jig's puts them into
-  smith's, for workers and the engine alike (section 8). Only the hosts'
-  agent capabilities, that translation, and a client's decoding of turns
-  (`../client/domain/client.md`, section 10) link smith.
+- **Neither the core nor the hub depends on smith** (6.8). The core
+  keeps turns as bytes and its charter in its own terms, which
+  `jig-charter` puts into smith's (section 8); the hub carries smith's
+  payloads as bytes, which its root hands out to its protocol layer to be
+  decoded for the agent, or encoded from it.
+- **Every message ends once** (section 9): read, refused or unread. The
+  start carries the messages waiting in the task's inbox; a refusal
+  travels inside the run's next turn, or its answer; a message the run
+  refused or left unread stays in the inbox and wakes its task again.
+- **A run's text comes from a host that has it** (6.5): every host tells
+  a run's activity, without content; only one whose agent runs in its own
+  process tells a run's text and the calls it makes.
 - **Committed turns survive.** Turns and answers are kept until the core
   acknowledges them, once committed, and sent again after every hello.
   What a host loses before it was committed (its turns, when a worker
@@ -61,9 +70,10 @@ Between the core's fleet and a host, whatever its shape:
 
 - **Down, from the core:**
   - an **assignment:** the run and its attempt; the workspace's items and
-    its workstream key; the charter; the transcript and the calls
-    committed since its last turn, when it resumes; credential grants
-    (engine.md, 7.1);
+    its workstream key; the charter; when it resumes, the transcript's
+    current window and the calls committed since its last turn (6.4);
+    the start's messages (section 9); the run's identity; credential
+    grants (engine.md, 7.1);
   - **messages** for the run, named, in order (tasks.md, 8.2);
   - **answers** to the run's relayed calls;
   - **grants** refreshed while the run lives;
@@ -72,17 +82,26 @@ Between the core's fleet and a host, whatever its shape:
 - **Up, from the host:**
   - a **hello:** the host's slots, how long it may take to stop a run it
     lost contact for, the workstreams it holds, the runs it hosts and
-    those whose turns or answers wait for acknowledgement;
-  - **turns,** numbered within their attempt, each with its spend and the
-    last message it read;
+    those whose turns or answers wait for acknowledgement; and its
+    agent's bounds, by which the fleet admits it (engine.md, section 8):
+    the limits a run's start must meet (smith's `protocol/limits.md`):
+    each model's window and output; the most turns, spend, time and
+    waiting a run may have; its checks' timeout; the largest message a run takes, and
+    how many its inbox holds; and how many turns it keeps
+    unacknowledged;
+  - **turns,** numbered within their attempt, each with its spend, the
+    last message it read, whether it opens a window, and the messages
+    refused since the run's previous turn, each by name with smith's
+    reason (6.4);
   - **calls,** named by the run, each answered once;
-  - **facts,** best effort: progress, streaming text, tool calls as they
-    happen; a run's text names the turn it belongs to, its completion's
-    retry, and the offset of its first byte within that retry's text
-    (6.5);
+  - **facts,** best effort: the run's activity, and, from a host that
+    has them, a run's text, named by its turn, retry and offset, and a
+    tool begun with its call (6.5);
   - one **answer:** finished with its result, parked, or failed with a
-    typed failure; with the turns it took, what it spent, what it left on
-    resources (the application's part), and how its save went;
+    typed failure; with the turns it took, what it spent, the last
+    message it read (the unread fence, section 9), the messages refused
+    since its last turn, what it left on resources (the application's
+    part), and how its save went;
   - **notices,** relayed from the run's agent: a grant its provider
     rejected, an account exhausted until a time;
   - **refusals:** busy, invalid, a duplicate.
@@ -94,7 +113,7 @@ Between the core's fleet and a host, whatever its shape:
 
 ```
 no agents           procedures and people only             no host, no smith, no LLM accounts
-agents in-engine    the hub and the inline agent           no workspace; tools are host tools only
+agents in-engine    the hub and smith-inline-agent         no workspace; tools are host tools only
 agents on workers   the hub and agent processes            workspaces, commands, many machines
 ```
 
@@ -104,20 +123,26 @@ agents on workers   the hub and agent processes            workspaces, commands,
    Nothing links smith.
 2. **Agents in the engine.** A triager, a researcher, a chat assistant,
    whose tools are the engine's and its connectors' reads. The engine's
-   root composes the hub and the inline agent (sections 5 and 6). The
-   costs:
+   root composes the hub and `smith-inline-agent`, with no workspace
+   (sections 5 and 6). The costs:
    - no process containment, which is fine when nothing runs commands;
    - the engine's worst case includes its runs;
    - LLM traffic goes through the engine's protocol layer, on its loop.
 3. **Agents on workers.** When runs execute commands, hold workspaces, or
    need many machines. Each run is its own agent process, so stopping a
-   run ends its process tree.
+   run ends its process tree. A worker's root may compose
+   `smith-inline-agent` instead, for one person's machine: its runs are
+   then in the worker's process, with no containment (5.2).
 
 A charter says which kinds of host may run it, and the fleet places by it
 (engine.md, section 8). `ops` is the second shape; temper is the third.
-Development, tests and one person's machine may run the engine, a
-worker's hub and agents in one process (smith's `host.md`, section 9),
-from the same parts.
+
+One process may run the engine and its workers, for one person's
+machine, development and tests, from the same parts
+(`../protocol/service.md`, section 10). Its workers' agents still run as
+child processes, as between hosts, spawned by smith's host half; the
+agent may be the application's own binary, running smith's agent shell
+as a command of its own (section 10).
 
 ## 4. Structure
 
@@ -127,7 +152,7 @@ In the engine, when it hosts runs:
 <application>-domain           the application's root
 ├── core                       jig's core
 ├── jig-host                   the hub: hosted runs on the engine's own slots
-├── jig-inline-agent           the agent: smith's domains in this process, one per run in flight
+├── smith-inline-agent         the agent, smith's: its domains in this process, one per run in flight
 └── …
 ```
 
@@ -136,77 +161,97 @@ On a worker:
 ```
 <application>-worker           the worker's root: the application's; routes among its children
 ├── jig-host                   the hub: hosted runs, admit, prepare, start, relay, park or end
-├── smith-host-domain          the agent: processes, spawn, channel, watchdog, cancel then kill
+├── smith-host-domain          the agent, smith's: processes, spawn, channel, watchdog, cancel then kill
 └── <workspace>                the application's: prepare, save, deliver, release (section 7)
 ```
 
+A worker's root may compose `smith-inline-agent` in place of
+`smith-host-domain` (5.2); nothing else in its tree changes.
+
 Each tree follows programming-model.md, 4.5. The hub knows a hosted run's
 lifecycle and nothing of the application's workspaces, of processes, of
-channels or of the core; the agent and the workspace are capabilities,
-which the root translates to and from with small total functions, the
-same functions for both kinds of agent. A hand-off goes from a
-capability to the hub, from the hub to a capability, and at most once
-more back and forth, so each entry point completes them before it
-returns.
+channels or of the core, and links no smith crate; the agent and the
+workspace are capabilities, which the root translates to and from with
+small total functions, the same functions for both kinds of agent, since
+both speak smith's parent face, smith's payloads among them by hand-out
+(6.8). A hand-off goes from a capability to the hub, from the hub to a
+capability, and at most once more back and forth, so each entry point
+completes them before it returns.
 
 A worker's root has the one shape of root.md, section 3, with no store: a
-worker keeps nothing durable. In the engine, the hub and the inline agent
-are children of the engine's root, beside the core: what the hub sends
-up goes to the core's fleet, and what the fleet sends down for the
-engine's slots goes to the hub (root.md, section 5).
+worker keeps nothing durable. In the engine, the hub and
+`smith-inline-agent` are children of the engine's root, beside the core:
+what the hub sends up goes to the core's fleet, and what the fleet sends
+down for the engine's slots goes to the hub (root.md, section 5).
 
 ## 5. The agent
 
-The hub's agent capability is of one of two kinds. Both speak the same
-vocabulary, smith's host domain's (smith's `host.md`, section 4): a start
-with the charter in smith's terms, messages, answers to calls, grants and
-a cancel down; calls, turns, waits, notices, facts and one answer up,
-in order, and the agent's failures, typed. A root translates either with
-the same functions.
+The hub's agent capability is one of smith's two crates. Both speak
+smith's parent face (`smith_host_domain::parent`; smith's
+`domain/host.md`, sections 4 and 9.4), its payloads typed (6.8): down, a
+start (what the assignment gives the agent, with the workspace's
+directories), messages, answers to calls, acknowledgements of turns,
+grants, a stop and a drop; up, in order, message refusals, calls and
+withdrawals, turns, waiting, long operations, notices, the unread names,
+one answer, and the agent's failures and end, typed. Both refuse a
+message at the entrance, typed, with smith's reasons (section 9).
 
 ### 5.1 Agent processes
 
-On a worker, the agent is smith's host domain:
+`smith-host-domain` runs each run as an agent process (smith's
+`domain/host.md`, section 4). It is a worker's agent capability unless
+its root chooses otherwise:
 
 - **one process per run,** its process tree the run's containment
   boundary, its environment free of credentials, which come as grants on
   its channel;
 - **one channel** over the process's pipes, whose rules smith's host
-  domain enforces;
+  domain enforces, its host half in the worker's protocol layer
+  (section 10);
 - **a watchdog on progress,** paused while the run waits for a message,
   for a call's answer, or for room to send a turn, and stretched to the
   span of a long operation the run reports; a separate bound on wall
   time;
-- **cancel, then kill:** a cancel down the channel first, then the tree
-  terminated, then killed, past a grace. Only an exited process and an
-  empty tree say the agent is gone.
+- **cancel, then kill:** a cancel down the channel first; past the host
+  domain's grace, the tree terminated; past its `kill_after`, killed.
+  Only an exited process and an empty tree say the agent is gone;
 - **LLM completions** are the agent process's own io, with the grants it
   is given.
 
-### 5.2 The inline agent
+### 5.2 `smith-inline-agent`
 
-In the engine, the agent is `jig-inline-agent`: smith's one-process form
-(smith's `host.md`, section 9), packaged as a child that speaks smith's
-host domain's vocabulary:
+`smith-inline-agent` runs smith's domains in the host's own process
+(smith's `domain/host.md`, 9.1 to 9.4). It is the engine's hub's agent,
+with no workspace, and a worker's by its root's choice:
 
-- **a run is a composed smith domain,** one per run in flight, not a
-  process: the contract crosses as entities, with no pipe and no frames;
+- **a run is a composed smith domain,** one per run in flight, on the
+  hub's slots, not a process: the contract crosses as typed values, with
+  no pipe and no frames;
 - **it hands its parent** what smith's host domain would, in the same
-  order, so the root translates both the same way;
-- **cancel** is smith's cancel: the run winds down and answers. One that
-  does not within the grace is dropped, which is when the agent is gone;
-- **LLM completions** are requests smith's domain makes, each with its
-  run's result contract (smith's `protocol/llm.md`); the inline agent
-  passes them up as they are, and the root routes them to the
-  application's protocol layer, which runs them on smith's LLM component
-  over skein's connections, and their answers back. They do not pass
-  through the hub;
+  order, through the same parent face, so the root translates both the
+  same way;
+- **a stop** is smith's cancel: the run winds down and answers. Past the
+  inline agent's cancel grace, the run is dropped: its relayed calls are
+  withdrawn, and what it holds below it is ended. The agent is gone once
+  each has its terminal (smith's `domain/host.md`, 9.2);
+- **requests below the run go up:** its LLM completions, and with a
+  workspace the machine's operations, leave as requests that the root
+  routes to its protocol layer, which runs them on smith's components
+  with the grants' values (section 10), the run holding only their
+  names. Their terminals come back to the run that asked, never through
+  the hub;
+- **content and facts** are drained from each run in the host's process
+  (smith's `domain/host.md`, 9.1), and reach the hub, through the root,
+  as a run's text and activity (6.5);
+- **no watchdog on progress:** a composed domain's waits are bounded by
+  its own deadlines and those of the requests it hands up; a bound on
+  wall time stays;
 - **bounded:** each run's worst case is smith's, and the inline agent's
   is its slots' sum, part of the root's.
 
-What it gives up is said in smith's `host.md`, section 9: no process as
+What it gives up is said in smith's `domain/host.md`, 9.3: no process as
 the run's containment boundary. That is why the engine runs no commands
-for its agents.
+for its agents, and why a worker composes it only by its root's choice.
 
 ## 6. The hub
 
@@ -223,8 +268,9 @@ per shape, buys:
 - **one root shape:** the engine's root and a worker's compose the same
   three kinds of child: the hub, an agent capability, and a workspace
   where there is one;
-- **one process when wanted:** the engine, a worker's hub and agents
-  share a process (section 3) with no code of their own.
+- **one process when wanted:** the engine and its workers share a
+  process (section 3), the workers' agents still child processes, with
+  no code of their own.
 
 ### 6.1 The link to the core
 
@@ -241,10 +287,12 @@ per shape, buys:
   it.
 - **One vocabulary toward the link,** section 2's whole, on a worker as
   in the engine: the hello as one value, which a worker's root assembles
-  from the hub, its workspace and its link's graces; notices relayed from
-  the agent; facts as outputs, best effort, as well as by query. The
-  engine's root translates its own hub's link as it translates a
-  worker's (`../protocol/channel.md`, section 1).
+  from the hub, its workspace, its agent capability's bounds and its
+  link's graces; notices relayed from the agent; facts as outputs, best
+  effort, as well as by query. The engine's root translates its own
+  hub's link as it translates a worker's (`../protocol/channel.md`,
+  section 1), its hello stating the bounds of its `smith-inline-agent`'s
+  configuration.
 - **The engine holds the claim.** It commits a claim before assigning a
   run, and decides what follows: commit its result, run it again on any
   host, or hold its task. The hub never retries a run and never decides
@@ -272,12 +320,15 @@ cancel, from any state ──────────────► stop ─►
    (beyond the limits).
 2. **Prepare** the workspace from its items (section 7), if the run has
    any and the root has a workspace.
-3. **Start** the agent with the charter, and the transcript if there is
-   one, through the agent capability (section 5).
+3. **Start** the agent through the agent capability (section 5), with
+   what the assignment gives it, smith's payloads decoded by hand-out on
+   the way (6.8).
 4. **Relay** while the run is live:
-   - **messages** go down as they arrive, each named, a bounded few held
-     until it is live; what does not fit, or comes as it ends, is bounced
-     to the engine by name, which keeps it in the task's inbox;
+   - **messages** that arrive after the assignment go down as they
+     arrive, each named, in order, a bounded few held until the run is
+     live; one the hub cannot hold, or that comes as the run ends, it
+     refuses, full or ending (6.4). One that arrives once the answer is
+     sent is past its fence, and so unread;
    - **turns** come up as the run ends each, kept until acknowledged
      (6.4);
    - **calls** come up, a bounded number per run and one delivery at a
@@ -312,16 +363,18 @@ wait is bounded below it.
 
 Typed, so the engine can act on them without reading prose:
 
-- **refused** at the entrance: busy, or invalid;
+- **refused** at the entrance: busy; or invalid, beyond the hub's
+  limits, with smith's parts that do not decode (6.8), or as a start
+  smith refuses, naming what (section 8);
 - **preparation failed:** transient (the system could not be reached,
   the worker's side failed or ran out of time, another run of the
   workstream holds its workspace), or permanent until something changes
   on a system, naming the resource the workspace says;
-- **the run failed,** as it reports it (smith's `run.md`, section 10), or
-  because an LLM account it needs is exhausted;
+- **the run failed,** as it reports it (smith's `domain/run.md`,
+  section 10), or because an LLM account it needs is exhausted;
 - **the agent failed:** it could not be started, it exited or was dropped
-  without answering, it broke the channel's rules, or the watchdog
-  stopped it;
+  without answering, it broke the channel's rules, or the watchdog or its
+  bound on wall time stopped it;
 - **cancelled:** by the engine, for lost contact, or for shutdown.
 
 Each carries bounded detail for operators; none of it is shown to an LLM.
@@ -329,9 +382,23 @@ Each carries bounded detail for operators; none of it is shown to an LLM.
 ### 6.4 Turns
 
 - **A turn** is the bytes of one turn of the run's conversation, in
-  smith's vocabulary (smith's `session.md`, section 3), numbered within
-  its attempt, with what it spent and the last message it read. The hub
-  reads only its number, its size and that name.
+  smith's vocabulary (smith's `domain/session.md`, section 3; smith's
+  `protocol/transcript.md`), encoded by hand-out (6.8), numbered within
+  its attempt, with what it spent, the last message it read, and whether
+  it opens a window: a window turn, or a conversation's first. The hub
+  reads only its number, its size, its spend, that name and that flag,
+  which come beside the bytes. A resumed run is given its current
+  window's turns only (engine.md, 7.2; smith's `domain/host.md`,
+  section 6).
+- **Refusals ride with turns.** A turn's fence covers every message
+  before it, so the core must know of a refused message before it
+  commits a turn whose fence passes it, across an engine restart too. No
+  refusal crosses on its own: the hub keeps each, its name and smith's
+  reason, with the run's next turn, or its answer if none follows, and
+  the core records them in the commit that takes the turn's read
+  messages (engine.md, 7.2). An agent refuses a message only before a
+  fence covers it (smith's `protocol/channel.md`, section 5), and the hub
+  makes its own refusals before it relays a later message.
 - **Kept until acknowledged,** like an answer: sent at once, sent again
   after every hello, and after a backoff when the engine answers it busy.
   A run may have a bounded number of turns, and bytes, unacknowledged;
@@ -339,14 +406,16 @@ Each carries bounded detail for operators; none of it is shown to an LLM.
   watchdog paused.
 - **The hub holds them, not the agent.** The hub acknowledges a turn to
   its agent capability as soon as it has taken it, and keeps it until the
-  engine acknowledges it: for smith's host domain, the hub is the host
-  that says a turn is safe (smith's `host.md`, section 6). Its room is
-  what it lets the agent send: past it, the hub takes no more turns and
-  withholds the agent's acknowledgements, so the run waits.
+  engine acknowledges it: for either kind of agent capability, the hub is
+  the host that says a turn is safe (smith's `domain/host.md`,
+  section 6). Its room is what it lets the agent send: past it, the hub
+  takes no more turns and withholds the agent's acknowledgements, so the
+  run waits.
 - **Stopping never waits for the engine.** Once a run is stopping, the
-  hub takes every turn the agent has sent, past its room if need be, since
-  the agent's own window bounds them, so the agent can be gone (section
-  5) while the engine is out of reach, and the stop bound holds (6.6).
+  hub takes every turn the agent has sent, past its room if need be,
+  since the turns the agent may leave unacknowledged are bounded by its
+  start, so the agent can be gone (section 5) while the engine is out of
+  reach, and the stop bound holds (6.6).
 - **Before the answer.** The answer says how many turns the run took,
   and is sent after them.
 - **Lost with the worker.** A turn not acknowledged when a worker dies is
@@ -356,31 +425,44 @@ Each carries bounded detail for operators; none of it is shown to an LLM.
 
 ### 6.5 Facts
 
-What the run reports as it goes (smith's `run.md`, section 11) feeds the
-watchdog and goes up to the engine for live views. Forwarding is best
-effort: a bounded queue, what does not fit dropped and counted, sent on
-an open link only, after the hello. Nothing decides on a fact.
+What the run reports as it goes (smith's `domain/run.md`, section 11)
+goes up to the engine for live views, and, from agent processes, feeds
+their watchdog. Forwarding is best effort: a bounded queue, what does not
+fit dropped and counted, sent on an open link only, after the hello.
+Nothing decides on a fact.
 
-- **A run's text names its turn, its retry and its offset:** the turn it
-  belongs to, by its attempt and its number within it (an attempt is one
-  activation of smith's run, whose turns smith numbers); the retry of
-  the turn's completion, which smith retries within the turn, each retry's text
-  starting again at zero; and the offset of its first byte within that
-  retry's text, as smith gives them with the text it streams (smith's
-  `domain/run.md`, 11.1). The host asks smith for text on every run it
-  starts. The engine's views keep a run's text by turn, retry and offset
-  (engine.md, section 11): a later retry replaces an earlier one's text, and
-  since facts may be dropped, text that starts past what the engine holds
-  of its retry marks that turn's text cut.
-- **Activity is the host's observation:** a run's phase, and a tool
-  begun or ended, are facts, fenced like everything a host sends
-  (section 2). The engine shows a run as writing, or as running a tool,
-  only on such a fact, never inferring it from an attempt being placed.
-  A tool begun names its call and its tool, with the call's input within
-  the views' bound, and a check begun or ended names the check and,
-  ended, its outcome, as
-  smith's host domain hands them up typed (smith's `domain/host.md`,
-  section 4); so a run's document shows the call it is making.
+- **Activity, from every host,** carries no content: the run's phase;
+  its long operations, each begun with what it is (its checks, an LLM
+  completion, a command) and its span, and ended (smith's
+  `domain/host.md`, section 2); and counts from smith's channel facts,
+  each a kind, its time and a count (smith's `protocol/channel.md`,
+  section 8), which the root decodes by hand-out before the hub sees them
+  (6.8). Activity is the host's observation, fenced like everything a
+  host sends (section 2). The engine shows a run as writing, or as
+  running a tool, only on such a fact, never inferring it from an
+  attempt being placed.
+- **A run's text, and a tool begun with its call, only from a host that
+  has them:** a hub whose agent is `smith-inline-agent` hands up, from
+  what is drained in its process (5.2), a run's text as it streams, and
+  a tool begun naming its call and its tool, with the call's input within
+  the views' bound, so a run's document shows the call it is making.
+  smith's channel carries no content, so runs in agent processes give
+  neither until it does (below).
+- **A run's text names its turn, its retry and its offset,** whatever
+  its source: the turn it belongs to, by its attempt and its number
+  within it (an attempt is one activation of smith's run, whose turns
+  smith numbers); the retry of the turn's completion, which smith
+  retries within the turn, each retry's text starting again at zero; and
+  the offset of its first byte within that retry's text
+  (`../protocol/llm.md`, section 3). The engine's views keep a run's text
+  by turn, retry and offset (engine.md, section 11): a later retry
+  replaces an earlier one's text, and since facts may be dropped, text
+  that starts past what the engine holds of its retry marks that turn's
+  text cut.
+- **What jig asks of smith, later:** a run's text, and a tool begun with
+  its call, on smith's channel at the host's request
+  (`../protocol/README.md`, section 11). Nothing above the hub changes
+  with it.
 
 ### 6.6 Losing contact
 
@@ -388,15 +470,16 @@ On a worker; in the engine the link is never lost, and none of this
 happens.
 
 - **Runs go on for a grace** if the channel drops, and what they send
-  waits, never dropped: turns, bounced messages, and relays, unless their
-  call has closed meanwhile. On reconnecting, the worker says what it
-  hosts and the engine keeps or cancels each run.
+  waits, never dropped: turns, with the refusals they carry, and relays,
+  unless their call has closed meanwhile. On reconnecting, the worker
+  says what it hosts and the engine keeps or cancels each run.
 - **Past the grace,** the hub cancels them itself, saving their work
   first, and keeps their turns and answers for the next channel.
 - **The stop bound** the worker says at its hello is the longest it may
   take to stop a run it lost contact for, counted from the last moment
   the engine may have heard from it: the time its link takes to notice
-  the loss, then its grace, then the longer of its cancel's grace and a
+  the loss, then its grace, then the longer of the time its agent
+  capability may take to be gone after a stop (5.1 and 5.2) and a
   delivery's deadline, then a save. The engine's grace, counted from when
   the engine notices the loss, is strictly longer (engine.md, section 8),
   so no next attempt starts while this one may still write, however each
@@ -408,6 +491,39 @@ Shutting down cancels every run and admits no more. The host is done
 once the engine has every turn and answer. A worker gives up what it
 keeps, counted, only once no run is left and the engine is still out of
 reach past the grace.
+
+### 6.8 smith's payloads
+
+- **Bytes in the hub.** The hub links no smith crate. It carries as
+  bytes it never reads the charter, a resumed run's transcript, each
+  turn's body, call names and a run's result, and the run's identity,
+  reading only what section 2 puts beside them. A host tool's input
+  stays the bytes the LLM wrote, for the engine's protocol layer to
+  decode (section 8).
+- **Typed in the agent.** smith's agent capabilities take and give them
+  typed, through smith's parent face, never encoding or decoding them
+  (smith's `domain/host.md`, sections 3 and 9.4).
+- **Translated by hand-out.** The root that composes the hub with an
+  agent capability, a worker's or the engine's for its own hub, hands
+  each payload out to its protocol layer, whose routing decodes or
+  encodes it with `smith-protocol-channel`'s functions, keeping no state,
+  and hands it back as an event of the root, in the order it went out:
+  the path of host tools' calls (`../protocol/channel.md`, 6.3).
+  - **Down,** the charter, the transcript and the committed calls'
+    names are decoded, with the endpoints of the agent's configuration,
+    which resolve those the charter names, and smith's start goes to the
+    agent typed. One that does not decode fails the start as invalid
+    (6.3).
+  - **Up,** each turn, call name and result is encoded for the hub, and
+    each of smith's channel facts is decoded into jig's typed activity
+    (6.5), so the hub and jig's channel carry jig's activity, never
+    smith's facts.
+- **Who links smith:** `jig-charter` (section 8), a client's decoding of
+  turns (`../client/domain/client.md`, section 10), and an application's
+  roots that compose smith's agent capability, with their protocol
+  layers' routing, which also runs smith's components where it composes
+  them. Never the hub, the core, or jig's channel's components, which
+  pass smith's bytes through (`../protocol/channel.md`, 6.1).
 
 ## 7. Workspaces
 
@@ -449,11 +565,12 @@ pushes to a saved-work branch. It is an example, not part of jig.
 ## 8. Charters, tools and contracts
 
 The core decides a run's charter in its own terms (engine.md, 7.1). Its
-translation into smith's (smith's `run.md`, 3.1) is in one place, a
-function of jig's that links smith: the engine's protocol layer calls it
-for runs on workers, which carry the result as bytes; the engine's root
-calls it for runs in the engine, before the assignment reaches the hub.
-The hub carries the charter as bytes it never reads.
+translation into smith's charter, version 2 (smith's `domain/run.md`,
+3.1; smith's `protocol/charter.md`, section 2), is in one place,
+`jig-charter`, a function of jig's that links smith, which the engine's
+protocol layer calls for every run, on workers and in the engine alike,
+and which reads every run's result back by the path of host tools' calls
+(6.8).
 
 - **Instructions and brief:** the charter's instructions, and the brief's
   sections rendered as smith's titled sections, in order, the
@@ -476,24 +593,35 @@ The hub carries the charter as bytes it never reads.
   protocol layer decodes every call the fleet has admitted, from workers
   and from the engine's own hub alike, so no domain parses a call's input
   (`../protocol/channel.md`, 6.3).
-- **Result contracts** become smith's (smith's `run.md`, 7.1): a report;
-  a verdict, with its labels, fields and follow-ups; a delivery, which
-  the run must make through its workspace before it finishes, with the
-  fields its workspace asks for; a failure. The core judges a result
+- **Result contracts** become smith's (smith's `domain/run.md`, 7.1): a
+  report; a verdict, with its labels, fields and follow-ups; a delivery,
+  which the run must make through its workspace before it finishes, with
+  the fields its workspace asks for; a failure. The core judges a result
   again as it commits it (tasks.md, 5.6).
-- **Budget, models, waiting:** the run's budget, reserved from its task
-  at its claim, in the deployment's unit, with each model's prices; the
-  LLM endpoints the accounts give, their credentials as grants; the
-  charter's waiting time, and whether a run resumes its transcript or
-  starts fresh.
-- **What jig asks of smith's budget** (smith's `run.md`, section 9):
-  before each completion, its sub-agents' included, the agent reserves
-  that completion's maximum cost (the input it sends and the output its
-  `max_tokens` allows, at the model's prices) from the run's budget, and
-  settles the difference when the completion ends; a completion whose
-  maximum does not fit is not made, and the run ends for its budget. All
-  of it is inside the run, with no call to its host, so the run never
-  spends past its budget (authority.md, section 7).
+- **Budget, models, waiting:** the run's budget, its turns, spend and
+  time, its spend reserved from its task at its claim, in the
+  deployment's unit, and its reserve of turns and time for finishing
+  (smith's `domain/run.md`, 9.1); its models, the main session's and
+  those its sub-agents may use, each on an endpoint named as the agent's
+  configuration names it, with its window, its output and its prices
+  (engine.md, 7.1); the LLM endpoints the accounts give, their
+  credentials as grants; the charter's waiting time, and whether a run
+  resumes its transcript or starts fresh.
+- **What jig asks of smith's budget** (smith's `domain/run.md`, 9 and
+  9.1): before each completion, its sub-agents' included, smith reserves
+  that completion's most (its input at the highest input rate, its
+  output at the output rate) from the run's budget, and returns the
+  difference when the completion ends. When the ordinary part of the
+  budget is spent, the run winds down on its reserve and finishes; a
+  completion that does not fit what is left at all ends the run for its
+  budget. All of it is inside the run, with no call to its host, so a
+  run never spends past its budget (authority.md, section 7).
+- **The core places no run smith would refuse.** A task whose budget
+  cannot hold its run's reserve and one of its main model's most costly
+  completions is held for its budget (authority.md, 7 and 8.3), and the
+  fleet admits no host whose agent cannot run the engine's charters
+  (engine.md, section 8). A start smith refuses all the same fails its
+  attempt as invalid, naming why (6.3).
 
 ## 9. Messages and delivery
 
@@ -502,12 +630,31 @@ The hub carries the charter as bytes it never reads.
   party by name, a subscription's topic) and the message's words, whole.
   Proposals and escalations waiting for the task are relayed the same
   way. The run names the last it read with each turn and when it waits.
+- **The start carries the inbox,** as many of its messages as the run's
+  inbox takes, oldest first; the rest are relayed as the run reads
+  (tasks.md, 8.2). The run opens on them (smith's `domain/host.md`,
+  section 2).
+- **Every message fits** a run's message bound (tasks.md, 8.2), and the
+  fleet admits no host whose agent takes less (engine.md, section 8), so
+  no run refuses a message as too large.
+- **Each message ends once** (smith's `domain/host.md`, section 2):
+  - **read:** a turn's last message read names it or a later one;
+  - **refused:** by the hub or by the agent, by name, with smith's
+    reason: too large, the run's inbox full, a name in use, or the run
+    ending; the refusal travels inside the run's next turn, or its
+    answer if no turn follows (6.4);
+  - **unread:** the run answered without reading it, which the answer's
+    last message read, the unread fence, says: every message relayed
+    after it, and not refused, went unread.
+- **Refused or unread, it stays** in the task's inbox, untaken, and
+  wakes the task again when the run ends, as it would had it arrived
+  then (tasks.md, 8.2 and 8.3). Nothing a host does drops a message.
 - **Delivery** is the workspace's: smith's `deliver` is served by the hub
   through the application's workspace (section 7), which makes it, for
-  temper, as a push. Its outcome is smith's (smith's `run.md`, 8.2):
-  delivered, nothing, stale, refused, failed. A delivery that was made
-  is the run's result even if the run was winding down; what it left on
-  resources reaches their connectors with the answer.
+  temper, as a push. Its outcome is smith's (smith's `domain/run.md`,
+  8.2): delivered, nothing, stale, refused, failed. A delivery that was
+  made is the run's result even if the run was winding down; what it
+  left on resources reaches their connectors with the answer.
 
 ## 10. Below the domain
 
@@ -515,26 +662,40 @@ The hub carries the charter as bytes it never reads.
   authenticated, carrying the contract of section 2, versioned.
 - **Agent processes:** spawning smith's agent in a contained process
   tree, with proof that the tree is empty after it stops; smith's channel
-  over its pipes (`smith-channel`, the host's half).
+  over its pipes, `smith-channel` its codec, its host half
+  `smith-host-protocol`, a component of the worker's protocol layer
+  (smith's `protocol/hosts.md`, section 2). The agent may be a command of
+  the application's own binary that runs smith's agent shell
+  (`smith-agent-shell`).
 - **Workspaces' io:** the application's (for temper, git invocations and
   workspace directories).
-- **In the engine:** the inline agent's LLM completions through skein's
-  LLM client, in the engine's protocol layer.
+- **In a host's process:** `smith-inline-agent`'s LLM completions and,
+  with a workspace, the machine's operations, on smith's components
+  (`smith-protocol-llm`, `smith-protocol-machine`) in the protocol layer
+  of the process that runs it, each slot's result contract kept beside
+  them (`../protocol/llm.md`, section 3).
+- **smith's payloads, by hand-out:** the protocol layer's routing under
+  each root that composes an agent capability (6.8).
 
 ## 11. The world
 
 - **The hub's world:** its root scripted; an engine that assigns,
   relays, cancels and acknowledges once its fake store commits; a link
   that drops for less and for more than the grace, and one that never
-  drops, as in the engine; agents of both kinds: smith's scripted agent
-  processes, which progress, call, take turns, wait, park and end, but
-  also hang, crash, break rules and ignore cancels; and the inline agent,
-  smith's real domain over skein's fake LLM, whose runs answer, wait,
-  park and resume, and are cancelled mid-turn; and a scripted workspace
-  that prepares, delivers, saves and fails, or none. It checks that every
-  turn and answer reaches the engine once and is acknowledged once, every
-  relayed call is answered once, nothing touches a workspace while a
-  run's agent may, and nothing is live once it settles.
+  drops, as in the engine; agent capabilities of both kinds, smith's:
+  `smith-host-domain` over smith's scripted agent processes, which
+  progress, call, take turns, some opening a window, wait, park and end,
+  refuse messages and leave them unread, but also hang, crash, break
+  rules and ignore cancels; and `smith-inline-agent`'s runs, smith's real
+  domain over skein's fake LLM, which answer, wait, park and resume from
+  their current window, stream text, are cancelled mid-turn, and ignore
+  a cancel past the grace, to be dropped; and a scripted workspace that
+  prepares, delivers, saves and fails, or none. It checks that every
+  turn and answer reaches the engine once and is acknowledged once,
+  every relayed call is answered once, every message relayed ends once,
+  read, refused or unread, each refusal inside a turn or answer no later
+  than the first whose fence passes it, nothing touches a workspace
+  while a run's agent may, and nothing is live once it settles.
 - **The application's worlds** run its hosts, with its own workspace or
   none, against jig's core on the conformance world (testing.md,
   section 5).
@@ -548,30 +709,12 @@ The hub carries the charter as bytes it never reads.
   since the run's last save.
 - **Before the first channel:** whether a worker's failed dials, before
   it ever reached the engine, want a grace of their own.
-- **Who owns the inline agent.** jig's for now, beside the hub. It
-  composes smith's domains and knows nothing of the core, and smith's
-  local host (smith's `host.md`, section 8) needs the same for its
-  one-process form. The ways on:
-  - **smith owns it,** a crate beside `smith-host-domain` sharing its
-    vocabulary, composed by jig's engine and smith's local host alike
-    (smith's draft `one-host.md`); jig retires `jig-inline-agent` at a
-    repin of smith. The leaning;
-  - **a mode of `smith-host-domain`,** one child running a run as a
-    process or in memory: one boundary, but two jobs mixed, every host
-    carrying both, and a worst case and a world that are their sum. A
-    vocabulary crate shared by two children keeps the one boundary
-    without the rest;
-  - **no agents in memory:** an engine's root composes
-    `smith-host-domain` for its slots, as the hub already allows. The
-    engine's runs are then contained and its LLM traffic leaves its loop,
-    at the cost of a process per run, grants leaving the engine, and the
-    engine's agent processes to prove ended with it. Whether jig offers
-    it as an application's composition, and whether `ops` uses it, is
-    open.
-- **Bytes across the hub in the engine.** The hub carries what it does
-  not read as bytes: the charter, turns, call inputs and answers. In the
-  engine, the charter and each call are encoded and decoded once more
-  than they need to be. Whether that ever shows, and if so whether the
+- **The hand-out's cost in the engine.** smith's payloads cross the hub
+  as bytes (6.8), so for runs in the engine some are encoded and decoded
+  once more than they need to be: the charter, encoded by `jig-charter`
+  and decoded again for `smith-inline-agent`; a result, encoded for the
+  hub and read back by `jig-charter`. Each turn is encoded once, as the
+  core keeps it anyway. Whether that ever shows, and if so whether the
   hub carries tokens its root resolves.
 - **Workspaces in the engine.** Whether a deployment may give in-engine
   runs a workspace, for one person's machine, knowing it has no

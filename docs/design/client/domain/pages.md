@@ -1,6 +1,6 @@
 # Pages
 
-Provisional, 2026-10-09, revised 2026-10-10. jig's pages: how a client is
+Provisional, 2026-10-09, revised 2026-10-12. jig's pages: how a client is
 organised, what a party finds where, and what they do there. They are
 jig's, as the primitives they show are, and every application's client
 has them, around its own. This document says what each page shows and
@@ -158,7 +158,7 @@ activity, the conversation, comes first.
   |---|---|
   | due, preparing or claimed | starting |
   | running, writing | writing |
-  | running a tool | which tool, and for how long |
+  | running a tool | which tool, when its host names it, and for how long |
   | running, waiting with its slot | waiting for you |
   | idle, parked | parked; your words resume it |
   | backing off | retrying, when, and why: "host lost, try 2 of 3" |

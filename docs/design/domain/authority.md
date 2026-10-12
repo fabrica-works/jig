@@ -1,13 +1,13 @@
 # Authority
 
-Provisional, 2026-10-07. What a task may do, and how the core holds it
-there: authority as a value, its order and how delegation narrows it,
-where it comes from, budgets and what is spent, the checks every action
-passes, what a proposal needs and what accepting it funds, and the
-requirements no task loosens. It is the fourth primitive of core.md
-(3.4) in depth. Proposals travel the tree as tasks.md, section 9 says;
-parties' roles are people.md, section 4. What is still open is listed in
-section 12.
+Provisional, 2026-10-07, revised 2026-10-12. What a task may do, and how
+the core holds it there: authority as a value, its order and how
+delegation narrows it, where it comes from, budgets and what is spent,
+the checks every action passes, what a proposal needs and what accepting
+it funds, and the requirements no task loosens. It is the fourth
+primitive of core.md (3.4) in depth. Proposals travel the tree as
+tasks.md, section 9 says; parties' roles are people.md, section 4. What
+is still open is listed in section 12.
 
 ## 1. In one page
 
@@ -263,10 +263,12 @@ deployment's rules       the most any project may have; requirements on effects
   it.
 - **What is spent:**
   - *LLM completions,* priced as they are spent. A charter carries its
-    models' prices, in the deployment's unit; a run prices each
-    completion it makes, its sub-agents' included, and reports what it
-    spent with each turn it commits (engine.md, 7.2), and the whole with
-    its answer. The core charges each turn as it commits it.
+    models' prices, in the deployment's unit: input, cached input, cache
+    writes when priced apart (at the input's rate otherwise), and
+    output. A run prices each completion it makes, its sub-agents'
+    included, and reports what it spent with each turn it commits
+    (engine.md, 7.2), and the whole with its answer. The core charges
+    each turn as it commits it.
   - *Priced effects.* A connector may price a kind of effect, in the
     deployment's unit: an environment for a week, a scale-up for a day.
     The price is the effect's maximum cost, part of its description when
@@ -274,15 +276,22 @@ deployment's rules       the most any project may have; requirements on effects
     effect's check (8.2), and charged in the commit that decides it.
     What the connector later finds it cost below that is returned when
     it says so; it never charges more.
-- **A run's budget** is reserved from what its task has left in the
-  commit that claims it, capped per run by the deployment. The agent
-  enforces it exactly: before each completion, its sub-agents' included,
-  it reserves that completion's maximum cost (the input it sends, and
-  the output its `max_tokens` allows, at its model's prices) from the
-  run's budget, and settles the difference when the completion ends. A
-  completion whose maximum does not fit is not made, and the run ends
-  for its budget (hosts.md, section 8). So a run never spends past its
+- **A run's budget** has turns, spend and time, and a reserve of turns
+  and time for finishing: its turns, time and reserve its charter's, its
+  spend reserved from what its task has left in the commit that claims
+  it, capped per run by the deployment. The agent enforces it exactly
+  (smith's `domain/run.md`, 9 and 9.1; hosts.md, section 8): it reserves
+  each completion's maximum cost before making it, winds down on its
+  reserve when the rest is spent, and ends for its budget a completion
+  that does not fit what is left at all. So a run never spends past its
   budget, and stops a little early rather than late.
+- **A run's spend holds its reserve and one completion more.** The
+  reserve's spend is its turns, each at the main model's most costly
+  completion: a window of input at its highest input rate, plus its
+  output at the output rate. The core places a run only if its spend
+  holds the reserve's and one more such completion, so the agent never
+  refuses it for its budget; a task whose budget left cannot fund that
+  waits, or is held for its budget (8.3).
 - **Spend lost with a worker.** A turn's spend is recorded when the turn
   commits. A worker that dies loses the turns it had not had
   acknowledged, and what they spent was spent but never recorded; the
@@ -345,15 +354,30 @@ Every check is against effective authority (section 6).
 
 ### 8.3 Runs
 
-Before a run is claimed and again as it starts: the task has budget left
-above the deployment's minimum for a run, its deadline is not past, the
-accounts its charter's models use are usable (engine.md, section 12), a
-host the charter allows has room (engine.md, section 8), and every
-resource its workspace writes, saved state included, is covered by a
-grant of the task and held by the task or by the task above it that
-holds it (tasks.md, section 6). A run that fails this check is not
-started: its task waits for its budget (held, if nothing will free one),
-its account, its host, or its writer slot.
+Before a run is claimed and again as it starts: its deadline is not
+past; the run's spend, what its task has left capped per run by the
+deployment, is above the deployment's minimum for a run and holds its
+reserve and one more of its main model's most costly completions
+(section 7); the accounts its charter's models use, and the
+application's credentials its workspace needs, are usable (engine.md,
+section 12); a host the charter allows has room (engine.md,
+section 8); and every resource its workspace writes, saved state
+included, is covered by a grant of the task and held by the task or by
+the task above it that holds it (tasks.md, section 6). A run that fails
+this check is not started: its task waits for its budget (held, if
+nothing will free one), its account or credential, its host, or its
+writer slot.
+
+Allowed, the answer is the run's budget: the turns, time and reserve
+its charter gives, and that spend, so the core places no run the agent
+would refuse for its budget. Each charter's turns and time above its
+reserve's are configuration's to check (`../protocol/configuration.md`,
+section 6); the agent's own limits are the fleet's, at each host's hello:
+the charter's models, their windows and outputs, the most turns, spend,
+time and waiting a run may have, and the reserve's time against the
+checks' timeout (engine.md, section 8). A start the agent refuses all
+the same fails its attempt as an assignment its host found invalid,
+naming why (tasks.md, 5.5).
 
 ### 8.4 Parties' requests
 
@@ -465,9 +489,10 @@ carving and returning budgets over generated trees with funders, the
 spend of a subtree never counted twice and never above what funded it,
 with reservations of completions' maxima under many open sessions;
 standing allotments renewed across periods with delegates live; every
-check's answer over generated verdicts, freshness and prices, the
-strictest always winning; effective authority as policy narrows and
-widens around live tasks. The core's world exercises it in
+check's answer over generated verdicts, freshness and prices, and a
+run's budget against its reserve and its main model's most costly
+completion, the strictest always winning; effective authority as policy
+narrows and widens around live tasks. The core's world exercises it in
 place (engine.md, section 15), whose referee holds the first promise of
 core.md, section 11.
 

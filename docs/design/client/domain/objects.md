@@ -1,9 +1,10 @@
 # Objects and cards
 
-Provisional, 2026-10-09. The objects jig's client shows, each as one card
-wherever it appears: tasks as chips, proposals, escalations, questions,
-person tasks, results, refusals, the conversation; and the requests a
-party makes about them, each saying what it will do before it is sent.
+Provisional, 2026-10-09, revised 2026-10-12. The objects jig's client
+shows, each as one card wherever it appears: tasks as chips, proposals,
+escalations, questions, person tasks, results, refusals, the
+conversation; and the requests a party makes about them, each saying
+what it will do before it is sent.
 What each card shows comes from the engine's documents (contract.md);
 how it is held is client.md, section 5; how it is drawn is view.md. What
 is still open is listed in section 13.
@@ -73,7 +74,7 @@ while it shows, linking to its page.
 | waiting | waiting for T2, T3: each a chip, with its phase; or for a hold: "waiting for a slot in staging" |
 | active, an agent: idle | waiting for news, and what would wake it, from its wake policy |
 | due, preparing, claimed | starting |
-| running | running: writing, or which tool, its attempt, for how long |
+| running | running: writing, or a tool (which, when its host names it), its attempt, for how long |
 | backing off | retrying at a time, and why: "host lost, try 2 of 3" |
 | active, a procedure | its connector's words, a part: "waiting for checkout to be healthy" |
 | active, a party | waiting for an answer from P, or from the person on call, since when |

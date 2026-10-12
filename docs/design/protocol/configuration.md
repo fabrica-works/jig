@@ -1,7 +1,7 @@
 # Configuration
 
-Provisional, 2026-10-10. What an engine and a worker are told when they
-start, as far as jig defines its shape: the parts of
+Provisional, 2026-10-10, revised 2026-10-12. What an engine and a worker
+are told when they start, as far as jig defines its shape: the parts of
 `../domain/engine.md`, section 14 that are jig's, how an application's
 configuration composes them with its own, where secrets come from, and
 when configuration is read. What is still open is listed in section 9.
@@ -56,7 +56,8 @@ the application's main (its shell)
   startup (`llm.md`, section 4).
 - **The application's startup** is ordinary code of its main: it reads,
   parses with `jig-protocol-config` and its own parsers, checks, and
-  constructs. `ops`'s main is the reference (`service.md`, section 7).
+  constructs. The reference binary's, `jig-test`'s, is the reference
+  (`service.md`, section 7).
 
 ## 3. jig's part for an engine
 
@@ -67,16 +68,23 @@ the application's main (its shell)
 | providers | each sign-in provider's number and kind; its settings are the application's | the people child; the client's protocol |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
 | projects | each project seeded on a first start: its number, its resources and their roles, its homes, its policy, its parties' roles | the core, on a first start |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget, which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several; and which charter chats run under | the core; `jig-charter` |
-| hosts | the engine's own slots, and the inline agent's limits, if it runs agents; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers` |
-| llm | endpoints, models and prices; accounts, each with its registration and its token endpoint, and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
-| clients | the clients' listener (a TCP address, or loopback on one person's machine) and its certificate and key files, but on loopback; the heartbeat; whether the engine prints a local sign-in link at start (`client.md`, sections 4 and 8) | `jig-protocol-engine-clients` |
+| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several; and which charter chats run under | the core; `jig-charter` |
+| hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
+| llm | endpoints, each with the models it serves; each model's window, output and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), and its prices: input, cached input, output, and cache writes when priced apart; accounts, each with its registration and its token endpoint, and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
+| clients | the clients' listener (a TCP address, or loopback on one person's machine) and its certificate and key files, but on loopback; the heartbeat; whether the engine prints a local sign-in link at start (`client.md`, sections 4 and 8). It serves the client's routes and files only: a connector's webhooks are on a listener of its own | `jig-protocol-engine-clients` |
 | connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5) | the core |
 | limits | a profile, and any limit overridden by name (section 6) | every child and component of jig's |
 
 - **Each connector's own configuration** (its system's address, its
-  credentials' files, its procedures' settings, its templates) is the
-  application's, in its own member.
+  credentials' files, the address of its webhooks' listener, its
+  procedures' settings, its templates) is the application's, in its own
+  member.
+- **An application's credentials** for its runs' workspaces (a token to
+  fetch and push) are its own members: each with its number, as the
+  domain names it, and its source, a file or an exchange it refreshes.
+  jig's part names none; the accounts child hears each generation from
+  the application's root (`../domain/engine.md`, 12.1; `channel.md`,
+  section 8).
 - **The application's own children** take their configuration from the
   application's members, as its root gives them.
 
@@ -88,7 +96,7 @@ the application's main (its shell)
 | name, secret | the worker's name, and the file holding its secret |
 | slots | how many runs it hosts at once |
 | graces | the grace after losing the engine, the stop graces of an agent's tree, a delivery's deadline, a save's: with the link's ping interval and silence deadline, what its stop bound is made of (`channel.md`, 10.1; `../domain/hosts.md`, 6.6) |
-| agent | the agent program and its configuration, which smith's host half starts, with the endpoints its runs' charters name, by the same names as the engine's (smith's `protocol/hosts.md`, section 3; `llm.md`, section 4) |
+| agent | the agent program, which the worker's protocol layer spawns for each run, and which may be the application's own binary run as its `agent` command, smith's agent shell (`service.md`, section 6); and its configuration, smith's agent configuration (smith's `protocol/agent.md`, section 4), which declares the models the engine's charters name, with their window and output, and the endpoints they run on, by the same names as the engine's (`llm.md`, section 4). The worker's routing decodes charters against its endpoints, and its hello states its agent's bounds from it (`channel.md`, 4.3). A worker that composes `smith-inline-agent` gives it the same configuration, and runs no agent program |
 | limits | a profile, and overrides |
 
 The worker's workspace's configuration is the application's. Workers are
@@ -123,6 +131,17 @@ secret, and every credential its runs need comes with their assignments
   memory the configuration states; the terms of the workers' channel
   follow from the same limits (`channel.md`, section 11). A profile whose
   sum does not fit refuses the start, saying by how much.
+- **Charters' budgets:** each charter's turns and time are above its
+  reserve's, and its default budget holds its reserve and one of its main
+  model's most costly completions (`../domain/authority.md`, section 7),
+  or the engine's start is refused, naming the charter.
+- **The deployment's message bound** holds every kind of message a
+  task's inbox admits, as a run renders it with its sender's label: a
+  party's words and questions by the people child's bound, which is at
+  most it, and every other kind by its own (`../domain/tasks.md`, 8.2;
+  `../domain/people.md`, 5.1). Whether a host's agent takes messages that
+  large, and runs the engine's charters, is the fleet's to check at its
+  hello, never configuration's (`../domain/engine.md`, section 8).
 - **The application's limits** are its own members, checked in the same
   sum.
 
@@ -136,6 +155,7 @@ secret, and every credential its runs need comes with their assignments
 | the listeners' TLS keys | private keys | files beside their certificates |
 | a sign-in provider's client secret | a confidential client's | a file (`client.md`, section 8) |
 | a connector's credentials | the application's | the application's files, or its own secrets' records |
+| an application's credential, for runs' workspaces | the application's | its own member's source: a file, or an exchange it refreshes (section 3) |
 
 - **Read at startup,** each within its bound, from a private file, with
   skein's `read_private_file` (skein's `shell.md`, 6.1): a file readable

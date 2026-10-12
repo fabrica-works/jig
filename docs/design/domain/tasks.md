@@ -1,13 +1,13 @@
 # Tasks
 
-Provisional, 2026-10-07. The core's tasks: what a task is, how tasks are
-made, how each moves from asked to ended, the resources it holds, what
-it hears and when it wakes, and how proposals and escalations travel the
-tree. It is the first primitive of core.md (3.1) in depth, and the hub
-of the core (engine.md, section 3). Authority, which every action here
-is checked against, is authority.md; what an agent's run is, engine.md,
-section 7; a connector's procedures, connectors.md, section 6. What is
-still open is listed in section 13.
+Provisional, 2026-10-07, revised 2026-10-12. The core's tasks: what a
+task is, how tasks are made, how each moves from asked to ended, the
+resources it holds, what it hears and when it wakes, and how proposals
+and escalations travel the tree. It is the first primitive of core.md
+(3.1) in depth, and the hub of the core (engine.md, section 3).
+Authority, which every action here is checked against, is authority.md;
+what an agent's run is, engine.md, section 7; a connector's procedures,
+connectors.md, section 6. What is still open is listed in section 13.
 
 ## 1. In one page
 
@@ -222,15 +222,15 @@ An active agent task is one of:
 - **idle:** nothing to do until a wake (8.3);
 - **due:** a run is wanted: the first activation, or a wake;
 - **preparing:** its brief is gathering and, if it resumes, its
-  transcript loading (engine.md, 7.1). An amendment or a cancel that
-  comes meanwhile drops what was gathered and decides again; a required
-  section that cannot be gathered sends it back to due after a backoff,
-  as no attempt was made;
+  transcript's current window loading (engine.md, 7.1). An amendment or
+  a cancel that comes meanwhile drops what was gathered and decides
+  again; a required section that cannot be gathered sends it back to due
+  after a backoff, as no attempt was made;
 - **claimed:** an attempt is committed, naming the run and its attempt
-  number, and the writer slots of the holds its workspace writes (6.3),
-  before the run is assigned;
-- **running:** a run is live on a host. It hears the messages its policy
-  lets through as they arrive (8.2);
+  number, the writer slots of the holds its workspace writes (6.3), and
+  the messages its start carries (8.2), before the run is assigned;
+- **running:** a run is live on a host. Its start carried the messages
+  waiting; it hears those its policy lets through as it reads (8.2);
 - **backing off:** an attempt failed and the next is due after a backoff
   (5.5).
 
@@ -282,10 +282,12 @@ which may amend, cancel or re-address it.
   resource it relies on (connectors.md, section 11), an effect it asked
   for fails for good, an effect it asked for is uncertain and of a kind
   that cannot be recovered (connectors.md, 4.3), its budget or its
-  deadline runs out (authority.md, section 7), a party stops it, it waits
-  for a hold past its bound (6.2), its pool lost its allocation (6.6), or
-  its procedure says it needs a decision. A hold keeps whatever
-  the task had: its result while closing, its inbox, its attempt number.
+  deadline runs out (authority.md, section 7; for an agent task, too
+  little left for its next run's reserve and one completion more, with
+  nothing to free more), a party stops it, it waits for a hold past its
+  bound (6.2), its pool lost its allocation (6.6), or its procedure says
+  it needs a decision. A hold keeps whatever the task had: its result
+  while closing, its inbox, its attempt number.
 - **A hold is escalated** (section 9): it waits for the nearest task or
   party above it that may decide, which it wakes. Whoever it reaches may
   release it, amend it and release it, or cancel it (section 7).
@@ -296,10 +298,10 @@ which may amend, cancel or re-address it.
 ### 5.6 Results
 
 - **Checked twice.** An agent's run checks its result against the
-  contract before it finishes (smith's `run.md`, section 7); the core
-  checks it again as it commits, against the contract and the state as it
-  is now. A result that breaks its contract is a failed attempt, its
-  reason given to the next run.
+  contract before it finishes (smith's `domain/run.md`, section 7); the
+  core checks it again as it commits, against the contract and the state
+  as it is now. A result that breaks its contract is a failed attempt,
+  its reason given to the next run.
 - **What a result may carry** beyond its words: effects, through the
   tools that ask for them; follow-up tasks its verdict's contract allows,
   as one batch of the task's own delegates, made in the commit that takes
@@ -484,11 +486,27 @@ are entries of its own (section 9), which always wake it.
   - *refused at the sender's entrance:* words and questions, past the
     bound: a party is told the inbox is full, an agent's tool call
     answers so.
-- **Relayed live.** A task with a running run has what its policy lets
-  through relayed to it as it arrives (engine.md, 7.4); what it does not
-  take before its run ends stays.
-- **Carried whole and read oldest first,** within the brief's budget: a
-  person's words are never cut, and what does not fit is said to wait.
+- **Within what a run reads.** Every message an inbox admits fits a
+  run's message bound as it is rendered (smith's `protocol/limits.md`,
+  3.9), so no run refuses one as too large: words and questions larger
+  are refused at their sender's entrance as too large, never cut (a
+  party's by the people child, whose bound is at most the run's;
+  people.md, 5.1), and every other kind fits by its own bound.
+  Configuration checks both against the deployment's message bound
+  (`../protocol/configuration.md`, section 6), and the fleet admits no
+  host whose agent takes less (engine.md, section 8).
+- **Carried whole and read oldest first,** within the run's inbox. A
+  run's start carries the messages waiting in its task's inbox, each
+  whole, oldest first, as many as the run's inbox takes (smith's
+  `protocol/limits.md`, 2.3); a person's words are never cut. The rest
+  wait in the inbox, in order, and are relayed as the run reads, as what
+  its policy lets through while it runs is, never more relayed and
+  unread than the run's inbox takes (engine.md, 7.1 and 7.4).
+- **Refused or unread, a message stays.** A message the run refused (too
+  large, its inbox full, a name in use, or the run ending), or left
+  unread (after the answer's fence, the last message it read), stays in
+  the inbox, untaken, and wakes the task again when the run ends, as it
+  would had it arrived then (8.3).
 
 ### 8.3 Wake policies
 
@@ -509,6 +527,10 @@ A wake policy is data, from a closed vocabulary:
 A proposal or an escalation waiting for its decision always wakes a
 task, as a cancel does: no policy may keep a decision from whoever must
 make it.
+
+A message a run refused or left unread (8.2) is judged again when the
+run ends, as if it arrived then: it wakes the task if its kind does, and
+otherwise waits for the next activation.
 
 Each charter brings a default policy, which the task's creator may
 narrow or widen: a chat wakes on its person's words and on its
@@ -643,7 +665,8 @@ worst case (engine.md, section 13):
 - tasks per tree, and the depth of a tree;
 - delegates per task, and batch size;
 - a spec's and a result's bytes, and inputs per task;
-- messages and bytes per inbox;
+- messages and bytes per inbox, and a message's bytes, within what a run
+  reads (8.2);
 - subscriptions, references, holds and saved resources per task;
 - waiters per resource's queue, and how long a task may wait for holds;
 - pending proposals per task, and in the deployment; open questions per
@@ -665,7 +688,8 @@ choice and procedure tasks, run in dependency order; a delegate failing
 past its tries, held, escalated two levels to a person, released and
 finished; a watch woken once by a burst of news; a cancel closing a tree
 of three levels with runs live and effects in flight; an amendment
-reaching a live run; a proposal routed past a procedure to a person and
+reaching a live run; a person's words left unread as a run ended, waking
+its task again; a proposal routed past a procedure to a person and
 accepted, and one that stalls and passes up; a chat's goal accepted as
 its person's, outliving the chat; an inbox filling, its news merged,
 words refused, a result still taken; two tasks wanting the last slot of

@@ -33,10 +33,13 @@
   make an application's root decide or order something is a change to
   jig's design first.
 - **The core never depends on smith.** Only the charter's translation
-  into smith's terms and the client's decoding of turns, below its
-  domain, do; the hub, `jig-host`, and the client's
-  domain and view do not. An application without agents never links
-  smith (`README.md`, section 9).
+  into smith's terms, the client's decoding of turns, below its domain,
+  and an application's roots that compose smith's agent capability, with
+  their protocol layers, which decode and encode smith's payloads, do.
+  The hub, `jig-host`, carries smith's payloads as bytes it never reads;
+  it, the core and its children, and the client's domain and view link
+  no smith crate. An application without agents never links smith
+  (`README.md`, section 9; `domain/hosts.md`, 6.8).
 - **No system is named in jig's code:** no forge, repository, branch, pull
   request, issue or git. Systems are an application's connectors.
 - **Work on a branch in a worktree of your own,** never in the primary

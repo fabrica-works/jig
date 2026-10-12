@@ -1,14 +1,14 @@
 # Connectors
 
-Provisional, 2026-10-07. The contract an external system meets to be
-driven by an application on jig: what a connector is, what crosses
-between it and the core through the application's root, and what every
-connector does: resources and holds, effects and the outbox, facts and
-topics, procedures, requirements' verdicts, projections, reads and brief
-sections, workspaces, drift and adoption. It is the fifth primitive of
-core.md (3.5) in depth, and jig's API toward applications: connectors
-are the application's, and this is what each owes and is owed. What is
-still open is listed in section 16.
+Provisional, 2026-10-07, revised 2026-10-12. The contract an external
+system meets to be driven by an application on jig: what a connector is,
+what crosses between it and the core through the application's root, and
+what every connector does: resources and holds, effects and the outbox,
+facts and topics, procedures, requirements' verdicts, projections, reads
+and brief sections, workspaces, drift and adoption. It is the fifth
+primitive of core.md (3.5) in depth, and jig's API toward applications:
+connectors are the application's, and this is what each owes and is
+owed. What is still open is listed in section 16.
 
 ## 1. In one page
 
@@ -81,7 +81,7 @@ application root            routes between the core and every connector
   | subscribe this task to this topic; unsubscribe | news for these subscribers, classified |
   | serve this read for a run | its answer |
   | gather this section for a brief, within this budget; cut it to a size; hand it over | ready, with its size; the section |
-  | name what a run of this task needs prepared; hand it over | its workspace items, with their size; the items |
+  | name what a run of this task needs prepared; hand it over | its workspace items, with their size, and the application's credentials they need; the items |
   | what a run of this task left on its resources | taken: facts updated, procedures stepped |
   | adopt this resource into this project | adopted, with what may be done there and the parties it knows; refused |
   | restart: restore these records; read afresh; settle the outbox | done |
@@ -550,6 +550,12 @@ procedure, but a mechanism of the connector's, keyed to the goal.
   through tools. These workspace items are handed to the root with the
   assignment (root.md, section 7), and the application's workspace child
   on the host prepares them (hosts.md, section 7).
+- **The credentials they need.** As it gathers a run's workspace items,
+  the connector names the application's credentials the host needs to
+  prepare, deliver and save them (a token to fetch and push), by the
+  application's number for each. The core grants the run the current
+  generation of each, and the assignment carries them as grants
+  (engine.md, 12.1). The connector never holds a value.
 - **Context resources** of the project may be added read-only, as the
   connector says.
 - **What a run left** on a connector's resources, as its host reports it

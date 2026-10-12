@@ -1,6 +1,6 @@
 # jig's domain
 
-Provisional, 2026-10-07, revised 2026-10-10. The design of jig's domain
+Provisional, 2026-10-07, revised 2026-10-12. The design of jig's domain
 layer: the core an application's engine composes, the contract its
 connectors meet, what its root does, where its agents run, and how all
 of it is tested. jig as a whole, and why it is a kit, is `../README.md`;
@@ -29,8 +29,9 @@ mechanics are those of skein's `programming-model.md`.
 7. **people.md:** parties: identity, roles, requests, inboxes, chats,
    person tasks, notifications.
 8. **hosts.md:** agents and their hosts: the contract, the three shapes,
-   the agent's two kinds, the one host for runs wherever their agents
-   run, workspaces, and what the core takes from smith.
+   the agent's two kinds, both smith's, the one host for runs wherever
+   their agents run, smith's payloads it carries, workspaces, and what
+   the core takes from smith.
 9. **testing.md:** the worlds, the conformance world and its referee.
 
 `../examples.md` is the example application, `ops`, which each document
@@ -52,13 +53,13 @@ an application's engine
 │   └── jig-core-views          parties' watches
 ├── <connector>…                the application's (connectors.md)
 ├── jig-host                    hosted runs on the engine's slots, if it runs agents (hosts.md)
-├── jig-inline-agent            their agent: smith's domains in this process
+├── smith-inline-agent          their agent, smith's: its domains in this process
 └── …                           the application's own child domains
 
 an application's worker, if it has workers
 <application>-worker            the worker's root: the application's
 ├── jig-host                    hosted runs (hosts.md)
-├── smith-host-domain           their agent: processes, smith's
+├── smith-host-domain           their agent, smith's: processes; or smith-inline-agent, as the root chooses
 └── <workspace>                 the application's
 
 skein-lib's journal             the commit barrier every root holds (root.md, section 4)
@@ -66,8 +67,10 @@ skein-lib's journal             the commit barrier every root holds (root.md, se
 
 The crate graph is the role graph: no jig crate depends on an
 application's; the core and its children depend on skein-lib alone; the
-hub depends on skein-lib alone too, and only the inline agent and the
-charter's translation link smith; nothing in jig names a system.
+hub depends on skein-lib alone too, and carries smith's payloads as
+bytes; the agent capabilities are smith's crates, and jig ships none.
+Which crates link smith is hosts.md, 6.8. Nothing in jig names a
+system.
 
 ## 3. Conventions
 
@@ -79,8 +82,9 @@ charter's translation link smith; nothing in jig names a system.
 - **skein's foundation documents** are named by their own file names:
   `programming-model.md`, `testing-strategy.md`, `notes.md`. skein's
   design documents are named with skein's name: skein's `lib.md`.
-- **smith's documents,** in smith's `docs/design/domain/`, are named with
-  smith's name: smith's `run.md`.
+- **smith's documents,** in smith's `docs/design/`, are named with
+  smith's name and their path there: smith's `domain/run.md`, smith's
+  `protocol/channel.md`.
 - **An application** appears only as an example, and says so: `ops`
   most often, temper where a second example helps.
 - **Each document** says in one page what it is, then its structure, its
@@ -116,10 +120,12 @@ charter's translation link smith; nothing in jig names a system.
 | run, attempt | one activation of an agent task on a host; one try at it, fenced by a number that only grows |
 | tries | the failed attempts counted per class, which a release resets |
 | transcript, turn | an agent task's conversation, kept turn by turn; one LLM turn, committed as it ends |
+| window | smith's: the turns from the last that opens a window (a window turn, or a conversation's first) are the current window, all a resumed run is given (engine.md, 7.2) |
 | a completion's retry | a turn's completion asked for again within one run, counted from zero by smith; a later retry's live text replaces an earlier one's (hosts.md, 6.5). Not one of a task's tries |
 | call | a run's tool call, named by the run, decided once |
 | brief | the context a run is given for why it runs |
 | message, inbox | what a task hears once started; its durable, bounded store of them |
+| message refused, the unread fence | a message a run did not take, with smith's reason (too large, full, a name in use, ending), told inside the run's next turn or its answer; the answer's last message read, after which every message relayed, and not refused, went unread. Either stays in the inbox (hosts.md, 6.4 and section 9) |
 | wake policy | which messages wake a task, and how they batch |
 | subscription, topic | a task's standing interest; a connector's subject |
 | reference | a task another may message |
@@ -149,7 +155,8 @@ charter's translation link smith; nothing in jig names a system.
 | owned, participating | what the application writes alone; what it writes among others |
 | drift | a change the application did not make to what it owns and relies on |
 | host, hub | where a run runs: the engine's own slots, or a worker; `jig-host`, the one hub hosting runs on either (hosts.md, section 6) |
-| inline agent | smith's domains run in the engine's process, the agent capability of the engine's hub (hosts.md, 5.2) |
+| agent capability | the hub's agent, one of smith's two crates speaking smith's parent face: `smith-host-domain`, agent processes, one per run (hosts.md, 5.1); or `smith-inline-agent`, smith's domains in the host's process, the engine's hub's agent and a worker's by its root's choice (hosts.md, 5.2) |
+| smith's payloads | the charter, a resumed run's transcript, turns' bodies, call names and results: typed in smith's agent capabilities, bytes in the hub, translated by hand-out to the root's protocol layer; smith's facts are decoded the same way into jig's typed activity (hosts.md, 6.8) |
 | workspace, item | what a run works in; what a connector names for it to hold |
 | workstream | the key a workspace is cached under: the holding task's number |
 | delivery | a run's hand-over through its workspace, made by the application's workspace |
@@ -182,8 +189,8 @@ where each is answered:
   a provider and a subject (people.md, section 3).
 - **Hosting runs inside the engine:** the same hub as on a worker, a
   child of the application's root, whose slots the fleet places on like
-  a worker's, with the inline agent as its agent (hosts.md, sections 5
-  and 6; engine.md, section 8).
+  a worker's, with `smith-inline-agent` as its agent, with no workspace
+  (hosts.md, sections 5 and 6; engine.md, section 8).
 - **The worker:** jig ships the hub; the worker's root and its
   workspaces are the application's (hosts.md, sections 4 and 7).
 - **Costs beyond LLMs:** a connector may price kinds of effect, charged
@@ -204,10 +211,12 @@ where each is answered:
   freshness; a policy may require a guard (authority.md, section 10;
   connectors.md, section 7).
 - **A hard ceiling on recorded spend:** a run reserves each completion's
-  maximum before making it, a priced effect is charged its maximum; only
-  turns lost with a worker escape it, within a stated bound
-  (authority.md, section 7). It asks a change of smith's `run.md`,
-  section 9 (hosts.md, section 8).
+  most before making it and winds down on its reserve when the rest is
+  spent, as smith's budget does (smith's `domain/run.md`, 9 and 9.1), and
+  the core places no run smith would refuse for its budget; a priced
+  effect is charged its maximum; only turns lost with a worker escape
+  it, within a stated bound (authority.md, section 7; hosts.md,
+  section 8).
 - **Standing work renews by period:** a standing task's allotment of
   tasks and spend is carved again each period (authority.md, section 7).
 - **Periods are the application's to say:** the engine keeps no
@@ -225,10 +234,38 @@ where each is answered:
   reach, with fakes reporting what they observed independently of the
   root's translation (root.md, section 1; testing.md, section 5).
 - **One host:** runs are hosted by one hub, `jig-host`, in the engine and
-  on workers alike, its agent a capability of two kinds (processes, or
-  the inline agent in the engine), its link to the core its root's. The
-  run's lifecycle is built and tested once (hosts.md, sections 1 and 4
-  to 6).
+  on workers alike, its agent a capability of two kinds, both smith's
+  (agent processes, `smith-host-domain`; or `smith-inline-agent`, in the
+  engine, or on a worker by its root's choice), translated with the same
+  functions, its link to the core its root's. jig ships no agent of its
+  own. The run's lifecycle is built and tested once (hosts.md, sections 1
+  and 4 to 6).
+- **One process runs workers' agents as child processes,** as between
+  hosts: the engine and its workers share the process, and each worker's
+  agents run in processes of their own, which the application's binary
+  may serve as a command of its own (hosts.md, section 3).
+- **smith's payloads are bytes in the hub, typed in the agent:** the
+  root that composes the two hands each payload out to its protocol
+  layer, which decodes or encodes it with smith's codec functions, as a
+  host tool's call is decoded; neither the hub nor the core links smith
+  (hosts.md, 6.8).
+- **Every message ends once:** read, refused or unread. The start
+  carries the messages waiting in the task's inbox; a refusal travels
+  inside the run's next turn, or its answer, and is committed with the
+  turn's read messages; a message the run refused or left unread stays
+  in the inbox; every kind of message fits the deployment's bound, and
+  the fleet admits no host whose agent takes less, so no run refuses one
+  for its size (hosts.md, 6.4 and sections 2 and 9; tasks.md, 8.2 and
+  8.3).
+- **An application's credentials are lent as accounts are:** named by
+  number and generation, their values its protocol layer's, named by the
+  connectors for a run's workspace and granted with the assignment
+  (engine.md, 12.1; connectors.md, section 10).
+- **A run's text where its host has it:** activity from every host
+  carries no content; a run's text, and a tool begun with its call, come
+  from a host whose agent runs in its process, and from agent processes
+  once smith's channel carries them, under the same contract (hosts.md,
+  6.5).
 - **Level-triggered views:** a watch delivers its subject's current
   document, one delivery in flight, changes coalesced, never queued; only
   a run's text as it is written is a stream, from an offset; an

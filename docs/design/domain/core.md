@@ -1,12 +1,12 @@
 # The model
 
-Provisional, 2026-10-07. What jig's domain is beneath its parts: an
-engine core that runs work done by agents, procedures and people, keeps
-it in its own store, and drives external systems through an
-application's connectors. Every other document in this directory builds
-on it, and it is the first to read (README.md gives the order and the
-names). The mechanics are those of skein's `programming-model.md`. What
-is still open is listed in section 12.
+Provisional, 2026-10-07, revised 2026-10-12. What jig's domain is
+beneath its parts: an engine core that runs work done by agents,
+procedures and people, keeps it in its own store, and drives external
+systems through an application's connectors. Every other document in
+this directory builds on it, and it is the first to read (README.md
+gives the order and the names). The mechanics are those of skein's
+`programming-model.md`. What is still open is listed in section 12.
 
 ## 1. In one page
 
@@ -334,9 +334,10 @@ fresh agent the chat delegates the goal to, which keeps a long
 conversation out of the supervision. The choice is the charter's.
 
 A coordinator woken rarely and far apart starts fresh by default, from a
-brief: its goal, the plan's state, its inbox and its notes. A chat
-resumes its transcript, which the store keeps whole. Either is its
-charter's choice (engine.md, 7.4).
+brief (its goal, the plan's state and its notes) and the messages
+waiting in its inbox. A chat resumes its transcript's current window,
+and the store keeps the whole. Either is its charter's choice
+(engine.md, 7.4).
 
 ### 7.3 Shapes of work
 
@@ -360,7 +361,7 @@ The same primitives make each of these:
 
 An agent delegates in two ways, and chooses between them:
 
-- **sub-agents within its run** (smith's `run.md`, 5.3): cheap,
+- **sub-agents within its run** (smith's `domain/run.md`, 5.3): cheap,
   ephemeral, sharing its workspace and its budget, and ended with the
   call that asked for them;
 - **tasks:** durable and scheduled, with an executor, a workspace and an

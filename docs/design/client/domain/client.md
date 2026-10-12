@@ -1,6 +1,6 @@
 # The client domain
 
-Provisional, 2026-10-09, revised 2026-10-10. `jig-client`: what a party's
+Provisional, 2026-10-09, revised 2026-10-12. `jig-client`: what a party's
 client knows of the engine's work, and what it does with it. It is the
 client's counterpart of the engine's core: a child of the application's
 client root, holding jig's part of the client: the frame and the link,
@@ -381,7 +381,7 @@ What a chat's page leads with, and every agent task's activity
 - **Turns, decoded below the domain.** A turn is bytes of smith's
   vocabulary, which the engine never reads (`../../domain/engine.md`,
   7.2). The client's protocol layer decodes it with smith's transcript
-  crate (smith's `transcript.md`) into the client's own turn: its
+  crate (smith's `protocol/transcript.md`) into the client's own turn: its
   messages; their blocks of text, calls and results, each call named by
   its tool with its input as written and its outcome summarised; what it
   used and spent. The domain holds that turn, typed and bounded, and
@@ -399,7 +399,9 @@ What a chat's page leads with, and every agent task's activity
   turn being written: the client keeps the text it holds of that turn, and
   takes what goes past it. A turn lost with its host never commits: its
   provisional text goes when the run ends, and the next run starts after
-  the last committed turn.
+  the last committed turn. A run whose host gives no text and names no
+  call (contract.md, 7.3) shows none live: its words appear as each turn
+  commits.
 - **A person's words, in three states:** being sent, while their request
   is pending; sent, once its answer says which message they are in the
   task's inbox; read, once a committed turn says it read through that
@@ -562,3 +564,6 @@ the one the person saw; nothing beyond the client's limits is held.
   or be told at once that nothing will be sent until then.
 - **Prefetching:** reading a task's document when its chip is hovered or
   near the screen, to open its page at once.
+- **A window's turn:** how a conversation shows a turn that opens a
+  window (a compaction's summary of what came before it), beside the
+  earlier window's turns it summarises.

@@ -1,14 +1,15 @@
 # The client's protocol
 
-Provisional, 2026-10-10. What carries the contract between a party's
-client and the engine (`../client/domain/contract.md`) as bytes: the
-wire's records and their versions, the one connection a client keeps, its
-exchanges and its stream, how a keyed request's answer becomes the
-request table's envelope, reads, watches and a run's text, signing in and
-the secrets it leaves, the small store's encoding, an application's
-documents and requests on the same connection, and the shells. Its two
-sides are components of the engine's protocol layer and of the client's
-(`README.md`, section 5). What is still open is listed in section 15.
+Provisional, 2026-10-10, revised 2026-10-12. What carries the contract
+between a party's client and the engine (`../client/domain/contract.md`)
+as bytes: the wire's records and their versions, the one connection a
+client keeps, its exchanges and its stream, how a keyed request's answer
+becomes the request table's envelope, reads, watches and a run's text,
+signing in and the secrets it leaves, the small store's encoding, an
+application's documents and requests on the same connection, and the
+shells. Its two sides are components of the engine's protocol layer and
+of the client's (`README.md`, section 5). What is still open is listed
+in section 15.
 
 ## 1. In one page
 
@@ -37,9 +38,11 @@ sides are components of the engine's protocol layer and of the client's
   versions, its heartbeat), carries a comment at each heartbeat while
   nothing else is sent, and its loss drops every watch on it, which the
   client domain reopens.
-- **Signing in is each provider's exchange,** run by the engine's protocol
-  layer and the client's shell. Its result is a sign-in's secret: an
-  HTTP-only cookie in a browser, a bearer token elsewhere. The engine
+- **Signing in is each provider's exchange,** with the client's shell.
+  jig ships one provider, the deployment's link; an application's
+  providers are components of its protocol layer, to which the engine's
+  side routes their sign-in routes. Signing in leaves a sign-in's secret:
+  an HTTP-only cookie in a browser, a bearer token elsewhere. The engine
   keeps its digest, and hands the domain only the sign-in's number.
 - **Versions per owner,** jig's and each application's; the engine serves
   a range of each, which its stream's hello states; a client outside a
@@ -69,11 +72,12 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
 
 - **`jig-protocol-engine-clients`** is a component of the engine's
   protocol layer: the HTTP server's exchanges for the client's routes, the
-  clients' streams, sign-ins' secrets checked against their digests, the
-  translation between the wire's records and the core's vocabulary, and
-  the stream's pacing. An application's requests, reads and subjects are
-  decoded by the application's wire, through the protocol layer's routing,
-  and reach the engine's root typed.
+  clients' streams, the deployment's link, an application's providers'
+  sign-in routes routed to them, sign-ins' secrets checked against their
+  digests, the translation between the wire's records and the core's
+  vocabulary, and the stream's pacing. An application's requests, reads
+  and subjects are decoded by the application's wire, through the
+  protocol layer's routing, and reach the engine's root typed.
 - **`jig-protocol-client-link`** is a component of the client's protocol
   layer: each attempt's exchange, the stream and its watches, the
   envelopes, the small store's records encoded and decoded, the stream's
@@ -224,17 +228,26 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   being written, within its bound; the client keeps what it holds and
   takes what goes past it (`../client/domain/client.md`, section 10).
   These events leave without waiting for a commit, marked provisional.
+  Only a run whose host gives its text, and the call it is making, has
+  them (`channel.md`, 6.4); a run in an agent process has neither.
 
 ## 8. Signing in
 
-- **A provider's exchange** is the application's: its kind (an OAuth or
-  OpenID server, a company's directory, the deployment itself for
-  services) and its settings. The engine's protocol layer runs it: for a
-  browser, the shell navigates to the engine's sign-in route for the
-  provider, the engine sends the person to the provider, and the
-  provider's redirect comes back to the engine, which reads who the
-  party is and drops what the exchange returned
-  (`../domain/people.md`, section 3).
+- **jig ships one provider,** the deployment's link, for one person's
+  machine (below). Services' credentials it issues itself, under the
+  deployment as their provider (below).
+- **An application's provider** (an OAuth or OpenID server, a company's
+  directory) is a component of the application's protocol layer, with
+  its settings in the application's configuration and its exchange its
+  own. `jig-protocol-engine-clients` routes the provider's sign-in route,
+  and the redirect back to the engine, to that component, through the
+  protocol layer's routing, and takes back an identity (the provider's
+  number and the subject, with a login and a name for display) or a
+  refusal, which signs nobody in. For a browser: the shell navigates to
+  the engine's sign-in route for the provider, the component sends the
+  person to its server, and the server's redirect comes back to the
+  engine, where the component reads who the party is and drops what the
+  exchange returned (`../domain/people.md`, section 3).
 - **The sign-in,** then: the core hears the identity and commits the
   sign-in, which gives it its number; the engine's side keeps the digest
   of a fresh secret under that number, in the store's secrets' records;
@@ -258,9 +271,10 @@ the platform's HTTP stack, TLS                  TLS server, or plaintext on loop
   deployment's first owner, and spends the secret. One link is live at a
   time: when a browser reaches the link provider's sign-in route
   without a live link's secret, the engine prints a fresh one, and the
-  page it answers says to find it in the engine's output. It is a provider of jig's, which an application enables by
-  configuration (`configuration.md`, section 3), and only on a loopback
-  listener.
+  page it answers says to find it in the engine's output. It is jig's
+  one provider, `jig-protocol-engine-clients`' own, which an application
+  enables by configuration (`configuration.md`, section 3), and only on
+  a loopback listener.
 - **A service's credential** is issued when an owner makes the service:
   the engine's protocol layer draws it, keeps its digest, and answers the
   owner's request with it once, never again. The service's shell holds
@@ -369,7 +383,8 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The component's machine worlds:** each side against a scripted peer
   of bytes: answers of every kind and none, deliveries paced by a slow
   reader, a stream dropped mid-event, a hello out of range, signed out,
-  records that do not decode.
+  records that do not decode, and, on the engine's side, a sign-in routed
+  to a scripted provider, answered with an identity and with a refusal.
 - **The protocol world,** `tests/client-protocol`: the client's world's
   stories (`../client/domain/testing.md`) run through bytes, the client
   root and the fake person over `jig-protocol-client-link` and the native
@@ -396,6 +411,10 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **JSON records:** the same schemas written as JSON, for clients not
   built on skein, when the generator writes them (skein's `codec.md`,
   section 7).
+- **A provider kind of jig's for OAuth or OpenID:** a generic provider,
+  configured by its issuer and its client, which jig would ship beside
+  the deployment's link, so an application whose people sign in through
+  a standard server writes no provider of its own (section 8).
 
 ## 16. What it owes and is owed
 
@@ -403,7 +422,13 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   signed out (`../client/domain/contract.md`, section 6), a reopened run's
   watch taken from its turn's beginning (`../client/domain/client.md`,
   section 10), and signing out as the shell's exchange
-  (`../client/domain/client.md`, section 12) are in its design.
+  (`../client/domain/client.md`, section 12), and a run's document with
+  no text and no call, for a run whose host gives neither
+  (`../client/domain/contract.md`, 7.3), are in its design.
+- **An application's protocol layer** is owed the routing of its
+  providers' sign-in routes and redirects to their components, and owes
+  `jig-protocol-engine-clients` an identity or a refusal for each
+  (section 8).
 - **The engine's domain** is owed nothing new: sign-ins numbered by their
   commit, and a party ending theirs (`../domain/people.md`, section 3),
   watches and reads as `../domain/engine.md`, section 11 has them.

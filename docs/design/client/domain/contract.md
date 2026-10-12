@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-10. What crosses between a
+Provisional, 2026-10-09, revised 2026-10-12. What crosses between a
 party's client and the engine, at the level of the two domains: who the
 party is, the keyed requests and their answers, the documents the engine
 gives, the reads and watches that bring them, and versions. It is to
@@ -433,6 +433,10 @@ commit, so they leave through the journal's door (`../../README.md`,
   says so; the turn, once committed, has it all.
 - **The watch follows the task,** not one attempt: a new run's text
   follows the last, and its beginning is in the document.
+- **Only from a host that gives it.** A run's text and the call it is
+  making come from hosts that hand them up (`../../domain/hosts.md`,
+  6.5): a run in an agent process gives neither, and its document holds
+  no text and no call, while its turns reach the client as they commit.
 
 ## 8. Versions
 

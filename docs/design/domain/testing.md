@@ -1,12 +1,12 @@
 # Testing the domain
 
-Provisional, 2026-10-07. How jig's domain is tested, and how it tests an
-application's: the worlds of jig's own parts, the core's world, and the
-conformance world every application runs its domain on, with the referee
-that holds it to jig's promises. It applies skein's `testing-strategy.md`
-to jig's domain layer; the tiers below the domain (protocol, simulated,
-the real loop) come with jig's protocol layers. What is still open is
-listed in section 10.
+Provisional, 2026-10-07, revised 2026-10-12. How jig's domain is tested,
+and how it tests an application's: the worlds of jig's own parts, the
+core's world, and the conformance world every application runs its
+domain on, with the referee that holds it to jig's promises. It applies
+skein's `testing-strategy.md` to jig's domain layer; the tiers below the
+domain (protocol, simulated, the real loop) come with jig's protocol
+layers. What is still open is listed in section 10.
 
 ## 1. In one page
 
@@ -56,8 +56,11 @@ referee in the loop, the heap counted at every iteration
 - **brief:** sections planned, gathered, cut by size, a required one
   missing; connectors' sections as sizes and tokens only.
 - **notes, views, accounts:** each its own concern.
-- **the hub,** with agents of both kinds, processes and the inline agent:
-  hosts.md, section 11.
+- **the hub,** with agent capabilities of both kinds, smith's: agent
+  processes, `smith-host-domain` over smith's scripted agent processes;
+  and, as the in-process kind, `smith-inline-agent`'s runs over skein's
+  fake LLM; with turns that open windows, and messages refused and left
+  unread: hosts.md, section 11.
 
 Each child's world plays its parent and the store as engine.md, 5.6
 says: it keeps saved records, commits at the end of each step, and
@@ -191,9 +194,11 @@ more than one world needs them (testing-strategy.md, section 4):
   commits, fails one, and serves pages slowly;
 - **scripted workers:** each a host that speaks the contract of
   hosts.md, section 2, playing a run's script, keeping turns and answers
-  until acknowledged, losing its channel and coming back, or vanishing;
-- **the inline agent's runs:** smith's real domain over skein's fake LLM,
-  with a script per charter;
+  until acknowledged, refusing messages and leaving them unread, losing
+  its channel and coming back, or vanishing;
+- **`smith-inline-agent`'s runs:** smith's real domain over skein's fake
+  LLM, with a script per charter, for the hub's world and for an
+  application's worlds that run smith's own domain;
 - **scripted parties:** sign-ins and requests, by script or at random
   within their role;
 - **the test connector:** resources named by paths, kinds of hold

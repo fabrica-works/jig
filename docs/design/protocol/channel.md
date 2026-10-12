@@ -1,13 +1,14 @@
 # jig's channel
 
-Provisional, 2026-10-10. The channel between an engine and each of its
-workers: the contract of `../domain/hosts.md`, section 2, carried as
-frames of skein's framed channel (skein's `channel.md`) with records
-generated from schemas (skein's `codec.md`). It covers the opening and
-what authenticates a worker, the records each way, what crosses as bytes
-of another owner, names and credential grants, liveness and flow
-control, the worker's link on each side, the two components that own it,
-and how it is tested. An application with no workers has no channel: its
+Provisional, 2026-10-10, revised 2026-10-12. The channel between an
+engine and each of its workers: the contract of `../domain/hosts.md`,
+section 2, carried as frames of skein's framed channel (skein's
+`channel.md`) with records generated from schemas (skein's `codec.md`).
+It covers the opening and what authenticates a worker, the records each
+way, what crosses as bytes of another owner and where smith's are
+decoded, names and credential grants, liveness and flow control, the
+worker's link on each side, the two components that own it, and how it
+is tested. An application with no workers has no channel: its
 engine's hub is linked to the core directly (`../domain/hosts.md`, 6.1).
 What is still open is listed in section 14.
 
@@ -33,17 +34,18 @@ What is still open is listed in section 14.
   a worker, `jig-protocol-worker-link` hands the hub what the engine sent;
   on the engine, `jig-protocol-engine-workers` hands the engine's root
   what the worker's hub sent, in the same vocabulary the engine's own hub
-  speaks. The engine's root
-  routes a worker's link as it routes its own hub, with the same
-  translations to and from the core's fleet (`../domain/root.md`,
-  section 5).
-- **What is not jig's crosses as bytes:** smith's charter, turns and
-  results, in smith's own versioned encodings; the application's
-  workspace items, what a run left on resources, what it saved and a
-  delivery's evidence, in the application's own encodings; host tools'
-  inputs and answers as the run and the engine wrote them. jig's
-  components never decode them; the application's protocol layer decodes
-  its own before the roots see them.
+  speaks. The engine's root routes a worker's link as it routes its own
+  hub, with the same translations to and from the core's fleet
+  (`../domain/root.md`, section 5).
+- **What is not jig's crosses as bytes:** smith's payloads (the
+  charter, a resumed run's transcript, turns, call names and a run's
+  result), in smith's own versioned encodings, as the hub holds them
+  (6.1); the application's workspace items, what a run left on
+  resources, what it saved and a delivery's evidence, in the
+  application's own encodings; host tools' inputs and answers as the run
+  and the engine wrote them. jig's components never decode them; the
+  application's protocol layer decodes its own before the roots see
+  them.
 - **The domains own reliability; the channel adds the rest.** Fencing,
   acknowledgements, resending after a hello and the graces' order are the
   fleet's and the hub's (`../domain/engine.md`, section 8;
@@ -51,7 +53,8 @@ What is still open is listed in section 14.
   versions, liveness, and, on the worker's side, the link's dialling,
   redialling and its grace's clock.
 - **Credentials travel beside the domains.** The domains name a credential
-  grant by account and generation. Each side's component fills its value
+  grant by its number (an LLM account's, or one of the application's
+  credentials') and a generation. Each side's component fills its value
   in as it encodes and takes it out as it decodes, from tables of the
   protocol layer (section 8).
 - **Bounded, never queued past its cap.** Each side's output cap is sized
@@ -83,10 +86,12 @@ io: a listener's sockets                            io: one socket, dialled
 - **The worker's protocol layer** owns `jig-protocol-worker-link`, which owns
   the one channel it dials, the link's life (section 10), the relays in
   flight across channels, and the same translation.
-- **Below the hub,** a worker's agents run over smith's own channel, which
-  smith's host half carries (smith's `protocol/hosts.md`). jig's channel
-  ends at the hub: what a run's agent sends reaches the engine only as the
-  hub relays it.
+- **Below the hub,** a worker's agents run as agent processes, over
+  smith's own channel, which smith's host half carries (smith's
+  `protocol/hosts.md`, sections 2 and 3), or, on a worker whose root
+  composes `smith-inline-agent`, in its own process (smith's
+  `domain/host.md`, 9.1). jig's channel ends at the hub: what a run's
+  agent sends reaches the engine only as the hub relays it.
 - **The streams are the protocol layer's to make:** the engine's listener
   and TLS, the worker's dial and TLS. The components take the streams
   they are given, as skein's channel does.
@@ -104,7 +109,9 @@ io: a listener's sockets                            io: one socket, dialled
   deadlines, which their protocol layer reports and fires
   (programming-model.md, section 9). Each depends on skein-lib, skein's
   channel, `jig-protocol-worker-wire` and `jig-host`'s vocabulary;
-  neither depends on the core, smith or an application's crate.
+  neither depends on the core, smith or an application's crate. smith's
+  payloads pass through both as bytes; smith's codecs are the routing's
+  (6.1).
 - **Translation is a module of small total functions** in each component,
   between records and the hub's vocabulary, exhaustive both ways. The
   domain worlds need none of it; the channel's protocol world (section 12)
@@ -169,16 +176,18 @@ worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
 
 - **The worker's hello is its first record,** after both terms, as
   `../domain/hosts.md`, section 2 has it: its slots, its stop bound
-  (10.1 says what it counts), the workstreams it holds, the runs it
-  hosts and those whose turns or answer wait for acknowledgement.
+  (10.1 says what it counts), its agent's bounds as its agent
+  configuration declares them (5.1), the workstreams it holds, the runs
+  it hosts and those whose turns or answer wait for acknowledgement.
 - **The engine's domain hears a channel only with its hello.** A channel
   refused during its opening, or lost before its hello, is never
   announced. Nothing but the hello is taken before it.
-- **The fleet may refuse the hello:** no room for another host, or a stop
-  bound not strictly shorter than the engine's grace
-  (`../domain/engine.md`, section 8). The engine's side then refuses the
-  channel with *not admitted*, the fleet's reason as its text, and the
-  worker redials after its backoff, as for any refusal.
+- **The fleet may refuse the hello:** no room for another host; a stop
+  bound not strictly shorter than the engine's grace; or an agent whose
+  bounds cannot run the engine's charters (`../domain/engine.md`,
+  section 8). The engine's side then refuses the channel with *not
+  admitted*, the fleet's reason as its text, and the worker redials after
+  its backoff, as for any refusal.
 - **Deadlines:** the opening within the handshake's deadline from the
   connection being made; the hello within the hello's deadline from
   `Accept`. Each is the component's, from its limits.
@@ -193,14 +202,13 @@ answer, and a **notice** is not answered.
 
 | Record | Fields | Shape |
 |---|---|---|
-| hello | slots; stop bound, a duration; workstreams held; runs hosted, each with its task, attempt and phase; runs whose turns or answer wait for acknowledgement | first, once |
-| turn | task, attempt; its number within the attempt; its cumulative spend; the last message it read, by name, if any; its bytes (6.1) | notice, kept by the hub until acknowledged |
-| call | task, attempt; the run's name for the call; the host tool's name; whether it writes; its input; the time left on its deadline | call |
-| bounced | task, attempt; the message's name; why: too large, full, ending | notice |
-| answer | task, attempt; the turns it took; what it spent; how it ended: refused (busy, or invalid and what), ended with its result, parked, or failed with its typed failure and bounded detail; what it left on resources and what it saved, each the application's bytes (6.2) | answer to an assignment, kept by the hub until acknowledged |
-| fact | task, attempt; activity (its phase, a tool or a check begun or ended), or text (6.4) | notice, best effort |
-| rejected | task, attempt; account, generation | notice |
-| exhausted | task, attempt; account; how long until it may be used again | notice |
+| hello | slots; stop bound, a duration; the agent's bounds: for each model it declares, its name, window and output; the most turns, spend, time and waiting a run may have; its checks' timeout; the largest message a run takes and how many its inbox holds; the turns it keeps unacknowledged (4.3); workstreams held; runs hosted, each with its task, attempt and phase; runs whose turns or answer wait for acknowledgement | first, once |
+| turn | task, attempt; its number within the attempt; its cumulative spend; the last message it read, by name, if any; the messages refused since the run's previous turn, each by name with smith's reason: too large as the run reads it, the run's inbox full, a name in use, or the run ending; whether it opens a window; its bytes, smith's (6.1) | notice, kept by the hub until acknowledged |
+| call | task, attempt; the run's name for the call, as bytes (section 7); the host tool's name; whether it writes; its input; the time left on its deadline | call |
+| answer | task, attempt; the turns it took; what it spent; the last message it read, by name, if any: the unread fence; the messages refused since the run's last turn, each by name with smith's reason, as a turn carries them; how it ended: refused (busy, or invalid and what), ended with its result, smith's bytes (6.1), parked, or failed with its typed failure and bounded detail; what it left on resources and what it saved, each the application's bytes (6.2) | answer to an assignment, kept by the hub until acknowledged |
+| fact | task, attempt; activity: the run's phase, a long operation begun (checks, an LLM completion or a command, with its span) or ended, or a count from smith's channel facts (its kind, its time, its count), all jig's typed activity, never smith's bytes; or, from a host that gives them, a tool begun with its call's name, its tool and its input, or text (6.4) | notice, best effort |
+| rejected | task, attempt; an LLM account, generation | notice |
+| exhausted | task, attempt; an LLM account; how long until it may be used again | notice |
 
 - **A call the run withdraws** ends on the worker: the hub answers the run
   that it is withdrawn and drops the engine's answer if one comes
@@ -209,19 +217,29 @@ answer, and a **notice** is not answered.
   still deciding the first, so the run asks again, and from the record it
   kept once the first is decided, never deciding it twice
   (`../domain/engine.md`, 7.3).
+- **Refusals ride with turns.** Every message the engine sends ends
+  once: read, refused or unread (`../domain/hosts.md`, section 9). A
+  turn's fence covers every message before it, so the core must know of
+  a refusal before it commits a turn whose fence passes it, across a
+  restart too, and no record of its own carries one: the hub keeps each
+  with the run's next turn, or its answer if none follows, and it
+  crosses, and crosses again after a hello, with that record. The core
+  records it in the commit that takes the turn's read messages
+  (`../domain/engine.md`, 7.2). A turn or an answer carries at most as
+  many as the run's inbox takes.
 
 ### 5.2 Down, engine to worker
 
 | Record | Fields | Shape |
 |---|---|---|
-| assignment | task, attempt; the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the charter, smith's bytes; the transcript, as its turns' bytes, when the run resumes; the calls committed since its last turn, each with its name, its tool and its answer; its credential grants, with their values (section 8) | call |
+| assignment | task, attempt; the run's identity, 16 bytes (section 7); the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the charter, smith's bytes; the transcript, when the run resumes: its current window's turns, smith's bytes, from the last that opens a window (6.1); the calls committed since its last turn, each with its name, its tool and its answer; the start's messages: those waiting in the task's inbox, oldest first, as many as the run's inbox takes, each with its name, its sender's label and its words, the rest relayed as message records as the run reads (`../domain/tasks.md`, 8.2); its credential grants, each naming whose table its value comes from, with their values (section 8) | call |
 | message | task, attempt; the message's name; its sender's label; its words | notice |
 | relayed | task, attempt; the call's name; the engine's answer: its text for the LLM and whether it is an error, or busy, to ask again after a backoff | answer to a call |
 | turn kept | task, attempt; the turn's number | notice |
 | turn busy | task, attempt; the turn's number: send it again after a backoff | notice |
 | acknowledge | task, attempt: the answer is durable, or not wanted | notice |
 | cancel | task, attempt | notice, at most one per attempt |
-| grant | task, attempt; account, generation, how long it is valid; its value (section 8) | notice |
+| grant | task, attempt; whose table its value comes from, jig's accounts' or the application's; its number there, generation, how long it is valid; its value (section 8) | notice |
 
 - **The fleet's refusals travel as the records above:** a turn answered
   busy, a relayed call answered busy or as an error, and an answer
@@ -241,38 +259,60 @@ answer, and a **notice** is not answered.
 
 - **Each side sends in its domain's order,** and skein's channel keeps it.
   The fleet and the hub rely on it: an answer goes after the turns it
-  counts (`../domain/hosts.md`, 6.4), messages go in their order
-  (`../domain/tasks.md`, 8.2), and acknowledgements in the order of the
-  commits they follow.
+  counts (`../domain/hosts.md`, 6.4), messages go in their order, a
+  start's before those sent after it (`../domain/tasks.md`, 8.2), and
+  acknowledgements in the order of the commits they follow.
 - **After a redial, everything kept goes again,** in order, after the
-  hello: the hub's unacknowledged turns and answers, and its relays still
-  waiting; the engine's current credential grant for every attempt it
-  keeps (section 13 says what the fleet owes for it). The domains drop
-  what they have seen (`../domain/engine.md`, section 8;
-  `../domain/hosts.md`, 6.6).
+  hello: the hub's unacknowledged turns and answers, with the refusals
+  they carry, and its relays still waiting; the engine's current
+  credential grants for every attempt it keeps (section 13 says what the
+  fleet owes for them). The domains drop what they have seen
+  (`../domain/engine.md`, section 8; `../domain/hosts.md`, 6.6).
 
 ## 6. Bytes of other owners
 
 ### 6.1 smith's charter, turns and results
 
+smith's payloads are bytes in the hub and typed in the agent; the root
+that composes the two hands each out to its protocol layer's routing, to
+be decoded or encoded with `smith-protocol-channel`'s functions
+(`../domain/hosts.md`, 6.8). jig's channel carries the bytes the hub
+holds, and neither of its components reads them.
+
 - **The charter** is put into smith's form by jig's one translation,
-  `jig-charter` (`../domain/hosts.md`, section 8), in the engine, and
-  crosses as smith's charter bytes, in smith's own version (smith's
-  `protocol/charter.md`). The hub hands it to smith's host domain unread.
-- **Turns** cross as smith's turn bytes, in smith's own version (smith's
-  `protocol/transcript.md`), up as they are taken and down, in order, as a
-  resumed run's transcript. The core reads a turn's number, size, spend
-  and the last message it read, which the record carries beside the bytes
+  `jig-charter` (`../domain/hosts.md`, section 8), in the engine's
+  protocol layer, and crosses as smith's charter bytes (smith's
+  `protocol/charter.md`). The worker's routing decodes it as the agent
+  starts, against the endpoints of the worker's agent configuration,
+  which resolve the names it uses (`configuration.md`, section 4;
+  smith's `protocol/charter.md`, section 7).
+- **Turns** cross as smith's turn bytes (smith's
+  `protocol/transcript.md`), encoded on the worker as the agent hands
+  each up, before the hub keeps it. The record carries beside them what
+  the core reads: the turn's number, size, spend, the last message it
+  read and whether it opens a window; the core keeps the bytes as they
+  came. Down, a resumed run's transcript is its current window's turns,
+  in order, within the resume limit, decoded on the worker as the agent
+  starts; earlier windows' turns are never sent (`../domain/engine.md`,
+  7.2).
+- **A run's result** is encoded on the worker as smith's result, in its
+  charter's version, before the hub keeps the answer. `jig-charter`'s
+  reader decodes it in the engine's protocol layer, for runs on workers
+  and in the engine alike, by the path of host tools' calls (6.3): the
+  core hands an answer's result out once the fleet has fenced it, and
+  the typed result comes back. A result that does not decode fails its
+  attempt as invalid.
+- **An assignment whose charter, transcript or a committed call's name
+  does not decode** is refused as invalid by the worker's root, naming
+  which, before the agent is started (`../domain/hosts.md`, 6.8). One
+  refused for its transcript is the engine's to start afresh
   (`../domain/engine.md`, 7.2).
-- **A run's result** crosses as smith's result, in its charter's version,
-  which `jig-charter`'s reader decodes in the engine's protocol layer,
-  for runs on workers and in the engine alike, by the path of host tools'
-  calls (6.3): the core hands an answer's result out once the fleet has
-  fenced it, the protocol layer reads it, and the typed result comes
-  back. A result that does not decode fails its attempt as invalid.
 - **Calls committed since a resumed run's last turn** cross with their
   answers as the engine kept them, so the run is told of them, not asked
   them again (`../domain/engine.md`, 7.3).
+- **In the engine's own hub,** nothing crosses this channel: the engine's
+  root hands its hub's payloads out the same way, so the core holds the
+  same bytes from either kind of host.
 
 ### 6.2 The application's parts
 
@@ -289,10 +329,10 @@ answer, and a **notice** is not answered.
 
 ### 6.3 Host tools' calls
 
-- **A call crosses as the run wrote it:** the call's name, the tool's
-  name as the charter declared it, whether it writes, and its input, the
-  JSON the LLM wrote, checked by smith only to be an object within its
-  bound (smith's `domain/run.md`, 5.2).
+- **A call crosses as the run wrote it:** the call's name, as the bytes
+  section 7 gives it, the tool's name as the charter declared it, whether
+  it writes, and its input, the JSON the LLM wrote, checked by smith only
+  to be an object within its bound (smith's `domain/run.md`, 5.2).
 - **The fleet fences it first,** as any call: one from an attempt that is
   not its task's live one is dropped. The core then hands the admitted
   call out for decoding, and the engine's protocol layer decodes its input
@@ -314,10 +354,23 @@ answer, and a **notice** is not answered.
 - **Facts are best effort** (`../domain/hosts.md`, 6.5): the worker's side
   sends one only while its output queue leaves room for everything else
   (section 9), and drops it, counted, otherwise.
-- **Activity** is the fleet's typed report: a run's phase, a tool or a
-  check begun or ended, a tool begun with its call's name and its input
-  within the views' bound, as the views and the deployment's document
-  show them (`../domain/hosts.md`, 6.5).
+- **Activity** is the fleet's typed report, which every host gives, and
+  which carries no content: a run's phase; its long operations (checks,
+  an LLM completion or a command), each begun with its span and ended
+  (smith's `domain/host.md`, section 2); and counts from smith's channel
+  facts, each its kind, its time since the activation's start and its
+  count (smith's `protocol/channel.md`, section 8), decoded from smith's
+  facts by the worker's hand-out (`../domain/hosts.md`, 6.8). The fact
+  record carries jig's activity, never smith's bytes, and the views show
+  a run by it.
+- **Text and named calls come only from a host that gives them:** a
+  run's text, and a tool begun with its call's name, its tool and its
+  input within the views' bound. smith drains them only in the host's
+  process, so a hub whose agent capability is `smith-inline-agent` gives
+  them (`llm.md`, section 3), and this channel carries them from such a
+  worker in the fact record. smith's channel carries facts without
+  content, so a worker whose agents are processes gives neither until it
+  does (section 13); the views show its runs by their activity.
 - **A run's text** carries the turn it belongs to, named by the attempt
   and its number within it, its completion's retry, the offset within
   that retry's text at which it starts, and its bytes. The call the run is
@@ -327,13 +380,10 @@ answer, and a **notice** is not answered.
   what they hold of a retry, because facts were dropped between, marks that
   turn's text cut, as text past its bound is; a new turn starts at zero
   under its own name. The turn, once committed, has all of it.
-- **The turn, retry and offset come from smith.** smith's agent says, with
-  each piece of text, which turn it is writing, in which retry and at which
-  offset; a host asks for text with each run's start, and the hub does
-  for every run (smith's `protocol/channel.md`, 8.1; smith's
-  `domain/run.md`, 11.1). smith numbers turns per activation, each start
-  of a run, and an attempt is one activation, so its numbers are the
-  attempt's.
+- **The turn, retry and offset are the host's to give** with each piece
+  of text, from what it drains (`llm.md`, section 3). smith numbers turns
+  per activation, each start of a run, and an attempt is one activation,
+  so its numbers are the attempt's.
 
 ## 7. Names
 
@@ -344,40 +394,64 @@ answer, and a **notice** is not answered.
   store restored.
 - **A message is named by its number,** which the core gives each message
   as it commits it, unique in the deployment; a turn names the last it
-  read, and a bounce the one it bounced.
-- **A call is named by the run,** as bytes the engine echoes and no
-  domain reads (`../domain/engine.md`, 7.3). `jig-charter` reads from
-  them the call's key (its completion, and its position within it) as
-  the protocol layer decodes the call (6.3), and hands it over typed
-  with the call, so a connector keys the call's effects by it.
+  read and those refused since the run's previous turn, and an answer
+  the last it read before it ended (its unread fence) and those refused
+  since the run's last turn.
+- **A call is named by the run,** typed by smith: its activation (the
+  attempt's number), its completion and its position within it (smith's
+  `domain/run.md`, 5.2). The root that composes the hub hands the name
+  out to be encoded before the hub relays the call (6.1); the hub, this
+  channel and the engine carry and echo its bytes, which no domain reads
+  (`../domain/engine.md`, 7.3), and the hub matches a relayed answer by
+  them. They are decoded back on the worker for the calls committed
+  since a resumed run's last turn, and by `jig-charter` in the engine,
+  which reads the call's key (its completion and position) as the
+  protocol layer decodes the call (6.3), so a connector keys the call's
+  effects by it.
+- **A run's identity,** which smith's start carries for the provider's
+  prompt cache (smith's `domain/host.md`, section 2), is the first 16
+  bytes of a SHA-256 digest of the deployment's id, the task's number and
+  its conversation's first attempt (`../domain/engine.md`, 7.1), derived
+  by the engine's protocol layer for each assignment, and for runs in the
+  engine alike. So a conversation's attempts share one identity, and no
+  two conversations do. No domain holds it, and the store keeps nothing
+  for it but the conversation's first attempt.
 - **A channel is named by the engine's side** with a token of its own,
   which the fleet uses and the component never reuses.
 
 ## 8. Credential grants
 
-- **The domains name a credential grant** by account and generation, with
-  how long it is valid, and never hold its value (`../domain/engine.md`,
-  section 12).
-- **The engine's accounts' table holds the values** (`llm.md`, 5.3).
-  `jig-protocol-engine-workers` fills a grant's value in as it encodes an
-  assignment or a grant record, reading it from that table through its
-  protocol layer. A grant whose generation the table no longer holds is
-  left out as it is encoded: a newer one follows it.
+- **The domains name a credential grant** by its number (an LLM
+  account's, or the application's for one of its credentials) and a
+  generation, with how long it is valid, and never hold its value
+  (`../domain/engine.md`, section 12).
+- **Tables of the protocol layer hold the values:** jig's accounts'
+  table, LLM accounts' (`llm.md`, 5.3), and the application's own table,
+  its credentials' (below). `jig-protocol-engine-workers` fills a grant's
+  value in as it encodes an assignment or a grant record, reading it from
+  the table the grant names, through its protocol layer. A grant whose
+  generation the table no longer holds is left out as it is encoded: a
+  newer one follows it.
 - **The worker's side takes the values out** as it decodes, into the
-  worker's table, by account, at most the two newest generations of each,
-  and the hub hears the names. The worker's protocol layer hands the
-  values to smith's host half, which fills them into its agent's start and
-  grants (smith's `protocol/hosts.md`, section 2). No root sees a value.
+  worker's table of the same owner, by number, at most the two newest
+  generations of each, and the hub hears the names. The worker's
+  protocol layer hands LLM accounts' values to smith's host half, which
+  fills them into its agent's start and grants (smith's
+  `protocol/hosts.md`, section 2), or to smith's LLM component on a
+  worker that composes `smith-inline-agent` (`llm.md`, section 6). No
+  root sees a value.
 - **Validity crosses as a duration,** the time left on the writer's
   clock, which the reader turns into a deadline on its own.
 - **An application's credentials** for a workspace's systems (a token
-  for fetching and pushing) are granted the same way: named in the
-  application's records by its own number and a generation, their values
-  held in the application's table on the engine, filled in as an
-  assignment or a grant record is encoded, and taken out on the worker
-  into the application's table there. A grant record names whose table
-  its value comes from: jig's accounts' or the application's. A worker's
-  configuration holds no credential but its own secret.
+  for fetching and pushing) are granted the same way, each named by the
+  application's number for it and a generation (`../domain/engine.md`,
+  12.1; `../domain/connectors.md`, section 10). Their values are the
+  application's protocol layer's, in its table on the engine, from a
+  source of its own, and are taken out on the worker into its table
+  there, for its workspace. A grant names whose table its value comes
+  from: jig's accounts' or the application's. Rejected and exhausted are
+  LLM accounts' only. A worker's configuration holds no credential but
+  its own secret.
 - **Grants cross only over TLS, in plaintext over loopback, or in one
   process,** as the worker's secret does (section 1).
 - **An entry goes** when its token has expired on the holder's clock, or a
@@ -395,16 +469,18 @@ answer, and a **notice** is not answered.
   its domain can have queued at once, so a record the domain sends is
   never refused at the channel's entrance:
   - engine to worker, per worker: for each slot, an assignment at its
-    largest, the messages its task's inbox may hold, an answer for each
-    call a run may have in flight, a kept or busy notice for each turn it
-    may have unacknowledged, an acknowledgement of its answer, a cancel,
-    and a grant for each account;
+    largest, its start's messages included, the messages its task's inbox
+    may hold, an answer for each call a run may have in flight, a kept or
+    busy notice for each turn it may have unacknowledged, an
+    acknowledgement of its answer, a cancel, and a grant for each LLM
+    account and each of the application's credentials;
   - worker to engine: a hello at its largest; for each slot, the turns
-    and the answer it may keep, its calls in flight and its bounces; a
-    rejected and an exhausted notice per account; and a reserve for
-    facts.
+    and the answer it may keep, each with the most refusals it may carry,
+    and its calls in flight; a rejected and an exhausted notice per LLM
+    account; and a reserve for facts.
 - **Facts take only the reserve.** The worker's side sends a fact only
-  while the queue leaves the rest of the cap free.
+  while the queue leaves the rest of the cap free; a long operation's
+  beginning and end are facts too.
 - **A link that fills its cap anyway** is lost: with caps sized so, only a
   peer that stopped reading can fill one, and the stall deadline closes
   it in any case.
@@ -484,12 +560,14 @@ and resends what it must after the next hello.
 
 - **`jig-protocol-worker-wire`'s sizes** are a plain struct of numbers,
   each taken from the domains' limits by the components that use them: the
-  largest charter, transcript, turn, message, call input, answer, result,
-  fact, detail and grant; the application's largest items, left work,
-  saved work and evidence, which the application's limits give; slots,
-  calls per run, turns kept per run, accounts. The crate turns them into
-  each kind's largest body and each side's output cap. It depends on no
-  domain.
+  largest charter, transcript (the resume limit, which bounds a current
+  window), turn, message, call input, answer, result, fact, detail and
+  grant; the application's largest items, left work, saved work and
+  evidence, which the application's limits give; slots, calls per run,
+  turns kept per run, the messages a run's inbox takes (a start's, and a
+  record's refusals), the models a hello may declare, LLM accounts and
+  the application's credentials. The crate turns them into each kind's
+  largest body and each side's output cap. It depends on no domain.
 - **The component's own limits:** the chunk read at once, the name's and
   the secret's bytes, the handshake's, hello's, ping's, silence's and
   stall's deadlines, the backoff's first span and ceiling, the span that
@@ -498,8 +576,10 @@ and resends what it must after the next hello.
 - **The worst case per channel** is skein's channel's (skein's
   `channel.md`, section 10) with these terms and caps; per side, the
   engine's is that times the fleet's workers and the connections opening,
-  and the worker's one channel and its relay table. The credential tables
-  are sized from the configured accounts.
+  and the worker's one channel and its relay table. The hand-out's
+  decoding and encoding are the routing's, within smith's codecs' worst
+  cases. The credential tables are sized from the configured LLM
+  accounts and the application's credentials.
 
 ## 12. Testing
 
@@ -514,14 +594,17 @@ tests in the default suite, randomized ones in the fuzzy suite.
 - **A machine world per component:** the component between the hub's
   scripted vocabulary and a scripted peer of skein's channel, with every
   refusal of the opening, a worker replaced, a hello not admitted,
-  silence, stall, the hello late, grants filled and dropped, relays across
-  channels, and the grace passing and not.
+  silence, stall, the hello late, grants filled and dropped, of both
+  owners, relays across channels, and the grace passing and not. smith's
+  payloads are opaque bytes there, as they are to the components.
 - **The channel's protocol world,** `tests/channel`: the engine's side
   with the core under jig's test root, and the worker's side with the hub
   under the test worker's root, both as the reference service composes
   them (`service.md`, section 7), with `testing/jig-test-worker`'s smith's
   scripted agent processes and scripted workspace beneath, joined by in-memory
-  streams cut and rejoined at random. It runs the hub's world's stories
+  streams cut and rejoined at random; the scripted agents tell real
+  turns and results, so smith's payloads cross the hand-out and
+  `jig-charter`. It runs the hub's world's stories
   (`../domain/hosts.md`, section 11) through bytes, and adds:
   - connections cut mid-frame, and the worker redialling;
   - a peer that stops reading, and one that goes quiet;
@@ -529,12 +612,21 @@ tests in the default suite, randomized ones in the fuzzy suite.
   - garbage frames, a wrong secret, another version, another application
     version, terms that do not fit;
   - a worker that dials again while its old channel looks alive;
-  - the engine restarting while workers keep runs.
+  - the engine restarting while workers keep runs;
+  - an assignment carrying its task's inbox, a message refused for each
+    of smith's reasons and committed with the next turn or the answer,
+    the engine restarting between, and an answer leaving messages unread;
+  - a run resumed after a compaction, sent only its current window, with
+    its conversation's identity;
+  - an assignment whose charter or transcript does not decode;
+  - smith's facts reaching the views as activity, with no text from
+    agent processes.
 
   Its referee is the hub's and the fleet's: every turn and answer reaches
   the engine once and is acknowledged once, every relayed call is answered
-  once, no attempt is placed while a worker may still run the last, and no
-  credential grant's value appears in any domain's state.
+  once, every message sent ends once (read, refused or unread), no attempt
+  is placed while a worker may still run the last, and no credential
+  grant's value appears in any domain's state.
 - **The application's worlds** keep running its hosts without bytes
   (`../domain/testing.md`), on the domain's vocabulary.
 - **Fuzzing,** in the fuzzy suite: each record's decoder and the
@@ -544,20 +636,31 @@ tests in the default suite, randomized ones in the fuzzy suite.
 
 - **The domain sends grants after a hello** (`../domain/engine.md`,
   sections 8 and 12): the fleet sends each attempt it keeps its current
-  credential grant when its worker says hello, or when it adopts the
-  attempt, and the core pushes a new generation to every live attempt
-  whose account it is. The stop bound's meaning is
-  `../domain/hosts.md`, 6.6's, which counts it from the engine's view of
-  the link, as 10.1 does; the fleet's check of it is unchanged.
-- **smith gives** a run's text as content, with its turn, retry and
-  offset: its LLM component hands its domain the text as it arrives
-  (smith's `protocol/llm.md`, section 6); its domain's text facts name
-  the turn, the retry and the offset (smith's `domain/run.md`, 11.1); its
-  channel carries them when the host asks at the run's start (smith's
-  `protocol/channel.md`, 8.1); its host half and the inline agent pass
-  them on. Its host domain hands up tool and check facts typed, a tool
-  begun with its call's name and input (smith's `domain/host.md`,
-  section 4).
+  credential grants, LLM accounts' and the application's credentials',
+  when its worker says hello, or when it adopts the attempt, and the core
+  pushes a new generation to every live attempt that holds one. The stop
+  bound's meaning is `../domain/hosts.md`, 6.6's, which counts it from
+  the engine's view of the link, as 10.1 does; the fleet's check of it is
+  unchanged.
+- **The domain gives the records their fields** (`../domain/engine.md`,
+  7.1 and 7.2; `../domain/hosts.md`, section 2 and 6.8): the
+  assignment's current window, start's messages and conversation's
+  first attempt; the turns' windows, the refusals with turns and
+  answers, and the unread fence; activity typed; smith's payloads as the
+  hand-out's bytes.
+- **smith gives,** for the first build, what its `main` has (`README.md`,
+  section 11): `smith-protocol-channel`'s functions, which the hand-out
+  calls, to decode a charter and a transcript against an agent
+  configuration's endpoints, and a channel fact, and to encode a turn, a
+  call's name and a result; its host domain's long operations and
+  facts; and `smith-inline-agent`'s drained content and facts (smith's
+  `domain/host.md`, 9.1). No crate of this channel's links smith.
+- **What jig asks of smith, later,** not needed for the first build: a
+  run's text and its tool calls on smith's channel (`README.md`, section
+  11), so a worker whose agents are processes gives what a host of
+  `smith-inline-agent` gives (6.4). smith's host half and host domain
+  would hand them up as they hand up facts, and this channel's fact
+  record would carry them unchanged.
 - **skein owes** in-process addresses, for one process (skein's `io.md`,
   3.5), and, between hosts, TLS's server side with independent output,
   for the engine's listener (skein's `channel.md`, section 12; skein's
@@ -566,7 +669,8 @@ tests in the default suite, randomized ones in the fuzzy suite.
 - **Configuration owes** (`configuration.md`): the workers' names and the
   digests of their secrets, the listener's addresses and certificate, on
   the engine; the engine's address, trust, the worker's name and secret,
-  its slots and its graces, on a worker.
+  its slots and its graces, and its agent's configuration, whose
+  endpoints the worker's charters are decoded against, on a worker.
 
 ## 14. Open questions
 

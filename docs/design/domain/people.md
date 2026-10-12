@@ -1,13 +1,14 @@
 # Parties
 
-Provisional, 2026-10-07. How people, and the services that act like
-them, take part: who they are, what their role in a project lets them
-do, what they ask of the engine and what waits for them, the chats they
-hold with agents, the tasks they carry out themselves, and how they hear
-of what waits. Parties are requesters and executors, as tasks are
-(core.md, section 9); this document is that party in depth. The clients
-they use are jig's client and the application's (`../client/domain/`).
-What is still open is listed in section 12.
+Provisional, 2026-10-07, revised 2026-10-12. How people, and the
+services that act like them, take part: who they are, what their role in
+a project lets them do, what they ask of the engine and what waits for
+them, the chats they hold with agents, the tasks they carry out
+themselves, and how they hear of what waits. Parties are requesters and
+executors, as tasks are (core.md, section 9); this document is that
+party in depth. The clients they use are jig's client and the
+application's (`../client/domain/`). What is still open is listed in
+section 12.
 
 ## 1. In one page
 
@@ -142,6 +143,11 @@ answered once durable (engine.md, 5.2):
 | set a party's pool | owner | the pool opened or resized in the current period, what was spent and reserved kept |
 | mark seen | the party themselves | their read position moved over results, or over one chat's replies (section 6) |
 
+- **Words are never cut.** A party's words, starting a chat, written to
+  a task or answering its question, are within the people child's bound,
+  which is at most what a run admits as one message (tasks.md, 8.2;
+  engine.md, section 8); words past it are refused at admission as too
+  large, saying the bound.
 - **A request refused** says why, with its facts: the role, the
   authority it lacked and by how much, and whether a proposal could be
   accepted; a limit; the object's revision since; a task since ended

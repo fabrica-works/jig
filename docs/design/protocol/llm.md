@@ -1,30 +1,32 @@
 # LLM calls and accounts in the engine
 
-Provisional, 2026-10-10. How an engine that runs agents in its own process
-makes their LLM calls, and how every engine that runs agents keeps its LLM
-accounts: the completions its inline agent asks for, carried by smith's
-LLM component over skein's LLM connections (`../domain/hosts.md`, 5.2 and
-section 10); and the accounts, signed in, refreshed and kept by skein's
-OAuth accounts driver, their access tokens' table, and the credential
-grants that reach runs in the engine and on workers
-(`../domain/engine.md`, section 12). An application without agents has
-none of this. What is still open is listed in section 10.
+Provisional, 2026-10-10, revised 2026-10-12. How a host that runs agents
+in its own process makes their LLM calls, and how every engine that runs
+agents keeps its LLM accounts: the completions `smith-inline-agent`'s
+runs ask for, in the engine or on a worker whose root composes it,
+carried by smith's LLM component over skein's LLM connections
+(`../domain/hosts.md`, 5.2 and section 10); and the accounts, signed in,
+refreshed and kept by skein's OAuth accounts driver, their access
+tokens' table, and the credential grants that reach runs in the engine
+and on workers (`../domain/engine.md`, section 12). An application
+without agents has none of this. What is still open is listed in
+section 10.
 
 ## 1. In one page
 
-- **smith's component makes the calls.** The engine's protocol layer owns
-  one `smith-protocol-llm` component, with skein's LLM connection
-  component beneath it, as smith's agent process does (smith's
-  `protocol/llm.md`; skein's `llm-connection.md`). Every inline run's
-  completions go through them. jig writes no prompt, and none of smith's
-  own tools' schemas, decoding or rendering; its engine tools' are
-  `jig-protocol-tools`' (`channel.md`, 6.3).
-- **The root passes completions through.** The inline agent hands up the
-  completions its runs' smith domains ask for, as they ask: each carries
-  its run's result contract (smith's `protocol/llm.md`). The engine's root
-  routes them out through the journal, as every output, to the protocol
-  layer, and the protocol layer's answers back to the inline agent
-  (`../domain/root.md`, section 5). They do not pass through the hub.
+- **smith's component makes the calls in a host's process.** A process
+  whose runs are `smith-inline-agent`'s (smith's `domain/host.md`, 9.1)
+  owns one `smith-protocol-llm` component, with skein's LLM connection
+  component beneath it, as smith's own hosts do (smith's
+  `protocol/llm.md`; skein's `llm-connection.md`): the engine, for its
+  own slots, and a worker that composes `smith-inline-agent`. jig writes
+  no prompt, and none of smith's own tools' schemas, decoding or
+  rendering; its engine tools' are `jig-protocol-tools`' (`channel.md`,
+  6.3). Agent processes make their own calls (section 6).
+- **The root routes completions,** as `smith-inline-agent` asks them,
+  to the protocol layer, which gives smith's component each with its
+  slot's result contract, and their terminals back to the agent (section
+  3; `../domain/root.md`, section 5). They do not pass through the hub.
 - **Accounts: the policy is the core's, the mechanism skein's.** The
   accounts child decides which accounts are usable and which runs hear of
   a new token (`../domain/engine.md`, section 12). skein's OAuth accounts
@@ -36,64 +38,89 @@ none of this. What is still open is listed in section 10.
 - **Names in the domain, values beside it.** The domain names a credential
   grant by account and generation, with how long it is valid. Values move
   only between components, through the protocol layer's routing: from the
-  accounts' table into smith's LLM component for inline runs, and into the
-  channel's records for runs on workers (`channel.md`, section 8). No
-  root sees a value, and `jig-protocol-accounts` links no smith crate.
+  accounts' table into smith's LLM component for the engine's own runs,
+  and into the channel's records for runs on workers (`channel.md`,
+  section 8). No root sees a value, and `jig-protocol-accounts` links no
+  smith crate.
 - **Endpoints are configuration,** one list from which the charter's
   endpoint names, smith's component's endpoints and skein's connections
   are all made, so the three never disagree (`configuration.md`).
 - **The budget is smith's to hold** within each run: it reserves each
-  completion's most before making it (`../domain/hosts.md`, section 8).
-  The engine sees spend in the turns it commits.
+  completion's most before making it and winds down on its reserve, so a
+  run never spends past its budget (smith's `domain/run.md`, 9 and 9.1).
+  The core places no run smith would refuse for its budget
+  (`../domain/authority.md`, section 7), and sees spend in the turns it
+  commits.
 
 ## 2. Where it sits
 
 ```
 engine's root
 ├── core: accounts                  want, rejected, release; granted, failed, availability   (names only)
-├── jig-inline-agent                completions asked, each with its run's contract, and answered
+├── jig-host                        the engine's own hub: its runs' turns, activity and text
+├── smith-inline-agent              completions asked and cancelled, and their terminals; facts and content drained
 └── …
 engine's protocol layer
 ├── jig-protocol-accounts           the child's vocabulary to the driver's and back; the access tokens' table
 │     └── skein-oauth-accounts      sign-in, refresh, records kept in private files, tokens lent by generation
-├── smith-protocol-llm              prompts, tools' schemas, decoding, rendering; its grants' table
+├── smith-protocol-llm              prompts, tools' schemas, decoding, rendering; its grants' table; text as it comes
 │     └── skein-llm-connection      connections, TLS, deadlines, the memory pool
+├── the slots' contracts            each slot's result contract, from its start's charter, beside smith's component
 └── jig-protocol-engine-workers     credential grants' values into assignments and grant records
 ```
 
-- **One of each per engine,** shared by every inline run, so connections
-  and memory are pooled across runs, and each account refreshes once
-  however many runs use it.
+- **One of each per engine,** shared by every run on its own slots, so
+  connections and memory are pooled across runs, and each account
+  refreshes once however many runs use it.
+- **On a worker that composes `smith-inline-agent`,** the same, beside
+  `smith-protocol-machine`, with no accounts: its grants come from jig's
+  channel (`service.md`, section 6).
 - **The protocol layer routes,** as any consumer of smith's components
   does (smith's `protocol/README.md`, section 6): io's tokens for the
   components' entities, their earliest deadline, their timers fired where
-  its own are, and values from the accounts' table to the components that
-  fill them in.
+  its own are, and values from the accounts' table, or the worker's, to
+  the components that fill them in.
 
-## 3. Completions for inline runs
+## 3. Completions for `smith-inline-agent`'s runs
 
-- **A completion asked:** the inline agent says which run (its token),
-  and passes smith's domain's request as it is: the prompt's parts, the
-  model, the most output tokens, the endpoint, the grant it uses, its
-  deadlines and bounds, and the run's result contract (smith's outcome and
-  delivery specifications, from the run's charter), which smith's
-  component needs to write `finish`'s schema and decode its calls
-  (smith's `protocol/llm.md`, sections 3 and 4). The root routes it to the
-  protocol layer, which hands it to smith's component. Nothing per run is
-  kept beside smith's domain.
+- **A completion asked:** `smith-inline-agent` hands up a run's lower
+  request, `Complete`, scoped by the agent's token for the run, as
+  smith's domain asks it: the completion's name (the turn it will be
+  told as, and its retry), the grant it uses, the prompt's parts with
+  its model and most output tokens, its deadlines and bounds (smith's
+  `domain/host.md`, 9.1). The root routes it to the protocol layer,
+  which hands it to smith's component with its slot's contract.
+- **Each slot's contract, beside the component.** smith's component
+  needs a completion's result contract (smith's outcome and delivery
+  specifications) to write `finish`'s schema and decode its calls
+  (smith's `protocol/llm.md`, sections 3 and 4), and smith's request
+  carries none. So the protocol layer keeps each slot's, taken from its
+  start's charter as its routing decodes it (`service.md`, section 2),
+  as smith's local host does, until the run is gone. It is bounded by
+  the slots and a charter's largest contract.
 - **One terminal per completion:** completed, with its blocks, stop and
-  usage; failed, with its class and evidence; or cancelled. The protocol
-  layer gives it to the root, which routes it to the inline agent's run.
-  Retrying is smith's session's (smith's `domain/session.md`, section 4).
-- **A cancel** follows a run's cancel: the inline agent asks for it, and
-  the completion ends cancelled.
-- **Text as it comes:** smith's component hands its domain the text as it
-  arrives; smith's domain reports it with the turn it belongs to, its
-  completion's retry and its offset; the inline agent passes it up, and the
-  root routes it to the core's views (`../domain/engine.md`, section 11).
-- **Unauthorized and exhausted** come back to the run as smith's failures,
-  and up to the accounts child as a rejected generation or an exhausted
-  account, as a worker's run reports them on the channel.
+  usage; failed, with its class, evidence and detail; or cancelled. The
+  protocol layer gives it to the root, which routes it to the agent's
+  run. Retrying is smith's session's (smith's `domain/session.md`,
+  section 4).
+- **A cancel,** `Cancel`, follows a run's cancel or drop: the agent asks
+  for it, and the completion still ends with its one terminal.
+- **Only these reach the engine.** The engine's runs have no workspace, so
+  `smith-inline-agent`'s machine requests (files, searches, commands,
+  checks, guides) never come there; on a worker that composes it, they go
+  to `smith-protocol-machine` (smith's `domain/host.md`, 9.1).
+- **Activity and text, from the agent:** each pass the host's root
+  drains `smith-inline-agent`'s facts and content (smith's
+  `domain/host.md`, 9.1) and hands the hub a run's activity, a tool begun
+  with its call's name and input among it (`../domain/hosts.md`, 6.5).
+  The protocol layer asks smith's component for each completion's text
+  as it arrives (smith's `protocol/events.md`, 3.5) and hands it up with
+  its completion's name and offset: the run's text by turn, retry and
+  offset (`channel.md`, 6.4), best effort, never holding the run.
+- **Unauthorized and exhausted** come back to the run as smith's failures.
+  The run's notices go up through the agent and the hub to the accounts
+  child, as a rejected generation or an exhausted account, fenced by
+  attempt, as a worker's run reports them on the channel.
 
 ## 4. Endpoints and models
 
@@ -105,11 +132,20 @@ engine's protocol layer
   endpoint names (`jig-charter`), smith's component's endpoints and
   skein's connection endpoints, by index, in the application's startup. A
   run's charter names endpoints the engine knows; a worker's agents
-  resolve the same names against their own configuration's list.
-- **Models and their prices** are configuration too: each model, the
-  endpoint that serves it, its most output tokens, and its prices in the
-  deployment's unit, which the charter carries (`../domain/hosts.md`,
-  section 8).
+  resolve the same names against their own configuration's list, against
+  which the worker's routing decodes charters (`configuration.md`,
+  section 4).
+- **Models and their prices** are configuration too, and the charter
+  carries them (smith's `protocol/charter.md`, section 2;
+  `../domain/hosts.md`, section 8): each model's endpoint; its window, the
+  most input tokens one prompt may hold, past which smith compacts the
+  conversation into a new window; its output, the most output tokens one
+  completion may have, thinking included, reserved before each
+  completion; and its prices in the deployment's unit, each per a number
+  of tokens: input, cached input, output, and cache writes when priced
+  apart, at the input's rate when not. A charter's window and output are
+  at most what the agent that runs it declares, which its host's hello
+  states and the fleet checks (`../domain/engine.md`, section 8).
 
 ## 5. Accounts
 
@@ -193,15 +229,17 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 
 ## 6. Credential grants
 
-- **To inline runs:** when the child lends a generation, the protocol
-  layer hands its value from the accounts' table to smith's LLM
-  component's table, by account and generation, with when it lapses
+- **To runs in the engine's process:** when the child lends a generation,
+  the protocol layer hands its value from the accounts' table to smith's
+  LLM component's table, by account and generation, with when it lapses
   (smith's `protocol/llm.md`, section 7). A completion names its grant;
   one whose value is missing or lapsed fails as unauthorized and unsent,
   and smith's session asks again once a newer grant has come.
 - **To runs on workers:** `jig-protocol-engine-workers` fills the value in
-  from the accounts' table as it encodes an assignment or a grant record
-  (`channel.md`, section 8).
+  from the accounts' table as it encodes an assignment or a grant record,
+  and the worker's protocol layer hands it to smith's host half for its
+  agent processes, or to its own LLM component's table when it composes
+  `smith-inline-agent` (`channel.md`, section 8).
 - **Pushed to every live attempt** whose account it is, when a new
   generation is lent, and sent again to each attempt a worker keeps after
   its hello, or that the fleet adopts (`../domain/engine.md`, sections 8
@@ -211,17 +249,23 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 
 ## 7. Limits and the worst case
 
-- **smith's component's,** from the inline agent's limits: the request's
-  bytes, tools' schemas, a completion's bytes and blocks, a decoded
-  call's bytes, a failure's detail (smith's `protocol/llm.md`, section 8).
-- **skein's connection component's:** conversations, the inline agent's
-  slots; its memory pool; connections per endpoint (skein's
+- **smith's component's,** from `smith-inline-agent`'s limits: the
+  request's bytes, tools' schemas, a completion's bytes and blocks, a
+  decoded call's bytes, a failure's detail, a contract's bytes (smith's
+  `protocol/llm.md`, section 8).
+- **skein's connection component's:** conversations, the agent's slots;
+  its memory pool; connections per endpoint (skein's
   `llm-connection.md`, section 7).
+- **The slots' contracts:** one per slot, each at most a charter's
+  largest contract.
+- **Text as it comes:** a piece's bytes, and the pieces a pass may hand
+  up.
 - **The driver's:** accounts, exchanges at once, listeners, the refresh
   lead (skein's `oauth.md`, 6.7); the table's, from the accounts and a
-  token's bytes.
-- **The engine's worst case** includes all of them, beside the inline
-  agent's slots' sum (`../domain/hosts.md`, 5.2).
+  token's bytes. The engine's only.
+- **A host's worst case,** the engine's or a worker's that composes
+  `smith-inline-agent`, includes all of them, beside the agent's slots'
+  sum (`../domain/hosts.md`, 5.2).
 
 ## 8. Testing
 
@@ -233,25 +277,30 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   every failure class mapped; the table's generations, expiry and
   pushing out.
 - **The engine's LLM path and accounts,** in the protocol world
-  (`service.md`, section 8): the root, the inline agent, smith's
-  component, skein's connection component and the driver, against skein's
-  fake LLM peer and fake issuer (skein's `fake-llm.md`; skein's
-  `oauth.md`, section 5), over streams cut at random: completions,
-  failures of each class, cancels mid-stream, a grant refreshed between
-  two completions, a rotation, a rejected token, an account's file
-  missing, then put in place, text reaching a watch by turn, retry and
-  offset. Its referee: no token reaches a run before its record is kept; a
-  name never means two values.
-- **The domain worlds** keep the scripted LLM below the inline agent and
-  the accounts child's own world: none of this is in them.
+  (`service.md`, section 8): the root, `smith-inline-agent`, smith's
+  component with the slots' contracts beside it, skein's connection
+  component and the driver, against skein's fake LLM peer and fake issuer
+  (skein's `fake-llm.md`; skein's `oauth.md`, section 5), over streams
+  cut at random: completions, `finish` decoded under each slot's own
+  contract, failures of each class, cancels mid-stream, a grant refreshed
+  between two completions, a rotation, a rejected token, an account's
+  file missing, then put in place, text reaching a watch by turn, retry
+  and offset, and a tool begun shown with its call. Its referee: no token
+  reaches a run before its record is kept; a name never means two
+  values; every completion is given its own run's contract.
+- **A worker that composes `smith-inline-agent`,** in the protocol world:
+  grants from jig's channel in its component's table, and its runs'
+  completions answered as the engine's are.
+- **The domain worlds** keep the scripted LLM below `smith-inline-agent`
+  and the accounts child's own world: none of this is in them.
 
 ## 9. What it owes and is owed
 
 - **The domain** wants every configured account, and pushes each new
   generation to every live attempt (`../domain/engine.md`, section 12).
-- **smith owes** its completion requests with their run's result contract,
-  and its text in flight to its domain with its turn, retry and offset
-  (`channel.md`, section 13).
+- **smith owes** nothing beyond what its `main` has for the first build,
+  and later an abort and a closed terminal for its LLM component
+  (`README.md`, section 11).
 - **skein owes** nothing beyond what it has: its accounts driver, LLM
   client, connection component and fake peers serve as they are.
 - **The store owes** nothing for accounts: their records are the driver's
@@ -263,9 +312,10 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   account's sign-in from the deployment's page, the client showing the
   driver's visit, and the provider's redirect reaching the engine's
   listener; in place of a sign-in at a terminal.
-- **Fairness on the engine's loop** (`../domain/hosts.md`, section 12):
-  many inline runs' completions share one connection component and one
-  loop; whether each run gets a share of each iteration.
+- **Fairness on a host's loop** (`../domain/hosts.md`, section 12):
+  many `smith-inline-agent` runs' completions share one connection
+  component and one loop; whether each run gets a share of each
+  iteration.
 - **API keys:** accounts whose credential is a static key rather than an
   OAuth grant, never refreshed: as the driver's handed-in records with no
   expiry, or a source of skein's of their own.
